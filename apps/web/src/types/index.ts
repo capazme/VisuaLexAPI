@@ -246,9 +246,15 @@ export interface AssistantNote {
 /** A passage an application proposed on one dossier entry, as `GET /api/dossiers/:id/items/:itemId/proposals` gives it. */
 export interface Proposal {
     id: string;
+    /**
+     * D8: `gloss`, a note on the passage with no colour (`color` null, the note never empty), shown beside the text and
+     * never drawn as a mark; `mark`, a coloured passage saved before D8. Absent from a server before D8: a mark.
+     */
+    kind?: 'mark' | 'gloss';
     normaKey: string;
     text: string;
-    color: 'yellow' | 'green' | 'red' | 'blue';
+    /** null on a gloss only. */
+    color: 'yellow' | 'green' | 'red' | 'blue' | null;
     startOffset: number;
     endOffset: number;
     createdAt: string;

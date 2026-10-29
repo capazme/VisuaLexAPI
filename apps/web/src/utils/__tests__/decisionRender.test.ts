@@ -450,3 +450,31 @@ describe('the projection contract — with a search open', () => {
     });
   }
 });
+
+describe('an application\'s glosses (D8): counted on the signs, never drawn in the text', () => {
+  it('every fixture with glosses on: the text nodes spell the projection, and a paragraph\'s sign counts its glosses', () => {
+    for (const [name, testo] of [...Object.entries(DECISION_TEXTS), ...Object.entries(READER_TEXTS)]) {
+      const plain = decisionProjection(testo);
+      if (plain.length < 4) continue;
+      const { highlights, annotations } = marksOn(testo);
+      const end = Math.min(plain.length, 12);
+      const html = renderDecisionHtml({
+        testo, highlights, annotations, signs: true,
+        glosses: [{ id: 'g', startOffset: 1, text: plain.slice(1, end), state: 'proposed' }],
+      });
+      expect(textNodes(html), name).toBe(plain);
+      const root = document.createElement('div');
+      root.innerHTML = html;
+      expect(root.querySelector('.vlx-sign[data-block="0"]')?.getAttribute('data-glosses'), name).toBe('1');
+      expect(root.querySelector('.vlx-sign-gloss[data-state="proposed"]'), name).not.toBeNull();
+    }
+  });
+
+  it('a gloss whose words are not at its offset makes no sign', () => {
+    const html = renderDecisionHtml({
+      testo: { motivazione: 'abcdefghij klm' }, highlights: [], annotations: [], signs: true,
+      glosses: [{ id: 'g', startOffset: 2, text: 'xyz', state: 'validated' }],
+    });
+    expect(html).not.toContain('vlx-sign');
+  });
+});

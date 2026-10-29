@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo } from 'react';
 import type { Highlight, Proposal } from '../types';
-import { proposalHighlight } from '../utils/aiReview';
+import { glossAnchor, isGloss, proposalHighlight } from '../utils/aiReview';
+import type { GlossAnchor } from '../utils/articleAnnotations';
 import {
   assistantProposalsStore, editProposalNote, flushRemovals, loadProposals, moveProposal, removeProposal, setProposalState,
 } from '../store/assistantProposals';
@@ -8,12 +9,15 @@ import type { ProposalActions } from '../components/features/search/BlockAnnotat
 import { CurrentDossierContext } from '../components/features/dossier/currentDossier';
 
 const NONE: Highlight[] = [];
+const NO_GLOSSES: Proposal[] = [];
+const NO_ANCHORS: GlossAnchor[] = [];
 
 /**
- * What an application proposed on one dossier entry (D7b), for the reader that shows it: its proposals drawn as
- * highlights under the reader's keys, and what the popover does with them through the entry's routes. Nothing outside
- * a dossier entry (no `itemId` or no dossier on the page), with the feature off, or on a text shown read-only (the
- * server refuses proposals there).
+ * What an application proposed on one dossier entry (D7b), for the reader that shows it: its coloured passages drawn
+ * as highlights under the reader's keys, its glosses (D8) apart — never a highlight, anchored for the signs alone
+ * (`glossAnchors`) —, and what the popover and the glosses' cards do with them through the entry's routes. Nothing
+ * outside a dossier entry (no `itemId` or no dossier on the page), with the feature off, or on a text shown read-only
+ * (the server refuses proposals there).
  */
 export function useEntryProposals(itemId: string | undefined, normaKey: string, articleId: string, readOnly = false) {
   const dossierId = useContext(CurrentDossierContext);
@@ -31,9 +35,15 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
   }, [proposalsOf, itemId]);
 
   const highlights = useMemo(
-    () => (proposalsOf && proposals ? proposals.map((p) => proposalHighlight(p, normaKey, articleId)) : NONE),
+    () => (proposalsOf && proposals ? proposals.filter((p) => !isGloss(p)).map((p) => proposalHighlight(p, normaKey, articleId)) : NONE),
     [proposalsOf, proposals, normaKey, articleId],
   );
+  // In the order of the text, as the server lists them (by offset).
+  const glosses = useMemo(() => {
+    const of = proposalsOf && proposals ? proposals.filter(isGloss) : NO_GLOSSES;
+    return of.length ? of : NO_GLOSSES;
+  }, [proposalsOf, proposals]);
+  const glossAnchors = useMemo(() => (glosses.length ? glosses.map(glossAnchor) : NO_ANCHORS), [glosses]);
 
   // «Sposta l'evidenziazione»: the passage whose new words this reader is asking for — one on the page at a time —,
   // while it is still there: binned meanwhile (or the feature off), the move ends.
@@ -72,5 +82,5 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
   }, [proposalsOf, itemId, movingId]);
   const cancelMove = useCallback(() => assistantProposalsStore.setState({ moving: null }), []);
 
-  return { highlights, actions, moving, saveMove, cancelMove };
+  return { highlights, glosses, glossAnchors, actions, moving, saveMove, cancelMove };
 }

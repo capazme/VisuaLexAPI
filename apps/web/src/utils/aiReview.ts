@@ -1,4 +1,5 @@
 import type { AiReviewState, AssistantNoteEntry, DossierItem, Highlight, Proposal } from '../types';
+import type { GlossAnchor } from './articleAnnotations';
 
 /** How many of the notes an application wrote on an entry or a block stand in each state (D7b; the server's `assistant_notes`). */
 export interface AiReviewCounts {
@@ -33,13 +34,22 @@ export function aiReviewSummary(counts: AiReviewCounts): string {
   return parts.join(' · ');
 }
 
+/** An application's gloss (D8), not a coloured passage: shown beside the text, never drawn as a mark. */
+export const isGloss = (p: Proposal): boolean => p.kind === 'gloss';
+
+/** Where a gloss is anchored and its note's state, for the renderer's signs (a gloss always has a note). */
+export function glossAnchor(p: Proposal): GlossAnchor {
+  return { id: p.id, startOffset: p.startOffset, text: p.text, state: p.note?.state ?? 'proposed' };
+}
+
 /**
  * A proposal drawn as a highlight on its entry's text (D7b): its own id, the reader's keys, the words and offset the
- * server cut from the real text, and who proposed it with its note.
+ * server cut from the real text, and who proposed it with its note. A coloured passage only, never a gloss (`isGloss`).
  */
 export function proposalHighlight(p: Proposal, normaKey: string, articleId: string): Highlight {
   return {
-    id: p.id, normaKey, articleId, rangeSerialized: '', text: p.text, color: p.color, startOffset: p.startOffset,
+    // A mark always has its colour (the server's CHECK); yellow only as today's renderer would draw a missing one.
+    id: p.id, normaKey, articleId, rangeSerialized: '', text: p.text, color: p.color ?? 'yellow', startOffset: p.startOffset,
     proposal: {
       clientName: p.proposedBy?.clientName ?? null,
       note: p.note,
