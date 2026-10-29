@@ -150,6 +150,32 @@ export const coursePatchSchema = z
   .strict()
   .refine((body) => body.titolo !== undefined || body.moduliPrevisti !== undefined, { message: 'Niente da modificare.' });
 
+// ─── Studying (S2, §10.4–§10.5): what the web sends. The server grades and dates; a choice is all it takes. ───
+
+const choice = z.enum(['a', 'b', 'c', 'd', 'e', 'f']);
+const ticks = z
+  .array(z.number().int().min(0).max(LIMITS.rubric.max - 1))
+  .max(LIMITS.rubric.max)
+  .refine((list) => new Set(list).size === list.length, { message: 'Un criterio è spuntato due volte.' });
+
+/** A body that must be empty (`apri`, `ritira`, `inizia`): an unknown key is a 400. */
+export const emptySchema = z.object({}).strict();
+export const answerSchema = z.object({ domandaId: id, scelta: choice }).strict();
+export const rubricTicksSchema = z.object({ spuntate: ticks }).strict();
+export const moduleEndSchema = z
+  .object({ giudizio: z.number().int().min(1).max(5).optional(), nota: z.string().trim().min(1).max(1_000).optional() })
+  .strict();
+export const flagSchema = z.object({ motivo: z.string().trim().min(1).max(500).optional() }).strict();
+export const handInSchema = z
+  .object({
+    risposte: z
+      .array(z.object({ domandaId: id, scelta: choice }).strict())
+      .max(LIMITS.examItems)
+      .refine((list) => new Set(list.map((r) => r.domandaId)).size === list.length, { message: 'Una domanda ha due risposte.' }),
+    aperta: z.object({ spuntate: ticks }).strict().optional(),
+  })
+  .strict();
+
 /** Every control character but the line feed, anywhere in a body: NUL would be a 500 in Postgres. */
 const CONTROL = /[\u0000-\u0009\u000B-\u001F\u007F]/;
 

@@ -4,22 +4,38 @@ import { review, type Rating, type SrsState } from '../../../src/srs/fsrsEngine'
 
 describe('reviewScope', () => {
   it('is the user’s own cards in draft, proposed or validated, or the community’s validated ones in the chosen subjects', () => {
-    expect(reviewScope('u1', ['DIRITTO_CIVILE', 'DIRITTO_PENALE'])).toEqual({
+    expect(reviewScope('u1', ['DIRITTO_CIVILE', 'DIRITTO_PENALE'], '2026-11-02')).toEqual({
       OR: [
-        // A course's card waits for its module (Percorsi; until S2, every course card).
-        { autoreId: 'u1', stato: { in: ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'] }, moduloId: null },
+        // A course's card waits for its module: done by the user's enrolment before today, and not withdrawn.
+        {
+          autoreId: 'u1',
+          stato: { in: ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'] },
+          OR: [
+            { moduloId: null },
+            { modulo: { stati: { some: { iscrizione: { utenteId: 'u1' }, fattoGiorno: { lt: new Date('2026-11-02T00:00:00.000Z') }, ritiratoIl: null } } } },
+          ],
+        },
         { stato: 'VALIDATA', materia: { in: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] } },
       ],
     });
   });
 
+  it('leaves every course card out while the courses are switched off (courseDay null)', () => {
+    expect(reviewScope('u1', ['DIRITTO_CIVILE'], null)).toEqual({
+      OR: [
+        { autoreId: 'u1', stato: { in: ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'] }, moduloId: null },
+        { stato: 'VALIDATA', materia: { in: ['DIRITTO_CIVILE'] } },
+      ],
+    });
+  });
+
   it('never excludes by author: an anonymous card (no author) is still the community’s', () => {
-    expect(JSON.stringify(reviewScope('u1', ['DIRITTO_CIVILE']))).not.toContain('not');
+    expect(JSON.stringify(reviewScope('u1', ['DIRITTO_CIVILE'], '2026-11-02'))).not.toContain('not');
   });
 
   it('narrows both branches to one subject when given', () => {
-    expect(reviewScope('u1', ['DIRITTO_CIVILE'], 'DIRITTO_PENALE')).toEqual({
-      AND: [reviewScope('u1', ['DIRITTO_CIVILE']), { materia: 'DIRITTO_PENALE' }],
+    expect(reviewScope('u1', ['DIRITTO_CIVILE'], '2026-11-02', 'DIRITTO_PENALE')).toEqual({
+      AND: [reviewScope('u1', ['DIRITTO_CIVILE'], '2026-11-02'), { materia: 'DIRITTO_PENALE' }],
     });
   });
 });
