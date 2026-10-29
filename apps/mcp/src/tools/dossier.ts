@@ -70,6 +70,10 @@ export const MAX_REFERENCES = 50;
 export const MAX_DECISIONS = 10;
 export const MAX_DOSSIER_NAME = 100;
 export const MAX_NOTE_LENGTH = 4000;
+/** How much of each note `omnilex_leggi_dossier` gives, with `dossier:text` (G-381); `nota_intera` gives one whole. */
+export const NOTE_EXCERPT = 500;
+/** The scope under which the text of the user's notes leaves (G-381 (b), owners, 29 October 2026). */
+export const TEXT_SCOPE = 'dossier:text';
 /** How many of the user's dossiers a «not found» names. */
 const MAX_LISTED_DOSSIERS = 20;
 
@@ -101,6 +105,18 @@ export interface ApiDossier {
 
 /** Data for the model, as compact JSON text (indenting costs a quarter more tokens): never an instruction. */
 export const data = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value) }] });
+
+/**
+ * A note's text as `omnilex_leggi_dossier` gives it: the first NOTE_EXCERPT characters, or all of it, and whether
+ * it was cut. A note's content is its text; anything else (an older shape) reads as no text.
+ */
+function noteText(item: ApiDossierItem, whole: boolean): { testo: string | null; troncata?: true } {
+  if (typeof item.content !== 'string') return { testo: null };
+  if (whole || item.content.length <= NOTE_EXCERPT) return { testo: item.content };
+  // Never half of a surrogate pair at the cut.
+  const cut = /[\uD800-\uDBFF]/.test(item.content[NOTE_EXCERPT - 1]) ? NOTE_EXCERPT - 1 : NOTE_EXCERPT;
+  return { testo: `${item.content.slice(0, cut)}…`, troncata: true };
+}
 
 /** A dossier's kind as the tools say it: `lavoro` unless the server says `studio`. */
 const kindOf = (d: ApiDossier): 'lavoro' | 'studio' => (d.kind === 'studio' ? 'studio' : 'lavoro');
@@ -154,18 +170,32 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Leggi un dossier',
       description:
-        'Il tipo del dossier («lavoro» o «studio») e le sue voci (id, tipo, titolo, riferimento della norma o della sentenza), senza il testo degli articoli. Il dossier si indica per id o per nome esatto.',
-      inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
+        'Il tipo del dossier («lavoro» o «studio») e le sue voci (id, tipo, titolo, riferimento della norma o della sentenza), senza il testo degli articoli. ' +
+        `Con il permesso «Leggere i testi», anche il testo delle note (${NOTE_EXCERPT} caratteri; intera con nota_intera). Il dossier si indica per id o per nome esatto.`,
+      inputSchema: {
+        dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
+        nota_intera: z.string().min(1).max(64).optional().describe('Id di una nota da dare intera'),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    ({ dossier }, extra) =>
+    ({ dossier, nota_intera }, extra) =>
       run('omnilex_leggi_dossier', extra, async (caller) => {
+        // Notes may hold a client's facts: their text leaves only under the texts' scope, which the consent page
+        // words with «e le tue note» (G-381 (b)). Without it, a note is its title and what it is about, as before.
+        const withText = caller.scopes.includes(TEXT_SCOPE);
+        if (nota_intera !== undefined && !withText) {
+          throw new ToolError('Per leggere il testo delle note serve il permesso «Leggere i testi»: ricollega l’applicazione a VisuaLex per concederlo.');
+        }
         const found = await findDossier(config, caller, dossier);
+        const items = found.items ?? [];
+        if (nota_intera !== undefined && !items.some((item) => item.id === nota_intera && item.item_type === 'note')) {
+          throw new ToolError(`Nessuna nota con id «${nota_intera}» in questo dossier.`);
+        }
         return data({
           id: found.id,
           nome: found.name,
           tipo: kindOf(found),
-          voci: (found.items ?? []).map((item) => ({
+          voci: items.map((item) => ({
             id: item.id,
             tipo: item.item_type,
             titolo: item.title,
@@ -174,6 +204,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
             // An application that registered without a name is still not the user.
             aggiunta_da: item.created_by ? (item.created_by.clientName ?? 'applicazione collegata') : null,
             nota_su: item.about_item_id ?? null,
+            ...(withText && item.item_type === 'note' ? noteText(item, item.id === nota_intera) : {}),
           })),
         });
       }),

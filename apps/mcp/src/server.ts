@@ -12,7 +12,7 @@ import { ToolError } from './errors.js';
 import { SessionStore } from './sessions.js';
 import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier.js';
 import { CARD_TOOL_SCOPES, registerCardTools } from './tools/cards.js';
-import { PASSAGE_TOOL_SCOPES, passagesOn, registerPassageTools } from './tools/passages.js';
+import { GLOSS_TOOL_SCOPES, glossesOn, registerGlossTools, registerTextTool } from './tools/glosses.js';
 
 /** Hostnames always accepted besides the endpoint's: the health check calls the loopback. */
 const LOOPBACK_NAMES = ['localhost', '127.0.0.1', '[::1]'];
@@ -71,7 +71,7 @@ function scopesNeeded(message: unknown): string[] {
   if (!message || typeof message !== 'object') return [];
   const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
   if (method !== 'tools/call' || typeof params?.name !== 'string') return [];
-  return TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? PASSAGE_TOOL_SCOPES[params.name] ?? [];
+  return TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? [];
 }
 
 type AuthedRequest = Request & { auth?: AuthInfo };
@@ -204,8 +204,10 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
         server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS });
         registerDossierTools(server, config, runner);
         registerCardTools(server, config, runner);
-        // D7b's two tools, only while the server has them on (asked once per session, closed when it cannot say).
-        if (await passagesOn(config)) registerPassageTools(server, config, runner);
+        // An entry's text, always (G-372); the glosses (D8) only while the server has them on (asked once per
+        // session, closed when it cannot say).
+        registerTextTool(server, config, runner);
+        if (await glossesOn(config)) registerGlossTools(server, config, runner);
         const opened = server;
         // No JSON responses: a tool that asks the user to confirm sends that
         // request back on the call's own SSE stream.

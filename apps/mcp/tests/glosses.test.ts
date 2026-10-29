@@ -3,7 +3,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { rpc, startStubs } from './stubs.js';
 
-// D7b (spec §8.4): an entry's text and the passages proposed on it, listed only while the server has them on.
+// D7b and D8: an entry's text and the glosses proposed on it, listed only while the server has glosses on. The tool
+// that proposed coloured passages is gone: highlighting is the user's gesture.
 
 let env: Awaited<ReturnType<typeof startStubs>>;
 beforeAll(async () => {
@@ -18,7 +19,7 @@ const TEXT_ANSWER = {
   parte: 1,
   parti: 1,
   testo: 'Qualunque fatto doloso o colposo, che cagiona ad altri un danno ingiusto, obbliga colui che ha commesso il fatto a risarcire il danno.',
-  proposte: [],
+  glosse: [],
 };
 
 async function connect(token = 'full') {
@@ -31,48 +32,60 @@ beforeEach(() => {
   env.stub.tokens = { full: { active: true, scope: ALL }, old: { active: true, scope: 'dossier:read dossier:write' } };
   env.stub.apiCalls = [];
   env.stub.exchanges = [];
-  env.stub.features = { assistantPassages: true };
+  env.stub.features = { assistantPassages: false, assistantGlosses: true };
   env.stub.dossiers = [{ id: 'd1', name: 'Pratica', items: [{ id: 'i1', item_type: 'norm', title: 'cc', citation: 'art. 2043 c.c.', content: {} }] }];
   env.stub.apiOverride = (method, path, body) => {
     if (method === 'GET' && path.startsWith('/dossiers/d1/items/i1/text')) return [200, TEXT_ANSWER];
-    if (method === 'POST' && path === '/dossiers/d1/items/i1/passages') {
-      const passaggi = (body as { passaggi: { testo: string }[] }).passaggi;
-      return [200, { voce: { id: 'i1', riferimento: 'art. 2043 c.c.' }, passaggi: passaggi.map((p, i) => (p.testo.includes('assente') ? { esito: 'rifiutato', motivo: 'non trovato alla lettera nel testo' } : { esito: 'proposto', id: `h${i}`, colore: 'giallo', nota: false })) }];
+    if (method === 'POST' && path === '/dossiers/d1/items/i1/glosses') {
+      const glosse = (body as { glosse: { testo: string }[] }).glosse;
+      return [200, { voce: { id: 'i1', riferimento: 'art. 2043 c.c.' }, glosse: glosse.map((g, i) => (g.testo.includes('assente') ? { esito: 'rifiutata', motivo: 'non trovato alla lettera nel testo' } : { esito: 'proposta', id: `h${i}` })) }];
     }
     return undefined;
   };
 });
 
 const json = (result: Awaited<ReturnType<Client['callTool']>>) => JSON.parse((result.content as { text: string }[])[0].text);
+const posts = () => env.stub.apiCalls.filter((c) => c.method === 'POST');
+const ONE = [{ testo: 'cagiona ad altri un danno ingiusto', nota: 'Il danno ingiusto è il presupposto.' }];
 
 describe('the list', () => {
-  it('has both tools while the server has them on: one reads, neither is destructive, none confirms or removes', async () => {
+  it('has the text and the glosses while the server has glosses on, and no tool that proposes coloured passages', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name);
-    expect(names).toContain('omnilex_leggi_testo_voce');
-    expect(names).toContain('omnilex_evidenzia_passaggi_dossier');
+    expect(names.slice(-2)).toEqual(['omnilex_leggi_testo_voce', 'omnilex_glossa_voce']);
+    expect(names).not.toContain('omnilex_evidenzia_passaggi_dossier');
+    for (const tool of tools) expect(JSON.stringify(tool)).not.toMatch(/evidenzia|colore|giallo/);
     const read = tools.find((t) => t.name === 'omnilex_leggi_testo_voce')!;
-    const propose = tools.find((t) => t.name === 'omnilex_evidenzia_passaggi_dossier')!;
+    const gloss = tools.find((t) => t.name === 'omnilex_glossa_voce')!;
     expect(read.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-    expect(propose.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
-    // P1: no tool confirms, validates, edits or removes a proposal.
-    for (const tool of tools) expect(tool.name).not.toMatch(/conferm|valid|rimuov|modific|aggiorn|passaggi.*elimin|elimina_pass/);
+    expect(gloss.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    // P1: no tool confirms, validates, edits or removes a gloss.
+    for (const tool of tools) expect(tool.name).not.toMatch(/conferm|valid|rimuov|modific|aggiorn|glossa.*elimin|elimina_gloss/);
     // Short descriptions: the context budget of N2.
     expect(read.description!.length).toBeLessThan(260);
-    expect(propose.description!.length).toBeLessThan(420);
+    expect(gloss.description!.length).toBeLessThan(480);
     await client.close();
   });
 
-  it('leaves them out while the server has them off, or cannot say', async () => {
-    for (const features of [{ assistantPassages: false }, 'down' as const]) {
+  it('leaves the glosses out while they are off, even with the passages’ switch on, or when the server cannot say; never the text', async () => {
+    for (const features of [{ assistantPassages: true, assistantGlosses: false }, { assistantPassages: true }, 'down' as const]) {
       env.stub.features = features;
       const client = await connect();
       const names = (await client.listTools()).tools.map((t) => t.name);
-      expect(names).not.toContain('omnilex_leggi_testo_voce');
-      expect(names).not.toContain('omnilex_evidenzia_passaggi_dossier');
+      // Quoting an entry verbatim is behind no switch (G-372).
+      expect(names[names.length - 1]).toBe('omnilex_leggi_testo_voce');
+      expect(names).not.toContain('omnilex_glossa_voce');
       await client.close();
     }
+  });
+
+  it('refuses the old tool by name: it no longer exists', async () => {
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_evidenzia_passaggi_dossier', arguments: { dossier: 'd1', voce: 'i1', passaggi: [{ testo: 'cagiona ad altri un danno ingiusto' }] } });
+    expect(result.isError).toBe(true);
+    expect(posts()).toHaveLength(0);
+    await client.close();
   });
 });
 
@@ -87,71 +100,114 @@ describe('omnilex_leggi_testo_voce', () => {
   });
 
   it('asks a connection made before the texts existed to sign in again for them', async () => {
-    const response = await rpc(
-      env.mcpUrl,
-      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'omnilex_leggi_testo_voce', arguments: { dossier: 'd1', voce: 'i1' } } },
-      { authorization: 'Bearer old' },
-    );
-    expect(response.status).toBe(403);
-    const header = response.headers.get('www-authenticate') ?? '';
-    expect(header).toContain('error="insufficient_scope"');
-    expect(header).toContain('scope="dossier:read dossier:write dossier:text"');
+    for (const name of ['omnilex_leggi_testo_voce', 'omnilex_glossa_voce']) {
+      // The scope is checked before the tools, listed or not.
+      const response = await rpc(
+        env.mcpUrl,
+        { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: { dossier: 'd1', voce: 'i1', glosse: ONE } } },
+        { authorization: 'Bearer old' },
+      );
+      expect(response.status).toBe(403);
+      const header = response.headers.get('www-authenticate') ?? '';
+      expect(header).toContain('error="insufficient_scope"');
+      expect(header).toContain('scope="dossier:read dossier:write dossier:text"');
+    }
     expect(env.stub.apiCalls).toHaveLength(0);
   });
 });
 
-describe('omnilex_evidenzia_passaggi_dossier', () => {
-  it('sends the passages with one token holding write and texts, and gives one outcome per passage', async () => {
+describe('omnilex_glossa_voce', () => {
+  it('sends the glosses with one token holding write and texts, and gives one outcome per gloss, no text', async () => {
     const client = await connect();
-    const passaggi = [
-      { testo: 'cagiona ad altri un danno ingiusto', nota: 'Il danno.' },
-      { testo: 'parole assente dal testo della norma' },
-    ];
-    const result = await client.callTool({ name: 'omnilex_evidenzia_passaggi_dossier', arguments: { dossier: 'd1', voce: 'i1', passaggi } });
+    const glosse = [...ONE, { testo: 'parole assente dal testo della norma', nota: 'x', prima: 'che', dopo: 'il' }];
+    const result = await client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', glosse } });
     expect(json(result)).toEqual({
       dossier: { id: 'd1', nome: 'Pratica' },
       voce: { id: 'i1', riferimento: 'art. 2043 c.c.' },
-      passaggi: [
-        { esito: 'proposto', id: 'h0', colore: 'giallo', nota: false },
-        { esito: 'rifiutato', motivo: 'non trovato alla lettera nel testo' },
+      glosse: [
+        { esito: 'proposta', id: 'h0' },
+        { esito: 'rifiutata', motivo: 'non trovato alla lettera nel testo' },
       ],
     });
-    const post = env.stub.apiCalls.find((c) => c.method === 'POST')!;
-    expect(post.body).toEqual({ passaggi });
+    expect(posts().map((c) => c.path)).toEqual(['/dossiers/d1/items/i1/glosses']);
+    expect(posts()[0].body).toEqual({ glosse });
     expect(env.stub.exchanges.map((e) => e.scope)).toEqual(['dossier:read', 'dossier:write dossier:text']);
     await client.close();
   });
 
-  it('says what each colour means, and offers no red: the user’s sign of a note «da rivedere»', async () => {
+  it('adds the general gloss as a note about the entry, after the passages, and says how it went', async () => {
     const client = await connect();
-    const tool = (await client.listTools()).tools.find((t) => t.name === 'omnilex_evidenzia_passaggi_dossier')!;
-    expect(tool.description).toContain('giallo punto centrale, verde condizione o presupposto, blu definizione o eccezione');
-    const colours = (tool.inputSchema as { properties: { passaggi: { items: { properties: { colore: { enum: string[] } } } } } }).properties.passaggi.items.properties.colore.enum;
-    expect(colours).toEqual(['giallo', 'verde', 'blu']);
-    expect(JSON.stringify(tool.inputSchema)).toContain('mai rosso');
-    const red = await client.callTool({ name: 'omnilex_evidenzia_passaggi_dossier', arguments: { dossier: 'd1', voce: 'i1', passaggi: [{ testo: 'cagiona ad altri un danno ingiusto', colore: 'rosso' }] } });
-    expect(red.isError).toBe(true);
-    expect(env.stub.apiCalls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    const result = await client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', generale: '  La norma generale sulla responsabilità.  ', glosse: ONE } });
+    expect(json(result)).toMatchObject({ glosse: [{ esito: 'proposta', id: 'h0' }], generale: { esito: 'aggiunta', id: 'n-new' } });
+    expect(posts().map((c) => c.path)).toEqual(['/dossiers/d1/items/i1/glosses', '/dossiers/d1/notes']);
+    expect(posts()[1].body).toEqual({ text: 'La norma generale sulla responsabilità.', aboutItemId: 'i1' });
+    expect(env.stub.exchanges.map((e) => e.scope)).toEqual(['dossier:read', 'dossier:write dossier:text', 'dossier:write']);
     await client.close();
   });
 
-  it('refuses more than ten passages and a quote under fifteen characters before calling', async () => {
+  it('keeps the glosses stored when the general one is refused, and gives the server’s reason', async () => {
+    const glosses = env.stub.apiOverride!;
+    env.stub.apiOverride = (method, path, body) =>
+      path === '/dossiers/d1/notes' ? [400, { detail: 'La voce indicata non è un articolo di questo dossier.' }] : glosses(method, path, body);
     const client = await connect();
-    const many = Array.from({ length: 11 }, () => ({ testo: 'cagiona ad altri un danno ingiusto' }));
-    const tooMany = await client.callTool({ name: 'omnilex_evidenzia_passaggi_dossier', arguments: { dossier: 'd1', voce: 'i1', passaggi: many } });
-    expect(tooMany.isError).toBe(true);
-    const short = await client.callTool({ name: 'omnilex_evidenzia_passaggi_dossier', arguments: { dossier: 'd1', voce: 'i1', passaggi: [{ testo: 'danno' }] } });
-    expect(short.isError).toBe(true);
-    expect(env.stub.apiCalls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    const result = await client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', generale: 'Sulla sentenza.', glosse: ONE } });
+    expect(result.isError).toBeFalsy();
+    expect(json(result)).toMatchObject({
+      glosse: [{ esito: 'proposta', id: 'h0' }],
+      generale: { esito: 'rifiutata', motivo: expect.stringContaining('La voce indicata non è un articolo di questo dossier.') },
+    });
+    await client.close();
+  });
+
+  it('writes no general gloss when the passages are refused whole', async () => {
+    env.stub.apiOverride = (method, path) =>
+      path.endsWith('/glosses') ? [400, { detail: 'Questa voce mostra un testo non in vigore: le glosse non si vedrebbero.' }] : undefined;
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', generale: 'Generale.', glosse: ONE } });
+    expect(result.isError).toBe(true);
+    expect((result.content as { text: string }[])[0].text).toContain('le glosse non si vedrebbero');
+    expect(posts().map((c) => c.path)).toEqual(['/dossiers/d1/items/i1/glosses']);
+    await client.close();
+  });
+
+  it('refuses before calling: no gloss, more than ten, a short quote, a missing, empty or long note, a long general one, a colour', async () => {
+    const client = await connect();
+    const call = (args: Record<string, unknown>) => client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', ...args } });
+    for (const args of [
+      { glosse: [] },
+      { generale: 'Solo generale.' },
+      { glosse: Array.from({ length: 11 }, () => ONE[0]) },
+      { glosse: [{ testo: 'danno', nota: 'x' }] },
+      { glosse: [{ testo: ONE[0].testo }] },
+      { glosse: [{ testo: ONE[0].testo, nota: '   ' }] },
+      { glosse: [{ testo: ONE[0].testo, nota: 'a'.repeat(1501) }] },
+      { glosse: ONE, generale: 'a'.repeat(4001) },
+    ]) {
+      expect((await call(args)).isError).toBe(true);
+    }
+    expect(posts()).toHaveLength(0);
+    // An unknown key is not part of the shape the model sees: it is never sent.
+    await call({ glosse: [{ ...ONE[0], colore: 'giallo' }] });
+    for (const post of posts()) expect(JSON.stringify(post.body)).not.toContain('colore');
     await client.close();
   });
 
   it('says plainly when the entry is gone or the feature was switched off meanwhile', async () => {
     env.stub.apiOverride = (method, path) => (path.includes('/items/') ? [404, { detail: 'Non disponibile' }] : undefined);
     const client = await connect();
-    const result = await client.callTool({ name: 'omnilex_evidenzia_passaggi_dossier', arguments: { dossier: 'd1', voce: 'i1', passaggi: [{ testo: 'cagiona ad altri un danno ingiusto' }] } });
+    const result = await client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', glosse: ONE } });
     expect(result.isError).toBe(true);
     expect((result.content as { text: string }[])[0].text).toContain('la funzione non è attiva');
+    await client.close();
+  });
+
+  it('asks for no colour and says the glosses are the model’s own words', async () => {
+    const client = await connect();
+    const tool = (await client.listTools()).tools.find((t) => t.name === 'omnilex_glossa_voce')!;
+    const item = (tool.inputSchema as { properties: { glosse: { items: { properties: Record<string, unknown>; required: string[] } } } }).properties.glosse.items;
+    expect(Object.keys(item.properties).sort()).toEqual(['dopo', 'nota', 'prima', 'testo']);
+    expect(item.required.sort()).toEqual(['nota', 'testo']);
+    expect(tool.description).toContain('non copiare testi di terzi');
     await client.close();
   });
 });

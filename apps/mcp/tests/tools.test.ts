@@ -45,7 +45,7 @@ const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.conten
 const json = (result: Awaited<ReturnType<Client['callTool']>>) => JSON.parse(text(result));
 
 describe('the tool list', () => {
-  it('has the nine dossier tools and the five card tools, the read-only ones marked, and only the three deletions destructive', async () => {
+  it('has the nine dossier tools, the five card tools and the entry’s text, the read-only ones marked, and only the three deletions destructive', async () => {
     const { tools } = await client.listTools();
     // In registration order, the same in every session: a client that caches the list sees no change.
     expect(tools.map((t) => t.name)).toEqual([
@@ -63,13 +63,15 @@ describe('the tool list', () => {
       'lingolex_le_mie_card',
       'lingolex_leggi_card',
       'lingolex_elimina_card',
+      // Behind no switch (G-372); omnilex_glossa_voce follows it while glosses are on (glosses.test.ts).
+      'omnilex_leggi_testo_voce',
     ]);
     // Deleting goes to the trash after the user's confirmation (second round, spec §4); nothing updates or moves.
     const destructive = tools.filter((t) => t.annotations?.destructiveHint !== false).map((t) => t.name).sort();
     expect(destructive).toEqual(['lingolex_elimina_card', 'omnilex_elimina_dossier', 'omnilex_elimina_voci_dossier']);
     for (const tool of tools) expect(tool.name).not.toMatch(/spost|modific|aggiorn|update|move/);
     const readOnly = tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort();
-    expect(readOnly).toEqual(['lingolex_le_mie_card', 'lingolex_leggi_card', 'lingolex_schema_card', 'omnilex_elenca_dossier', 'omnilex_leggi_dossier', 'omnilex_stato_account']);
+    expect(readOnly).toEqual(['lingolex_le_mie_card', 'lingolex_leggi_card', 'lingolex_schema_card', 'omnilex_elenca_dossier', 'omnilex_leggi_dossier', 'omnilex_leggi_testo_voce', 'omnilex_stato_account']);
   });
 
   it('says what the server is for at initialize, in under 600 characters, and that sources are read elsewhere', () => {
@@ -111,6 +113,34 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
       });
       expect(text(result)).not.toContain('NON DEVE USCIRE');
     }
+  });
+
+  it('gives the notes’ text only under the texts’ permission (G-381), cut at 500 characters, one whole on request', async () => {
+    const long = `${'a'.repeat(499)}😀${'b'.repeat(600)}`;
+    env.stub.dossiers[0].items.push({ id: 'i3', item_type: 'note', title: 'Nota', citation: null, content: long, created_by: null, about_item_id: null });
+    // Without dossier:text: titles and references, as before, and no way to ask for a note whole.
+    const plain = json(await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } }));
+    for (const voce of plain.voci) expect(voce).not.toHaveProperty('testo');
+    const refused = await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1', nota_intera: 'i3' } });
+    expect(refused.isError).toBe(true);
+    expect(text(refused)).toContain('«Leggere i testi»');
+
+    env.stub.tokens = { good: { active: true, scope: 'dossier:read dossier:write dossier:text' } };
+    const withText = json(await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } }));
+    expect(withText.voci[0]).not.toHaveProperty('testo');
+    expect(withText.voci[1]).toMatchObject({ id: 'i2', testo: 'appunto' });
+    expect(withText.voci[1]).not.toHaveProperty('troncata');
+    // Cut before the emoji, never inside its surrogate pair.
+    expect(withText.voci[2]).toMatchObject({ id: 'i3', testo: `${'a'.repeat(499)}…`, troncata: true });
+    const whole = json(await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1', nota_intera: 'i3' } }));
+    expect(whole.voci[2]).toEqual({ id: 'i3', tipo: 'note', titolo: 'Nota', riferimento: null, aggiunta_da: null, nota_su: null, testo: long });
+    expect(whole.voci[1].testo).toBe('appunto');
+    // Only a note of this dossier.
+    for (const id of ['i1', 'zz']) expect((await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1', nota_intera: id } })).isError).toBe(true);
+    // A note whose content is not text reads as none.
+    env.stub.dossiers[0].items[1].content = { vecchia: true };
+    expect(json(await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } })).voci[1].testo).toBeNull();
+    expect(env.stub.exchanges.every((e) => e.scope === 'dossier:read')).toBe(true);
   });
 
   it('never reads an entry added by an unnamed application as the user\'s own', async () => {

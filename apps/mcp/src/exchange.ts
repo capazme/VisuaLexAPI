@@ -10,7 +10,7 @@ const QUOTA_WORDS: Record<string, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
-  passage: 'passaggi evidenziati',
+  passage: 'glosse sui passaggi',
   text: 'pagine di testo',
 };
 
