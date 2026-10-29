@@ -33,8 +33,13 @@ reason for every row. Usage went there.
    [{ nota, motivo }]` (the note's position, 1-based, and why: its `voce` did not enter, or the
    server's reason), and `errore`, once the dossier exists, for a step the server refused whole (the
    daily points, a revoked connection) or answered with something unreadable: its rows are «non
-   verificabile» and the other steps still run. Once the dossier exists nothing is thrown, so its id
-   always reaches the model.
+   verificabile» and the other steps still run. A route that gave no answer at all (failed, timed out,
+   a gateway's 502/504) may still be writing — the norms route has no overall ceiling, 50 references
+   five at a time at 30 s each can outlast the MCP's 120 s —, so its rows are reported neither in nor
+   out: `errore` says the dossier exists, its entries may still be landing, to check it with
+   `omnilex_leggi_dossier` and not to create it again; a note on one of those norms is left out with
+   the same words, and a note whose own request got no answer is not told to be written again. Once
+   the dossier exists nothing is thrown, so its id always reaches the model.
    The steps can take minutes: a client that sent a `progressToken` gets a progress notification after
    each, one that cancels stops the steps not yet begun, and the description tells the model to look
    for the dossier with `omnilex_elenca_dossier` before repeating a call left without an answer (a

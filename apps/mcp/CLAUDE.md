@@ -45,7 +45,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   token for a two-minute API token for every call (RFC 8693), with the
   narrowest scope, and maps the API's 400/401/403/404/409/429/503 to Italian
   tool errors, passing the server's own Italian reason on where it gives one
-  (the 429 says when the daily quota renews). The client's token never reaches
+  (the 429 says when the daily quota renews). A request that got no answer, or a gateway's 502/504, is a `NoAnswer`
+  (a `ToolError`): the API may have done it. The client's token never reaches
   the API; the exchanged token never reaches the client.
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
   `omnilex_leggi_dossier`, `omnilex_crea_dossier` (D8 S1, spec
@@ -59,7 +60,11 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   riconosciuto, inesistente, ambiguo (with at most three `candidati`, the decisions route's `candidates`), non
   verificabile (a court VisuaLex cannot read too), già presente; no text, no citation; a row written exactly as one that
   entered is not reported. Once the dossier exists nothing is thrown (its id must reach the model, or a retry makes a
-  second dossier): a step refused whole goes in `errore` and the others still run. A progress notification after each
+  second dossier): a step refused whole goes in `errore` and the others still run. A route that gave **no answer**
+  (`NoAnswer` in `src/errors.ts`: the request failed or timed out, or a gateway answered 502/504; the norms route has no
+  overall ceiling and may still be writing) has its rows reported neither in nor out: `errore` says the dossier exists,
+  its entries may still be landing, to check it with `omnilex_leggi_dossier` and not to create it again, and a note on
+  one of those norms is left out with the same words. A progress notification after each
   step to a client that sent a `progressToken`; a cancelled call stops the steps not yet begun),
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
   checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in

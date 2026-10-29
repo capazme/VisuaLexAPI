@@ -338,6 +338,47 @@ describe('omnilex_crea_dossier', () => {
     expect(progress).toEqual([{ progress: 2, total: 3 }, { progress: 3, total: 3 }]);
   });
 
+  it('never calls rows refused when a route gave no answer: the dossier exists, its entries may still be landing', async () => {
+    env.stub.apiOverride = (method, path) => (method === 'POST' && path === '/dossiers/d4/norms' ? 'drop' : undefined);
+    const progress: number[] = [];
+    const result = await client.callTool(
+      {
+        name: 'omnilex_crea_dossier',
+        arguments: {
+          nome: 'X', riferimenti: ['art. 2043 c.c.', 'art. 2059 c.c.'], sentenze: ['Cass. SU 31310/2024'],
+          note: [{ testo: 'sul dossier' }, { testo: 'sul danno', voce: 'art. 2043 c.c.' }],
+        },
+      },
+      undefined,
+      { onprogress: (p) => progress.push(p.progress) },
+    );
+    expect(result.isError).toBeFalsy();
+    const landing = 'VisuaLex non ha risposto in tempo: il dossier d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
+    expect(json(result)).toEqual({
+      dossier: { id: 'd4', nome: 'X', tipo: 'lavoro' },
+      // The decision and the note on the dossier still went in; the norms are neither in nor out.
+      entrate: { norme: 0, sentenze: 1, note: 1 },
+      non_entrate: [],
+      note_non_entrate: [{ nota: 2, motivo: landing }],
+      errore: landing,
+    });
+    // Every step reported, the skipped note too: creation, norms, decisions, two notes.
+    expect(progress).toEqual([2, 3, 4, 5]);
+  });
+
+  it('a gateway that gave up counts as no answer, and a note without an answer is not told to be written again', async () => {
+    env.stub.apiOverride = (method, path) => {
+      if (method === 'POST' && path === '/dossiers/d4/decisions') return [504, {}];
+      if (method === 'POST' && path === '/dossiers/d4/notes') return 'drop';
+      return undefined;
+    };
+    const result = await client.callTool({ name: 'omnilex_crea_dossier', arguments: { nome: 'X', sentenze: ['Cass. SU 31310/2024'], note: [{ testo: 'a' }] } });
+    const answer = json(result);
+    expect(answer.non_entrate).toEqual([]);
+    expect(answer.errore).toContain('non crearlo di nuovo');
+    expect(answer.note_non_entrate).toEqual([{ nota: 1, motivo: 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' }]);
+  });
+
   it('reports a note the server refuses, and adds the others', async () => {
     env.stub.apiOverride = (method, path, body) =>
       method === 'POST' && path.endsWith('/notes') && (body as { text: string }).text === 'no' ? [400, { detail: 'Caratteri di controllo non ammessi.' }] : undefined;

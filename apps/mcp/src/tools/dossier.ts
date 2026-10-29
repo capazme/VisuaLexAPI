@@ -4,7 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { Caller } from '../auth.js';
 import type { McpConfig } from '../config.js';
-import { ToolError } from '../errors.js';
+import { NoAnswer, ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
 import { TRASH_DAYS, canAsk, confirmWithUser, deletionMessage, type Confirmation } from '../confirm.js';
 
@@ -342,13 +342,19 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         // Once the dossier exists nothing is thrown, so its id always reaches the model: a step refused whole leaves
         // the others to run, and the answer says what entered.
         const errors = new Set<string>();
+        // A route that gave no answer may still be writing its entries: its rows are never reported as refused (the
+        // model would create the dossier again, and a client subtracting them would count them as absent).
+        const STILL_LANDING =
+          `VisuaLex non ha risposto in tempo: il dossier ${created.id} esiste e le sue voci potrebbero essere ancora in arrivo. ` +
+          'Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
         const reasonOf = (error: unknown): string => {
           if (error instanceof ToolError) return error.message;
           console.error('[mcp] omnilex_crea_dossier step failed:', error instanceof Error ? error.message : 'unknown error');
           return 'VisuaLex ha avuto un problema in un passo: il dossier è creato, controlla cosa contiene.';
         };
         /** The norms' or the decisions' route, the existing one: the same checks, points and refunds as their own tools. */
-        const addAll = async (rows: string[], route: 'norms' | 'decisions'): Promise<ApiOutcome[]> => {
+        /** The route's outcomes, or null when it gave no answer and may have added some of them. */
+        const addAll = async (rows: string[], route: 'norms' | 'decisions'): Promise<ApiOutcome[] | null> => {
           if (rows.length === 0 || goneAway()) return [];
           try {
             const answer = await callApi<{ results?: ApiOutcome[] }>(config, caller, 'dossier:write', `/dossiers/${id}/${route}`, {
@@ -357,6 +363,10 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
             });
             return Array.isArray(answer.results) ? answer.results : [];
           } catch (error) {
+            if (error instanceof NoAnswer) {
+              errors.add(STILL_LANDING);
+              return null;
+            }
             errors.add(reasonOf(error));
             return [];
           } finally {
@@ -365,7 +375,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         };
         // One outcome per row, in order; a row the route did not answer did not enter. A row written exactly as one that
         // entered is not reported «già presente»: its string did enter, and a client subtracting it would lose both.
-        const tally = (rows: string[], results: ApiOutcome[], kind: 'norme' | 'sentenze') => {
+        const tally = (rows: string[], results: ApiOutcome[] | null, kind: 'norme' | 'sentenze') => {
+          if (results === null) return;
           const entered = new Set<string>();
           rows.forEach((riga, i) => {
             if (results[i]?.outcome === 'added') {
@@ -377,8 +388,10 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           });
         };
 
-        const norms = await addAll(riferimenti, 'norms');
-        tally(riferimenti, norms, 'norme');
+        const answered = await addAll(riferimenti, 'norms');
+        tally(riferimenti, answered, 'norme');
+        const normsUncertain = answered === null;
+        const norms = answered ?? [];
         // The article each reference names: its own entry, or the one an earlier row of the call added (the first).
         const byCitation = new Map<string, string>();
         for (const r of norms) if (r.outcome === 'added' && r.itemId && r.display && !byCitation.has(r.display)) byCitation.set(r.display, r.itemId);
@@ -394,7 +407,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           if (goneAway()) break;
           const about = voce === undefined ? undefined : articleOf(voce);
           if (voce !== undefined && !about) {
-            notesNotEntered.push({ nota: i + 1, motivo: 'la sua voce non è entrata' });
+            notesNotEntered.push({ nota: i + 1, motivo: normsUncertain ? STILL_LANDING : 'la sua voce non è entrata' });
+            await stepDone();
             continue;
           }
           try {
@@ -404,7 +418,9 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
             });
             entrate.note += 1;
           } catch (error) {
-            notesNotEntered.push({ nota: i + 1, motivo: reasonOf(error) });
+            // Without an answer the note may be there: never told to write it again.
+            const motivo = error instanceof NoAnswer ? 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' : reasonOf(error);
+            notesNotEntered.push({ nota: i + 1, motivo });
           } finally {
             await stepDone();
           }
