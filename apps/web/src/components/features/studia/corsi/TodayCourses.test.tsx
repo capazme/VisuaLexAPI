@@ -32,12 +32,12 @@ describe('«Oggi»\'s row of the courses (§6.2)', () => {
     expect(today).not.toHaveBeenCalled();
   });
 
-  it('suggests the day\'s module: «Modulo del giorno: <titolo> · <percorso>»', async () => {
+  it('suggests the day\'s module: «Modulo del giorno: <titolo> · <percorso>», which opens its session with one tap', async () => {
     today.mockResolvedValue([{ corsoId: 'corso-1', titolo: 'Segni distintivi', modulo: { id: 'm-4', ordine: 4, titolo: 'Il marchio di fatto' }, schedeDovute: 0 }]);
     renderRow();
     const row = await screen.findByRole('link', { name: /Modulo del giorno: Il marchio di fatto/ });
     expect(row).toHaveTextContent('Modulo del giorno: Il marchio di fatto · Segni distintivi');
-    expect(row).toHaveAttribute('href', '/studia/percorsi/corso-1');
+    expect(row).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-4');
   });
 
   it('offers the course\'s due cards first, the module after them', async () => {

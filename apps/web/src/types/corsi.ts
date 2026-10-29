@@ -125,3 +125,90 @@ export interface CorsoCestinato {
   trashId: string;
   dossier: { id: string; name: string } | null;
 }
+
+// ─── A module's session (`/studia/percorsi/:id/moduli/:moduloId`, the web's pull request b) ─────────────────────────
+// S2's `GET /lingo/corsi/:id/moduli/:moduloId` and `POST …/apri`, `POST …/risposte` (§10.4, §10.5): the spec names what
+// they carry, not every field, so these shapes are the smallest the reading and the recall need, to be checked against
+// S2. The quiz, the open question and the end are the web's pull request (c), which adds their fields.
+
+/** An option's key, as the server stores it. */
+export type Chiave = 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
+
+/** An option of a graded item; its explanation only once the item is answered (§10.4: never before). */
+export interface Opzione {
+  chiave: Chiave;
+  testo: string;
+  spiegazione?: string;
+}
+
+/** The caller's outcome on an item, as graded by the server. */
+export interface Risposta {
+  scelta: Chiave;
+  corretto: boolean;
+  /** The right key: sent only with an outcome. */
+  corretta: Chiave;
+}
+
+/** A graded item of a module (here a block's recall question): no key and no explanation until it is answered. */
+export interface DomandaModulo {
+  id: string;
+  testo: string;
+  /** The competences it serves, by code. */
+  competenze: string[];
+  opzioni: Opzione[];
+  risposta: Risposta | null;
+}
+
+/**
+ * A citation of the lesson (§10.3): `[testo](#c1)` in the text names `marcatore` `c1`, a copy of a norm or a decision of
+ * the course's dossier as it was when the module was written (`voce` is that entry's id, which may be gone since).
+ * `riferimento` is the entry's identity as the dossier stores it: a norm's `NormaVisitata` fields, or a decision's content.
+ */
+export interface CitazioneLezione {
+  marcatore: string;
+  voce: string;
+  tipo: 'norm' | 'sentenza';
+  riferimento: Record<string, unknown>;
+  /** The citation the server wrote for it, «Art. 2569 c.c.»; null when it could not write one. */
+  citation: string | null;
+}
+
+/** One block of the lesson: about 1,200 words of the closed Markdown subset (§10.3), closed by its recall (§5, step 4). */
+export interface BloccoLezione {
+  id: string;
+  ordine: number;
+  titolo: string | null;
+  testo: string;
+  /** Counted by the server. */
+  parole: number;
+  citazioni: CitazioneLezione[];
+  /** Its 0–3 recall questions. */
+  richiamo: DomandaModulo[];
+}
+
+/** A module as its session reads it (`GET /lingo/corsi/:id/moduli/:moduloId`, S2). */
+export interface ModuloLezione {
+  id: string;
+  corso: { id: string; titolo: string };
+  ordine: number;
+  titolo: string;
+  /** The reading's estimate for the whole module, in minutes. */
+  minuti: number | null;
+  /** The competences it serves, with their words: the intro says what the module is for. */
+  competenze: { codice: string; testo: string }[];
+  /** For this enrolment: `da-iniziare` until `apri` or a first answer. */
+  stato: StatoModulo;
+  ritirato: boolean;
+  /** The 0–3 pre-questions, never answered to the server (§5, step 1). */
+  domandePrima: string[];
+  blocchi: BloccoLezione[];
+}
+
+/** `POST …/risposte`: the outcome, the right key and every option's explanation; `registrata` false for a retry (§10.4). */
+export interface EsitoRisposta {
+  registrata: boolean;
+  scelta: Chiave;
+  corretto: boolean;
+  corretta: Chiave;
+  opzioni: Required<Opzione>[];
+}

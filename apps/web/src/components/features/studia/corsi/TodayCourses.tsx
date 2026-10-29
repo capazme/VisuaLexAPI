@@ -4,7 +4,7 @@ import { cn } from '../../../../lib/utils';
 import { corsiService } from '../../../../services/corsiService';
 import type { CorsoDiOggi } from '../../../../types/corsi';
 import { FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from '../progress/tokens';
-import { coursePath } from './corsiLabels';
+import { modulePath } from './corsiLabels';
 import { useCoursesSwitch } from './coursesSwitch';
 import { useCourseRead } from './useCourseRead';
 
@@ -12,7 +12,7 @@ import { useCourseRead } from './useCourseRead';
  * «Oggi»'s row of the courses (courses spec §6.2): for each course with something today, «Modulo del giorno: <titolo>
  * · <percorso>»; when the course's due cards are not done, the row offers them first (§5, step 9), and the module after
  * them. Nothing while the switch is off, nor while the read travels or fails (logged: «Oggi»'s own reads carry the
- * page's errors). The module opens the course page until the module session comes (the web's pull request b).
+ * page's errors). The module opens its session (§6.5) with one tap.
  */
 export function TodayCourses() {
   const on = useCoursesSwitch() === 'on';
@@ -63,7 +63,7 @@ function CourseToday({ course }: { course: CorsoDiOggi }) {
     );
   }
   return (
-    <Link to={coursePath(course.corsoId)} className={ROW}>
+    <Link to={modulePath(course.corsoId, course.modulo!.id)} className={ROW}>
       {icon}
       <span className="min-w-0 break-words text-sm text-slate-900 dark:text-slate-50">
         <span className="font-semibold">Modulo del giorno: {course.modulo!.titolo}</span>

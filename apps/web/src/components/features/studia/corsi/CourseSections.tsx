@@ -6,7 +6,7 @@ import { CopyableCode } from '../../../../features/connections/CopyableCode';
 import type { CompetenzaPagina, CorsoPagina, EsamePagina, Mancanze, ModuloPagina } from '../../../../types/corsi';
 import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
 import { MasteryChip, ModuleStateChip } from './CourseChips';
-import { closingOpensExam, competenceNumbers, completeSentence, fromDay, missingLines, newExamSentence, onDay, thePercent } from './corsiLabels';
+import { closingOpensExam, competenceNumbers, completeSentence, fromDay, missingLines, moduleOpenLabel, modulePath, newExamSentence, onDay, thePercent } from './corsiLabels';
 
 /** The course page's parts (courses spec §6.4), drawn from `GET /lingo/corsi/:id`. */
 
@@ -100,7 +100,8 @@ const deletable = (m: ModuloPagina) => m.stato === 'da-iniziare' && !m.ritirato;
 /** Whether «Ritira questo modulo» is offered: opened, superseded by a live correction, not yet withdrawn. */
 const withdrawable = (m: ModuloPagina) => m.stato !== 'da-iniziare' && m.sostituitoDa !== null && !m.ritirato;
 
-export function ModulesSection({ moduli, actions, headingRef, offer }: {
+export function ModulesSection({ corsoId, moduli, actions, headingRef, offer }: {
+  corsoId: string;
   moduli: ModuloPagina[];
   actions: ModuleActions;
   headingRef?: RefObject<HTMLHeadingElement | null>;
@@ -137,31 +138,37 @@ export function ModulesSection({ moduli, actions, headingRef, offer }: {
                   {m.sostituisceId && <span>correzione {corrects ? `del modulo ${corrects.ordine}` : 'di un modulo'}</span>}
                 </p>
                 {m.ritirato && <p className={cn('text-sm', MUTED_TEXT)}>Ritirato: le sue risposte non contano più, conta la correzione.</p>}
-                {(deletable(m) || withdrawable(m)) && (
-                  <div className="flex flex-wrap gap-2">
-                    {deletable(m) && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => actions.onDelete(m)}
-                        aria-label={`Elimina il modulo ${m.ordine}, ${m.titolo}`}
-                        className={cn(QUIET_BUTTON, 'mx-0 text-red-700 disabled:opacity-60 dark:text-red-300')}
-                      >
-                        Elimina
-                      </button>
-                    )}
-                    {withdrawable(m) && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => actions.onWithdraw(m)}
-                        className={cn(SECONDARY_BUTTON, 'disabled:opacity-60')}
-                      >
-                        Ritira questo modulo
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {/* The session (§6.5): a module not yet started opens on its start, where it can be read first. */}
+                  <Link
+                    to={modulePath(corsoId, m.id)}
+                    aria-label={`${moduleOpenLabel(m.stato)} il modulo ${m.ordine}, ${m.titolo}`}
+                    className={cn(SECONDARY_BUTTON, 'inline-flex items-center')}
+                  >
+                    {moduleOpenLabel(m.stato)}
+                  </Link>
+                  {deletable(m) && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => actions.onDelete(m)}
+                      aria-label={`Elimina il modulo ${m.ordine}, ${m.titolo}`}
+                      className={cn(QUIET_BUTTON, 'mx-0 text-red-700 disabled:opacity-60 dark:text-red-300')}
+                    >
+                      Elimina
+                    </button>
+                  )}
+                  {withdrawable(m) && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => actions.onWithdraw(m)}
+                      className={cn(SECONDARY_BUTTON, 'disabled:opacity-60')}
+                    >
+                      Ritira questo modulo
+                    </button>
+                  )}
+                </div>
               </li>
             );
           })}

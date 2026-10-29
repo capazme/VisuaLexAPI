@@ -202,6 +202,7 @@ function Course({ id }: { id: string }) {
 
       <CompetencesSection competenze={data.competenze} />
       <ModulesSection
+        corsoId={data.id}
         moduli={data.moduli}
         headingRef={modulesHeading}
         offer={deleted && canEnd && missing ? (

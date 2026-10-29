@@ -4,6 +4,13 @@ import type { CompetenzaPagina, CorsoInLista, Mancanze, StatoCorso, StatoModulo,
 
 export const COURSES_PATH = '/studia/percorsi';
 export const coursePath = (id: string) => `${COURSES_PATH}/${encodeURIComponent(id)}`;
+/** A module's session (§6.5), by the module's id: a correction shares its order with the module it supersedes. */
+export const modulePath = (id: string, moduloId: string) => `${coursePath(id)}/moduli/${encodeURIComponent(moduloId)}`;
+
+/** What a module's row offers to open it with (§6.4): a module not yet started can be read before it is started. */
+export function moduleOpenLabel(stato: StatoModulo): string {
+  return stato === 'da-iniziare' ? 'Apri' : stato === 'in-corso' ? 'Riprendi' : 'Rileggi';
+}
 
 export const COURSE_STATE_LABEL: Record<StatoCorso, string> = {
   'in-preparazione': 'In preparazione',

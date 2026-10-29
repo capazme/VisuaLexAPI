@@ -88,6 +88,15 @@ describe('the course page', () => {
     expect(within(rows[2]).getByRole('button', { name: 'Elimina il modulo 3, Titolo del modulo 3' })).toBeInTheDocument();
   });
 
+  it('opens each module\'s session from its row: «Rileggi» done, «Riprendi» in progress, «Apri» not yet started (§6.4, §6.5)', async () => {
+    renderPage();
+    const modules = await screen.findByRole('region', { name: 'Moduli' });
+    const rows = within(modules).getAllByRole('listitem');
+    expect(within(rows[0]).getByRole('link', { name: 'Rileggi il modulo 1, Titolo del modulo 1' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-1');
+    expect(within(rows[1]).getByRole('link', { name: 'Riprendi il modulo 2, Titolo del modulo 2' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-2');
+    expect(within(rows[2]).getByRole('link', { name: 'Apri il modulo 3, Titolo del modulo 3' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-3');
+  });
+
   it('deletes a module never opened to the trash, with «Annulla» restoring it', async () => {
     vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
     vi.mocked(trashService.restore).mockResolvedValue({ dossierId: null });

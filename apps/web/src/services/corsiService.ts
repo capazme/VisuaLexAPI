@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { CorsoCestinato, CorsoDiOggi, CorsoInLista, CorsoPagina } from '../types/corsi';
+import type { Chiave, CorsoCestinato, CorsoDiOggi, CorsoInLista, CorsoPagina, EsitoRisposta, ModuloLezione } from '../types/corsi';
 import type { TestoCorrente, TestoDaAccettare } from '../types/studia';
 
 /**
@@ -9,6 +9,7 @@ import type { TestoCorrente, TestoDaAccettare } from '../types/studia';
  */
 
 const course = (id: string) => `/lingo/corsi/${encodeURIComponent(id)}`;
+const courseModule = (id: string, moduloId: string) => `${course(id)}/moduli/${encodeURIComponent(moduloId)}`;
 const DECLARATION = '/lingo/testi/MATERIALE_STUDIO';
 
 /** What an apiClient rejection looks like (`services/api.ts`). */
@@ -72,13 +73,36 @@ export const corsiService = {
 
   /** A module never opened, to the trash (409 once opened). */
   async trashModule(id: string, moduloId: string): Promise<{ trashId: string }> {
-    const response = await apiClient.delete(`${course(id)}/moduli/${encodeURIComponent(moduloId)}`);
+    const response = await apiClient.delete(courseModule(id, moduloId));
     return response.data;
   },
 
   /** «Ritira questo modulo»: only once a live correction supersedes it (409 otherwise). */
   async withdrawModule(id: string, moduloId: string): Promise<void> {
-    await apiClient.post(`${course(id)}/moduli/${encodeURIComponent(moduloId)}/ritira`);
+    await apiClient.post(`${courseModule(id, moduloId)}/ritira`);
+  },
+
+  /**
+   * A module's lesson and its recall questions (S2), the caller's outcomes with them: a module not yet opened is
+   * readable too, and reading it opens nothing (§6.4).
+   */
+  async module(id: string, moduloId: string): Promise<ModuloLezione> {
+    const response = await apiClient.get(courseModule(id, moduloId));
+    return response.data;
+  },
+
+  /** Starts a module: from now it is frozen, never trashed, only withdrawn (§10.5). Idempotent. */
+  async openModule(id: string, moduloId: string): Promise<void> {
+    await apiClient.post(`${courseModule(id, moduloId)}/apri`);
+  },
+
+  /**
+   * One choice on one item: the server grades it (§4: the web never says «right» or «wrong»). Only the item and the key
+   * travel: the free recall, the highlights and the step reached never leave the browser (§8).
+   */
+  async answer(id: string, moduloId: string, domandaId: string, scelta: Chiave): Promise<EsitoRisposta> {
+    const response = await apiClient.post(`${courseModule(id, moduloId)}/risposte`, { domandaId, scelta });
+    return response.data;
   },
 
   /** One course as the account's export carries it. */

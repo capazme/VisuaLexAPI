@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -62,25 +62,32 @@ export function LessonFrame({ children }: { children: ReactNode }) {
   );
 }
 
+/** Where a lesson loading goes back to: a course's module to its course, the review to Oggi. */
+function lessonHome(pathname: string): string {
+  const course = /^(\/studia\/percorsi\/[^/]+)\/moduli\//.exec(pathname);
+  return course ? course[1] : '/studia/ripasso';
+}
+
 /**
  * What the frame shows while the session's code loads (the route is lazy): the close button and the card's
  * place, so the screen is never blank with no way out. Esc leaves too.
  */
 export function LessonLoading() {
   const navigate = useNavigate();
+  const home = lessonHome(useLocation().pathname);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') navigate('/studia/ripasso');
+      if (event.key === 'Escape') navigate(home);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate]);
+  }, [navigate, home]);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <button
           type="button"
-          onClick={() => navigate('/studia/ripasso')}
+          onClick={() => navigate(home)}
           aria-label="Chiudi"
           className={cn('inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
         >
@@ -88,7 +95,7 @@ export function LessonLoading() {
         </button>
         <div aria-hidden className="h-3 flex-1 rounded-full bg-slate-200 dark:bg-slate-800" />
       </div>
-      <p className="sr-only">Carico il ripasso…</p>
+      <p className="sr-only">{home === '/studia/ripasso' ? 'Carico il ripasso…' : 'Carico il modulo…'}</p>
     </div>
   );
 }
