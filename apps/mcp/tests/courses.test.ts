@@ -131,10 +131,11 @@ describe('the switch', () => {
     const off = await size();
     env.stub.features = { lingoCourses: true };
     const on = await size();
-    // Measured on 29 October 2026 (PR of M1): 14,562 off, 21,281 on. With every switch on the list passes the
+    // Measured on 29 October 2026 (PR of M1): 14,562 off, 21,281 on; 14,605 off once #371 (`in_sospeso` in
+    // omnilex_crea_dossier's description) was in develop. With every switch on the list passes the
     // 18,000 characters of §10.6: the groups of #318 (1b) are what keep the courses out of a session that does
     // not use them (G-379 went ahead without them).
-    expect(off).toBeLessThanOrEqual(14_600);
+    expect(off).toBeLessThanOrEqual(14_700);
     expect(on - off).toBeLessThanOrEqual(7_000);
   });
 });
