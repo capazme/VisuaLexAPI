@@ -78,13 +78,35 @@ const trashSchema = z.object({ cardIds: z.array(z.string().min(1).max(64).refine
  * review, and null for a card that can no longer be reviewed (its state row stays but nothing is due). The
  * study state is the user's session's: a connected application gets the card as before.
  */
-const reviewedBy = (userId: string) => ({ ancore: true, statiRipasso: { where: { utenteId: userId } } }) satisfies Prisma.LingoCardInclude;
+const reviewedBy = (userId: string) =>
+  ({
+    ancore: true,
+    statiRipasso: { where: { utenteId: userId } },
+    modulo: { select: { id: true, corsoId: true, titolo: true, stati: { where: { iscrizione: { utenteId: userId } }, select: { fattoGiorno: true } } } },
+  }) satisfies Prisma.LingoCardInclude;
 type CardWithReview = Prisma.LingoCardGetPayload<{ include: ReturnType<typeof reviewedBy> }>;
-const serializeForCaller = (req: Request) => (card: CardWithReview) =>
+
+/**
+ * A course card's module (Percorsi, spec 2026-10-23 §10.5): `{ id, corsoId, titolo, fatto }`, which «Le mie schede»
+ * shows. The session reads it while the switch `lingo_courses` is on; a token only with `lingo:courses:read` too (a
+ * course's title is not a card's data). Otherwise every card answers `modulo: null`.
+ */
+async function showsModule(req: Request): Promise<boolean> {
+  if (req.delegation && !req.delegation.scopes.includes('lingo:courses:read')) return false;
+  return isSwitchOn('lingo_courses');
+}
+
+const moduleOf = (card: CardWithReview, shown: boolean) =>
+  shown && card.modulo
+    ? { id: card.modulo.id, corsoId: card.modulo.corsoId, titolo: card.modulo.titolo, fatto: card.modulo.stati.some((s) => s.fattoGiorno !== null) }
+    : null;
+
+const serializeForCaller = (req: Request, shown: boolean) => (card: CardWithReview) =>
   req.delegation
-    ? serialize(card)
+    ? { ...serialize(card), modulo: moduleOf(card, shown) }
     : {
         ...serialize(card),
+        modulo: moduleOf(card, shown),
         prossimoRipasso: card.statiRipasso[0] && REVIEWABLE_OWN_STATES.includes(card.stato) ? romeDay(card.statiRipasso[0].dueAt) : null,
       };
 
@@ -197,7 +219,7 @@ router.get('/', async (req, res) => {
     take: limit + 1,
     skip: offset,
   });
-  res.json({ cards: cards.slice(0, limit).map(serializeForCaller(req)), nextOffset: cards.length > limit ? offset + limit : null });
+  res.json({ cards: cards.slice(0, limit).map(serializeForCaller(req, await showsModule(req))), nextOffset: cards.length > limit ? offset + limit : null });
 });
 
 router.get('/:id', async (req, res) => {
@@ -206,7 +228,7 @@ router.get('/:id', async (req, res) => {
   // A connected application reads the card as before: a validator's reason is their writing and may name
   // someone (spec decision 19), so it is not handed to an application unless the owner decides it.
   if (req.delegation) {
-    res.json(serializeForCaller(req)(card));
+    res.json(serializeForCaller(req, await showsModule(req))(card));
     return;
   }
   // What the validators said about the current proposal: the count of approvals and each remark, never who made it.
@@ -218,7 +240,7 @@ router.get('/:id', async (req, res) => {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }),
   ]);
-  res.json({ ...serializeForCaller(req)(card), approvazioni, rilievi: rilievi.map((r) => ({ ...r, motivazione: r.motivazione ?? '' })) });
+  res.json({ ...serializeForCaller(req, await showsModule(req))(card), approvazioni, rilievi: rilievi.map((r) => ({ ...r, motivazione: r.motivazione ?? '' })) });
 });
 
 router.post('/:id/proponi', async (req, res) => {

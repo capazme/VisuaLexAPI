@@ -60,8 +60,8 @@ const zeroCounts = (): StateCounts => ({ nuove: 0, apprendimento: 0, consolidate
 export async function readProgress(userId: string, materia?: LingoMateria): Promise<Progress> {
   const today = romeDay(new Date());
   const { nuoveAlGiorno, ripassiAlGiorno, materieComunita } = await readPreferences(prisma, userId);
-  const scopeAll = reviewScope(userId, materieComunita);
-  const scope = reviewScope(userId, materieComunita, materia);
+  const scopeAll = reviewScope(userId, materieComunita, today);
+  const scope = reviewScope(userId, materieComunita, today, materia);
 
   // First, in one transaction: a finished queue makes today count, and the missions it or anything else completed
   // without a grade are credited (Gymnasium XP spec §5.1). The user row first, in key share: `markQueueFinished`

@@ -32,7 +32,7 @@ export function newCardsWhere(userId: string, scope: Prisma.LingoCardWhereInput)
  */
 export async function queueFinished(db: Prisma.TransactionClient, userId: string, today: string): Promise<boolean> {
   const { nuoveAlGiorno, materieComunita } = await readPreferences(db, userId);
-  const scope = reviewScope(userId, materieComunita);
+  const scope = reviewScope(userId, materieComunita, today);
   const studied = await db.lingoStatoRipasso.findFirst({ where: { utenteId: userId, card: scope }, select: { cardId: true } });
   if (studied === null) return false;
   const due = await db.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) });

@@ -1,5 +1,6 @@
 import type { LingoCardStato, LingoMateria, Prisma } from '@prisma/client';
 import { review, type Rating, type SrsState } from '../srs/fsrsEngine';
+import { dayToDate } from './studyDays';
 
 /** The daily goal of new cards until the user changes it (spec decision 9). */
 export const DEFAULT_NUOVE_AL_GIORNO = 20;
@@ -16,25 +17,29 @@ export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROP
  * The cards a user may review (spec decision 8): their own that are drafts,
  * proposed or validated, and the community's validated ones in the subjects
  * they switched on, optionally narrowed to one subject and, within it, to one institute. Never «da rivedere»
- * or archived.
+ * or archived. A course's card (Percorsi, spec 2026-10-23 §10.7) is in scope from the Rome day after its module
+ * was done by the caller's enrolment, never before, and leaves it when that module is withdrawn: so `today`.
  *
  * The community branch does not say `autoreId != me`: in SQL that drops a card
  * with no author (its author's account is gone), which is still the community's.
  * A card of one's own that is validated is matched by the first branch already.
  * With no subjects on, `in: []` matches nothing.
  */
-export function reviewScope(userId: string, materieComunita: LingoMateria[], materia?: LingoMateria, istituto?: string): Prisma.LingoCardWhereInput {
+export function reviewScope(userId: string, materieComunita: LingoMateria[], today: string, materia?: LingoMateria, istituto?: string): Prisma.LingoCardWhereInput {
   const scope: Prisma.LingoCardWhereInput = {
     OR: [
-      // A course's card stays out until its module is done (Percorsi, spec 2026-10-23 §10.7): S2 adds that condition;
-      // until then no course card is reviewed.
-      { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES }, moduloId: null },
+      { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES }, OR: [{ moduloId: null }, { modulo: courseCardModuleDone(userId, today) }] },
       { stato: 'VALIDATA', materia: { in: materieComunita } },
     ],
   };
   if (!materia) return scope;
   // An institute only exists within a subject, and is matched exactly as `/percorso` returns it.
   return { AND: [scope, { materia }, ...(istituto === undefined ? [] : [{ istituto }])] };
+}
+
+/** A course card's module, done by the user's enrolment before `today` and not withdrawn (A3 adds other authors'). */
+export function courseCardModuleDone(userId: string, today: string): Prisma.LingoCorsoModuloWhereInput {
+  return { stati: { some: { iscrizione: { utenteId: userId }, fattoGiorno: { lt: dayToDate(today) }, ritiratoIl: null } } };
 }
 
 /**
