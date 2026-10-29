@@ -25,6 +25,7 @@ from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
+from visualex_api.services import eurlex_fetch
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn, sweep_exported_pdfs
 from visualex_api.services.akn_parser import comparable_article_key
 from visualex_api.tools.article_suffixes import other_ordinal_spelling
@@ -1794,20 +1795,23 @@ class NormaController:
                 }
                 results['status'] = 'degraded'
 
-            # Test EUR-Lex (fetch homepage with timeout)
-            try:
-                start = time_module.time()
-                await eurlex_scraper.request_document("https://eur-lex.europa.eu", source="health_check")
-                latency = time_module.time() - start
-                results['services']['eurlex'] = {
-                    'status': 'ok',
-                    'latency_ms': round(latency * 1000, 2)
-                }
-            except Exception as e:
-                results['services']['eurlex'] = {
-                    'status': 'error',
-                    'error': str(e)
-                }
+            # The Union's acts: EUR-Lex's site and CELLAR, one request each, no browser. The
+            # acts are read from CELLAR first and from the site second (eurlex_fetch), so the
+            # source is down only when both are; each one's own state rides along ("challenge":
+            # the site's firewall answered 202 with x-amzn-waf-action).
+            start = time_module.time()
+            eurlex_site = await eurlex_fetch.probe_eurlex()
+            cellar = await eurlex_fetch.probe_cellar()
+            latency = time_module.time() - start
+            eu_ok = 'ok' in (eurlex_site, cellar)
+            results['services']['eurlex'] = {
+                'status': 'ok' if eu_ok else 'error',
+                'latency_ms': round(latency * 1000, 2),
+                'eurlex': eurlex_site,
+                'cellar': cellar,
+            }
+            if not eu_ok:
+                results['services']['eurlex']['error'] = f"EUR-Lex: {eurlex_site}; CELLAR: {cellar}"
                 results['status'] = 'degraded'
 
             status_code = 200 if results['status'] == 'ok' else 503

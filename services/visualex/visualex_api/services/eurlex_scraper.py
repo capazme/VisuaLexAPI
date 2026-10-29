@@ -2,8 +2,8 @@ import copy
 import os
 import re
 import structlog
-from playwright.async_api import async_playwright
 
+from . import eurlex_fetch
 from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
@@ -307,38 +307,16 @@ class EurlexScraper(BaseScraper):
         self.base_url = 'https://eur-lex.europa.eu/eli'
         self.cache = get_cache_manager().get_persistent("eurlex")
         self.selectors = EURLexSelectors()
-        log.info("EUR-Lex scraper initialized with Playwright")
-
-    async def _fetch_with_playwright(self, url: str) -> str:
-        """Fetch URL using Playwright to bypass CloudFront WAF protection."""
-        log.info(f"Consulting EUR-Lex with Playwright - URL: {url}")
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-dev-shm-usage']
-            )
-            try:
-                context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                )
-                page = await context.new_page()
-                await page.goto(url, wait_until='networkidle', timeout=30000)
-                html = await page.content()
-                await context.close()
-                return html
-            finally:
-                await browser.close()
+        log.info("EUR-Lex scraper initialized (CELLAR first, Playwright second)")
 
     async def request_document(self, url, *, source: str = "eurlex"):
-        """Override base request_document to use Playwright for WAF bypass."""
+        """The act's page: CELLAR's, else EUR-Lex's through the browser (`eurlex_fetch`). A page
+        that is no act's — a challenge, an empty answer — is an error, never a document."""
         try:
-            html = await self._fetch_with_playwright(url)
-            if not html or len(html) < 1000:
-                raise DocumentNotFoundError(f"Document not found or empty at {url}", urn=url)
-            log.debug("EUR-Lex document fetched successfully with Playwright")
+            html = await eurlex_fetch.fetch_act_page(url)
+            log.debug("EUR-Lex document fetched", url=url)
             return html
-        except DocumentNotFoundError:
+        except (DocumentNotFoundError, NetworkError):
             raise
         except Exception as e:
             log.error(f"Error during EUR-Lex consultation: {e}")
@@ -375,10 +353,11 @@ class EurlexScraper(BaseScraper):
         """The parsed page for ``url``, from the persistent cache when it has it.
 
         One page carries the whole act — tree, articles, rubriche and recitals
-        — so every extractor goes through here and the WAF is crossed once.
+        — so every extractor goes through here and the source is asked once a day.
         """
         cached_html = await self.cache.get(url)
-        if cached_html:
+        # A copy kept before pages were checked can be a challenge's: it is fetched again.
+        if eurlex_fetch.is_act_page(cached_html):
             log.info("Cache hit", source="eurlex_persistent")
             return self.parse_document(cached_html)
         html_content = await self.request_document(url)

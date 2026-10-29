@@ -49,6 +49,7 @@ export interface Stub {
     materia: string;
     stato: string;
     istituto: string;
+    tipo?: string;
     domanda: string;
     createdAt: string;
     ancore?: { normaKey: string; articleId: string; urn: string; isPrimary: boolean }[];
