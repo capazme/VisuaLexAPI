@@ -15,6 +15,9 @@ import { currentText, hasAccepted, serializeText } from '../lingo/texts';
 import { romeDay, startOfRomeDay } from '../lingo/studyDay';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
 import { trashLingoCards } from '../trash/trash';
+import { isSwitchOn } from '../assistant/switches';
+import { lockModuleForCards, lockUserRow } from '../lingo/courses';
+import { LIMITS, competenceCode } from '../schemas/lingo/corso';
 
 /**
  * Study cards for their author (MCP second round, spec §6; the spike plan's
@@ -40,9 +43,15 @@ export const MAX_CARDS_PER_CALL = 10;
 /** Distinct anchor references checked against the sources in one call, as a cost cap (each one is fetched). */
 export const MAX_REFERENCES_PER_CALL = 20;
 
+// A course's cards (Percorsi, A1; spec 2026-10-23 §10.5): the call names the module, each card the competences it
+// serves (codes of the module's course); without a module no card names one.
+const courseCardInputSchema = cardInputSchema.extend({ competenze: z.array(competenceCode).min(1).max(LIMITS.competences.max).optional() }).strict();
 const createSchema = z
-  .object({ cards: z.array(cardInputSchema).min(1).max(MAX_CARDS_PER_CALL) })
+  .object({ cards: z.array(courseCardInputSchema).min(1).max(MAX_CARDS_PER_CALL), moduloId: z.string().min(1).max(64).refine(hasNoNul).optional() })
   .strict()
+  .refine((body) => body.cards.every((card) => (card.competenze !== undefined) === (body.moduloId !== undefined)), {
+    message: 'Con un modulo ogni scheda indica le sue competenze; senza modulo nessuna.',
+  })
   .refine((body) => new Set(body.cards.flatMap((card) => card.ancore.map((a) => a.riferimento))).size <= MAX_REFERENCES_PER_CALL, {
     message: `Al massimo ${MAX_REFERENCES_PER_CALL} riferimenti diversi per chiamata.`,
   });
@@ -80,7 +89,29 @@ const serializeForCaller = (req: Request) => (card: CardWithReview) =>
       };
 
 router.post('/', async (req, res) => {
-  const { cards } = createSchema.parse(req.body);
+  const { cards: withCompetences, moduloId } = createSchema.parse(req.body);
+  const userId = req.user!.id;
+  let course: { moduloId: string; competenze: Map<string, string> } | null = null;
+  if (moduloId) {
+    // Off, a module names nothing (§10.10); a connected application also needs the courses' write scope.
+    if (!(await isSwitchOn('lingo_courses'))) throw new AppError(404, 'Modulo non trovato.');
+    if (req.delegation && !req.delegation.scopes.includes('lingo:courses:write')) {
+      res.status(403).json({ detail: 'Per legare schede a un percorso serve il permesso sui percorsi.', error: 'insufficient_scope' });
+      return;
+    }
+    // Checked before the sources are asked: an unknown module or competence costs no call.
+    const found = await prisma.$transaction((tx) => lockModuleForCards(tx, userId, moduloId));
+    if (!found) throw new AppError(404, 'Modulo non trovato.');
+    for (const [i, card] of withCompetences.entries()) {
+      const unknown = card.competenze!.find((code) => !found.byCode.has(code));
+      if (unknown) throw new AppError(400, `Scheda ${i + 1}: la competenza ${unknown} non è di questo percorso.`);
+    }
+    if ((await prisma.lingoCard.count({ where: { moduloId } })) + withCompetences.length > LIMITS.cardsPerModule) {
+      throw new AppError(409, `Un modulo ha al massimo ${LIMITS.cardsPerModule} schede.`);
+    }
+    course = { moduloId, competenze: found.byCode };
+  }
+  const cards = withCompetences.map(({ competenze: _competenze, ...card }) => card);
   const { planned, failures, allTransient } = await planCards(cards);
 
   // Sources down for every reference: nothing could be checked, so nothing is written or spent (503).
@@ -88,9 +119,24 @@ router.post('/', async (req, res) => {
 
   const origin = req.delegation ? { clientId: req.delegation.clientId, clientName: req.delegation.clientName } : null;
   const created = await prisma.$transaction(async (tx) => {
+    let tie: (index: number) => { moduloId: string; competenzaIds: string[] } | null = () => null;
+    if (course) {
+      // The user's row first (an account's deletion takes it last), then the module, while its cards are written.
+      await lockUserRow(tx, userId);
+      const module = await lockModuleForCards(tx, userId, course.moduloId);
+      if (!module) throw new AppError(404, 'Modulo non trovato.');
+      const toCreate = planned.filter((plan) => 'input' in plan).length;
+      if ((await tx.lingoCard.count({ where: { moduloId: module.id } })) + toCreate > LIMITS.cardsPerModule) {
+        throw new AppError(409, `Un modulo ha al massimo ${LIMITS.cardsPerModule} schede.`);
+      }
+      tie = (index) => ({
+        moduloId: module.id,
+        competenzaIds: [...new Set(withCompetences[index].competenze!)].map((code) => module.byCode.get(code)!).filter(Boolean),
+      });
+    }
     const ids = new Map<number, string>();
     for (const plan of planned) {
-      if ('input' in plan) ids.set(plan.index, (await createLingoCard(req.user!.id, plan.input, tx, origin)).id);
+      if ('input' in plan) ids.set(plan.index, (await createLingoCard(userId, plan.input, tx, origin, tie(plan.index))).id);
     }
     return ids;
   });
@@ -179,8 +225,10 @@ router.post('/:id/proponi', async (req, res) => {
   const { accettoTestoId } = proposeSchema.parse(req.body);
   const outcome = await prisma.$transaction(async (tx) => {
     // The row is locked (the author's own, as in the edit): a second click or an edit waits its turn.
-    const locked = await tx.$queryRaw<{ stato: LingoCardStato }[]>`SELECT stato FROM lingo_cards WHERE id = ${req.params.id} AND autore_id = ${req.user!.id} FOR UPDATE`;
+    const locked = await tx.$queryRaw<{ stato: LingoCardStato; da_percorso: boolean }[]>`SELECT stato, da_percorso FROM lingo_cards WHERE id = ${req.params.id} AND autore_id = ${req.user!.id} FOR UPDATE`;
     if (locked.length !== 1) throw new AppError(404, 'Scheda non trovata.');
+    // G-362: nothing of a course reaches the community without validation (G-377, Q8), even once detached.
+    if (locked[0].da_percorso) throw new AppError(409, 'Le schede di un percorso restano private.');
     if (!canTransition(locked[0].stato, 'PROPOSTA_COMMUNITY')) {
       throw new AppError(409, 'Solo una bozza si può proporre alla comunità.');
     }

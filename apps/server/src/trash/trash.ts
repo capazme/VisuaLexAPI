@@ -4,6 +4,8 @@ import { AppError } from '../middleware/errorHandler';
 import { citeStoredAct } from '../norms/citation';
 import { citeStoredItem } from '../norms/decisionCitation';
 import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
+import { countingModules } from '../lingo/courses';
+import { LIMITS } from '../schemas/lingo/corso';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
@@ -38,6 +40,8 @@ export interface TrashListEntry {
   itemCount: number;
   /** A whole dossier's planner tasks, which went to the trash with it (absent when it had none). */
   taskCount?: number;
+  /** A course's or a module's cards, which went with it (Percorsi). */
+  cardCount?: number;
   items?: { itemType: string; citation: string | null; actCitation: string | null }[];
   cards?: { istituto: string; domanda: string }[];
   clientName: string | null;
@@ -190,6 +194,8 @@ export async function trashDossier(
     }
     const { items, snapshots, publishedCopy, tasks, ...row } = dossier;
     const proposals = await lockedProposals(tx, userId, items.map((item) => item.id));
+    // The course enrolments that study it (Percorsi, §10.3): their link is set null with the row and comes back on restore.
+    const iscrizioni = (await tx.lingoCorsoIscrizione.findMany({ where: { dossierId: dossier.id, utenteId: userId }, select: { id: true } })).map((i) => i.id);
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -199,7 +205,7 @@ export async function trashDossier(
         label: dossier.name,
         summary: tasks.length > 0 ? { itemCount: items.length, taskCount: tasks.length } : { itemCount: items.length },
         // Its copy in the Forum stays published; the link (cleared with the row) comes back on restore.
-        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null, tasks, proposals }),
+        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null, tasks, proposals, iscrizioni }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -280,7 +286,7 @@ export async function trashLingoCards(
     // Lock the rows first, in id order: an edit in flight (PATCH) finishes before the payload is read, and one
     // that comes after waits, then finds no card.
     await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id IN (${Prisma.join(wanted)}) AND autore_id = ${userId} ORDER BY id FOR UPDATE`;
-    const cards = await tx.lingoCard.findMany({ where: { id: { in: wanted }, autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } });
+    const cards = await tx.lingoCard.findMany({ where: { id: { in: wanted }, autoreId: userId }, include: CARD_PAYLOAD, orderBy: { createdAt: 'asc' } });
     const movable = cards.filter((card) => PERSONAL_STATES.includes(card.stato));
     const moved = movable.map((card) => card.id);
     const notFound = wanted.filter((id) => !cards.some((card) => card.id === id));
@@ -329,7 +335,7 @@ export async function listTrash(userId: string): Promise<TrashListEntry[]> {
     orderBy: { deletedAt: 'desc' },
   });
   return entries.map((entry) => {
-    const summary = entry.summary as { itemCount?: number; taskCount?: number; items?: ItemSummary[]; cards?: { istituto: string; domanda: string }[] };
+    const summary = entry.summary as { itemCount?: number; taskCount?: number; cardCount?: number; items?: ItemSummary[]; cards?: { istituto: string; domanda: string }[] };
     return {
       id: entry.id,
       kind: entry.kind,
@@ -337,6 +343,7 @@ export async function listTrash(userId: string): Promise<TrashListEntry[]> {
       label: entry.label,
       itemCount: summary.itemCount ?? 0,
       ...(summary.taskCount ? { taskCount: summary.taskCount } : {}),
+      ...(summary.cardCount !== undefined ? { cardCount: summary.cardCount } : {}),
       ...(summary.items ? { items: summary.items } : {}),
       ...(summary.cards ? { cards: summary.cards } : {}),
       clientName: entry.clientName,
@@ -521,9 +528,11 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       if (entry.kind === 'DOSSIER') {
         // `tasks` is absent from an entry trashed before the planner.
         // `proposals` is absent from an entry trashed before D7b.
-        const { dossier, items, snapshots, publishedCopyId, tasks = [], proposals = [] } = payload as unknown as {
+        // `iscrizioni` is absent from an entry trashed before the courses.
+        const { dossier, items, snapshots, publishedCopyId, tasks = [], proposals = [], iscrizioni = [] } = payload as unknown as {
           dossier: Record<string, unknown> & { id: string; createdAt: string; updatedAt: string };
           publishedCopyId?: string | null;
+          iscrizioni?: string[];
           tasks?: StoredTask[];
           proposals?: StoredProposal[];
           items: StoredItem[];
@@ -621,6 +630,10 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             await tx.task.updateMany({ where: { id: { in: children } }, data: { parentId } });
           }
         }
+        if (iscrizioni.length > 0) {
+          // A course's enrolment links it again when it still points nowhere (a course restored meanwhile may not).
+          await tx.lingoCorsoIscrizione.updateMany({ where: { id: { in: iscrizioni }, utenteId: userId, dossierId: null }, data: { dossierId: dossier.id } });
+        }
         if (typeof publishedCopyId === 'string' && publishedCopyId) {
           // Relinked only when the copy is still the user's and linked to nothing else.
           await tx.sharedEnvironment.updateMany({
@@ -659,52 +672,18 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
 
       if (entry.kind === 'LINGO_CARDS') {
         // `states` and `reviews` are absent from an entry trashed before reviews were kept.
-        const { cards, states = [], reviews = [] } = payload as unknown as {
-          cards: (Record<string, unknown> & { id: string; createdAt: string; ancore: (Record<string, unknown> & { id: string; ultimaVerifica: string })[] })[];
-          states?: StoredReviewState[];
-          reviews?: StoredReview[];
-        };
-        for (const card of cards) {
-          const { ancore, createdAt, updatedAt: _updatedAt, autoreId: _autoreId, ...fields } = card;
-          await tx.lingoCard.create({
-            data: {
-              ...(fields as unknown as Omit<Prisma.LingoCardUncheckedCreateInput, 'autoreId' | 'createdAt' | 'ancore'>),
-              autoreId: userId,
-              createdAt: new Date(createdAt),
-              ancore: {
-                create: ancore.map(({ cardId: _cardId, ultimaVerifica, ...anchor }) => ({
-                  ...(anchor as unknown as Omit<Prisma.LingoCardAncoraCreateWithoutCardInput, 'ultimaVerifica'>),
-                  ultimaVerifica: new Date(ultimaVerifica),
-                })),
-              },
-            },
-          });
-        }
-        await tx.lingoStatoRipasso.createMany({
-          data: states.map((state) => ({
-            utenteId: userId,
-            cardId: state.cardId,
-            stability: state.stability,
-            difficulty: state.difficulty,
-            dueAt: new Date(state.dueAt),
-            lastReviewAt: new Date(state.lastReviewAt),
-            reps: state.reps,
-            lapses: state.lapses,
-          })),
-        });
-        await tx.lingoRevisioneSRS.createMany({
-          data: reviews.map((log) => ({
-            id: log.id,
-            utenteId: userId,
-            cardId: log.cardId,
-            dataRevisione: new Date(log.dataRevisione),
-            rating: log.rating,
-            scheduledDays: log.scheduledDays,
-            stability: log.stability,
-            difficulty: log.difficulty,
-            durataMs: log.durataMs,
-          })),
-        });
+        const { cards, states = [], reviews = [] } = payload as unknown as { cards: StoredCard[]; states?: StoredReviewState[]; reviews?: StoredReview[] };
+        await restoreCards(tx, userId, cards, states, reviews);
+        return { dossierId: null };
+      }
+
+      if (entry.kind === 'LINGO_CORSO') {
+        await restoreLingoCorso(tx, userId, payload);
+        return { dossierId: null };
+      }
+
+      if (entry.kind === 'LINGO_CORSO_MODULO') {
+        await restoreLingoCorsoModulo(tx, userId, payload);
         return { dossierId: null };
       }
 
@@ -723,4 +702,304 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
 export async function purgeTrashEntry(userId: string, trashId: string): Promise<void> {
   const { count } = await prisma.trashEntry.deleteMany({ where: { id: trashId, userId } });
   if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+}
+
+// ─── Gymnasium's courses (Percorsi, A1; spec 2026-10-23 §10.9) ───────────────────────────────────────────────
+
+/** A card as the payload keeps it, with its anchors and, for a course's card, its competences. */
+type StoredCard = Record<string, unknown> & {
+  id: string;
+  createdAt: string;
+  moduloId?: string | null;
+  competenze?: { competenzaId: string }[];
+  ancore: (Record<string, unknown> & { id: string; ultimaVerifica: string })[];
+};
+
+/** The cards' rows that travel with them: anchors and the competences of a course's card. */
+const CARD_PAYLOAD = { ancore: true, competenze: { select: { competenzaId: true } } } satisfies Prisma.LingoCardInclude;
+
+/** The author's review state and log of these cards (the card's deletion would cascade them away). */
+async function reviewRows(tx: Prisma.TransactionClient, userId: string, cardIds: string[]) {
+  if (cardIds.length === 0) return { states: [], reviews: [] };
+  const states = await tx.lingoStatoRipasso.findMany({ where: { cardId: { in: cardIds }, utenteId: userId } });
+  const reviews = await tx.lingoRevisioneSRS.findMany({ where: { cardId: { in: cardIds }, utenteId: userId }, orderBy: [{ dataRevisione: 'asc' }, { id: 'asc' }] });
+  return { states, reviews };
+}
+
+/**
+ * Brings cards back with their ids, anchors, review state and log. A course's card keeps its module and
+ * competences when its module is still there, and comes back detached otherwise (`moduloId` null, no
+ * competences, `daPercorso` kept: still never proposed), never a foreign-key 500.
+ */
+async function restoreCards(tx: Prisma.TransactionClient, userId: string, cards: StoredCard[], states: StoredReviewState[], reviews: StoredReview[]) {
+  const moduleIds = [...new Set(cards.flatMap((card) => (typeof card.moduloId === 'string' ? [card.moduloId] : [])))];
+  const liveModules = new Set(
+    moduleIds.length === 0
+      ? []
+      : (await tx.lingoCorsoModulo.findMany({ where: { id: { in: moduleIds }, corso: { autoreId: userId } }, select: { id: true } })).map((m) => m.id),
+  );
+  const competenceIds = [...new Set(cards.flatMap((card) => (card.competenze ?? []).map((c) => c.competenzaId)))];
+  const liveCompetences = new Set(
+    competenceIds.length === 0 ? [] : (await tx.lingoCorsoCompetenza.findMany({ where: { id: { in: competenceIds } }, select: { id: true } })).map((c) => c.id),
+  );
+  for (const card of cards) {
+    const { ancore, competenze = [], createdAt, updatedAt: _updatedAt, autoreId: _autoreId, moduloId, ...fields } = card;
+    const attached = typeof moduloId === 'string' && liveModules.has(moduloId);
+    await tx.lingoCard.create({
+      data: {
+        ...(fields as unknown as Omit<Prisma.LingoCardUncheckedCreateInput, 'autoreId' | 'createdAt' | 'ancore' | 'moduloId' | 'competenze'>),
+        autoreId: userId,
+        moduloId: attached ? moduloId : null,
+        createdAt: new Date(createdAt),
+        ancore: {
+          create: ancore.map(({ cardId: _cardId, ultimaVerifica, ...anchor }) => ({
+            ...(anchor as unknown as Omit<Prisma.LingoCardAncoraCreateWithoutCardInput, 'ultimaVerifica'>),
+            ultimaVerifica: new Date(ultimaVerifica),
+          })),
+        },
+        ...(attached ? { competenze: { create: competenze.filter((c) => liveCompetences.has(c.competenzaId)).map((c) => ({ competenzaId: c.competenzaId })) } } : {}),
+      },
+    });
+  }
+  await tx.lingoStatoRipasso.createMany({
+    data: states.map((state) => ({
+      utenteId: userId,
+      cardId: state.cardId,
+      stability: state.stability,
+      difficulty: state.difficulty,
+      dueAt: new Date(state.dueAt),
+      lastReviewAt: new Date(state.lastReviewAt),
+      reps: state.reps,
+      lapses: state.lapses,
+    })),
+  });
+  await tx.lingoRevisioneSRS.createMany({
+    data: reviews.map((log) => ({
+      id: log.id,
+      utenteId: userId,
+      cardId: log.cardId,
+      dataRevisione: new Date(log.dataRevisione),
+      rating: log.rating,
+      scheduledDays: log.scheduledDays,
+      stability: log.stability,
+      difficulty: log.difficulty,
+      durataMs: log.durataMs,
+    })),
+  });
+}
+
+/** A module's rows under it: its competences, blocks, items with theirs, and its cards (locked by the caller). */
+async function moduleRows(tx: Prisma.TransactionClient, moduleIds: string[], examIds: string[] = []) {
+  const moduliCompetenze = await tx.lingoCorsoModuloCompetenza.findMany({ where: { moduloId: { in: moduleIds } } });
+  const blocchi = await tx.lingoCorsoBlocco.findMany({ where: { moduloId: { in: moduleIds } }, orderBy: [{ moduloId: 'asc' }, { ordine: 'asc' }] });
+  const domande = await tx.lingoCorsoDomanda.findMany({
+    where: { OR: [{ moduloId: { in: moduleIds } }, { esameId: { in: examIds } }] },
+    orderBy: [{ createdAt: 'asc' }, { ordine: 'asc' }, { id: 'asc' }],
+  });
+  const domandeCompetenze = await tx.lingoCorsoDomandaCompetenza.findMany({ where: { domandaId: { in: domande.map((d) => d.id) } } });
+  const cards = await tx.lingoCard.findMany({ where: { moduloId: { in: moduleIds } }, include: CARD_PAYLOAD, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+  return { moduliCompetenze, blocchi, domande, domandeCompetenze, cards };
+}
+
+/** Locks a course's modules, then their cards, in id order: an edit or a card in flight lands in the payload or after it. */
+async function lockModulesAndCards(tx: Prisma.TransactionClient, corsoId: string, moduloId?: string) {
+  const modules = moduloId
+    ? await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi_moduli WHERE id = ${moduloId} AND corso_id = ${corsoId} FOR UPDATE`
+    : await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi_moduli WHERE corso_id = ${corsoId} ORDER BY id FOR UPDATE`;
+  const ids = modules.map((m) => m.id);
+  if (ids.length > 0) await tx.$queryRaw`SELECT id FROM lingo_cards WHERE modulo_id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+  return ids;
+}
+
+/**
+ * Moves a course to the trash (§10.9): the course row `FOR UPDATE`, its modules, its cards in id order; the
+ * payload is the content, the enrolments with their states, outcomes and attempts, and the cards with their
+ * review state and log; then one delete, the rest by cascade. The XP ledger is never touched, and the study
+ * dossier is not in the payload: it stays in Dossier, and the answer names it for the web's toast.
+ */
+export async function trashLingoCorso(userId: string, corsoId: string, by: DeletedBy): Promise<{ trashId: string; dossier: { id: string; name: string } | null }> {
+  await maybeSweep();
+  return prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi WHERE id = ${corsoId} AND autore_id = ${userId} FOR UPDATE`;
+    if (locked.length === 0) throw new AppError(404, 'Percorso non trovato.');
+    const moduleIds = await lockModulesAndCards(tx, corsoId);
+    const corso = await tx.lingoCorso.findUniqueOrThrow({ where: { id: corsoId } });
+    const competenze = await tx.lingoCorsoCompetenza.findMany({ where: { corsoId }, orderBy: { ordine: 'asc' } });
+    const moduli = await tx.lingoCorsoModulo.findMany({ where: { corsoId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+    const esami = await tx.lingoCorsoEsame.findMany({ where: { corsoId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+    const rows = await moduleRows(tx, moduleIds, esami.map((e) => e.id));
+    const iscrizioni = await tx.lingoCorsoIscrizione.findMany({ where: { corsoId } });
+    const enrolmentIds = iscrizioni.map((i) => i.id);
+    const stati = await tx.lingoCorsoModuloStato.findMany({ where: { iscrizioneId: { in: enrolmentIds } } });
+    const tentativi = await tx.lingoCorsoTentativo.findMany({ where: { iscrizioneId: { in: enrolmentIds } } });
+    const esiti = await tx.lingoCorsoEsito.findMany({ where: { iscrizioneId: { in: enrolmentIds } } });
+    const { states, reviews } = await reviewRows(tx, userId, rows.cards.map((c) => c.id));
+    const own = iscrizioni.find((i) => i.utenteId === userId);
+    const dossier = own?.dossierId ? await tx.dossier.findFirst({ where: { id: own.dossierId, userId }, select: { id: true, name: true } }) : null;
+    const now = new Date();
+    const entry = await tx.trashEntry.create({
+      data: {
+        userId,
+        kind: 'LINGO_CORSO',
+        dossierId: null,
+        label: corso.titolo,
+        summary: { itemCount: moduli.length, cardCount: rows.cards.length },
+        payload: asJson({ corso, competenze, moduli, esami, ...rows, iscrizioni, stati, tentativi, esiti, states, reviews }),
+        clientId: by.clientId,
+        clientName: by.clientName,
+        grantId: by.grantId,
+        deletedAt: now,
+        expiresAt: expiry(now),
+      },
+    });
+    await tx.lingoCorso.delete({ where: { id: corsoId } });
+    return { trashId: entry.id, dossier };
+  }).catch((error: unknown) => quietly('Course trash', error));
+}
+
+/**
+ * Moves a module never opened to the trash (§10.9): its rows and cards, and the ids of the corrections that name
+ * it (their link is set null by the delete and comes back on restore). An opened module is frozen: 409, it can
+ * only be withdrawn once a correction supersedes it. `moduliPrevisti` never changes with it.
+ */
+export async function trashLingoCorsoModulo(userId: string, corsoId: string, moduloId: string, by: DeletedBy): Promise<{ trashId: string }> {
+  await maybeSweep();
+  return prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ titolo: string }[]>`SELECT titolo FROM lingo_corsi WHERE id = ${corsoId} AND autore_id = ${userId} FOR UPDATE`;
+    if (locked.length === 0) throw new AppError(404, 'Percorso non trovato.');
+    const ids = await lockModulesAndCards(tx, corsoId, moduloId);
+    if (ids.length === 0) throw new AppError(404, 'Modulo non trovato.');
+    if ((await tx.lingoCorsoModuloStato.count({ where: { moduloId } })) > 0) {
+      throw new AppError(409, 'Il modulo è già stato aperto: si può solo ritirare, quando una correzione lo sostituisce.');
+    }
+    const modulo = await tx.lingoCorsoModulo.findUniqueOrThrow({ where: { id: moduloId } });
+    const rows = await moduleRows(tx, [moduloId]);
+    const correzioni = (await tx.lingoCorsoModulo.findMany({ where: { sostituisceId: moduloId }, select: { id: true } })).map((m) => m.id);
+    const { states, reviews } = await reviewRows(tx, userId, rows.cards.map((c) => c.id));
+    const now = new Date();
+    const entry = await tx.trashEntry.create({
+      data: {
+        userId,
+        kind: 'LINGO_CORSO_MODULO',
+        dossierId: null,
+        label: `${modulo.titolo} · ${locked[0].titolo}`,
+        summary: { itemCount: 1, cardCount: rows.cards.length },
+        payload: asJson({ modulo, ...rows, correzioni, states, reviews }),
+        clientId: by.clientId,
+        clientName: by.clientName,
+        grantId: by.grantId,
+        deletedAt: now,
+        expiresAt: expiry(now),
+      },
+    });
+    await tx.lingoCorsoModulo.delete({ where: { id: moduloId } });
+    return { trashId: entry.id };
+  }).catch((error: unknown) => quietly('Course module trash', error));
+}
+
+type Row = Record<string, unknown>;
+/** A JSON column's value for a write: SQL NULL for null. */
+const dbJson = (value: unknown) => (value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue));
+
+interface StoredModuleRows {
+  moduliCompetenze: Row[];
+  blocchi: Row[];
+  domande: Row[];
+  domandeCompetenze: Row[];
+  cards: StoredCard[];
+  states: StoredReviewState[];
+  reviews: StoredReview[];
+}
+
+/** Writes back modules' blocks, items and competences (the modules themselves exist), then their cards. */
+async function restoreModuleRows(tx: Prisma.TransactionClient, userId: string, rows: StoredModuleRows) {
+  if (rows.moduliCompetenze.length > 0) await tx.lingoCorsoModuloCompetenza.createMany({ data: rows.moduliCompetenze as unknown as Prisma.LingoCorsoModuloCompetenzaCreateManyInput[] });
+  if (rows.blocchi.length > 0) {
+    await tx.lingoCorsoBlocco.createMany({ data: rows.blocchi.map((b) => ({ ...b, citazioni: dbJson(b.citazioni) }) as unknown as Prisma.LingoCorsoBloccoCreateManyInput) });
+  }
+  if (rows.domande.length > 0) {
+    await tx.lingoCorsoDomanda.createMany({
+      data: rows.domande.map((d) => ({ ...d, opzioni: dbJson(d.opzioni), rubrica: dbJson(d.rubrica) }) as unknown as Prisma.LingoCorsoDomandaCreateManyInput),
+    });
+  }
+  if (rows.domandeCompetenze.length > 0) await tx.lingoCorsoDomandaCompetenza.createMany({ data: rows.domandeCompetenze as unknown as Prisma.LingoCorsoDomandaCompetenzaCreateManyInput[] });
+  await restoreCards(tx, userId, rows.cards, rows.states, rows.reviews);
+}
+
+/** A course's restore (inside `restoreTrashEntry`): every row with its id, the dossier linked again if still the user's. */
+async function restoreLingoCorso(tx: Prisma.TransactionClient, userId: string, payload: Prisma.JsonValue) {
+  const p = payload as unknown as StoredModuleRows & {
+    corso: Row & { id: string };
+    competenze: Row[];
+    moduli: (Row & { id: string; sostituisceId: string | null })[];
+    esami: Row[];
+    iscrizioni: (Row & { id: string; dossierId: string | null; utenteId: string })[];
+    stati: Row[];
+    tentativi: Row[];
+    esiti: Row[];
+  };
+  // The limits hold on the way back too: the user may have written others meanwhile.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('lingo_corsi:' || ${userId}::text))`;
+  if ((await tx.lingoCorso.count({ where: { autoreId: userId } })) >= LIMITS.coursesPerUser) {
+    throw new AppError(409, `Hai già ${LIMITS.coursesPerUser} percorsi: eliminane uno prima di ripristinare questo.`);
+  }
+  await tx.lingoCorso.create({ data: { ...(p.corso as unknown as Prisma.LingoCorsoUncheckedCreateInput), autoreId: userId } });
+  if (p.competenze.length > 0) await tx.lingoCorsoCompetenza.createMany({ data: p.competenze as unknown as Prisma.LingoCorsoCompetenzaCreateManyInput[] });
+  // The corrections' links in a second step, so that the order of the rows never matters.
+  if (p.moduli.length > 0) {
+    await tx.lingoCorsoModulo.createMany({
+      data: p.moduli.map((m) => ({ ...m, sostituisceId: null }) as unknown as Prisma.LingoCorsoModuloCreateManyInput),
+    });
+    for (const m of p.moduli.filter((m) => m.sostituisceId)) await tx.lingoCorsoModulo.update({ where: { id: m.id }, data: { sostituisceId: m.sostituisceId } });
+  }
+  // The enrolments before the exams written for one of them; a dossier only when it is still the user's.
+  const dossierIds = [...new Set(p.iscrizioni.flatMap((i) => (i.dossierId ? [i.dossierId] : [])))];
+  const ownDossiers = new Set(
+    dossierIds.length === 0 ? [] : (await tx.dossier.findMany({ where: { id: { in: dossierIds }, userId }, select: { id: true } })).map((d) => d.id),
+  );
+  const enrolments = p.iscrizioni.filter((i) => i.utenteId === userId);
+  if (enrolments.length > 0) {
+    await tx.lingoCorsoIscrizione.createMany({
+      data: enrolments.map((i) => ({ ...i, dossierId: i.dossierId && ownDossiers.has(i.dossierId) ? i.dossierId : null }) as unknown as Prisma.LingoCorsoIscrizioneCreateManyInput),
+    });
+  }
+  if (p.esami.length > 0) await tx.lingoCorsoEsame.createMany({ data: p.esami as unknown as Prisma.LingoCorsoEsameCreateManyInput[] });
+  await restoreModuleRows(tx, userId, p);
+  if (p.stati.length > 0) await tx.lingoCorsoModuloStato.createMany({ data: p.stati as unknown as Prisma.LingoCorsoModuloStatoCreateManyInput[] });
+  if (p.tentativi.length > 0) {
+    await tx.lingoCorsoTentativo.createMany({ data: p.tentativi.map((t) => ({ ...t, perCompetenza: dbJson(t.perCompetenza) }) as unknown as Prisma.LingoCorsoTentativoCreateManyInput) });
+  }
+  if (p.esiti.length > 0) await tx.lingoCorsoEsito.createMany({ data: p.esiti as unknown as Prisma.LingoCorsoEsitoCreateManyInput[] });
+}
+
+/** A module's restore: into its course if still there (404 otherwise), its corrections linked again. */
+async function restoreLingoCorsoModulo(tx: Prisma.TransactionClient, userId: string, payload: Prisma.JsonValue) {
+  const p = payload as unknown as StoredModuleRows & { modulo: Row & { id: string; corsoId: string; sostituisceId: string | null }; correzioni: string[] };
+  // Locked as a module's addition locks it: the limits below cannot be passed by a module added at the same time.
+  const course = await tx.$queryRaw<{ moduli_previsti: number }[]>`
+    SELECT moduli_previsti FROM lingo_corsi WHERE id = ${p.modulo.corsoId} AND autore_id = ${userId} FOR NO KEY UPDATE`;
+  if (course.length === 0) throw new AppError(404, 'Il percorso di questo modulo non c’è più.');
+  const modules = await tx.lingoCorsoModulo.findMany({ where: { corsoId: p.modulo.corsoId }, select: { id: true, sostituisceId: true } });
+  const withdrawn = await tx.lingoCorsoModuloStato.findMany({
+    where: { moduloId: { in: modules.map((m) => m.id) }, ritiratoIl: { not: null }, iscrizione: { utenteId: userId } },
+    select: { moduloId: true },
+  });
+  const counting = countingModules([...modules, { id: p.modulo.id, sostituisceId: p.modulo.sostituisceId }], new Set(withdrawn.map((w) => w.moduloId))).length;
+  if (modules.length + 1 > LIMITS.moduleRows || counting > Math.min(LIMITS.liveModules, course[0].moduli_previsti)) {
+    throw new AppError(409, 'Il percorso ha già tutti i suoi moduli: abbassa il programma o elimina un modulo prima di ripristinare questo.');
+  }
+  const corrected = p.modulo.sostituisceId
+    ? await tx.lingoCorsoModulo.count({ where: { id: p.modulo.sostituisceId, corsoId: p.modulo.corsoId } })
+    : 0;
+  await tx.lingoCorsoModulo.create({
+    data: {
+      ...(p.modulo as unknown as Prisma.LingoCorsoModuloUncheckedCreateInput),
+      domandePrima: p.modulo.domandePrima as Prisma.InputJsonValue,
+      sostituisceId: corrected > 0 ? p.modulo.sostituisceId : null,
+    },
+  });
+  await restoreModuleRows(tx, userId, p);
+  if (p.correzioni.length > 0) {
+    await tx.lingoCorsoModulo.updateMany({ where: { id: { in: p.correzioni }, corsoId: p.modulo.corsoId, sostituisceId: null }, data: { sostituisceId: p.modulo.id } });
+  }
 }

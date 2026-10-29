@@ -56,9 +56,9 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
     it('is off by default: GET /features says so and every route answers 404', async () => {
       const features = await request(app).get('/api/features').set(authHeader(alice));
       expect(features.status).toBe(200);
-      expect(features.body).toEqual({ assistantPassages: false });
+      expect(features.body).toEqual({ assistantPassages: false, lingoCourses: false });
       // Public: the MCP server asks it with no token before a session lists its tools.
-      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: false });
+      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: false, lingoCourses: false });
       const p = await proposal(alice.id, itemId);
       for (const call of [
         request(app).get(`${base()}/proposals`),
@@ -82,9 +82,12 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       const on = await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: true });
       expect(on.status).toBe(200);
       expect(on.body).toMatchObject({ key: 'assistant_passages', enabled: true });
-      expect((await request(app).get('/api/features').set(authHeader(bob))).body).toEqual({ assistantPassages: true });
+      expect((await request(app).get('/api/features').set(authHeader(bob))).body).toEqual({ assistantPassages: true, lingoCourses: false });
       const list = await request(app).get('/api/admin/switches').set(authHeader(alice));
-      expect(list.body.switches).toEqual([expect.objectContaining({ key: 'assistant_passages', enabled: true })]);
+      expect(list.body.switches).toEqual([
+        expect.objectContaining({ key: 'assistant_passages', enabled: true }),
+        expect.objectContaining({ key: 'lingo_courses', enabled: false }),
+      ]);
       expect((await request(app).put('/api/admin/switches/nope').set(authHeader(alice)).send({ enabled: true })).status).toBe(404);
       expect((await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: 'yes' })).status).toBe(400);
     });
