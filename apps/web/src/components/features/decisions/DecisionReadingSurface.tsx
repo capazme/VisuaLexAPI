@@ -19,9 +19,13 @@ import { ArticleDiscussionPanel } from '../search/ArticleDiscussionPanel';
 import { PassageThreadsStatus } from '../search/PassageThreadsStatus';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
-import { LostProposalsList } from '../search/LostProposalsList';
+import { LostGlossesList, LostProposalsList } from '../search/LostProposalsList';
 import { MoveProposalBar } from '../search/MoveProposalBar';
+import { GlossMargin, type GlossMarginHandle } from '../search/GlossMargin';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
+import { useGlossPassage } from '../../../hooks/useGlossPassage';
+import { isGloss } from '../../../utils/aiReview';
+import { GLOSS_WORDS } from '../../../constants/glossWords';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
@@ -140,7 +144,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   );
 
   // What an application proposed on the dossier entry (D7b): drawn with the reader's marks, never in their downloads.
-  const { highlights: proposalHighlights, actions: proposalActions, moving, saveMove, cancelMove } = useEntryProposals(dossierItemId, key, NO_ARTICLE);
+  // Its glosses (D8) are counted on the signs and shown beside the text, never drawn in it.
+  const {
+    highlights: proposalHighlights, glosses, glossAnchors, actions: proposalActions, moving, saveMove, cancelMove,
+  } = useEntryProposals(dossierItemId, key, NO_ARTICLE);
   const shownHighlights = useMemo(
     () => (proposalHighlights.length ? [...decisionHighlights, ...proposalHighlights] : decisionHighlights),
     [decisionHighlights, proposalHighlights],
@@ -176,21 +183,38 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     () => wrapDecisionCitationsInHtml(
       wrapCitationsInHtml(renderDecisionHtml({
         testo, highlights: shownHighlights, annotations: decisionNotes, signs: true,
-        threads: locatedThreads, focusedThreadId, keyPassages: passages,
+        threads: locatedThreads, focusedThreadId, keyPassages: passages, glosses: glossAnchors,
       })),
       { within, selfPath },
     ),
-    [testo, shownHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath, passages],
+    [testo, shownHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath, passages, glossAnchors],
   );
 
   // What each paragraph's sign counts, for the popover it opens (the renderer derives the signs
   // from the same structure through the same module).
   const blockGroups = useMemo(
-    () => groupAnnotationsByBlock(plain, structure, shownHighlights, decisionNotes, locatedThreads),
-    [plain, structure, shownHighlights, decisionNotes, locatedThreads],
+    () => groupAnnotationsByBlock(plain, structure, shownHighlights, decisionNotes, locatedThreads, glossAnchors),
+    [plain, structure, shownHighlights, decisionNotes, locatedThreads, glossAnchors],
   );
   const { openBlock, closeBlock } = useArticleTextInteractions(contentRef, key, { contentKey: html });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
+  // A gloss whose words are in no paragraph (the text changed): listed under the text with its actions.
+  const lostGlosses = useMemo(() => {
+    if (glosses.length === 0) return glosses;
+    const shown = new Set(blockGroups.flatMap((g) => g.glosses.map((a) => a.id)));
+    return glosses.filter((g) => !shown.has(g.id));
+  }, [glosses, blockGroups]);
+  const marginRef = useRef<GlossMarginHandle>(null);
+  const [glossesWide, setGlossesWide] = useState(false);
+  // With the glosses beside the text, a sign whose paragraph holds only glosses focuses the first one's card (D8).
+  const onlyGlosses = !!openGroup && openGroup.glosses.length > 0
+    && openGroup.notes.length + openGroup.highlights.length + openGroup.threads.length === 0;
+  const focusCard = glossesWide && onlyGlosses ? openGroup.glosses[0].id : null;
+  useEffect(() => {
+    if (!focusCard) return;
+    // The column took the click: the focus goes to the card (a DOM write), and the paragraph is closed again.
+    if (marginRef.current?.focus(focusCard)) closeBlock();
+  }, [focusCard, closeBlock]);
 
   // What no longer lands is listed under the text (a free note has no anchor: the panel holds it).
   // An application's proposal that no longer lands has a list of its own, with its note and its actions (D7b).
@@ -211,6 +235,11 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const findButtonRef = useRef<HTMLButtonElement>(null);
   const textRootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
+  const { shownId: shownGlossId, show: showGloss, hide: hideGloss } = useGlossPassage(textRootRef, plain, glossAnchors, html);
+  const showGlossPassage = useCallback(
+    (id: string, show: boolean) => (show ? showGloss(id) : hideGloss(id)),
+    [showGloss, hideGloss],
+  );
 
   // The find window's target for this decision (spec §13.1): one text, keyed by its own
   // `decisionKey`, the key the scope computes for a decision tab. No `hostTabId` (a host with no
@@ -403,20 +432,41 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           onClose={closeComposer}
         />
       )}
-      <ArticleBody
-        contentRef={contentRef}
+      <GlossMargin
+        ref={marginRef}
+        glosses={glosses}
+        plain={plain}
+        actions={proposalActions}
         textRootRef={textRootRef}
-        itemKey={key}
-        processedContent={html}
-        className="vlx-art vlx-decision"
-        onPopupHighlight={handlePopupHighlight}
-        onPopupAddNote={handlePopupAddNote}
-        onPopupCopy={copySelection}
-        onPopupDiscuss={discussion.popupDiscuss}
-        selectionPopup={!moving}
-      />
+        contentKey={html}
+        shownId={shownGlossId}
+        onShowPassage={showGlossPassage}
+        onWideChange={setGlossesWide}
+      >
+        <ArticleBody
+          contentRef={contentRef}
+          textRootRef={textRootRef}
+          itemKey={key}
+          processedContent={html}
+          className="vlx-art vlx-decision"
+          onPopupHighlight={handlePopupHighlight}
+          onPopupAddNote={handlePopupAddNote}
+          onPopupCopy={copySelection}
+          onPopupDiscuss={discussion.popupDiscuss}
+          selectionPopup={!moving}
+        />
+      </GlossMargin>
       {moving && (
-        <MoveProposalBar key={moving.id} textRootRef={textRootRef} proposalId={moving.id} startOffset={moving.startOffset} text={moving.text} onSave={saveMove} onCancel={cancelMove} />
+        <MoveProposalBar
+          key={moving.id}
+          textRootRef={textRootRef}
+          proposalId={moving.id}
+          startOffset={moving.startOffset}
+          text={moving.text}
+          onSave={saveMove}
+          onCancel={cancelMove}
+          label={isGloss(moving) ? GLOSS_WORDS.moveTitle : undefined}
+        />
       )}
       {!discussion.open && (
         <PassageThreadsStatus error={discussion.error} loading={discussion.loading} onRetry={discussion.reload} />
@@ -429,7 +479,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         onRemoveAnnotation={removeAnnotation}
       />
       {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
-      {openBlock !== null && hasAnnotations(openGroup) && (
+      {proposalActions && <LostGlossesList glosses={lostGlosses} actions={proposalActions} />}
+      {openBlock !== null && hasAnnotations(openGroup) && !focusCard && (
         <BlockAnnotationsPopover
           key={openBlock}
           containerRef={contentRef}
@@ -444,6 +495,11 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           onRemoveNote={removeAnnotation}
           onRemoveHighlight={removeHighlight}
           proposalActions={proposalActions}
+          glosses={glosses}
+          glossesInMargin={glossesWide}
+          onGoToGloss={(id) => marginRef.current?.focus(id)}
+          shownGlossId={shownGlossId}
+          onShowGlossPassage={showGlossPassage}
         />
       )}
       <ArticleDiscussionPanel
