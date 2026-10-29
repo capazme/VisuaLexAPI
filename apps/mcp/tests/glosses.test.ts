@@ -182,6 +182,8 @@ describe('omnilex_glossa_voce', () => {
       { glosse: [{ testo: ONE[0].testo, nota: '   ' }] },
       { glosse: [{ testo: ONE[0].testo, nota: 'a'.repeat(1501) }] },
       { glosse: ONE, generale: 'a'.repeat(4001) },
+      { glosse: [{ testo: ONE[0].testo, nota: 'a\u0007b' }] },
+      { glosse: ONE, generale: 'a\u0000b' },
     ]) {
       expect((await call(args)).isError).toBe(true);
     }

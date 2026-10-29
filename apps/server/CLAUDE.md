@@ -154,7 +154,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   reads (`assistant/locateQuote.ts`: whitespace runs match whitespace runs or nothing, every other
   character as written; `prima`/`dopo` choose among occurrences), stores the projection's own slice at
   its offset (root rule 23), and answers one outcome per gloss (`proposta` with its id, or `rifiutata` with the reason; no
-  text). A gloss repeats only a gloss where the model put one; a user's mark or a saved coloured proposal on the same words
+  text). A gloss repeats only the same application's gloss where the model put it (never another application's: the answer
+  must not tell what it glossed); a user's mark or a saved coloured proposal on the same words
   stays beside it, unread. The text is fetched once per call
   from the Python API as the web fetches it (`assistant/entryText.ts`: ports of `buildItemKey`,
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,

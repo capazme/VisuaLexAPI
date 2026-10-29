@@ -33,7 +33,7 @@ const NO_TEXT = 'Questa voce non ha un testo: è una nota.';
 const NOT_YET = 'Il testo non è ancora disponibile, riprova tra poco.';
 const NOT_IN_FORCE = 'Questa voce mostra un testo non in vigore: le glosse non si vedrebbero.';
 export const NO_MORE_PASSAGES =
-  'Le evidenziazioni proposte dall’IA non ci sono più: evidenziare è un gesto dell’utente. Per spiegare un passaggio proponi una glossa.';
+  'Le evidenziazioni proposte dall’IA non ci sono più: evidenziare è un gesto dell’utente. Un passaggio si spiega con una glossa, dove è attiva.';
 
 // Plain text, as notes: new lines and tabs, nothing else below U+0020.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
@@ -169,11 +169,14 @@ router.post('/dossiers/:id/items/:itemId/glosses', async (req, res) => {
     // model what the user marked (§8.9).
     const existing = await tx.highlight.findMany({
       where: { userId: req.user!.id, dossierItemId: item.id, createdByClientId: { not: null } },
-      select: { kind: true, assistantStartOffset: true, assistantText: true, noteState: true },
+      select: { kind: true, createdByClientId: true, assistantStartOffset: true, assistantText: true, noteState: true },
     });
-    // A gloss repeats only a gloss, where the model put it, never where the user moved it: the answer must not
-    // tell a move. A saved coloured proposal on the same words is another thing, and stays beside it.
-    const taken = new Set(existing.filter((h) => h.kind === 'gloss').map((h) => `${h.assistantStartOffset}:${h.assistantText}`));
+    // A gloss repeats only this application's own gloss, where the model put it, never where the user moved it: the
+    // answer must not tell a move, nor what another application glossed. A saved coloured proposal on the same words
+    // is another thing, and stays beside it.
+    const taken = new Set(
+      existing.filter((h) => h.kind === 'gloss' && h.createdByClientId === clientId).map((h) => `${h.assistantStartOffset}:${h.assistantText}`),
+    );
     let open = existing.filter((h) => h.noteState !== 'validated').length;
     const result: Outcome[] = [];
     for (const gloss of glosse) {

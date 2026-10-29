@@ -34,15 +34,20 @@ export async function glossesOn(config: McpConfig): Promise<boolean> {
   }
 }
 
+// Plain text, as the server takes it: new lines and tabs, nothing else below U+0020.
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+
 // `.max` gives the schema's maxLength, in code points under zod 4; the refinement keeps the server's count, UTF-16
-// units, so a text too long for the server is refused here (as `omnilex_aggiungi_nota_dossier` does).
+// units, so a text too long for the server is refused here (as `omnilex_aggiungi_nota_dossier` does). A control
+// character is refused here too, naming the row: the server would refuse the whole call.
 const plainText = (max: number) =>
   z
     .string()
     .trim()
     .min(1)
     .max(max)
-    .refine((text) => text.length <= max, `Too big: expected string to have <=${max} characters`);
+    .refine((text) => text.length <= max, `Too big: expected string to have <=${max} characters`)
+    .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi');
 
 export function registerTextTool(server: McpServer, config: McpConfig, run: RunTool): void {
   server.registerTool(
@@ -80,7 +85,7 @@ export function registerGlossTools(server: McpServer, config: McpConfig, run: Ru
     {
       title: 'Glossa una voce',
       description:
-        `Glosse su una norma o sentenza del dossier: una generale facoltativa e 1-${MAX_GLOSSES} sui passaggi più importanti (i commi), ` +
+        `Glosse su una norma o sentenza del dossier: 1-${MAX_GLOSSES} sui passaggi più importanti (i commi) e, per una norma, una generale facoltativa; ` +
         'citati alla lettera da omnilex_leggi_testo_voce (parole ripetute: aggiungi prima o dopo). ' +
         'L’utente le valida, modifica o toglie in VisuaLex. Spiegazioni tue: non copiare testi di terzi, niente dati personali non richiesti.',
       inputSchema: {

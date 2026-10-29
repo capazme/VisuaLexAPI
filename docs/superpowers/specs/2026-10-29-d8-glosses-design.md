@@ -49,7 +49,7 @@ the trash in a second place.
   `dossier:write` and `dossier:text`, 1–10 glosses (quote 15–2000, note 1–1500 UTF-16 units), two points and one of
   the counter `passage` each, refused ones given back; the quote is located as D7b's passages were, the
   projection's own slice is stored; at most 30 open proposals per entry (glosses and saved marks together); a gloss
-  repeats only a gloss at the model's position. Answer: `{ voce, glosse: [{ esito: 'proposta', id } |
+  repeats only the same application's gloss at the model's position. Answer: `{ voce, glosse: [{ esito: 'proposta', id } |
   { esito: 'rifiutata', motivo }] }`.
 - `GET …/text` lists the glosses this application proposed still `proposed` (`glosse: [{ testo, nota }]`).
 - The web app's routes answer each proposal with its `kind`; a gloss's note cannot be emptied (400).

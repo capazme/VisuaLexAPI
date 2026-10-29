@@ -222,7 +222,7 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
       for (const body of [{ passaggi: [{ testo: 'il risarcimento del danno', colore: 'verde' }] }, { passaggi: [{ testo: 'x', colore: 'rosso' }] }, {}]) {
         const response = await request(app).post(`/api/dossiers/${dossierId}/items/${normId}/passages`).set(as()).send(body);
         expect(response.status).toBe(410);
-        expect(response.body.detail).toBe('Le evidenziazioni proposte dall’IA non ci sono più: evidenziare è un gesto dell’utente. Per spiegare un passaggio proponi una glossa.');
+        expect(response.body.detail).toBe('Le evidenziazioni proposte dall’IA non ci sono più: evidenziare è un gesto dell’utente. Un passaggio si spiega con una glossa, dove è attiva.');
       }
       // Also with the switches off, and for the user's session.
       await switchOn(false);
@@ -316,6 +316,14 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
       await savedMark(alice.id, normId, 'il risarcimento del danno', at, { clientId: 'irrelevant' });
       const first = await gloss([{ testo: 'il risarcimento del danno', nota: 'a' }, { testo: 'il risarcimento del danno', nota: 'b' }]);
       expect(first.body.glosse.map((p: { esito: string; motivo?: string }) => p.motivo ?? p.esito)).toEqual(['proposta', 'già glossato in questo punto']);
+    });
+
+    it('never tells an application what another one glossed: the same words are its own gloss', async () => {
+      await gloss([{ testo: 'il risarcimento del danno', nota: 'a' }]);
+      const other = (await delegatedToken(alice, 'dossier:read dossier:write dossier:text')).apiToken;
+      const second = await gloss([{ testo: 'il risarcimento del danno', nota: 'b' }], normId, { Authorization: `Bearer ${other}` });
+      expect(second.body.glosse[0].esito).toBe('proposta');
+      expect(await prisma.highlight.count({ where: { kind: 'gloss' } })).toBe(2);
     });
 
     it('judges a repeat by where the model put a gloss, never by where the user moved it', async () => {

@@ -28,7 +28,7 @@ const COUNTER_WORDS: Record<DelegatedCounter, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
-  passage: 'glosse sui passaggi',
+  passage: 'glosse proposte',
   text: 'pagine di testo',
 };
 
