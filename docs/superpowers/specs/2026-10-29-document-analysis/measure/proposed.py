@@ -1,5 +1,6 @@
-"""Prototype of the proposed path (spec §4, docs/superpowers/specs/2026-10-29-document-analysis-design.md): the browser's candidate finder, the query string it would send,
-the server's /parse_query resolution (resolve_alias -> parse_nl_query), then the browser's inheritance.
+"""Prototype of the proposed path (spec §4, docs/superpowers/specs/2026-10-29-document-analysis-design.md): the
+browser's candidate finder, the query string it would send, the server's /parse_query resolution (resolve_alias ->
+parse_nl_query), then the browser's inheritance.
 
 Run with the visualex venv, from services/visualex:  python -I proposed.py <plain dir> <out.json>
 Not the shipped code: a faithful sketch of the span rules, to measure them.
@@ -13,9 +14,10 @@ from visualex_api.tools.nl_parser import parse_nl_query, build_eu_act_pattern  #
 from visualex_api.tools.act_resolver import known_act_names  # noqa: E402
 from visualex_api.tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION  # noqa: E402
 
+# The types that name an act only with a number (spec §4.4: one table, shared with the linker's _NUMBERED_ACT_TYPES).
 NUMBERED = {"legge", "decreto legge", "decreto legislativo", "decreto del presidente della repubblica", "regio decreto",
             "decreto ministeriale", "regolamento ue", "direttiva ue", "legge costituzionale", "regio decreto legge",
-            "decreto legislativo luogotenenziale"}
+            "decreto legislativo luogotenenziale", "decreto del presidente del consiglio dei ministri"}
 
 
 def resolve(query: str):
@@ -27,7 +29,8 @@ def resolve(query: str):
     return p.to_api_params() if p else None
 
 
-def openable(r):
+def identifies_act(r):
+    """§4.4: a type that needs no number, or a type with its number; case folded ('Regolamento UE')."""
     return bool(r and r.get("act_type") and (r["act_type"].lower() not in NUMBERED or r.get("act_number")))
 
 
@@ -38,7 +41,7 @@ for n in names:
     n = n.strip()
     if len(n) < 2 or n.isdigit():
         continue
-    if openable(resolve(n)):
+    if identifies_act(resolve(n)):
         vocab.append(n)
 vocab.sort(key=len, reverse=True)
 
@@ -67,8 +70,10 @@ EU_ACT = build_eu_act_pattern()
 ACT_PHRASE = r"(?:" + EU_ACT + r"|" + NUMBERED_ACT + r"|" + VOCAB_SRC + r")"
 
 SUF = r"(?:\s*-?\s*(?:" + ARTICLE_SUFFIX_ALTERNATION + r")\b)?"
-ART_HEAD = r"(?<![A-Za-zÀ-ÿ])(?:artt?\.\s*|articol[oi]\s+)"
-ART_ITEM = r"\d+" + SUF
+# «art.», «artt.», «articolo», «articoli»; «art» with no dot only before a digit («art 2043 c.c.»)
+ART_HEAD = r"(?<![A-Za-zÀ-ÿ])(?:artt?\.\s*|artt?\s+(?=\d)|articol[oi]\s+)"
+# a number with its suffix, or a range («1362-1371»)
+ART_ITEM = r"\d+" + SUF + r"(?:\s*-\s*\d+" + SUF + r")?"
 ART_LIST = ART_ITEM + r"(?:\s*(?:,|\be\b)\s*" + ART_ITEM + r")*(?:\s+e\s+(?:ss|segg|seguenti)\.?)?"
 ORD = r"(?:primo|secondo|terzo|quarto|quinto|sesto|settimo|ottavo|nono|decimo)"
 CLAUSE = (r"(?:\s*,?\s*(?:"
@@ -79,12 +84,18 @@ CLAUSE = (r"(?:\s*,?\s*(?:"
           r"))*")
 SEP = r"(?:\s*,\s*|\s+)(?:(?:del|della|dello|dei|degli|delle)\s+|dell['’]\s*)?"
 
-ART_FIRST = re.compile(r"(" + ART_HEAD + r")(" + ART_LIST + r")(" + CLAUSE + r")" + SEP + r"(" + ACT_PHRASE + r")", re.I)
-ACT_FIRST = re.compile(r"(" + ACT_PHRASE + r")\s*,?\s*(" + ART_HEAD + r")(" + ART_LIST + r")(" + CLAUSE + r")", re.I)
-ACT_ONLY = re.compile(r"(?<![\w.])(" + ACT_PHRASE + r")", re.I)
-BARE = re.compile(r"(" + ART_HEAD + r")(" + ART_LIST + r")(" + CLAUSE + r")", re.I)
+# Named groups: ACT_PHRASE holds the EU pattern's own five groups.
+ART_FIRST = re.compile(ART_HEAD + r"(?P<list>" + ART_LIST + r")" + CLAUSE + SEP + r"(?P<act>" + ACT_PHRASE + r")", re.I)
+ACT_FIRST = re.compile(r"(?<![\w.])(?P<act>" + ACT_PHRASE + r")\s*,?\s*" + ART_HEAD + r"(?P<list>" + ART_LIST + r")" + CLAUSE, re.I)
+ACT_ONLY = re.compile(r"(?<![\w.])(?P<act>" + ACT_PHRASE + r")", re.I)
+BARE = re.compile(ART_HEAD + r"(?P<list>" + ART_LIST + r")" + CLAUSE, re.I)
+# §4.3: an act named alone becomes context only when it is numbered or EU, or a name that opens with an act word —
+# never a short acronym («CTU», «CAP», «TUA» are also words of a brief) nor a subject («smart working»).
+CONTEXT_PHRASE = re.compile(r"(?:" + EU_ACT + r"|" + NUMBERED_ACT + r")$", re.I)
+ACT_WORD = re.compile(r"^(?:codice|cod\.|legge|l\.|decreto|testo\s+unico|t\.\s*u\.|tu\s|regolamento|direttiva|statuto|disp\.|ordinamento)", re.I)
 # What follows a bare article: «del medesimo decreto» inherits; «del contratto» names something else.
 SAME = re.compile(r"^\s*,?\s*(?:del|della|dello)\s+(?:medesim[oa]|stess[oa]|citat[oa]|predett[oa]|suddett[oa])\b", re.I)
+OTHER_OF = re.compile(r"^\s*,?\s*(?:del|della|dello|dei|degli|delle|dell['’])\s*\S", re.I)
 OTHER = re.compile(r"^\s*,?\s*(?:(?:del|della|dello|dei|degli|delle|dell['’])\s*\S|[A-Z]|[a-z]{1,4}\.)")
 
 
@@ -113,29 +124,33 @@ def scan(text):
         for m in rx.finditer(text):
             if not free(m.start(), m.end()):
                 continue
-            if kind == "art_first":
-                lst, act = m.group(2), m.group(4)
-            else:
-                act, lst = m.group(1), m.group(3)
+            lst, act = m.group("list"), m.group("act")
+            if kind == "act_first":
+                # §4.3: the act before an article is held to the context rule, and an article that goes on with
+                # «del contratto» belongs to that, not to the act before it
+                if not (CONTEXT_PHRASE.match(act) or ACT_WORD.match(act)):
+                    continue
+                if OTHER_OF.match(text[m.end():m.end() + 60]):
+                    continue
             arts = articles_of(lst)
             # the query: what a user types in the search bar — the clause and the preposition left out (§4.3)
             query = "art. " + " e ".join(arts) + " " + re.sub(r"\s+", " ", act).strip()
             cands.append({"kind": kind, "start": m.start(), "end": m.end(), "query": query, "articles": arts})
             take(m.start(), m.end())
     for m in ACT_ONLY.finditer(text):
-        if not free(m.start(1), m.end(1)):
+        a, b = m.start("act"), m.end("act")
+        if not free(a, b):
             continue
-        g = m.group(1)
-        # §4.2: a mention alone, in prose, needs a capital, a dot or a number — «costituzione», «mica» are words
-        if not re.search(r"[A-Z0-9.]", g):
+        g = m.group("act")
+        if not (CONTEXT_PHRASE.match(g) or ACT_WORD.match(g)):
             continue
-        cands.append({"kind": "act", "start": m.start(1), "end": m.end(1), "query": re.sub(r"\s+", " ", m.group(1)).strip(), "articles": []})
-        take(m.start(1), m.end(1))
+        cands.append({"kind": "act", "start": a, "end": b, "query": re.sub(r"\s+", " ", g).strip(), "articles": []})
+        take(a, b)
     for m in BARE.finditer(text):
         if not free(m.start(), m.end()):
             continue
         tail = text[m.end():m.end() + 60]
-        cands.append({"kind": "bare", "start": m.start(), "end": m.end(), "query": None, "articles": articles_of(m.group(2)),
+        cands.append({"kind": "bare", "start": m.start(), "end": m.end(), "query": None, "articles": articles_of(m.group("list")),
                       "same": bool(SAME.match(tail)), "other": bool(OTHER.match(tail)) and not SAME.match(tail)})
         take(m.start(), m.end())
     cands.sort(key=lambda c: c["start"])
@@ -143,7 +158,8 @@ def scan(text):
 
 
 def paragraph_of(text, pos):
-    return text.count("\n\n", 0, pos)
+    """§4.6: a paragraph is a line — a DOCX and (after PR 2) an HTML reader end each block with one line break."""
+    return text.count("\n", 0, pos)
 
 
 def run(text, scope):
@@ -153,7 +169,7 @@ def run(text, scope):
         if c["query"]:
             queries.append(c["query"])
             r = resolve(c["query"])
-            if openable(r):
+            if identifies_act(r):
                 act = {k: r.get(k) for k in ("act_type", "act_number", "date")}
                 context = (act, paragraph_of(text, c["start"]))
                 arts = [a.strip() for a in (r.get("article") or "").split(",") if a.strip()] if c["articles"] else []

@@ -121,3 +121,21 @@ for name, get in runs.items():
     totals[name] = tot
 for name, t in totals.items():
     print(f"{name}: {t}")
+
+# The client parser against the server on the same strings (§3.2): where both read a string, do they agree?
+cq = D / "client_queries.json"
+if cq.exists():
+    sys.path.insert(0, str(Path(__file__).parent))
+    from proposed import resolve  # noqa: E402
+
+    def flat(x):
+        return ((x.get("act_type") or "").lower(), x.get("act_number") or "", (x.get("date") or "")[:4],
+                (x.get("article") or "").replace(" ", ""))
+    readings = json.loads(cq.read_text())
+    ready = [q for q, v in readings.items() if v["ready"]]
+    differ = [(q, flat(readings[q]["parsed"]), flat(resolve(q) or {})) for q in ready
+              if flat(readings[q]["parsed"]) != flat(resolve(q) or {})]
+    print(f"client parser: {len(ready)} of {len(readings)} strings searchable in the browser; differing from the server: {len(differ)}")
+    for d in differ:
+        print("  ", d)
+
