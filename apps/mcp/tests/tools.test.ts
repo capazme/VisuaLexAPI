@@ -260,6 +260,8 @@ describe('omnilex_crea_dossier', () => {
       ],
       note_non_entrate: [{ nota: 4, motivo: 'la sua voce non è entrata' }],
     });
+    // No error, so no in_sospeso: the answer keeps the shape it had before the key.
+    expect(json(result)).not.toHaveProperty('in_sospeso');
     // No citation, detail or text of the sources travels back: only the rows that did not enter.
     expect(text(result)).not.toMatch(/display|detail|citation|Fonte non raggiungibile/);
     // The existing routes, in order, each with its own exchanged token; the words sent as written.
@@ -319,6 +321,8 @@ describe('omnilex_crea_dossier', () => {
       note_non_entrate: [{ nota: 2, motivo: 'la sua voce non è entrata' }],
     });
     expect(answer.errore).toMatch(/^Hai raggiunto il limite giornaliero di operazioni/);
+    // The norms' step was refused, not left without an answer: nothing is pending, and the key says so.
+    expect(answer.in_sospeso).toEqual([]);
   });
 
   it('answers with the dossier even when a step answers nonsense, and tells a client that asked of each step', async () => {
@@ -362,6 +366,8 @@ describe('omnilex_crea_dossier', () => {
       non_entrate: [],
       note_non_entrate: [{ nota: 2, motivo: landing }],
       errore: landing,
+      // Which rows are neither in nor out, for a client that subtracts non_entrate from its list.
+      in_sospeso: ['norme'],
     });
     // Every step reported, the skipped note too.
     expect(progress).toEqual(['dossier creato', 'norme', 'norme: fatto', 'sentenze', 'sentenze: fatto', 'nota 1', 'nota 1: fatto', 'nota 2: saltata']);
@@ -425,7 +431,29 @@ describe('omnilex_crea_dossier', () => {
     const answer = json(result);
     expect(answer.non_entrate).toEqual([]);
     expect(answer.errore).toContain('non crearlo di nuovo');
+    expect(answer.in_sospeso).toEqual(['sentenze']);
     expect(answer.note_non_entrate).toEqual([{ nota: 1, motivo: 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' }]);
+  });
+
+  it('names both steps pending when neither answered, and reports none of their rows', async () => {
+    env.stub.apiOverride = (method, path) => {
+      if (method === 'POST' && path === '/dossiers/d4/norms') return 'drop';
+      if (method === 'POST' && path === '/dossiers/d4/decisions') return [502, {}];
+      return undefined;
+    };
+    const result = await client.callTool({
+      name: 'omnilex_crea_dossier',
+      arguments: { nome: 'X', riferimenti: ['art. 2043 c.c.'], sentenze: ['Cass. SU 31310/2024'] },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(json(result)).toEqual({
+      dossier: { id: 'd4', nome: 'X', tipo: 'lavoro' },
+      entrate: { norme: 0, sentenze: 0, note: 0 },
+      non_entrate: [],
+      // The same sentence once, the steps in the order they ran.
+      errore: 'VisuaLex non ha risposto in tempo: il dossier d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.',
+      in_sospeso: ['norme', 'sentenze'],
+    });
   });
 
   it('reports a note the server refuses, and adds the others', async () => {

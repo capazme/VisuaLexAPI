@@ -286,6 +286,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         `e nella stessa chiamata vi aggiunge fino a ${MAX_REFERENCES} norme e ${MAX_DECISIONS} sentenze a parole, verificate sulle fonti, e ${MAX_NOTES} note. ` +
         'Per ogni riga non entrata (com’è stata scritta) dice il motivo: non riconosciuto, inesistente, ambiguo (atto intero o più articoli; sentenza: i candidati), ' +
         'non verificabile (fonte assente o corte non ancora letta), già presente. Nessun testo. Una nota non dia per verificata una riga non entrata. ' +
+        'Con errore, in_sospeso nomina i passi (norme, sentenze) rimasti senza risposta: le loro righe non sono né entrate né non entrate. ' +
         'Se la chiamata resta senza risposta, cerca il dossier con omnilex_elenca_dossier prima di ripeterla.',
       inputSchema: {
         nome: z.string().trim().min(1).max(MAX_DOSSIER_NAME).describe('Il nome del dossier'),
@@ -359,6 +360,9 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         // Once the dossier exists nothing is thrown, so its id always reaches the model: a step refused whole leaves
         // the others to run, and the answer says what entered.
         const errors = new Set<string>();
+        // The steps that got no answer, for a client that reads the answer as data (mcp-legal-it's citation check):
+        // their rows are in neither list, and only this key says which rows those are.
+        const pending: ('norme' | 'sentenze')[] = [];
         // A route that gave no answer may still be writing its entries: its rows are never reported as refused (the
         // model would create the dossier again, and a client subtracting them would count them as absent).
         const STILL_LANDING =
@@ -395,7 +399,10 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         // One outcome per row, in order; a row the route did not answer did not enter. A row written exactly as one that
         // entered is not reported «già presente»: its string did enter, and a client subtracting it would lose both.
         const tally = (rows: string[], results: ApiOutcome[] | null, kind: 'norme' | 'sentenze') => {
-          if (results === null) return;
+          if (results === null) {
+            pending.push(kind);
+            return;
+          }
           const entered = new Set<string>();
           rows.forEach((riga, i) => {
             if (results[i]?.outcome === 'added') {
@@ -450,7 +457,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           entrate,
           non_entrate: nonEntrate,
           ...(notesNotEntered.length ? { note_non_entrate: notesNotEntered } : {}),
-          ...(errors.size ? { errore: [...errors].join(' ') } : {}),
+          // Every answer with an error says which steps are pending, [] for none; one without keeps the old shape.
+          ...(errors.size ? { errore: [...errors].join(' '), in_sospeso: pending } : {}),
         });
       }),
   );
