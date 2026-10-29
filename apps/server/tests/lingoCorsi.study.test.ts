@@ -44,11 +44,21 @@ describe('reading a module', () => {
     const { id, moduleIds } = await ready();
     const read = await request(app).get(moduleUrl(id, moduleIds[0])).set(a);
     expect(read.status).toBe(200);
-    expect(read.body).toMatchObject({ id: moduleIds[0], titolo: 'Modulo 1', stato: null, aperta: null, quiz: { totale: 6, risposte: 0 } });
-    expect(read.body.blocchi[0].testo).toContain('La ditta');
-    expect(read.body.domande.map((d: { tipo: string }) => d.tipo)).toEqual(['RICHIAMO', 'QUIZ', 'QUIZ', 'QUIZ', 'QUIZ', 'QUIZ', 'QUIZ', 'APERTA']);
-    leaksNoKey(read.body.domande);
-    leaksNoKey(read.body.aperta);
+    expect(read.body).toMatchObject({
+      id: moduleIds[0], corso: { id, titolo: 'Proprietà intellettuale' }, titolo: 'Modulo 1', stato: 'da-iniziare', ritirato: false, avanzamento: null,
+      rispostaModello: null, quizStato: { totale: 6, risposte: 0 }, domandePrima: ['Che cos’è la ditta?'],
+    });
+    // The competences with their words, the recall questions inside their block (the web's session reads these).
+    expect(read.body.competenze).toEqual([
+      { codice: 'C1', testo: 'Qualificare un segno distintivo e i suoi impedimenti' },
+      { codice: 'C2', testo: 'Distinguere la ditta dall’insegna e dal marchio' },
+      { codice: 'C3', testo: 'Applicare le regole sul trasferimento della ditta' },
+    ]);
+    expect(read.body.blocchi[0]).toMatchObject({ id: expect.any(String), ordine: 1, testo: expect.stringContaining('La ditta') });
+    expect(read.body.blocchi[0].richiamo.map((d: { tipo: string; risposta: unknown }) => [d.tipo, d.risposta])).toEqual([['RICHIAMO', null]]);
+    expect(read.body.quiz).toHaveLength(6);
+    expect(read.body.domandaAperta.tipo).toBe('APERTA');
+    leaksNoKey([read.body.blocchi.map((b: { richiamo: unknown }) => b.richiamo), read.body.quiz, read.body.domandaAperta, read.body.rispostaModello]);
     // Reading does not open: the module can still be trashed.
     expect(await prisma.lingoCorsoModuloStato.count()).toBe(0);
   });
@@ -59,7 +69,7 @@ describe('reading a module', () => {
     await answer(a, id, moduleIds[0], quiz[0].id, 'b');
     const read = await readModule(a, id, moduleIds[0]);
     const first = read.domande.find((d) => d.id === quiz[0].id) as unknown as Record<string, unknown>;
-    expect(first).toMatchObject({ corretta: 'a', esito: { scelta: 'b', corretto: false, giorno: TODAY, segnalata: false } });
+    expect(first).toMatchObject({ risposta: { scelta: 'b', corretto: false, corretta: 'a', giorno: TODAY, segnalata: false } });
     expect(JSON.stringify(first)).toContain('Perché la seconda.');
     leaksNoKey(read.domande.filter((d) => d.id !== quiz[0].id));
   });

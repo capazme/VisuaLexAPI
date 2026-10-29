@@ -107,15 +107,17 @@ async function outcomesFor(db: Tx, iscrizioneId: string, domandaIds: string[]): 
   return new Map(rows.map((r) => [r.domandaId, r]));
 }
 
-/** An item with the caller's outcome: keys and explanations only once the choice was graded. */
+/**
+ * An item with the caller's outcome (`risposta`): the explanations and the right key only once the choice was graded.
+ * A row holding only the rubric's ticks (the open question at 70% or more) unlocks nothing.
+ */
 function itemWithOutcome(item: ItemForRead, codeOf: Map<string, string>, outcome: OutcomeRow | undefined) {
-  const graded = outcome?.scelta != null || outcome?.corretto != null;
-  const base = serializeItem(item, codeOf, false);
+  const graded = outcome?.scelta != null;
   return {
-    ...base,
-    ...(graded ? { opzioni: item.opzioni as unknown as StoredOption[], corretta: item.corretta } : {}),
-    esito: outcome
-      ? { scelta: outcome.scelta, corretto: outcome.corretto, giorno: dateToDay(outcome.giorno), segnalata: outcome.segnalatoIl !== null }
+    ...serializeItem(item, codeOf, false),
+    ...(graded ? { opzioni: item.opzioni as unknown as StoredOption[] } : {}),
+    risposta: outcome && graded
+      ? { scelta: outcome.scelta, corretto: outcome.corretto, corretta: item.corretta, giorno: dateToDay(outcome.giorno), segnalata: outcome.segnalatoIl !== null }
       : null,
   };
 }
@@ -159,7 +161,9 @@ async function afterStudy(tx: Tx, userId: string, enrolment: Enrolment, today: s
 
 /**
  * `GET /:id/moduli/:moduloId`: the lesson and its items, the answered ones with their keys, explanations and the
- * caller's outcome, so a session resumes where it stopped. A module not yet opened is readable (§6, point 4).
+ * caller's outcome, so a session resumes where it stopped. A module not yet opened is readable (§6, point 4). The
+ * shape is the one the web's session reads (web PR (b)): the competences with their words, each block's recall
+ * questions inside it, then the quiz and the open question.
  */
 export async function readModule(userId: string, corsoId: string, moduloId: string) {
   const enrolment = await enrolmentFor(userId, corsoId);
@@ -175,23 +179,35 @@ export async function readModule(userId: string, corsoId: string, moduloId: stri
     prisma.lingoCorsoModuloStato.findUnique({ where: { iscrizioneId_moduloId: { iscrizioneId: enrolment.id, moduloId } } }),
     prisma.lingoCorsoModulo.findMany({ where: { sostituisceId: moduloId }, select: { id: true } }),
   ]);
-  const blockOrder = new Map(modulo.blocchi.map((b) => [b.id, b.ordine]));
+  const [corso, competences] = await Promise.all([
+    prisma.lingoCorso.findUnique({ where: { id: corsoId }, select: { id: true, titolo: true } }),
+    prisma.lingoCorsoCompetenza.findMany({ where: { id: { in: modulo.competenze.map((c) => c.competenzaId) } }, orderBy: { ordine: 'asc' }, select: { codice: true, testo: true } }),
+  ]);
+  if (!corso) throw new AppError(404, NOT_FOUND);
+  const read = (i: ItemForRead) => itemWithOutcome(i, codeOf, outcomes.get(i.id));
+  const open = items.find((i) => i.tipo === 'APERTA');
   return {
     id: modulo.id,
-    corsoId,
+    corso,
     ordine: modulo.ordine,
     titolo: modulo.titolo,
     minuti: modulo.minuti,
-    competenze: modulo.competenze.map((c) => codeOf.get(c.competenzaId)).filter(Boolean),
+    competenze: competences,
+    stato: state?.ritiratoIl ? 'ritirato' : state?.fattoGiorno ? 'fatto' : state ? 'in-corso' : 'da-iniziare',
+    ritirato: Boolean(state?.ritiratoIl),
+    avanzamento: serializeState(state),
     sostituisceId: modulo.sostituisceId,
     sostituitoDa: corrections.map((c) => c.id),
     creatoDa: modulo.createdByClientName === null && modulo.createdByClientId === null ? null : { clientName: modulo.createdByClientName },
     domandePrima: modulo.domandePrima,
-    blocchi: modulo.blocchi.map((b) => ({ ordine: b.ordine, titolo: b.titolo, testo: b.testo, parole: b.parole, citazioni: b.citazioni })),
-    domande: items.map((i) => ({ ...itemWithOutcome(i, codeOf, outcomes.get(i.id)), blocco: i.bloccoId ? (blockOrder.get(i.bloccoId) ?? null) : null })),
-    quiz: (({ completo: _c, ...q }) => q)(quizOf(items, outcomes)),
-    aperta: openAnswer(items, outcomes),
-    stato: serializeState(state),
+    blocchi: modulo.blocchi.map((b) => ({
+      id: b.id, ordine: b.ordine, titolo: b.titolo, testo: b.testo, parole: b.parole, citazioni: b.citazioni,
+      richiamo: items.filter((i) => i.tipo === 'RICHIAMO' && i.bloccoId === b.id).map(read),
+    })),
+    quiz: items.filter((i) => i.tipo === 'QUIZ').map(read),
+    quizStato: (({ completo: _c, ...q }) => q)(quizOf(items, outcomes)),
+    domandaAperta: open ? read(open) : null,
+    rispostaModello: openAnswer(items, outcomes),
   };
 }
 

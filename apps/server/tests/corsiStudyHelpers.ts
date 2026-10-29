@@ -10,10 +10,15 @@ export const moduleUrl = (corsoId: string, moduloId: string) => `${CORSI}/${cors
 export const answer = (h: Headers, corsoId: string, moduloId: string, domandaId: string, scelta: string) =>
   request(app).post(`${moduleUrl(corsoId, moduloId)}/risposte`).set(h).send({ domandaId, scelta });
 
+type Item = { id: string; tipo: string } & Record<string, unknown>;
+
+/** The module read, with `domande`: its items flat, in the order recall, quiz, open question. */
 export async function readModule(h: Headers, corsoId: string, moduloId: string) {
   const read = await request(app).get(moduleUrl(corsoId, moduloId)).set(h);
   if (read.status !== 200) throw new Error(`module read: ${read.status} ${JSON.stringify(read.body)}`);
-  return read.body as { domande: { id: string; tipo: string }[] } & Record<string, unknown>;
+  const body = read.body as { blocchi: { richiamo: Item[] }[]; quiz: Item[]; domandaAperta: Item | null } & Record<string, unknown>;
+  const domande = [...body.blocchi.flatMap((b) => b.richiamo), ...body.quiz, ...(body.domandaAperta ? [body.domandaAperta] : [])];
+  return { ...body, domande };
 }
 
 /** Answers the module's quiz: the first `wrong` items with «b» (wrong in the fixtures), the rest with «a». */
