@@ -41,6 +41,7 @@ _NOTE_SEPARATOR = "art_aggiornamento_separator-akn"
 # «AGGIORNAMENTO (129a)», and the marker «((348))» the text leaves where a note applies.
 _HEADING = re.compile(r"AGGIORNAMENTO\s*\(\s*(\d{1,6}[a-z]?)\s*\)", re.I)
 _DOUBLE_MARKER = re.compile(r"\(\(\s*(\d{1,6}[a-z]?)\s*\)\)", re.I)
+_YEAR = re.compile(r"\d{4}")
 # A word match, no legal reading: what a client may open its box of notes on.
 _COURT = re.compile(r"corte\s+costituzionale|\bc\.\s*cost\.", re.I)
 _JUDGMENT = re.compile(r"\bsentenz[ae]\b", re.I)
@@ -82,6 +83,20 @@ def _read_note(block: Tag) -> Optional[tuple[str, str]]:
     return heading.group(1).lower(), _collapse(body.get_text())
 
 
+def _is_note_reference(text: str, marker: re.Match[str]) -> bool:
+    """Whether a «((n))» in the text points at a note (the rules of mcp-legal-it's reader).
+
+    Two shapes of it do not: «((2)).» opening a line is a comma the amendment renumbered
+    (art. 117 TUB), and «((2006))» is a year. Only a bounded slice around the marker is
+    read, so many markers on one long line stay linear.
+    """
+    if _YEAR.fullmatch(marker.group(1)):
+        return False
+    head = text[max(0, marker.start() - 80):marker.start()]
+    opens_line = ("\n" in head or marker.start() <= 80) and not head.rsplit("\n", 1)[-1].strip()
+    return not (opens_line and text[marker.end():marker.end() + 4].lstrip().startswith("."))
+
+
 def _notes_in_text(body: Tag) -> bool:
     """Whether the scraper's extractor reads this body with the notes in its text.
 
@@ -118,6 +133,9 @@ def extract_update_notes(raw_html: str, *, article: Optional[str] = None) -> Opt
             return None
 
     in_text = _notes_in_text(body)
+    # Every «AGGIORNAMENTO (n)» on the page, in a note block or not: more than the notes read
+    # means one was missed.
+    headings = len(_HEADING.findall(body.get_text()))
     notes: List[UpdateNote] = []
     unread = False
     for block in body.find_all("div", class_=_NOTE_BLOCK):
@@ -140,8 +158,11 @@ def extract_update_notes(raw_html: str, *, article: Optional[str] = None) -> Opt
     # page with notes it still can: a cautious notice, never a lost note). A plain «(n)» is
     # left alone: the text has those for other reasons too.
     numbers = {note["numero"] for note in notes}
-    if (notes or unread) and any(
-            m.group(1).lower() not in numbers for m in _DOUBLE_MARKER.finditer(body.get_text())):
+    text = body.get_text()
+    if (notes or unread) and any(m.group(1).lower() not in numbers and _is_note_reference(text, m)
+                                 for m in _DOUBLE_MARKER.finditer(text)):
+        unread = True
+    if headings > len(notes):
         unread = True
 
     log.info("Update notes read", count=len(notes), unread=unread, in_text=in_text)

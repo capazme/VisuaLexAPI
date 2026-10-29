@@ -93,6 +93,24 @@ class TestWhatCannotBeRead:
         read = extract_update_notes(comma_page(text="1. Entro ((30)) giorni."), article="7")
         assert read == {"notes": [], "unread": False, "in_text": False}
 
+    def test_a_renumbered_comma_is_not_a_marker(self):
+        """«((2)).» opening a line is a comma the amendment renumbered (art. 117 TUB)."""
+        page_ = comma_page(text="\n((2)). Il contratto è redatto per iscritto.", notes=note_block())
+        assert extract_update_notes(page_, article="7")["unread"] is False
+        mid_line = comma_page(text="1. Il testo ((2)). Altro.", notes=note_block())
+        assert extract_update_notes(mid_line, article="7")["unread"] is True
+
+    def test_a_year_is_not_a_marker(self):
+        page_ = comma_page(text="1. Dal 1° gennaio ((2027)) il saggio …", notes=note_block())
+        assert extract_update_notes(page_, article="7")["unread"] is False
+
+    def test_more_headings_than_notes_read_flags_the_answer(self):
+        """A heading outside a note block: a note the reader did not see as one."""
+        stray = '<div class="art_aggiornamento_title-akn">AGGIORNAMENTO (6)</div><div>Il D.L. … ha disposto …</div>'
+        read = extract_update_notes(comma_page(notes=note_block() + stray), article="7")
+        assert [n["numero"] for n in read["notes"]] == ["5"]
+        assert read["unread"] is True
+
     def test_a_plain_marker_with_no_note_is_left_alone(self):
         read = extract_update_notes(comma_page(text="1. Il testo. (6)"), article="7")
         assert read == {"notes": [], "unread": False, "in_text": False}
@@ -174,6 +192,13 @@ class TestFields:
 
 
 class TestOnTheWire:
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_a_reader_that_fails_never_costs_the_article(self, controller, brocardi, endpoint):
+        with patch("visualex_api.services.normattiva_notes.extract_update_notes", side_effect=RuntimeError("boom")):
+            [result] = await ask(controller, endpoint, requested(), scraper=normattiva_serving(DLGS23_ART3))
+        assert result["article_text"] == TEXT
+        assert (result["note_aggiornamento"], result["note_non_lette"]) == (None, True)
+
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
     async def test_the_notes_ride_next_to_an_untouched_text(self, controller, brocardi, endpoint):
         [result] = await ask(controller, endpoint, requested(), scraper=normattiva_serving(DLGS23_ART3))
