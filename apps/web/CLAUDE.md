@@ -1064,6 +1064,35 @@ tick, nothing if the application wrote nothing — last in the row's toggle, in 
 («2 da validare · 1 da rivedere») are its `title` and in the row's name, its counts the server's `assistant_notes` on
 the item (`serverFieldsFromApi`).
 
+**An application's glosses** (D8: the server's side in PR #366, spec `docs/superpowers/specs/2026-10-29-d8-glosses-design.md`) are notes an application wrote on a passage of a dossier entry, validated
+by the user: `Proposal.kind === 'gloss'` (`color` null, the note never empty), on the same routes, store, states,
+boundary move and bin as the D7b passages, behind the same `assistant_passages` switch (the web shows a gloss saved
+while `assistant_glosses` was on even once that switch is off; it never reads `assistantGlosses`). **A gloss is never a
+mark**: `useEntryProposals` splits them out (`glosses`, and `glossAnchors` for the renderer: `GlossAnchor`, the id,
+the offset, the words and the state) and never makes a `Highlight` of one, so it reaches no other reader, PDF, Forum,
+Study Mode or practice, and no element of it enters the text (root rule 23): `renderArticleHtml` and
+`renderDecisionHtml` take `glosses` and only count them on the block's sign (`BlockAnnotations.glosses`,
+`data-glosses`, `.vlx-sign-gloss` with the state's shape, named apart by `signAriaLabel`: «…; 2 glosse dell'IA: 1 da
+validare · 1 validato»); «Nascondi evidenziazioni» leaves them, a gloss is a note. The projection tests run with glosses
+on. Where the reader has room (`.vlx-glossed`, a container query at 52 rem on the wrapper `GlossMargin` puts around
+`ArticleBody`, in the article's and the decision's dossier reader alike) the cards stand in a column on the right, as a
+word processor's comments (`GlossMargin`): each at the height of the first line of its words, read from a DOM range of
+the text root (`rangeFromPlainOffsets`), pushed down under the card above when they would overlap, in the order of the
+text (`placeGlossCards`, `utils/glossLayout.ts`, pure), placed by a `transform` (160 ms, none under reduced motion) and
+measured again on every redraw, reflow or card that grows (`ResizeObserver`s); a sign whose block holds only glosses
+then focuses the first card and opens nothing, one that holds more opens the popover with «Vai alla glossa a margine»
+(`glossesInMargin`). With less room — a phone, and the norms' column of a dossier that has decisions too — the column
+is not drawn (`display: none`, read by its width: `onWideChange`) and the sign's popover lists the block's `GlossCard`s
+first (44 px on a touch screen). A card (`GlossCard`): the state in words and shape, the passage's words on one line,
+the text, then «Valida» and «Da rivedere» (toggles, `aria-pressed`, waiting while a write is out), «Modifica»
+(`NoteEditBox explicit`; an emptied text is not sent), «Sposta» (`MoveProposalBar`, named «Sposta la glossa») and
+«Rimuovi» (the bin's «Annulla», «Glossa rimossa»); «Cosa non va?» while flagged (`ReviewComment`), «Vedi la versione
+dell'IA» once edited, «Vedi il passaggio dell'IA» once moved. Hovering a card or focusing anything in it shows its
+words with the CSS Custom Highlight API (`useGlossPassage`, `utils/glossPassage.ts`, `::highlight(vlx-gloss)`: the
+discussion's tint, one passage on the page at a time). A gloss whose words no longer land is listed under the text
+(`LostGlossesList`). **Every visible word that names one is in `constants/glossWords.ts`** (`GLOSS_WORDS`), and only
+there: «glossa» is also the Forum's discussion on a passage, and the owners may choose another word.
+
 The colour of new highlights is chosen once, in the reading bar (H1, the owner's decision; `settings.highlightColor`,
 kept on this device with the other reading settings, yellow until chosen, and yellow again for a save holding
 anything else — the persist `merge` checks it, `isHighlightColor`): `HighlightColorMenu` beside «Evidenziazioni» on a
@@ -2345,7 +2374,7 @@ Duplicating any of these is a defect, not a shortcut.
 - `hooks/useArticleTextInteractions.ts` — the update-note chips, the
   foldable AGGIORNAMENTO tail and the annotation signs (`openBlock`), for any
   surface that renders structured text.
-- `utils/articleAnnotations.ts` — `resolveAnchors`, `groupAnnotationsByBlock`,
+- `utils/articleAnnotations.ts` — `resolveAnchors`, `resolveGlosses` (D8), `groupAnnotationsByBlock`,
   `highlightsWithoutSign`, `describeBlock` (a block named by its printed enumerator or its opening
   words, never a computed number). The renderer and the block popover both
   read it: never re-derive where an anchor lands anywhere else.
