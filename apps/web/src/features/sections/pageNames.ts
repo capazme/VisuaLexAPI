@@ -18,6 +18,7 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/opus\/ingresso(\/|$)/, "Lista d'ingresso"],
   [/^\/opus\/cestino(\/|$)/, 'Cestino dei compiti'],
   [/^\/studia\/ripasso(\/|$)/, 'Oggi'],
+  [/^\/studia\/percorsi(\/|$)/, 'Percorsi'],
   [/^\/studia\/progressi(\/|$)/, 'Progressi'],
   [/^\/studia\/schede(\/|$)/, 'Le mie schede'],
   [/^\/studia\/valida(\/|$)/, 'Da validare'],

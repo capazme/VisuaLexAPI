@@ -149,7 +149,7 @@ export function ConnectPage() {
               <ShieldAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
               <span>
                 <span className="font-semibold">Dati personali:</span> secondo i permessi qui sopra, l’app leggerà i nomi dei tuoi
-                dossier, i titoli e i riferimenti delle voci, le tue schede di studio e le tue note, e li passerà al servizio di intelligenza
+                dossier, i titoli e i riferimenti delle voci, le tue note, le tue schede e i tuoi percorsi di studio, e li passerà al servizio di intelligenza
                 artificiale che usa. Non scrivere lì dati personali dei clienti, oppure autorizza solo app AI di cui ti fidi.
               </span>
             </p>

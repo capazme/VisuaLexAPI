@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, CalendarCheck, CalendarDays, Inbox, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
+import { Search, Folder, FolderOpen, CalendarCheck, CalendarDays, Inbox, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -22,6 +22,7 @@ import { spring } from '../../lib/motion';
 import type { SidebarLayout } from './sidebarWidth';
 import { plannerStore } from '../features/planner/plannerStore';
 import { todayCountLabel } from '../features/planner/taskDates';
+import { useCoursesSwitch } from '../features/studia/corsi/coursesSwitch';
 
 interface SidebarProps {
   theme: string;
@@ -323,6 +324,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
   const navigate = useNavigate();
   const { user, isAdmin, isValidator, logout } = useAuth();
+  const coursesOn = useCoursesSwitch() === 'on';
   const { section, active } = useSection();
   const sectionEntries = useEntriesEntrance(section);
   const { count: forumNotifications } = useForumNotifications(!!user);
@@ -479,6 +481,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}
                 <NavGroup name="Studia" heading layout={layout}>
                   <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
+                  {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
+                  {coursesOn && <NavItem to="/studia/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}
                   <NavItem to="/studia/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
                   <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 </NavGroup>

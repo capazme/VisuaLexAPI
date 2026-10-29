@@ -79,6 +79,34 @@ describe('useTrash', () => {
   });
 });
 
+describe('useTrash — courses of «Percorsi»', () => {
+  const module = entry({ id: 'tm', kind: 'LINGO_CORSO_MODULO', dossierId: null, label: 'Modulo · Corso', cardCount: 2 });
+
+  it('a module whose course is gone stays in the trash, with the server\'s reason', async () => {
+    list.mockResolvedValue([module]);
+    restoreCall.mockRejectedValue({ status: 404, message: 'Il percorso di questo modulo non c’è più.' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(module); });
+    expect(outcome).toEqual({ kind: 'failed', message: 'Il percorso di questo modulo non c’è più.' });
+    expect(result.current.entries).toHaveLength(1);
+  });
+
+  it('a course\'s entry the trash no longer has is dropped, and a restored course has the cards read again', async () => {
+    list.mockResolvedValueOnce([module]).mockResolvedValueOnce([]);
+    restoreCall.mockRejectedValueOnce({ status: 404, message: 'Elemento del cestino non trovato.' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(module); });
+    expect(outcome).toEqual({ kind: 'failed', message: GONE_FROM_TRASH });
+    restoreCall.mockResolvedValueOnce({ dossierId: null });
+    await act(async () => { await result.current.restore(entry({ id: 'tc', kind: 'LINGO_CORSO', dossierId: null })); });
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useTrash — what can go wrong', () => {
   it('drops an entry the server no longer has, and says why', async () => {
     list.mockResolvedValue([entry()]);
