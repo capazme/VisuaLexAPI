@@ -20,12 +20,20 @@ interface Props {
 function titleOf(entry: TrashEntry, showSource: boolean): string {
   if (entry.kind === 'DOSSIER') return `Dossier «${entry.label}»`;
   if (entry.kind === 'LINGO_CARDS') return entry.itemCount === 1 ? 'Scheda di studio' : `Schede di studio (${entry.itemCount})`;
+  if (entry.kind === 'LINGO_CORSO') return `Percorso «${entry.label}»`;
+  if (entry.kind === 'LINGO_CORSO_MODULO') return `Modulo «${entry.label}»`;
   return showSource ? `Da «${entry.label}»` : (entry.itemCount === 1 ? '1 elemento' : `${entry.itemCount} elementi`);
 }
 
 function whatOf(entry: TrashEntry): string {
   if (entry.kind === 'DOSSIER') return entry.itemCount === 1 ? '1 elemento' : `${entry.itemCount} elementi`;
   if (entry.kind === 'LINGO_CARDS') return trashCardsSummary(entry.cards ?? []);
+  if (entry.kind === 'LINGO_CORSO' || entry.kind === 'LINGO_CORSO_MODULO') {
+    const cards = entry.cardCount ?? 0;
+    const cardsLine = cards === 0 ? 'nessuna scheda' : cards === 1 ? '1 scheda' : `${cards} schede`;
+    if (entry.kind === 'LINGO_CORSO_MODULO') return cards === 0 ? 'Senza schede' : `Con ${cardsLine}`;
+    return `${entry.itemCount === 1 ? '1 modulo' : `${entry.itemCount} moduli`} · ${cardsLine}`;
+  }
   return trashItemsSummary(entry.items ?? []);
 }
 

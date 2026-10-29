@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TrashEntryRow } from './TrashEntryRow';
 import type { TrashEntry } from '../../../services/trashService';
 import type { Dossier } from '../../../types';
@@ -57,6 +57,16 @@ describe('TrashEntryRow', () => {
     expect(screen.getByText('Schede di studio (4)')).toBeInTheDocument();
     expect(screen.queryByText(/LingoLex/)).toBeNull();
     expect(screen.getByText('«Che cos’è la causa?» · «Quando è nullo?» · «Che cos’è la forma?» e altre 1')).toBeInTheDocument();
+  });
+
+  it('names a course of «Percorsi» with its modules and cards, and a module of one with its cards', () => {
+    renderRow({ ...base, id: 't4', kind: 'LINGO_CORSO', dossierId: null, label: 'Segni distintivi', itemCount: 10, cardCount: 1, byApplication: false, clientName: null });
+    expect(screen.getByText('Percorso «Segni distintivi»')).toBeInTheDocument();
+    expect(screen.getByText('10 moduli · 1 scheda')).toBeInTheDocument();
+    cleanup();
+    renderRow({ ...base, id: 't5', kind: 'LINGO_CORSO_MODULO', dossierId: null, label: 'Il marchio di fatto · Segni distintivi', itemCount: 1, cardCount: 0 });
+    expect(screen.getByText('Modulo «Il marchio di fatto · Segni distintivi»')).toBeInTheDocument();
+    expect(screen.getByText('Senza schede')).toBeInTheDocument();
   });
 
   it('names one card in the singular', () => {
