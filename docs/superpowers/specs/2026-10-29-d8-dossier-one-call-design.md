@@ -1,7 +1,9 @@
 # D8 S1 — a dossier in one call, and its cost measured
 
-Status: decided by the owners on 29 October 2026; the answer's contract agreed with mcp-legal-it's
-maintainer. Part of D8 («MCP più leggero e glosse»); the glosses are
+Status: decided by the owners on 29 October 2026; the answer's three keys (`dossier`, `entrate`,
+`non_entrate` with `riga` and `motivo`) agreed with mcp-legal-it's maintainer. The two keys that appear
+only when they apply (`note_non_entrate`, `errore`) and the mapping of a court VisuaLex cannot read to
+«non verificabile» are this step's choices, for the owners to confirm. Part of D8 («MCP più leggero e glosse»); the glosses are
 `2026-10-29-d8-glosses-design.md`.
 
 ## Why
@@ -26,10 +28,17 @@ reason for every row. Usage went there.
    mcp-legal-it subtracts it from its own list). `motivo` is one of «non riconosciuto»,
    «inesistente», «ambiguo» (a decision's with at most three `candidati`, in words), «non
    verificabile» (a source that did not answer, or a court VisuaLex cannot read yet), «già presente».
-   Rows that entered are not repeated. Two keys appear only when they apply: `note_non_entrate:
+   Rows that entered are not repeated, nor is a row written exactly as one that entered (its string
+   is in the dossier: reported «già presente», a client subtracting it would lose both). Two keys appear only when they apply: `note_non_entrate:
    [{ nota, motivo }]` (the note's position, 1-based, and why: its `voce` did not enter, or the
    server's reason), and `errore`, once the dossier exists, for a step the server refused whole (the
-   daily points, a revoked connection): its rows are «non verificabile» and the other steps still run.
+   daily points, a revoked connection) or answered with something unreadable: its rows are «non
+   verificabile» and the other steps still run. Once the dossier exists nothing is thrown, so its id
+   always reaches the model.
+   The steps can take minutes: a client that sent a `progressToken` gets a progress notification after
+   each, one that cancels stops the steps not yet begun, and the description tells the model to look
+   for the dossier with `omnilex_elenca_dossier` before repeating a call left without an answer (a
+   second call would create a second dossier).
 3. **`omnilex_aggiungi_nota_dossier`** takes `note` (1–10 `{ testo, voce? }`, `voce` the entry's id)
    in place of the single `testo`/`voce`, which is gone: one shape, a smaller definition. It answers
    `{ dossier, entrate: [{ nota, id, nota_su }], non_entrate?: [{ nota, motivo }] }`; every note
@@ -47,7 +56,8 @@ table, the points, the daily counters (10 dossiers, 100 notes) and the refunds e
 separate tools spend them. Norms then decisions, in sequence: the entries keep the order of the call,
 and the two routes' position counters never race. The one server change is additive: an ambiguous
 decision's candidates as a list (`candidates`, beside the `detail` that already named them), so the
-MCP never parses a sentence. No migration, no new route.
+MCP never parses a sentence; `omnilex_aggiungi_sentenze_dossier` leaves it out of its own answer,
+whose `detail` already names them. No migration, no new route.
 
 ## The measure
 

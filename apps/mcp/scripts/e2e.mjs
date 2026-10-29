@@ -123,19 +123,18 @@ check(`${expected} tools, only the three deletions destructive`, tools.length ==
 const name = `E2E MCP ${new Date().toISOString().slice(0, 19)}`;
 const created = await call(client, 'omnilex_crea_dossier', { nome: name });
 must('omnilex_crea_dossier', !created.isError && created.data?.dossier?.id, created.isError ? created.text : name);
-created.data.id = created.data.dossier.id;
 const added = await call(client, 'omnilex_aggiungi_norme_dossier', { dossier: name, riferimenti: ['art. 2043 c.c.', 'art 2059 cc', 'art. 99999 c.c.'] });
 const outcomes = added.data?.esiti?.map((e) => e.outcome) ?? [];
 check('omnilex_aggiungi_norme_dossier: two added, the made-up one refused', JSON.stringify(outcomes) === JSON.stringify(['added', 'added', 'does_not_exist']), added.isError ? added.text : outcomes.join(', '));
-const read = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
+const read = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.dossier.id });
 check('omnilex_leggi_dossier: the two articles, no text', read.data?.voci?.length === 2 && !read.text.includes('article_text'), read.data?.voci?.map((v) => v.riferimento).join('; '));
 const article = read.data?.voci?.[0];
-const note = await call(client, 'omnilex_aggiungi_nota_dossier', { dossier: created.data.id, note: [{ testo: 'Nota di prova sul danno ingiusto.', voce: article?.id }] });
+const note = await call(client, 'omnilex_aggiungi_nota_dossier', { dossier: created.data.dossier.id, note: [{ testo: 'Nota di prova sul danno ingiusto.', voce: article?.id }] });
 check('omnilex_aggiungi_nota_dossier: a note on the first article', !note.isError && note.data?.entrate?.[0]?.nota_su === article?.id, note.isError ? note.text : note.data?.entrate?.[0]?.id);
-const reread = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
+const reread = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.dossier.id });
 const noteEntry = reread.data?.voci?.find((v) => v.tipo === 'note');
 check('the note reads as written by the application, about that article', noteEntry?.nota_su === article?.id && noteEntry?.aggiunta_da === 'VisuaLex e2e', `aggiunta_da ${noteEntry?.aggiunta_da}`);
-const fifty1 = await client.callTool({ name: 'omnilex_aggiungi_norme_dossier', arguments: { dossier: created.data.id, riferimenti: Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`) } }).catch((e) => ({ isError: true, content: [{ text: String(e) }] }));
+const fifty1 = await client.callTool({ name: 'omnilex_aggiungi_norme_dossier', arguments: { dossier: created.data.dossier.id, riferimenti: Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`) } }).catch((e) => ({ isError: true, content: [{ text: String(e) }] }));
 check('51 references refused', Boolean(fifty1.isError));
 
 // D8 S1: the dossier in one call, the rows that did not enter answered as they were written.
@@ -155,27 +154,27 @@ const oneCallId = oneCall.data?.dossier?.id;
 // Deletion (second round): off until the user switches it on; then confirmed, into the trash, restorable.
 const grantsNow = await json(await fetch(`${VISUALEX}/api/oauth/grants`, { headers: session }));
 const grantNow = grantsNow.find?.((g) => g.clientName === 'VisuaLex e2e');
-const offAnswer = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
+const offAnswer = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.dossier.id, voci: [article?.id] });
 check('without the permission the deletion says where to turn it on', offAnswer.isError && offAnswer.text.includes('Applicazioni collegate'), offAnswer.text.slice(0, 60));
 const switched = await fetch(`${VISUALEX}/api/oauth/grants/${grantNow?.id}`, { method: 'PATCH', headers: session, body: JSON.stringify({ canDelete: true }) });
 check('the user switches deletion on in the settings', switched.status === 200);
 answer = { action: 'decline' };
 const askedBefore = asked.length;
-const declined = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
-const stillThere = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
+const declined = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.dossier.id, voci: [article?.id] });
+const stillThere = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.dossier.id });
 check(
   'the user is asked, and Decline deletes nothing',
   asked.length === askedBefore + 1 && !declined.isError && declined.data?.esito === 'annullata' && stillThere.data?.voci?.some((v) => v.id === article?.id),
   asked.at(-1)?.split('\n')[0],
 );
 answer = { action: 'accept', content: { conferma: true } };
-const accepted = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
+const accepted = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.dossier.id, voci: [article?.id] });
 check('Accept moves the entry to the trash', accepted.data?.spostate_nel_cestino === 1, accepted.isError ? accepted.text : `fino al ${accepted.data?.ripristinabili_fino_al}`);
 const trash = await json(await fetch(`${VISUALEX}/api/trash`, { headers: session }));
-const entry = trash.find?.((t) => t.dossierId === created.data.id && t.kind === 'DOSSIER_ITEMS');
+const entry = trash.find?.((t) => t.dossierId === created.data.dossier.id && t.kind === 'DOSSIER_ITEMS');
 check('the trash lists it, with its citation and the application that deleted it', entry?.items?.[0]?.citation === article?.riferimento && entry?.clientName === 'VisuaLex e2e', entry?.items?.[0]?.citation);
 const restored = await fetch(`${VISUALEX}/api/trash/${entry?.id}/restore`, { method: 'POST', headers: session, body: '{}' });
-const back = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
+const back = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.dossier.id });
 check('the user restores it from VisuaLex, with its note still about it', restored.status === 200 && back.data?.voci?.some((v) => v.id === article?.id) && back.data?.voci?.find((v) => v.tipo === 'note')?.nota_su === article?.id);
 // LingoLex cards (spec §6): a draft anchored on art. 1453 c.c., listed, deleted with Accept, restored.
 const savedCards = await call(client, 'lingolex_salva_card', { schede: [{
@@ -199,7 +198,7 @@ const cardBack = await json(await fetch(`${VISUALEX}/api/lingo/cards/${cardId}`,
 check('the card comes back from the trash, still a draft', cardRestored.status === 200 && cardBack.stato === 'BOZZA_PERSONALE');
 
 await fetch(`${VISUALEX}/api/oauth/grants/${grantNow?.id}`, { method: 'PATCH', headers: session, body: JSON.stringify({ canDelete: false }) });
-const offAgain = await call(client, 'omnilex_elimina_dossier', { dossier: created.data.id });
+const offAgain = await call(client, 'omnilex_elimina_dossier', { dossier: created.data.dossier.id });
 check('switched off again, the next deletion is refused', offAgain.isError && offAgain.text.includes('non è autorizzata'));
 
 const quota = await call(client, 'omnilex_stato_account');
@@ -230,7 +229,7 @@ try {
 check('after the revocation the next call fails', afterRevoke.isError, afterRevoke.text.slice(0, 80));
 
 // 9. Clean up: the two dossiers go through the user session (to its trash, as every deletion of the web app does).
-const deleted = await fetch(`${VISUALEX}/api/dossiers/${created.data.id}`, { method: 'DELETE', headers: session });
+const deleted = await fetch(`${VISUALEX}/api/dossiers/${created.data.dossier.id}`, { method: 'DELETE', headers: session });
 if (oneCallId) {
   const second = await fetch(`${VISUALEX}/api/dossiers/${oneCallId}`, { method: 'DELETE', headers: session });
   check('cleanup: the one-call dossier deleted through the user session', second.status === 204 || second.status === 200);

@@ -8,6 +8,10 @@
  *     at most 10, then one note per call (the way the tools were used before D8 S1);
  *   - «dopo»: one omnilex_crea_dossier call with the list and the notes.
  *
+ * Both run on the code checked out, so both read today's definitions: the «prima» of a pull request
+ * is this script run on the base branch (it reads either answer of the creation and either form of
+ * the notes tool), its «dopo» the script run on the branch.
+ *
  * For each it counts the calls and the characters of the definitions loaded (the tools list as the
  * client receives it, and the server's instructions), of the arguments the model writes and of every
  * answer. Characters, not tokens: no tokenizer runs here, and the ratio between the two paths is what
@@ -178,7 +182,7 @@ export function table(before, after) {
   const n = (value) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   const share = (a, b) => (a === 0 ? '—' : `${Math.round((b / a) * 100)}%`);
   return [
-    '| | Prima | Dopo | Dopo / prima |',
+    '| | Un passo per chiamata | Una chiamata | Una / un passo |',
     '| --- | ---: | ---: | ---: |',
     ...rows.map(([label, key]) => `| ${label} | ${n(before[key])} | ${n(after[key])} | ${share(before[key], after[key])} |`),
   ].join('\n');

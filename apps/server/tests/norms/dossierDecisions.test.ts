@@ -206,7 +206,10 @@ describe('POST /api/dossiers/:id/decisions', () => {
     expect(seats.detail).toContain('Indica la sede del TAR.');
     // The same citations as a list, for a client that names the candidates (D8 S1).
     expect(seats.candidates).toEqual(expect.arrayContaining(['TAR Lombardia, Milano, sent., n. 4000/2020']));
-    expect(seats.candidates.every((c: string) => seats.detail.includes(c))).toBe(true);
+    for (const result of [kinds, seats]) {
+      expect(result.candidates.length).toBeGreaterThan(1);
+      expect(result.candidates.every((c: string) => result.detail.includes(c))).toBe(true);
+    }
     expect(await prisma.dossierItem.count()).toBe(0);
   });
 

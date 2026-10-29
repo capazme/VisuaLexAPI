@@ -209,7 +209,7 @@ describe('omnilex_crea_dossier', () => {
   });
 
   it('creates, adds norms, decisions and notes in one call, and answers only what did not enter, byte for byte', async () => {
-    const riferimenti = ['art. 2043 c.c.', '  Art.2059 cc ', 'art. 99999 c.c.', 'd.lgs. 36/2023', 'art 2043 codice civile', 'art. 1 l. 1/2099', 'sconosciuto'];
+    const riferimenti = ['art. 2043 c.c.', '  Art.2059 cc ', ' art. 99999 c.c.', 'd.lgs. 36/2023', 'art 2043 codice civile', 'art. 1 l. 1/2099', 'sconosciuto', 'art. 2043 c.c.'];
     const sentenze = ['Cass. SU 31310/2024', 'Cass. 10787/2024', 'Corte EDU, n. 1/2020'];
     env.stub.apiOverride = (method, path, body) => {
       if (method === 'POST' && path === '/dossiers/d4/norms') {
@@ -221,6 +221,7 @@ describe('omnilex_crea_dossier', () => {
           4: { outcome: 'already_present', display: 'art. 2043 c.c.' },
           5: { outcome: 'unavailable', detail: 'Fonte non raggiungibile: riprova più tardi.' },
           6: { outcome: 'not_recognised', detail: 'Riferimento non riconosciuto.' },
+          7: { outcome: 'already_present', display: 'art. 2043 c.c.' },
         };
         return [200, { results: (body as { references: string[] }).references.map((reference, i) => ({ reference: reference.trim(), ...outcomes[i] })) }];
       }
@@ -237,7 +238,7 @@ describe('omnilex_crea_dossier', () => {
       { testo: 'Sul dossier.' },
       { testo: 'Sul danno.', voce: 'art. 2043 c.c.' },
       { testo: 'Sulla stessa norma, scritta altrimenti.', voce: 'art 2043 codice civile' },
-      { testo: 'Su una norma che non c’è.', voce: 'art. 99999 c.c.' },
+      { testo: 'Su una norma che non c’è.', voce: ' art. 99999 c.c.' },
       { testo: 'Sul danno non patrimoniale.', voce: '  Art.2059 cc ' },
     ];
     const result = await client.callTool({ name: 'omnilex_crea_dossier', arguments: { nome: 'Pratica', riferimenti, sentenze, note } });
@@ -246,11 +247,13 @@ describe('omnilex_crea_dossier', () => {
       dossier: { id: 'd4', nome: 'Pratica', tipo: 'lavoro' },
       entrate: { norme: 2, sentenze: 1, note: 4 },
       non_entrate: [
-        { riga: 'art. 99999 c.c.', motivo: 'inesistente' },
+        // As it was sent, the leading space too.
+        { riga: ' art. 99999 c.c.', motivo: 'inesistente' },
         { riga: 'd.lgs. 36/2023', motivo: 'ambiguo' },
         { riga: 'art 2043 codice civile', motivo: 'già presente' },
         { riga: 'art. 1 l. 1/2099', motivo: 'non verificabile' },
         { riga: 'sconosciuto', motivo: 'non riconosciuto' },
+        // The last row, written exactly as the first, which entered: not reported, its string is in the dossier.
         { riga: 'Cass. 10787/2024', motivo: 'ambiguo', candidati: ['A', 'B', 'C'] },
         { riga: 'Corte EDU, n. 1/2020', motivo: 'non verificabile' },
       ],
@@ -317,6 +320,24 @@ describe('omnilex_crea_dossier', () => {
     expect(answer.errore).toMatch(/^Hai raggiunto il limite giornaliero di operazioni/);
   });
 
+  it('answers with the dossier even when a step answers nonsense, and tells a client that asked of each step', async () => {
+    env.stub.apiOverride = (method, path) => (method === 'POST' && path === '/dossiers/d4/norms' ? [200, { niente: true }] : undefined);
+    const progress: { progress: number; total?: number }[] = [];
+    const result = await client.callTool(
+      { name: 'omnilex_crea_dossier', arguments: { nome: 'X', riferimenti: ['art. 2043 c.c.'], note: [{ testo: 'a' }] } },
+      undefined,
+      { onprogress: (p) => progress.push({ progress: p.progress, total: p.total }) },
+    );
+    expect(result.isError).toBeFalsy();
+    expect(json(result)).toMatchObject({
+      dossier: { id: 'd4' },
+      entrate: { norme: 0, sentenze: 0, note: 1 },
+      non_entrate: [{ riga: 'art. 2043 c.c.', motivo: 'non verificabile' }],
+    });
+    // The creation, the norms, the note: three steps, two reported after the first.
+    expect(progress).toEqual([{ progress: 2, total: 3 }, { progress: 3, total: 3 }]);
+  });
+
   it('reports a note the server refuses, and adds the others', async () => {
     env.stub.apiOverride = (method, path, body) =>
       method === 'POST' && path.endsWith('/notes') && (body as { text: string }).text === 'no' ? [400, { detail: 'Caratteri di controllo non ammessi.' }] : undefined;
@@ -357,9 +378,13 @@ describe('omnilex_aggiungi_sentenze_dossier', () => {
       { reference: 'Cass. civ., sez. un., n. 31310/2024', outcome: 'added', citation: 'Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310', itemId: 'x' },
       { reference: 'Cons. Stato, sez. VI, n. 2270/2019', outcome: 'court_not_supported', court: 'Consiglio di Stato',
         detail: 'VisuaLex non legge ancora le decisioni di questa corte (Consiglio di Stato): non è stata aggiunta.' },
+      { reference: 'Cass. 10787/2024', outcome: 'ambiguous', detail: 'Più decisioni con questo numero e anno: A; B. Indica l’archivio (civ. o pen.).' },
     ];
+    // The server's list of candidates repeats the detail: omnilex_crea_dossier's answer uses it, this one does not.
     env.stub.apiOverride = (method, path) =>
-      method === 'POST' && path === '/dossiers/d1/decisions' ? [200, { results }] : undefined;
+      method === 'POST' && path === '/dossiers/d1/decisions'
+        ? [200, { results: results.map((r) => (r.outcome === 'ambiguous' ? { ...r, candidates: ['A', 'B'] } : r)) }]
+        : undefined;
     const sentenze = results.map((r) => r.reference);
     const result = await client.callTool({ name: 'omnilex_aggiungi_sentenze_dossier', arguments: { dossier: 'Prova', sentenze } });
     expect(json(result)).toEqual({ dossier: { id: 'd1', nome: 'Prova' }, esiti: results });

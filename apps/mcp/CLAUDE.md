@@ -57,8 +57,10 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   motivo, candidati? }] }`, plus `note_non_entrate: [{ nota, motivo }]` and `errore` when they apply; `riga` is the
   input string **byte for byte** (never trimmed: mcp-legal-it subtracts it from its list), `motivo` one of non
   riconosciuto, inesistente, ambiguo (with at most three `candidati`, the decisions route's `candidates`), non
-  verificabile (a court VisuaLex cannot read too), già presente; no text, no citation. Once the dossier exists a step
-  refused whole goes in `errore` and the others still run),
+  verificabile (a court VisuaLex cannot read too), già presente; no text, no citation; a row written exactly as one that
+  entered is not reported. Once the dossier exists nothing is thrown (its id must reach the model, or a retry makes a
+  second dossier): a step refused whole goes in `errore` and the others still run. A progress notification after each
+  step to a client that sent a `progressToken`; a cancelled call stops the steps not yet begun),
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
   checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
   words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
@@ -66,7 +68,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   Union (by their case), the Consiglio di Stato, the C.G.A.R.S. and the TAR (by kind, and a TAR by
   its seat, design `docs/superpowers/specs/2026-10-12-administrative-courts-design.md`); a court VisuaLex cannot read yet is answered `court_not_supported` with its name, and its
   description tells the model not to fall back to a note; design
-  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2), `omnilex_aggiungi_nota_dossier` (`note`, 1–10
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2; the server's `candidates` is left out of
+  its answer, `detail` names them), `omnilex_aggiungi_nota_dossier` (`note`, 1–10
   plain-text notes up to 4,000 characters each, in a dossier or about one of its articles with
   `voce`, the entry's id; one request per note, one refused and the others go on, answered `{ entrate: [{ nota, id,
   nota_su }], non_entrate?: [{ nota, motivo }] }`, and an error when every note was refused for the same reason;

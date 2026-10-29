@@ -279,7 +279,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         `Crea un dossier (nome fino a ${MAX_DOSSIER_NAME} caratteri; al massimo 10 al giorno tramite applicazioni collegate), «di lavoro» (una pratica, predefinito) o «di studio» (un tema), ` +
         `e nella stessa chiamata vi aggiunge fino a ${MAX_REFERENCES} norme e ${MAX_DECISIONS} sentenze a parole, verificate sulle fonti, e ${MAX_NOTES} note. ` +
         'Per ogni riga non entrata (com’è stata scritta) dice il motivo: non riconosciuto, inesistente, ambiguo (atto intero o più articoli; sentenza: i candidati), ' +
-        'non verificabile, già presente. Nessun testo.',
+        'non verificabile (fonte assente o corte non ancora letta), già presente. Nessun testo. Una nota non dia per verificata una riga non entrata. ' +
+        'Se la chiamata resta senza risposta, cerca il dossier con omnilex_elenca_dossier prima di ripeterla.',
       inputSchema: {
         nome: z.string().trim().min(1).max(MAX_DOSSIER_NAME).describe('Il nome del dossier'),
         descrizione: z.string().trim().max(500).optional().describe('Una descrizione facoltativa'),
@@ -301,7 +302,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           .array(
             z.object({
               testo: noteSchema(),
-              voce: z.string().min(1).max(200).optional().describe('Uno dei riferimenti, scritto uguale: la nota è su quell’articolo; senza, sul dossier'),
+              voce: z.string().min(1).max(200).optional().describe('Una delle norme di riferimenti, scritta uguale: la nota è su quell’articolo; senza, sul dossier'),
             }),
           )
           .max(MAX_NOTES)
@@ -322,37 +323,65 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           body: { name: nome, ...(descrizione ? { description: descrizione } : {}), kind: tipo ?? 'lavoro' },
         });
         const id = encodeURIComponent(created.id);
+        // The steps can take minutes (a decision's lookup up to 100 s): a client that asked for progress hears of each
+        // one, and one that gave up stops the rest. Its answer is lost either way, hence the description's advice.
+        const progressToken = extra._meta?.progressToken;
+        const steps = 1 + (riferimenti.length ? 1 : 0) + (sentenze.length ? 1 : 0) + note.length;
+        let done = 1;
+        const stepDone = async () => {
+          done += 1;
+          if (progressToken === undefined) return;
+          await extra
+            .sendNotification({ method: 'notifications/progress', params: { progressToken, progress: done, total: steps } })
+            .catch(() => undefined);
+        };
+        const goneAway = () => extra.signal.aborted;
         const entrate = { norme: 0, sentenze: 0, note: 0 };
         const nonEntrate: RowNotEntered[] = [];
         const notesNotEntered: { nota: number; motivo: string }[] = [];
-        // Once the dossier exists, a step refused whole leaves the others to run: the answer says what entered.
+        // Once the dossier exists nothing is thrown, so its id always reaches the model: a step refused whole leaves
+        // the others to run, and the answer says what entered.
         const errors = new Set<string>();
+        const reasonOf = (error: unknown): string => {
+          if (error instanceof ToolError) return error.message;
+          console.error('[mcp] omnilex_crea_dossier step failed:', error instanceof Error ? error.message : 'unknown error');
+          return 'VisuaLex ha avuto un problema in un passo: il dossier è creato, controlla cosa contiene.';
+        };
         /** The norms' or the decisions' route, the existing one: the same checks, points and refunds as their own tools. */
         const addAll = async (rows: string[], route: 'norms' | 'decisions'): Promise<ApiOutcome[]> => {
-          if (rows.length === 0) return [];
+          if (rows.length === 0 || goneAway()) return [];
           try {
-            const answer = await callApi<{ results: ApiOutcome[] }>(config, caller, 'dossier:write', `/dossiers/${id}/${route}`, {
+            const answer = await callApi<{ results?: ApiOutcome[] }>(config, caller, 'dossier:write', `/dossiers/${id}/${route}`, {
               method: 'POST',
               body: { references: rows },
             });
-            return answer.results;
+            return Array.isArray(answer.results) ? answer.results : [];
           } catch (error) {
-            if (!(error instanceof ToolError)) throw error;
-            errors.add(error.message);
+            errors.add(reasonOf(error));
             return [];
+          } finally {
+            await stepDone();
           }
         };
-        // One outcome per row, in order; a row the route did not answer did not enter.
-        const tally = (rows: string[], results: ApiOutcome[], kind: 'norme' | 'sentenze') =>
+        // One outcome per row, in order; a row the route did not answer did not enter. A row written exactly as one that
+        // entered is not reported «già presente»: its string did enter, and a client subtracting it would lose both.
+        const tally = (rows: string[], results: ApiOutcome[], kind: 'norme' | 'sentenze') => {
+          const entered = new Set<string>();
           rows.forEach((riga, i) => {
-            if (results[i]?.outcome === 'added') entrate[kind] += 1;
-            else nonEntrate.push(notEntered(riga, results[i]));
+            if (results[i]?.outcome === 'added') {
+              entrate[kind] += 1;
+              entered.add(riga);
+            } else if (!(results[i]?.outcome === 'already_present' && entered.has(riga))) {
+              nonEntrate.push(notEntered(riga, results[i]));
+            }
           });
+        };
 
         const norms = await addAll(riferimenti, 'norms');
         tally(riferimenti, norms, 'norme');
-        // The article each reference names: its own entry, or the one an earlier row of the call added.
-        const byCitation = new Map(norms.flatMap((r) => (r.outcome === 'added' && r.itemId && r.display ? [[r.display, r.itemId] as const] : [])));
+        // The article each reference names: its own entry, or the one an earlier row of the call added (the first).
+        const byCitation = new Map<string, string>();
+        for (const r of norms) if (r.outcome === 'added' && r.itemId && r.display && !byCitation.has(r.display)) byCitation.set(r.display, r.itemId);
         const articleOf = (voce: string): string | undefined => {
           const result = norms[riferimenti.indexOf(voce)];
           if (result?.outcome === 'added') return result.itemId;
@@ -362,6 +391,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         tally(sentenze, await addAll(sentenze, 'decisions'), 'sentenze');
 
         for (const [i, { testo, voce }] of note.entries()) {
+          if (goneAway()) break;
           const about = voce === undefined ? undefined : articleOf(voce);
           if (voce !== undefined && !about) {
             notesNotEntered.push({ nota: i + 1, motivo: 'la sua voce non è entrata' });
@@ -374,8 +404,9 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
             });
             entrate.note += 1;
           } catch (error) {
-            if (!(error instanceof ToolError)) throw error;
-            notesNotEntered.push({ nota: i + 1, motivo: error.message });
+            notesNotEntered.push({ nota: i + 1, motivo: reasonOf(error) });
+          } finally {
+            await stepDone();
           }
         }
         return data({
@@ -442,14 +473,15 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     ({ dossier, sentenze }, extra) =>
       run('omnilex_aggiungi_sentenze_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
-        const answer = await callApi<{ results: Record<string, unknown>[] }>(
+        const answer = await callApi<{ results: (Record<string, unknown> & { candidates?: unknown })[] }>(
           config,
           caller,
           'dossier:write',
           `/dossiers/${encodeURIComponent(found.id)}/decisions`,
           { method: 'POST', body: { references: sentenze } },
         );
-        return data({ dossier: { id: found.id, nome: found.name }, esiti: answer.results });
+        // `candidates` repeats what `detail` already says in words (it is there for omnilex_crea_dossier's answer).
+        return data({ dossier: { id: found.id, nome: found.name }, esiti: answer.results.map(({ candidates: _, ...rest }) => rest) });
       }),
   );
 
