@@ -24,6 +24,8 @@ export interface ReviewSummary {
 export interface ReviewSessionOptions {
   /** One institute of `materia`, spelt as the road lists it: the session narrowed to it (Gymnasium spec §5.2). */
   istituto?: string;
+  /** One course of «Percorsi» (courses spec §10.5), read instead of a subject: its cards and its check cards. */
+  corso?: string;
   /** The keys are left alone while a dialog of the screen is open. */
   paused?: boolean;
   /** Esc was pressed (and no dialog was open). */
@@ -61,7 +63,7 @@ export type GoalMet = OggiDelVoto & { missione: boolean };
  * a post resolving and the screen rendering would otherwise act on the card already graded. Every
  * move of the queue is made from the ref, and checks that the head is still the card it was made for.
  */
-export function useReviewSession(materia?: Materia, { istituto, paused = false, onEscape }: ReviewSessionOptions = {}) {
+export function useReviewSession(materia?: Materia, { istituto, corso, paused = false, onEscape }: ReviewSessionOptions = {}) {
   const [queue, setQueueState] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -103,7 +105,9 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
     setLoadError(false);
     try {
       // One argument when no institute is asked: the call stays exactly what it was before G5.
-      const session = await (istituto === undefined ? studiaService.session(materia) : studiaService.session(materia, istituto));
+      const session = await (corso !== undefined
+        ? studiaService.courseSession(corso)
+        : istituto === undefined ? studiaService.session(materia) : studiaService.session(materia, istituto));
       if (request !== latest.current) return;
       setQueue(session.cards.map((card) => ({ card, posted: false })));
       setRevealed(false);
@@ -121,7 +125,7 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
     } finally {
       if (request === latest.current) setLoading(false);
     }
-  }, [materia, istituto, setQueue, setRevealed]);
+  }, [materia, istituto, corso, setQueue, setRevealed]);
 
   useEffect(() => {
     // Leaving (or asking again) makes the answer in flight stale.

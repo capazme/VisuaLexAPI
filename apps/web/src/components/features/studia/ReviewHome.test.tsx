@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import type { Progressi, TappaIstituto } from '../../../types/studia';
@@ -8,7 +8,14 @@ vi.mock('../../../services/studiaService', () => ({
   studiaService: { progress: vi.fn(), percorso: vi.fn(), preferences: vi.fn(), savePreferences: vi.fn() },
 }));
 
+vi.mock('../../../services/corsiService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../services/corsiService')>()),
+  corsiService: { today: vi.fn(async () => []) },
+}));
+
 import { studiaService } from '../../../services/studiaService';
+import { corsiService } from '../../../services/corsiService';
+import { coursesSwitchStore } from './corsi/coursesSwitch';
 import { appStore } from '../../../store/useAppStore';
 import { ReviewHome } from './ReviewHome';
 import { serverMissions, xpFields } from './__fixtures__/xp';
@@ -103,6 +110,18 @@ function windowOf(width: number) {
 }
 
 describe('ReviewHome', () => {
+  it('shows the day\'s module of a course under the day block once «Percorsi» is on, and reads no course while off (§6.2)', async () => {
+    progress.mockResolvedValue(answer(18, 20));
+    renderHome();
+    expect(await screen.findByText('18 da ripassare, 20 nuove')).toBeInTheDocument();
+    expect(corsiService.today).not.toHaveBeenCalled();
+    vi.mocked(corsiService.today).mockResolvedValue([{ corsoId: 'c1', titolo: 'Segni distintivi', modulo: { id: 'm', ordine: 2, titolo: 'Il marchio' }, schedeDovute: 0 }]);
+    act(() => coursesSwitchStore.setState({ state: 'on' }));
+    const row = await screen.findByRole('link', { name: /Modulo del giorno: Il marchio/ });
+    expect(follows(screen.getByRole('button', { name: START }), row)).toBe(true);
+    act(() => coursesSwitchStore.setState({ state: 'unknown' }));
+  });
+
   it('says what is on today, how far the goal is, and offers to start', async () => {
     progress.mockResolvedValue(answer(18, 20));
     renderHome();
