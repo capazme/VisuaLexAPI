@@ -101,7 +101,8 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
   const norma = useMemo(() => normaFromAnchor(anchor), [anchor]);
   const label = anchorLabel(anchor) ?? 'Articolo';
   if (!norma) return null;
-  const reader = <DossierItemReader norma={norma} onOpenOnDashboard={onOpenInReader} showToast={showToast} />;
+  // In the phone's sheet no gear to Impostazioni: the sheet keeps the focus, a dialog over it would fight it.
+  const reader = <DossierItemReader norma={norma} onOpenOnDashboard={onOpenInReader} showToast={showToast} meaningsGear={desktop} />;
 
   if (!desktop) {
     return (

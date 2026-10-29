@@ -11,6 +11,7 @@ import { NotesHighlightsButtons } from './NotesHighlightsButtons';
 import { HighlightColorMenu } from './HighlightColorMenu';
 import { highlightColorItems } from './highlightColorItems';
 import { useAppStore } from '../../../store/useAppStore';
+import { useHighlightColorMeanings } from '../../../hooks/useHighlightColorMeanings';
 import { namedAnnex } from '../../../utils/sources';
 
 export interface ReadingToolbarProps {
@@ -128,9 +129,11 @@ export function ReadingToolbar({
 
     /** The tools behind «⋯» (R3: the reading's own in words, the rest here), the phone's adding what its row does not show. */
     // The colour of new highlights (H1): a menu of its own beside «Evidenziazioni» on a computer; on a phone, where the
-    // row has no room, its four choices close the «⋯».
+    // row has no room, its four choices close the «⋯», and the gear's way to their meanings after them.
     const highlightColor = useAppStore((s) => s.settings.highlightColor);
     const updateSettings = useAppStore((s) => s.updateSettings);
+    const openSettings = useAppStore((s) => s.openSettings);
+    const meanings = useHighlightColorMeanings();
     const moreItems = (phone: boolean): MenuItem[] => [
         ...(compact ? [] : [{
             label: isPinnedQuick ? 'Togli dalle norme rapide' : 'Aggiungi alle norme rapide',
@@ -165,7 +168,12 @@ export function ReadingToolbar({
             { label: 'Confronta con…', icon: GitCompare, onSelect: onCompare },
         ]),
         // The colour of new highlights (H1), last: a setting, under its own title. Not on a text that takes none.
-        ...(phone && !lockedReason ? highlightColorItems(highlightColor, (color) => updateSettings({ highlightColor: color }), { section: true }) : []),
+        ...(phone && !lockedReason
+            ? highlightColorItems(highlightColor, meanings, (color) => updateSettings({ highlightColor: color }), {
+                section: true,
+                onChangeMeanings: () => openSettings('highlightColors'),
+            })
+            : []),
     ];
 
     // The annex as the source convention names it: never a code's own (the codice civile is Allegato 2 of its decree).
