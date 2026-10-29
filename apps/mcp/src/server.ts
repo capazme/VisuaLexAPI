@@ -55,7 +55,9 @@ const runner: RunTool = async (tool, extra, body) => {
     const caller = callerOf(extra);
     try {
       const result = await body(caller);
-      console.info(`[mcp] user=${caller.userId} client=${caller.clientId} tool=${tool} outcome=ok`);
+      // A call the client cancelled ran its last step and stopped: its answer goes nowhere.
+      const outcome = extra.signal?.aborted ? 'cancelled' : 'ok';
+      console.info(`[mcp] user=${caller.userId} client=${caller.clientId} tool=${tool} outcome=${outcome}`);
       return result;
     } catch (error) {
       const known = error instanceof ToolError;

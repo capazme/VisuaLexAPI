@@ -72,6 +72,12 @@ export const MAX_DOSSIER_NAME = 100;
 export const MAX_NOTE_LENGTH = 4000;
 /** Notes in one call, to `omnilex_crea_dossier` or `omnilex_aggiungi_nota_dossier`. */
 export const MAX_NOTES = 10;
+/**
+ * How often `omnilex_crea_dossier` tells a client that asked for progress that a step is still running: the SDK's
+ * client waits 60 s by default and a decisions step can last 100 s; a client that restarts its wait on progress then
+ * does not give up (and retry, creating a second dossier). Mutable for the tests only.
+ */
+export const PROGRESS = { heartbeatMs: 15_000 };
 /** How many candidates an ambiguous row names. */
 const MAX_CANDIDATES = 3;
 /** How much of each note `omnilex_leggi_dossier` gives, with `dossier:text` (G-381); `nota_intera` gives one whole. */
@@ -323,19 +329,30 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           body: { name: nome, ...(descrizione ? { description: descrizione } : {}), kind: tipo ?? 'lavoro' },
         });
         const id = encodeURIComponent(created.id);
-        // The steps can take minutes (a decision's lookup up to 100 s): a client that asked for progress hears of each
-        // one, and one that gave up stops the rest. Its answer is lost either way, hence the description's advice.
+        // The steps can take minutes (a decision's lookup up to 100 s): a client that asked for progress hears before
+        // and after each step and every PROGRESS.heartbeatMs while one runs; one that gave up stops the steps not yet
+        // begun. Its answer is lost either way, hence the description's advice. No total: the beats are not counted.
         const progressToken = extra._meta?.progressToken;
-        const steps = 1 + (riferimenti.length ? 1 : 0) + (sentenze.length ? 1 : 0) + note.length;
-        let done = 1;
-        const stepDone = async () => {
-          done += 1;
+        let progress = 0;
+        const notify = async (message: string) => {
           if (progressToken === undefined) return;
+          progress += 1;
           await extra
-            .sendNotification({ method: 'notifications/progress', params: { progressToken, progress: done, total: steps } })
+            .sendNotification({ method: 'notifications/progress', params: { progressToken, progress, message } })
             .catch(() => undefined);
         };
+        const step = async <T>(label: string, body: () => Promise<T>): Promise<T> => {
+          await notify(label);
+          const beat = progressToken === undefined ? undefined : setInterval(() => void notify(label), PROGRESS.heartbeatMs);
+          try {
+            return await body();
+          } finally {
+            clearInterval(beat);
+            await notify(`${label}: fatto`);
+          }
+        };
         const goneAway = () => extra.signal.aborted;
+        await notify('dossier creato');
         const entrate = { norme: 0, sentenze: 0, note: 0 };
         const nonEntrate: RowNotEntered[] = [];
         const notesNotEntered: { nota: number; motivo: string }[] = [];
@@ -352,26 +369,28 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           console.error('[mcp] omnilex_crea_dossier step failed:', error instanceof Error ? error.message : 'unknown error');
           return 'VisuaLex ha avuto un problema in un passo: il dossier è creato, controlla cosa contiene.';
         };
-        /** The norms' or the decisions' route, the existing one: the same checks, points and refunds as their own tools. */
-        /** The route's outcomes, or null when it gave no answer and may have added some of them. */
+        /**
+         * The norms' or the decisions' route, the existing one: the same checks, points and refunds as their own tools.
+         * The route's outcomes, or null when it gave no answer and may have added some of them.
+         */
         const addAll = async (rows: string[], route: 'norms' | 'decisions'): Promise<ApiOutcome[] | null> => {
           if (rows.length === 0 || goneAway()) return [];
-          try {
-            const answer = await callApi<{ results?: ApiOutcome[] }>(config, caller, 'dossier:write', `/dossiers/${id}/${route}`, {
-              method: 'POST',
-              body: { references: rows },
-            });
-            return Array.isArray(answer.results) ? answer.results : [];
-          } catch (error) {
-            if (error instanceof NoAnswer) {
-              errors.add(STILL_LANDING);
-              return null;
+          return step(route === 'norms' ? 'norme' : 'sentenze', async () => {
+            try {
+              const answer = await callApi<{ results?: ApiOutcome[] }>(config, caller, 'dossier:write', `/dossiers/${id}/${route}`, {
+                method: 'POST',
+                body: { references: rows },
+              });
+              return Array.isArray(answer.results) ? answer.results : [];
+            } catch (error) {
+              if (error instanceof NoAnswer) {
+                errors.add(STILL_LANDING);
+                return null;
+              }
+              errors.add(reasonOf(error));
+              return [];
             }
-            errors.add(reasonOf(error));
-            return [];
-          } finally {
-            await stepDone();
-          }
+          });
         };
         // One outcome per row, in order; a row the route did not answer did not enter. A row written exactly as one that
         // entered is not reported «già presente»: its string did enter, and a client subtracting it would lose both.
@@ -408,22 +427,22 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           const about = voce === undefined ? undefined : articleOf(voce);
           if (voce !== undefined && !about) {
             notesNotEntered.push({ nota: i + 1, motivo: normsUncertain ? STILL_LANDING : 'la sua voce non è entrata' });
-            await stepDone();
+            await notify(`nota ${i + 1}: saltata`);
             continue;
           }
-          try {
-            await callApi(config, caller, 'dossier:write', `/dossiers/${id}/notes`, {
-              method: 'POST',
-              body: { text: testo, ...(about ? { aboutItemId: about } : {}) },
-            });
-            entrate.note += 1;
-          } catch (error) {
-            // Without an answer the note may be there: never told to write it again.
-            const motivo = error instanceof NoAnswer ? 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' : reasonOf(error);
-            notesNotEntered.push({ nota: i + 1, motivo });
-          } finally {
-            await stepDone();
-          }
+          await step(`nota ${i + 1}`, async () => {
+            try {
+              await callApi(config, caller, 'dossier:write', `/dossiers/${id}/notes`, {
+                method: 'POST',
+                body: { text: testo, ...(about ? { aboutItemId: about } : {}) },
+              });
+              entrate.note += 1;
+            } catch (error) {
+              // Without an answer the note may be there: never told to write it again.
+              const motivo = error instanceof NoAnswer ? 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' : reasonOf(error);
+              notesNotEntered.push({ nota: i + 1, motivo });
+            }
+          });
         }
         return data({
           // What the server stored; an older server that knows no kind keeps what was asked.
@@ -653,6 +672,6 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
 /** Runs a tool for the caller of this request (from the SDK's `extra`), logging the outcome. */
 export type RunTool = (
   tool: string,
-  extra: { authInfo?: AuthInfo },
+  extra: { authInfo?: AuthInfo; signal?: AbortSignal },
   body: (caller: Caller) => Promise<CallToolResult>,
 ) => Promise<CallToolResult>;

@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startStubs } from './stubs.js';
 import { SERVER_INSTRUCTIONS } from '../src/server.js';
+import { PROGRESS } from '../src/tools/dossier.js';
 
 let env: Awaited<ReturnType<typeof startStubs>>;
 let client: Client;
@@ -322,11 +323,11 @@ describe('omnilex_crea_dossier', () => {
 
   it('answers with the dossier even when a step answers nonsense, and tells a client that asked of each step', async () => {
     env.stub.apiOverride = (method, path) => (method === 'POST' && path === '/dossiers/d4/norms' ? [200, { niente: true }] : undefined);
-    const progress: { progress: number; total?: number }[] = [];
+    const progress: { progress: number; message?: string }[] = [];
     const result = await client.callTool(
       { name: 'omnilex_crea_dossier', arguments: { nome: 'X', riferimenti: ['art. 2043 c.c.'], note: [{ testo: 'a' }] } },
       undefined,
-      { onprogress: (p) => progress.push({ progress: p.progress, total: p.total }) },
+      { onprogress: (p) => progress.push({ progress: p.progress, message: p.message }) },
     );
     expect(result.isError).toBeFalsy();
     expect(json(result)).toMatchObject({
@@ -334,13 +335,13 @@ describe('omnilex_crea_dossier', () => {
       entrate: { norme: 0, sentenze: 0, note: 1 },
       non_entrate: [{ riga: 'art. 2043 c.c.', motivo: 'non verificabile' }],
     });
-    // The creation, the norms, the note: three steps, two reported after the first.
-    expect(progress).toEqual([{ progress: 2, total: 3 }, { progress: 3, total: 3 }]);
+    // Before and after each step, numbered as they come.
+    expect(progress).toEqual(['dossier creato', 'norme', 'norme: fatto', 'nota 1', 'nota 1: fatto'].map((message, i) => ({ progress: i + 1, message })));
   });
 
   it('never calls rows refused when a route gave no answer: the dossier exists, its entries may still be landing', async () => {
     env.stub.apiOverride = (method, path) => (method === 'POST' && path === '/dossiers/d4/norms' ? 'drop' : undefined);
-    const progress: number[] = [];
+    const progress: string[] = [];
     const result = await client.callTool(
       {
         name: 'omnilex_crea_dossier',
@@ -350,7 +351,7 @@ describe('omnilex_crea_dossier', () => {
         },
       },
       undefined,
-      { onprogress: (p) => progress.push(p.progress) },
+      { onprogress: (p) => progress.push(p.message ?? '') },
     );
     expect(result.isError).toBeFalsy();
     const landing = 'VisuaLex non ha risposto in tempo: il dossier d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
@@ -362,8 +363,56 @@ describe('omnilex_crea_dossier', () => {
       note_non_entrate: [{ nota: 2, motivo: landing }],
       errore: landing,
     });
-    // Every step reported, the skipped note too: creation, norms, decisions, two notes.
-    expect(progress).toEqual([2, 3, 4, 5]);
+    // Every step reported, the skipped note too.
+    expect(progress).toEqual(['dossier creato', 'norme', 'norme: fatto', 'sentenze', 'sentenze: fatto', 'nota 1', 'nota 1: fatto', 'nota 2: saltata']);
+  });
+
+  it('tells a client that asked, while a long step runs, that it is still running', async () => {
+    const heartbeat = PROGRESS.heartbeatMs;
+    PROGRESS.heartbeatMs = 40;
+    try {
+      env.stub.apiOverride = (method, path) =>
+        method === 'POST' && path === '/dossiers/d4/decisions'
+          ? new Promise((resolve) => setTimeout(() => resolve([200, { results: [{ outcome: 'added', itemId: 's1' }] }]), 300))
+          : undefined;
+      const progress: string[] = [];
+      const result = await client.callTool(
+        { name: 'omnilex_crea_dossier', arguments: { nome: 'X', sentenze: ['Cass. SU 31310/2024'] } },
+        undefined,
+        { onprogress: (p) => progress.push(p.message ?? ''), resetTimeoutOnProgress: true, timeout: 150 },
+      );
+      // The client's own wait (150 ms) is shorter than the step (300 ms): the beats keep it waiting.
+      expect(json(result).entrate.sentenze).toBe(1);
+      expect(progress[0]).toBe('dossier creato');
+      expect(progress.filter((m) => m === 'sentenze').length).toBeGreaterThan(3);
+      expect(progress[progress.length - 1]).toBe('sentenze: fatto');
+    } finally {
+      PROGRESS.heartbeatMs = heartbeat;
+    }
+  });
+
+  it('stops the steps not yet begun when the client cancels, and logs the call as cancelled', async () => {
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const controller = new AbortController();
+      env.stub.apiOverride = (method, path) => {
+        if (method !== 'POST' || path !== '/dossiers/d4/norms') return undefined;
+        // The user gives up while the norms are being checked; they still land.
+        controller.abort();
+        return new Promise((resolve) => setTimeout(() => resolve([200, { results: [{ outcome: 'added', display: 'art. 2043 c.c.', itemId: 'n1' }] }]), 200));
+      };
+      const call = client.callTool(
+        { name: 'omnilex_crea_dossier', arguments: { nome: 'X', riferimenti: ['art. 2043 c.c.'], sentenze: ['Cass. SU 31310/2024'], note: [{ testo: 'a' }, { testo: 'b', voce: 'art. 2043 c.c.' }] } },
+        undefined,
+        { signal: controller.signal },
+      );
+      await expect(call).rejects.toThrow();
+      await vi.waitFor(() => expect(log.mock.calls.flat().join('\n')).toContain('tool=omnilex_crea_dossier outcome=cancelled'), { timeout: 2000 });
+      // The creation and the step already running; no decisions, no note.
+      expect(env.stub.apiCalls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual(['/dossiers', '/dossiers/d4/norms']);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it('a gateway that gave up counts as no answer, and a note without an answer is not told to be written again', async () => {

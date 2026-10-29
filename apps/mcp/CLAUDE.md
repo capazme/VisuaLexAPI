@@ -64,8 +64,11 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   (`NoAnswer` in `src/errors.ts`: the request failed or timed out, or a gateway answered 502/504; the norms route has no
   overall ceiling and may still be writing) has its rows reported neither in nor out: `errore` says the dossier exists,
   its entries may still be landing, to check it with `omnilex_leggi_dossier` and not to create it again, and a note on
-  one of those norms is left out with the same words. A progress notification after each
-  step to a client that sent a `progressToken`; a cancelled call stops the steps not yet begun),
+  one of those norms is left out with the same words. To a client that sent a `progressToken`, a
+  progress notification before and after each step and every 15 s while one runs (`PROGRESS.heartbeatMs`; no total):
+  the SDK's client waits 60 s by default, a decisions step up to 100 s, and a client that restarts its wait on progress
+  then does not give up and retry. A cancelled call stops the steps not yet begun, and its log line says
+  `outcome=cancelled`),
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
   checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
   words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;

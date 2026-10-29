@@ -40,8 +40,9 @@ reason for every row. Usage went there.
    `omnilex_leggi_dossier` and not to create it again; a note on one of those norms is left out with
    the same words, and a note whose own request got no answer is not told to be written again. Once
    the dossier exists nothing is thrown, so its id always reaches the model.
-   The steps can take minutes: a client that sent a `progressToken` gets a progress notification after
-   each, one that cancels stops the steps not yet begun, and the description tells the model to look
+   The steps can take minutes: a client that sent a `progressToken` gets a progress notification before
+   and after each and every 15 s while one runs (the SDK's client waits 60 s by default, a decisions
+   step up to 100 s), one that cancels stops the steps not yet begun (logged `outcome=cancelled`), and the description tells the model to look
    for the dossier with `omnilex_elenca_dossier` before repeating a call left without an answer (a
    second call would create a second dossier).
 3. **`omnilex_aggiungi_nota_dossier`** takes `note` (1–10 `{ testo, voce? }`, `voce` the entry's id)
