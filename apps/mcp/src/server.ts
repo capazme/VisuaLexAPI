@@ -26,6 +26,16 @@ export const REQUESTS_PER_MINUTE = 300;
 // What a client asks for at sign-in; deletion (content:delete) is never asked: the user switches it on in VisuaLex.
 const ALL_SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write'];
 
+/**
+ * What the server is for, sent once at `initialize` (MCP `instructions`): a client that also has a
+ * sources server should not bounce between the two to file an article.
+ */
+export const SERVER_INSTRUCTIONS =
+  'VisuaLex: i dossier dell’utente (pratiche e temi di studio, con norme, sentenze e note) e le sue schede di studio di Gymnasium. ' +
+  'Qui si leggono e si arricchiscono. Per aggiungere norme o sentenze basta il riferimento a parole («art. 2043 c.c.», «Cass. civ., n. 31310/2024»): ' +
+  'VisuaLex lo verifica sulle fonti, non serve cercarlo prima altrove. ' +
+  'Cercare o studiare il testo di norme e sentenze fuori da un dossier si fa con altri strumenti.';
+
 /** The protected resource metadata URL for the endpoint (RFC 9728 §3.1). */
 export function resourceMetadataUrl(config: McpConfig): string {
   const url = new URL(config.resource);
@@ -191,7 +201,7 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
       let server: McpServer | undefined;
       let transport: StreamableHTTPServerTransport | undefined;
       try {
-        server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
+        server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS });
         registerDossierTools(server, config, runner);
         registerCardTools(server, config, runner);
         // D7b's two tools, only while the server has them on (asked once per session, closed when it cannot say).

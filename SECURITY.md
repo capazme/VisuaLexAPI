@@ -40,16 +40,19 @@ Two mechanisms, with different guarantees:
 Two paths reach the network without passing `is_allowed()`. They are known and
 open, not oversights:
 
-- **Playwright navigation.** `page.goto()` in `services/eurlex_scraper.py` and
-  `services/pdfextractor.py` drives a real browser and never consults the
-  allowlist. `POST /export_pdf` has its own, narrower guard (`is_allowed_pdf_urn`,
-  Normattiva URNs only); the EUR-Lex scraper has none. `tools/treextractor.py`
-  checks the host of the URL before it starts the browser (below), but no
-  browser re-checks the hosts a page then loads or redirects to.
+- **Playwright navigation.** `page.goto()` in `services/pdfextractor.py` drives a
+  real browser and never consults the allowlist; `POST /export_pdf` has its own,
+  narrower guard (`is_allowed_pdf_urn`, Normattiva URNs only). EUR-Lex's browser
+  (`services/eurlex_fetch.fetch_with_playwright`, for the scraper and the tree,
+  since 27 October 2026 only when CELLAR does not serve the act) checks the host
+  of the URL before it starts, but no browser re-checks the hosts a page then
+  loads or redirects to.
 - **Redirects.** Every `ThrottledHttpClient` (the shared one and the
   court-decision readers') checks the host of the URL it is given. `aiohttp`
   follows redirects by default and none of them re-checks the target, so an
   allowed host that answers with a 302 can move the request somewhere unlisted.
+  The one exception is an EU act's page from CELLAR (`eurlex_fetch.fetch_from_cellar`):
+  its 303 is followed by hand, over https, and only to CELLAR's own host.
 
 `POST /fetch_tree` was a third path until 21 October 2026: its caller-supplied
 `urn` was fetched by `tools/treextractor.get_tree` on an `aiohttp` session of its

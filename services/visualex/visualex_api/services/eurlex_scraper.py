@@ -2,14 +2,15 @@ import copy
 import os
 import re
 import structlog
-from playwright.async_api import async_playwright
 
+from . import eurlex_fetch
 from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
-from ..tools.treextractor import HEADING_ORDINAL, glued_headings, is_quoted_heading, strip_amendment_markers
+from ..tools.treextractor import (HEADING_ORDINAL, cites_an_article, following_nodes, glued_headings,
+                                 is_quoted_heading, node_text, strip_amendment_markers)
 from .akn_parser import normalize_article_key
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
@@ -227,8 +228,24 @@ _ORDINAL_AFTER_NUMBER = re.compile(rf"[\s\-]*+{HEADING_ORDINAL}", re.IGNORECASE)
 
 
 def _number_ends_here(rest) -> bool:
-    """True when the heading's number ends where `rest` starts: no digit and no ordinal follow."""
-    return not rest[:1].isdigit() and not _ORDINAL_AFTER_NUMBER.match(rest)
+    """True when the heading's number ends where `rest` starts: no digit and no ordinal follow, and
+    no sentence goes on («Articolo 5 della direttiva …» cites art. 5, it does not head it)."""
+    return (not rest[:1].isdigit() and not _ORDINAL_AFTER_NUMBER.match(rest)
+            and not cites_an_article(rest))
+
+
+# The start of the next article while an article's text is read: «Articolo 12», «Article 12»,
+# «Art. 12», with its ordinal or rubrica, never a paragraph that opens on an article it cites.
+_NEXT_ARTICLE = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
+
+
+def _starts_next_article(text) -> bool:
+    heads = _NEXT_ARTICLE.match(text)
+    if not heads:
+        return False
+    rest = text[heads.end():]
+    ordinal = _ORDINAL_AFTER_NUMBER.match(rest)
+    return not cites_an_article(rest[ordinal.end():] if ordinal else rest)
 
 
 def _heads_article(text, pattern) -> bool:
@@ -290,38 +307,16 @@ class EurlexScraper(BaseScraper):
         self.base_url = 'https://eur-lex.europa.eu/eli'
         self.cache = get_cache_manager().get_persistent("eurlex")
         self.selectors = EURLexSelectors()
-        log.info("EUR-Lex scraper initialized with Playwright")
-
-    async def _fetch_with_playwright(self, url: str) -> str:
-        """Fetch URL using Playwright to bypass CloudFront WAF protection."""
-        log.info(f"Consulting EUR-Lex with Playwright - URL: {url}")
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-dev-shm-usage']
-            )
-            try:
-                context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                )
-                page = await context.new_page()
-                await page.goto(url, wait_until='networkidle', timeout=30000)
-                html = await page.content()
-                await context.close()
-                return html
-            finally:
-                await browser.close()
+        log.info("EUR-Lex scraper initialized (CELLAR first, Playwright second)")
 
     async def request_document(self, url, *, source: str = "eurlex"):
-        """Override base request_document to use Playwright for WAF bypass."""
+        """The act's page: CELLAR's, else EUR-Lex's through the browser (`eurlex_fetch`). A page
+        that is no act's — a challenge, an empty answer — is an error, never a document."""
         try:
-            html = await self._fetch_with_playwright(url)
-            if not html or len(html) < 1000:
-                raise DocumentNotFoundError(f"Document not found or empty at {url}", urn=url)
-            log.debug("EUR-Lex document fetched successfully with Playwright")
+            html = await eurlex_fetch.fetch_act_page(url)
+            log.debug("EUR-Lex document fetched", url=url)
             return html
-        except DocumentNotFoundError:
+        except (DocumentNotFoundError, NetworkError):
             raise
         except Exception as e:
             log.error(f"Error during EUR-Lex consultation: {e}")
@@ -358,10 +353,11 @@ class EurlexScraper(BaseScraper):
         """The parsed page for ``url``, from the persistent cache when it has it.
 
         One page carries the whole act — tree, articles, rubriche and recitals
-        — so every extractor goes through here and the WAF is crossed once.
+        — so every extractor goes through here and the source is asked once a day.
         """
         cached_html = await self.cache.get(url)
-        if cached_html:
+        # A copy kept before pages were checked can be a challenge's: it is fetched again.
+        if eurlex_fetch.is_act_page(cached_html):
             log.info("Cache hit", source="eurlex_persistent")
             return self.parse_document(cached_html)
         html_content = await self.request_document(url)
@@ -503,19 +499,22 @@ class EurlexScraper(BaseScraper):
 
         log.debug("Article found, extracting text")
         full_text = [heading or article_section.get_text(strip=True)]
-        element = article_section.find_next_sibling()
         glued_at = {id(elem): start for elem, start in glued.values()}
-
-        # Detect end of article by finding next article
-        next_article_pattern = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
+        if heading is None:
+            element = article_section.find_next_sibling()
+        else:
+            # A glued heading's body is read where `glued_headings` found it: the paragraph's later
+            # siblings, or, when it has none, the next container or bare text after it.
+            following = following_nodes(article_section)
+            element = next(following, None)
 
         while element:
             # Check if we've reached the next article
             if element.name == 'p' and 'ti-art' in element.get('class', []):
                 log.debug("Next article section found (ti-art class), stopping extraction")
                 break
-            elem_text = element.get_text(strip=True) if element.name else ''
-            if next_article_pattern.match(elem_text):
+            elem_text = node_text(element)
+            if _starts_next_article(elem_text):
                 log.debug("Next article section found (text pattern), stopping extraction")
                 break
             if id(element) in glued_at:
@@ -530,7 +529,9 @@ class EurlexScraper(BaseScraper):
                     full_text.append(text)
             elif element.name == 'table':
                 full_text.extend(self.extract_table_text(element))
-            element = element.find_next_sibling()
+            elif element.name is None and elem_text:
+                full_text.append(elem_text)  # bare text after a glued heading
+            element = element.find_next_sibling() if heading is None else next(following, None)
 
         log.info(f"Article {article} text extracted successfully")
         return "\n".join(full_text)

@@ -12,6 +12,32 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.6] - 2026-10-29
+
+The Union's acts read again despite EUR-Lex's firewall, and a lighter MCP. Server and MCP only: no
+migration, no change to the web.
+
+### MCP
+
+- Fewer tokens for the same results: compact JSON in every tool result; `lingolex_le_mie_card`
+  returns a light list (`ancore` as words, no URN) and the new read-only `lingolex_leggi_card`
+  gives 1–10 cards whole; server instructions at `initialize`; a dossier named wrongly is refused
+  with the list of the user's dossiers. Clients reconnect to see the new tool.
+
+### Sources
+
+- The Union's acts are read from CELLAR, the Publications Office's repository, first, and from
+  EUR-Lex's site through the browser only when CELLAR does not serve the act: since 25-26
+  October 2026 eur-lex.europa.eu answers a server with a firewall challenge. Same page, same
+  texts (23 acts compared, 1534 articles identical). `/health/detailed` probes both hosts and
+  reports the source down only when both are.
+- An EU act's article heading glued to the end of the paragraph before it is now found also when
+  its body sits in the next container or is bare text after the paragraph. A paragraph that
+  opens on an article it cites («Articolo 5 della direttiva … è sostituito», «Article 5 of
+  Directive …») is no longer read as that article's heading, and, on every page, no longer ends
+  the article it sits in. No real page known today has these shapes; the texts of the 23 acts
+  compared are unchanged.
+
 ## [1.10.5] - 2026-10-27
 
 The web only: the boundaries of an assistant's passage moved by hand, and the
