@@ -14,7 +14,8 @@ import { CONTEXT_MAX, QUOTE_MAX, QUOTE_MIN, locateQuote } from '../assistant/loc
  * passages (D8): the text as the dossier's reader reads it, and glosses proposed on it, which the user validates,
  * edits, moves or removes from the web app. In the delegated table: the text under `dossier:text`, the glosses
  * under `dossier:write` and `dossier:text`. The text is behind no switch: it is how an application quotes an entry
- * verbatim (G-372), whatever it then writes. The glosses are behind `assistant_glosses`: off, that route answers 404.
+ * verbatim (G-372), whatever it then writes. The glosses are behind `assistant_glosses` and `assistant_passages` (the
+ * web app's side, where the user validates them): either off, that route answers 404.
  * Coloured passages are no longer proposed (D8, the owners on 29 October 2026): that route answers 410, and the
  * proposals already saved stay as they are, on the web app's side (`assistantProposals.ts`).
  */
@@ -38,8 +39,10 @@ export const NO_MORE_PASSAGES =
 // Plain text, as notes: new lines and tabs, nothing else below U+0020.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
-async function requireSwitch() {
-  if (!(await isSwitchOn('assistant_glosses'))) throw new AppError(404, 'Non disponibile');
+// Both switches: a gloss written while the web app's side is off is one the user could neither see nor remove.
+async function requireSwitches() {
+  const [glosses, review] = await Promise.all([isSwitchOn('assistant_glosses'), isSwitchOn('assistant_passages')]);
+  if (!glosses || !review) throw new AppError(404, 'Non disponibile');
 }
 
 async function entryOf(req: Request) {
@@ -147,7 +150,7 @@ const REFUSED = {
 };
 
 router.post('/dossiers/:id/items/:itemId/glosses', async (req, res) => {
-  await requireSwitch();
+  await requireSwitches();
   const { glosse } = glossesSchema.parse(req.body);
   // A gloss here is the assistant's by definition, validated by the user in the web app.
   if (!req.delegation) throw new AppError(403, 'Solo un’applicazione collegata propone glosse.');

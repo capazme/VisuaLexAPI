@@ -31,7 +31,7 @@ describe('a version change between the text read and the glosses stored', () => 
     nock(API).post('/fetch_article_text').times(5).reply(() => [200, [{ article_text: 'Il risarcimento del danno è dovuto dal debitore.', norma_data: NORM, validity: { state: 'current' } }]]);
     try {
       const alice = await createTestUser('race-alice');
-      await prisma.appSwitch.create({ data: { key: 'assistant_glosses', enabled: true } });
+      await prisma.appSwitch.createMany({ data: [{ key: 'assistant_glosses', enabled: true }, { key: 'assistant_passages', enabled: true }] });
       const dossierId = (await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Pratica' })).body.id;
       const itemId = (await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({ itemType: 'norm', title: 'x', content: NORM })).body.id;
       const token = (await delegatedToken(alice, 'dossier:read dossier:write dossier:text')).apiToken;

@@ -76,7 +76,9 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
     decisionId = (await add({ itemType: 'sentenza', title: 'x', content: SENTENZA })).body.id;
     noteId = (await add({ itemType: 'note', title: 'Nota', content: 'Mia nota.' })).body.id;
     token = (await delegatedToken(alice, 'dossier:read dossier:write dossier:text')).apiToken;
+    // Glosses need both: the applications' side and the web app's, where the user validates them.
     await switchOn();
+    await switchOn(true, 'assistant_passages');
   });
 
   afterEach(() => {
@@ -357,10 +359,13 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
       articleStatus = 200;
       await switchOn(false);
       // The passages' switch alone does not open it.
-      await switchOn(true, 'assistant_passages');
       const off = await gloss(one);
       expect(off.status).toBe(404);
       expect(off.body.detail).toBe('Non disponibile');
+      // Nor the glosses' alone: the user could neither see nor remove what it wrote.
+      await switchOn(true);
+      await switchOn(false, 'assistant_passages');
+      expect((await gloss(one)).status).toBe(404);
       expect(await prisma.highlight.count()).toBe(0);
     });
 

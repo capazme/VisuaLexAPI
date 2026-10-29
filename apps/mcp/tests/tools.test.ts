@@ -140,7 +140,21 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
     // A note whose content is not text reads as none.
     env.stub.dossiers[0].items[1].content = { vecchia: true };
     expect(json(await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } })).voci[1].testo).toBeNull();
-    expect(env.stub.exchanges.every((e) => e.scope === 'dossier:read')).toBe(true);
+    // The dossier is read with the texts' scope only by a caller who has it: the server gates the notes too.
+    const scopes = env.stub.exchanges.map((e) => e.scope);
+    expect(scopes.slice(0, 1)).toEqual(['dossier:read']);
+    expect(new Set(scopes.slice(1))).toEqual(new Set(['dossier:read dossier:text']));
+  });
+
+  it('says nothing of a note the server leaves out for a grant approved before the notes were named', async () => {
+    env.stub.tokens = { good: { active: true, scope: 'dossier:read dossier:write dossier:text' } };
+    // The server answers content null for such a grant (G-381 (b)).
+    env.stub.dossiers[0].items[1].content = null;
+    const read = json(await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } }));
+    expect(read.voci[1]).toEqual({ id: 'i2', tipo: 'note', titolo: 'Nota', riferimento: null, aggiunta_da: null, nota_su: 'i1' });
+    const whole = await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1', nota_intera: 'i2' } });
+    expect(whole.isError).toBe(true);
+    expect(text(whole)).toContain('ricollegare l’applicazione');
   });
 
   it('never reads an entry added by an unnamed application as the user\'s own', async () => {

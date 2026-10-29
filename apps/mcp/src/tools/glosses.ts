@@ -22,13 +22,13 @@ export const MAX_GLOSSES = 10;
 export const MAX_GLOSS_NOTE = 1500;
 const NOT_FOUND = 'Non trovato: il dossier o la voce non esiste, oppure la funzione non è attiva.';
 
-/** Whether the server has glosses on: false when it cannot say (fail closed). */
+/** Whether the server has glosses on, both their switch and the web app's side the user validates them on: false when it cannot say (fail closed). */
 export async function glossesOn(config: McpConfig): Promise<boolean> {
   try {
     const response = await fetch(`${config.apiBase}/features`, { signal: AbortSignal.timeout(5_000) });
     if (!response.ok) return false;
-    const body = (await response.json()) as { assistantGlosses?: unknown };
-    return body.assistantGlosses === true;
+    const body = (await response.json()) as { assistantGlosses?: unknown; assistantPassages?: unknown };
+    return body.assistantGlosses === true && body.assistantPassages === true;
   } catch {
     return false;
   }

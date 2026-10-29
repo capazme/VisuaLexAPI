@@ -18,7 +18,10 @@ Status: decided by the owners on 29 October 2026 (G-383, with G-381 (b)). Scope 
 - **An entry's text is behind no switch** (`omnilex_leggi_testo_voce` and `GET …/items/:itemId/text`): it is how an
   application quotes a text verbatim.
 - **The text of the user's notes** leaves through the MCP only under `dossier:text` («Leggere i testi»), whose
-  consent words, and the «Dati personali» notice, now say «e le tue note».
+  consent words, and the «Dati personali» notice, now say «e le tue note», and only for a grant approved with those
+  words: the grant stores the version of the words it was approved with (`oauth_grants.text_consent_version`), and
+  the server answers a note's content null to any other connected application. Grants approved before keep today's
+  behaviour until the user connects again.
 
 ## Why a `Highlight` row and not an anchored note
 
@@ -42,6 +45,8 @@ the trash in a second place.
   becomes a mark and keeps its colour.
 - `highlights.color` nullable; `CHECK ((kind = 'gloss') = (color IS NULL))`.
 - `CHECK (kind <> 'gloss' OR (created_by_client_id, note_state, note present and note not blank))`.
+- `oauth_grants.text_consent_version INTEGER` (null for every existing grant; set to `TEXT_CONSENT_VERSION`, 1, when
+  the user approves a request for `dossier:text`).
 
 ## Routes
 
@@ -57,8 +62,9 @@ the trash in a second place.
 ## Switches
 
 - `assistant_passages` (existing): the web app's side of everything an assistant proposed.
-- `assistant_glosses` (new, off): the glosses route and the MCP's `omnilex_glossa_voce`. A gloss needs both; this one
-  is switched on only once the web shows glosses, since today's web draws an unknown colour as yellow.
+- `assistant_glosses` (new, off): the glosses route and the MCP's `omnilex_glossa_voce`. The glosses route needs
+  both switches; this one is switched on only once the web shows glosses, since today's web draws an unknown colour
+  as yellow.
 
 ## MCP
 

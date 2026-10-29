@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { DELETE_SCOPE, type OAuthConfig } from './config';
+import { DELETE_SCOPE, TEXT_CONSENT_VERSION, TEXT_SCOPE, type OAuthConfig } from './config';
 import { randomSecret, sha256 } from './hash';
 
 export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
@@ -111,6 +111,8 @@ export async function decideAuthorizationRequest(
   // Whatever the client asked, deletion is what the user ticked on this page.
   const scopes = [...request.scopes.filter((scope) => scope !== DELETE_SCOPE), ...(allowDelete ? [DELETE_SCOPE] : [])];
   const code = randomSecret();
+  // The user read the current words of the texts' permission on this page (G-381 (b)): the grant records which.
+  const textConsent = scopes.includes(TEXT_SCOPE) ? { textConsentVersion: TEXT_CONSENT_VERSION } : {};
   await prisma.$transaction(async (tx) => {
     const live = await tx.oAuthGrant.findFirst({
       where: { userId, clientId: request.clientId, resource: request.resource, revokedAt: null },
@@ -119,10 +121,10 @@ export async function decideAuthorizationRequest(
       ? await tx.oAuthGrant.update({
           where: { id: live.id },
           // Read and write merge with what was granted before; deletion follows this decision.
-          data: { scopes: [...new Set([...live.scopes.filter((scope) => scope !== DELETE_SCOPE), ...scopes])] },
+          data: { scopes: [...new Set([...live.scopes.filter((scope) => scope !== DELETE_SCOPE), ...scopes])], ...textConsent },
         })
       : await tx.oAuthGrant.create({
-          data: { userId, clientId: request.clientId, scopes, resource: request.resource },
+          data: { userId, clientId: request.clientId, scopes, resource: request.resource, ...textConsent },
         });
     await tx.oAuthAuthorizationCode.create({
       data: {

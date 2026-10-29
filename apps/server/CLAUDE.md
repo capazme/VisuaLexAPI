@@ -141,8 +141,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   an admin switches them with `PUT /api/admin/switches/:key { enabled }`): `assistant_passages` is the web app's side (off,
   its routes below answer 404 and the dossier answers carry no state); `assistant_glosses` is the connected application's
   side of glosses (off, the glosses route answers 404 and the MCP does not list `omnilex_glossa_voce`). An entry's text is
-  behind no switch: it is how an application quotes it verbatim (G-372). A gloss needs both, and
-  `assistant_glosses` is switched on only once the web shows glosses: today's web draws an unknown colour as yellow.
+  behind no switch: it is how an application quotes it verbatim (G-372). The glosses route needs **both** switches (a
+  gloss written while the web's side is off is one the user could neither see nor remove), and `assistant_glosses` is
+  switched on only once the web shows glosses: today's web draws an unknown colour as yellow.
   **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
   table): `GET /dossiers/:id/items/:itemId/text?parte=` (`dossier:text`, a point and a page of the
   counter `text`) gives a norm's or a decision's text in pages of 20,000 characters cut at a line end,
@@ -190,8 +191,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `assistant_note_versions` is for the second cut (the
   versions an assistant replaced); nothing writes it yet. The scope `dossier:text` is worded on the
   consent page and in «Applicazioni collegate» (`SCOPE_LABELS`): the texts of norms and decisions and, since G-381 (b)
-  (owners, 29 October 2026), the user's notes, which `apps/mcp`'s `omnilex_leggi_dossier` gives only under it. A grant made
-  before it has it only once the user connects again.
+  (owners, 29 October 2026), the user's notes. **A note's content reaches a connected application only** through a token
+  with `dossier:text` whose grant was approved with those words: approving a request for `dossier:text` stores
+  `TEXT_CONSENT_VERSION` (`oauth/config.ts`, now 1) on the grant (`oauth_grants.text_consent_version`), `delegatedAuth`
+  reads it live into `req.delegation.readsNotes`, and `serializeItem` answers a note's `content` null otherwise (a
+  norm's or a decision's never). Every grant older than the column has none and keeps today's behaviour until the user
+  connects again; widening the words means raising the version. A grant made before `dossier:text` existed has it only
+  once the user connects again.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
   and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most

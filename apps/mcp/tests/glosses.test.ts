@@ -32,7 +32,7 @@ beforeEach(() => {
   env.stub.tokens = { full: { active: true, scope: ALL }, old: { active: true, scope: 'dossier:read dossier:write' } };
   env.stub.apiCalls = [];
   env.stub.exchanges = [];
-  env.stub.features = { assistantPassages: false, assistantGlosses: true };
+  env.stub.features = { assistantPassages: true, assistantGlosses: true };
   env.stub.dossiers = [{ id: 'd1', name: 'Pratica', items: [{ id: 'i1', item_type: 'norm', title: 'cc', citation: 'art. 2043 c.c.', content: {} }] }];
   env.stub.apiOverride = (method, path, body) => {
     if (method === 'GET' && path.startsWith('/dossiers/d1/items/i1/text')) return [200, TEXT_ANSWER];
@@ -68,8 +68,9 @@ describe('the list', () => {
     await client.close();
   });
 
-  it('leaves the glosses out while they are off, even with the passages’ switch on, or when the server cannot say; never the text', async () => {
-    for (const features of [{ assistantPassages: true, assistantGlosses: false }, { assistantPassages: true }, 'down' as const]) {
+  it('leaves the glosses out unless both switches are on, or when the server cannot say; never the text', async () => {
+    // The server's glosses route needs both switches: so does the list.
+    for (const features of [{ assistantPassages: true, assistantGlosses: false }, { assistantPassages: false, assistantGlosses: true }, { assistantGlosses: true }, 'down' as const]) {
       env.stub.features = features;
       const client = await connect();
       const names = (await client.listTools()).tools.map((t) => t.name);

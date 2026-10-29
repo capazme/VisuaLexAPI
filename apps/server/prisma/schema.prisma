@@ -1498,6 +1498,9 @@ model OAuthGrant {
   createdAt  DateTime  @default(now()) @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
   revokedAt  DateTime? @map("revoked_at")
+  // The words of `dossier:text` the user last approved (`TEXT_CONSENT_VERSION` in oauth/config.ts); null for a grant
+  // approved before the words named the user's notes (G-381 (b)): it never receives a note's text until reconnected.
+  textConsentVersion Int? @map("text_consent_version")
 
   user   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   client OAuthClient              @relation(fields: [clientId], references: [id], onDelete: Cascade)

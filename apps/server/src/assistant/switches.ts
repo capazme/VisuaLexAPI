@@ -12,8 +12,9 @@ export const APP_SWITCHES = {
   // proposes coloured passages any more: the saved ones stay, readable here.
   assistant_passages: 'Proposte e note dell’IA nel dossier, da validare a mano (D7b).',
   // D8: the connected application's side of glosses. Off: the delegated route that proposes them answers 404 and
-  // the MCP does not list `omnilex_glossa_voce` (an entry's text is behind no switch). The user validates glosses on
-  // the web app's side, under `assistant_passages`: switch this on only once the web shows glosses.
+  // the MCP does not list `omnilex_glossa_voce` (an entry's text is behind no switch). The route also needs
+  // `assistant_passages`, the web app's side where the user validates them. Switch this on only once the web shows
+  // glosses: today's web draws a gloss's missing colour as yellow.
   assistant_glosses: 'Glosse dell’IA sui passaggi, proposte dalle applicazioni collegate (D8).',
 } as const;
 

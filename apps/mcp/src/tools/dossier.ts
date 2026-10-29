@@ -74,6 +74,8 @@ export const MAX_NOTE_LENGTH = 4000;
 export const NOTE_EXCERPT = 500;
 /** The scope under which the text of the user's notes leaves (G-381 (b), owners, 29 October 2026). */
 export const TEXT_SCOPE = 'dossier:text';
+const RECONNECT_FOR_NOTES =
+  'Per leggere il testo delle note l’utente deve ricollegare l’applicazione a VisuaLex e concedere «Leggere i testi».';
 /** How many of the user's dossiers a «not found» names. */
 const MAX_LISTED_DOSSIERS = 20;
 
@@ -121,9 +123,12 @@ function noteText(item: ApiDossierItem, whole: boolean): { testo: string | null;
 /** A dossier's kind as the tools say it: `lavoro` unless the server says `studio`. */
 const kindOf = (d: ApiDossier): 'lavoro' | 'studio' => (d.kind === 'studio' ? 'studio' : 'lavoro');
 
-/** The dossier a tool names, by id or by its exact name; an ambiguous name is an error. */
-export async function findDossier(config: McpConfig, caller: Caller, dossier: string): Promise<ApiDossier> {
-  const all = await callApi<ApiDossier[]>(config, caller, 'dossier:read', '/dossiers');
+/**
+ * The dossier a tool names, by id or by its exact name; an ambiguous name is an error. `scope` is the exchanged
+ * token's: with `dossier:text` too, the server also gives the notes' text to a grant that consented to it (G-381).
+ */
+export async function findDossier(config: McpConfig, caller: Caller, dossier: string, scope = 'dossier:read'): Promise<ApiDossier> {
+  const all = await callApi<ApiDossier[]>(config, caller, scope, '/dossiers');
   const byId = all.find((d) => d.id === dossier);
   if (byId) return byId;
   const byName = all.filter((d) => d.name === dossier);
@@ -182,15 +187,14 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
       run('omnilex_leggi_dossier', extra, async (caller) => {
         // Notes may hold a client's facts: their text leaves only under the texts' scope, which the consent page
         // words with «e le tue note» (G-381 (b)). Without it, a note is its title and what it is about, as before.
+        // The server is the gate: it also leaves a note's content out (null) for a grant approved before those words.
         const withText = caller.scopes.includes(TEXT_SCOPE);
-        if (nota_intera !== undefined && !withText) {
-          throw new ToolError('Per leggere il testo delle note serve il permesso «Leggere i testi»: ricollega l’applicazione a VisuaLex per concederlo.');
-        }
-        const found = await findDossier(config, caller, dossier);
+        if (nota_intera !== undefined && !withText) throw new ToolError(RECONNECT_FOR_NOTES);
+        const found = await findDossier(config, caller, dossier, withText ? `dossier:read ${TEXT_SCOPE}` : 'dossier:read');
         const items = found.items ?? [];
-        if (nota_intera !== undefined && !items.some((item) => item.id === nota_intera && item.item_type === 'note')) {
-          throw new ToolError(`Nessuna nota con id «${nota_intera}» in questo dossier.`);
-        }
+        const whole = nota_intera === undefined ? undefined : items.find((item) => item.id === nota_intera && item.item_type === 'note');
+        if (nota_intera !== undefined && !whole) throw new ToolError(`Nessuna nota con id «${nota_intera}» in questo dossier.`);
+        if (whole && whole.content === null) throw new ToolError(RECONNECT_FOR_NOTES);
         return data({
           id: found.id,
           nome: found.name,
@@ -204,7 +208,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
             // An application that registered without a name is still not the user.
             aggiunta_da: item.created_by ? (item.created_by.clientName ?? 'applicazione collegata') : null,
             nota_su: item.about_item_id ?? null,
-            ...(withText && item.item_type === 'note' ? noteText(item, item.id === nota_intera) : {}),
+            // Null from the server: a grant approved before the notes were named; nothing to say for that note.
+            ...(withText && item.item_type === 'note' && item.content !== null ? noteText(item, item.id === nota_intera) : {}),
           })),
         });
       }),
