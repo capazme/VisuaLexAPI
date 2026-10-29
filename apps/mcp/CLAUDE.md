@@ -63,7 +63,13 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   public and stays a human act, with the preview and the privacy check in front of the user
   (owner, 14 October 2026, question 189). `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
-  `created_by`) and which article a note is about (`nota_su`). A norm or a decision is named by the
+  `created_by`) and which article a note is about (`nota_su`). Only when the caller's token holds `dossier:text`
+  («Leggere i testi», whose consent words say «e le tue note»: G-381 (b), owners, 29 October 2026) it also gives each
+  note's text (`testo`), its first 500 characters with `troncata: true` when cut (never inside a surrogate pair), and one
+  note whole with `nota_intera` (refused without the scope, or for an id that is not a note of the dossier). The
+  server is the gate: the dossier is then read with a token exchanged for `dossier:read dossier:text`, and the server
+  answers a note's content null to a grant whose consent version is older than the words' (`apps/server`'s
+  `text_consent_version`; the grants that held `dossier:text` when it came were given the current one); such a note gets no `testo`, and `nota_intera` on it asks the user to connect again. A norm or a decision is named by the
   server's citation (`citation` on dossier items, `display` on the norms
   route's results, `citation` on the decisions route's: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
   dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read
@@ -73,7 +79,7 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   keeps registration order, in every session. A dossier named by a wrong name is never
   guessed: the refusal lists the user's dossiers (at most 20, id and name as JSON, never prose: a name may come from another user's environment), so the model
   retries without calling `omnilex_elenca_dossier` first. The text of a norm or a decision leaves only through
-  `omnilex_leggi_testo_voce` (below; owners' decision G2, 25 October 2026).
+  `omnilex_leggi_testo_voce` (below; owners' decision G2, 25 October 2026), the text of a note only under `dossier:text`.
   **No tool updates or moves; two tools delete, into the trash**:
   `omnilex_elimina_dossier` and `omnilex_elimina_voci_dossier` (1–50 entries).
   Each needs the connection's `content:delete` (read live by `apps/server`;
@@ -92,16 +98,19 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   lost a task meanwhile is a 409 (owner, 20 October 2026). `lingolex_elimina_card` is the third destructive tool
   (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
-- **D7b, passages proposed** (`src/tools/passages.ts`; spec
-  `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8) — `omnilex_leggi_testo_voce` (an
-  entry's text in parts, as VisuaLex shows it, and the proposals still open; scope `dossier:text`) and
-  `omnilex_evidenzia_passaggi_dossier` (1–10 passages quoted verbatim, with an optional note and
-  `prima`/`dopo`; colours `giallo` central point, `verde` condition or premise, `blu` definition or exception,
-  never `rosso`, the user's sign of a note «da rivedere»; one outcome per passage; one exchanged token with `dossier:write dossier:text`).
-  Listed only when `apps/server`'s public `GET /features` says `assistantPassages: true`, asked once at
-  each session's `initialize` (closed when it cannot say). No tool confirms, validates, edits or removes a
-  proposal: the user does, in VisuaLex. A connection made before `dossier:text` existed is asked to sign
-  in again for it (the step-up challenge).
+- **An entry's text and the glosses** (`src/tools/glosses.ts`; D7b, spec
+  `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8; D8,
+  `docs/superpowers/specs/2026-10-29-d8-glosses-design.md`) — `omnilex_leggi_testo_voce` (an entry's text in parts, as
+  VisuaLex shows it, and the glosses this application proposed still to validate; scope `dossier:text`), **always
+  listed**: it is how an application quotes an entry verbatim (G-372). `omnilex_glossa_voce` (an optional general gloss
+  up to 4,000 characters, which becomes a note about the entry through `POST /dossiers/:id/notes`, and 1–10 glosses on
+  passages `{ testo 15–2000, nota ≤ 1500, prima?, dopo? }`, no colour; the passages first, so a call refused whole writes
+  no general gloss; one outcome per row, no text; one exchanged token with `dossier:write dossier:text`, then one with
+  `dossier:write` for the general gloss) is listed only when `apps/server`'s public `GET /features` says
+  `assistantGlosses: true` and `assistantPassages: true` (the server's route needs both), asked once at each session's `initialize` (closed when it cannot say). No tool proposes
+  coloured passages any more: `omnilex_evidenzia_passaggi_dossier` is gone (D8, owners, 29 October 2026), highlighting
+  is the user's gesture. No tool confirms, validates, edits or removes a gloss: the user does, in VisuaLex. A
+  connection made before `dossier:text` existed is asked to sign in again for it (the step-up challenge).
 - **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —
   `lingolex_schema_card` (the card's shape and the anchoring rules, as text),
   `lingolex_salva_card` (1–10 cards, always the user's drafts; anchors as

@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import jwt from 'jsonwebtoken';
 import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible';
 import { prisma } from '../lib/prisma';
-import { DELETE_SCOPE, oauthConfig } from '../oauth/config';
+import { DELETE_SCOPE, TEXT_CONSENT_VERSION, TEXT_SCOPE, oauthConfig } from '../oauth/config';
 import { ACTOR, delegationSecret } from '../oauth/delegationSecret';
 import { findDelegatedRoute, type DelegatedCounter } from '../oauth/delegatedRoutes';
 import type { DelegatedClaims } from '../oauth/exchange';
@@ -18,7 +18,7 @@ export const DELEGATED_COUNTERS: Record<DelegatedCounter, number> = {
   note: 100,
   trash: 20,
   card: 100,
-  // D7b: passages proposed on dossier entries, and pages of an entry's text read.
+  // D7b and D8: glosses proposed on the passages of dossier entries, and pages of an entry's text read.
   passage: 100,
   text: 200,
   // Percorsi (A1, spec 2026-10-23 §10.6): courses created, and modules and exams added.
@@ -31,7 +31,7 @@ const COUNTER_WORDS: Record<DelegatedCounter, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
-  passage: 'passaggi evidenziati',
+  passage: 'glosse proposte',
   text: 'pagine di testo',
   corso: 'percorsi creati',
   modulo: 'moduli ed esami aggiunti',
@@ -172,6 +172,8 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   let user;
   // The name the application registered with (unverified): the mark on what it creates.
   let clientName: string | null = null;
+  // Whether this call may receive the text of the user's notes (G-381 (b)): the token's scope and the grant's consent.
+  let readsNotes = false;
   try {
     const grant = await prisma.oAuthGrant.findUnique({
       where: { id: claims.grant },
@@ -188,6 +190,7 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     }
     user = grant.user;
     clientName = grant.client.clientName ?? null;
+    readsNotes = tokenScopes.includes(TEXT_SCOPE) && grant.scopes.includes(TEXT_SCOPE) && (grant.textConsentVersion ?? 0) >= TEXT_CONSENT_VERSION;
   } catch (error) {
     console.error('delegatedAuth: could not read the grant:', error instanceof Error ? error.message : error);
     res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
@@ -247,6 +250,6 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   });
 
   req.user = user;
-  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: claims.scope.split(' '), clientName };
+  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: tokenScopes, clientName, readsNotes };
   next();
 }

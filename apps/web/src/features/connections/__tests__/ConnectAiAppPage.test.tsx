@@ -88,7 +88,7 @@ describe('ConnectAiAppPage', () => {
   it('carries the safety note: what a connected app reads, no personal data of clients, only trusted apps', async () => {
     render(<ConnectAiAppPage />);
     const notice = await screen.findByRole('region', { name: 'Dati personali e app AI' });
-    expect(within(notice).getByText(/legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci e le tue schede e i tuoi percorsi di studio/i)).toBeInTheDocument();
+    expect(within(notice).getByText(/legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci, le tue note, le tue schede e i tuoi percorsi di studio/i)).toBeInTheDocument();
     expect(within(notice).getByText(/non scrivere lì dati personali dei clienti, oppure collega solo app AI di cui ti fidi/i)).toBeInTheDocument();
     expect(within(notice).getByText(/agisce con il tuo account, nei limiti dei permessi/i)).toBeInTheDocument();
   });

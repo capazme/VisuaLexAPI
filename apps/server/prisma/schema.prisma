@@ -425,7 +425,8 @@ model Highlight {
   id          String   @id @default(uuid())
   normaKey    String   @map("norma_key")
   text        String // Highlighted text
-  color       String   @default("yellow") // yellow, green, red, blue
+  // yellow, green, red, blue; null only for a gloss (a CHECK in the migration)
+  color       String?  @default("yellow")
   startOffset Int      @map("start_offset")
   endOffset   Int      @map("end_offset")
   note        String? // Optional note
@@ -456,6 +457,9 @@ model Highlight {
   reviewComment        String?             @map("review_comment")
   noteEditedAt         DateTime?           @map("note_edited_at")
   noteEditedBy         String?             @map("note_edited_by")
+  // D8: a `gloss` is an assistant's note on a passage with no colour (a coloured mark is the user's gesture);
+  // every other row is a `mark`. A gloss always has a state and a note that is not empty (CHECKs in the migration).
+  kind                 HighlightKind       @default(mark)
 
   // Relationships
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -468,6 +472,12 @@ model Highlight {
   @@index([normaKey])
   @@index([userId, dossierItemId])
   @@map("highlights")
+}
+
+// What a highlight row is (D8): a coloured mark, the user's or a D7b proposal, or an assistant's gloss on a passage.
+enum HighlightKind {
+  mark
+  gloss
 }
 
 // The state of a note written by an assistant (D7b): yellow, green, red. The user's own notes have none.
@@ -1797,6 +1807,10 @@ model OAuthGrant {
   createdAt  DateTime  @default(now()) @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
   revokedAt  DateTime? @map("revoked_at")
+  // The words of `dossier:text` the user last approved (`TEXT_CONSENT_VERSION` in oauth/config.ts); null for a grant
+  // without the texts. A lower version never receives a note's text until reconnected (G-381 (b); the grants that held
+  // `dossier:text` when the column came were given 1, G-385).
+  textConsentVersion Int? @map("text_consent_version")
 
   user   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   client OAuthClient              @relation(fields: [clientId], references: [id], onDelete: Cascade)
