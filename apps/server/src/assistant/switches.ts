@@ -11,8 +11,8 @@ export const APP_SWITCHES = {
   // answer 404, dossier answers carry no state, the MCP lists neither tool, the delegated routes 404.
   assistant_passages: 'Passaggi e note proposti dall’IA, da validare a mano (D7b).',
   // Gymnasium's courses («Percorsi», A1, spec 2026-10-23 §10.10). Off: every /api/lingo/corsi route and the
-  // declaration's accept route answer 404, the card route refuses a module, the MCP lists none of the tools.
-  // Switching off hides, never deletes.
+  // declaration's accept route answer 404, the card route refuses a module, the trash hides a course and a module
+  // (`trash/trash.ts`), the MCP lists none of the tools. Switching off hides, never deletes.
   lingo_courses: 'Percorsi di studio creati dall’assistente (A1).',
 } as const;
 

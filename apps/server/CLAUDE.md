@@ -630,7 +630,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   it, one person's): content rows are never updated but for a course's title and `moduliPrevisti`, and a
   correction is a new module naming the one it supersedes (`sostituisceId`). Behind the switch `lingo_courses`
   (`app_switches`; `GET /api/features` answers `lingoCourses`): off, every `/api/lingo/corsi` route and `POST
-  /api/lingo/testi/MATERIALE_STUDIO/accetta` answer 404 and the card route refuses a module; the rows stay.
+  /api/lingo/testi/MATERIALE_STUDIO/accetta` answer 404, the card route refuses a module, and the trash neither
+  lists, restores nor empties a `LINGO_CORSO` or `LINGO_CORSO_MODULO` entry (404; the sweep still expires it); the
+  rows stay. The admin's texts page still lists `MATERIALE_STUDIO`: admins are the owners. `GET
+  /api/lingo/srs/sessione` is strict until S2 narrows it to a course: `?corso=` is a 400, never ignored.
   `routes/lingoCorsi.ts` over `lingo/courses.ts`: `POST /` (course, competences C1… in the order given, the
   author's enrolment with a study dossier of the user's, locked `FOR KEY SHARE`; 409 `{ detail, richiedeTesto,
   link }` until the current `MATERIALE_STUDIO` is accepted; 30 a user), `POST /:id/moduli` (one module whole, the

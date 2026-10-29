@@ -92,6 +92,36 @@ describe('a course to the trash and back', () => {
   });
 });
 
+describe('the trash with the switch off', () => {
+  it('neither lists, restores nor empties a course or a module, and keeps their rows; the rest of the trash works', async () => {
+    const c = await course(alice, token, 2);
+    const moduleTrashed = await request(app).delete(`${CORSI}/${c.id}/moduli/${c.moduleIds[1]}`).set(authHeader(alice));
+    const other = await course(alice, token, 1);
+    const courseTrashed = await request(app).delete(`${CORSI}/${other.id}`).set(authHeader(alice));
+    const card = await prisma.lingoCard.create({ data: { autoreId: alice.id, materia: 'DIRITTO_CIVILE', istituto: 'Contratto', domanda: 'Che cos’è?', risposta: 'Un accordo.' } });
+    const cardTrashed = await request(app).post('/api/lingo/cards/trash').set(authHeader(alice)).send({ cardIds: [card.id] });
+    expect([moduleTrashed.status, courseTrashed.status, cardTrashed.status]).toEqual([200, 200, 200]);
+    const ids = [moduleTrashed.body.trashId, courseTrashed.body.trashId];
+
+    await switchCourses(false);
+    const list = await request(app).get('/api/trash').set(authHeader(alice));
+    expect(list.body.map((entry: { kind: string }) => entry.kind)).toEqual(['LINGO_CARDS']);
+    for (const id of ids) {
+      expect((await request(app).post(`/api/trash/${id}/restore`).set(authHeader(alice)).send({})).status).toBe(404);
+      expect((await request(app).delete(`/api/trash/${id}`).set(authHeader(alice))).status).toBe(404);
+    }
+    expect(await prisma.trashEntry.count({ where: { id: { in: ids } } })).toBe(2);
+    expect((await request(app).post(`/api/trash/${cardTrashed.body.trashId}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+
+    // Switched on again, both are there and come back.
+    await switchCourses(true);
+    expect((await request(app).get('/api/trash').set(authHeader(alice))).body.map((entry: { kind: string }) => entry.kind).sort()).toEqual(['LINGO_CORSO', 'LINGO_CORSO_MODULO']);
+    for (const id of ids) expect((await request(app).post(`/api/trash/${id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+    expect(await prisma.lingoCorso.count()).toBe(2);
+    expect(await prisma.lingoCorsoModulo.count({ where: { corsoId: c.id } })).toBe(2);
+  });
+});
+
 describe('a module to the trash', () => {
   it('only when never opened; back with its cards and its correction’s link', async () => {
     const c = await course(alice, token, 1);

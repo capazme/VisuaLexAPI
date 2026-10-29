@@ -1,5 +1,6 @@
 import { Prisma, type TrashKind } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { isSwitchOn } from '../assistant/switches';
 import { AppError } from '../middleware/errorHandler';
 import { citeStoredAct } from '../norms/citation';
 import { citeStoredItem } from '../norms/decisionCitation';
@@ -149,6 +150,17 @@ async function maybeSweep(): Promise<void> {
   if (now - lastSweep < SWEEP_EVERY_MS) return;
   lastSweep = now;
   await sweepExpiredTrash(new Date(now));
+}
+
+const COURSE_KINDS: TrashKind[] = ['LINGO_CORSO', 'LINGO_CORSO_MODULO'];
+
+/**
+ * The entries the routes reach. While `lingo_courses` is off a course or a module in the trash is neither listed,
+ * restored nor emptied by hand (404): switching off hides, never deletes (spec 2026-10-23 §10.10). The sweep still
+ * empties it when it expires, as it would have with the switch on.
+ */
+async function reachableKinds(db: Pick<Prisma.TransactionClient, 'appSwitch'> = prisma): Promise<Prisma.TrashEntryWhereInput> {
+  return (await isSwitchOn('lingo_courses', db)) ? {} : { kind: { notIn: COURSE_KINDS } };
 }
 
 /**
@@ -331,7 +343,7 @@ export async function trashLingoCards(
 export async function listTrash(userId: string): Promise<TrashListEntry[]> {
   await maybeSweep();
   const entries = await prisma.trashEntry.findMany({
-    where: { userId, expiresAt: { gt: new Date() } },
+    where: { userId, expiresAt: { gt: new Date() }, ...(await reachableKinds()) },
     orderBy: { deletedAt: 'desc' },
   });
   return entries.map((entry) => {
@@ -509,7 +521,7 @@ const itemRow = (item: StoredItem, dossierId: string, position: number, aboutIte
 export async function restoreTrashEntry(userId: string, trashId: string, targetDossierId?: string): Promise<{ dossierId: string | null }> {
   try {
     return await prisma.$transaction(async (tx) => {
-      const entry = await tx.trashEntry.findFirst({ where: { id: trashId, userId, expiresAt: { gt: new Date() } } });
+      const entry = await tx.trashEntry.findFirst({ where: { id: trashId, userId, expiresAt: { gt: new Date() }, ...(await reachableKinds(tx)) } });
       if (!entry) throw new AppError(404, 'Elemento del cestino non trovato.');
       // A dossier's published copy is locked before its entry, in the order the admin's withdraw and
       // republish take them (the copy, then the entry they rewrite): the other way round, a restore and
@@ -700,7 +712,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
 
 /** Empties one trash entry now. */
 export async function purgeTrashEntry(userId: string, trashId: string): Promise<void> {
-  const { count } = await prisma.trashEntry.deleteMany({ where: { id: trashId, userId } });
+  const { count } = await prisma.trashEntry.deleteMany({ where: { id: trashId, userId, ...(await reachableKinds()) } });
   if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
 }
 
