@@ -12,6 +12,14 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+### Sources
+
+- The Union's acts are read from CELLAR, the Publications Office's repository, first, and from
+  EUR-Lex's site through the browser only when CELLAR does not serve the act: since 25-26
+  October 2026 eur-lex.europa.eu answers a server with a firewall challenge. Same page, same
+  texts (23 acts compared, 1534 articles identical). `/health/detailed` probes both hosts and
+  reports the source down only when both are.
+
 ## [1.10.5] - 2026-10-27
 
 The web only: the boundaries of an assistant's passage moved by hand, and the

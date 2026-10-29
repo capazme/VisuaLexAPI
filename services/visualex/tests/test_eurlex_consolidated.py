@@ -645,7 +645,7 @@ class TestTreeFailuresAreNotKept:
         # the repository's download/cache
         eurlex_copy = SimpleNamespace(get=AsyncMock(return_value=None), set=AsyncMock())
         manager = SimpleNamespace(get_persistent=lambda namespace: eurlex_copy)
-        with patch.object(treextractor, "_fetch_with_playwright", fetch), \
+        with patch.object(treextractor.eurlex_fetch, "fetch_act_page", fetch), \
                 patch.object(treextractor, "get_cache_manager", lambda: manager), \
                 patch.object(treextractor._tree_cache, "get", AsyncMock(return_value=None)), \
                 patch.object(treextractor._tree_cache, "set", AsyncMock()):

@@ -48,3 +48,19 @@ Added 2026-10-22:
 - `dir_85_374_eli_legacy_text_trimmed.html` — the legacy OJ page of dir. 85/374
   (`/eli/dir/1985/374/oj/ita`, captured 2026-10-25), trimmed to its text (`div#TexteOnly`):
   art. 11's heading is glued to the end of art. 10's last paragraph.
+
+Added 2026-10-27 — CELLAR (`publications.europa.eu/resource/celex/<CELEX>`, `Accept:
+application/xhtml+xml,text/html`, `Accept-Language: it`, after its 303), the host the acts are
+read from first since EUR-Lex answers a server with a WAF challenge (`services/eurlex_fetch.py`):
+
+- `cellar_eprivacy_oj_legacy.html` — CELLAR's page of dir. 2002/58 (CELEX 32002L0058), whole:
+  the legacy class-less markup, as `eprivacy_oj_legacy.html` from EUR-Lex.
+- `cellar_eprivacy_consolidated_20091219.html` — CELLAR's page of `02002L0058-20091219`,
+  whole: the consolidated markup, as `eprivacy_consolidated_20091219.html` from EUR-Lex.
+- `cellar_gdpr_oj_head_trimmed.html` — CELLAR's XHTML of the GDPR (CELEX 32016R0679), trimmed
+  to its own prolog and `<head>` (an XML declaration, the OJ file's name as `<title>`), the
+  title block `#tit_1` and `#art_1`. Trimmed as `gdpr_oj_trimmed.html` (the same ids from the
+  same page), CELLAR's GDPR is byte for byte that file, so it is not kept twice.
+
+`tests/test_eurlex_cellar.py` reads each pair and asks the same of both: tree, rubriche,
+title, recitals and every article's text.

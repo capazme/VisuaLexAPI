@@ -5,7 +5,6 @@ import re
 from urllib.parse import urlparse
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
-from playwright.async_api import async_playwright
 
 from .cache import PersistentCache
 from .cache_manager import get_cache_manager
@@ -14,6 +13,7 @@ from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
 from ..services.akn_parser import normalize_article_key
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+from ..services import eurlex_fetch
 from ..services.http_client import http_client
 
 # Configurazione del logging
@@ -23,36 +23,6 @@ logging.basicConfig(level=logging.INFO,
 
 # Persistent cache for tree structures (survives restarts)
 _tree_cache = PersistentCache("tree", ttl=86400)  # 24 hours
-
-
-async def _fetch_with_playwright(url: str) -> str:
-    """
-    Fetch URL using Playwright to bypass CloudFront WAF protection.
-    Used for EUR-Lex which blocks simple HTTP requests.
-    """
-    logging.info(f"Fetching with Playwright (WAF bypass): {url[:80]}...")
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage']
-        )
-        try:
-            context = await browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
-            page = await context.new_page()
-            await page.goto(url, wait_until='networkidle', timeout=45000)
-            html = await page.content()
-            await context.close()
-            return html
-        finally:
-            await browser.close()
-
-
-# The shortest EUR-Lex page the scraper accepts as an act (EurlexScraper.request_document): a
-# shorter one is an error or a challenge page, never stored where the scraper reads.
-_EURLEX_MIN_PAGE = 1000
 
 
 def _full_key(normurn, link):
@@ -75,13 +45,14 @@ def _narrow(result, count, metadata, details, return_metadata):
 
 async def _eurlex_page(normurn):
     """The EUR-Lex page behind a tree: the copy the scraper keeps (namespace "eurlex", keyed by
-    the same URL), else one Playwright visit. The article text is read from that page too, so
-    one visit serves the tree, the rubriche and every article of the act."""
+    the same URL), else the act's page from CELLAR or EUR-Lex (`eurlex_fetch.fetch_act_page`).
+    The article text is read from that page too, so one fetch serves the tree, the rubriche and
+    every article of the act."""
     cached_html = await get_cache_manager().get_persistent("eurlex").get(normurn)
-    if cached_html:
+    if eurlex_fetch.is_act_page(cached_html):
         logging.info(f"EUR-Lex page from the scraper's cache: {normurn[:80]}")
         return cached_html, True
-    return await _fetch_with_playwright(normurn), False
+    return await eurlex_fetch.fetch_act_page(normurn, timeout_ms=45000), False
 
 
 def _source_of(normurn):
@@ -183,11 +154,11 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
 
     try:
         if is_eurlex:
-            # EUR-Lex requires Playwright to bypass WAF
+            # CELLAR first, EUR-Lex's site through the browser second (`eurlex_fetch`)
             if eurlex_copy:
                 text, from_copy = await _eurlex_page(normurn)
             else:
-                text = await _fetch_with_playwright(normurn)
+                text = await eurlex_fetch.fetch_act_page(normurn, timeout_ms=45000)
         else:
             # Normattiva through the shared client, as its article pages: its rate limit and
             # its host check. One attempt, as when the tree had a session of its own: the
@@ -218,7 +189,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
         result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
-        if count > 0 and not from_copy and len(text) >= _EURLEX_MIN_PAGE:
+        if count > 0 and not from_copy and eurlex_fetch.is_act_page(text):
             # A page that parsed into articles is the act's: kept where the scraper reads it.
             await get_cache_manager().get_persistent("eurlex").set(normurn, text)
 
