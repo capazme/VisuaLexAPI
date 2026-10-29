@@ -64,7 +64,11 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   (`NoAnswer` in `src/errors.ts`: the request failed or timed out, or a gateway answered 502/504; the norms route has no
   overall ceiling and may still be writing) has its rows reported neither in nor out: `errore` says the dossier exists,
   its entries may still be landing, to check it with `omnilex_leggi_dossier` and not to create it again, and a note on
-  one of those norms is left out with the same words. To a client that sent a `progressToken`, a
+  one of those norms is left out with the same words. Every answer that carries `errore` also carries `in_sospeso`,
+  the steps left without an answer in the order they ran — `[]`, `["norme"]`, `["sentenze"]` or both —, so that a
+  client reading the answer as data (mcp-legal-it's citation check, which subtracts `non_entrate[].riga` from its list)
+  knows which rows are neither in nor out; an answer without `errore` has no `in_sospeso` (agreed with mcp-legal-it's
+  maintainer, 29 October 2026). To a client that sent a `progressToken`, a
   progress notification before and after each step and every 15 s while one runs (`PROGRESS.heartbeatMs`; no total):
   the SDK's client waits 60 s by default, a decisions step up to 100 s, and a client that restarts its wait on progress
   then does not give up and retry. A cancelled call stops the steps not yet begun, and its log line says
