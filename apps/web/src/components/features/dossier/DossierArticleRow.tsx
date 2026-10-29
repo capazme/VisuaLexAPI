@@ -6,11 +6,12 @@ import { getRubricText, parseArticleStructure } from '../../../utils/articleStru
 import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
-import { ClaudeMark } from '../../ui/ClaudeMark';
-import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
+import { AiReviewSignal } from '../../ui/AiReviewSignal';
+import { AiNoteEntryReview } from './AiNoteEntryReview';
+import { aiReviewSignal, aiReviewSummary, hasAssistantNote } from '../../../utils/aiReview';
 import { formatTimestampLong } from './dossierUtils';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
+import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_SIGN, ROW_TITLE, ROW_TOGGLE } from './dossierStyles';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
@@ -69,11 +70,19 @@ export function DossierArticleRow({
   const rowLabel = `${verb} ${named}`
     + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '');
   const regionId = `dossier-item-content-${item.id}`;
-  const byApp = notes.find((n) => n.createdBy)?.createdBy ?? null;
-  // The closed row's note count and mark sit inside the toggle, whose own name
-  // replaces them for a screen reader: the name has to say them.
-  const notesLabel = notes.length === 0 || isExpanded ? '' : `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}`
-    + (byApp ? `, ${notes.length === 1 ? '' : 'una '}${claudeMarkSentence(byApp)}` : '');
+  // The closed row's note count sits inside the toggle, whose own name replaces
+  // it for a screen reader: the name has to say it. No application's mark on the
+  // row (D7b): each note carries its own once the row is open. Counted on the closed row only: open, the notes are
+  // listed under it.
+  const showNotesCount = notes.length > 0 && !isExpanded;
+  const notesLabel = showNotesCount ? `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}` : '';
+  // The traffic light too, open or closed: what is left to check stays said. The server counts the application's
+  // notes on this entry (`assistant_notes`, D7b); null with nothing written or the feature off.
+  const aiReview = item.assistantNotes ?? null;
+  // Drawn when it says something: none for counts of nothing (`AiReviewSignal` draws nothing then), so no empty box.
+  const light = aiReview && aiReviewSignal(aiReview) ? aiReview : null;
+  const reviewSummary = aiReview ? aiReviewSummary(aiReview) : '';
+  const reviewLabel = reviewSummary ? `, ${reviewSummary}` : '';
 
   return (
     // `data-dossier-item`: a norm a decision cites opens this row (D7d, `useCitedNorms`).
@@ -98,7 +107,7 @@ export function DossierArticleRow({
         <div
           role="button"
           tabIndex={0}
-          aria-label={rowLabel + notesLabel}
+          aria-label={rowLabel + notesLabel + reviewLabel}
           aria-expanded={isExpanded}
           aria-controls={isExpanded ? regionId : undefined}
           onClick={onToggleExpand}
@@ -109,7 +118,7 @@ export function DossierArticleRow({
               onToggleExpand();
             }
           }}
-          className={cn('flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5', FOCUS_RING)}
+          className={ROW_TOGGLE}
         >
           <ChevronDown
             size={16}
@@ -120,27 +129,43 @@ export function DossierArticleRow({
             <span className={cn(ROW_TITLE, 'block font-medium')}>art. {item.data.numero_articolo}</span>
             {greyLine && <span className={cn(ROW_LINE, 'mt-0.5 line-clamp-2 block')}>{greyLine}</span>}
           </span>
-          {/* The signs may shrink, up to half the row: a long application's name wraps instead of squeezing the title. */}
-          <span className="flex min-w-0 max-w-[50%] flex-wrap items-center justify-end gap-1.5 pt-0.5">
-            {annex && (
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                All. {annex}
-              </span>
-            )}
-            {historicalLabel && (
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                {historicalLabel}
-              </span>
-            )}
-            {notes.length > 0 && !isExpanded && (
-              <span className="inline-flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300" title={notes.length === 1 ? '1 nota' : `${notes.length} note`}>
-                <StickyNote size={13} aria-hidden />
-                {notes.length}
-                <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
-              </span>
-            )}
-            {notes.length > 0 && !isExpanded && byApp && <ClaudeMark createdBy={byApp} compact />}
-          </span>
+          {/* The signs, up to half the row. The notes' count and the application's light each take a box as tall as
+              the star and the bin (`ROW_SIGN`): alone after the title, the count sat 2 px above them, the light 1 to 3.
+              The chips are 20 px tall under the toggle's padding and `pt-0.5`, on that line too. Drawn from the right
+              (`flex-row-reverse`, so light, count, chips in the source): where the half row is too narrow for all, the
+              chips wrap to the next line, under, and the count and the light keep the star's line. */}
+          {(annex || historicalLabel || showNotesCount || light) && (
+            <span className="flex min-w-0 max-w-[50%] flex-row-reverse flex-wrap items-start gap-1.5">
+              {light && (
+                <span className={ROW_SIGN}>
+                  <AiReviewSignal counts={light} />
+                </span>
+              )}
+              {showNotesCount && (
+                <span className={ROW_SIGN}>
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300" title={notes.length === 1 ? '1 nota' : `${notes.length} note`}>
+                    <StickyNote size={13} aria-hidden />
+                    {notes.length}
+                    <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
+                  </span>
+                </span>
+              )}
+              {(annex || historicalLabel) && (
+                <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 pt-0.5">
+                  {annex && (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      All. {annex}
+                    </span>
+                  )}
+                  {historicalLabel && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                      {historicalLabel}
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -167,17 +192,24 @@ export function DossierArticleRow({
           {/* The article's notes first, then its text (spec §6). */}
           {(notes.length > 0 || onAddNote) && (
             <div className="mb-2 mt-1 space-y-1.5">
-              {notes.map((note) => (
+              {notes.map((note) => {
+                const words = <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>;
+                const meta = (
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span>{formatTimestampLong(note.addedAt)}</span>
+                  </div>
+                );
+                // A note an application wrote: its state, the pencil and its bin under it (D7b).
+                const reviewed = hasAssistantNote(note) && onRemoveNote;
+                return (
                 <div key={note.id} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
                   <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
                   <div className="min-w-0 flex-1">
-                    <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{formatTimestampLong(note.addedAt)}</span>
-                      <ClaudeMark createdBy={note.createdBy ?? null} />
-                    </div>
+                    {reviewed
+                      ? <AiNoteEntryReview note={note} meta={meta} onRemove={() => onRemoveNote(note)}>{words}</AiNoteEntryReview>
+                      : <>{words}{meta}</>}
                   </div>
-                  {onRemoveNote && (
+                  {onRemoveNote && !reviewed && (
                     <button
                       type="button"
                       onClick={() => onRemoveNote(note)}
@@ -188,7 +220,8 @@ export function DossierArticleRow({
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
               {onAddNote && (
                 <button
                   type="button"
@@ -202,6 +235,7 @@ export function DossierArticleRow({
           )}
           <DossierItemReader
             norma={item.data}
+            itemId={item.id}
             onOpenOnDashboard={onOpenOnDashboard}
             showToast={showToast}
             onArticle={onArticle}

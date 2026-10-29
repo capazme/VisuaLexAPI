@@ -994,12 +994,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             />
 
             {url && (
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                // 44 px to tap on a phone (M1), the words as they were: the row's padding goes into the link there.
+                <div className="mt-4 md:pt-3 border-t border-slate-100 dark:border-slate-800">
                     <a
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                        className="inline-flex min-h-[44px] items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline md:min-h-0"
                     >
                         <ExternalLink size={12} />
                         Visualizza fonte ufficiale su Normattiva

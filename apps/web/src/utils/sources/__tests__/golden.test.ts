@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { ANNEXED_ACTS, CODES_TABLE } from '../actTypes';
+import { ANNEX_HEADINGS, ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE } from '../actTypes';
 import { actHeading, citeAct, citeNorm, normFromUrn, shortAct, shortNorm, type LabelledNorm } from '../normLabels';
 
 // The web app's labels of norms against the convention's golden file
@@ -100,5 +100,27 @@ describe('the table of acts whose text is an annex is the API\'s', () => {
     const rows = Object.fromEntries([...block.matchAll(/^\s*"(.+)":\s*"(.+)",?\s*$/gm)].map((m) => [m[1], m[2]]));
     expect(Object.keys(rows).length).toBeGreaterThan(0);
     expect(ANNEXED_ACTS).toEqual(rows);
+  });
+});
+
+describe('the ANNEX_SIGLE table is the API\'s', () => {
+  it('has the same rows', () => {
+    const python = readFileSync(join(ROOT, 'services', 'visualex', 'visualex_api', 'tools', 'map.py'), 'utf8');
+    const start = python.indexOf('ANNEX_SIGLE = {');
+    const block = python.slice(start, python.indexOf('\n}', start));
+    const rows = Object.fromEntries([...block.matchAll(/^\s*"(.+)":\s*"(.+)",?\s*$/gm)].map((m) => [m[1], m[2]]));
+    expect(Object.keys(rows).length).toBeGreaterThan(0);
+    expect(ANNEX_SIGLE).toEqual(rows);
+  });
+});
+
+describe('the ANNEX_HEADINGS table is the API\'s', () => {
+  it('has the same rows', () => {
+    const python = readFileSync(join(ROOT, 'services', 'visualex', 'visualex_api', 'tools', 'map.py'), 'utf8');
+    const start = python.indexOf('ANNEX_HEADINGS = {');
+    const block = python.slice(start, python.indexOf('\n}', start));
+    const rows = Object.fromEntries([...block.matchAll(/^\s*"(.+)":\s*"(.+)",?\s*$/gm)].map((m) => [m[1], m[2]]));
+    expect(Object.keys(rows).length).toBeGreaterThan(0);
+    expect(ANNEX_HEADINGS).toEqual(rows);
   });
 });

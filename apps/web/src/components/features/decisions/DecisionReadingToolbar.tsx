@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { NotesHighlightsButtons } from '../search/NotesHighlightsButtons';
+import { HighlightColorMenu } from '../search/HighlightColorMenu';
 import { DiscussionButton } from '../search/DiscussionButton';
 import { FindInTextButton } from '../search/FindInTextButton';
 
@@ -50,6 +51,8 @@ export function DecisionReadingToolbar({
         onToggleNotes={onToggleNotes}
         onToggleHighlights={onToggleHighlights}
       />
+      {/* The colour of new highlights (H1), as in the article's bar. */}
+      <HighlightColorMenu triggerClassName="min-h-[44px] min-w-[44px] justify-center p-2.5 hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-800" />
       <DiscussionButton isOpen={isDiscussionOpen} onToggle={onToggleDiscussion} name="Glosse sulla decisione" />
       {onToggleFind && <FindInTextButton ref={findButtonRef} isOpen={isFindOpen} onToggle={onToggleFind} />}
     </div>

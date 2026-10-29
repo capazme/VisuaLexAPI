@@ -41,12 +41,15 @@ export interface Stub {
     task_count?: number;
   }[];
   introspectionDown?: boolean;
+  /** What GET /api/features answers (public, asked at each session's start; not recorded in apiCalls). */
+  features?: { assistantPassages: boolean } | 'down';
   /** The user's study cards, as GET /api/lingo/cards answers them. */
   cards: {
     id: string;
     materia: string;
     stato: string;
     istituto: string;
+    tipo?: string;
     domanda: string;
     createdAt: string;
     ancore?: { normaKey: string; articleId: string; urn: string; isPrimary: boolean }[];
@@ -74,6 +77,10 @@ export async function startStubs() {
     if (!subject?.active) return void res.status(400).json({ error: 'invalid_grant' });
     stub.exchanges.push({ subject: req.body.subject_token, scope: req.body.scope, audience: req.body.audience });
     res.json({ access_token: `api-token-for-${req.body.scope}`, token_type: 'Bearer', expires_in: 120 });
+  });
+  as.get('/api/features', (_req, res) => {
+    if (stub.features === 'down') return void res.status(500).end();
+    res.json(stub.features ?? { assistantPassages: false });
   });
   as.all(/^\/api\/.*/, (req, res) => {
     const path = req.path.slice(4);

@@ -25,6 +25,7 @@ from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
+from visualex_api.services import eurlex_fetch
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn, sweep_exported_pdfs
 from visualex_api.services.akn_parser import comparable_article_key
 from visualex_api.tools.article_suffixes import other_ordinal_spelling
@@ -33,9 +34,11 @@ from visualex_api.services.normattiva_validity import (
     read_upcoming_request,
     read_validity,
     reject_future_version_date,
+    reject_original_with_a_date,
     starts_after_today,
     today_in_rome,
     upcoming_change,
+    versions_between,
 )
 from types import SimpleNamespace
 
@@ -52,7 +55,7 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import complete_request_date, export_url, pdf_cache_path
+from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
@@ -456,6 +459,7 @@ class NormaController:
         if upcoming_asked:
             read_upcoming_request(data.get('version'), data.get('version_date'))
         else:
+            reject_original_with_a_date(data.get('version'), data.get('version_date'))
             reject_future_version_date(data.get('version_date'))
 
         act_type = data.get('act_type')
@@ -851,7 +855,7 @@ class NormaController:
             return article_text, url, validity, {}
         log.info("Served the text in force today instead of a later version",
                  later_from=validity.get('valid_from'), url=str(url_today)[:120])
-        return text_today, url_today, validity_today, {'upcoming': upcoming_change(validity)}
+        return text_today, url_today, validity_today, {'upcoming': upcoming_change(validity, today=validity_today)}
 
     async def _text_today(self, scraper, nv):
         """`(text, url, validity)` of the article at today, its validity judged against an
@@ -889,11 +893,20 @@ class NormaController:
         if not later:
             raise ResourceNotFoundError(f"Nessuna versione non ancora in vigore per {nv}")
         valid_from = validity['valid_from']
+        today = await self._text_today(scraper, nv)
+        inserted = bool(today and today[2] and today[2].get('state') == 'not_yet')
         if until and valid_from > until:
+            between = 0 if inserted else versions_between(validity, today[2] if today else None)
+            if between:
+                # The day falls before the latest version, and other versions come first:
+                # Normattiva shows only the latest, so the one of that day cannot be read.
+                others = "ce n'è un'altra" if between == 1 else f"ce ne sono altre {between}"
+                raise ResourceNotFoundError(
+                    f"Non so dire quale versione di {nv} sia in vigore il {until}: prima di quella che "
+                    f"entra in vigore il {valid_from} {others}, che Normattiva non mostra a parte")
             raise ResourceNotFoundError(
                 f"La versione non ancora in vigore di {nv} entra in vigore il {valid_from}")
-        today = await self._text_today(scraper, nv)
-        upcoming = upcoming_change(validity, inserted=bool(today and today[2] and today[2].get('state') == 'not_yet'))
+        upcoming = upcoming_change(validity, inserted=inserted, today=today[2] if today else None)
         if (today is None or today[2] is None) and upcoming['change'] == 'amended':
             # Today's page could not be read: an amendment cannot be told from an insertion.
             upcoming['change'] = None
@@ -1782,20 +1795,23 @@ class NormaController:
                 }
                 results['status'] = 'degraded'
 
-            # Test EUR-Lex (fetch homepage with timeout)
-            try:
-                start = time_module.time()
-                await eurlex_scraper.request_document("https://eur-lex.europa.eu", source="health_check")
-                latency = time_module.time() - start
-                results['services']['eurlex'] = {
-                    'status': 'ok',
-                    'latency_ms': round(latency * 1000, 2)
-                }
-            except Exception as e:
-                results['services']['eurlex'] = {
-                    'status': 'error',
-                    'error': str(e)
-                }
+            # The Union's acts: EUR-Lex's site and CELLAR, one request each, no browser. The
+            # acts are read from CELLAR first and from the site second (eurlex_fetch), so the
+            # source is down only when both are; each one's own state rides along ("challenge":
+            # the site's firewall answered 202 with x-amzn-waf-action).
+            start = time_module.time()
+            eurlex_site = await eurlex_fetch.probe_eurlex()
+            cellar = await eurlex_fetch.probe_cellar()
+            latency = time_module.time() - start
+            eu_ok = 'ok' in (eurlex_site, cellar)
+            results['services']['eurlex'] = {
+                'status': 'ok' if eu_ok else 'error',
+                'latency_ms': round(latency * 1000, 2),
+                'eurlex': eurlex_site,
+                'cellar': cellar,
+            }
+            if not eu_ok:
+                results['services']['eurlex']['error'] = f"EUR-Lex: {eurlex_site}; CELLAR: {cellar}"
                 results['status'] = 'degraded'
 
             status_code = 200 if results['status'] == 'ok' else 503
@@ -1893,15 +1909,23 @@ class NormaController:
                 return jsonify({'error': 'URN mancante'}), 400
             if not is_allowed_pdf_urn(urn):
                 return jsonify({'error': 'URN non valido: sono ammessi solo URL normattiva.it'}), 400
-            # Normattiva's address rebuilt from the URN, an undated one at today (G-355).
+            # Normattiva's address rebuilt from the URN, an undated one at today (G-355); a day
+            # after today is refused as for an article (Normattiva would export today's text
+            # under it), and the cache name is built before anything else: a URN it cannot
+            # name is a 400, never a 500 later.
             try:
                 urn = export_url(urn.strip(), today_in_rome().isoformat())
-            except ValueError:
+                reject_future_version_date(export_version_date(urn))
+                # The same folder extract_pdf downloads into: the cached copy is a file in it.
+                pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
+            except ValidationError as exc:
+                return jsonify({'error': str(exc)}), 400
+            except ValueError as exc:
+                if str(exc) == URN_TOO_LONG:
+                    return jsonify({'error': 'URN troppo lungo per l\'esportazione'}), 400
                 return jsonify({'error': 'URN non valido: serve un indirizzo /uri-res/N2Ls?urn:nir:… di normattiva.it'}), 400
 
             log.info("Received data for export_pdf", data=data)
-            # The same folder extract_pdf downloads into: the cached copy is a file in it.
-            pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
 
             # Check if PDF already exists in cache
             file_exists = await asyncio.to_thread(os.path.exists, pdf_path)

@@ -10,7 +10,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `reject_future_version_date`, an undated request served as Normattiva answers it (G-355,
   G-357, G-358 are the root app's). Never deploy it as it is; its `/api/export_pdf` follows
   the root app's. Retiring or porting it goes with the move to the mcp-legal-it shell.
-- **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
+- **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`, `eurlex_fetch.py` (where an
+  EU act's page comes from: CELLAR first, by CELEX through the shared client — `source="cellar"`,
+  the 303 followed by hand over https and re-checked against the allow-list — and EUR-Lex's site
+  through Playwright second, since eur-lex.europa.eu answers a server with an AWS WAF challenge,
+  202 plus `x-amzn-waf-action` (`is_waf_challenge`); a page with no act's marker, `is_act_page`, is
+  neither served nor kept; the URL the app holds and the copies' key stay EUR-Lex's),
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
   `request(..., max_retries=n)` lowers the retry budget for a caller that paces
@@ -137,10 +142,19 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     them and those codici lost their default annex. `ANNEXED_ACTS` (with
     `act_default_annex`) does the same for an act cited by type, date and number whose text
     is its annex: the TULPS is annex 1 of r.d. 773/1931 (G-351), so «r.d. 773/1931, art. 86»
-    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`. A code's
+    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`; so are the legge
+    fallimentare (r.d. 267/1942), the c.p.p. minorile (d.P.R. 448/1988) and the testo unico sulle
+    successioni e donazioni (d.lgs. 346/1990), whose decree's own art. 1 approves the annexed text
+    (found on 25 October 2026; no other act of the codes table or of `ATTI_DENOMINATI` has that shape). A code's
     default annex and such an act's annex are never named in a citation (`sources.py`, and
     the server's, the web's and MERL-T's copies); the TS mirrors and MERL-T's copy of
-    `ANNEXED_ACTS` are pinned to this one by their tests
+    `ANNEXED_ACTS` are pinned to this one by their tests. `ANNEX_SIGLE` / `ANNEX_HEADINGS`
+    (keyed «<decree>:<annex>») give an annex of a code's decree, or an act of the codes table,
+    a sigla and a heading of its own (G-369: «disp. att. c.p.a.», «c.p.m.g.», «disp. att. c.p.p.»);
+    `sources._named` reads the sigla by the annex a norm sits in, so another annex of a code's
+    decree is never the code, and an annex with no sigla is cited by the decree with
+    «(Allegato N)». The parser reads each sigla back as the code and its annex; the same
+    copies are pinned the same way
   - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
     brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
     `brocardi_scraper.do_know` asks — unused since Brocardi was switched off (D-078). The lookup is **by identity**: every label
@@ -169,8 +183,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     read as another host than `urlparse` does. `tests/test_egress_allowlist.py` fails the
     build when a URL literal names an undeclared host. The runtime check covers
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
-    and treextractor's check before a browser — `SECURITY.md` lists what it does not
-    cover (the EUR-Lex scraper's and the PDF export's Playwright, redirect targets).
+    and the check before EUR-Lex's browser (`eurlex_fetch.fetch_with_playwright`, for the
+    scraper and the tree alike) — `SECURITY.md` lists what it does not cover (the PDF
+    export's Playwright, what a page then loads, redirect targets except CELLAR's).
   - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
     the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
     pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
@@ -346,14 +361,19 @@ POST unless noted, JSON bodies.
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard). An
   undated URN is exported as the text in force today, `!vig=<today>` in Europe/Rome
-  (`export_url`, G-355); a dated one or `@originale` as asked. The file is cached in
-  `download/` under the act's type, date, number, annex and version (`urn_to_filename`;
-  until 21 October 2026 the number and the year alone, so acts and versions shared a file),
-  and the PDFs there older than two days are deleted on the six-hour sweep
-  (`sweep_exported_pdfs`, top-level `.pdf` files only)
+  (`export_url`, G-355); a dated one or `@originale` as asked, and a day after today is a
+  400, as for an article. The file is cached in `download/` under the act's authority, type,
+  date, number, annex and version, each in its place joined by «_», which no part of a URN
+  holds (`urn_to_filename`; until 21 October 2026 the number and the year alone, until 25
+  October without the authority and with «:» and «;» read alike); a name over 150
+  characters is a 400, never cut. The PDFs there older than two days are deleted on the
+  six-hour sweep (`sweep_exported_pdfs`, top-level `.pdf` files only)
 - `GET /history` — server-side search history
-- `GET /health/detailed` — probes Normattiva and EUR-Lex **for
-  real**, on the shared client and circuit breakers. One result is cached
+- `GET /health/detailed` — probes Normattiva, EUR-Lex's site and CELLAR **for
+  real**, on the shared client, one request each and no browser. `services.eurlex` is
+  `error` only when both EU hosts are down (the acts are read from either), and carries each
+  one's own state: `eurlex` (`ok`, `challenge`, `error`) and `cellar` (`ok`, `error`: the
+  GDPR's CELEX answers its 303). One result is cached
   for `HEALTH_DETAILED_TTL` seconds (120) behind an `asyncio.Lock`, so N
   concurrent cold callers run one probe; the body carries `cached` and the
   status stays 503 while a source fails. Never wire it to a tight loop
@@ -365,10 +385,12 @@ request_in_window}`, dates in ISO form. It is the source's own statement of whic
 version came back; `norma_data.data_versione` is only the date the caller sent (except for
 `upcoming: true`, below, where it is the later text's first day). A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
-current text and say nothing — and so is one that cannot be read as a date.
+current text and say nothing — and so is one that cannot be read as a date, and one with
+`version: "originale"` (a date asks for the text in force that day, G-353; mcp-legal-it refuses the pair too).
 
-A date always asks for the text in force on that day, with or without «vigente» and
-over «originale» (owner, G-353; `append_version_info` writes `!vig=<day>`, and the AKN
+A date always asks for the text in force on that day, with or without «vigente» (owner,
+G-353; a request pairing it with «originale» is refused, above, and inside the API the date
+still wins: `append_version_info` writes `!vig=<day>`, and the AKN
 fallback reads the export at that day, never the original from today's). A request
 with no date is the text in force: Normattiva answers it with its latest version, also
 one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
@@ -376,7 +398,10 @@ January 2027). When the page's window starts after today (`starts_after_today`),
 handlers read the article at today (`!vig=<today>`) and serve that text, its `url` and
 its `validity`, with the later version in `upcoming` (owner, G-355;
 `NormaController._document_in_force`): `{change: "abrogated" | "amended" | "inserted",
-valid_from, version_number}`, absent otherwise. `norma_data` stays the request's (no
+valid_from, version_number}`, absent otherwise, with `versions_between: n` when the version
+numbers show `n` other versions not in force yet before it: Normattiva's undated page is the
+latest version and a date after today answers today's text, so those cannot be read, and a
+request for a day they cover says so («Non so dire quale versione … sia in vigore il …»). `norma_data` stays the request's (no
 date), so the key notes and highlights are stored under does not move. When nothing is
 in force today (today's page is `not_yet`: an article inserted from a later day) the
 later text is served as before, with `upcoming.change` `"inserted"` and `not_in_force:
@@ -474,7 +499,8 @@ in a loop: each act it cannot find costs a request (a miss is not cached).
 1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
    EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
    state law.
-   EU acts come from the Official Journal page unless the request names a
+   EU acts come from the Official Journal page (fetched from CELLAR, else from EUR-Lex:
+   `eurlex_fetch`) unless the request names a
    `celex_consolidated` (sector-0 CELEX, `02002L0058-20091219`): then the
    tree, rubriche and article text are read from that consolidated page,
    whose markup is different (`title-article-norm`, `modref` markers) and

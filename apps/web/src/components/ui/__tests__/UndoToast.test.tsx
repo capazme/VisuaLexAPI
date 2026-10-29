@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { NotificationHost, Toast } from '../Toast';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { closeNotification, notificationStore, notify, resetNotifications } from '../notifications/notifications';
+import { setFootBarRoom } from '../notifications/footBar';
 
 // jsdom runs no animation to its end on its own: an exit is ended by hand, as the card would at its end.
 const endExits = () => act(() => notificationStore.getState().entries.filter((e) => e.closing).forEach((e) => notificationStore.setState((s) => ({ entries: s.entries.filter((x) => x.id !== e.id) }))));
@@ -20,8 +21,20 @@ describe('NotificationHost (K1a)', () => {
     render(<NotificationHost />);
     await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
     const stack = list().parentElement as HTMLElement;
-    expect(stack.className).toContain('md:bottom-[5.5rem]');
+    expect(stack.className).toContain('md:bottom-[max(5.5rem,calc(1rem+var(--foot-bar,0px)))]');
     expect(stack.className).not.toContain('md:bottom-8');
+  });
+
+  it('rises over a bar held at the foot of the window (`--foot-bar`, «Sposta l\'evidenziazione»), at every width', async () => {
+    render(<NotificationHost />);
+    await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
+    const stack = list().parentElement as HTMLElement;
+    expect(stack.className).toContain('bottom-[calc(1rem+var(--foot-bar,0px))]');
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('');
+    act(() => setFootBarRoom(150));
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('150px');
+    act(() => setFootBarRoom(0));
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('');
   });
 
   it('answers «Annulla» while the time runs, then says «Ripristinato» in the same place', async () => {
@@ -285,6 +298,39 @@ describe('NotificationHost (K1a)', () => {
       document.body.append(dialog);
       await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
       dialog.remove();
+      expect(undoNew).not.toHaveBeenCalled();
+    });
+
+    it('undoes over Study Mode, under the notifications (`data-undo-through`), and writes it there; not under a dialog over it', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      const study = document.createElement('div');
+      study.setAttribute('data-find-overlay', '');
+      study.setAttribute('data-undo-through', '');
+      const dialog = document.createElement('div');
+      dialog.setAttribute('aria-modal', 'true');
+      try {
+        await act(async () => { document.body.append(study); await new Promise((r) => setTimeout(r, 20)); });
+        expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).toHaveTextContent('Ctrl+Z');
+        await act(async () => { study.append(dialog); });
+        await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+        expect(undoNew).not.toHaveBeenCalled();
+        dialog.remove();
+        await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+        expect(undoNew).toHaveBeenCalledOnce();
+      } finally {
+        await act(async () => { study.remove(); });
+      }
+    });
+
+    it('does nothing under another overlay over the workspace (the find overlay of a page, a sheet)', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      const overlay = document.createElement('div');
+      overlay.setAttribute('data-find-overlay', '');
+      document.body.append(overlay);
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      overlay.remove();
       expect(undoNew).not.toHaveBeenCalled();
     });
 

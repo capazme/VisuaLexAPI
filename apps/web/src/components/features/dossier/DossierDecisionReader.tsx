@@ -14,6 +14,8 @@ import { CitedNormsContext } from './useCitedNorms';
 
 interface Props {
   identity: DecisionIdentity;
+  /** Its dossier entry: what an application proposed on it is drawn on its text (D7b). */
+  itemId?: string;
 }
 
 /**
@@ -27,7 +29,7 @@ interface Props {
  * a decision it cites opens in the workspace, which the page goes to. Nothing is recorded in the Cronologia, as for an
  * article read here.
  */
-export function DossierDecisionReader({ identity }: Props) {
+export function DossierDecisionReader({ identity, itemId }: Props) {
   const navigate = useNavigate();
   const openPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const { current, answer, retry, chooseCandidate } = useDecisionAnswer(identity);
@@ -52,7 +54,7 @@ export function DossierDecisionReader({ identity }: Props) {
         // The row names the decision: its full heading as a line of details, not a second title (D7a).
         title="line"
         textSlot={answer?.esito === 'trovata' ? (
-          <DecisionReadingSurface identity={answer.identita} testo={answer.testo} attributi={answer.attributi} onLeave={toWorkspace} citedNorms={citedNorms} />
+          <DecisionReadingSurface identity={answer.identita} testo={answer.testo} attributi={answer.attributi} onLeave={toWorkspace} citedNorms={citedNorms} dossierItemId={itemId} />
         ) : undefined}
         noTextSlot={answer?.esito === 'trovata' ? (
           <DecisionDiscussionsWithoutText identity={answer.identita} attributi={answer.attributi} />

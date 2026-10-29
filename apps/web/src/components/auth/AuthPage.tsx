@@ -250,10 +250,11 @@ export function AuthPage() {
   }
 
   return (
-    // The page is its own scroller, so the gutter it keeps for a bar is its own: a window too low for
-    // the card scrolls without the page moving sideways.
+    // The page is its own scroller, so the gutter it keeps for a bar is its own: from md, a window too low for
+    // the card scrolls without the page moving sideways. Below md none: on the phone it took 7 px off the right
+    // margin (23 against 16, M1).
     <div
-      className="h-app overflow-y-auto bg-slate-50 [scrollbar-gutter:stable] dark:bg-slate-950"
+      className="h-app overflow-y-auto bg-slate-50 md:[scrollbar-gutter:stable] dark:bg-slate-950"
       // The card's height on «Accedi», by which the page centres it (A1c); until measured, about what it is.
       style={centreHeight ? ({ '--login-card-h': `${centreHeight}px` } as CSSProperties) : undefined}
     >

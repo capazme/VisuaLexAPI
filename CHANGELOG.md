@@ -12,6 +12,84 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+### Sources
+
+- The Union's acts are read from CELLAR, the Publications Office's repository, first, and from
+  EUR-Lex's site through the browser only when CELLAR does not serve the act: since 25-26
+  October 2026 eur-lex.europa.eu answers a server with a firewall challenge. Same page, same
+  texts (23 acts compared, 1534 articles identical). `/health/detailed` probes both hosts and
+  reports the source down only when both are.
+- An EU act's article heading glued to the end of the paragraph before it is now found also when
+  its body sits in the next container or is bare text after the paragraph. A paragraph that
+  opens on an article it cites («Articolo 5 della direttiva … è sostituito», «Article 5 of
+  Directive …») is no longer read as that article's heading, and, on every page, no longer ends
+  the article it sits in. No real page known today has these shapes; the texts of the 23 acts
+  compared are unchanged.
+
+## [1.10.5] - 2026-10-27
+
+The web only: the boundaries of an assistant's passage moved by hand, and the
+signs of a dossier row on one line. No migration, no server change.
+
+### Dossier
+
+- D7b: «Sposta l'evidenziazione» on a proposal's card, in the block's popover
+  and among the proposals no longer in the text: new words chosen by mouse,
+  touch or Shift+arrows, 1–2000 characters inside the entry's text; the note
+  keeps its state and the application's original words stay viewable.
+- The AI light and the notes' count on a dossier row sit on the line of the
+  star and the bin, for articles and decisions.
+
+## [1.10.4] - 2026-10-26
+
+The web only: undo for removed highlights and notes, the highlight colour
+chosen once, and the touch-ups from a real phone. No migration, no server
+change.
+
+### Reading
+
+- «Annulla» (and Ctrl/Cmd+Z, also over Study Mode) when removing a highlight
+  or a note: the removal reaches the server only when the notification closes.
+- H1: the highlight colour is chosen once in the reading bar and every new
+  highlight uses it; a short legend suggests a meaning for each colour.
+- In Study Mode «H» with text selected no longer moves to the previous article.
+
+### Phone
+
+- 44 px targets in the reader, in Settings and on the group marks in the text
+  (touch area only), contrast fixes, Cronologia at 392 px, the sign-in margin,
+  the 404 bar; the favourites dash in the sidebar removed.
+
+## [1.10.3] - 2026-10-25
+
+Passages and notes an assistant proposes in a dossier, validated by hand (D7b,
+first cut), and the readers' corrections from the inventory of mcp-legal-it.
+One migration.
+
+### Dossier and MCP
+
+- An assistant connected through MCP reads the text of a dossier's norm or
+  decision (`omnilex_leggi_testo_voce`, scope `dossier:text`) and proposes
+  passages with a note (`omnilex_evidenzia_passaggi_dossier`): the server finds
+  the quoted words in the real text and stores its own slice (rule 23).
+- In the dossier each assistant note is «da validare», «Validato» (or
+  «modificato da te», the assistant's original kept), or «Da rivedere» with a
+  comment; a mark per row sums them. No tool confirms, edits or removes.
+- Behind a switch (`app_switches`), off by default; the consent's words name
+  the text that goes to the connected application's provider.
+- Migration `20261027100000_assistant_proposed_marks`.
+
+### Readers
+
+- The c.p.a., the cod. nav., the cod. post. and the c.g.c. by their sigla.
+- EUR-Lex: an article quoted by an amending act is never served as the act's
+  own; older acts' titles read without commas round the date; dir. 85/374's
+  art. 11 is listed and served.
+- Three acts whose text is their decree's annex 1 are read from the annex; a
+  request for the original at a date is refused, also in imports and quick
+  norms.
+- The exported PDF's cache name and the review of #279 and #281.
+
 ## [1.10.2] - 2026-10-24
 
 The phone first: a lighter first load and no layout shift on «Oggi» and the

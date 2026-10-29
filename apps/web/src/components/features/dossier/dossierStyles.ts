@@ -49,5 +49,16 @@ export const ROW_LINE = 'text-[13px] leading-snug text-slate-600 dark:text-slate
 /** An icon at a row's right end (the star, the removal): 44 px square at every width. */
 export const ROW_ICON = `inline-grid h-11 w-11 shrink-0 place-items-center rounded-md transition-colors ${FOCUS_RING}`;
 
+/** A row's toggle (`role="button"`), the article's or the decision's: its title, grey line and signs. */
+export const ROW_TOGGLE = `flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5 ${FOCUS_RING}`;
+
+/**
+ * The box of a row's sign on the star's line: the application's traffic light (D7b, `AiReviewSignal`) and, on an
+ * article's closed row, the notes' count. In the row's toggle, as tall as the buttons beside it (`ROW_ICON`) and across
+ * the toggle's own padding (its `py-2.5`, `ROW_TOGGLE`: the two change together), its sign centred in it. Inline after
+ * the title the light sat 1 to 3 px higher, the count 2.
+ */
+export const ROW_SIGN = '-my-2.5 flex h-11 shrink-0 items-center';
+
 /** The removal at a row's right end: always there, as the planner's «⋯», in grey until the pointer is on it. */
 export const ROW_REMOVE = `${ROW_ICON} text-slate-500 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/40 dark:hover:text-red-300`;

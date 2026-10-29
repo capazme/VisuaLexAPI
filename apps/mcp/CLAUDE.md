@@ -22,9 +22,13 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   closed); idle 30 minutes → closed; a restart drops them all and clients open
   new ones (Claude Code does so by itself). Tools read the caller of their own
   request (`callerOf`), never the one that opened the session. SDK
-  `@modelcontextprotocol/sdk` pinned at **1.31.0** (serves 2025-11-25 and
+  `@modelcontextprotocol/sdk` pinned at **1.32.0** (serves 2025-11-25 and
   earlier; a client asking for 2026-07-28, as Claude Code does first, is
-  negotiated down). Bump it in a task of its own.
+  negotiated down). Bump it in a task of its own. At `initialize` the server
+  sends `instructions` (`SERVER_INSTRUCTIONS` in `src/server.ts`, under 600
+  characters): what it is for, that norms and decisions are added by a reference
+  in words without looking them up first, and that reading sources outside a
+  dossier is another server's job — so a client with both does not bounce.
 - **Authentication** (`src/auth.ts`) — every request's bearer token is
   introspected at `apps/server`'s `/oauth/introspect` with the server's own
   credential (`mcp-omnilex`, `MCP_CLIENT_SECRET`); it must be active and its
@@ -65,7 +69,11 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read
   apart; `tests/sourcesGolden.test.ts` passes every decided citation of
   `conventions/sources/golden.json` through the tools byte for byte. Results are data (JSON
-  text), never instructions to the model; the article text never leaves.
+  text, compact: indenting cost a quarter more tokens), never instructions to the model. The tools list
+  keeps registration order, in every session. A dossier named by a wrong name is never
+  guessed: the refusal lists the user's dossiers (at most 20, id and name as JSON, never prose: a name may come from another user's environment), so the model
+  retries without calling `omnilex_elenca_dossier` first. The text of a norm or a decision leaves only through
+  `omnilex_leggi_testo_voce` (below; owners' decision G2, 25 October 2026).
   **No tool updates or moves; two tools delete, into the trash**:
   `omnilex_elimina_dossier` and `omnilex_elimina_voci_dossier` (1–50 entries).
   Each needs the connection's `content:delete` (read live by `apps/server`;
@@ -84,12 +92,27 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   lost a task meanwhile is a 409 (owner, 20 October 2026). `lingolex_elimina_card` is the third destructive tool
   (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
+- **D7b, passages proposed** (`src/tools/passages.ts`; spec
+  `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8) — `omnilex_leggi_testo_voce` (an
+  entry's text in parts, as VisuaLex shows it, and the proposals still open; scope `dossier:text`) and
+  `omnilex_evidenzia_passaggi_dossier` (1–10 passages quoted verbatim, with an optional note and
+  `prima`/`dopo`; colours `giallo` central point, `verde` condition or premise, `blu` definition or exception,
+  never `rosso`, the user's sign of a note «da rivedere»; one outcome per passage; one exchanged token with `dossier:write dossier:text`).
+  Listed only when `apps/server`'s public `GET /features` says `assistantPassages: true`, asked once at
+  each session's `initialize` (closed when it cannot say). No tool confirms, validates, edits or removes a
+  proposal: the user does, in VisuaLex. A connection made before `dossier:text` existed is asked to sign
+  in again for it (the step-up challenge).
 - **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —
   `lingolex_schema_card` (the card's shape and the anchoring rules, as text),
   `lingolex_salva_card` (1–10 cards, always the user's drafts; anchors as
   references in words, which `apps/server` resolves and anchors with the
   official URN and the AKN fingerprint — the model never handles a hash),
-  `lingolex_le_mie_card`, and `lingolex_elimina_card` (1–10 of the user's own
+  `lingolex_le_mie_card` (a light list, 50 a page: id, subject, institute, kind, state,
+  the question's first 160 characters, the anchors in words, the date — never the answer
+  or the explanation; whole cards ran to tens of thousands of tokens a page),
+  `lingolex_leggi_card` (1–10 cards whole, by id, through the same `GET /lingo/cards/:id`
+  the deletion reads; a tool of its own rather than a parameter, so each answer has one
+  shape and the list's filters mean what they say), and `lingolex_elimina_card` (1–10 of the user's own
   drafts or archived cards, refused before asking for a card the community has
   taken up; confirmed and moved to the trash like the dossier deletions). In
   the card dialog a card is named only by what the server set — its subject,

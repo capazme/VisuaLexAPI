@@ -1,11 +1,10 @@
 import asyncio
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 import logging
 import re
 from urllib.parse import urlparse
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
-from playwright.async_api import async_playwright
 
 from .cache import PersistentCache
 from .cache_manager import get_cache_manager
@@ -13,6 +12,8 @@ from .egress import is_allowed
 from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
 from ..services.akn_parser import normalize_article_key
+from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+from ..services import eurlex_fetch
 from ..services.http_client import http_client
 
 # Configurazione del logging
@@ -22,36 +23,6 @@ logging.basicConfig(level=logging.INFO,
 
 # Persistent cache for tree structures (survives restarts)
 _tree_cache = PersistentCache("tree", ttl=86400)  # 24 hours
-
-
-async def _fetch_with_playwright(url: str) -> str:
-    """
-    Fetch URL using Playwright to bypass CloudFront WAF protection.
-    Used for EUR-Lex which blocks simple HTTP requests.
-    """
-    logging.info(f"Fetching with Playwright (WAF bypass): {url[:80]}...")
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage']
-        )
-        try:
-            context = await browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
-            page = await context.new_page()
-            await page.goto(url, wait_until='networkidle', timeout=45000)
-            html = await page.content()
-            await context.close()
-            return html
-        finally:
-            await browser.close()
-
-
-# The shortest EUR-Lex page the scraper accepts as an act (EurlexScraper.request_document): a
-# shorter one is an error or a challenge page, never stored where the scraper reads.
-_EURLEX_MIN_PAGE = 1000
 
 
 def _full_key(normurn, link):
@@ -74,13 +45,14 @@ def _narrow(result, count, metadata, details, return_metadata):
 
 async def _eurlex_page(normurn):
     """The EUR-Lex page behind a tree: the copy the scraper keeps (namespace "eurlex", keyed by
-    the same URL), else one Playwright visit. The article text is read from that page too, so
-    one visit serves the tree, the rubriche and every article of the act."""
+    the same URL), else the act's page from CELLAR or EUR-Lex (`eurlex_fetch.fetch_act_page`).
+    The article text is read from that page too, so one fetch serves the tree, the rubriche and
+    every article of the act."""
     cached_html = await get_cache_manager().get_persistent("eurlex").get(normurn)
-    if cached_html:
+    if eurlex_fetch.is_act_page(cached_html):
         logging.info(f"EUR-Lex page from the scraper's cache: {normurn[:80]}")
         return cached_html, True
-    return await _fetch_with_playwright(normurn), False
+    return await eurlex_fetch.fetch_act_page(normurn, timeout_ms=45000), False
 
 
 def _source_of(normurn):
@@ -182,11 +154,11 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
 
     try:
         if is_eurlex:
-            # EUR-Lex requires Playwright to bypass WAF
+            # CELLAR first, EUR-Lex's site through the browser second (`eurlex_fetch`)
             if eurlex_copy:
                 text, from_copy = await _eurlex_page(normurn)
             else:
-                text = await _fetch_with_playwright(normurn)
+                text = await eurlex_fetch.fetch_act_page(normurn, timeout_ms=45000)
         else:
             # Normattiva through the shared client, as its article pages: its rate limit and
             # its host check. One attempt, as when the tree had a session of its own: the
@@ -217,7 +189,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
         result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
-        if count > 0 and not from_copy and len(text) >= _EURLEX_MIN_PAGE:
+        if count > 0 and not from_copy and eurlex_fetch.is_act_page(text):
             # A page that parsed into articles is the act's: kept where the scraper reads it.
             await get_cache_manager().get_persistent("eurlex").set(normurn, text)
 
@@ -505,6 +477,142 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     return new_urn
 
 
+def is_quoted_heading(element) -> bool:
+    """An article heading quoted inside the act's text, not one of its own articles.
+
+    An amending act's OJ page sets the articles it replaces or inserts in another act in a
+    table cell, the first of a run opening with «: dir. 2009/136 (six articles) quotes art.
+    21, 22, 23, 23 bis and 27 of dir. 2002/22, and they were listed and served as its own.
+    The act's own articles never sit in a table cell (checked on every EUR-Lex test page).
+    """
+    return (element.get_text(strip=True).startswith(("«", "“"))
+            or element.find_parent("td") is not None)
+
+
+# A legacy OJ page can glue an article's heading to the end of the paragraph before it: dir.
+# 85/374 reads «… l'interruzione della prescrizione. Articolo 11</p>», so art. 11 was not listed,
+# not found, and its text was served at the end of art. 10's.
+_GLUED_HEADING = re.compile(r"[.;:]\s+((?:Articolo|Article)\s+(\d+))$")
+_HEADING_TAGS = ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']
+
+
+_BLOCKS = ("p", "div", "table")
+
+
+def _paragraphs(tag):
+    """`tag` as the paragraphs a reader meets in it: the tag itself when it holds no block, else its
+    blocks and bare text in order, each container opened the same way."""
+    if tag.name in ("p", "table") or tag.find(_BLOCKS) is None:
+        yield tag
+        return
+    for child in tag.children:
+        if isinstance(child, Tag):
+            yield from _paragraphs(child)
+        elif type(child) is NavigableString and child.strip():
+            yield child
+
+
+def following_nodes(elem):
+    """What a reader meets after `elem`, as elements and bare text: its later siblings and, only
+    when none of them holds text, its parent's, and so up until a level holds text or the page
+    ends. A glued heading's body can sit in the next container
+    (`<div><p>Testo. Articolo 3</p></div><div><p>Corpo.</p></div>`) or be bare text after the
+    paragraph; same-parent elements alone see neither. Above the paragraph's own level a container
+    is opened into its paragraphs (`_paragraphs`), so each one is a line and the next article's
+    heading among them ends the text. Blank text, comments and the like are skipped."""
+    node, climbed = elem, False
+    while node is not None and node.name not in ("body", "[document]"):
+        met_text = False
+        for sibling in node.next_siblings:
+            if isinstance(sibling, Tag):
+                met_text = met_text or bool(sibling.get_text(strip=True))
+                yield from (_paragraphs(sibling) if climbed else (sibling,))
+            elif type(sibling) is NavigableString and sibling.strip():
+                met_text = True
+                yield sibling
+        if met_text:
+            return
+        node, climbed = node.parent, True
+
+
+def node_text(node) -> str:
+    """A node's text as the extractor reads it: an element's stripped text, a bare string stripped."""
+    return node.get_text(strip=True) if isinstance(node, Tag) else str(node).strip()
+
+
+def _body_follows(elem) -> bool:
+    """Whether the next text after `elem` is an article's body, not another heading or nothing."""
+    for node in following_nodes(elem):
+        text = node_text(node)
+        if text:
+            return eurlex_heading_number(text) is None
+    return False
+
+
+def glued_headings(soup):
+    """The article headings glued to the end of a class-less paragraph, as {number: (paragraph,
+    where the heading starts in its stripped text)}. Only the article right after the one before
+    it, never one that an element of its own heads, and only with a body after it: a sentence
+    ending «… Articolo 11» is otherwise a reference, not a heading. Nor a paragraph quoted in the
+    act or set in a table cell (`is_quoted_heading`): there it is another act's text."""
+    own = set()
+    for elem in soup.find_all(_HEADING_TAGS):
+        number = None if is_quoted_heading(elem) else eurlex_heading_number(elem.get_text(strip=True))
+        if number:
+            own.add(number)
+    found, previous = {}, None
+    for elem in soup.find_all(_HEADING_TAGS):
+        text = elem.get_text(strip=True)
+        number = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+        if number:
+            previous = number
+            continue
+        match = _GLUED_HEADING.search(text) if elem.name == 'p' and not elem.get('class') else None
+        if (match and match.group(2) not in own and previous is not None and previous.isdigit()
+                and int(match.group(2)) == int(previous) + 1
+                and not is_quoted_heading(elem) and _body_follows(elem)):
+            found[match.group(2)] = (elem, match.start(1))
+            previous = match.group(2)
+    return found
+
+
+# An ordinal after a heading's number: a whole word («15 bis», «15 BIS», «15-bis»), or a lower-case
+# ordinal glued to the capital that opens the text after it, as a class-less page whose heading and
+# text share an element reads «Articolo 15 bisTesto». A capital after a lower-case ordinal never
+# starts a word of it; «Articolo 1 Bisogna» and «Articolo 1Terzi» stay art. 1.
+HEADING_ORDINAL = (rf"(?:(?:{ARTICLE_SUFFIX_ALTERNATION})(?![^\W\d_])"
+                   rf"|(?-i:(?:{ARTICLE_SUFFIX_ALTERNATION})(?=[A-ZÀ-Ý])))")
+
+# An OJ heading's number with its ordinal, read as one article: «Articolo 15 bis» is «15-bis».
+_EURLEX_HEADING_NUMBER = re.compile(
+    rf"^(?:Articolo|Article)\s+(\d+)(?:[\s\-]*+({HEADING_ORDINAL}))?", re.IGNORECASE)
+
+
+# A word after the number, past a blank: «Articolo 5 della …». A letter glued to the number
+# («Article 6a») is the number's own.
+_CITING_WORD = re.compile(r"\s++([^\W\d_])")
+
+
+def cites_an_article(rest) -> bool:
+    """Whether the text after a heading's number goes on as a sentence: «Articolo 5 della direttiva
+    … è sostituito», «Article 5 of Directive …», «Articolo 13 e articolo 14». A heading's number is
+    alone, or followed by its rubrica, which opens with a capital («Articolo 1 Terzi»), a bracket,
+    a stop or a figure: on 23 real pages (1962-2024, the Treaties, two consolidations) no heading
+    goes on with a lower-case word, and only references do. A reference that goes on with a comma
+    («Articolo 5, paragrafo 1, della direttiva …») is still read as a heading, as before."""
+    word = _CITING_WORD.match(rest)
+    return word is not None and word.group(1).islower()
+
+
+def eurlex_heading_number(text):
+    """The article an OJ heading names («15», «15-bis»), or None when it names none: a paragraph
+    that opens on an article it cites (`cites_an_article`) names none."""
+    match = _EURLEX_HEADING_NUMBER.match(text)
+    if not match or cites_an_article(text[match.end():]):
+        return None
+    return f"{match.group(1)}-{match.group(2).lower()}" if match.group(2) else match.group(1)
+
+
 async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     """
     Parsa la struttura dell'albero degli articoli per Eur-Lex.
@@ -537,7 +645,6 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     title_pattern = re.compile(r'^(TITOLO|TITLE)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
     chapter_pattern = re.compile(r'^(CAPO|CHAPTER)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
     section_pattern = re.compile(r'^(SEZIONE|SECTION)\s+(\d+|\w+)', re.IGNORECASE)
-    article_pattern = re.compile(r'^(Articolo|Article)\s+(\d+)', re.IGNORECASE)
 
     # Strategia principale: cerca elementi ti-section (sezioni) e ti-art (articoli) in ordine di documento
     # Questo preserva l'ordine gerarchico: CAPO -> Sezione -> Articolo
@@ -567,9 +674,8 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
 
             # Verifica se è un articolo
             elif 'ti-art' in class_str.lower():
-                article_match = article_pattern.match(text)
-                if article_match:
-                    article_num = article_match.group(2)
+                article_num = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+                if article_num:
                     if article_num not in seen_articles:
                         seen_articles.add(article_num)
                         article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
@@ -580,8 +686,9 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     if count_articles == 0:
         logging.info("ti-section/ti-art not found, falling back to pattern search")
 
+        glued = {id(elem): number for number, (elem, _) in glued_headings(soup).items()}
         # Cerca tutti gli elementi che potrebbero contenere articoli o sezioni
-        for elem in soup.find_all(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']):
+        for elem in soup.find_all(_HEADING_TAGS):
             text = elem.get_text(strip=True)
 
             # Check for sections first (when details=True)
@@ -597,9 +704,9 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
                     continue
 
             # Check for articles
-            article_match = article_pattern.match(text)
-            if article_match:
-                article_num = article_match.group(2)
+            article_num = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+            article_num = article_num or glued.get(id(elem))
+            if article_num:
                 if article_num not in seen_articles:
                     seen_articles.add(article_num)
                     article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
@@ -727,9 +834,16 @@ def _extract_eurlex_rubriche(soup):
     rubriche = {}
     for marker in soup.find_all(class_=lambda c: c and "ti-art" in str(c).lower()
                                 and "sti-art" not in str(c).lower()):
-        match = _EURLEX_ARTICLE_NUM.match(marker.get_text(" ", strip=True))
-        if not match:
+        if is_quoted_heading(marker):
             continue
+        heading = marker.get_text(" ", strip=True)
+        number = eurlex_heading_number(heading)
+        if not number:
+            # A heading with no number in figures («Articolo unico») keeps its own word.
+            match = _EURLEX_ARTICLE_NUM.match(heading)
+            if not match:
+                continue
+            number = match.group(1)
         sibling = marker.find_next_sibling()
         if sibling is None:
             continue
@@ -738,15 +852,20 @@ def _extract_eurlex_rubriche(soup):
             continue
         title = sibling.get_text(" ", strip=True)
         if title:
-            rubriche[match.group(1)] = title
+            rubriche[number] = title
     return rubriche
 
 
 # "del 27 aprile 2016", "dell'8 giugno 2000": the line between an act's name and its subject.
-_EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]", re.IGNORECASE)
-# The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …".
+# A digit after it: «DEL PARLAMENTO EUROPEO…», an act's name split over two lines, is no date.
+_EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]\s*\d", re.IGNORECASE)
+# The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …";
+# an older act's has no commas round the date ("Direttiva 85/374/CEE del Consiglio del 25 luglio 1985 relativa al …").
+# The blanks before "del" are matched only from a run's first one (`(?<!\s)`), or a search restarted
+# at every blank of a long run and scanned the rest of it each time: 0.75 s on 20,000 blanks. Same
+# matches as `(?:,\s*|\s+)del…`.
 _EURLEX_DESCRIPTION_SUBJECT = re.compile(
-    r",\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,\s*(.+)$", re.IGNORECASE | re.DOTALL)
+    r"(?:,|(?<!\s)\s)\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,?\s*(.+)$", re.IGNORECASE | re.DOTALL)
 
 
 def _eurlex_subject(lines):
@@ -768,7 +887,8 @@ def _extract_eurlex_title(soup):
     The OJ page names the act in `oj-doc-ti` lines inside `eli-main-title` (an annex's heading uses
     the same class, so only the first consecutive run counts, and only when it holds the date); the
     consolidated page in `title-doc-first` and
-    `title-doc-last` (printed twice, the first copy is enough); the legacy page in its
+    `title-doc-last` (printed twice, the first copy is enough; the subject in `title-doc-first`
+    when `title-doc-last` holds only the EEA note); the legacy page in its
     `DC.description` meta, which the `/eli/` address of a legacy act does not carry (dir.
     2002/58): there the ELI metadata names the act in every language, and the Italian
     `eli:title` is read the same way. Never a title from another language.
@@ -789,12 +909,29 @@ def _extract_eurlex_title(soup):
         return _eurlex_subject(lines)
     last = soup.find("p", class_="title-doc-last")
     if last is not None:
-        return _eurlex_subject([last.get_text(" ", strip=True)])
-    for meta in (soup.find("meta", attrs={"name": "DC.description"}),
-                 soup.find("meta", attrs={"property": "eli:title", "lang": "it"})):
+        subject = _eurlex_subject([last.get_text(" ", strip=True)])
+        if subject:
+            return subject
+        # The consolidated GDPR (02016R0679-20160504) has only the EEA note there: its subject is
+        # in the `title-doc-first` run, after the date line, as on the OJ page.
+        first = soup.find("p", class_="title-doc-first")
+        run = [first] if first is not None else []
+        for sibling in first.find_next_siblings() if first is not None else []:
+            if sibling.name != "p" or "title-doc-first" not in (sibling.get("class") or []):
+                break
+            run.append(sibling)
+        lines = [p.get_text(" ", strip=True) for p in run]
+        return _eurlex_subject(lines) if any(_EURLEX_DATE_LINE.match(line) for line in lines) else ""
+    # The Italian expression of the act: `about` names it (…/oj/ita), the language tag alone
+    # could also sit on another resource's meta.
+    eli_title = soup.find("meta", attrs={"property": "eli:title", "lang": "it",
+                                         "about": lambda about: bool(about) and about.rstrip("/").endswith("/ita")})
+    for meta in (soup.find("meta", attrs={"name": "DC.description"}), eli_title):
         match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
-        if match:
-            return " ".join(match.group(1).split())
+        subject = " ".join(match.group(1).split()) if match else ""
+        # A note in brackets after the date («(GU L 210 …)») is no subject, as in `_eurlex_subject`.
+        if subject and not (subject.startswith("(") and subject.endswith(")")):
+            return subject
     return ""
 
 
