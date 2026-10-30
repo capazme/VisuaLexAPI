@@ -946,7 +946,10 @@ though that doc's header still says DRAFT.
   no sub-flag, no consent) → MERL-T `GET /api/v1/rassegne/by-norma`. The BFF
   strips the URN's version marker; any MERL-T failure, an upstream 401
   included, is `503 merlt_unavailable`. The web panel
-  (`features/merlt/rassegne`) sits in the `article_content_after` slot.
+  (`features/merlt/rassegne`) sits in the `article_case_law` slot, inside the
+  article's «Giurisprudenza», and does not make the reader depend on MERL-T:
+  no panel on `404 merlt_disabled`; on a 503 or a network error a closed row
+  with no count, which says the reviews are unavailable only once opened.
 
 **Graph co-evolution.** The design is
 `docs/superpowers/specs/2026-07-16-merlt-graph-coevolution-design.md`; see
