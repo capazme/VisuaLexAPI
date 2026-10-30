@@ -169,6 +169,16 @@ class TestTheRequest:
             [plain] = await ctrl.create_norma_visitata_from_data(body)
         assert by_part.parte == "701-800" and plain.parte is None
 
+    async def test_parse_query_still_names_the_article_when_the_tree_cannot_be_read(self):
+        ctrl = NormaController()
+        with patch("app.get_tree", new=AsyncMock(return_value=("Empty response from server", 0, {}))), \
+                patch("app.fetch_act_index", new=AsyncMock(return_value=None)), \
+                patch("app.complete_request_date", new=AsyncMock(return_value="2006-12-27")):
+            response = await ctrl.app.test_client().post("/parse_query", json={"query": "art. 1, comma 773, l. 296/2006"})
+        answer = await response.get_json()
+        assert answer["parsed"]["comma"] == "773"
+        assert answer["urn"].endswith(";296~art1") and answer["display"] == "art. 1, l. 27 dicembre 2006, n. 296"
+
     async def test_a_comma_with_an_unreadable_tree_is_a_503_on_the_routes(self):
         ctrl = NormaController()
         body = {"act_type": "legge", "date": "2006-12-27", "act_number": "296", "article": "1", "comma": "773"}

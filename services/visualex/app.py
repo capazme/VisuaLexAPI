@@ -1210,7 +1210,12 @@ class NormaController:
             urn = None
             display = None
             try:
-                normavisitate = await self.create_norma_visitata_from_data(parsed_params)
+                try:
+                    normavisitate = await self.create_norma_visitata_from_data(parsed_params)
+                except IndexUnavailableError:
+                    # Which part holds the comma cannot be told now; the article's URN can (it names no part).
+                    normavisitate = await self.create_norma_visitata_from_data(
+                        {k: v for k, v in parsed_params.items() if k not in ('comma', 'parte')})
                 if normavisitate:
                     nv = normavisitate[0]
                     urn = getattr(nv, "urn", None)
