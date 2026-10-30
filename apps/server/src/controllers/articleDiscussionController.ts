@@ -340,8 +340,8 @@ export const createComment = async (req: Request, res: Response) => {
     data: { threadId: thread.id, parentId: data.parentId ?? null, body: data.body, userId: req.user!.id },
     include: { user: { select: { id: true, username: true } }, votes: true },
   });
-  // The feed's «Attive» reads the last activity; `updatedAt` moves with it as before.
-  await prisma.articleThread.update({ where: { id: thread.id }, data: { lastActivityAt: comment.createdAt } });
+  // The feed's «Attive» reads the last activity, which only moves forward (two replies may land out of order).
+  await prisma.articleThread.updateMany({ where: { id: thread.id, lastActivityAt: { lt: comment.createdAt } }, data: { lastActivityAt: comment.createdAt } });
   res.status(201).json(commentView(comment, req.user!.id));
 };
 

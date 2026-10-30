@@ -305,7 +305,7 @@ Scrivi solo ciò che puoi pubblicare. Non inserire dati personali di altre perso
 
 Puoi modificare o cancellare i tuoi contributi quando vuoi. Se altri hanno già risposto a una tua glossa, cancellandola ne resta il posto senza il tuo testo, perché le risposte appartengono ai loro autori. La licenza non si revoca per le copie che altri hanno già fatto.
 
-Se elimini l''account, i contributi che non hai cancellato restano visibili, senza il tuo nome, come «utente cancellato». Dopo l''eliminazione puoi chiederne la cancellazione con il pulsante «Invia feedback».
+Se elimini l''account, i contributi che non hai cancellato prima restano visibili, senza il tuo nome, come «utente cancellato». Cancella quindi, prima di eliminarlo, ciò che non vuoi lasciare; dopo, puoi ancora chiederne la cancellazione ai responsabili di VisuaLex.
 
 I moderatori possono nascondere un contributo contrario alle regole della Community. Ogni loro intervento è registrato, con il motivo.',
     'Ho letto e accetto',
