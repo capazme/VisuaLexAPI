@@ -178,10 +178,16 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   modules runs to millions of characters), each flag with its module and question, or with `modulo` that module
   whole with its flags and judgement. The input schemas carry the shape only: the limits and the rules (the
   lesson's Markdown subset, citations as entries of the course's dossier, the shares of application questions)
-  are in `lingolex_schema_card`'s text and the server checks them all, naming the part. Nothing edits, withdraws
-  or deletes a course or a module (G-377, Q9): a correction is a new module with `sostituisceId`. The definitions'
-  size is held by `tests/courses.test.ts`: with the switch on they pass §10.6's 18,000 characters, which the groups
-  of 1b are meant to keep for those who switch the courses on.
+  are in `lingolex_schema_card`'s text and the server checks them all, naming the part. A module's `blocchi`,
+  `quiz` and `aperta`, and an exam's `domande` and `aperta`, are not even shaped in the definitions (G-391): they
+  are plain objects there (`z.looseObject({})`), their shape is in the schema text, and the handlers check them
+  against `MODULE_PARTS` and `EXAM_PARTS` with the SDK's words before anything is sent. They are the server's only
+  open object schemas (`{"type":"object","properties":{},"additionalProperties":{}}`): Claude takes them, but a
+  client that turns tool schemas into a strict function-calling mode may refuse or mangle them (the optional
+  properties elsewhere already keep strict modes out), so whoever switches `lingo_courses` on creates one module
+  from LibreLex first. Nothing edits, withdraws or deletes a course or a module (G-377, Q9): a correction is a new module with
+  `sostituisceId`. The definitions' size is held by `tests/courses.test.ts`: with the switch on they pass §10.6's
+  18,000 characters, an overshoot accepted until the groups of 1b keep the courses for those who use them (G-391).
 - **Hardening** — binds to `127.0.0.1` by default. On every bind it refuses a
   `Host` other than `MCP_RESOURCE`'s hostname or the loopback names (DNS
   rebinding; the port does not count). It refuses a browser `Origin` not in

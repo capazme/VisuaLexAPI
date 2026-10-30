@@ -729,8 +729,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   nothing), and the course's review: `GET /srs/sessione?corso=` adds **check cards** (`verifica: true`) for the
   competences whose next session counts today, «da riprendere» first, never a new card or one graded today, none for a
   competence whose reviewed cards cannot reach five answers today (they would be drilled daily), at most once every
-  seven Rome days (`wantsCheckCards`; whether «acquisita» and «da iniziare» competences get them too is
-  G-390, the constants `CHECK_ACQUIRED` and `CHECK_UNSTARTED`). **Missions:** «Completa un modulo» (30, at 70%, at
+  seven Rome days (`wantsCheckCards`); after them an «acquisita» competence weekly from its last valid session, then
+  a «da iniziare» one with answers from the day after its first ones, then weekly (G-390: the constants
+  `CHECK_ACQUIRED` and `CHECK_UNSTARTED`, both on). **Missions:** «Completa un modulo» (30, at 70%, at
   most two a Rome day, the rest credited by a later event or the course page) and «Supera un percorso» (100, for three
   competences and three counting modules at least), settled in `settleMissions` with the events `modulo`, `esame`,
   `corso` and a course card's `revisione`; neither is in «Le missioni di oggi».
