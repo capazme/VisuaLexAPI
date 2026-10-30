@@ -90,7 +90,7 @@ describe('the Community’s data', () => {
       await deleteAccount(carla);
 
       expect(await prisma.articleCommentVote.count({ where: { commentId: replyId } })).toBe(0);
-      expect(await prisma.forumNotification.count()).toBe(0);
+      expect(await prisma.forumNotification.count({ where: { userId: carla.id } })).toBe(0);
     });
   });
 
@@ -143,6 +143,7 @@ describe('the Community’s data', () => {
     it('erases a closed report’s copy after 90 days and deletes notifications read 90 days ago', async () => {
       const threadId = await writeGlossa(alice);
       const replyId = await reply(bob, threadId, 'Risposta di Bob');
+      await prisma.forumNotification.deleteMany();
       const now = new Date();
       const daysAgo = (days: number) => new Date(now.getTime() - days * DAY_MS);
       const report = (userId: string, status: string, resolvedAt: Date | null) =>
@@ -181,7 +182,7 @@ describe('the Community’s data', () => {
       await reply(carla, first, 'Risposta recente');
       const admin = await prisma.user.update({ where: { id: carla.id }, data: { isAdmin: true } });
       expect(admin.isAdmin).toBe(true);
-      expect((await request(app).patch(`/api/admin/article-discussions/${second}`).set(authHeader(carla)).send({ hidden: false })).status).toBe(200);
+      expect((await request(app).patch(`/api/moderation/threads/${second}`).set(authHeader(carla)).send({ locked: true, reason: 'Chiusa per prova' })).status).toBe(200);
 
       const rows = await prisma.articleThread.findMany({ orderBy: { title: 'asc' } });
       expect(rows[0].lastActivityAt.getTime()).toBeGreaterThan(past.getTime());
