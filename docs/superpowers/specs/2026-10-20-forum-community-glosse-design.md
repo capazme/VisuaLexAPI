@@ -1,7 +1,9 @@
 # The Forum's Community: discussion on someone's glossa
 
 Written 20 October 2026 and brought up to date with `develop` on 29 October 2026 (at 6b1c3f90). Status:
-**proposal**, to be read by both owners before any code (G-304). It builds on the draft pull request #205
+**approved by the owner for the server** (G-392, 30 October 2026: Q-1 to Q-6 «ok» as recommended; pull requests 1
+and 2 start now). Pull request 0 (the word) and pull request 3 (the web) wait for the other developer's yes on Q-1 and
+G-309 to G-312 (§9, §12). It builds on the draft pull request #205
 (`feat/glosse-forum`, spec `2026-10-19-glosse-forum-design.md`) and on the decisions G-265, G-266, G-283, G-291,
 G-292, G-293 and D-076. The owner's answers G-306 to G-312 (19 October 2026) are folded in; G-309 to G-312 also wait
 for the other developer's word (§12).
@@ -120,7 +122,7 @@ Possible, as a later step, and only as a **copy made by the user's own act**:
   «Later»), when the word question (§2.5) is settled — otherwise the button would read «Pubblica la
   glossa come glossa».
 
-### 2.5 Naming options (the owners decide; the other developer's answer to D8's question 5 is pending)
+### 2.5 Naming options (the owner chose B, G-392; the other developer's answer to D8's question 5 is pending)
 
 | Option | Forum's word | D8's word | What changes | Against |
 | --- | --- | --- | --- | --- |
@@ -129,7 +131,8 @@ Possible, as a later step, and only as a **copy made by the user's own act**:
 | C. Rename the Forum's | discussione / commento | glossa | overturns D-076; the server's messages (#192), the reader's panel, the toolbar, the composer, the Community copy; G-304's own words lose their noun | most work, against a recorded decision |
 | D. Rename both | — | — | both lists above | no gain over B |
 
-**Recommendation: B, with «postilla».** D-076 named the Forum's threads «glosse» and the server already speaks that
+**The owner's choice (G-392): B, with «postilla»**, as recommended; pull request 0 waits for the other developer's
+word on it (D8's question 5). **The reasoning:** D-076 named the Forum's threads «glosse» and the server already speaks that
 way; D8's word lives in one constant by design and its writing switch is still off, so no user has learnt it yet.
 «Postilla» is a single word, feminine (the states «Validata», «Da rivedere» and «Glossa rimossa» → «Postilla
 rimossa» keep their agreement), distinct from «nota», which already names the user's notes and the dossier's notes.
@@ -191,8 +194,8 @@ are still wanted.
 **What is now wrong in it.** The «Glosse» tab inside «Dossier pubblici»: S7a rewrote `BulletinBoardPage` and its tabs,
 and under this design the feed *is* the Community page. **Recommended** *(my call on the process, the owners'
 on the outcome, §12 Q-4)*: #205 is not merged; its server commits and tests are carried into this design's
-server pull request 2 (§9), its composer notice and `glossaLinks.ts` into the reader-panel changes of the same pull
-request, and #205 is closed with a pointer.
+server pull request 2 (§9), its composer notice and `glossaLinks.ts` into the reader-panel changes of pull request
+2c, and #205 is closed with a pointer (G-392).
 
 ## 5. The model
 
@@ -206,7 +209,8 @@ request, and #205 is closed with a pointer.
 - `materia` — nullable `LingoMateria` (the five subjects of Gymnasium), the author's choice (§6.2).
 - `user_id` becomes **nullable**, `ON DELETE SET NULL` instead of `CASCADE` (G-307, §7.3).
 - `last_activity_at` — the glossa's last activity: set at creation and by a new reply or comment, by nothing else;
-  backfilled from `updated_at` by the migration. `updated_at` is Prisma's `@updatedAt` and moves on *every* update
+  backfilled by the migration from the glossa's creation and its latest reply or comment (not from `updated_at`,
+  which an administrator's hiding or release also moved). `updated_at` is Prisma's `@updatedAt` and moves on *every* update
   (an edit, an acceptance, a lock, a hiding, an emptying, a subject changed); #205 had to hold it still by hand for
   moderation. An explicit column ends that: the feed's «Attive» and «last activity» read `last_activity_at`
   *(my call)*.
@@ -222,7 +226,8 @@ On both `article_threads` and `article_comments`:
 (`SET NULL`, G-307).
 
 New tables:
-- `article_comment_reports` — as `article_thread_reports` (one per user and reply, `reason`, `details`, `status`), plus
+- `article_comment_reports` — as `article_thread_reports` (one per user and reply, `reason`, `details`, `status`,
+  and a plain `thread_id` too, so a report on a reply deleted for good still leads to its glossa), plus
   on both report tables `resolved_by` (FK `users`, `SET NULL`), `resolved_at`, `resolution_note` and `reported_text`
   (G-308, §5.7). On both, the item is named by a plain id with **no foreign key** (`thread_id`, `comment_id`, as
   `about_item_id` is on dossier notes), so a report keeps pointing at the item it copied after the item is deleted
@@ -232,7 +237,11 @@ New tables:
   `created_at`, `read_at`. No actor column: the reply names its author already; a notification whose reply is
   deleted goes with it.
 - `forum_moderation_log` — append-only: `actor_id` (`SET NULL`), `action`, `target_kind`
-  (`thread|comment|report|user`), `target_id`, `reason` (required, 3–1000 characters), `created_at`.
+  (`thread|comment|report|user`), `target_id`, `reason` (required, 3–1000 characters), `created_at`. Until pull
+  request 2c, releasing or withholding a decision's quotation may come without a reason (the panel sends none,
+  §9): the column is nullable for those two actions alone, a CHECK.
+- Emptied means empty: a CHECK holds `title` and `body` (a reply's `body`) at `''` whenever `deleted_at` is set
+  (§5.5).
 
 `users` gains `forum_moderator` (boolean, default false), set like `lingoValidatore`.
 
@@ -462,7 +471,7 @@ for opening VisuaLex to the public).
 
 - **Today**: the reader's toolbar opens «Glosse sull'articolo» (`ArticleDiscussionPanel`); the passage signs count the
   glosse on a block and open them. A decision's reader does the same (`DecisionReadingSurface`).
-- **This design adds**, in the same server pull request so the panel never breaks (§9): on each glossa in the panel
+- **This design adds**, in pull request 2c together with the strict rules, so the panel never breaks (§9): on each glossa in the panel
   «Apri nella Community» (its page), the «risposta accettata» mark, «modificata», «chiusa», the author's edit and
   delete, a report reason from the closed list, the licence on a 409, no vote on one's own content and no reply to a
   comment. At the panel's head, «Tutte le glosse di questo articolo nella Community» (the feed filtered on
@@ -564,16 +573,24 @@ Nothing. The Community sends no event to MERL-T and nothing to an AI in this cut
 change, M < 1,000, L above, tests included).
 
 0. **Web, the word (S)** — after the owners' answer to §2.5: `GLOSS_WORDS` and, if B, the places listed in §2.5's row B. Independent of the rest; before 3.
-1. **Server, data (M)** — the two migrations, account deletion (§7.3), the reports' copy and its sweep (§5.7), the
+1. **Server, data (M)**, #383 — the two migrations, account deletion (§7.3), the reports' copy and its sweep (§5.7), the
    export's additions (§7.4), **and every existing view made safe for a null author** (`threadView`, `commentView`,
    `listPassages`: «utente cancellato», never anyone's own, §8). Without the views, the first account deleted after
    the foreign keys change would make every reader of that article a 500 until pull request 2.
-2. **Server, routes, and the reader's panel (L)** — #205's feed and glossa route carried over with their tests (§4),
-   replies at two levels, edit, delete, accept, own-vote refusal, closed report reasons and reply reports, moderation
-   queue and acts with the log, notifications, limits, feed filters. **The reader's discussion panel changes in the
-   same pull request** (§6.4), so the reader never breaks between the two. If review finds it too large, it splits
-   into 2a (feed, glossa route, two levels, edit, delete, accept, votes, panel) and 2b (reports, moderation,
-   notifications, limits), 2a first.
+2. **Server, routes (L)** — #205's feed and glossa route carried over with their tests (§4), replies at two levels,
+   edit, delete, accept, reply reports, moderation queue and acts with the log, notifications, limits, feed filters.
+   **Server only, and today's reader panel keeps working** (G-392 left the web for after the other developer's word;
+   the orchestrator's call of 30 October): the four rules the panel cannot meet yet stay lenient, each pinned by a test
+   of today's behaviour, and are **pending PR2c**:
+   - the licence's 409 on a first write (§7.2): no check yet, `licence_text_id` stays null, like the older rows;
+   - the closed report reasons (§5.7): a free reason (the panel sends «segnalazione») is read as `altro`, its text
+     kept in `details`;
+   - a reason for releasing or withholding a decision's quotation (§5.7): optional, logged without one;
+   - the 403 on voting for one's own glossa or reply (§5.3): still allowed.
+   The panel's two-level replies are no break: it only writes top-level replies.
+2c. **Server and web, the strict rules and the panel (M)** — after the other developer's word on the wording: the
+   four rules above turn strict, and the reader's discussion panel changes with them (§6.4): the licence dialog on a
+   409, the menu of report reasons, the release's reason, no vote button on one's own content, and the rest of §6.4.
 3. **Web, the Community (L)** — the feed at `/forum/community` and a glossa's page, the notifications list and badge,
    the moderation queue (in the admin page for admins, under the Forum for moderators). The other developer designs
    them in the Inchiostro language; this pull request waits for that design and wires the data to it. No mock-up
@@ -582,12 +599,12 @@ change, M < 1,000, L above, tests included).
 No switch: the Community replaces a placeholder, and every route is behind the login. *(My call; a switch
 `forum_community` can be added in 2 if the owners want to ship 1–2 before 3.)*
 
-**Migrations** (reserved 29 October 2026 in the owners' register):
+**Migrations** (reserved 29 October 2026 in the owners' register; written in pull request 1):
 - `20261031100000_community_licence_key` — `ALTER TYPE "LingoTestoChiave" ADD VALUE 'CONTRIBUTO_COMMUNITY'`: the
   second migration inserts version 1 of the text with that value, and a new enum value cannot be used in the
   transaction that adds it (`20261024100000`/`…01` did the same).
 - `20261031100001_forum_community` — everything in §5.1, the report reasons moved to the closed list (§5.2), and
-  version 1 of the licence's text (§7.2). The closed lists are SQL `CHECK`s, as the discussion tables' existing
+  version 1 of the licence's text (§7.2; its words are a draft the owners approve in pull request 1's review). The closed lists are SQL `CHECK`s, as the discussion tables' existing
   ones (report `reason`, `hidden_reason`, the log's `action` and `target_kind`, the notifications' `kind`), and every
   new `SET NULL` column has its index (`locked_by`, `resolved_by`, `actor_id`, the reporters' `user_id`).
 
@@ -615,7 +632,7 @@ automatic hiding; the daily limits and their 24-hour window; the personal-data c
 the feed's default order; offset pages; the subject column and its pre-selection; notifications kept 90 days; existing
 data left as stored; the moderator's free reason kept to the log, a category shown to the author; the licence's
 version 1 in the migration, a new acceptance per version and the version on each row; the reader's panel kept
-complete and changed with the server routes; no Forum glossa in the dossier's article reader; reports outliving their
+complete and changed with the strict rules (2c); no Forum glossa in the dossier's article reader; reports outliving their
 reporter's account and their item; an admin emptying an anonymous contribution on request; the reported text's sweep once a day; a
 published D8 glossa as an unlinked copy; carrying #205 into pull request 2; no switch.
 
@@ -649,6 +666,7 @@ The owner answered on 19 October 2026; G-309 to G-312 also need the other develo
 | G-310 Licence CC BY-SA 4.0, a versioned text accepted at the first write | «ok» (§7.2) |
 | G-311 First cut: only discussions anchored on a norm or a decision | «ok» (§1) |
 | G-312 Moderators' request and commitment outside the app | «ok» (§5.7) |
+| G-392 (30 October) Q-1 to Q-6 below | «ok», as recommended: «postilla» for the assistant's note; a D8 note published only as the user's copy, with a mark; #205 closed after; a 24-hour window; no switch. Pull requests 1 and 2 start; 0 and 3 wait for the other developer |
 
 **Still open: the other developer**
 - G-309: the placement in the Forum. Recommended: `/forum/community` is the feed, in place of S7a's placeholder;
@@ -656,7 +674,8 @@ The owner answered on 19 October 2026; G-309 to G-312 also need the other develo
 - G-310, G-311, G-312: their word on the owner's «ok».
 - D8's question 5, the word: see Q-1.
 
-**New questions (29 October), each with a recommendation**
+**Questions of 29 October, answered by the owner on 30 October (G-392: «ok» to each recommendation); Q-1 also
+waits for the other developer**
 - **Q-1 · The word.** «Glossa» names the Forum's discussion and the assistant's note on a passage (§2). Recommended:
   option B, the Forum keeps «glossa» (D-076) and D8's note becomes «postilla» (§2.5). Needed before the Community's
   web (pull request 0 before 3).
