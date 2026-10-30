@@ -1155,7 +1155,7 @@ class NormaController:
                 return jsonify({"error": f"Body over {PARSE_BATCH_MAX_BYTES // 1024} KB"}), 400
             try:
                 data = json.loads(raw)
-            except ValueError:
+            except (ValueError, RecursionError):  # 48 KB of «[[[[…» passes the parser's depth
                 return jsonify({"error": "Body must be JSON"}), 400
             queries = data.get("queries") if isinstance(data, dict) else None
             if not isinstance(queries, list) or not queries:

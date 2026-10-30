@@ -39,14 +39,21 @@ _PARAGRAPH = (
     r"|(?:parr?\.|paragraf[oi]\b)\s*+" + _DIGITS + r"(?:" + _SEPARATOR + _DIGITS + r")*"
     r")"
 )
-# «n. 3», «nn. 1 e 2»: a number of the article, right after it or after its paragraph.
-# Never «n. 241/1990» nor «n. 241 del 1990»: those are an act's number and year.
-_NUMBER = r"nn?\.\s*+\d++(?:" + _SEPARATOR + r"\d++)*(?![\d/])(?!\s*+/)(?!\s++del\b)"
-# «lett. b)», «lettera a)», «lettere c) ed e)». After the first, a letter is a letter only
-# alone («lett. a) e d.lgs. 196/2003»: the «d» is the decree's).
+# «n. 3», «nn. 1 e 2»: a number of the article, right after it or after its paragraph,
+# also before the act («n. 4 del codice penale»). Never «n. 241/1990» nor «n. 241 del 1990»
+# or «del 7 agosto 1990»: a number followed by its year or date is an act's.
+_NUMBER = r"nn?\.\s*+\d++(?:" + _SEPARATOR + r"\d++)*(?![\d/])(?!\s*+/)(?!\s++del\s++\d)"
+# «lett. b)», «lettera a)», «lettere c) ed e)». A list goes on in the shape it started
+# with: after «a)» only a letter with its bracket («lettera a), o all'articolo 9» ends at
+# «a)»); after a bare «a» (the parser drops brackets) only a letter alone, followed by no
+# dot, apostrophe or number («lett. a e l 241/1990», «lett. a) e d.lgs. 196/2003»: the
+# law's and the decree's).
+_LETTER_SEPARATOR = r"\s*+(?:,|\bed?\b)\s*+"
 _LETTER = (
-    r"(?:lett\.?|letter[ae])\s*+[a-z]\b\)?"
-    r"(?:\s*+(?:,|\bed?\b)\s*+[a-z](?![\w.])\)?)*"
+    r"(?:lett\.?|letter[ae])\s*+(?:"
+    r"[a-z]\)(?:" + _LETTER_SEPARATOR + r"[a-z]\))*"
+    r"|[a-z]\b(?:" + _LETTER_SEPARATOR + r"[a-z](?![\w.'’])(?!\s*+\d))*"
+    r")"
 )
 
 ARTICLE_CLAUSE_SOURCE = (

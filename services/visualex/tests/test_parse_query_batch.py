@@ -108,6 +108,12 @@ async def test_a_body_that_is_not_json_is_a_400(controller):
     assert status == 400 and "JSON" in answer["error"]
 
 
+@pytest.mark.asyncio
+async def test_json_nested_past_the_parsers_depth_is_a_400(controller):
+    status, answer = await _post(controller, None, raw=b"[" * 40_000)
+    assert status == 400 and "JSON" in answer["error"]
+
+
 @pytest.fixture
 def captured_logs(monkeypatch):
     """Every structured record the app writes during the test. structlog writes to stdout,

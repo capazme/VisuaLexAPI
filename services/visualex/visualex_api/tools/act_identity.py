@@ -2,7 +2,7 @@
 
 A copy of `conventions/sources/numbered-act-types.json`, which the container image does
 not carry: `tests/test_act_identity.py` fails when the two differ. A leaf module, like
-`article_suffixes`: the parser, the linker and the controller read it.
+`article_suffixes`: `norm_query`, the citation linker and the controller read it.
 """
 from __future__ import annotations
 

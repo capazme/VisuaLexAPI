@@ -659,6 +659,19 @@ class TestClausesOfTheDocumentAnalysis:
         c = extract_citations("ai sensi dell'art. 360, n. 3, c.p.c.", context_act_type="codice civile")
         assert [(x.article, x.act_type) for x in c] == [("360", "codice di procedura civile")]
 
+    @pytest.mark.parametrize("cited, act", [
+        ("articolo 2, comma 1, n. 4 del codice penale", ("codice penale", None)),
+        ("art. 1, comma 1, n. 3 del d.P.R. 380/2001", ("decreto del presidente della repubblica", "380")),
+    ])
+    def test_a_number_then_the_act_keeps_the_act(self, cited, act):
+        c = extract_citations(f"Si veda l'{cited}.", context_act_type="codice civile")
+        assert [(x.act_type, x.act_number) for x in c] == [act]
+
+    def test_a_list_of_letters_ends_where_the_letters_end(self):
+        text = "ai sensi dell'articolo 6, paragrafo 1, lettera a), o all'articolo 9 del regolamento (UE) 2016/679"
+        c = extract_citations(text, context_act_type="codice civile")
+        assert text[c[0].start:c[0].end].endswith("lettera a)")
+
     def test_letters_after_the_first_do_not_eat_a_decree(self):
         c = extract_citations("art. 2, lett. a) e d.lgs. 196/2003")
         assert ("decreto legislativo", "196") in [(x.act_type, x.act_number) for x in c]

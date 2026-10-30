@@ -538,6 +538,17 @@ class TestClausesOfTheDocumentAnalysis:
             r = parse_nl_query(query)
             assert (r.act_type, r.act_number, r.date, r.article) == ("regolamento ue", "679", "2016", "4")
 
+    def test_a_number_before_the_act_and_its_preposition_is_the_articles(self):
+        for query in ("art. 4 n. 7 del GDPR", "art. 4, n. 7 del GDPR"):
+            r = parse_nl_query(query)
+            assert (r.act_type, r.act_number, r.date, r.article) == ("regolamento ue", "679", "2016", "4")
+        r = parse_nl_query("art. 360 n. 3 del c.p.c.")
+        assert (r.act_type, r.act_number, r.article) == ("codice di procedura civile", None, "360")
+
+    def test_a_letter_does_not_take_the_law_after_it(self):
+        r = parse_nl_query("art. 7 lett. a e l 241/1990")
+        assert (r.act_type, r.act_number, r.date, r.article) == ("legge", "241", "1990", "7")
+
     def test_a_number_after_the_paragraph_is_not_the_codes(self):
         r = parse_nl_query("art. 360, comma 1, n. 3, c.p.c.")
         assert (r.act_type, r.act_number, r.article) == ("codice di procedura civile", None, "360")
