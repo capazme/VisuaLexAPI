@@ -3,14 +3,35 @@ import { isSwitchOn } from '../assistant/switches';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { addExam, addModule, courseStructure, createCourse, exportOneCourse, listCourses, patchCourse, type Origin } from '../lingo/courses';
+import { readCoursePage, readToday } from '../lingo/coursePage';
+import {
+  answerModuleItem,
+  endModule,
+  flagItem,
+  handInExam,
+  openModule,
+  readModule,
+  readOpenQuestion,
+  startExam,
+  tickExamOpinion,
+  tickOpenQuestion,
+  withdrawModule,
+} from '../lingo/courseStudy';
 import { hasNoNul } from '../lingo/noNul';
+import { romeDay } from '../lingo/studyDay';
 import {
   LIMITS,
+  answerSchema,
   controlCharacterAt,
   courseCreateSchema,
   coursePatchSchema,
+  emptySchema,
   examCreateSchema,
+  flagSchema,
+  handInSchema,
   moduleCreateSchema,
+  moduleEndSchema,
+  rubricTicksSchema,
 } from '../schemas/lingo/corso';
 import { BY_THE_USER, trashLingoCorso, trashLingoCorsoModulo } from '../trash/trash';
 
@@ -18,7 +39,10 @@ import { BY_THE_USER, trashLingoCorso, trashLingoCorsoModulo } from '../trash/tr
  * Gymnasium's courses, «Percorsi» (A1; spec 2026-10-23 §10.5), the first server pull request (S1): the
  * assistant's side — create a course, add a module, add a final exam, read the user's courses and a course's
  * structure — and the user's — rename, «Il programma finisce qui», trash a course or a module never opened,
- * export a course. The study routes (open, answer, end, flag, withdraw, exam) and the course page are S2's.
+ * export a course. S2 adds the user's study: the course page, «Oggi»'s row, a module's reading, opening,
+ * answers, open question, end, flags and withdrawal, and the final exam's start and hand-in (`lingo/courseStudy.ts`,
+ * `lingo/coursePage.ts`). None of the study routes is in the delegated table: a token gets 403 there, and no token
+ * ever settles XP.
  *
  * Behind the switch `lingo_courses`: off, every route answers 404 and the rows stay. Every read and write is
  * scoped to the caller (a course by its author, a module through its course): anything else is 404, never 403.
@@ -31,7 +55,7 @@ router.use(async (_req: Request, _res: Response, next: NextFunction) => {
   next((await isSwitchOn('lingo_courses')) ? undefined : new AppError(404, 'Not found'));
 });
 // An id with a NUL byte names nothing (and would be a 500 in the database).
-for (const name of ['id', 'moduloId']) {
+for (const name of ['id', 'moduloId', 'esameId', 'domandaId']) {
   router.param(name, (_req, _res, next, value: string) => next(hasNoNul(value) ? undefined : new AppError(404, 'Percorso non trovato.')));
 }
 
@@ -49,6 +73,18 @@ function noControlCharacters(body: unknown): void {
 
 router.get('/', async (req, res) => {
   res.json(await listCourses(req.user!.id));
+});
+
+/** The user's own study, from the web: a connected application never studies (and never earns XP). */
+function userSession(req: Request): void {
+  if (req.delegation) throw new AppError(403, 'Lo studio di un percorso si fa in VisuaLex.');
+}
+
+const today = () => romeDay(new Date());
+
+router.get('/oggi', async (req, res) => {
+  userSession(req);
+  res.json(await readToday(req.user!.id, today()));
 });
 
 router.post('/', async (req, res) => {
@@ -93,6 +129,73 @@ router.get('/:id/struttura', async (req, res) => {
   // The assistant's read: the session reads the course page (S2).
   connectedApplication(req);
   res.json(await courseStructure(req.user!.id, req.params.id));
+});
+
+router.get('/:id', async (req, res) => {
+  userSession(req);
+  res.json(await readCoursePage(req.user!.id, req.params.id, today()));
+});
+
+router.get('/:id/moduli/:moduloId', async (req, res) => {
+  userSession(req);
+  res.json(await readModule(req.user!.id, req.params.id, req.params.moduloId));
+});
+
+router.post('/:id/moduli/:moduloId/apri', async (req, res) => {
+  userSession(req);
+  emptySchema.parse(req.body ?? {});
+  res.json(await openModule(req.user!.id, req.params.id, req.params.moduloId));
+});
+
+router.post('/:id/moduli/:moduloId/risposte', async (req, res) => {
+  userSession(req);
+  res.json(await answerModuleItem(req.user!.id, req.params.id, req.params.moduloId, answerSchema.parse(req.body), today()));
+});
+
+router.get('/:id/moduli/:moduloId/aperta', async (req, res) => {
+  userSession(req);
+  res.json(await readOpenQuestion(req.user!.id, req.params.id, req.params.moduloId));
+});
+
+router.post('/:id/moduli/:moduloId/aperta', async (req, res) => {
+  userSession(req);
+  const { spuntate } = rubricTicksSchema.parse(req.body);
+  res.json(await tickOpenQuestion(req.user!.id, req.params.id, req.params.moduloId, spuntate, today()));
+});
+
+router.post('/:id/moduli/:moduloId/fine', async (req, res) => {
+  userSession(req);
+  noControlCharacters(req.body);
+  res.json(await endModule(req.user!.id, req.params.id, req.params.moduloId, moduleEndSchema.parse(req.body ?? {}), today()));
+});
+
+router.post('/:id/moduli/:moduloId/ritira', async (req, res) => {
+  userSession(req);
+  emptySchema.parse(req.body ?? {});
+  res.json(await withdrawModule(req.user!.id, req.params.id, req.params.moduloId, today()));
+});
+
+router.post('/:id/domande/:domandaId/segnala', async (req, res) => {
+  userSession(req);
+  noControlCharacters(req.body);
+  res.json(await flagItem(req.user!.id, req.params.id, req.params.domandaId, flagSchema.parse(req.body ?? {}).motivo));
+});
+
+router.post('/:id/esami/:esameId/inizia', async (req, res) => {
+  userSession(req);
+  emptySchema.parse(req.body ?? {});
+  res.json(await startExam(req.user!.id, req.params.id, req.params.esameId));
+});
+
+router.post('/:id/esami/:esameId/consegna', async (req, res) => {
+  userSession(req);
+  res.json(await handInExam(req.user!.id, req.params.id, req.params.esameId, handInSchema.parse(req.body), today()));
+});
+
+router.post('/:id/esami/:esameId/aperta', async (req, res) => {
+  userSession(req);
+  const { spuntate } = rubricTicksSchema.parse(req.body);
+  res.json(await tickExamOpinion(req.user!.id, req.params.id, req.params.esameId, spuntate));
 });
 
 router.patch('/:id', async (req, res) => {

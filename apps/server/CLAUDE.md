@@ -572,16 +572,18 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   carry `lingo_validatore`.
 - **Card review** (`routes/lingoSrs.ts`, `/api/lingo/srs`, session only — not in the
   delegated table, so every path is a 403 for an exchanged token; Studia spec decisions
-  7–9, 17, 18): `GET /sessione?materia=&istituto=` (`istituto` only with `materia`, else 400; exact match on the values `/percorso` returns, so a stop round-trips; a session narrowed this way never marks the day's queue finished) answers `{ conteggi: { dovute, nuove }, cards }`,
+  7–9, 17, 18): `GET /sessione?materia=&istituto=` (`istituto` only with `materia`, else 400; exact match on the values `/percorso` returns, so a stop round-trips; a session narrowed this way never marks the day's queue finished; `?corso=` alone narrows to one course, below) answers `{ conteggi: { dovute, nuove }, cards }`,
   the due cards first (earliest `dueAt`, at most 500 fetched, `dovute` exact), then the
   new ones (oldest first) up to the daily goal minus the cards introduced today — state
   rows with `reps = 1` reviewed today, since only a day's first grade is recorded — so
   the goal holds across devices, and across subjects: a session narrowed to one subject
   still counts the day's new cards of every subject; each card carries `nuova`, `comunita` and `anteprima`
   (the days each grade would give, `previewIntervals`). `lingo/reviewQueue.ts`
-  `reviewScope` is decision 8: the user's own drafts, proposals and validated cards, and
-  the community's validated cards in the subjects switched on — never `autoreId != me`,
-  which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
+  `reviewScope(userId, materieComunita, courseDay, materia?, istituto?)` is decision 8: the user's own drafts, proposals
+  and validated cards (a course card only from the Rome day after its module was done by the user's enrolment, and
+  not once withdrawn: `courseCardModuleDone`; none at all while `lingo_courses` is off, `courseDay` null — read it
+  with `courseDayFor`), and the community's validated cards in the subjects switched on —
+  never `autoreId != me`, which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
   rating, durataMs? }`: one transaction serialised on the pair by
   `pg_advisory_xact_lock` (a first review has no state row to lock), the card row held
   `FOR KEY SHARE` (a grade racing the trash waits, then answers 404; a P2003 is a 404 too), the scope checked
@@ -628,7 +630,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Gymnasium XP and levels** (spec `docs/superpowers/specs/2026-10-20-gymnasium-xp-levels-design.md`,
   plan `docs/superpowers/plans/2026-10-20-gymnasium-xp-levels.md`; migration `20261026100000_lingo_xp_ledger`).
   `LingoCreditoXp` (`lingo_crediti_xp`) is an append-only ledger: one row per mission credited per period
-  (`G:<day>`, `S:<Monday>` for the week, `U` once), its points at the time, the kind and id of the event
+  (`G:<day>`, `S:<Monday>` for the week, `U` once; `M:<module id>` and `C:<course id>` for the courses' two missions), its points at the time, the kind and id of the event
   (`REVISIONE` the log row, `PROPOSTA` the card, `VOTO` the vote, `LETTURA` none) and the subject where one
   applies. `@@unique([utenteId, missione, periodo])` makes a mission pay once per period, `@@unique([missione,
   fonteId])` makes a card earn «scrivi» once in its life; the CHECKs (points 1–1000, the period's shape by
@@ -638,12 +640,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   transaction, under `SAVEPOINT xp` with `SET LOCAL lock_timeout = '1s'` (an error or a long wait rolls back to
   the savepoint, logs the error's name only, and answers no credit: XP never fails the event), then the user's
   two-key advisory lock (`LINGO_XP_LOCK_CLASS`, `hashtext(user)`), then the daily safety net
-  (`XP_DAILY_CEILING` = 300, above the catalogue's 255). Each mission is decided from stored facts only (the
+  (`XP_DAILY_CEILING` = 450, above the catalogue's 255, two modules and a course passed: G-377 Q5). Each mission is decided from stored facts only (the
   stored day, the log, the review states, the scopes) in Rome days of the server's clock; the user's quota and
   goal cannot lower «Impara 5» or the goal's 10 reviews. Callers, all of the user's session and none in the
-  delegated table (`tests/lingoXp.security.test.ts` pins both): the grade (after `recordGradeDay`), the proposal,
+  delegated table (`tests/lingoXp.security.test.ts` pins both): the grade (after `recordGradeDay`, and for a course
+  card after «superato» is checked under the enrolment's lock), the proposal,
   the vote (after `countVoteDay`, before the card's state changes; `validationRule.ts` never reads XP, G-253,
-  G-318), `readProgress` and the unnarrowed session read when it marks the queue finished — the two reads in a
+  G-318), the courses' study writes and course page (`lingo/courseStudy.ts`, `lingo/coursePage.ts`, below),
+  `readProgress` and the unnarrowed session read when it marks the queue finished — the two reads in a
   transaction that takes `users` `FOR KEY SHARE` first, or the credit's insert deadlocks with an account
   deletion. Lock order: cards, today's day row, the XP lock. `lingo/levels.ts` is the curve (100 + 25·(n − 1),
   no ceiling, integers; only ever gentler after release); the level is never stored, `lingo/xpLedger.ts`
@@ -655,8 +659,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Gymnasium's courses, «Percorsi»** (A1; spec `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md`
   §10; migrations `20261029100000_lingo_courses`, the thirteen tables, the two columns on `lingo_cards` and the
   CHECKs, and `20261029100001_lingo_courses_declaration`, the ledger's `periodo` CHECK for `MODULO` (`M:<uuid>`)
-  and `PERCORSO` (`C:<uuid>`) and version 1 of `MATERIALE_STUDIO`). The first server pull request (S1) holds the
-  content side; studying, mastery, the exam's attempts, the missions, the course page and `/oggi` are S2. Content
+  and `PERCORSO` (`C:<uuid>`) and version 1 of `MATERIALE_STUDIO`). S1 holds the content side; S2 (no migration)
+  the study, mastery, the exam's attempts, the missions, the course page and `/oggi`, below. Content
   (`LingoCorso` and the tables under it, the author's) is apart from progress (`LingoCorsoIscrizione` and under
   it, one person's): content rows are never updated but for a course's title and `moduliPrevisti`, and a
   correction is a new module naming the one it supersedes (`sostituisceId`). Behind the switch `lingo_courses`
@@ -664,7 +668,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   /api/lingo/testi/MATERIALE_STUDIO/accetta` answer 404, the card route refuses a module, and the trash neither
   lists, restores nor empties a `LINGO_CORSO` or `LINGO_CORSO_MODULO` entry (404; the sweep still expires it); the
   rows stay. The admin's texts page still lists `MATERIALE_STUDIO`: admins are the owners. `GET
-  /api/lingo/srs/sessione` is strict until S2 narrows it to a course: `?corso=` is a 400, never ignored.
+  /api/lingo/srs/sessione` is strict: `?corso=` with a subject is a 400, with the switch off or a course not the
+  caller's a 404. Off also hides the course cards from the review (`reviewScope`), and nothing of a course is
+  credited: `evaluatePassed` and the courses' missions in `settleMissions` read the switch themselves.
   `routes/lingoCorsi.ts` over `lingo/courses.ts`: `POST /` (course, competences C1… in the order given, the
   author's enrolment with a study dossier of the user's, locked `FOR KEY SHARE`; 409 `{ detail, richiedeTesto,
   link }` until the current `MATERIALE_STUDIO` is accepted; 30 a user), `POST /:id/moduli` (one module whole, the
@@ -684,8 +690,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `moduloId` for the call and `competenze` (codes) per card: a token also needs `lingo:courses:write`, the module
   must be the caller's (the user's row `FOR KEY SHARE`, then the module `FOR NO KEY UPDATE`), at most 20 cards a
   module; such a card is `daPercorso` for good,
-  `POST /:id/proponi` refuses it (409, G-362), and `reviewScope` leaves every course card out until S2 adds the
-  module's done day. The trash takes a course (`LINGO_CORSO`: content, enrolments, states, outcomes, attempts,
+  `POST /:id/proponi` refuses it (409, G-362), and `reviewScope` offers it from the Rome day after its module is
+  done. `GET /lingo/cards` and `/:id` carry `modulo: { id, corsoId, titolo, fatto } | null` (the session while the
+  switch is on; a token only with `lingo:courses:read` too). The trash takes a course (`LINGO_CORSO`: content, enrolments, states, outcomes, attempts,
   cards with their review rows; the dossier stays, answered for the toast) and a module never opened
   (`LINGO_CORSO_MODULO`, with its corrections' ids); a course card in the card trash keeps its competences and
   comes back detached when its module is gone; a dossier's trash records the enrolments that pointed at it and
@@ -694,6 +701,36 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   handed in left out) and each card's `moduloId`, `daPercorso` and codes. Everything cascades from `User`;
   `deleteUserAccount` locks the person's courses before their cards, the order the course trash takes (course,
   modules, cards), and `createCourse` takes the user's row `FOR KEY SHARE` first, so neither deadlocks with it.
+  **Studying (S2)**, the user's session only (a token gets 403; none is in the delegated table, so no token ever
+  settles XP): `lingo/courseStudy.ts` — `GET /:id/moduli/:moduloId` (the lesson; an item carries its key,
+  explanations and the caller's outcome only once answered), `POST …/apri`, `POST …/risposte { domandaId, scelta }`
+  (graded on the server; one outcome per item, a retry answers the stored one with `registrata: false`; the first
+  answer opens the module), `GET`/`POST …/aperta` (the model answer and rubric once the quiz is whole and, under 70%,
+  the hybrid's choice graded; the ticks sit on the open question's row, never scored, Q6), `POST …/fine` (the whole
+  quiz; `quizPercentuale` floored; idempotent), `POST /:id/domande/:domandaId/segnala` (an answered item; changes no
+  score, Q7), `POST …/ritira` (opened, and a live correction supersedes it), `POST /:id/esami/:esameId/inizia` (once
+  every counting module is done; one attempt per exam, never a key before the hand-in) and `…/consegna { risposte,
+  aperta? }` (graded at once: 70% overall and 60% on each competence, an item left blank is wrong; idempotent), then
+  `…/aperta { spuntate }` (the opinion's ticks once handed in, when the rubric is shown; never scored). Every
+  study write locks the course `FOR KEY SHARE` (the course and module trash take it `FOR UPDATE` first), then the
+  user's row `FOR KEY SHARE` (an account's deletion locks courses before it deletes the user), then the enrolment
+  `FOR NO KEY UPDATE`; the XP lock last. `lingo/courseMastery.ts` is mastery as a pure function (§4: five answers in
+  a Rome day make a session; «acquisita» at two sessions of 80% seven days apart; «da riprendere» at a fall under
+  60% after an acquisition); `lingo/courseProgress.ts` reads its answers (module and exam items whose choice was
+  graded, a course card's first grade of each Rome day from the log, «Bene» or «Facile» right, a withdrawn module's
+  items and cards left out) and writes «superato» (`evaluatePassed`, once, under the enrolment's lock: at an answer,
+  the end, a withdrawal, a hand-in, a course card's grade, the course page). `lingo/coursePage.ts`: `GET /:id` (the
+  competences' state and numbers, the modules, what «in preparazione» lacks, the exam's state with
+  `nuovoEsameDal`, the dossier, the cards `{ dovute, nuove, inAttesa, verifica }`; it settles credits left behind),
+  `GET /oggi` (per course: the module to suggest, none on a day one was done, and the due and check cards; writes
+  nothing), and the course's review: `GET /srs/sessione?corso=` adds **check cards** (`verifica: true`) for the
+  competences whose next session counts today, «da riprendere» first, never a new card or one graded today, none for a
+  competence whose reviewed cards cannot reach five answers today (they would be drilled daily), at most once every
+  seven Rome days (`wantsCheckCards`; whether «acquisita» and «da iniziare» competences get them too is
+  G-390, the constants `CHECK_ACQUIRED` and `CHECK_UNSTARTED`). **Missions:** «Completa un modulo» (30, at 70%, at
+  most two a Rome day, the rest credited by a later event or the course page) and «Supera un percorso» (100, for three
+  competences and three counting modules at least), settled in `settleMissions` with the events `modulo`, `esame`,
+  `corso` and a course card's `revisione`; neither is in «Le missioni di oggi».
 - **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
   subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own

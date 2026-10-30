@@ -7,6 +7,7 @@ import { rebuildDecisionEntry } from '../schemas/decisionItem';
 import { LIMITS, type CourseCreateInput, type ExamCreateInput, type ModuleCreateInput } from '../schemas/lingo/corso';
 import { rebuildNormEntry } from '../schemas/normEntry';
 import { checkLessonText } from './courseFormat';
+import { masteryFor } from './courseProgress';
 import { addDays, romeDay } from './studyDay';
 import { dateToDay } from './studyDays';
 import { currentText, hasAccepted, serializeText } from './texts';
@@ -37,10 +38,10 @@ export async function lockCourse(tx: Tx, userId: string, corsoId: string, mode: 
   return rows.length === 1;
 }
 
-const NOT_FOUND = 'Percorso non trovato.';
+export const NOT_FOUND = 'Percorso non trovato.';
 
 /** The author's own enrolment (A1: a private course has one, the author's). */
-async function ownEnrolment(tx: Tx, userId: string, corsoId: string) {
+export async function ownEnrolment(tx: Tx, userId: string, corsoId: string) {
   const enrolment = await tx.lingoCorsoIscrizione.findUnique({ where: { corsoId_utenteId: { corsoId, utenteId: userId } } });
   if (!enrolment) throw new AppError(404, NOT_FOUND);
   return enrolment;
@@ -339,7 +340,7 @@ export async function addModule(userId: string, corsoId: string, input: ModuleCr
 }
 
 /** The modules this enrolment withdrew (a correction superseded them, §5.1). */
-async function withdrawnModules(tx: Tx, iscrizioneId: string): Promise<Set<string>> {
+export async function withdrawnModules(tx: Tx, iscrizioneId: string): Promise<Set<string>> {
   const rows = await tx.lingoCorsoModuloStato.findMany({ where: { iscrizioneId, ritiratoIl: { not: null } }, select: { moduloId: true } });
   return new Set(rows.map((r) => r.moduloId));
 }
@@ -454,9 +455,9 @@ export async function addExam(userId: string, corsoId: string, input: ExamCreate
 // ─── Reads ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** An item's options as a learner sees them before answering: no explanation. */
-type StoredOption = { chiave: string; testo: string; spiegazione: string };
+export type StoredOption = { chiave: string; testo: string; spiegazione: string };
 
-interface ItemForRead {
+export interface ItemForRead {
   id: string;
   tipo: LingoCorsoTipoDomanda;
   bloccoId: string | null;
@@ -471,7 +472,7 @@ interface ItemForRead {
 }
 
 /** Every read of an item names the key's columns: none of them is read by default (§10.2). */
-const ITEM_SELECT = {
+export const ITEM_SELECT = {
   id: true, tipo: true, bloccoId: true, applicazione: true, ordine: true, testo: true, opzioni: true, corretta: true,
   rispostaModello: true, rubrica: true, competenze: { select: { competenzaId: true } },
 } satisfies Prisma.LingoCorsoDomandaSelect;
@@ -579,18 +580,23 @@ function serializeContent(read: ReadCourse) {
 
 /**
  * `GET /struttura`, the course for the assistant (§10.5): the content (keys too, but not those of an exam not
- * yet handed in), the flags with their reasons and the judgements, so that it can correct. The competences'
- * states («in corso», «da riprendere») come with mastery (S2). The text was written from the user's material:
- * the MCP tool says it is data, never instructions (§10.9).
+ * yet handed in), the flags with their reasons and the judgements, so that it can correct, and every competence's
+ * mastery (`padronanza`: «in corso», «da riprendere»… with the numbers), so that it can reinforce (A2). The text was
+ * written from the user's material: the MCP tool says it is data, never instructions (§10.9).
  */
-export async function courseStructure(userId: string, corsoId: string) {
+export async function courseStructure(userId: string, corsoId: string, today = romeDay(new Date())) {
   const read = await readCourse(userId, corsoId);
   if (!read) throw new AppError(404, NOT_FOUND);
   const content = serializeContent(read);
+  const mastery = (await masteryFor(prisma, userId, [{ id: read.enrolment.id, corsoId }], today)).get(corsoId)!;
   const itemIds = new Set([...read.corso.moduli.flatMap((m) => m.domande.map((d) => d.id)), ...read.corso.esami.flatMap((e) => e.domande.map((d) => d.id))]);
   return {
     ...content,
     stato: summarize(read).stato,
+    padronanza: mastery.competenze.map((c) => {
+      const m = mastery.padronanza.get(c.id)!;
+      return { codice: c.codice, stato: m.stato, sessioni: m.sessioni, prossimaDal: m.prossimaDal, ultima: m.ultima };
+    }),
     segnalazioni: read.enrolment.esiti
       .filter((e) => e.segnalatoIl && itemIds.has(e.domandaId))
       .map((e) => ({ domandaId: e.domandaId, motivo: e.segnalazione, segnalataIl: e.segnalatoIl })),
@@ -672,11 +678,11 @@ function summarize(read: SummaryInput) {
 }
 
 /**
- * `GET /` (§10.5): the caller's courses, newest first, with their state, the competences («acquisite» is 0 until
- * mastery, S2: no outcome can be written before the study routes), the modules counted against the programme and
- * the next step. Content first, then the person's rows, joined in memory.
+ * `GET /` (§10.5): the caller's courses, newest first, with their state, the competences acquired (mastery, §4),
+ * the modules counted against the programme and the next step. Content first, then the person's rows, joined in
+ * memory.
  */
-export async function listCourses(userId: string) {
+export async function listCourses(userId: string, today = romeDay(new Date())) {
   const courses = await prisma.lingoCorso.findMany({
     where: { autoreId: userId },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -696,6 +702,7 @@ export async function listCourses(userId: string) {
     },
   });
   const byCourse = new Map(enrolments.map((e) => [e.corsoId, e]));
+  const mastery = await masteryFor(prisma, userId, enrolments, today);
   return courses.flatMap((corso) => {
     const enrolment = byCourse.get(corso.id);
     if (!enrolment) return [];
@@ -707,7 +714,10 @@ export async function listCourses(userId: string) {
         titolo: corso.titolo,
         materia: corso.materia,
         stato,
-        competenze: { acquisite: stato === 'superato' ? corso._count.competenze : 0, totale: corso._count.competenze },
+        competenze: {
+          acquisite: [...(mastery.get(corso.id)?.padronanza.values() ?? [])].filter((m) => m.stato === 'acquisita').length,
+          totale: corso._count.competenze,
+        },
         moduli: { contati: counting, previsti: corso.moduliPrevisti },
         prossimo,
         createdAt: corso.createdAt,

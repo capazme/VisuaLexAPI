@@ -21,6 +21,8 @@ afterEach(() => {
   coursesSwitchStore.setState({ state: 'unknown' });
 });
 
+
+const COURSE = { id: 'corso-1', titolo: 'Segni distintivi', materia: 'DIRITTO_CIVILE' as const };
 describe('«Oggi»\'s row of the courses (§6.2)', () => {
   it('reads nothing and draws nothing while the switch is off or unknown', () => {
     for (const state of ['off', 'unknown'] as const) {
@@ -32,16 +34,16 @@ describe('«Oggi»\'s row of the courses (§6.2)', () => {
     expect(today).not.toHaveBeenCalled();
   });
 
-  it('suggests the day\'s module: «Modulo del giorno: <titolo> · <percorso>»', async () => {
-    today.mockResolvedValue([{ corsoId: 'corso-1', titolo: 'Segni distintivi', modulo: { id: 'm-4', ordine: 4, titolo: 'Il marchio di fatto' }, schedeDovute: 0 }]);
+  it('suggests the day\'s module: «Modulo del giorno: <titolo> · <percorso>», which opens its session with one tap', async () => {
+    today.mockResolvedValue([{ corso: COURSE, modulo: { id: 'm-4', ordine: 4, titolo: 'Il marchio di fatto' }, schede: { dovute: 0, verifica: 0 } }]);
     renderRow();
     const row = await screen.findByRole('link', { name: /Modulo del giorno: Il marchio di fatto/ });
     expect(row).toHaveTextContent('Modulo del giorno: Il marchio di fatto · Segni distintivi');
-    expect(row).toHaveAttribute('href', '/studia/percorsi/corso-1');
+    expect(row).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-4');
   });
 
-  it('offers the course\'s due cards first, the module after them', async () => {
-    today.mockResolvedValue([{ corsoId: 'corso-1', titolo: 'Segni distintivi', modulo: { id: 'm-4', ordine: 4, titolo: 'Il marchio di fatto' }, schedeDovute: 5 }]);
+  it('offers the course\'s due cards and its check cards first, as one count, the module after them', async () => {
+    today.mockResolvedValue([{ corso: COURSE, modulo: { id: 'm-4', ordine: 4, titolo: 'Il marchio di fatto' }, schede: { dovute: 3, verifica: 2 } }]);
     renderRow();
     const row = await screen.findByRole('link', { name: /Ripassa 5 schede di «Segni distintivi»/ });
     expect(row).toHaveAttribute('href', '/studia/ripasso/sessione?corso=corso-1');
@@ -52,7 +54,7 @@ describe('«Oggi»\'s row of the courses (§6.2)', () => {
   });
 
   it('draws nothing for a course with nothing today, and nothing when the read fails', async () => {
-    today.mockResolvedValue([{ corsoId: 'corso-1', titolo: 'Segni distintivi', modulo: null, schedeDovute: 0 }]);
+    today.mockResolvedValue([{ corso: COURSE, modulo: null, schede: { dovute: 0, verifica: 0 } }]);
     const { container, unmount } = renderRow();
     // The read answered and drawn: what is empty is what the answer gave.
     await act(async () => {});
