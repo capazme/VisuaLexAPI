@@ -110,7 +110,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     request names a part by `parte` or by a `comma` it holds (`_part_request`, `_name_the_part`: the ranges from the
     act's tree the existence check has just read; a comma of part 1 or of a whole article is the article, and so
     is part 1's range; a comma past the last range, a range the tree does not list or a range of an article it
-    lists whole is a 404 in words; an unreadable tree is never «does not exist»; EUR-Lex articles have no parts). `NormattivaScraper.get_document` reads a part with `_get_part`:
+    lists whole is a 404 in words; an unreadable tree is never «does not exist»: with a `comma` it is a 503 in
+    words (which part holds the comma cannot be told, and part 1 must never be stored as if it did), with a `parte`
+    the reader decides from the article page, with neither the request fails open as before (gotcha 24); EUR-Lex
+    articles have no parts). `NormattivaScraper.get_document` reads a part with `_get_part`:
     the page kept under its key, else `read_part_page`, which reads the article page (the request's URN, its date)
     and then the part's `caricaArticolo` page in one aiohttp session with its own cookie jar (Normattiva answers
     500 without the article page's cookies; the shared session's single jar would mix two parts read at once), the
