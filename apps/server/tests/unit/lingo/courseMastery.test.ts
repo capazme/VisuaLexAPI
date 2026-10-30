@@ -13,7 +13,7 @@ const day = (n: number) => addDays(DAY1, n - 1);
 const answers = (d: number, n: number, right: number) => Array.from({ length: n }, (_, i) => ({ giorno: day(d), giusta: i < right }));
 
 describe('the worked example of §4.1, day by day', () => {
-  // C3, served by modules 2 and 6; check cards on day 9 and day 23.
+  // C3, served by modules 2 and 6; check cards on day 9 and, offered from day 16, answered on day 23.
   const history = [...answers(2, 6, 5), ...answers(6, 8, 7), ...answers(9, 5, 4), ...answers(23, 5, 2)];
   const upTo = (d: number) => history.filter((a) => a.giorno <= day(d));
 
@@ -111,31 +111,46 @@ describe('check cards (§10.7, G-377 Q10)', () => {
     expect(checkCardRank('da-riprendere')).toBeLessThan(checkCardRank('in-corso'));
   });
 
-  describe('the two open choices of G-390, each pinned on both sides', () => {
+  describe('the two choices of G-390, each pinned on both sides', () => {
     const acquired = [...answers(1, 5, 5), ...answers(8, 5, 5)];
     const unstarted = answers(2, 3, 3);
+    const off = { acquired: false, unstarted: false };
 
-    it('defaults to the spec’s §10.7: neither an «acquisita» nor a «da iniziare» competence', () => {
-      expect(CHECK_ACQUIRED).toBe(false);
-      expect(CHECK_UNSTARTED).toBe(false);
-      expect(wantsCheckCards(competenceMastery(acquired, day(20)), day(20))).toBe(0);
-      expect(wantsCheckCards(competenceMastery(unstarted, day(3)), day(3))).toBe(0);
+    it('both are on: an «acquisita» and a «da iniziare» competence with answers take them, after the other two', () => {
+      expect(CHECK_ACQUIRED).toBe(true);
+      expect(CHECK_UNSTARTED).toBe(true);
+      expect(wantsCheckCards(competenceMastery(acquired, day(15)), day(15))).toBe(5);
+      expect(wantsCheckCards(competenceMastery(unstarted, day(3)), day(3))).toBe(5);
+      const order = (['acquisita', 'da-iniziare', 'in-corso', 'da-riprendere'] as const).slice().sort((x, y) => checkCardRank(x) - checkCardRank(y));
+      expect(order).toEqual(['da-riprendere', 'in-corso', 'acquisita', 'da-iniziare']);
     });
 
-    it('with `acquired`: an «acquisita» competence once seven days have passed since its last valid session', () => {
-      const rules = { acquired: true, unstarted: false };
-      expect(wantsCheckCards(competenceMastery(acquired, day(14)), day(14), rules)).toBe(0);
-      expect(wantsCheckCards(competenceMastery(acquired, day(15)), day(15), rules)).toBe(5);
+    it('off, as §10.7 first read: neither an «acquisita» nor a «da iniziare» competence', () => {
+      expect(wantsCheckCards(competenceMastery(acquired, day(20)), day(20), off)).toBe(0);
+      expect(wantsCheckCards(competenceMastery(unstarted, day(3)), day(3), off)).toBe(0);
     });
 
-    it('with `unstarted`: a «da iniziare» competence with answers, the day after its first ones, then weekly', () => {
-      const rules = { acquired: false, unstarted: true };
-      expect(wantsCheckCards(competenceMastery(unstarted, day(2)), day(2), rules)).toBe(0);
-      expect(wantsCheckCards(competenceMastery(unstarted, day(3)), day(3), rules)).toBe(5);
+    it('an «acquisita» competence: at most once every seven days from its last valid session', () => {
+      expect(wantsCheckCards(competenceMastery(acquired, day(9)), day(9))).toBe(0);
+      expect(wantsCheckCards(competenceMastery(acquired, day(14)), day(14))).toBe(0);
+      expect(wantsCheckCards(competenceMastery(acquired, day(15)), day(15))).toBe(5);
+      expect(wantsCheckCards(competenceMastery([...acquired, ...answers(15, 2, 2)], day(15)), day(15))).toBe(3);
+      const checked = [...acquired, ...answers(15, 5, 5)];
+      expect(competenceMastery(checked, day(16)).stato).toBe('acquisita');
+      expect(wantsCheckCards(competenceMastery(checked, day(16)), day(16))).toBe(0);
+      expect(wantsCheckCards(competenceMastery(checked, day(21)), day(21))).toBe(0);
+      expect(wantsCheckCards(competenceMastery(checked, day(22)), day(22))).toBe(5);
+    });
+
+    it('a «da iniziare» competence with answers: from the day after its first ones, then weekly; none without', () => {
+      expect(wantsCheckCards(competenceMastery(unstarted, day(2)), day(2))).toBe(0);
+      expect(wantsCheckCards(competenceMastery(unstarted, day(3)), day(3))).toBe(5);
+      expect(wantsCheckCards(competenceMastery(unstarted, day(5)), day(5))).toBe(5);
       const again = [...unstarted, ...answers(3, 2, 2)];
-      expect(wantsCheckCards(competenceMastery(again, day(4)), day(4), rules)).toBe(0);
-      expect(wantsCheckCards(competenceMastery(again, day(10)), day(10), rules)).toBe(5);
-      expect(wantsCheckCards(competenceMastery([], day(3)), day(3), rules)).toBe(0);
+      expect(competenceMastery(again, day(4)).stato).toBe('da-iniziare');
+      expect(wantsCheckCards(competenceMastery(again, day(4)), day(4))).toBe(0);
+      expect(wantsCheckCards(competenceMastery(again, day(10)), day(10))).toBe(5);
+      expect(wantsCheckCards(competenceMastery([], day(3)), day(3))).toBe(0);
     });
   });
 });

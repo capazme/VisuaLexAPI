@@ -84,7 +84,8 @@ class ArticleResult:
     note_non_lette: bool = False
     note_nel_testo: bool = False
     # G-387: the parts of an article Normattiva splits (`{progressivo, commi_dal,
-    # commi_al, url}`), and whether the text is one of them (the first).
+    # commi_al, url}`), and whether the text is one of them: the one `norma_data.parte`
+    # names ("701-800", G-387 (a)), else the first.
     parti: Optional[List[Dict[str, Any]]] = None
     testo_parziale: bool = False
 
@@ -95,14 +96,19 @@ UPDATE_NOTES_UNREAD = "note di aggiornamento non lette: verificare su Normattiva
 
 def partial_text_notice(result: ArticleResult) -> str:
     """«testo parziale: commi 1-100 di 1364 (diviso in 14 parti)» for one part of a split
-    article (G-387), "" otherwise: the model must not take the part for the whole."""
+    article (G-387), "" otherwise: the model must not take the part for the whole. The
+    part served is the one `norma_data.parte` names («commi 701-800 di 1364»), else the first."""
     if not result.testo_parziale:
         return ""
+    asked = (result.norma_data or {}).get("parte")
+    parte = asked if isinstance(asked, str) and asked else None
     parts = [p for p in result.parti or [] if isinstance(p, dict) and p.get("commi_dal") and p.get("commi_al")]
     if not parts:
+        if parte:
+            return f"testo parziale: commi {parte} dell'articolo, diviso in parti"
         return "testo parziale: l'articolo è diviso in parti, verificare su Normattiva"
-    return (f"testo parziale: commi {parts[0]['commi_dal']}-{parts[0]['commi_al']} di "
-            f"{parts[-1]['commi_al']} (diviso in {len(parts)} parti)")
+    served = parte or f"{parts[0]['commi_dal']}-{parts[0]['commi_al']}"
+    return f"testo parziale: commi {served} di {parts[-1]['commi_al']} (diviso in {len(parts)} parti)"
 
 
 def update_notes_block(result: ArticleResult) -> str:
@@ -323,6 +329,8 @@ class VisuaLexClient:
         version: Optional[str] = None,
         version_date: Optional[str] = None,
         annex: Optional[str] = None,
+        parte: Optional[str] = None,
+        comma: Optional[str] = None,
     ) -> List[ArticleResult]:
         """
         Fetch article text from Normattiva.
@@ -337,6 +345,9 @@ class VisuaLexClient:
             version: Version type
             version_date: Specific version date
             annex: Annex number
+            parte: One part of an article Normattiva splits, by its commas ("701-800")
+            comma: A comma: the part of a split article that holds it (G-387 (a));
+                the article itself when it is not split. Never both.
 
         Returns:
             List of ArticleResult with text and metadata
@@ -357,6 +368,10 @@ class VisuaLexClient:
             payload["version_date"] = version_date
         if annex is not None:
             payload["annex"] = annex
+        if parte:
+            payload["parte"] = parte
+        if comma:
+            payload["comma"] = comma
 
         try:
             response = await client.post("/fetch_article_text", json=payload)
