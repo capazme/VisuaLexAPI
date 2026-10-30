@@ -234,6 +234,20 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     guessed («l. cost.» was once read as `cost.`)
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
     Regolamento UE 2016/679); runs before the NL parser
+  - `norm_query.py` — `read_norm_query(query)`: the search's reading, the preset aliases then the
+    parser, which `/parse_query` and `/parse_query_batch` share so they cannot drift; and
+    `act_names()`, the names that name an act on their own (`/fetch_alias_catalog`'s `act_names`)
+  - `act_identity.py` — `identifies_act(params)`: a reading names an act when its type needs no
+    number, or has its number and its date («art. 2 d.m.» reads and names none). The types that
+    need them are a copy of `conventions/sources/numbered-act-types.json`
+    (`tests/test_act_identity.py` compares them); the citation linker's context reads the same list
+  - `article_clause.py` — the clause after an article («comma 1», «secondo comma», «par. 1», «n. 3»,
+    «lett. b)»), one source for `nl_parser` and `citation_linker`: a clause is the article's, never
+    the act's («art. 4, n. 7, GDPR» was regulation n. 7; «art. 82, par. 1, GDPR» read as nothing).
+    A «n.» followed by «/» or «del» is an act's number and is left to the act
+  - `act_resolver.AMBIGUOUS_NAMES` — spellings that name two acts, refused by the resolver and the
+    parser so the search asks instead of guessing; kept by hand and short («T.U.E.»: the testo unico
+    edilizia or the Treaty; «TUE» without dots stays the Treaty)
   - `citation_linker.py` — citation detection in article text, emits
     `{start, end, display_text, article, act_type, date, act_number}`; exposed at
     `POST /extract_citations`. EU acts ("regolamento (UE) 2016/679, art. 5",
@@ -278,7 +292,17 @@ POST unless noted, JSON bodies.
 - `/fetch_brocardi_info` — 410 Gone: Brocardi is no longer a source (D-078)
 - `/fetch_all_data` — article text and `norma_data` (and `validity`) in one call
 - `/fetch_tree` — article tree for a complete URN
-- `/parse_query`, `/extract_citations` — NL parsing and citation detection
+- `/parse_query`, `/extract_citations` — NL parsing and citation detection. `/parse_query`
+  answers `identifies_act` beside `recognized` (`act_identity.py`)
+- `/parse_query_batch` — `{"queries": [...]}`, 1 to 200 strings of 1 to 200 characters, the body
+  at most 48 KB (anything else a 400 that names the limit) → `{"results": [{recognized, parsed,
+  source, identifies_act}]}` in order: each read as `/parse_query` reads one (`read_norm_query`),
+  and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
+  failures and the duration, never a string, and an error by its type only: the strings are the
+  citations of a document the user may hold confidential (`tests/test_parse_query_batch.py`
+  captures the records). Priced 3 points by the server's scrape gate; routed by the ingress's
+  `/parse_query*` and Vite's prefix. For «Analizza documento»
+  (`docs/superpowers/specs/2026-10-29-document-analysis-design.md` §4.4)
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
   AKN index, and the act's `title` (`presentable_title`: no Gazzetta code, no
   amendment brackets, accents restored; `''` when there is none), so the
@@ -364,7 +388,8 @@ POST unless noted, JSON bodies.
   PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
   fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.
   Served only behind the login
-- `GET /fetch_alias_catalog` — the presets we ship plus the act names the
+- `GET /fetch_alias_catalog` — `act_names` (the names that name an act on their own, no bare
+  type word: what «Analizza documento» looks for in the browser), the presets we ship plus the act names the
   resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
 - `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
 - `POST /resolve_act_dates {"urns": [...]}` — internal (MERL-T): up to 20 year-only URNs (`urn:nir:stato:legge:1983;184`) → full URNs, through Normattiva's resolver; found dates cached a year. Only State acts of the nine kinds in

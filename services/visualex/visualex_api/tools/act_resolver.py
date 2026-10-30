@@ -32,6 +32,15 @@ _LEADING_WORDS = re.compile(
 _DOTTED_ACRONYM = re.compile(r"^[a-zà-ù]+(?:\.[a-zà-ù]*)+$", re.IGNORECASE)
 
 
+# Spellings that name two acts. Refused rather than read as one of them, so the search asks
+# instead of guessing (design 2026-10-29-document-analysis §4.8, Q9). Kept by hand and short:
+# an entry is a spelling lawyers really write for two acts, with the two named.
+# «T.U.E.» is the testo unico edilizia (d.P.R. 380/2001) in a brief, and the dotted acronym of
+# «TUE», the Treaty on European Union, to the tables; «TUE» without dots stays the Treaty.
+AMBIGUOUS_NAMES: dict[str, tuple[str, ...]] = {
+    "t.u.e": ("testo unico edilizia (d.P.R. 380/2001)", "Trattato sull'Unione europea"),
+}
+
 def _normalize_search_type(input_type: str) -> str:
     """Act-type abbreviation -> canonical full name, via NORMATTIVA_SEARCH.
 
@@ -117,12 +126,23 @@ def _lookup_key(key: str) -> dict | None:
     return None
 
 
+def ambiguous_act(name: str) -> tuple[str, ...] | None:
+    """The acts an ambiguous spelling names («T.U.E.», «del t. u. e.»), or None."""
+    if not name:
+        return None
+    normalized = _normalize_key(name)
+    for key in (normalized, _strip_leading_words(normalized)):
+        acts = AMBIGUOUS_NAMES.get(re.sub(r"\s+", "", key).rstrip("."))
+        if acts:
+            return acts
+    return None
+
 def resolve_atto(name: str) -> dict | None:
     """Resolve a common act name to scraper parameters.
 
     Returns {"tipo_atto", "data", "numero_atto"} or None. Never guesses.
     """
-    if not name:
+    if not name or ambiguous_act(name):
         return None
     for key in _candidate_keys(name):
         result = _lookup_key(key)

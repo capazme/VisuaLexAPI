@@ -137,3 +137,13 @@ its identity, or refused: the shapes, the leading zeros, the whitespace, the fir
 court and the current-year bound (`{currentYear}`, `{nextYear}` stand for the reader's clock). Every
 number is fictional. The web's `identityFromKey` and the server's `readDecisionKey` both assert it
 (`apps/web/src/utils/__tests__/decisionLinks.key.test.ts`, `apps/server/tests/decisionKey.test.ts`).
+
+## `numbered-act-types.json`
+
+The act types that name an act only with their number and date («legge», «d.m.», «decreto
+legislativo» alone name none). A reading identifies an act when its type is not in the list, or
+when it has its number and its date (`docs/superpowers/specs/2026-10-29-document-analysis-design.md`
+§4.4): one predicate for the search and «Analizza documento». The Python API's copy is
+`services/visualex/visualex_api/tools/act_identity.py` (`tests/test_act_identity.py`), read by the
+citation linker and by `/parse_query` and `/parse_query_batch` (`identifies_act`); the web's copy
+replaces `ACT_TYPES_REQUIRING_DETAILS` when the web adopts it.
