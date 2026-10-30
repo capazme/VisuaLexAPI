@@ -41,7 +41,10 @@ from visualex_api.services.normattiva_validity import (
     versions_between,
 )
 from visualex_api.services.normattiva_notes import extract_update_notes, update_notes_fields
-from visualex_api.services.normattiva_parts import extract_parts, parts_fields
+from visualex_api.services.normattiva_parts import (
+    PART_KEY_MARK, article_page_key, extract_parts, normalize_comma, normalize_range, parts_fields,
+    range_holding, ranges_in_words,
+)
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
@@ -240,16 +243,40 @@ def _asks_for_text_in_force(nv) -> bool:
             and not (isinstance(version, str) and version.strip().lower() == 'originale'))
 
 
-def _read_page_extras(raw, article):
+def _part_request(data):
+    """`(parte, comma)` as the request names them, normalised; (None, None) when it names
+    neither (G-387 (a)). A part is named by its range («701-800») or by a comma it holds
+    («773»), never both."""
+    def given(value):
+        return value is not None and value != ''
+
+    raw_part, raw_comma = data.get('parte'), data.get('comma')
+    if given(raw_part) and given(raw_comma):
+        raise ValidationError("Indicare la parte o il comma dell'articolo, non entrambi")
+    if given(raw_part):
+        part = normalize_range(raw_part)
+        if part is None:
+            raise ValidationError(f"Parte non valida: {str(raw_part)[:40]} (per esempio «701-800»)")
+        return part, None
+    if given(raw_comma):
+        comma = normalize_comma(raw_comma)
+        if comma is None:
+            raise ValidationError(f"Comma non valido: {str(raw_comma)[:40]} (per esempio «773»)")
+        return None, comma
+    return None, None
+
+
+def _read_page_extras(raw, article, tree_raw=None):
     """(update notes, parts) of one cached Normattiva page, each None when unreadable: one
-    reader's failure never costs the other's answer."""
+    reader's failure never costs the other's answer. A part's page has no tree: its parts
+    are read from the article's page (`tree_raw`)."""
     try:
         notes = extract_update_notes(raw, article=article)
     except Exception as exc:  # noqa: BLE001 - best effort by contract
         log.warning("Update notes could not be read", error=str(exc))
         notes = None
     try:
-        parts = extract_parts(raw, article=article)
+        parts = extract_parts(tree_raw or raw, article=article)
     except Exception as exc:  # noqa: BLE001 - best effort by contract
         log.warning("Article parts could not be read", error=str(exc))
         parts = None
@@ -499,6 +526,7 @@ class NormaController:
             raise ValidationError("Campo obbligatorio mancante: act_type")
         if 'article' not in data or data.get('article') in (None, ''):
             raise ValidationError("Campo obbligatorio mancante: article")
+        part, comma = _part_request(data)
 
         # Normattiva answers a date after today with the current text and says
         # nothing. Refused here, before any network call, so that no door skips
@@ -554,6 +582,8 @@ class NormaController:
         # NormaVisitata with numero_articolo='error', whose URN ends in ~arterror.
         if isinstance(articles, dict) and 'error' in articles:
             raise article_input_error(articles)
+        if (part or comma) and len(articles) != 1:
+            raise ValidationError("La parte o il comma valgono per un solo articolo")
 
         # Validate and sanitize annex parameter
         annex_value = data.get('annex')
@@ -725,8 +755,64 @@ class NormaController:
                 f"Articolo {', '.join(missing_articles)} non presente {where} {norma}{hint}"
             )
 
+        if part or comma:
+            await self._name_the_part(norma_visitata_list[0], part, comma)
+
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
         return norma_visitata_list
+
+    async def _name_the_part(self, nv, part, comma):
+        """Set `nv.parte` from the request's `parte` or `comma` (G-387 (a), G-389).
+
+        The ranges come from the act's tree, which the existence check has just read (cached,
+        no request). The first part has no `parte` (Q1): asked by its range or by one of its
+        commas, it is the article as before, with the same keys. A comma of an article that is
+        not split is in it: the article. A comma past the last range, or a range the tree does
+        not list, is a 404 in words; a range of an article the tree does not show split is left
+        to the reader, which reads the article page itself (a tree that cannot be read is never
+        «does not exist»). EUR-Lex articles have no parts: a comma is in the article, a part is
+        refused.
+        """
+        if self.get_scraper_for_norma(nv) is not normattiva_scraper:
+            if part:
+                raise ValidationError("Le parti di un articolo valgono solo per i testi di Normattiva")
+            return
+        ranges = await self._ranges_in_tree(nv)
+        article = f"art. {nv.numero_articolo} di {nv.norma}"
+        if comma:
+            if not ranges:
+                return
+            held = range_holding(ranges, comma)
+            if held is None:
+                first, last = ranges[0].split('-', 1)[0], ranges[-1].rsplit('-', 1)[-1]
+                raise ResourceNotFoundError(f"Il comma {comma} non è nell'{article} (commi {first}-{last})")
+            nv.parte = None if held == ranges[0] else held
+            return
+        if ranges and part == ranges[0]:
+            return
+        if ranges and part not in ranges:
+            raise ResourceNotFoundError(
+                f"L'{article} non ha la parte commi {part}: è diviso in {ranges_in_words(ranges)}")
+        nv.parte = part
+
+    async def _ranges_in_tree(self, nv):
+        """The comma ranges of `nv`'s article in the act's tree, in order («1-100», …), `[]`
+        when the tree lists it whole, None when the tree cannot be read."""
+        try:
+            tree_result = await get_tree(nv.norma.url, link=False, details=False, return_metadata=True)
+        except Exception as exc:  # noqa: BLE001 - never fail the request on a tree error
+            log.warning("Tree unavailable, parts not checked", error=str(exc))
+            return None
+        entries = tree_result[0] if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3 else tree_result
+        if isinstance(entries, str) or not entries:
+            return None
+        wanted = comparable_article_key(nv.numero_articolo)
+        return [
+            entry['commi'] for entry in entries
+            if isinstance(entry, dict) and entry.get('commi')
+            and str(entry.get('allegato') or '') == str(nv.allegato or '')
+            and comparable_article_key(entry.get('numero', '')) == wanted
+        ]
 
     async def _source_spelling(self, norma, article, annex):
         """`article` as the act spells its ordinal, and whether the act holds it.
@@ -913,6 +999,7 @@ class NormaController:
         in_force = NormaVisitata(
             norma=nv.norma, allegato=nv.allegato, numero_articolo=nv.numero_articolo,
             versione='vigente', data_versione=today_in_rome().isoformat(),
+            parte=getattr(nv, 'parte', None),
         )
         try:
             text_today, url_today = await scraper.get_document(in_force)
@@ -930,7 +1017,7 @@ class NormaController:
         unrecognised, and today's text without its window."""
         validity = await self._validity_for(scraper, nv, url)
         if (validity is None and isinstance(scraper, NormattivaScraper)
-                and await self._page_left_the_cache(scraper, url)):
+                and await self._page_left_the_cache(scraper, url, nv)):
             validity = await self._validity_for(scraper, nv, url)
         return validity
 
@@ -970,15 +1057,19 @@ class NormaController:
         }
 
     @staticmethod
-    async def _page_left_the_cache(scraper, url):
+    async def _page_left_the_cache(scraper, url, nv=None):
         """True when the page for `url` was missing from the scraper's persistent cache
-        and has been read again and stored; False when it was there, or cannot be read."""
+        and has been read again and stored; False when it was there, or cannot be read.
+        A part's page is read again by the scraper, in the article page's session: its key
+        is no address to request."""
         cache = getattr(scraper, 'cache', None)
         if cache is None or not url:
             return False
         try:
             if await cache.get(url):
                 return False
+            if PART_KEY_MARK in url:
+                return bool(nv is not None and nv.parte and await scraper.read_part_page(nv))
             page = await scraper.request_document(url, source="normattiva")
             if not page:
                 return False
@@ -1010,8 +1101,10 @@ class NormaController:
         try:
             cache = getattr(scraper, 'cache', None)
             raw = await cache.get(url) if cache is not None and url else None
+            # A part's page (its key holds PART_KEY_MARK) has no tree: the article page has.
+            tree_raw = await cache.get(article_page_key(url)) if raw and PART_KEY_MARK in url else None
             if isinstance(raw, str) and raw:
-                notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo)
+                notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo, tree_raw)
         except Exception as exc:  # noqa: BLE001 - best effort: the text already read stands
             log.warning("Page extras could not be read", error=str(exc), url=str(url)[:100])
         return {**update_notes_fields(notes), **parts_fields(parts)}

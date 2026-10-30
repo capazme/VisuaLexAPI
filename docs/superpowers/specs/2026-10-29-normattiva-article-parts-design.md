@@ -1,6 +1,7 @@
 # Articles split into parts, each its own entry (G-387 (a))
 
-Status: draft for review (Alfred, then the owner where marked **Q**). No code before it is agreed.
+Status: agreed. The owner answered Q1–Q4 as recommended (G-389, 30 October 2026); the Python API, the server and
+the MCP go ahead, the web (index, tabs, labels) waits for Luca's ok.
 Decision G-387: «(a): each part becomes its own entry («art. 1 (commi 701-800)») with its own text and
 highlights; a request for a comma gets the part that holds it; part 1 stays as it is.» Shape agreed with the
 mcp-legal-it side (3.0.x): `ParteArticolo(progressivo, commi_dal, commi_al, url)`.
@@ -57,7 +58,10 @@ mcp-legal-it side (3.0.x): `ParteArticolo(progressivo, commi_dal, commi_al, url)
 - Labels for a part (**Q2**, recommendation): citation «art. 1, commi 701-800, l. 296/2006»; short
   «art. 1 (commi 701-800) l. 296/2006»; the tab and the dossier entry «Art. 1 (commi 701-800)», as Normattiva
   labels it. Part 1 keeps today's labels («art. 1, l. 296/2006»), with the PR 2 notice beside its text.
-- New golden cases: a part, a comma citation, the NIR comma form, part 1. Status `proposed` until Q2 is answered.
+- New golden cases: a part and part 1, by identity (`identity.part`, decided by Q1). Their labels go into the
+  golden file with the web's adoption (3c): every label there is asserted by the web's suite. Until then the API's
+  suite checks the citation `cite_article` writes for a part and that the part's and the comma's labels read back
+  through `nl_parser`.
 
 ## 4. Reading a part (Python API)
 
@@ -76,8 +80,8 @@ mcp-legal-it side (3.0.x): `ParteArticolo(progressivo, commi_dal, commi_al, url)
 ## 5. The tree and the index the web shows
 
 - `/fetch_tree`: the 14 entries become one article with its parts instead of 14 false articles: the first entry
-  `{numero: "1", parte: null, …}` and each following `{numero: "1", parte: "101-200", label:
-  "1 (commi 101-200)"}`. The annex metadata's `article_numbers` lists `1` once. The earlier versions' entries
+  `{numero: "1", parte: null, commi: "1-100", label: "1 (commi 1-100)", …}` and each following `{numero: "1",
+  parte: "101-200", commi: "101-200", label: "1 (commi 101-200)"}`. The annex metadata's `article_numbers` lists `1` once. The earlier versions' entries
   («agg.149 (commi …)») are already skipped.
 - The web (Irnerio, with Luca's ok) shows them as entries under the article and opens one with `parte`.
   `/fetch_rubriche` is unchanged (the AKN index has the article whole).

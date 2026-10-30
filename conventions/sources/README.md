@@ -14,7 +14,7 @@ Python API and MERL-T. Design: `docs/superpowers/specs/2026-10-04-source-convent
     "id": "l-241-1990-2",            // unique across the file
     "note": "…",                     // why, in plain words; quotes the owner where he decided
     "input": { "tipo_atto": "legge", "numero_atto": "241", "data": "1990-08-07", "numero_articolo": "2" },
-    "identity": { "act": E, "article": E, "aliases": E, "reference": E },   // any subset
+    "identity": { "act": E, "article": E, "aliases": E, "reference": E, "part": E },   // any subset
     "labels": { "citation": E, "short": E, "act_citation": E, "act_short": E, "act_heading": E, "authority": E }
   }],
   "decisions": [{
@@ -30,6 +30,12 @@ Python API and MERL-T. Design: `docs/superpowers/specs/2026-10-04-source-convent
 `input` is the source as VisuaLex stores it: a norm is a `norma_data` (the
 fields the reader and the dossier keep), a decision is a reference with the
 attributes the source gave.
+
+A part of an article Normattiva splits into parts (art. 1 l. 296/2006, «1 (commi
+701-800)») is the article plus its comma range: `input.parte` and `identity.part`
+(`"701-800"`), the article's URN unchanged; the first part has none (`null`), so
+its identity is the article's (spec
+`docs/superpowers/specs/2026-10-29-normattiva-article-parts-design.md`, G-389).
 
 Every expected value `E` is `{ "value": …, "status": … }`:
 

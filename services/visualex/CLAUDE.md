@@ -18,7 +18,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   neither served nor kept; the URL the app holds and the copies' key stay EUR-Lex's),
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
-  `request(..., max_retries=n)` lowers the retry budget for a caller that paces
+  `request(..., session=s)` sends one request on the caller's own session, for a page that
+  opens only with the cookies of the page before it, with the same rate limit, host check
+  and retries; `request(..., max_retries=n)` lowers the retry budget for a caller that paces
   itself, `None` keeps `HTTP_MAX_RETRIES`; once the budget is spent it gives up at once,
   without the backoff or the `Retry-After` no attempt would follow — but a rate-limit
   answer (429/503) that states a `Retry-After` pauses its `source` for that wait, so the
@@ -99,8 +101,26 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     request, the text untouched; only the entries labelled «<article> (commi a-b)» count (the tree lists an
     article's earlier versions split the same way, «agg.149 (commi 1-100)»), the article compared by
     `comparable_article_key`. A part is `{progressivo, commi_dal, commi_al, url}` (mcp-legal-it 3.0.x's shape;
-    `url` is the part's `caricaArticolo` page, which opens only in the article page's session). It fetches no part:
-    that is the parts as entries, G-387 (a), the next round
+    `url` is the part's `caricaArticolo` page, which opens only in the article page's session). It also names a
+    part from a request (`normalize_range`, `normalize_comma`, `range_holding`) and keys its page
+    (`part_cache_key`: «<URN>#commi701-800»)
+  - A part as an entry of its own (G-387 (a), G-389; spec `docs/superpowers/specs/2026-10-29-normattiva-article-parts-design.md`):
+    the article plus its comma range, `NormaVisitata.parte` ("701-800"), written in `norma_data` only for a part.
+    The first part has no `parte`: what the URN serves, with the request, keys and text of before (rule 23). A
+    request names a part by `parte` or by a `comma` it holds (`_part_request`, `_name_the_part`: the ranges from the
+    act's tree the existence check has just read; a comma of part 1 or of a whole article is the article; a comma
+    past the last range, or a range the tree does not list, is a 404 in words; an unreadable tree is never «does
+    not exist»; EUR-Lex articles have no parts). `NormattivaScraper.get_document` reads a part with `_get_part`:
+    the page kept under its key, else `read_part_page`, which reads the article page (the request's URN, its date)
+    and then the part's `caricaArticolo` page in one aiohttp session with its own cookie jar (Normattiva answers
+    500 without the article page's cookies; the shared session's single jar would mix two parts read at once), the
+    address from the article page's tree, the shared client's rate limit and retries. A range the page no longer
+    lists is refused with today's parts (Q3), never another range served. The text is the same extractor's on the
+    part's page, checked to open on the part's first comma; never the AKN export (the whole article). The answer's
+    `url` is the key, «<URN>#commi701-800» (on Normattiva it opens the article); `validity` and the notes are read
+    from the part's page (it states its window but not the act's `act_updated`), `parti` from the article page;
+    `testo_parziale` is true. After a restart a part's page is read again in its session, never requested by its
+    key (`_page_left_the_cache`)
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
     portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
     down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
@@ -229,7 +249,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     exposed at `POST /parse_query`. Every label the source convention writes reads
     back to the norm it was written from (`tests/test_nl_parser_convention.py`, driven
     by the golden file): «d.l.», «l. cost.», «r.d.l.», «d.lgs.lgt.», «1° settembre»,
-    and «(Allegato A)» / «(All. A)», sent on as `annex`. The Costituzione has no
+    and «(Allegato A)» / «(All. A)», sent on as `annex`. A single article's comma
+    («art. 1, comma 773, l. 296/2006», «co. 773») is sent on as `comma`, a part's
+    label («art. 1, commi 701-800, …», «art. 1 (commi 701-800) …») as `parte`; after a
+    list or a range of articles neither. The Costituzione has no
     number and no date: a type that reads as it next to either is refused, never
     guessed («l. cost.» was once read as `cost.`)
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
@@ -291,7 +314,12 @@ POST unless noted, JSON bodies.
 - `/stream_article_text` — stream results as NDJSON, one object per line
 - `/fetch_brocardi_info` — 410 Gone: Brocardi is no longer a source (D-078)
 - `/fetch_all_data` — article text and `norma_data` (and `validity`) in one call
-- `/fetch_tree` — article tree for a complete URN
+- `/fetch_tree` — article tree for a complete URN. An article Normattiva splits into parts is one
+  article with its parts: «1 (commi 1-100)» … «1 (commi 1301-1364)» are entries `{numero: "1", parte,
+  commi, label}`, the first with `parte: null` (the article), each other with its range («101-200»),
+  the article's URL for all; `count` and the annex's `article_numbers` count the article once. They
+  were 14 «articles» numbered «1 (commi 101-200)» (and the existence check found no art. 1); the
+  persistent keys carry `|parts`, so a tree stored before is read again
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection. `/parse_query`
   answers `identifies_act` beside `recognized` (`act_identity.py`)
 - `/parse_query_batch` — `{"queries": [...]}`, 1 to 200 strings of 1 to 200 characters, the body
@@ -437,7 +465,8 @@ So are, for an article Normattiva splits into parts (G-387), `parti` (`[{progres
 ordered by `progressivo`, `[]` for an article listed whole, null when the page has no tree, cannot be read (a
 dated request's page after a restart: no notice then, unlike the notes) or the text is the AKN export's, which holds
 the whole article) and `testo_parziale` (true when the text is one part: the first, the one the
-article's URN serves). A client says so: «testo parziale: commi 1-100 di 1364 (diviso in 14 parti)»
+article's URN serves, or the part asked, whose `norma_data.parte` names it). A client says so: «testo
+parziale: commi 1-100 di 1364 (diviso in 14 parti)», or «commi 701-800 di 1364» for part 8
 (`normattiva_parts.partial_notice`). The page is read once for both (`_page_extras_for`), and one reader's failure
 leaves the other's answer.
 
