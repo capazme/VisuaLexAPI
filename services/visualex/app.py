@@ -768,9 +768,11 @@ class NormaController:
         no request). The first part has no `parte` (Q1): asked by its range or by one of its
         commas, it is the article as before, with the same keys. A comma of an article that is
         not split is in it: the article. A comma past the last range, a range the tree does not
-        list, or a range of an article the tree lists whole, is a 404 in words; with a tree that
-        cannot be read the range is left to the reader, which reads the article page itself (a
-        tree that cannot be read is never «does not exist»). EUR-Lex articles have no parts: a comma is in the article, a part is
+        list, or a range of an article the tree lists whole, is a 404 in words. With a tree that
+        cannot be read, a comma is a 503 in words (which part holds it cannot be told, and the
+        first part must not be stored as if it did), and a range is left to the reader, which
+        reads the article page itself; neither is ever «does not exist», and a request with
+        neither fails open as before. EUR-Lex articles have no parts: a comma is in the article, a part is
         refused.
         """
         if self.get_scraper_for_norma(nv) is not normattiva_scraper:
@@ -780,6 +782,11 @@ class NormaController:
         ranges = await self._ranges_in_tree(nv)
         article = f"art. {nv.numero_articolo} di {nv.norma}"
         if comma:
+            if ranges is None:
+                # Which part holds the comma cannot be told: never the first part served as if it did.
+                raise IndexUnavailableError(
+                    f"Non riesco a leggere l'indice dell'{article} su Normattiva per trovare il comma {comma}: "
+                    "riprova più tardi")
             if not ranges:
                 return
             held = range_holding(ranges, comma)
