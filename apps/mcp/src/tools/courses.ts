@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { McpConfig } from '../config.js';
 import { ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
@@ -48,16 +49,19 @@ export const COURSE_SCHEMA_TEXT = [
     'un’azione: «qualificare un segno distintivo e indicare gli impedimenti alla registrazione»), dossier (di tipo studio). VisuaLex dà i codici C1, C2… nell’ordine dato. ' +
     'Prima del primo percorso l’utente accetta in VisuaLex › Percorsi la dichiarazione sul materiale: finché non lo fa, lo strumento lo dice.',
   '',
-  'lingolex_aggiungi_modulo (un modulo intero in una chiamata, ≤300.000 caratteri):',
+  'lingolex_aggiungi_modulo (un modulo intero in una chiamata, ≤300.000 caratteri; la forma di blocchi, quiz e aperta è solo qui):',
   '- ordine (1-200), titolo, minuti (facoltativo, 5-120), competenze (i codici serviti), domandePrima (0-3 domande non valutate);',
-  '- blocchi (1-12, ciascuno ≤12.000 caratteri, circa 1.200 parole, la lezione ≤80.000): titolo facoltativo, testo, citazioni, richiamo (0-3 domande dopo il blocco);',
+  '- blocchi (1-12, ciascuno ≤12.000 caratteri, circa 1.200 parole, la lezione ≤80.000): ' +
+    '{ titolo (facoltativo), testo, citazioni (facoltative), richiamo (facoltativo: 0-3 domande dopo il blocco) };',
   '- testo: paragrafi, titoli «### », elenchi «- » e «1. » di un solo livello, citazioni «> », **grassetto**, *corsivo*, e i link di citazione «[testo](#c1)». ' +
     'Nient’altro: niente HTML, altri link, immagini, codice, tabelle, tabulazioni;',
   '- citazioni: per ogni «#cN» del testo { marcatore: "c1", voce: id di una norma o sentenza del dossier del percorso, da omnilex_leggi_dossier }, ognuna usata;',
   '- quiz: 6-10 domande, almeno metà di applicazione («qualifica il caso», «quale norma e perché»: applicazione true), distrattori da istituti vicini, ' +
     'una spiegazione per ogni opzione, tutti gli elementi degli istituti del modulo coperti;',
-  '- domanda: { testo, opzioni: 2-6 { chiave a-f, testo ≤500, spiegazione ≤1.500 }, corretta, applicazione, competenze (tra quelle del modulo) };',
-  '- aperta: una domanda da svolgere in 3-4 righe (questione, regola, esito), con opzioni e corretta per chi resta sotto il 70% nel quiz, rispostaModello, rubrica (3-5 criteri), competenze;',
+  '- domanda: { testo, opzioni: 2-6 { chiave: "a"-"f", testo ≤500, spiegazione ≤1.500 }, corretta: la chiave giusta, applicazione: true o false (facoltativa), ' +
+    'competenze: i codici, tra quelli del modulo };',
+  '- aperta: una domanda da svolgere in 3-4 righe (questione, regola, esito), con opzioni e corretta per chi resta sotto il 70% nel quiz: ' +
+    '{ testo, opzioni, corretta, rispostaModello, rubrica: 3-5 criteri, competenze } (senza applicazione);',
   '- sostituisceId: il modulo che questo corregge (una segnalazione dell’utente); il vecchio lo ritira l’utente in VisuaLex. Un modulo già aperto non cambia mai.',
   '',
   'lingolex_aggiungi_esame: quando tutti i moduli ci sono. domande (≤60, almeno 2 di applicazione per ogni competenza del percorso), ' +
@@ -71,6 +75,38 @@ const options = z.array(z.object({ chiave: z.enum(KEYS), testo: z.string(), spie
 const item = z.object({ testo: z.string(), opzioni: options, corretta: z.enum(KEYS), applicazione: z.boolean().optional(), competenze: codes });
 // Ids, codes and lengths are the server's to check: each keyword here is paid in every session.
 const id = z.string();
+
+/**
+ * A module's lesson and verification (G-391). Their shape is in `lingolex_schema_card`'s text, read once, not in the
+ * tool's definition, paid in every session: the definition lists plain objects, and the handler checks them against
+ * these schemas before anything is sent, with the SDK's own message, so a module is refused or stripped as before.
+ * Only the order differs: an error of the other fields comes first, and the parts' at the next call.
+ */
+const MODULE_PARTS = z.object({
+  blocchi: z
+    .array(
+      z.object({
+        titolo: z.string().optional(),
+        testo: z.string(),
+        citazioni: z.array(z.object({ marcatore: z.string(), voce: id })).optional(),
+        richiamo: z.array(item).max(3).optional(),
+      }),
+    )
+    .min(1)
+    .max(12),
+  quiz: z.array(item).min(6).max(10),
+  aperta: item.omit({ applicazione: true }).extend({ rispostaModello: z.string(), rubrica: z.array(z.string()).min(3).max(5) }),
+});
+const part = z.looseObject({});
+
+function moduleParts(args: Record<string, unknown>): z.infer<typeof MODULE_PARTS> {
+  const parsed = MODULE_PARTS.safeParse(args);
+  if (parsed.success) return parsed.data;
+  // The words and the paths of the SDK's validation (`validateToolInput`), which checked these parts until G-391.
+  const at = (path: PropertyKey[]) => path.map((seg, i) => (typeof seg === 'number' ? `[${seg}]` : `${i ? '.' : ''}${String(seg)}`)).join('');
+  const issues = parsed.error.issues.map((issue) => (issue.path.length ? `${issue.message} at ${at(issue.path)}` : issue.message));
+  throw new McpError(ErrorCode.InvalidParams, `Input validation error: Invalid arguments for tool lingolex_aggiungi_modulo: ${issues.join('\n')}`);
+}
 
 interface ApiStructure {
   id: string;
@@ -162,7 +198,8 @@ export function registerCourseTools(server: McpServer, config: McpConfig, run: R
     {
       title: 'Aggiungi un modulo a un percorso',
       description:
-        'Aggiunge a un percorso un modulo intero, lezione e verifica (forma e regole in lingolex_schema_card). Per correggerne uno, uno nuovo con sostituisceId.',
+        'Aggiunge a un percorso un modulo intero, lezione e verifica (la forma di blocchi, quiz e aperta e le regole in lingolex_schema_card). ' +
+        'Per correggerne uno, uno nuovo con sostituisceId.',
       inputSchema: {
         percorso: id.describe('Id del percorso'),
         ordine: z.number().int().min(1).max(200),
@@ -171,31 +208,23 @@ export function registerCourseTools(server: McpServer, config: McpConfig, run: R
         competenze: codes.describe('Codici: C1, C2…'),
         sostituisceId: id.optional(),
         domandePrima: z.array(z.string()).max(3).optional(),
-        blocchi: z
-          .array(
-            z.object({
-              titolo: z.string().optional(),
-              testo: z.string(),
-              citazioni: z.array(z.object({ marcatore: z.string(), voce: id })).optional(),
-              richiamo: z.array(item).max(3).optional(),
-            }),
-          )
-          .min(1)
-          .max(12),
-        quiz: z.array(item).min(6).max(10),
-        aperta: item.omit({ applicazione: true }).extend({ rispostaModello: z.string(), rubrica: z.array(z.string()).min(3).max(5) }),
+        blocchi: z.array(part),
+        quiz: z.array(part),
+        aperta: part,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ percorso, ...module }, extra) =>
-      run('lingolex_aggiungi_modulo', extra, async (caller) =>
+    ({ percorso, ...module }, extra) => {
+      const body = { ...module, ...moduleParts(module) };
+      return run('lingolex_aggiungi_modulo', extra, async (caller) =>
         data(
           await callApi<Record<string, unknown>>(config, caller, 'lingo:courses:write', `/lingo/corsi/${encodeURIComponent(percorso)}/moduli`, {
             ...WRITE,
-            body: module,
+            body,
           }),
         ),
-      ),
+      );
+    },
   );
 
   server.registerTool(
