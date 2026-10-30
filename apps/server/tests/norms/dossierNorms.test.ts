@@ -2,6 +2,7 @@ import nock from 'nock';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from '../helpers';
 import { delegatedToken } from '../oauth/oauthHelpers';
+import { setSwitch } from '../../src/assistant/switches';
 
 // The Python API, stubbed: what it answered on 4 October 2026 for these
 // references (probed on the development stack).
@@ -49,6 +50,10 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   // What /parse_query reads since G-387 (a): a single article's comma, a part's label.
   'art. 2043, comma 1 c.c.': { parsed: { act_type: 'codice civile', article: '2043', comma: '1' }, recognized: true },
   'art. 2059 (commi 1-2) c.c.': { parsed: { act_type: 'codice civile', article: '2059', parte: '1-2' }, recognized: true },
+  'art. 1 l. 296/2006': { parsed: { act_type: 'legge', act_number: '296', date: '2006', article: '1' }, recognized: true },
+  'art. 1, comma 773, l. 296/2006': { parsed: { act_type: 'legge', act_number: '296', date: '2006', article: '1', comma: '773' }, recognized: true },
+  'art. 1, comma 42, l. 296/2006': { parsed: { act_type: 'legge', act_number: '296', date: '2006', article: '1', comma: '42' }, recognized: true },
+  'art. 1, comma 1400, l. 296/2006': { parsed: { act_type: 'legge', act_number: '296', date: '2006', article: '1', comma: '1400' }, recognized: true },
 };
 
 // D.lgs. 104/2010: the codice del processo amministrativo is its annex, which Normattiva
@@ -62,7 +67,7 @@ const DLGS_104_TREE = [
 const normaDataBodies: Record<string, string>[] = [];
 
 // The full date fetch_norma_data finds for a law named by number and year.
-const LAW_DATES: Record<string, string> = { '241': '1990-08-07', '247': '2012-12-31', '49': '2023-04-21' };
+const LAW_DATES: Record<string, string> = { '241': '1990-08-07', '247': '2012-12-31', '49': '2023-04-21', '296': '2006-12-27' };
 const lawUrl = (number: string) => `https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:${LAW_DATES[number]};${number}`;
 
 
@@ -116,10 +121,15 @@ function stubPythonApi() {
       return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: null, numero_atto: null, allegato: null,
         url: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None', urn: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None~art2' }] }];
     }
+    if (body.act_type === 'legge' && body.comma === '1400') {
+      return [404, { error: "Il comma 1400 non è nell'art. 1 di legge 2006-12-27, n. 296 (commi 1-1364)" }];
+    }
     if (body.act_type === 'legge') {
       const url = lawUrl(body.act_number);
+      // Art. 1 l. 296/2006 is split into parts (G-387 (a)): a comma past 100 is in another part.
+      const parte = body.comma && Number(body.comma) > 100 ? { parte: '701-800' } : {};
       return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: LAW_DATES[body.act_number], numero_atto: body.act_number, allegato: null, tipo_atto_reale: null,
-        numero_articolo: body.article, url, urn: `${url}~art${body.article}` }] }];
+        numero_articolo: body.article, url, urn: `${url}~art${body.article}`, ...parte }] }];
     }
     if (body.act_type === 'preleggi') {
       return [200, { norma_data: [{ ...ccArticle(body.article), tipo_atto: 'preleggi', allegato: '1', urn: `${CC_ACT}:1~art${body.article}` }] }];
@@ -224,6 +234,33 @@ describe('POST /api/dossiers/:id/norms', () => {
     }
     const items = await prisma.dossierItem.findMany({ where: { dossierId } });
     expect(items.map((item) => item.content)).not.toContainEqual(expect.objectContaining({ parte: expect.anything() }));
+  });
+
+  describe('with the switch article_parts on (G-387 (a))', () => {
+    beforeEach(async () => {
+      await setSwitch('article_parts', true, alice.id);
+    });
+
+    it('stores the part that holds a reference\'s comma, beside its article', async () => {
+      const response = await addNorms(alice, dossierId, ['art. 1 l. 296/2006', 'art. 1, comma 773, l. 296/2006']);
+      expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'added']);
+      expect(response.body.results[1].display).toBe('art. 1, commi 701-800, l. 27 dicembre 2006, n. 296');
+      expect(normaDataBodies[1]).toMatchObject({ article: '1', comma: '773' });
+      const items = await prisma.dossierItem.findMany({ where: { dossierId }, orderBy: { position: 'asc' } });
+      expect(items[0].content).not.toHaveProperty('parte');
+      expect(items[1].content).toMatchObject({ numero_articolo: '1', parte: '701-800' });
+    });
+
+    it('a comma of the first part is the article, already there', async () => {
+      await addNorms(alice, dossierId, ['art. 1 l. 296/2006']);
+      const response = await addNorms(alice, dossierId, ['art. 1, comma 42, l. 296/2006']);
+      expect(response.body.results[0].outcome).toBe('already_present');
+    });
+
+    it('a comma the article does not have does not exist, in the API\'s words', async () => {
+      const response = await addNorms(alice, dossierId, ['art. 1, comma 1400, l. 296/2006']);
+      expect(response.body.results[0]).toMatchObject({ outcome: 'does_not_exist', detail: expect.stringContaining('Il comma 1400') });
+    });
   });
 
   it('never moves an article to another part of its act when the annex named has none', async () => {

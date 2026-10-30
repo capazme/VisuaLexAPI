@@ -11,12 +11,13 @@ import { isAppSwitchKey, isSwitchOnCached, listSwitches, setSwitch } from '../as
  * before the limiters, so it answers from a few seconds' memory (`isSwitchOnCached`).
  */
 export async function features(_req: Request, res: Response) {
-  const [assistantPassages, assistantGlosses, lingoCourses] = await Promise.all([
+  const [assistantPassages, assistantGlosses, lingoCourses, articleParts] = await Promise.all([
     isSwitchOnCached('assistant_passages'),
     isSwitchOnCached('assistant_glosses'),
     isSwitchOnCached('lingo_courses'),
+    isSwitchOnCached('article_parts'),
   ]);
-  res.json({ assistantPassages, assistantGlosses, lingoCourses });
+  res.json({ assistantPassages, assistantGlosses, lingoCourses, articleParts });
 }
 
 /** The administrator's side of the runtime switches (`/admin/switches`, none of it delegated). */

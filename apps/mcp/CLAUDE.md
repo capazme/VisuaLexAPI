@@ -76,7 +76,9 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   then does not give up and retry. A cancelled call stops the steps not yet begun, and its log line says
   `outcome=cancelled`),
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
+  checked by `apps/server`; while `GET /features` says `articleParts: true`, the switch `article_parts`, its
+  description says a reference with a comma adds the part of a split article that holds it, G-387 (a)),
+  `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
   words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
   the Cassazione, the Corte costituzionale, the Court of Justice and the General Court of the
   Union (by their case), the Consiglio di Stato, the C.G.A.R.S. and the TAR (by kind, and a TAR by
@@ -135,7 +137,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   VisuaLex shows it, and the glosses this application proposed still to validate; for a norm, the server adds
   Normattiva's update notes after `testo`, on every part, as `note_aggiornamento` (absent when the text already holds
   them, as for the codes), and `avviso_note` when some could not be read — never inside the text, G-386; `avviso_testo_parziale` when the
-  text is one part of an article Normattiva splits, G-387; scope `dossier:text`), **always
+  text is one part of an article Normattiva splits, G-387, naming the part served for one stored as an entry; scope
+  `dossier:text`; its `parte` is still the page number), **always
   listed**: it is how an application quotes an entry verbatim (G-372). `omnilex_glossa_voce` (an optional general gloss
   up to 4,000 characters, which becomes a note about the entry through `POST /dossiers/:id/notes`, and 1–10 glosses on
   passages `{ testo 15–2000, nota ≤ 1500, prima?, dopo? }`, no colour; the passages first, so a call refused whole writes

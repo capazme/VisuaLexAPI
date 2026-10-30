@@ -215,7 +215,11 @@ export async function findDossier(config: McpConfig, caller: Caller, dossier: st
  * call. Nothing updates or moves; the two deletion tools move to the trash,
  * after the user confirms in the client's own dialog (second round, spec §4).
  */
-export function registerDossierTools(server: McpServer, config: McpConfig, run: RunTool): void {
+/**
+ * `articleParts`: the server stores a part of an article Normattiva splits (G-387 (a), the switch `article_parts`):
+ * then a reference with a comma adds the part that holds it, and the tool says so.
+ */
+export function registerDossierTools(server: McpServer, config: McpConfig, run: RunTool, { articleParts = false } = {}): void {
   server.registerTool(
     'omnilex_elenca_dossier',
     {
@@ -469,7 +473,10 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
       title: 'Aggiungi norme a un dossier',
       description:
         `Aggiunge a un dossier da 1 a ${MAX_REFERENCES} norme indicate a parole («art. 2043 c.c.», «art. 2 l. 241/1990»), un articolo per riferimento. ` +
-        'Ogni riferimento è verificato sulle fonti: l’esito di ciascuno è aggiunta, già presente, non riconosciuto, inesistente, ambiguo o non verificabile. Non modifica né cancella nulla.',
+        'Ogni riferimento è verificato sulle fonti: l’esito di ciascuno è aggiunta, già presente, non riconosciuto, inesistente, ambiguo o non verificabile. Non modifica né cancella nulla.' +
+        (articleParts
+          ? ' Con il comma («art. 1, comma 773, l. 296/2006») aggiunge la parte dell’articolo che Normattiva divide in parti e che lo contiene («commi 701-800»).'
+          : ''),
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
         riferimenti: z

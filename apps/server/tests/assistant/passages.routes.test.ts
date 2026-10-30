@@ -146,6 +146,18 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
       expect((await text()).body.avviso_testo_parziale).toBe('testo parziale: l’articolo è diviso in parti, verificare su Normattiva');
     });
 
+    it('reads an entry stored as a part as that part, and says which (G-387 (a))', async () => {
+      const part = (k: number, dal: number, al: number) => ({ progressivo: k, commi_dal: String(dal), commi_al: String(al), url: `https://www.normattiva.it/atto/caricaArticolo?art.progressivo=${k}` });
+      const stored = { ...NORM, parte: '101-200' };
+      const partId = (await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({ itemType: 'norm', title: 'Art. 1453', content: stored })).body.id;
+      updateNotes = { parti: [part(1, 1, 100), part(2, 101, 200), part(3, 201, 264)], testo_parziale: true, norma_data: stored };
+      const response = await text(partId);
+      expect(articleBodies.at(-1)).toMatchObject({ article: '1453', parte: '101-200' });
+      expect(response.body.voce.riferimento).toBe('art. 1453, commi 101-200 c.c.');
+      expect(response.body.avviso_testo_parziale).toBe('testo parziale: commi 101-200 di 264 (diviso in 3 parti)');
+      expect(response.body.parte).toBe(1); // the route's own page
+    });
+
     it('gives a decision’s blocks under their names', async () => {
       const response = await text(decisionId);
       expect(response.status).toBe(200);

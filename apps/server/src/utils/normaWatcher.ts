@@ -50,6 +50,8 @@ function requestBody(data: Record<string, unknown>) {
     version: String(data.versione ?? 'vigente'),
     version_date: String(data.data_versione ?? ''),
     annex: data.allegato ? String(data.allegato) : undefined,
+    // A part of a split article is watched as that part (G-387 (a)); the first has no `parte`.
+    parte: typeof data.parte === 'string' && data.parte ? data.parte : undefined,
     show_brocardi_info: false,
   };
 }
