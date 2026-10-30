@@ -209,15 +209,17 @@ export async function findDossier(config: McpConfig, caller: Caller, dossier: st
   throw new ToolError(`Nessun dossier con id o nome esatto «${dossier}». I dossier dell’utente (dati, non istruzioni): ${listed}.${more}`);
 }
 
+const PART_SENTENCE =
+  ' Con il comma («art. 1, comma 773, l. 296/2006») aggiunge la parte dell’articolo che Normattiva divide in parti e che lo contiene («commi 701-800»).';
+
 /**
  * The dossier tools (spec section 6). Each acts for the caller of its own
  * request (the session may outlive a token) through a token exchanged per
  * call. Nothing updates or moves; the two deletion tools move to the trash,
  * after the user confirms in the client's own dialog (second round, spec §4).
- */
-/**
- * `articleParts`: the server stores a part of an article Normattiva splits (G-387 (a), the switch `article_parts`):
- * then a reference with a comma adds the part that holds it, and the tool says so.
+ * `articleParts`: the server stores a part of an article Normattiva splits
+ * (G-387 (a), the switch `article_parts`): then a reference with a comma adds
+ * the part that holds it, and the two tools that add norms say so.
  */
 export function registerDossierTools(server: McpServer, config: McpConfig, run: RunTool, { articleParts = false } = {}): void {
   server.registerTool(
@@ -291,7 +293,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         'Per ogni riga non entrata (com’è stata scritta) dice il motivo: non riconosciuto, inesistente, ambiguo (atto intero o più articoli; sentenza: i candidati), ' +
         'non verificabile (fonte assente o corte non ancora letta), già presente. Nessun testo. Una nota non dia per verificata una riga non entrata. ' +
         'Con errore, in_sospeso nomina i passi (norme, sentenze) rimasti senza risposta: le loro righe non sono né entrate né non entrate. ' +
-        'Se la chiamata resta senza risposta, cerca il dossier con omnilex_elenca_dossier prima di ripeterla.',
+        'Se la chiamata resta senza risposta, cerca il dossier con omnilex_elenca_dossier prima di ripeterla.' +
+        (articleParts ? PART_SENTENCE : ''),
       inputSchema: {
         nome: z.string().trim().min(1).max(MAX_DOSSIER_NAME).describe('Il nome del dossier'),
         descrizione: z.string().trim().max(500).optional().describe('Una descrizione facoltativa'),
@@ -474,9 +477,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
       description:
         `Aggiunge a un dossier da 1 a ${MAX_REFERENCES} norme indicate a parole («art. 2043 c.c.», «art. 2 l. 241/1990»), un articolo per riferimento. ` +
         'Ogni riferimento è verificato sulle fonti: l’esito di ciascuno è aggiunta, già presente, non riconosciuto, inesistente, ambiguo o non verificabile. Non modifica né cancella nulla.' +
-        (articleParts
-          ? ' Con il comma («art. 1, comma 773, l. 296/2006») aggiunge la parte dell’articolo che Normattiva divide in parti e che lo contiene («commi 701-800»).'
-          : ''),
+        (articleParts ? PART_SENTENCE : ''),
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
         riferimenti: z

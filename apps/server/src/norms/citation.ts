@@ -13,6 +13,7 @@
  * `conventions/sources/golden.json`.
  */
 import { ACT_TYPES, ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
+import { partOf } from './parts';
 
 export interface CitableNorm {
   tipo_atto: string;
@@ -188,7 +189,7 @@ function storedAct(itemType: string, content: unknown): (CitableAct & { numero_a
     data: text('data'),
     allegato: text('allegato'),
     numero_articolo: text('numero_articolo') ?? undefined,
-    parte: text('parte'),
+    parte: partOf(raw.parte) ?? null,
   };
 }
 

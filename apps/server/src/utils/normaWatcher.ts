@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { citeStoredNorm } from '../norms/citation';
+import { partOf } from '../norms/parts';
 
 let running = false;
 
@@ -51,7 +52,7 @@ function requestBody(data: Record<string, unknown>) {
     version_date: String(data.data_versione ?? ''),
     annex: data.allegato ? String(data.allegato) : undefined,
     // A part of a split article is watched as that part (G-387 (a)); the first has no `parte`.
-    parte: typeof data.parte === 'string' && data.parte ? data.parte : undefined,
+    parte: partOf(data.parte),
     show_brocardi_info: false,
   };
 }

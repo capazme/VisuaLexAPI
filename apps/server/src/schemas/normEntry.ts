@@ -9,6 +9,7 @@
  * Normattiva's or EUR-Lex's; unknown keys are dropped.
  */
 import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS } from '../norms/actTypes';
+import { PART_RANGE } from '../norms/parts';
 import { ARTICLE_SUFFIX_ALTERNATION } from '../utils/articleSuffixes';
 
 export interface NormEntry {
@@ -45,8 +46,8 @@ const PATTERNS = {
   // "2", "2-bis", "2043 bis", "270-bis.1", "135-sex-decies", "2409octiesdecies", "8a", "314/2"
   numero_articolo: new RegExp(`^\\d{1,5}(?:[- ]?${ORDINAL}){0,2}(?:[- ]?[a-z])?(?:[./]\\d{1,3})?$`, 'i'),
   allegato: new RegExp(`^${ANNEX_PART}(?:[.-]${ANNEX_PART}){0,2}$`, 'i'),
-  // "701-800": a part's comma range, as the Python API writes it.
-  parte: /^\d{1,5}-\d{1,5}$/,
+  // "701-800": a part's comma range, as the Python API writes it (norms/parts.ts).
+  parte: PART_RANGE,
 };
 const URN = /^urn:nir:[\w.:;~!@=-]{1,400}$/i;
 const SOURCE_HOSTS = new Set(['www.normattiva.it', 'normattiva.it', 'eur-lex.europa.eu']);

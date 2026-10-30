@@ -549,12 +549,12 @@ describe('omnilex_aggiungi_norme_dossier', () => {
       await own.connect(new StreamableHTTPClientTransport(new URL(env.mcpUrl), { requestInit: { headers: { Authorization: 'Bearer good' } } }));
       const { tools } = await own.listTools();
       await own.close();
-      return tools.find((t) => t.name === 'omnilex_aggiungi_norme_dossier')!.description;
+      return ['omnilex_aggiungi_norme_dossier', 'omnilex_crea_dossier'].map((name) => tools.find((t) => t.name === name)!.description).join('\n');
     };
     const before = env.stub.features;
     try {
       env.stub.features = { articleParts: true };
-      expect(await description()).toMatch(/comma 773.*commi 701-800/);
+      expect((await description()).match(/comma 773.*commi 701-800/g)).toHaveLength(2);
       for (const features of [{ articleParts: false }, {}, 'down' as const]) {
         env.stub.features = features;
         expect(await description()).not.toMatch(/comma/);

@@ -172,7 +172,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `decisionProjection`, pinned to the web's code by `tests/assistant/entryText.test.ts` and
   `ruleTwentyThree.test.ts`, which proposes on the web's fixtures and finds the marks in the web's
   renderer; a part of a split article, `parte` in the content, is read as that part and keyed with one more
-  segment, `…--1--c701-800` and `1~c701-800`, as the spec says the web writes it from 3c; the watcher reads a
+  segment, `…--1--c701-800` and `1~c701-800`, as the spec says the web writes it from 3c; a part the article no
+  longer has (Normattiva split it again, G-389 Q3) is a 400 in the API's words, never a 503 to try again; every
+  reader takes `parte` through `norms/parts.ts` `partOf` (the API's shape, «701-800»); the watcher reads a
   watched part as that part; a Forum proposal keeps a `parte` of the form «701-800»; LingoLex anchors and the
   MERL-T graph keep the article, one per article, G-389 Q4); a text the reader shows read-only is refused (400), an article or a decision the source says is
   not there is a 400, a source that cannot answer now is a 503, an entry changed while its text was read a 409.

@@ -1,6 +1,7 @@
 import { postLegalApi, SourceUnavailable } from '../norms/resolveReference';
 import { decisionKeyOf } from '../norms/resolveDecisions';
 import { parseDecisionItemContent } from '../schemas/decisionItem';
+import { partOf } from '../norms/parts';
 import { wireNormaKey } from '../services/studyImport';
 
 /**
@@ -23,9 +24,6 @@ export interface StoredNorma {
   parte?: string;
 }
 
-// A part's range as the Python API writes it (`normattiva_parts.part_range`).
-const PART_RANGE = /^\d{1,5}[a-z-]{0,12}-\d{1,5}[a-z-]{0,12}$/;
-
 /** The norm inside an entry's content: the star's envelope dropped, a Forum entry's `articleRef` read (web `dossierItemFromApi`). */
 export function normaOfContent(content: unknown): StoredNorma | null {
   if (!content || typeof content !== 'object' || Array.isArray(content)) return null;
@@ -43,7 +41,7 @@ export function normaOfContent(content: unknown): StoredNorma | null {
     versione: text('versione'),
     data_versione: text('data_versione'),
     allegato: text('allegato'),
-    ...(text('parte') && PART_RANGE.test(text('parte')!) ? { parte: text('parte') } : {}),
+    ...(partOf(norma.parte) ? { parte: partOf(norma.parte) } : {}),
   };
 }
 
@@ -202,8 +200,7 @@ const isArticlePart = (value: unknown): value is ArticlePart => {
  */
 export function partialNoticeOf(answer: { parti?: unknown; testo_parziale?: unknown; norma_data?: unknown }): string | undefined {
   if (answer.testo_parziale !== true) return undefined;
-  const asked = (answer.norma_data as { parte?: unknown } | undefined)?.parte;
-  const parte = typeof asked === 'string' && PART_RANGE.test(asked) ? asked : undefined;
+  const parte = partOf((answer.norma_data as { parte?: unknown } | undefined)?.parte);
   const parts = Array.isArray(answer.parti) ? answer.parti.filter(isArticlePart) : [];
   if (parts.length === 0) {
     return parte
@@ -241,6 +238,8 @@ export class SourceHasNoText extends Error {}
 // What the Python API's scrapers write for a document or an article that is not there (DocumentNotFoundError,
 // a permanent error): «Document not found …», «Article 999 not found in EUR-Lex …».
 const PERMANENT = /\bnot found\b|does not exist|non esiste|non trovat/i;
+// What the API answers for a part it no longer lists, or for an article no longer split (G-387 (a)).
+const PART_GONE = /non ha la parte commi|non è diviso in parti|va chiesto senza parte/;
 
 /** A budget of 60 seconds for the fetch (§8.5): a cold decision can take minutes at its source. */
 export const TEXT_BUDGET_MS = 60_000;
@@ -268,6 +267,12 @@ async function readNorm(content: unknown, signal: AbortSignal): Promise<EntryTex
     | undefined;
   // The request refused as invalid, or a document the source says is not there: asking again will not help.
   if (status === 400 || (first && typeof first.error === 'string' && PERMANENT.test(first.error))) throw new SourceHasNoText();
+  // A part the article no longer has (Normattiva split it again, G-389 Q3), in the API's words, which name today's
+  // parts: refused for good, never «try again».
+  if (norma.parte && (status === 404 || (first && typeof first.error === 'string' && PART_GONE.test(first.error)))) {
+    const said = (first && typeof first.error === 'string' ? first.error : (data as { error?: unknown } | undefined)?.error);
+    throw new SourceHasNoText(typeof said === 'string' ? said.slice(0, 500) : undefined);
+  }
   if (status !== 200 || !first || first.error || typeof first.article_text !== 'string' || !first.article_text) {
     throw new TextUnavailable(`fetch_article_text ${status}`);
   }

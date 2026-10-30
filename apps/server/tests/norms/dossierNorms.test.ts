@@ -251,6 +251,11 @@ describe('POST /api/dossiers/:id/norms', () => {
       expect(items[1].content).toMatchObject({ numero_articolo: '1', parte: '701-800' });
     });
 
+    it('the same part twice is added once', async () => {
+      const response = await addNorms(alice, dossierId, ['art. 1, comma 773, l. 296/2006', 'art. 1, comma 773, l. 296/2006']);
+      expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'already_present']);
+    });
+
     it('a comma of the first part is the article, already there', async () => {
       await addNorms(alice, dossierId, ['art. 1 l. 296/2006']);
       const response = await addNorms(alice, dossierId, ['art. 1, comma 42, l. 296/2006']);
@@ -261,6 +266,11 @@ describe('POST /api/dossiers/:id/norms', () => {
       const response = await addNorms(alice, dossierId, ['art. 1, comma 1400, l. 296/2006']);
       expect(response.body.results[0]).toMatchObject({ outcome: 'does_not_exist', detail: expect.stringContaining('Il comma 1400') });
     });
+  });
+
+  it('with the switch off, a 404 of the API is a reference that does not exist, in its words', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 99999 c.c.']);
+    expect(response.body.results[0]).toMatchObject({ outcome: 'does_not_exist', detail: expect.stringContaining('non presente') });
   });
 
   it('never moves an article to another part of its act when the annex named has none', async () => {

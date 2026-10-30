@@ -158,6 +158,19 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
       expect(response.body.parte).toBe(1); // the route's own page
     });
 
+    it('refuses for good a part the article no longer has, in the source’s words (G-389 Q3)', async () => {
+      const stored = { ...NORM, parte: '101-200' };
+      const partId = (await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({ itemType: 'norm', title: 'Art. 1453', content: stored })).body.id;
+      const gone = "L'art. 1453 di codice civile non ha la parte commi 101-200: oggi è diviso in commi 1-150 e 151-264";
+      nock.cleanAll();
+      nock(API).post('/fetch_article_text').reply(200, [{ error: gone, norma_data: stored }]);
+      const read = await text(partId);
+      expect(read.status).toBe(400);
+      expect(read.body.detail).toBe(gone);
+      nock(API).post('/fetch_article_text').reply(404, { error: "L'art. 1453 di codice civile non è diviso in parti" });
+      expect((await text(partId)).status).toBe(400);
+    });
+
     it('gives a decision’s blocks under their names', async () => {
       const response = await text(decisionId);
       expect(response.status).toBe(200);
