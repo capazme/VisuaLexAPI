@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from datetime import date as _date
 from typing import Optional
 
-from .act_resolver import resolve_atto
+from .act_resolver import ambiguous_act, resolve_atto
+from .article_clause import ARTICLE_CLAUSE_SOURCE
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import ANNEX_SIGLE, NORMATTIVA_SEARCH, NORMATTIVA_URN_CODICI, code_row_of_annex
 from .sources import SIGLA_BY_ANNEX
@@ -43,12 +44,12 @@ _ART_NUM_RE = re.compile(
     r"(" + _ART_ITEM + r")(?:" + _ART_SEPARATOR_RE.pattern + r"(" + _ART_ITEM + r"))*",
     re.IGNORECASE,
 )
-# "comma 1", "co. 3", "comma 1, lett. b)": qualifies the article, is not the
-# act number, and hides the act name from the resolver if left in place.
-_COMMA_CLAUSE_RE = re.compile(
-    r"\s*,?\s*(?:comma|co\.|c\.)\s*\d+(?:\s*,?\s*(?:lett\.?|lettera)\s*[a-z]\b\)?)?",
-    re.IGNORECASE,
-)
+# "comma 1", "secondo comma", "par. 1", "n. 3", "lett. b)": qualifies the article, is
+# not the act number, and hides the act name from the resolver if left in place. The
+# linker's clause too (article_clause.py): «art. 4, n. 7, GDPR» read «n. 7» as the
+# GDPR's number, «art. 82, par. 1, GDPR» and «art. 360, primo comma, n. 3, c.p.c.» as
+# nothing.
+_COMMA_CLAUSE_RE = re.compile(ARTICLE_CLAUSE_SOURCE, re.IGNORECASE)
 
 # Act number patterns: "241/90", "241/1990", "n. 241", "241 del 1990"
 _ACT_NUM_DATE_PATTERNS = [
@@ -231,6 +232,10 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
         text, year_date = _extract_year(text)
         if year_date:
             result.date = year_date
+
+    # A spelling that names two acts («T.U.E.») is refused, never read as one of them.
+    if ambiguous_act(text):
+        return None
 
     # 5. Identify act type from remaining text: an annex's own sigla first («disp. att. c.p.a.»
     #    is the c.p.a.'s decree at annex 3, never the «c.p.a.» inside it)

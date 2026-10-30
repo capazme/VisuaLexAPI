@@ -9,7 +9,8 @@ import { createLimiter, getClientIp, sendTooManyRequests } from './rateLimiter';
  * costs 1. The export starts a Chromium; the stream and the whole-act fetch carry many
  * articles in one request; the detailed health page reaches the three sources for real;
  * a decision lookup can query both Cassazione archives or download a Corte
- * costituzionale bundle.
+ * costituzionale bundle; a batch of norm readings reads up to 200 strings, for which one
+ * reading costs 1 (design 2026-10-29-document-analysis §4.4).
  */
 export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/export_pdf': 20,
@@ -17,6 +18,7 @@ export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/fetch_all_data': 5,
   '/health/detailed': 5,
   '/fetch_decision': 2,
+  '/parse_query_batch': 3,
 };
 
 /**
