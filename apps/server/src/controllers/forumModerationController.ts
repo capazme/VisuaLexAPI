@@ -144,6 +144,8 @@ export const resolveReports = async (req: Request, res: Response) => {
     const { count } = kind === 'thread'
       ? await tx.articleThreadReport.updateMany({ where: pendingWhere, data: closing })
       : await tx.articleCommentReport.updateMany({ where: pendingWhere, data: closing });
+    // Another moderator closed them meanwhile: nothing of this decision stays.
+    if (count === 0) throw new AppError(404, 'Nessuna segnalazione aperta su questo contributo');
     await logModeration(tx, body.action === 'hide'
       ? { actorId, action: 'hide', targetKind: kind, targetId: itemId, reason: body.reason }
       : { actorId, action: 'dismiss', targetKind: 'report', targetId: `${kind}:${itemId}`, reason: body.reason });
@@ -152,7 +154,10 @@ export const resolveReports = async (req: Request, res: Response) => {
   res.json(outcome);
 };
 
-/** Hides a glossa or a reply under a category and tells its author; false when the item is gone. */
+/**
+ * Hides a glossa or a reply under a category and tells its author; false when the item is gone. One
+ * already hidden stays as it is: its category and its author's notice are those of the first hiding.
+ */
 async function hideItem(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   kind: 'thread' | 'comment',
@@ -162,12 +167,14 @@ async function hideItem(
 ): Promise<boolean> {
   if (kind === 'thread') {
     if (!(await lockThread(tx, itemId))) return false;
+    if ((await tx.articleThread.findUniqueOrThrow({ where: { id: itemId } })).isHidden) return true;
     const thread = await tx.articleThread.update({ where: { id: itemId }, data: { isHidden: true, hiddenReason: category } });
     await notify(tx, { to: thread.userId, by: actorId, kind: 'hidden', threadId: thread.id });
     return true;
   }
   const found = await tx.articleComment.findUnique({ where: { id: itemId }, select: { threadId: true } });
   if (!found || !(await lockThread(tx, found.threadId)) || !(await lockComment(tx, itemId))) return false;
+  if ((await tx.articleComment.findUniqueOrThrow({ where: { id: itemId } })).isHidden) return true;
   const comment = await tx.articleComment.update({ where: { id: itemId }, data: { isHidden: true, hiddenReason: category } });
   await notify(tx, { to: comment.userId, by: actorId, kind: 'hidden', threadId: comment.threadId, commentId: comment.id });
   return true;

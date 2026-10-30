@@ -421,7 +421,8 @@ export const acceptReply = async (req: Request, res: Response) => {
   const data = parseItalian(acceptSchema, req.body);
   const userId = req.user!.id;
   await maybeSweepCommunity();
-  const acceptedCommentId = await prisma.$transaction(async (tx) => {
+  // Under the edits' daily counter: accepting and withdrawing is the author's change to their glossa.
+  const acceptedCommentId = await withDailyLimit('edit', userId, () => prisma.$transaction(async (tx) => {
     if (!(await lockThread(tx, req.params.threadId))) throw new AppError(404, 'Glossa non trovata');
     const thread = await tx.articleThread.findUniqueOrThrow({ where: { id: req.params.threadId } });
     if (!isVisible(thread)) throw new AppError(404, 'Glossa non trovata');
@@ -433,11 +434,13 @@ export const acceptReply = async (req: Request, res: Response) => {
       if (isOwn(reply.userId, userId)) throw new AppError(400, 'Non puoi accettare una tua risposta');
     }
     await tx.articleThread.update({ where: { id: thread.id }, data: { acceptedCommentId: data.commentId } });
-    if (reply && reply.id !== thread.acceptedCommentId) {
+    // A reply's author is told once that it was accepted, however often the mark comes and goes.
+    if (reply && reply.id !== thread.acceptedCommentId
+      && !(await tx.forumNotification.count({ where: { kind: 'accepted', commentId: reply.id } }))) {
       await notify(tx, { to: reply.userId, by: userId, kind: 'accepted', threadId: thread.id, commentId: reply.id });
     }
     return data.commentId;
-  });
+  }));
   res.json({ acceptedCommentId });
 };
 

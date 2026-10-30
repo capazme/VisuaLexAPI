@@ -208,6 +208,8 @@ describe('the Community', () => {
       expect((await accept(alice, second)).body).toEqual({ acceptedCommentId: second });
       expect((await page(bob, threadId)).body.replies[0]).toMatchObject({ id: second, accepted: true });
       expect((await accept(alice, null)).body).toEqual({ acceptedCommentId: null });
+      // Accepted again: its author was told already.
+      expect((await accept(alice, first)).status).toBe(200);
       expect((await notificationsOf(bob)).filter((n) => n.kind === 'accepted')).toHaveLength(1);
       expect((await notificationsOf(carla)).filter((n) => n.kind === 'accepted')).toHaveLength(1);
     });
@@ -322,6 +324,29 @@ describe('the Community', () => {
       expect((await resolve('dismiss')).body).toEqual({ closed: 1, status: 'dismissed' });
     });
 
+    it('neither tells the author twice nor changes the category of what is hidden already', async () => {
+      const threadId = await glossa(alice);
+      await request(app).post(`/api/article-discussions/${threadId}/report`).set(as(bob)).send({ reason: 'spam' });
+      await request(app).patch(`/api/moderation/threads/${threadId}`).set(as(mod)).send({ hidden: true, category: 'spam', reason: 'Pubblicità' });
+      const resolved = await request(app).post(`/api/moderation/reports/thread/${threadId}/resolve`).set(as(admin))
+        .send({ action: 'hide', category: 'offensivo', reason: 'Chiudo le segnalazioni' });
+      expect(resolved.body).toEqual({ closed: 1, status: 'resolved' });
+      expect((await prisma.articleThread.findUniqueOrThrow({ where: { id: threadId } })).hiddenReason).toBe('spam');
+      expect((await notificationsOf(alice)).filter((n) => n.kind === 'hidden')).toHaveLength(1);
+    });
+
+    it('takes no comment under an emptied reply, and does not tell an author who emptied their glossa', async () => {
+      const threadId = await glossa(alice);
+      const replyId = await answer(bob, threadId, 'Risposta');
+      await answer(carla, threadId, 'Commento', replyId);
+      await request(app).delete(`/api/article-discussion-comments/${replyId}`).set(as(bob));
+      expect((await request(app).post(`/api/article-discussions/${threadId}/comments`).set(as(carla)).send({ body: 'Ancora', parentId: replyId })).status).toBe(404);
+      await request(app).delete(`/api/article-discussions/${threadId}`).set(as(alice));
+      await prisma.forumNotification.deleteMany();
+      await answer(carla, threadId, 'Nuova risposta');
+      expect(await notificationsOf(alice)).toEqual([]);
+    });
+
     it('needs a category to hide and a reason for every act', async () => {
       const threadId = await glossa(alice);
       const url = `/api/moderation/threads/${threadId}`;
@@ -413,24 +438,34 @@ describe('the Community', () => {
   });
 
   describe('the daily limits', () => {
-    const saved = process.env.FORUM_DAILY_GLOSSE;
+    const saved = { glosse: process.env.FORUM_DAILY_GLOSSE, replies: process.env.FORUM_DAILY_REPLIES };
     afterEach(() => {
-      if (saved === undefined) delete process.env.FORUM_DAILY_GLOSSE;
-      else process.env.FORUM_DAILY_GLOSSE = saved;
+      for (const [name, value] of [['FORUM_DAILY_GLOSSE', saved.glosse], ['FORUM_DAILY_REPLIES', saved.replies]] as const) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
     });
 
-    it('refuses the write past the count with an Italian 429, and a refused write costs nothing', async () => {
+    it('refuses the write past the count with an Italian 429, each person on their own count', async () => {
       process.env.FORUM_DAILY_GLOSSE = '2';
-      const threadId = await glossa(alice);
-      // A write refused for its own reason gives its point back.
-      expect((await request(app).post('/api/article-discussions').set(as(alice)).send({ ...ARTICLE, normaKey: 'cassazione:civile:1:2024', articleId: '1', body: 'Testo' })).status).toBe(400);
+      await glossa(alice);
       await glossa(alice);
       const over = await request(app).post('/api/article-discussions').set(as(alice)).send({ ...ARTICLE, title: 'Terza glossa', body: 'Testo' });
       expect(over.status).toBe(429);
       expect(over.body.detail).toBe('Hai pubblicato 2 glosse nelle ultime 24 ore: riprova più tardi.');
-      // Another person's count is their own.
       expect((await request(app).post('/api/article-discussions').set(as(bob)).send({ ...ARTICLE, title: 'Di Bob', body: 'Testo' })).status).toBe(201);
-      expect(threadId).toBeTruthy();
+    });
+
+    it('gives back the point of a write refused inside the count', async () => {
+      process.env.FORUM_DAILY_REPLIES = '2';
+      const locked = await glossa(alice);
+      const open = await glossa(alice);
+      await request(app).patch(`/api/moderation/threads/${locked}`).set(as(mod)).send({ locked: true, reason: 'Chiusa per prova' });
+      // Refused under the counter (the glossa is closed): it costs nothing.
+      expect((await request(app).post(`/api/article-discussions/${locked}/comments`).set(as(bob)).send({ body: 'Tardi' })).status).toBe(409);
+      await answer(bob, open, 'Prima');
+      await answer(bob, open, 'Seconda');
+      expect((await request(app).post(`/api/article-discussions/${open}/comments`).set(as(bob)).send({ body: 'Terza' })).status).toBe(429);
     });
   });
 

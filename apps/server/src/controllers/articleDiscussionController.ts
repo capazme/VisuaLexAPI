@@ -365,7 +365,8 @@ export const createComment = async (req: Request, res: Response) => {
     if (data.parentId) {
       if (!(await lockComment(tx, data.parentId))) throw new AppError(404, 'Risposta padre non trovata');
       const found = await tx.articleComment.findFirst({ where: { id: data.parentId, threadId: thread.id } });
-      if (!found || found.isHidden) throw new AppError(404, 'Risposta padre non trovata');
+      // An emptied reply only keeps a place for the comments already under it (§5.2).
+      if (!found || !isVisible(found)) throw new AppError(404, 'Risposta padre non trovata');
       if (found.parentId !== null) throw new AppError(400, 'Si può commentare una risposta, non un commento');
       if (data.body.length > COMMENT_MAX) throw new AppError(400, `Un commento può avere al massimo ${COMMENT_MAX} caratteri`);
       parent = found;
@@ -377,9 +378,9 @@ export const createComment = async (req: Request, res: Response) => {
     });
     // The feed's «Attive» reads the last activity, which only moves forward.
     await tx.articleThread.updateMany({ where: { id: thread.id, lastActivityAt: { lt: created.createdAt } }, data: { lastActivityAt: created.createdAt } });
-    await notify(tx, parent
-      ? { to: parent.userId, by: userId, kind: 'comment', threadId: thread.id, commentId: created.id }
-      : { to: thread.userId, by: userId, kind: 'reply', threadId: thread.id, commentId: created.id });
+    // An author who emptied their glossa is not told of what comes under it.
+    if (parent) await notify(tx, { to: parent.userId, by: userId, kind: 'comment', threadId: thread.id, commentId: created.id });
+    else if (thread.deletedAt === null) await notify(tx, { to: thread.userId, by: userId, kind: 'reply', threadId: thread.id, commentId: created.id });
     return created;
   }));
   res.status(201).json(commentView(comment, userId));
