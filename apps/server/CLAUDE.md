@@ -470,6 +470,36 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   meet them yet): a free report reason is read as `altro` with its text in `details`; no licence check
   (`licence_text_id` stays null); releasing a quotation needs no reason; voting on one's own content is
   allowed.
+  Pull request 2, the routes (`controllers/communityController.ts`, `forumModerationController.ts`,
+  `forumNotificationController.ts`, `routes/forumCommunity.ts`; helpers in `src/forum/`):
+  `GET /article-discussions/feed` (every listed glossa: `sort=active` by default |recent|popular|unanswered;
+  `kind`, `act`, `normaKey`, `court`, `materia`, `mine`, `participated`, `accepted`; pages of 1–50) and
+  `GET /article-discussions/:threadId` (replies with their comments nested, a stored third level flattened;
+  the accepted reply first, then votes, then the oldest), both carried over from #205 and withholding a
+  decision's quotation (`forum/views.ts` `isPassageWithheld`); `PATCH`/`DELETE` on a glossa and on
+  `/article-discussion-comments/:id` (the author; a deletion is `deleted` when nothing of anyone else's,
+  hidden included, hangs on it, else `emptied`); `POST …/:threadId/accept { commentId | null }`;
+  `POST /article-discussion-comments/:id/report`; replies at **two levels** (400 under a comment, a
+  comment 1–2,000 characters), 409 on a locked glossa. **Every write that adds under a glossa or decides
+  about what hangs on it locks the glossa, then the reply** (`forum/locks.ts`, `SELECT … FOR UPDATE`),
+  in that order. Visible = not hidden, not emptied (`VISIBLE`); a list shows an emptied glossa only while
+  something visible hangs on it (`LISTED_THREAD`), without its author's name. Moderation (moderators =
+  `users.forum_moderator` or admins, read from the database on every call, `forum/roles.ts`):
+  `GET /moderation/reports?status=` (one row per item, its text even hidden, its anchor whole, each
+  report's copy, `deleted` when gone for good; reporters not named), `POST /moderation/reports/:kind/:itemId/resolve
+  { action: hide|dismiss, category?, reason }` (one decision closes every pending report of the item; hiding
+  something gone is a 409), `PATCH /moderation/threads/:id { hidden?, locked?, category?, reason }`,
+  `PATCH /moderation/comments/:id { hidden, category?, reason }`, `POST /moderation/:kind/:itemId/empty
+  { reason }` (admins, anonymous contributions only); each act in `forum_moderation_log`. The admin route
+  `PATCH /admin/article-discussions/:id` no longer hides (400) and logs releases. `PUT /admin/users/:id
+  { forumModerator, reason }` appoints and revokes, with a required reason, logged. Notifications
+  (`forum/notify.ts`, in the event's transaction, never one's own act, never naming who acted):
+  `GET /forum/notifications`, `POST /forum/notifications/read { ids | all }`; the Forum's badge
+  (`/notifications/forum-unread-count`) adds `community` to its total, and `pendingReports` (items, not in
+  the total) for moderators. Daily per-user limits (`forum/limits.ts`, 24 hours from the first write:
+  `FORUM_DAILY_GLOSSE` 10, `FORUM_DAILY_REPLIES` 60, `FORUM_DAILY_REPORTS` 20, `FORUM_DAILY_EDITS` 60;
+  an Italian 429; a refused write gives its point back; fail-open). None of these routes is in
+  `oauth/delegatedRoutes.ts`: a connected application can neither read nor write the Community.
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing

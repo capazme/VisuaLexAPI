@@ -457,7 +457,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
       include: { _count: { select: { comments: { where: { OR: [{ userId: { not: userId } }, { userId: null }] } } } } },
       orderBy: { createdAt: 'asc' },
     }),
-    prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    // Whether a reply was accepted lives on the glossa, someone else's: it travels as a mark, not as that row.
+    prisma.articleComment.findMany({ where: { userId }, include: { acceptedIn: { select: { id: true } } }, orderBy: { createdAt: 'asc' } }),
     // A course's card carries its module and the codes of its competences (Percorsi, A1).
     prisma.lingoCard.findMany({
       where: { autoreId: userId },
@@ -574,7 +575,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own, false) })),
       // The release and lock times are the author's; the admin's and the moderator's ids are other people's identifiers.
       threads: threads.map(({ passageReleasedById: _releasedBy, lockedById: _lockedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
-      comments,
+      comments: comments.map(({ acceptedIn, ...comment }) => ({ ...comment, accepted: acceptedIn.length > 0 })),
       threadVotes, commentVotes, threadReports, commentReports, forumNotifications,
       lingoCards: lingoCards.map(({ competenze, ...card }) => ({ ...card, competenze: competenze.map((c) => c.competenza.codice) })),
       lingoValidazioni,
