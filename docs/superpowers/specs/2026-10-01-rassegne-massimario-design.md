@@ -288,10 +288,11 @@ corpus: 63 batches; the vectors' time is measured on the pilot.
   id (no semantic search) and groups them. One request per article view, after the text has
   rendered, cached per session by URN (P5). The call records no reading event. The reader does
   not depend on MERL-T: a server without it (404 `merlt_disabled`) shows no panel; when MERL-T
-  cannot answer (503, a network error) the panel is a closed row with no count, and only whoever
-  opens it reads *Le rassegne non sono disponibili al momento.*, in the muted text colour, the
-  same line a year or an archive that fails to load shows. Errors are logged, bar
-  `merlt_disabled`, which is a configuration.
+  cannot answer (503, a network error) the panel's row stays, with nothing to open, and says
+  *Non disponibili al momento* in the muted text colour where the count would be — seen only by
+  whoever opened «Giurisprudenza», and no error anywhere else in the reader. A year or an archive
+  that fails to load inside the open panel says *Le rassegne non sono disponibili al momento.*,
+  in the same colour. Errors are logged, bar `merlt_disabled`, which is a configuration.
 
 ## 8. Dependencies and coordination
 

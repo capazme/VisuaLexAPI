@@ -948,8 +948,9 @@ though that doc's header still says DRAFT.
   included, is `503 merlt_unavailable`. The web panel
   (`features/merlt/rassegne`) sits in the `article_case_law` slot, inside the
   article's «Giurisprudenza», and does not make the reader depend on MERL-T:
-  no panel on `404 merlt_disabled`; on a 503 or a network error a closed row
-  with no count, which says the reviews are unavailable only once opened.
+  no panel on `404 merlt_disabled`; on a 503 or a network error the panel's
+  row alone, saying quietly «Non disponibili al momento» where the count would
+  be.
 
 **Graph co-evolution.** The design is
 `docs/superpowers/specs/2026-07-16-merlt-graph-coevolution-design.md`; see

@@ -164,19 +164,15 @@ describe('RassegnePanel', () => {
   it.each([
     ['MERL-T is unavailable', { status: 503, message: 'merlt_unavailable', data: { detail: 'merlt_unavailable' } }],
     ['the network fails', { status: undefined, message: 'Network Error', data: undefined }],
-  ])('when %s, stays a closed row with no count, and says so only once opened', async (_, failure) => {
+  ])('when %s, the panel\u2019s row says so quietly, with nothing to open', async (_, failure) => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     fetchRassegne.mockRejectedValue(failure);
-    renderPanel();
-    const row = await screen.findByRole('button', { name: 'Nelle rassegne della Cassazione' });
-    expect(row).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(/non sono disponibili/)).not.toBeInTheDocument();
+    const { container } = renderPanel();
+    expect(await screen.findByText('Non disponibili al momento')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nelle rassegne della Cassazione' })).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByText(/passi/)).not.toBeInTheDocument();
-    fireEvent.click(row);
-    expect(row).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('Le rassegne non sono disponibili al momento.')).toBeInTheDocument();
-    fireEvent.click(row);
-    expect(screen.queryByText(/non sono disponibili/)).not.toBeInTheDocument();
+    expect(container.querySelector('[class*="amber"]')).toBeNull();
     expect(error).toHaveBeenCalled();
     error.mockRestore();
   });
