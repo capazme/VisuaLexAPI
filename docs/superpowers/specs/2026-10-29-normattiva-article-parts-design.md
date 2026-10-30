@@ -1,7 +1,7 @@
 # Articles split into parts, each its own entry (G-387 (a))
 
 Status: agreed. The owner answered Q1–Q4 as recommended (G-389, 30 October 2026); the Python API, the server and
-the MCP go ahead, the web (index, tabs, labels) waits for Luca's ok.
+the MCP go ahead, the web (index, tabs, labels) waits for the other owner's ok.
 Decision G-387: «(a): each part becomes its own entry («art. 1 (commi 701-800)») with its own text and
 highlights; a request for a comma gets the part that holds it; part 1 stays as it is.» Shape agreed with the
 mcp-legal-it side (3.0.x): `ParteArticolo(progressivo, commi_dal, commi_al, url)`.
@@ -83,7 +83,7 @@ mcp-legal-it side (3.0.x): `ParteArticolo(progressivo, commi_dal, commi_al, url)
   `{numero: "1", parte: null, commi: "1-100", label: "1 (commi 1-100)", …}` and each following `{numero: "1",
   parte: "101-200", commi: "101-200", label: "1 (commi 101-200)"}`. The annex metadata's `article_numbers` lists `1` once. The earlier versions' entries
   («agg.149 (commi …)») are already skipped.
-- The web (Irnerio, with Luca's ok) shows them as entries under the article and opens one with `parte`.
+- The web (with the other owner's ok) shows them as entries under the article and opens one with `parte`.
   `/fetch_rubriche` is unchanged (the AKN index has the article whole).
 
 ## 6. The existence check (gotcha 24)
@@ -118,7 +118,7 @@ mcp-legal-it side (3.0.x): `ParteArticolo(progressivo, commi_dal, commi_al, url)
 1. **3a, API**: identity (`parte`, `comma`), reading a part (§4), tree (§5), existence (§6), golden cases, `nl_parser`
    keeping `comma`. Rule-23 compare.
 2. **3b, server and MCP**: key copies, references with a comma, the text route on a part.
-3. **3c, web** (Irnerio, Luca's ok): entries, tabs, dossier, index, on 3a/3b's contract.
+3. **3c, web** (the other owner's ok): entries, tabs, dossier, index, on 3a/3b's contract.
 4. MERL-T's client fields go with 3b.
 
 ## Questions

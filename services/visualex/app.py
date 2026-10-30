@@ -767,10 +767,10 @@ class NormaController:
         The ranges come from the act's tree, which the existence check has just read (cached,
         no request). The first part has no `parte` (Q1): asked by its range or by one of its
         commas, it is the article as before, with the same keys. A comma of an article that is
-        not split is in it: the article. A comma past the last range, or a range the tree does
-        not list, is a 404 in words; a range of an article the tree does not show split is left
-        to the reader, which reads the article page itself (a tree that cannot be read is never
-        «does not exist»). EUR-Lex articles have no parts: a comma is in the article, a part is
+        not split is in it: the article. A comma past the last range, a range the tree does not
+        list, or a range of an article the tree lists whole, is a 404 in words; with a tree that
+        cannot be read the range is left to the reader, which reads the article page itself (a
+        tree that cannot be read is never «does not exist»). EUR-Lex articles have no parts: a comma is in the article, a part is
         refused.
         """
         if self.get_scraper_for_norma(nv) is not normattiva_scraper:
@@ -788,6 +788,8 @@ class NormaController:
                 raise ResourceNotFoundError(f"Il comma {comma} non è nell'{article} (commi {first}-{last})")
             nv.parte = None if held == ranges[0] else held
             return
+        if ranges == []:
+            raise ResourceNotFoundError(f"L'{article} non è diviso in parti")
         if ranges and part == ranges[0]:
             return
         if ranges and part not in ranges:
@@ -1006,18 +1008,19 @@ class NormaController:
         except Exception as exc:  # noqa: BLE001 - the page already read still stands
             log.warning("Text in force today could not be read", error=str(exc))
             return None
-        return text_today, url_today, await self._validity_of_page(scraper, nv, url_today)
+        return text_today, url_today, await self._validity_of_page(scraper, nv, url_today, in_force)
 
-    async def _validity_of_page(self, scraper, nv, url):
+    async def _validity_of_page(self, scraper, nv, url, page_nv=None):
         """`_validity_for`, reading the page once more when it has left the cache.
 
         The text comes from the scraper's memory (a day from when it was filled) and the
         page from the persistent cache (a day from when it was written): after a restart
         the page can expire first, and without it a later version would go out
-        unrecognised, and today's text without its window."""
+        unrecognised, and today's text without its window. `page_nv` is the request that page
+        answered, when it is not `nv` (today's text): a part's page is read again for it."""
         validity = await self._validity_for(scraper, nv, url)
         if (validity is None and isinstance(scraper, NormattivaScraper)
-                and await self._page_left_the_cache(scraper, url, nv)):
+                and await self._page_left_the_cache(scraper, url, page_nv or nv)):
             validity = await self._validity_for(scraper, nv, url)
         return validity
 
@@ -1107,7 +1110,11 @@ class NormaController:
                 notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo, tree_raw)
         except Exception as exc:  # noqa: BLE001 - best effort: the text already read stands
             log.warning("Page extras could not be read", error=str(exc), url=str(url)[:100])
-        return {**update_notes_fields(notes), **parts_fields(parts)}
+        fields = {**update_notes_fields(notes), **parts_fields(parts)}
+        if getattr(nv, 'parte', None):
+            # A part is one part, also when the article page that lists them has left the cache.
+            fields['testo_parziale'] = True
+        return fields
 
     @staticmethod
     async def _validity_for(scraper, nv, url):

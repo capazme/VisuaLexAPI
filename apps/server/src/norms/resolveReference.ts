@@ -136,7 +136,10 @@ async function identify(reference: string): Promise<Resolution> {
     return { outcome: 'ambiguous', display, detail: 'Il riferimento indica più articoli: scrivine uno per riferimento.' };
   }
 
-  const fetched = await postLegalApi('/fetch_norma_data', params);
+  // The API reads a single article's comma (or a part's label) and answers the part of a split article that holds
+  // it (G-387 (a)). The web does not open a part yet: until it does, a reference is stored as the article, as before.
+  const { comma: _comma, parte: _parte, ...article } = params;
+  const fetched = await postLegalApi('/fetch_norma_data', article);
   if (NOT_PRESENT.test(String(fetched.data.error ?? ''))) {
     return { outcome: 'does_not_exist', display, detail: String(fetched.data.error) };
   }

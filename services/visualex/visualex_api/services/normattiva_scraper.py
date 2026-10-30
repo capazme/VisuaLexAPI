@@ -123,11 +123,16 @@ class NormattivaScraper(BaseScraper):
         if page:
             log.info("Cache hit", source="normattiva_persistent", parte=nv.parte)
             return await self._part_text(page, nv), key
-        page = await self.read_part_page(nv)
-        return await self._part_text(page, nv), key
+        _, text = await self._read_part(nv)
+        return text, key
 
     async def read_part_page(self, nv: NormaVisitata) -> str:
-        """A part's page, read from Normattiva and stored under its key.
+        """A part's page, read from Normattiva and stored under its key (`_read_part`)."""
+        page, _ = await self._read_part(nv)
+        return page
+
+    async def _read_part(self, nv: NormaVisitata) -> Tuple[str, str]:
+        """`(page, text)` of a part, read from Normattiva; the page stored under its key.
 
         The page (`/atto/caricaArticolo?…&art.progressivo=k`) opens only with the cookies of
         the article's page (without them Normattiva answers 500), so both are read in a
@@ -146,21 +151,24 @@ class NormattivaScraper(BaseScraper):
             parts = await asyncio.to_thread(extract_parts, article_page or "", article=nv.numero_articolo)
             part = self._listed_part(nv, parts)
             page = (await http_client.request("GET", part["url"], source="normattiva", session=session)).text
-        await self._part_text(page, nv)
+        text = await self._part_text(page, nv)
         await self.cache.set(part_cache_key(nv.urn, nv.parte), page)
         log.info("Read a part of a split article", norma=str(nv), progressivo=part["progressivo"])
-        return page
+        return page, text
 
     @staticmethod
     def _listed_part(nv: NormaVisitata, parts) -> Dict[str, Any]:
         """The part `nv` names among those the article page lists, or the error in words: a
         part saved before Normattiva split the article again is refused with today's parts,
-        never answered with another range (G-389, Q3)."""
+        never answered with another range (G-389, Q3). The first part is the article itself
+        (Q1): asked as a part, it is refused, never kept under a second key."""
         article = f"L'art. {nv.numero_articolo} di {nv.norma}"
         if parts is None:
             raise IndexUnavailableError(f"Non riesco a leggere le parti dell'art. {nv.numero_articolo} di {nv.norma} su Normattiva")
         if not parts:
             raise ResourceNotFoundError(f"{article} non è diviso in parti")
+        if part_range(parts[0]) == nv.parte:
+            raise ResourceNotFoundError(f"I commi {nv.parte} sono l'art. {nv.numero_articolo} di {nv.norma} stesso: va chiesto senza parte")
         for part in parts:
             if part_range(part) == nv.parte:
                 return part

@@ -108,18 +108,19 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     the article plus its comma range, `NormaVisitata.parte` ("701-800"), written in `norma_data` only for a part.
     The first part has no `parte`: what the URN serves, with the request, keys and text of before (rule 23). A
     request names a part by `parte` or by a `comma` it holds (`_part_request`, `_name_the_part`: the ranges from the
-    act's tree the existence check has just read; a comma of part 1 or of a whole article is the article; a comma
-    past the last range, or a range the tree does not list, is a 404 in words; an unreadable tree is never «does
-    not exist»; EUR-Lex articles have no parts). `NormattivaScraper.get_document` reads a part with `_get_part`:
+    act's tree the existence check has just read; a comma of part 1 or of a whole article is the article, and so
+    is part 1's range; a comma past the last range, a range the tree does not list or a range of an article it
+    lists whole is a 404 in words; an unreadable tree is never «does not exist»; EUR-Lex articles have no parts). `NormattivaScraper.get_document` reads a part with `_get_part`:
     the page kept under its key, else `read_part_page`, which reads the article page (the request's URN, its date)
     and then the part's `caricaArticolo` page in one aiohttp session with its own cookie jar (Normattiva answers
     500 without the article page's cookies; the shared session's single jar would mix two parts read at once), the
     address from the article page's tree, the shared client's rate limit and retries. A range the page no longer
-    lists is refused with today's parts (Q3), never another range served. The text is the same extractor's on the
+    lists is refused with today's parts (Q3), never another range served; part 1 asked as a part (a tree the request
+    could not read) is refused, never kept under a second key. The text is the same extractor's on the
     part's page, checked to open on the part's first comma; never the AKN export (the whole article). The answer's
     `url` is the key, «<URN>#commi701-800» (on Normattiva it opens the article); `validity` and the notes are read
     from the part's page (it states its window but not the act's `act_updated`), `parti` from the article page;
-    `testo_parziale` is true. After a restart a part's page is read again in its session, never requested by its
+    `testo_parziale` is true (also when the article page has left the cache and `parti` is null). After a restart a part's page is read again in its session, never requested by its
     key (`_page_left_the_cache`)
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
     portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it

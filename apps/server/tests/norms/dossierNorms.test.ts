@@ -46,6 +46,9 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   // What /parse_query reads since 9 October 2026 (PR #113): the annex too.
   'art. 29 d.lgs. 104/2010 (All. 2)': { parsed: { act_type: 'decreto legislativo', act_number: '104', date: '2010', article: '29', annex: '2' }, recognized: true },
   'art. 29 d.lgs. 104/2010 (All. 1)': { parsed: { act_type: 'decreto legislativo', act_number: '104', date: '2010', article: '29', annex: '1' }, recognized: true },
+  // What /parse_query reads since G-387 (a): a single article's comma, a part's label.
+  'art. 2043, comma 1 c.c.': { parsed: { act_type: 'codice civile', article: '2043', comma: '1' }, recognized: true },
+  'art. 2059 (commi 1-2) c.c.': { parsed: { act_type: 'codice civile', article: '2059', parte: '1-2' }, recognized: true },
 };
 
 // D.lgs. 104/2010: the codice del processo amministrativo is its annex, which Normattiva
@@ -210,6 +213,17 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(item.content).toMatchObject({ allegato: '2', urn: `${DLGS_104}:2~art29` });
     // Existence on the act's tree, annex by annex: the fingerprints cover one part only.
     expect(calls['/fetch_tree']).toBe(1);
+  });
+
+  it('stores the article, never a part of it, while the web cannot open one (G-387 (a))', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 2043, comma 1 c.c.', 'art. 2059 (commi 1-2) c.c.']);
+    expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'added']);
+    for (const body of normaDataBodies) {
+      expect(body).not.toHaveProperty('comma');
+      expect(body).not.toHaveProperty('parte');
+    }
+    const items = await prisma.dossierItem.findMany({ where: { dossierId } });
+    expect(items.map((item) => item.content)).not.toContainEqual(expect.objectContaining({ parte: expect.anything() }));
   });
 
   it('never moves an article to another part of its act when the annex named has none', async () => {

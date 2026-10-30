@@ -148,6 +148,10 @@ class TestTheRequest:
         with pytest.raises(ResourceNotFoundError, match=r"non ha la parte commi 701-799: è diviso in commi 1-100, "):
             await _asked({"parte": "701-799"})
 
+    async def test_a_range_of_an_article_listed_whole(self):
+        with pytest.raises(ResourceNotFoundError, match=r"L'art\. 1 di .* non è diviso in parti"):
+            await _asked({"parte": "1-2"}, tree=WHOLE_ART_1_PARSED)
+
     async def test_a_comma_of_a_whole_article_is_in_it(self):
         [nv] = await _asked({"comma": "2"}, tree=WHOLE_ART_1_PARSED)
         assert nv.parte is None
@@ -261,6 +265,28 @@ class TestReadingAPart:
         with pytest.raises(ResourceNotFoundError, match=r"non ha la parte commi 701-750: oggi è diviso in commi 1-100, .* e 1301-1364"):
             await _read(l296("701-750"), FakeNormattiva())
 
+    async def test_the_first_part_is_never_read_as_a_part(self):
+        """Q1: «1-100» is the article itself; asked as a part (a tree the request could not read),
+        it is refused, never kept under a second key."""
+        cache = DictCache()
+        with pytest.raises(ResourceNotFoundError, match="va chiesto senza parte"):
+            await _read(l296("1-100"), FakeNormattiva(), cache)
+        assert not any("#commi" in key for key in cache.entries)
+
+    async def test_a_new_part_is_parsed_once(self):
+        scraper = bare_scraper()
+        calls = []
+        real = NormattivaScraper.estrai_da_html
+
+        async def counted(self, page, *args, **kwargs):
+            calls.append(1)
+            return await real(self, page, *args, **kwargs)
+
+        with patch.object(NormattivaScraper, "estrai_da_html", counted), \
+                patch.object(scraper_module, "http_client", FakeNormattiva()):
+            await NormattivaScraper.get_document.__wrapped__(scraper, l296("701-800"))
+        assert len(calls) == 1
+
     async def test_an_article_no_longer_split(self):
         with pytest.raises(ResourceNotFoundError, match="non è diviso in parti"):
             await _read(l296("701-800"), FakeNormattiva(article_page=WHOLE_ART_1))
@@ -302,6 +328,12 @@ class TestOnTheWire:
         assert result["note_aggiornamento"] == [] and result["note_non_lette"] is False
 
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_a_part_is_partial_when_the_article_page_has_left_the_cache(self, controller, brocardi, endpoint):
+        scraper = self._serving({PART_8_KEY: PART_8})
+        [result] = await ask(controller, endpoint, [l296("701-800")], scraper=scraper)
+        assert result["parti"] is None and result["testo_parziale"] is True
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
     async def test_the_first_part_answers_as_before(self, controller, brocardi, endpoint):
         scraper = self._serving({ARTICLE: L296_TREE})
         [result] = await ask(controller, endpoint, [l296()], scraper=scraper)
@@ -316,6 +348,17 @@ class TestOnTheWire:
         scraper.read_part_page.assert_awaited_once_with(nv)
         scraper.request_document = AsyncMock(side_effect=AssertionError("a part's key is no address"))
         assert await NormaController._page_left_the_cache(scraper, PART_8_KEY, None) is False
+
+    async def test_today_s_part_page_is_read_again_for_today(self):
+        """The page of today's text, gone after a restart, is read again for today's request."""
+        ctrl = NormaController.__new__(NormaController)
+        today_key = PART_8_KEY.replace("#", "!vig=2026-10-30#")
+        scraper = bare_scraper(DictCache())
+        scraper.get_document = AsyncMock(return_value=("PART TEXT", today_key))
+        scraper.read_part_page = AsyncMock(return_value=None)
+        await ctrl._text_today(scraper, l296("701-800"))
+        [asked] = scraper.read_part_page.await_args.args
+        assert asked.parte == "701-800" and asked.versione == "vigente" and asked.data_versione
 
     async def test_the_text_in_force_today_keeps_the_part(self):
         ctrl = NormaController.__new__(NormaController)
@@ -363,3 +406,18 @@ class TestTheConvention:
         norm = {"tipo_atto": "legge", "numero_atto": "296", "data": "2006-12-27", "numero_articolo": "1"}
         assert cite_article({**norm, "parte": "701-800"}) == "art. 1, commi 701-800, l. 27 dicembre 2006, n. 296"
         assert cite_article(norm) == "art. 1, l. 27 dicembre 2006, n. 296"
+
+
+class TestTheFirstPartIsUntouched:
+    """Spec §8: a request with no `parte` is today's code path, byte for byte."""
+
+    async def test_no_part_reads_the_urn_s_page_with_the_same_extractor(self):
+        article_page = page("dlgs23_2015_art3_update_notes_trimmed.html")
+        nv = NormaVisitata(norma=Norma(tipo_atto="decreto legislativo", data="2015-03-04", numero_atto="23"),
+                           numero_articolo="3")
+        scraper = bare_scraper(DictCache({nv.urn: article_page}))
+        with patch.object(NormattivaScraper, "_get_part", AsyncMock(side_effect=AssertionError("a part"))):
+            text, url = await NormattivaScraper.get_document.__wrapped__(scraper, nv)
+        assert url == nv.urn and "#" not in url
+        assert text == await scraper.estrai_da_html(article_page)
+        assert "parte" not in nv.to_dict()
