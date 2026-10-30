@@ -50,6 +50,18 @@ _ART_NUM_RE = re.compile(
 # GDPR's number, «art. 82, par. 1, GDPR» and «art. 360, primo comma, n. 3, c.p.c.» as
 # nothing.
 _COMMA_CLAUSE_RE = re.compile(ARTICLE_CLAUSE_SOURCE, re.IGNORECASE)
+# A single comma inside that clause is kept: the API answers the part of a split
+# article that holds it (G-387 (a)). «comma 773», «co. 4-bis»; never a list («commi 1
+# e 2») nor an ordinal («secondo comma»).
+_SINGLE_COMMA_RE = re.compile(
+    r"\s*+(?:,\s*+)?(?:comma|co\.?|c\.)\s*+(\d{1,5})(?:\s*+-?\s*+(" + ARTICLE_SUFFIX_ALTERNATION + r")\b)?"
+    r"(?!\s*+(?:,|\be\b)\s*+\d)",
+    re.IGNORECASE,
+)
+# A part of a split article as the convention labels it (G-389): «art. 1, commi
+# 701-800, l. …» and «art. 1 (commi 701-800) l. …», read before the clause above,
+# which would stop at «commi 701». _normalize has dropped the brackets by then.
+_PART_CLAUSE_RE = re.compile(r"\s*,?\s*\(?\s*commi\s+(\d{1,5})\s*-\s*(\d{1,5})\s*\)?\s*,?", re.IGNORECASE)
 
 # Act number patterns: "241/90", "241/1990", "n. 241", "241 del 1990"
 _ACT_NUM_DATE_PATTERNS = [
@@ -153,6 +165,9 @@ class ParsedQuery:
     act_number: Optional[str] = None
     article: Optional[str] = None
     annex: Optional[str] = None
+    # One article only: the comma it names, or the part («701-800») its label names.
+    comma: Optional[str] = None
+    part: Optional[str] = None
 
     def to_api_params(self) -> dict:
         """Convert to API request parameters, omitting None values."""
@@ -167,6 +182,10 @@ class ParsedQuery:
             params["article"] = self.article
         if self.annex:
             params["annex"] = self.annex
+        if self.part:
+            params["parte"] = self.part
+        elif self.comma:
+            params["comma"] = self.comma
         return params
 
     @property
@@ -201,9 +220,11 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
     result = ParsedQuery()
 
     # 1. Extract article numbers (remove from text for cleaner act matching)
-    text, articles = _extract_articles(text)
+    text, articles, comma, part = _extract_articles(text)
     if articles:
         result.article = articles
+        if re.fullmatch(r"[^,]+", articles) and not re.search(r"\d\s*-\s*\d", articles):
+            result.comma, result.part = comma, part
 
     # 1b. EU acts read their pair in their own order. Resolve them before the
     #     Italian number/year rule can read "2024/2847" as act 2024 of 2847.
@@ -332,16 +353,17 @@ def _normalize(text: str) -> str:
     return text
 
 
-def _extract_articles(text: str) -> tuple[str, Optional[str]]:
-    """Extract article numbers from text. Returns (remaining_text, article_string)."""
+def _extract_articles(text: str) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+    """Extract article numbers from text. Returns (remaining_text, article_string, comma, part):
+    the comma or the part's range («701-800») that follows the article, if any."""
     match = _ART_RE.search(text)
     if not match:
-        return text, None
+        return text, None, None, None
 
     after_prefix = text[match.end():]
     num_match = _ART_NUM_RE.match(after_prefix)
     if not num_match:
-        return text, None
+        return text, None, None, None
 
     # Hand the API its own shapes: "2 bis" → "2-bis", "1 - 10" → "1-10",
     # "5 e 6" → "5,6".
@@ -353,15 +375,24 @@ def _extract_articles(text: str) -> tuple[str, Optional[str]]:
         items.append(item)
     full_match_str = ",".join(items)
 
-    # Remove the article portion from text, and the comma clause behind it
+    # Remove the article portion from text, and the comma or part clause behind it
     consumed_end = match.start() + len(match.group(0)) + len(num_match.group(0))
-    clause = _COMMA_CLAUSE_RE.match(text, consumed_end)
+    comma = part = None
+    clause = _PART_CLAUSE_RE.match(text, consumed_end)
     if clause:
         consumed_end = clause.end()
+        part = f"{clause.group(1)}-{clause.group(2)}"
+    else:
+        clause = _COMMA_CLAUSE_RE.match(text, consumed_end)
+        if clause:
+            consumed_end = clause.end()
+            single = _SINGLE_COMMA_RE.match(clause.group(0))
+            if single:
+                comma = single.group(1) + (f"-{single.group(2).lower()}" if single.group(2) else "")
     remaining = text[:match.start()] + " " + text[consumed_end:]
     remaining = re.sub(r"\s+", " ", remaining).strip()
 
-    return remaining, full_match_str
+    return remaining, full_match_str, comma, part
 
 
 def _is_eu_year_like(half: str, ceiling: int) -> bool:

@@ -59,6 +59,26 @@
       "labels": {"citation": {"value": "art. 191 c.p.p.", "status": "decided"}, "short": {"value": "art. 191 c.p.p.", "status": "proposed"}}
     },
     {
+      "id": "l-296-2006-1",
+      "note": "Art. 1 l. 296/2006 is split by Normattiva into 14 parts; its URN serves the first, which has no part (G-389, Q1, decided 30 October 2026): the article's identity and keys as before. Its labels and the part's wait for the web (3c).",
+      "input": {"tipo_atto": "legge", "numero_atto": "296", "data": "2006-12-27", "numero_articolo": "1"},
+      "identity": {
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:2006-12-27;296~art1", "status": "current"},
+        "part": {"value": null, "status": "decided"}
+      },
+      "labels": {}
+    },
+    {
+      "id": "l-296-2006-1-commi-701-800",
+      "note": "Part 8 of art. 1 l. 296/2006, «1 (commi 701-800)» on Normattiva: the article's identity plus its comma range (G-389, Q1). A citation of a comma, «art. 1, comma 773, l. 296/2006», reads to the article plus `comma`, which the API turns into this part.",
+      "input": {"tipo_atto": "legge", "numero_atto": "296", "data": "2006-12-27", "numero_articolo": "1", "parte": "701-800"},
+      "identity": {
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:2006-12-27;296~art1", "status": "current"},
+        "part": {"value": "701-800", "status": "decided"}
+      },
+      "labels": {}
+    },
+    {
       "id": "l-241-1990-2",
       "note": "The owner's model: «art. 2, l. 7 agosto 1990, n. 241» — art. in lower case, a comma after the number, the act in lower case (1 October 2026).",
       "input": {"tipo_atto": "legge", "numero_atto": "241", "data": "1990-08-07", "numero_articolo": "2"},

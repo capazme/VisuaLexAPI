@@ -6,8 +6,13 @@ the left of the page: «1 (commi 1-100)», «1 (commi 101-200)», … up to «1 
 URN serves the first part only, so comma 773 was not there for us and nothing said
 so (G-387). This module reads the list of parts from the page the scraper already
 keeps in its persistent cache, as `normattiva_validity` does: no request, and
-`article_text` never touched (root CLAUDE.md, rule 23). It does not fetch a part:
-that needs the page's session and comes with the parts as entries (G-387 (a)).
+`article_text` never touched (root CLAUDE.md, rule 23).
+
+A part is also an entry of its own (G-387 (a), G-389): the article plus its comma
+range, `parte: "701-800"`, never its `progressivo`. The first part has no `parte`: it
+is what the article's URN serves, with the keys and the text of before. The helpers
+below name a part from a request (`parte`, or the `comma` it holds) and key its page;
+the scraper reads the page (`NormattivaScraper.read_part_page`).
 
 The shape is the one agreed for mcp-legal-it 3.0.x: `{progressivo, commi_dal,
 commi_al, url}` per part, `[]` when the article is not split. Best effort: a page
@@ -40,6 +45,14 @@ _PART_LABEL = re.compile(
     re.I,
 )
 _LABEL_MAX = 120
+# A part and a comma as a request names them: "701-800"; "773", "4-bis", "4 bis".
+_RANGE = re.compile(r"^\d{1,5}[a-z-]{0,12}-\d{1,5}[a-z-]{0,12}$")
+_COMMA = re.compile(r"^(\d{1,5})(?:[ -]?[a-z]{2,12})?$")
+_LEADING_NUMBER = re.compile(r"\d{1,5}")
+_RANGE_BOUNDS = re.compile(r"^(\d{1,5})[a-z-]{0,12}?-(\d{1,5})")
+# A part's page in the scraper's persistent cache, and its text in the scraper's memory:
+# the article's URN plus the range, so a part never shares the first part's key.
+PART_KEY_MARK = "#commi"
 
 
 class ArticlePart(TypedDict):
@@ -95,11 +108,68 @@ def extract_parts(raw_html: str, *, article: str) -> Optional[List[ArticlePart]]
     return ordered
 
 
-def partial_notice(parts: List[ArticlePart]) -> str:
-    """«testo parziale: commi 1-100 di 1364 (diviso in 14 parti)»: the first part is the one the article's URN serves."""
-    first, last = parts[0], parts[-1]
-    return (f"testo parziale: commi {first['commi_dal']}-{first['commi_al']} di {last['commi_al']} "
-            f"(diviso in {len(parts)} parti)")
+def part_range(part: ArticlePart) -> str:
+    """"701-800": a part's identity beside its article."""
+    return f"{part['commi_dal']}-{part['commi_al']}"
+
+
+def normalize_range(value: object) -> Optional[str]:
+    """A requested part's range, lower case and without spaces ("701-800"), or None when
+    it is not a range of commas."""
+    if not isinstance(value, str):
+        return None
+    candidate = "".join(value.split()).lower()
+    return candidate if len(candidate) <= 40 and _RANGE.match(candidate) else None
+
+
+def normalize_comma(value: object) -> Optional[str]:
+    """A requested comma ("773", "4-bis"), or None when it is not one."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        value = str(value)
+    if not isinstance(value, str):
+        return None
+    candidate = " ".join(value.split()).lower()
+    return candidate if len(candidate) <= 20 and _COMMA.match(candidate) else None
+
+
+def _number(comma: str) -> int:
+    return int(_LEADING_NUMBER.match(comma).group())
+
+
+def range_holding(ranges: List[str], comma: str) -> Optional[str]:
+    """The range among `ranges` ("1-100", "101-200", …) that holds `comma`, by its number:
+    «773-bis» is in «701-800». None when no range holds it."""
+    wanted = _number(comma)
+    for candidate in ranges:
+        bounds = _RANGE_BOUNDS.match(candidate)
+        if bounds and int(bounds.group(1)) <= wanted <= int(bounds.group(2)):
+            return candidate
+    return None
+
+
+def part_cache_key(urn: str, parte: str) -> str:
+    """The key of a part's page and text: «<URN>#commi701-800». Also the `url` a part's
+    answer carries: on Normattiva it opens the article, whose page lists the part."""
+    return f"{urn}{PART_KEY_MARK}{parte}"
+
+
+def article_page_key(key: str) -> str:
+    """The article page's key behind a part's key; any other key as it is."""
+    return key.split(PART_KEY_MARK, 1)[0]
+
+
+def ranges_in_words(ranges: List[str]) -> str:
+    """"commi 1-100, 101-200 e 201-250"."""
+    if len(ranges) == 1:
+        return f"commi {ranges[0]}"
+    return f"commi {', '.join(ranges[:-1])} e {ranges[-1]}"
+
+
+def partial_notice(parts: List[ArticlePart], parte: Optional[str] = None) -> str:
+    """«testo parziale: commi 1-100 di 1364 (diviso in 14 parti)»: the part served, the first
+    (the one the article's URN serves) when `parte` is None."""
+    served = parte or part_range(parts[0])
+    return f"testo parziale: commi {served} di {parts[-1]['commi_al']} (diviso in {len(parts)} parti)"
 
 
 def parts_fields(parts: Optional[List[ArticlePart]]) -> dict:

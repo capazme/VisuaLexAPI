@@ -96,10 +96,21 @@ async def test_three_variants_of_a_normattiva_page_cost_one_visit(isolated):
 async def test_a_tree_kept_before_is_still_read(isolated):
     tree_cache, _ = isolated
     kept = {"result": [{"numero": "1", "allegato": None}], "count": 1, "metadata": {"annexes": []}}
-    tree_cache.data[f"{L241}|link=False|details=False|metadata=True"] = kept
+    tree_cache.data[f"{L241}|link=False|details=False|metadata=True|parts"] = kept
     answer = await treextractor.get_tree(L241, link=False, details=False, return_metadata=True)
     assert answer == ([{"numero": "1", "allegato": None}], 1, {"annexes": []})
     assert FakeClient.visits == []
+
+
+async def test_a_tree_kept_before_articles_had_parts_is_read_again(isolated):
+    """A tree stored before a split article became one article with its parts listed
+    «1 (commi 101-200)» as an article (G-387 (a)): it is not read back."""
+    tree_cache, _ = isolated
+    stale = {"result": [{"numero": "1 (commi 1-100)", "allegato": None}], "count": 1, "metadata": {"annexes": []}}
+    tree_cache.data[f"{L241}|link=False|details=False|metadata=True"] = stale
+    tree_cache.data[f"{L241}|link=False|details=True|metadata=True"] = stale
+    await treextractor.get_tree(L241, link=False, details=False, return_metadata=True)
+    assert FakeClient.visits
 
 
 async def test_a_failed_normattiva_page_keeps_nothing(isolated):

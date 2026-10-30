@@ -268,7 +268,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
-  norm as the reader stores it), then existence once per act: the
+  norm as the reader stores it; the `comma` or `parte` the parser reads is not
+  sent on until the web opens a part of a split article, G-387 (a): the article is
+  stored, as before), then existence once per act: the
   fingerprints for a single-part Normattiva act, the tree's (annex, article)
   pairs for an act with annexes, the article's own text for an EU act. Never
   the text alone for Normattiva: it answers a missing article with the act's
