@@ -13,6 +13,10 @@ import type { RassegnePasso } from './types';
 
 type Archivio = 'civile' | 'penale';
 
+/** Said only to whoever opened the panel or one of its years: a quiet line, never an alert. */
+const UNAVAILABLE = 'Le rassegne non sono disponibili al momento.';
+const NOTICE = 'text-sm text-slate-500 dark:text-slate-400';
+
 const passi = (n: number): string => (n === 1 ? '1 passo' : `${n.toLocaleString('it-IT')} passi`);
 
 function years(anni: { anno: number }[]): string {
@@ -89,7 +93,7 @@ function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry 
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {shown.map((p) => <RassegnaPassage key={p.id} passo={p} besideId={besideId} backEntry={backEntry} />)}
           </ul>
-          {failed && <p className="text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
+          {failed && <p className={NOTICE}>{UNAVAILABLE}</p>}
           {next && !loading && (
             <button type="button" onClick={() => load(next)}
               className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400">
@@ -99,6 +103,22 @@ function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry 
         </div>
       )}
     </section>
+  );
+}
+
+/** The panel's closed row: accordion pattern, the toggle inside the heading, named by its text, state in aria-expanded alone. */
+function PanelHeading({ open, onToggle, detail }: { open: boolean; onToggle: () => void; detail?: string }) {
+  return (
+    <h4>
+      <button type="button" aria-expanded={open} onClick={onToggle}
+        className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
+        <span className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</span>
+        <span className="flex items-center gap-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+          {detail && <span>{detail}</span>}
+          <ChevronDown size={16} className={cn('transition-transform duration-200', open && 'rotate-180')} />
+        </span>
+      </button>
+    </h4>
   );
 }
 
@@ -117,6 +137,10 @@ export interface RassegnePanelProps {
  * the slot's other props, bar the place it opens decisions beside. The section's controls reach it
  * through `useCaseLawFilters` (the slot's props are a contract): it narrows the passages loaded
  * and puts the review years in their order.
+ *
+ * MERL-T is the reviews' source, not the reader's: a server without it (404 `merlt_disabled`)
+ * shows nothing, and one that cannot answer now (503, the network) leaves a closed row with no
+ * count, which says the reviews are unavailable only to whoever opens it.
  */
 export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanelProps) {
   const { order } = useCaseLawFilters();
@@ -130,31 +154,27 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
     setArchivio(undefined);
   }
   const summary = useRassegneSummary(articleUrn, archivio);
+  const toggle = () => setOpen((v) => !v);
 
   if (!articleUrn || summary.status === 'idle' || summary.status === 'loading') return null;
   if (summary.status === 'error') {
-    return <p className="mt-6 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>;
+    if (summary.disabled) return null;
+    return (
+      <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
+        <PanelHeading open={open} onToggle={toggle} />
+        {open && <p className={cn('mt-3', NOTICE)}>{UNAVAILABLE}</p>}
+      </div>
+    );
   }
   const { data } = summary;
   const shownArchivio = summary.archivio; // the year sections follow the data on screen
   if (data.total === 0) return null;
 
-  const toggle = () => setOpen((v) => !v);
   const both = data.archivi.includes('civile') && data.archivi.includes('penale');
 
   return (
     <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
-      {/* Accordion pattern: the toggle inside the heading, named by its text, state in aria-expanded alone. */}
-      <h4>
-        <button type="button" aria-expanded={open} onClick={toggle}
-          className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
-          <span className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</span>
-          <span className="flex items-center gap-2 text-xs font-normal text-slate-500 dark:text-slate-400">
-            <span>{`${passi(data.total)}, ${years(data.anni)}`}</span>
-            <ChevronDown size={16} className={cn('transition-transform duration-200', open && 'rotate-180')} />
-          </span>
-        </button>
-      </h4>
+      <PanelHeading open={open} onToggle={toggle} detail={`${passi(data.total)}, ${years(data.anni)}`} />
       {open && (
         <div className="mt-3">
           {both && (
@@ -168,7 +188,7 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
               ))}
             </div>
           )}
-          {summary.failed && <p className="mb-2 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
+          {summary.failed && <p className={cn('mb-2', NOTICE)}>{UNAVAILABLE}</p>}
           {[...data.anni].sort((a, b) => (order === 'desc' ? b.anno - a.anno : a.anno - b.anno)).map(({ anno, passi: count }) => (
             <YearSection key={`${shownArchivio ?? ''}-${anno}`} urn={articleUrn} archivio={shownArchivio} anno={anno} count={count}
               besideId={besideId} backEntry={backEntry}

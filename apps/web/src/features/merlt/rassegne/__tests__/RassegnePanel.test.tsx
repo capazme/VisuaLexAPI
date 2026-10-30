@@ -150,12 +150,47 @@ describe('RassegnePanel', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
-  it('says so when MERL-T is unavailable, and logs it', async () => {
+  it('renders nothing, and logs nothing, on a server without MERL-T', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fetchRassegne.mockRejectedValue(new Error('503'));
+    // the shape services/api.ts rejects with
+    fetchRassegne.mockRejectedValue({ status: 404, message: 'merlt_disabled', data: { detail: 'merlt_disabled' } });
+    const { container } = renderPanel();
+    await waitFor(() => expect(fetchRassegne).toHaveBeenCalled());
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it.each([
+    ['MERL-T is unavailable', { status: 503, message: 'merlt_unavailable', data: { detail: 'merlt_unavailable' } }],
+    ['the network fails', { status: undefined, message: 'Network Error', data: undefined }],
+  ])('when %s, stays a closed row with no count, and says so only once opened', async (_, failure) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchRassegne.mockRejectedValue(failure);
     renderPanel();
-    expect(await screen.findByText('Rassegne non disponibili ora.')).toBeInTheDocument();
+    const row = await screen.findByRole('button', { name: 'Nelle rassegne della Cassazione' });
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/non sono disponibili/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/passi/)).not.toBeInTheDocument();
+    fireEvent.click(row);
+    expect(row).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Le rassegne non sono disponibili al momento.')).toBeInTheDocument();
+    fireEvent.click(row);
+    expect(screen.queryByText(/non sono disponibili/)).not.toBeInTheDocument();
     expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('a year that fails to load says so quietly, inside it', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchRassegne
+      .mockResolvedValueOnce(SUMMARY)
+      .mockRejectedValueOnce({ status: 503, message: 'merlt_unavailable', data: { detail: 'merlt_unavailable' } });
+    renderPanel();
+    await openPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Rassegna dell'anno 2016/ }));
+    expect(await screen.findByText('Le rassegne non sono disponibili al momento.')).toBeInTheDocument();
+    expect(screen.getByText("Rassegna dell'anno 2024")).toBeInTheDocument();
     error.mockRestore();
   });
 
@@ -192,9 +227,9 @@ describe('RassegnePanel', () => {
     renderPanel();
     await openPanel();
     fireEvent.click(await screen.findByRole('button', { name: 'Civile' }));
-    expect(await screen.findByText('Rassegne non disponibili ora.')).toBeInTheDocument();
+    expect(await screen.findByText('Le rassegne non sono disponibili al momento.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Tutte' }));
-    await waitFor(() => expect(screen.queryByText('Rassegne non disponibili ora.')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Le rassegne non sono disponibili al momento.')).not.toBeInTheDocument());
     expect(screen.getByText("Rassegna dell'anno 2024")).toBeInTheDocument();
     error.mockRestore();
   });
