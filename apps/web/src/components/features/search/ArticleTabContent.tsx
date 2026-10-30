@@ -62,6 +62,7 @@ import { PassageThreadsStatus } from './PassageThreadsStatus';
 import { VersionBanner } from './VersionBanner';
 import { TextAtDateDialog } from './TextAtDateDialog';
 import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
+import { copyNormLink, linkPinDay, normLink, normLinkToast } from '../../../utils/normattivaLink';
 import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
 import {
     READ_ONLY_REASON,
@@ -518,6 +519,25 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
+    // «Copia link Normattiva»: the address the API returned, with its version marker; a past
+    // text's link reads as its version, as «Copia citazione» says it.
+    const copyLink = async () => {
+        if (!display.canCopyOrSave) {
+            showToast(display.copyBlockedReason ?? '', 'info');
+            return;
+        }
+        const pinDay = linkPinDay(norma_data, display.citeAs ?? data.validity, data.upcoming, todayInRome());
+        const link = normLink(norma_data, citationNow(), pinDay);
+        if (!link) return;
+        try {
+            await copyNormLink(link);
+            showToast(normLinkToast(link), 'success');
+        } catch {
+            showToast('Errore durante la copia del link', 'error');
+        }
+    };
+    const handleCopyLink = normLink(norma_data, null) ? copyLink : undefined;
+
     // Handler for SelectionPopup copy action. The popup stays on a text that may
     // not be copied (a reading), so the table is asked here, and the click says why.
     const handlePopupCopy = async (text: string) => {
@@ -676,6 +696,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     triggerSearch(buildTextAtDateParams(norma_data, { kind: 'date', date: display.banner.nextDay }));
                 }
                 break;
+            case 'copy_link':
+                await handleCopyLink?.();
+                break;
             case 'copy_citation': {
                 const citation = citationNow();
                 if (!citation) return;
@@ -810,6 +833,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onOpenDossier={() => setDossierPopoverOpen(true)}
                 dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
+                onCopyLink={handleCopyLink}
                 onOpenAdvancedExport={() => setShowAdvancedExport(true)}
                 onOpenVersionInput={() => setShowVersionInput(true)}
                 onCompare={handleCompare}
@@ -876,7 +900,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
             {display.banner && (
                 <VersionBanner
-                    banner={display.banner}
+                    // No address of the source, no «Copia link Normattiva».
+                    banner={handleCopyLink ? display.banner : { ...display.banner, actions: display.banner.actions.filter((a) => a !== 'copy_link') }}
                     onAction={handleBannerAction}
                     variant={display.textVisible ? 'banner' : 'state'}
                 />

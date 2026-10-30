@@ -117,10 +117,14 @@ describe('the switch', () => {
       expect(tool.name).not.toMatch(/elimin|modific|aggiorn|sposta|ritir/);
     }
     expect(await schemaText(client)).toContain('PERCORSI');
+    // The only place a model finds the shape of a module's lesson and verification (G-391).
+    for (const key of ['blocchi', 'citazioni', 'marcatore', 'richiamo', 'opzioni', 'chiave', 'spiegazione', 'corretta', 'rispostaModello', 'rubrica']) {
+      expect(await schemaText(client)).toContain(key);
+    }
     await client.close();
   });
 
-  it('keeps the definitions lean: the courses add at most 7,000 characters, and none while off', async () => {
+  it('keeps the definitions lean: the courses add at most 4,200 characters, and none while off', async () => {
     const size = async () => {
       const client = await connect();
       const { tools } = await client.listTools();
@@ -132,11 +136,12 @@ describe('the switch', () => {
     env.stub.features = { lingoCourses: true };
     const on = await size();
     // Measured on 29 October 2026 (PR of M1): 14,562 off, 21,281 on; 14,605 off once #371 (`in_sospeso` in
-    // omnilex_crea_dossier's description) was in develop. With every switch on the list passes the
-    // 18,000 characters of §10.6: the groups of #318 (1b) are what keep the courses out of a session that does
-    // not use them (G-379 went ahead without them).
+    // omnilex_crea_dossier's description) was in develop. On 30 October, with a module's lesson and verification
+    // and an exam's questions shaped in the schema text instead (G-391): 14,605 off, 18,742 on, the courses 4,137.
+    // With every switch on the list still passes the 18,000 characters of §10.6, an overshoot G-391 accepts until
+    // the groups of #318 (1b) keep the courses out of a session that does not use them.
     expect(off).toBeLessThanOrEqual(14_700);
-    expect(on - off).toBeLessThanOrEqual(7_000);
+    expect(on - off).toBeLessThanOrEqual(4_200);
   });
 });
 
@@ -187,6 +192,45 @@ describe('lingolex_aggiungi_modulo and lingolex_aggiungi_esame', () => {
     expect(json(result)).toMatchObject({ id: 'm-new', citazioni: 1, corso: { moduli: { contati: 2, previsti: 2 } } });
     expect(posts()).toMatchObject([{ path: '/lingo/corsi/p1/moduli', body: MODULE }]);
     expect(env.stub.exchanges.map((e) => e.scope)).toEqual(['lingo:courses:write']);
+    await client.close();
+  });
+
+  it('checks the lesson and the verification before sending, with the SDK’s words, though their shape is only in the schema text (G-391)', async () => {
+    const client = await connect();
+    const bad = {
+      ...MODULE,
+      blocchi: [{ ...MODULE.blocchi[0], richiamo: [{ ...ITEM, corretta: 'g' }] }],
+      quiz: MODULE.quiz.slice(0, 5),
+    };
+    const refused = await client.callTool({ name: 'lingolex_aggiungi_modulo', arguments: { percorso: 'p1', ...bad } });
+    expect(refused.isError).toBe(true);
+    expect(text(refused)).toBe(
+      'MCP error -32602: Input validation error: Invalid arguments for tool lingolex_aggiungi_modulo: ' +
+        'Invalid option: expected one of "a"|"b"|"c"|"d"|"e"|"f" at blocchi[0].richiamo[0].corretta\n' +
+        'Too small: expected array to have >=6 items at quiz',
+    );
+    // A key the module does not have is dropped, at any depth, as the typed schema did.
+    const extra = { ...MODULE, blocchi: [{ ...MODULE.blocchi[0], colore: 'rosso' }], aperta: { ...MODULE.aperta, applicazione: true } };
+    const sent = await client.callTool({ name: 'lingolex_aggiungi_modulo', arguments: { percorso: 'p1', ...extra } });
+    expect(sent.isError).toBeFalsy();
+    expect(posts().map((call) => call.body)).toEqual([MODULE]);
+    await client.close();
+  });
+
+  it('checks an exam’s questions and open question the same way (G-391)', async () => {
+    const client = await connect();
+    const bad = { domande: [ITEM, { ...ITEM, opzioni: [option('a')] }], aperta: { ...EXAM.aperta, rubrica: ['questione'] } };
+    const refused = await client.callTool({ name: 'lingolex_aggiungi_esame', arguments: { percorso: 'p1', ...bad } });
+    expect(refused.isError).toBe(true);
+    expect(text(refused)).toBe(
+      'MCP error -32602: Input validation error: Invalid arguments for tool lingolex_aggiungi_esame: ' +
+        'Too small: expected array to have >=2 items at domande[1].opzioni\n' +
+        'Too small: expected array to have >=3 items at aperta.rubrica',
+    );
+    const extra = { domande: [{ ...ITEM, peso: 2 }, ITEM], aperta: { ...EXAM.aperta, opzioni: [option('a'), option('b')] } };
+    const sent = await client.callTool({ name: 'lingolex_aggiungi_esame', arguments: { percorso: 'p1', ...extra } });
+    expect(sent.isError).toBeFalsy();
+    expect(posts().map((call) => call.body)).toEqual([EXAM]);
     await client.close();
   });
 
