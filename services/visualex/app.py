@@ -62,9 +62,9 @@ from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details
-from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import cite_act, cite_article
-from visualex_api.tools.alias_resolver import resolve_alias
+from visualex_api.tools.act_identity import identifies_act
+from visualex_api.tools.norm_query import act_names, read_norm_query
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
 from visualex_api.tools.exceptions import (
@@ -97,6 +97,32 @@ structlog.configure(
     cache_logger_on_first_use=True,
 )
 log = structlog.get_logger()
+
+# /parse_query_batch's limits (design 2026-10-29-document-analysis §4.4). 200 strings of 200
+# characters can pass 48 KB once accents and JSON escapes are counted: the caller cuts its
+# chunks by count and by bytes.
+PARSE_BATCH_MAX_QUERIES = 200
+PARSE_BATCH_MAX_CHARS = 200
+PARSE_BATCH_MAX_BYTES = 48 * 1024
+
+
+def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
+    """Each string read as /parse_query reads one; one that makes the reading raise is
+    unrecognised, and counted. Returns (results in order, failures)."""
+    results, failed = [], 0
+    for query in queries:
+        try:
+            params, source = read_norm_query(query)
+        except Exception:
+            params, source = None, None
+            failed += 1
+        results.append({
+            "recognized": params is not None,
+            "parsed": params,
+            "source": source,
+            "identifies_act": identifies_act(params),
+        })
+    return results, failed
 
 # Funzione per il conteggio dei token (numero di parole) in modo ricorsivo
 def count_tokens(data):
@@ -401,6 +427,11 @@ class NormaController:
         # server alongside the other /fetch_*, /health, /version endpoints —
         # /api/* is reserved for the Node BFF.
         self.app.add_url_rule('/parse_query', view_func=self.parse_query, methods=['POST'])
+        # Up to 200 strings read as /parse_query reads one, and no further: no URN, no request
+        # out, no string in the logs. «Analizza documento» (design 2026-10-29-document-analysis
+        # §4.4). Routed by the ingress's /parse_query* and Vite's '/parse_query' prefix; priced
+        # by the scrape gate on its own path.
+        self.app.add_url_rule('/parse_query_batch', view_func=self.parse_query_batch, methods=['POST'])
         # Contextual citation linker — finds normative references embedded in free
         # text. Used by MERL-T's query NER (Loop β #2) to detect refs inside a
         # natural-language question. Mirrors /api/extract_citations on the prefixed
@@ -1059,17 +1090,11 @@ class NormaController:
             if not query:
                 return jsonify({"error": "Missing required field: query"}), 400
 
-            # 1. Preset alias first ("gdpr" → Regolamento UE 2016/679, ecc.).
-            parsed_params = resolve_alias(query)
-            source = "alias" if parsed_params else None
-
-            # 2. Fall back to the NL parser ("art 1453 cc", "art 3 cost", ...).
-            if not parsed_params:
-                parsed = parse_nl_query(query)
-                if parsed is None:
-                    return jsonify({"parsed": None, "recognized": False})
-                parsed_params = parsed.to_api_params()
-                source = "nl_parser"
+            # 1-2. Preset alias first ("gdpr" → Regolamento UE 2016/679), then the NL
+            # parser ("art 1453 cc", "art 3 cost"): the reading /parse_query_batch shares.
+            parsed_params, source = read_norm_query(query)
+            if parsed_params is None:
+                return jsonify({"parsed": None, "recognized": False, "identifies_act": False})
 
             # 3. Best-effort URN: build a NormaVisitata with the same pipeline
             # `fetch_norma_data` uses, then pick its .urn. If the URN cannot be
@@ -1100,6 +1125,8 @@ class NormaController:
             return jsonify({
                 "recognized": True,
                 "parsed": parsed_params,
+                # The convention's predicate (act_identity.py): «art. 2 d.m.» reads, and names no act.
+                "identifies_act": identifies_act(parsed_params),
                 "urn": urn,
                 "display": display,
                 "source": source,
@@ -1107,6 +1134,49 @@ class NormaController:
         except Exception as e:
             log.error("Error in parse_query", error=str(e))
             return jsonify({"error": str(e)}), 500
+
+    async def parse_query_batch(self):
+        """Read up to 200 norms, each as `/parse_query` reads one, and stop at the reading.
+
+        Body `{"queries": [string, ...]}`: 1 to 200 strings, each non-empty and at most 200
+        characters, the body at most 48 KB. Anything else is a 400 that names the limit.
+        Answer `{"results": [{recognized, parsed, source, identifies_act}]}`, in the order
+        asked. No URN, so no request leaves (the URN step asks Normattiva and logs the norm);
+        the log line holds the count and the duration, never a string: the strings are the
+        citations of a document the user may hold confidential (design
+        2026-10-29-document-analysis §4.4, §6.2).
+        """
+        started = time()
+        try:
+            if (request.content_length or 0) > PARSE_BATCH_MAX_BYTES:
+                return jsonify({"error": f"Body over {PARSE_BATCH_MAX_BYTES // 1024} KB"}), 400
+            raw = await request.get_data()
+            if len(raw) > PARSE_BATCH_MAX_BYTES:
+                return jsonify({"error": f"Body over {PARSE_BATCH_MAX_BYTES // 1024} KB"}), 400
+            try:
+                data = json.loads(raw)
+            except (ValueError, RecursionError):  # 48 KB of «[[[[…» passes the parser's depth
+                return jsonify({"error": "Body must be JSON"}), 400
+            queries = data.get("queries") if isinstance(data, dict) else None
+            if not isinstance(queries, list) or not queries:
+                return jsonify({"error": "queries must be a non-empty list"}), 400
+            if len(queries) > PARSE_BATCH_MAX_QUERIES:
+                return jsonify({"error": f"At most {PARSE_BATCH_MAX_QUERIES} queries"}), 400
+            for query in queries:
+                if not isinstance(query, str) or not query.strip():
+                    return jsonify({"error": "Each query must be a non-empty string"}), 400
+                if len(query) > PARSE_BATCH_MAX_CHARS:
+                    return jsonify({"error": f"Each query at most {PARSE_BATCH_MAX_CHARS} characters"}), 400
+
+            # Regexes and table lookups, a few ms for 200 strings: off the event loop all the same.
+            results, failed = await asyncio.to_thread(_read_norm_queries, [q.strip() for q in queries])
+            log.info("parse_query_batch", queries=len(queries), failed=failed,
+                     duration_ms=round((time() - started) * 1000))
+            return jsonify({"results": results})
+        except Exception as e:
+            # The type only: an exception's message may quote the string that raised it.
+            log.error("Error in parse_query_batch", error_type=type(e).__name__)
+            return jsonify({"error": "Internal error"}), 500
 
     async def extract_citations_endpoint(self):
         """Detect normative citations embedded in free text (shared linker).
@@ -1559,6 +1629,10 @@ class NormaController:
         - `known_acts`: the act names the resolver understands on its own
           ("statuto dei lavoratori", "legge fornero", "TUSL"). Not aliases —
           these need no shortcut, and an alias for one is a duplicate.
+        - `act_names`: the names of both lists that name an act on their own,
+          without a number («codice civile», «gdpr»; never «legge» or «d.lgs.»):
+          what «Analizza documento» looks for in a document, in the browser
+          (design 2026-10-29-document-analysis §4.2).
 
         Named `/fetch_...` deliberately: nginx routes the Python API by that
         prefix, so this needs no server-config change to be reachable.
@@ -1569,8 +1643,9 @@ class NormaController:
 
             presets = get_all_presets()
             known = known_act_names()
-            log.info("Alias catalog served", presets=len(presets), known_acts=len(known))
-            return jsonify({'presets': presets, 'known_acts': known})
+            names = act_names()
+            log.info("Alias catalog served", presets=len(presets), known_acts=len(known), act_names=len(names))
+            return jsonify({'presets': presets, 'known_acts': known, 'act_names': names})
         except Exception as e:
             return self._error_response(e, 'fetch_alias_catalog')
 
