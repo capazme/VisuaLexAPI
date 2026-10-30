@@ -110,13 +110,13 @@ export function courseMastery(competenzaIds: readonly string[], answers: readonl
 
 /**
  * Which competences take check cards (§10.7, G-377 Q10), in the order they are served. The spec's server design
- * names «in corso» and «da riprendere» only; §4.1's worked example also checks an «acquisita» one, and a
- * competence whose modules gave it fewer than five answers stays «da iniziare» with no card to gather them. Both
- * are an open question to the owners (G-390): `CHECK_ACQUIRED` and `CHECK_UNSTARTED` are the two switches, each
- * pinned by a test on both sides.
+ * named «in corso» and «da riprendere» only; the owners settled the rest (G-390): an «acquisita» competence takes
+ * them too, at most once every seven days from its last valid session, after the other two, and so does a «da
+ * iniziare» competence with at least one answer, last. `CHECK_ACQUIRED` and `CHECK_UNSTARTED` hold the two
+ * choices, each pinned by a test on both sides.
  */
-export const CHECK_ACQUIRED = false;
-export const CHECK_UNSTARTED = false;
+export const CHECK_ACQUIRED = true;
+export const CHECK_UNSTARTED = true;
 const CHECK_ORDER: Record<MasteryState, number> = { 'da-riprendere': 0, 'in-corso': 1, acquisita: 2, 'da-iniziare': 3 };
 export const checkCardRank = (stato: MasteryState) => CHECK_ORDER[stato];
 
@@ -130,8 +130,9 @@ const RULES: CheckCardRules = { acquired: CHECK_ACQUIRED, unstarted: CHECK_UNSTA
  * How many check cards the course's session offers for this competence today: never more than the answers still
  * missing for a valid session today, and only either on the day its next session counts with no valid session
  * since, or once seven Rome days have passed since its last valid session — never daily, so the same cards are not
- * drilled every day. With `unstarted`, a «da iniziare» competence with answers is offered on the day after its
- * first answers, then once seven days have passed since its last ones.
+ * drilled every day. An «acquisita» one (with `acquired`) has no next session waiting, so only the weekly test
+ * applies. With `unstarted`, a «da iniziare» competence with answers is offered from the day after its first
+ * answers until it has more, then once seven days have passed since its last ones.
  */
 export function wantsCheckCards(m: CompetenceMastery, today: string, rules: CheckCardRules = RULES): number {
   const need = SESSION_ANSWERS - m.oggi.risposte;

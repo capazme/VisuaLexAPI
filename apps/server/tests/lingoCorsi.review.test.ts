@@ -204,6 +204,28 @@ describe('the session narrowed to a course (`?corso=`)', () => {
     expect(new Set(checks.slice(0, 5))).toEqual(new Set(c2.map((c) => c.id)));
     expect((await request(app).get(`${CORSI}/${id}`).set(a)).body.competenze.map((c: { stato: string }) => c.stato)).toEqual(['in-corso', 'da-riprendere', 'da-iniziare']);
   });
+
+  it('G-390: an «acquisita» competence weekly, then a «da iniziare» one with answers, after «in corso»', async () => {
+    const { id, moduleIds } = await withCards();
+    // The module gives each competence fewer than five answers today: all three «da iniziare», with answers.
+    await studyModule(a, id, moduleIds[0]);
+    const [c1, c2, c3] = [await cardsOf(id, 'C1'), await cardsOf(id, 'C2'), await cardsOf(id, 'C3')];
+    // C1 acquired on 11-10; C2 valid at 100% on 11-10 (next counts from 11-17); C3 answered on 11-09 and 11-10, never five a day.
+    await gradeByHand(alice, c1, '2026-11-03T10:00:00Z', [true, true, true, true, true]);
+    await gradeByHand(alice, c1, '2026-11-10T10:00:00Z', [true, true, true, true, true]);
+    await gradeByHand(alice, c2, '2026-11-10T10:00:00Z', [true, true, true, true, true]);
+    await gradeByHand(alice, c3.slice(0, 1), '2026-11-09T10:00:00Z', [true]);
+    await gradeByHand(alice, c3.slice(1), '2026-11-10T10:00:00Z', [true, true, true, true]);
+    setClock('2026-11-16T09:00:00Z');
+    expect((await sessionCards({ corso: id })).conteggi.verifica).toBe(0);
+    setClock('2026-11-17T09:00:00Z');
+    const checks = (await sessionCards({ corso: id })).cards.filter((c) => c.verifica).map((c) => c.id);
+    expect(checks).toHaveLength(15);
+    expect([new Set(checks.slice(0, 5)), new Set(checks.slice(5, 10)), new Set(checks.slice(10))]).toEqual(
+      [c2, c1, c3].map((cards) => new Set(cards.map((c) => c.id))),
+    );
+    expect((await request(app).get(`${CORSI}/${id}`).set(a)).body.competenze.map((c: { stato: string }) => c.stato)).toEqual(['acquisita', 'in-corso', 'da-iniziare']);
+  });
 });
 
 describe('a course card’s grade', () => {
