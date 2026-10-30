@@ -39,7 +39,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   minute: a flood with no token stops here), `authenticate`, the user's quota
   (`SCRAPE_QUOTA_POINTS`, 300 points per `SCRAPE_QUOTA_WINDOW_SECONDS`, charged by the route
   the ingress names in `X-Forwarded-Uri`: an export 20, a stream 3, a whole act 5, the
-  detailed health page 5, a decision lookup 2, anything else 1), then `204`. A `401` or `429`
+  detailed health page 5, a decision lookup 2, a batch of norm readings
+  (`/parse_query_batch`, up to 200 strings) 3, anything else 1), then `204`. A `401` or `429`
   (with `Retry-After`) goes back to the browser as it is. Mounted **before** the general
   limiter in `app.ts` on purpose: it has limits of its own, and reading many articles must
   not spend the quota of every other call. Both caps count over
@@ -726,8 +727,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   nothing), and the course's review: `GET /srs/sessione?corso=` adds **check cards** (`verifica: true`) for the
   competences whose next session counts today, «da riprendere» first, never a new card or one graded today, none for a
   competence whose reviewed cards cannot reach five answers today (they would be drilled daily), at most once every
-  seven Rome days (`wantsCheckCards`; whether «acquisita» and «da iniziare» competences get them too is
-  G-390, the constants `CHECK_ACQUIRED` and `CHECK_UNSTARTED`). **Missions:** «Completa un modulo» (30, at 70%, at
+  seven Rome days (`wantsCheckCards`); after them an «acquisita» competence weekly from its last valid session, then
+  a «da iniziare» one with answers from the day after its first ones, then weekly (G-390: the constants
+  `CHECK_ACQUIRED` and `CHECK_UNSTARTED`, both on). **Missions:** «Completa un modulo» (30, at 70%, at
   most two a Rome day, the rest credited by a later event or the course page) and «Supera un percorso» (100, for three
   competences and three counting modules at least), settled in `settleMissions` with the events `modulo`, `esame`,
   `corso` and a course card's `revisione`; neither is in «Le missioni di oggi».
