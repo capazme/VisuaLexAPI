@@ -375,8 +375,8 @@ export const createComment = async (req: Request, res: Response) => {
       data: { threadId: thread.id, parentId: data.parentId ?? null, body: data.body, userId },
       include: { user: { select: { id: true, username: true } }, votes: true },
     });
-    // The feed's «Attive» reads the last activity; `updatedAt` moves with it as before.
-    await tx.articleThread.update({ where: { id: thread.id }, data: { lastActivityAt: created.createdAt } });
+    // The feed's «Attive» reads the last activity, which only moves forward.
+    await tx.articleThread.updateMany({ where: { id: thread.id, lastActivityAt: { lt: created.createdAt } }, data: { lastActivityAt: created.createdAt } });
     await notify(tx, parent
       ? { to: parent.userId, by: userId, kind: 'comment', threadId: thread.id, commentId: created.id }
       : { to: thread.userId, by: userId, kind: 'reply', threadId: thread.id, commentId: created.id });
