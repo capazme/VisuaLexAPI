@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { RefreshCw, Copy, ExternalLink } from 'lucide-react';
+import { RefreshCw, Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { proposedPassageAt, useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
@@ -16,6 +16,7 @@ import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
 import { todayInRome } from '../../../utils/dateUtils';
+import { copyNormLink, EUROPEAN_LINK_NOTE, linkPinDay, normLink, normLinkActionLabel, normLinkToast } from '../../../utils/normattivaLink';
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
 import { HighlightColorMenu } from '../search/HighlightColorMenu';
@@ -303,6 +304,27 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     }
   };
 
+  // «Copia link Normattiva»: the address the API returned for this text (its version marker
+  // with it), the stored one only if the answer had none. Locked where «Copia citazione» is.
+  const linkUrn = article?.norma_data?.urn || norma.urn;
+  const hasLink = useMemo(() => normLink({ ...norma, urn: linkUrn }, null) !== null, [norma, linkUrn]);
+  const european = isEuropeanAct(norma.tipo_atto);
+  const handleCopyLink = async () => {
+    if (display && !display.canCopyOrSave) {
+      showToast(display.copyBlockedReason ?? '', 'info');
+      return;
+    }
+    const pinDay = linkPinDay(norma, display?.citeAs ?? article?.validity, article?.upcoming, todayInRome());
+    const link = normLink({ ...norma, urn: linkUrn }, citationNow(), pinDay);
+    if (!link) return;
+    try {
+      await copyNormLink(link);
+      showToast(normLinkToast(link), 'success');
+    } catch {
+      showToast('Errore durante la copia del link', 'error');
+    }
+  };
+
   if (state.phase === 'loading') {
     return (
       <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-2 text-sm text-slate-400">
@@ -433,14 +455,25 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           type="button"
           onClick={handleCopyCitation}
           disabled={citeLocked}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex min-h-[44px] md:min-h-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Copy size={13} /> Copia citazione
         </button>
+        {hasLink && (
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            disabled={citeLocked}
+            title={european ? EUROPEAN_LINK_NOTE : 'L’indirizzo dell’articolo su Normattiva; incollato in Word, la citazione con il collegamento'}
+            className="inline-flex min-h-[44px] md:min-h-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Link2 size={13} aria-hidden /> {normLinkActionLabel(norma)}
+          </button>
+        )}
         <button
           type="button"
           onClick={onOpenOnDashboard}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="inline-flex min-h-[44px] md:min-h-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
           <ExternalLink size={13} /> Apri su Dashboard
         </button>
