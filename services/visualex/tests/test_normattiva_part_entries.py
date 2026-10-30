@@ -395,6 +395,18 @@ class TestTheConvention:
         assert parse_nl_query(label).to_api_params() == {
             "act_type": "legge", "act_number": "296", "article": "1", **params}
 
+    @pytest.mark.parametrize("label,comma", [
+        ("art. 3 co. 4-bis l. 241/1990", "4-bis"),
+        ("art. 3, comma 2, lett. a), l. 241/1990", "2"),
+        ("art. 3, commi 1 e 2, l. 241/1990", None),          # a list: no one part
+        ("art. 3, primo comma, l. 241/1990", None),          # an ordinal: not sent on
+        ("art. 3, n. 2, l. 241/1990", None),
+    ])
+    def test_only_a_single_numbered_comma_is_sent_on(self, label, comma):
+        from visualex_api.tools.nl_parser import parse_nl_query
+        params = parse_nl_query(label).to_api_params()
+        assert (params["article"], params.get("act_number"), params.get("comma")) == ("3", "241", comma)
+
     @pytest.mark.parametrize("label", ["artt. 1, 2, comma 3 l. 241/1990", "art. 1-3, comma 2 l. 241/1990"])
     def test_a_comma_after_several_articles_names_none(self, label):
         from visualex_api.tools.nl_parser import parse_nl_query
