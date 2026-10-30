@@ -1,6 +1,8 @@
 # «Analizza documento» — one recognizer with the search, and completion by hand
 
-**Status:** draft for the owners, 29 October 2026. A specification only: nothing here is built yet.
+**Status:** approved, 30 October 2026 (G-393): the owner answered «ok» to the nine questions of §9, each as
+recommended. PR 1 (the Python API, which also fixes the search) is built first (§8); the web (PR 2 and PR 3) waits for
+the other owner's agreement on the page's words and screens and for the blind corpus (§3.3, Q8).
 **Asked by:** one owner, 29 October 2026, in chat with the orchestrator: widen what «Analizza documento» recognises
 as far as it will go, let the user complete by hand what it leaves half-read («the user spends 5–10 minutes looking
 at where that article is cited and adds the reference by hand, which will often be the same one»), and align the
@@ -139,6 +141,10 @@ The seven left to complete are honest gaps, each settled by a lawyer in a second
   sent — but the server would read it as the Treaty on European Union (§4.8);
 - «art. 167» under the heading «COSTITUZIONE IN GIUDIZIO»: no act in its paragraph, and «Costituzione» alone is not
   taken as the context (§4.3) — read as the Constitution it would have been wrong.
+
+Measured again on PR 1's code (30 October), the rest unchanged: the two spellings resolve, so the proposed path finds
+**98** within the paragraph (5 to complete) and 99 across the document (4); «art. 6 T.U.E.» stays to complete, as Q9
+wants, and the server no longer reads it as the Treaty.
 
 The nine non-norms are the eight clauses of contracts, agreements, a policy and an expert's report, and «art. 6
 CEDU», which the page offers as «Non è una norma»; «Come rilevato dalla CTU, art. 3 della relazione» and «quanto alla
@@ -282,7 +288,7 @@ list, and the act phrase as written, spaces folded); nothing else of the line go
 5. **The answer per candidate:** identifies the act → resolved (with its articles, or as context for an act alone);
    otherwise «Da completare», the reading so far kept for the picker.
 
-**The endpoint (Q1): a new path, `/parse_query_batch`.**
+**The endpoint (Q1, decided): a new path, `/parse_query_batch`.**
 
 - The body is `{"queries": [string, …]}`: at most 200 strings, each non-empty and at most 200 characters, the body
   at most 48 KB encoded; the browser cuts its chunks by count and by bytes (accented letters and JSON escapes make 200
@@ -291,12 +297,13 @@ list, and the act phrase as written, spaces folded); nothing else of the line go
   `parse_nl_query` — taken out of the handler so the two routes cannot drift.
 - **No URN, no display, no network:** the batch stops at `parsed`. The URN step reaches Normattiva and logs the norm
   (§2.2); the page needs `parsed` only, as the search does; a citation's URN is built when it is opened.
-- The answer is `{"results": [{"recognized": bool, "parsed": {...} | null, "source": "alias" | "nl_parser"}]}`, in
-  the order asked.
+- The answer is `{"results": [{"recognized": bool, "parsed": {...} | null, "source": "alias" | "nl_parser" | null,
+  "identifies_act": bool}]}`, in the order asked. `identifies_act` is the predicate of point 1, on the API's copy of
+  the list, so a server answer carries its own verdict; `/parse_query` answers it too, beside `recognized`.
 - `parse_nl_query` and `resolve_alias` are regex and table lookups (200 hostile strings take about 0.1 s), run off
   the event loop all the same (`asyncio.to_thread`), as `/extract_citations` is.
 - **Its price:** the quota sees the path, not the body (`scrapeCost` reads the forwarded URI). A path of its own gets
-  a price of its own in `DEFAULT_SCRAPE_COSTS` — proposed 3 points a call: a document of 300 pages with a few hundred
+  a price of its own in `DEFAULT_SCRAPE_COSTS` — 3 points a call (decided with Q1): a document of 300 pages with a few hundred
   distinct strings costs a handful of calls, and nobody can resolve 200 strings for the price of one search. That
   file is authentication's area and its owner reviews the change.
 - **Routing:** the ingress matches `/parse_query*` and Vite proxies by prefix (`startsWith`), so the new path is
@@ -338,7 +345,9 @@ where the act came from.
 The measure (§3.2) gives 96 with paragraph scope and 97 across the document, both with no wrong one. Across the
 document is one more right on this corpus, but the linker's own warning stands («a rhetorical "E l'art. 2043?" after
 "legge 241/1990" is read as art. 2043 of that law»), and its measured errors are that: in a brief that moves from one
-statute to the next, a bare article three paragraphs on is a guess. Paragraph scope is the recommendation (Q2).
+statute to the next, a bare article three paragraphs on is a guess. Paragraph scope is decided (Q2, 30 October): the
+paragraph, plus «del medesimo decreto» and its kin across paragraphs. It is the browser's rule, built in PR 2; the
+server's linker (`/extract_citations`, MERL-T's) keeps its own whole-text context, which this design does not touch.
 
 ### 4.7 When the server does not answer
 
@@ -370,7 +379,14 @@ of the search today, fixed in PR 1, and each reaches the document page through �
 - **«T.U.E.» is read as the Treaty on European Union** today (`act_resolver`'s dotted acronyms, `_DOTTED_ACRONYM`,
   fold «t.u.e.» into «tue»), and the corpus writes it for the building code, as lawyers do. There is no rule for an
   ambiguous name today; PR 1 adds a short list of spellings the resolver refuses because they name two acts —
-  «t.u.e.» the first — so the search asks instead of guessing (Q9). «TUE» without dots stays the Treaty.
+  «t.u.e.» the first — so the search asks instead of guessing (Q9, decided). «TUE» without dots stays the Treaty.
+- **«art. 2 d.m.» with no number** is read as a decreto ministeriale and named searchable by the web's
+  `isSearchReady`, whose list lacks the d.m. and the DPCM. PR 1 writes the list in the convention and answers
+  `identifies_act: false` for it; PR 2 moves `isSearchReady` onto the web's copy.
+- **Left for later, found by PR 1's review:** the server still reads «art. 4 n 7 gdpr» (no dot after «n») as
+  regulation n. 7, does not read «par 1» with no dot, and does not resolve «St.lav.» with no space. The browser's
+  candidate rules (§4.3) find all three; PR 2 either sends the vocabulary's spelling or adds the forms to the
+  clause source, with tests.
 - **Outside the sources:** the ECHR and the Charter of Fundamental Rights are not in the tables; a citation of them
   is «Da completare» and the picker cannot complete it. Whether the page should say «fuori dalle fonti di VisuaLex»
   for them is a later question; not in this spec.
@@ -487,11 +503,12 @@ sends them in one go, for a document the user may consider confidential. Two con
 - the page must say it (§6.4), not imply that nothing leaves;
 - the user should be able to keep a sensitive document wholly local: a switch «Riconosci solo nel browser» on the
   page, which runs the candidate rules with the client parser and the client's own act names only (as §4.7, by
-  choice) — Q3.
+  choice) — Q3, decided: yes, off by default.
 
 ### 6.4 The words of the promise (the web owner decides)
 
-Proposed, to replace the three that are true today and would not be:
+The owner accepted the recommendation (Q5: say what goes out, with an example); the words themselves are the other
+owner's, and PR 3 waits for them. Proposed, to replace the three that are true today and would not be:
 
 - line under the title: «Trova le norme citate in un atto. Il documento resta sul tuo computer: a VisuaLex arrivano
   solo le citazioni trovate, come in una ricerca.»
@@ -531,48 +548,60 @@ automatically; the user can see and export what they sent, and withdraw.
    lives; whether the privacy policy changes.
 5. Does it wait for the 2.0 (the first public alpha), or start with the owners as the only senders?
 
-Recommendation: decide after phase 1 has run for a few weeks with the owners using it; start with an aggregate
-count per spelling and the chosen act, no account link, opt-in, reviewed by an owner. The migration would be one
-table; not reserved now.
+Recommendation, accepted on 30 October (Q7): decide after phase 1 has run for a few weeks with the owners using it;
+if it goes, start with an aggregate count per spelling and the chosen act, no account link, opt-in, reviewed by an
+owner. The migration would be one table; not reserved now. The five questions above stay open until then.
 
 ## 8. The pull requests, in order
 
 | # | Area | What | Size |
 | --- | --- | --- | --- |
-| 1 | Python API, conventions, server quota | `/parse_query_batch` (§4.4) on a resolving function `/parse_query` shares, limits and their 400s, logging test (§6.2); `/fetch_alias_catalog` adds `act_names` (§4.2); the list of numbered types in `conventions/sources/` (§4.4), the linker's copy and its comparison test; the clause source, «n. N» after an article, the two spellings and the ambiguous «t.u.e.» (§4.8), each with tests from the corpus's strings; the batch's price in `DEFAULT_SCRAPE_COSTS`; the suites of `/parse_query`'s other callers (the server's, the web's, MERL-T's in CI); `services/visualex/CLAUDE.md` updated | M: ~350 lines and their tests |
+| 1 | Python API, conventions, server quota | `/parse_query_batch` (§4.4) on `read_norm_query`, the reading `/parse_query` shares; limits and their 400s; the logging test (§6.2); `identifies_act` in both answers; `/fetch_alias_catalog` adds `act_names` (§4.2, 417 names); `conventions/sources/numbered-act-types.json` (§4.4), the API's copy (`act_identity.py`, read by the linker too) and its comparison test; one clause source for the parser and the linker (`article_clause.py`: «n. N» after an article, «par.», ordinals, letters), the two spellings and the ambiguous «t.u.e.» (§4.8), each with tests from the corpus's strings; the batch's price in `DEFAULT_SCRAPE_COSTS`; the area's `CLAUDE.md` files | M: ~350 lines and their tests. Built: #381 |
 | 2 | Web, logic | the web's copy of the numbered types, its comparison test, and `isSearchReady` on it; `readNormQuery` out of `useSearchQuery` (the hook unchanged in behaviour, its tests green); `documentCandidates.ts` (§4.3) and the resolution and inheritance (§4.4–§4.6), pure, tested on the corpus with recorded server answers; the HTML reader's line breaks (§4.6); the corpus test prints §3.2's table and fails below the agreed floor; the fallback (§4.7); the page calls it, the list unchanged in look but for the counts | L: ~650 lines and their tests |
 | 3 | Web, screens | «Da completare», the picker, applying and undo, «Non sono norme», the inherited and hand-chosen tags, phone and keyboard (§5); the promise's new words (§6.4) and the switch if Q3 is yes; `apps/web/CLAUDE.md`'s «no request at all» rewritten; a browser pass on the corpus's documents | L |
 | 4 | Both | Phase 2, only if the owners decide it (§7) | — |
 
-PR 1 can merge on its own: the search gains from it at once. PR 2 needs PR 1 deployed for its server half and falls
+PR 1 can merge on its own: the search gains from it at once. It touches the scraping quota, authentication's
+area, so the other owner is asked to review it (CODEOWNERS). PR 2 needs PR 1 deployed for its server half and falls
 back without it (§4.7). PR 3 needs PR 2. The blind corpus (§3.3) and the MCP comparison (§3.4) are run before PR 3
 merges. A follow-up, not in this plan: the DOCX reader reads footnotes and endnotes (`word/footnotes.xml`,
 `word/endnotes.xml`), drawn after the text under «Note».
 
-## 9. Questions for the owners
+## 9. Questions for the owners — answered
+
+All nine were answered on 30 October 2026 (G-393): «ok» to each recommendation. Kept as asked, with the answer.
 
 1. **The endpoint.** A new path `/parse_query_batch`, or a list in `/parse_query`'s body? *Recommendation:* the new
    path — it gets a price of its own in the quota, keeps the network-free form apart from the one that builds URNs,
    and is routed by the ingress and Vite as they stand (§4.4). One cost to accept: the picker reads one string per
    pause in typing through it, so a reading costs 3 points where a search costs 1 — a few readings per completion.
+   *Answer (30 October, G-393):* the new path, 3 points a call (PR 1).
 2. **How far a bare article inherits.** Within its paragraph (plus «del medesimo decreto»), across the whole
    document, or never (all to complete)? *Recommendation:* the paragraph, drawn «dal contesto» and changeable in
    one tap: 96 of 103 found with no wrong one, and no guess three paragraphs on (§4.6).
+   *Answer (30 October, G-393):* the paragraph, plus «del medesimo decreto» (PR 2).
 3. **A switch to stay wholly local.** *Recommendation:* yes, «Riconosci solo nel browser», off by default and said
    in the page's words: the norms a document cites can reveal its subject (§6.3), and a lawyer should be able to
    choose for a sensitive file.
+   *Answer (30 October, G-393):* yes, off by default (PR 3).
 4. **Should hand choices survive a reload?** *Recommendation:* not in phase 1 — kept in memory, and the browser asks
    before the page is left while there are choices (`beforeunload`). Storing them on the device would mean storing a
    trace of the document; that is a decision of its own.
+   *Answer (30 October, G-393):* not in phase 1; `beforeunload` while there are choices (PR 3).
 5. **The words of the promise** (§6.4) are the web owner's. *Recommendation:* say what goes out with an example («per
    esempio «art. 82 GDPR»»), as proposed.
+   *Answer (30 October, G-393):* say what goes out, with an example; the words are the other owner's, and PR 3 waits for them.
 6. **The bar of G-375.** *Recommendation:* the page goes when, on the blind corpus, it finds at least as many as
    Claude through MCP with no more wrong ones, counting a citation completed by hand as found only if the page put it
    in «Da completare» (it found the place, the user named the act).
+   *Answer (30 October, G-393):* as recommended; run on the blind corpus before PR 3 merges.
 7. **Phase 2** (§7): go or no, and the five questions there. *Recommendation:* decide after a few weeks of phase 1;
    if go, aggregate counts, opt-in, no account link.
+   *Answer (30 October, G-393):* decide after a few weeks of phase 1; aggregate, opt-in, no account link if it goes.
 8. **The blind corpus.** Who writes it? *Recommendation:* three briefs by the other owner or a validator — one HTML,
    one DOCX with footnotes — plus two public decisions of the Corte costituzionale, never a client's document.
+   *Answer (30 October, G-393):* as recommended: the other owner or a validator writes it; the web waits for it.
 9. **Ambiguous names in the search.** Should the resolver refuse a spelling that names two acts («T.U.E.»: the
    building code or the Treaty), so the search asks instead of guessing? *Recommendation:* yes, with a short list kept
    by hand; «TUE» without dots stays the Treaty.
+   *Answer (30 October, G-393):* yes, a short list kept by hand, «T.U.E.» the first (PR 1).
