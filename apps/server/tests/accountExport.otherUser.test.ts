@@ -33,6 +33,25 @@ async function seedBobEverywhere(alice: TestUser, bob: TestUser) {
     data: { normaKey: 'codice_civile', articleId: '2043', title: said('glossa'), body: said('testo della glossa'), userId: bob.id },
   });
   await prisma.articleComment.create({ data: { threadId: bobThread.id, body: 'Alice sotto la glossa di Bob', userId: alice.id } });
+  // The Community (spec 2026-10-20 §7.4): Bob, a moderator, locks Alice's glossa and closes her report on his
+  // glossa with a note; his report on her reply keeps a copy of her text, hers on his glossa a copy of his; she
+  // was told of his reply; his act is in the moderation log.
+  await prisma.articleThread.update({ where: { id: thread.id }, data: { lockedAt: new Date(), lockedById: bob.id } });
+  await prisma.articleThreadReport.create({
+    data: {
+      threadId: bobThread.id, userId: alice.id, reason: 'spam', details: 'Segnalazione di Alice', reportedText: said('testo segnalato'),
+      status: 'dismissed', resolvedAt: new Date(), resolvedById: bob.id, resolutionNote: said('chiusura'),
+    },
+  });
+  await prisma.articleCommentReport.create({
+    data: { commentId: aliceComment.id, threadId: thread.id, userId: bob.id, reason: 'altro', details: said('su Alice'), reportedText: 'Risposta di Alice' },
+  });
+  await prisma.forumNotification.create({ data: { userId: alice.id, kind: 'reply', threadId: thread.id, commentId: bobComment.id } });
+  await prisma.forumNotification.create({ data: { userId: bob.id, kind: 'comment', threadId: thread.id, commentId: bobComment.id } });
+  await prisma.forumModerationLog.create({ data: { actorId: bob.id, action: 'lock', targetKind: 'thread', targetId: thread.id, reason: said('motivo') } });
+  await prisma.articleThreadVote.create({ data: { threadId: bobThread.id, userId: alice.id } });
+  // A reply whose author deleted their account is someone else's: counted, never read.
+  await prisma.articleComment.create({ data: { threadId: thread.id, body: said('risposta anonima'), userId: null } });
 
   // The Forum: Alice publishes, Bob likes, reports and proposes; Alice takes some, declines one, leaves one.
   const published = await request(app).post('/api/shared-environments').set(authHeader(alice))
@@ -184,6 +203,27 @@ describe('the account export, against a second user who touches everything', () 
     }
     // Her XP: her own credit, not Bob's, and no event's id (a vote's id would name a row about Bob's card).
     expect(response.body.data.lingoCreditiXp).toEqual([{ missione: 'CONVALIDA', periodo: 'G:2026-10-20', giorno: '2026-10-20', punti: 20, fonte: 'VOTO', materia: null }]);
+  });
+
+  it('carries the Community rows that are the user’s, never a report’s copy, its closing or a moderator', async () => {
+    const alice = await createTestUser('export-community-alice');
+    const bob = await createTestUser('export-community-bob');
+    await seedBobEverywhere(alice, bob);
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    expect(response.status).toBe(200);
+    const { threads, threadVotes, commentVotes, threadReports, commentReports, forumNotifications } = response.body.data;
+    const hers = threads.find((thread: { title: string }) => thread.title === 'La glossa di Alice');
+    // Bob's two replies and the anonymous one.
+    expect(hers).toMatchObject({ repliesFromOthers: 3 });
+    expect(hers.lockedAt).toEqual(expect.any(String));
+    expect(hers).not.toHaveProperty('lockedById');
+    expect(threadVotes).toHaveLength(1);
+    expect(commentVotes).toEqual([]);
+    expect(threadReports).toEqual([{ threadId: expect.any(String), reason: 'spam', details: 'Segnalazione di Alice', status: 'dismissed', createdAt: expect.any(String) }]);
+    expect(commentReports).toEqual([]);
+    expect(forumNotifications).toEqual([{ kind: 'reply', threadId: hers.id, commentId: expect.any(String), createdAt: expect.any(String), readAt: null }]);
   });
 
   it('keeps the user’s own identity in hand-imported content and drops the other’s, at any depth', async () => {
