@@ -13,6 +13,7 @@
  * `conventions/sources/golden.json`.
  */
 import { ACT_TYPES, ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
+import { partOf } from './parts';
 
 export interface CitableNorm {
   tipo_atto: string;
@@ -21,6 +22,8 @@ export interface CitableNorm {
   numero_atto?: string | null;
   data?: string | null;
   allegato?: string | null;
+  /** One part of a split article ("701-800", G-387 (a)). */
+  parte?: string | null;
 }
 
 export type CitableAct = Omit<CitableNorm, 'numero_articolo'>;
@@ -153,16 +156,21 @@ export function citeAct(norm: CitableAct): string {
   return actOf(norm, false).act;
 }
 
-/** "art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679". */
+/**
+ * "art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679". A part of a split article
+ * names its commas after the article (G-389, Q2): "art. 1, commi 701-800, l. 27 dicembre 2006, n. 296".
+ */
 export function citeArticle(norm: CitableNorm): string {
   const { act, joiner } = actOf(norm, false);
-  return `art. ${text(norm.numero_articolo)}${joiner}${act}${annexOf(norm, false)}`;
+  const part = text(norm.parte) ? `, commi ${text(norm.parte)}` : '';
+  return `art. ${text(norm.numero_articolo)}${part}${joiner}${act}${annexOf(norm, false)}`;
 }
 
-/** The article in little room: "art. 2 l. 241/1990", "art. 2043 c.c.". */
+/** The article in little room: "art. 2 l. 241/1990", "art. 2043 c.c.", a part "art. 1 (commi 701-800) l. 296/2006". */
 export function shortNorm(norm: CitableNorm): string {
   const { act, joiner } = actOf(norm, true);
-  return `art. ${text(norm.numero_articolo)}${joiner}${act}${annexOf(norm, true)}`;
+  const part = text(norm.parte) ? ` (commi ${text(norm.parte)})` : '';
+  return `art. ${text(norm.numero_articolo)}${part}${joiner}${act}${annexOf(norm, true)}`;
 }
 
 // A stored item's content is whatever the client sent (the items route takes
@@ -181,6 +189,7 @@ function storedAct(itemType: string, content: unknown): (CitableAct & { numero_a
     data: text('data'),
     allegato: text('allegato'),
     numero_articolo: text('numero_articolo') ?? undefined,
+    parte: partOf(raw.parte) ?? null,
   };
 }
 
