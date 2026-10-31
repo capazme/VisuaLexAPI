@@ -333,7 +333,7 @@ class EurlexScraper(BaseScraper):
                     "(atteso il CELEX di una versione consolidata, es. 02002L0058-20091219)"
                 )
             uri = f"https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:{celex_consolidated}"
-            log.info(f"Consolidated version requested. URI: {uri}")
+            log.debug(f"Consolidated version requested. URI: {uri}")
             return uri
 
         # EUR-Lex only needs the year, not full date (YYYY-MM-DD → YYYY)
@@ -342,10 +342,10 @@ class EurlexScraper(BaseScraper):
 
         if act_type in EURLEX and EURLEX[act_type].startswith('https'):
             uri = EURLEX[act_type]
-            log.info(f"Act type is a treaty. Using predefined URI: {uri}")
+            log.debug(f"Act type is a treaty. Using predefined URI: {uri}")
         else:
             uri = f'{self.base_url}/{EURLEX[act_type]}/{year}/{num}/oj/ita'
-            log.info(f"Constructed URI for regulation or directive: {uri}")
+            log.debug(f"Constructed URI for regulation or directive: {uri}")
 
         return uri
 

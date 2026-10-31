@@ -335,6 +335,29 @@ POST unless noted, JSON bodies.
   captures the records). Priced 3 points by the server's scrape gate; routed by the ingress's
   `/parse_query*` and Vite's prefix. For «Analizza documento»
   (`docs/superpowers/specs/2026-10-29-document-analysis-design.md` §4.4)
+- `/fetch_norm_links` — the links of a filing (`docs/superpowers/specs/2026-10-31-document-hyperlinks-design.md`
+  §3.1): `{"norms": [{act_type, act_number?, date?, article, annex?}], "pin_day"?}`, the readings the
+  page holds (never a query string or a passage), 1 to 200 norms of at most 30 distinct acts, one
+  article each, the body at most 48 KB (anything else a 400 that names the limit) →
+  `{"results": [{href, reason}]}` in order, `href` only with `ok`. Each norm goes through
+  `resolve_norm_address`, the address half of `create_norma_visitata_from_data` that both share,
+  `strict`: the fetch keeps its guesses, the link refuses them. `date_incomplete` (the year stood
+  after the lookup: the `-01-01` fallback is never looked up nor sent), `article_missing` (not in
+  the part's index), `ambiguous_part` (in the body and an annex, or two annexes, and the norm names
+  none; `annex` '' or a number is the user's choice), `source_unavailable` (an index, a lookup or
+  EUR-Lex that does not answer, an existence left unknown: never the body by default, never the AKN
+  index's answer, which has no parts), `not_linkable` (names no act, a range or a list, an address
+  off the two hosts). The address is the text in force fixed to `pin_day` (`!vig=<day>`), today in
+  Rome when absent (G-395; a later day is a 400); an EU act links its EUR-Lex page once its tree
+  holds the article. The whole call has `LINKS_BATCH_BUDGET` = 20 s, the acts four at a time, each
+  act's norms in turn: what is not settled in time is `source_unavailable`. It logs the counts, the
+  reasons and the duration, never a norm: every line on its path that names an act, an article or
+  an address (`resolve_norm_address`, the existence check, `urngenerator`, `treextractor`,
+  `act_dates.complete_year`, `eurlex_scraper.get_uri`, `eurlex_fetch`, the shared client's
+  warnings, which name the host only) is at debug, which the deployed app does not write
+  (`tests/test_fetch_norm_links_logs.py` fakes the network under the shared client and captures
+  both kinds of record). Priced 5 points by the scrape gate; routed by the ingress's `@legal` and
+  Vite's proxy, its own prefix on both
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
   AKN index, and the act's `title` (`presentable_title`: no Gazzetta code, no
   amendment brackets, accents restored; `''` when there is none), so the

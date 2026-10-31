@@ -138,7 +138,9 @@ async def fetch_from_cellar(url: str) -> str:
             or not _ITALIAN.search(result.text)):
         raise NetworkError(f"CELLAR: nessun atto per {celex} ({result.status}, {content_type[:40]})",
                            status_code=result.status)
-    log.info("EU act page from CELLAR", celex=celex, size=len(result.text))
+    # The act's identity at debug only: the links of a filing pass here (/fetch_norm_links).
+    log.info("EU act page from CELLAR", size=len(result.text))
+    log.debug("EU act page from CELLAR", celex=celex)
     return result.text
 
 
@@ -147,7 +149,8 @@ async def fetch_with_playwright(url: str, timeout_ms: int = 30000) -> str:
     declared host is visited (`is_allowed`); what the page then loads is not re-checked."""
     if not is_allowed(url):
         raise NetworkError(f"Host non consentito: {url[:80]}", status_code=403)
-    log.info("Consulting EUR-Lex with Playwright", url=url)
+    log.info("Consulting EUR-Lex with Playwright")
+    log.debug("Consulting EUR-Lex with Playwright", url=url)
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
@@ -173,7 +176,8 @@ async def fetch_act_page(url: str, timeout_ms: int = 30000) -> str:
     try:
         return await fetch_from_cellar(url)
     except (NetworkError, DocumentNotFoundError) as exc:
-        log.warning("CELLAR did not serve the act; trying EUR-Lex's site", url=url[:120], error=str(exc))
+        log.warning("CELLAR did not serve the act; trying EUR-Lex's site", error_type=type(exc).__name__)
+        log.debug("CELLAR did not serve the act", url=url[:120], error=str(exc))
     html = await fetch_with_playwright(url, timeout_ms)
     if not is_act_page(html):
         raise DocumentNotFoundError(f"EUR-Lex: nessun atto nella pagina (sfida anti-bot?) {url[:80]}", urn=url)

@@ -97,7 +97,7 @@ def date_from_title(page: str, kind: str, year: str, number: str) -> Optional[st
 async def _resolve_one(urn: str) -> Optional[str]:
     authority, kind, year, number = _YEAR_ONLY.fullmatch(urn).groups()
     if authority != "stato" or kind not in _TITLES:
-        log.info("act_dates.not_resolvable", urn=urn)
+        log.debug("act_dates.not_resolvable", urn=urn)
         return None
     cache = get_cache_manager().get_persistent("act_dates")
     cached = await cache.get(urn)
@@ -111,7 +111,8 @@ async def _resolve_one(urn: str) -> Optional[str]:
         return None
     found = date_from_title(result.text, kind, year, number)
     if found is None:
-        log.info("act_dates.not_found", urn=urn)
+        log.info("act_dates.not_found")
+        log.debug("act_dates.not_found", urn=urn)
         return None
     full = f"urn:nir:{authority}:{kind}:{found};{int(number)}"
     await cache.set(urn, full)
@@ -165,7 +166,9 @@ async def complete_year(act_type: str, year: str, act_number) -> str:
     try:
         full = await asyncio.wait_for(_resolve_one(urn), LOOKUP_BUDGET)
     except Exception as exc:  # the search goes on with the year; the reason is logged
-        log.warning("act_dates.lookup_failed", urn=urn, error=f"{type(exc).__name__}: {exc}")
+        # The act at debug only: a search's and a filing's norms pass here.
+        log.warning("act_dates.lookup_failed", error_type=type(exc).__name__)
+        log.debug("act_dates.lookup_failed", urn=urn, error=f"{type(exc).__name__}: {exc}")
         return year
     found = _FULL_DATE.search(full or "")
     return found.group(1) if found else year

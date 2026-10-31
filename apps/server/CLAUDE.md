@@ -40,7 +40,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`SCRAPE_QUOTA_POINTS`, 300 points per `SCRAPE_QUOTA_WINDOW_SECONDS`, charged by the route
   the ingress names in `X-Forwarded-Uri`: an export 20, a stream 3, a whole act 5, the
   detailed health page 5, a decision lookup 2, a batch of norm readings
-  (`/parse_query_batch`, up to 200 strings) 3, anything else 1), then `204`. A `401` or `429`
+  (`/parse_query_batch`, up to 200 strings) 3, a batch of link addresses (`/fetch_norm_links`,
+  up to 200 norms of 30 acts, which reaches Normattiva) 5, anything else 1), then `204`. A `401` or `429`
   (with `Retry-After`) goes back to the browser as it is. Mounted **before** the general
   limiter in `app.ts` on purpose: it has limits of its own, and reading many articles must
   not spend the quota of every other call. Both caps count over
