@@ -65,7 +65,7 @@ describe('normLink', () => {
     expect(normLinkToast(link!)).toBe('Link Normattiva copiato (apre il testo in vigore al 31 ottobre 2026)');
     // Elision and ordinal, as the citations write them.
     const toast = (day: string) => normLinkToast(normLink({ ...civil, urn: `${CC}!vig=` }, null, day)!);
-    expect(toast('2026-11-08')).toContain('in vigore all’8 novembre 2026');
+    expect(toast('2026-11-08')).toContain('in vigore all'8 novembre 2026');
     expect(toast('2026-11-01')).toContain('in vigore al 1° novembre 2026');
     // No pin, no date in the toast.
     expect(normLinkToast(normLink(civil, null)!)).toBe('Link Normattiva copiato');
