@@ -5,8 +5,10 @@ import sys
 import json
 import re
 from datetime import date as _date
-from collections import defaultdict
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from time import time
+from urllib.parse import urlparse
 
 from quart import Quart, request, jsonify, send_file, Response, g
 from quart_cors import cors
@@ -30,6 +32,7 @@ from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
 from visualex_api.services.akn_parser import comparable_article_key
 from visualex_api.tools.article_suffixes import other_ordinal_spelling
 from visualex_api.services import act_dates, massimario_portal
+from visualex_api.services.massimario import routes as rassegne_routes
 from visualex_api.services.normattiva_validity import (
     read_upcoming_request,
     read_validity,
@@ -60,7 +63,7 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, export_version_date, pdf_cache_path
+from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, read_request_date, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
@@ -107,6 +110,124 @@ log = structlog.get_logger()
 PARSE_BATCH_MAX_QUERIES = 200
 PARSE_BATCH_MAX_CHARS = 200
 PARSE_BATCH_MAX_BYTES = 48 * 1024
+
+# /fetch_norm_links's limits (design 2026-10-31-document-hyperlinks §3.1): the browser cuts its
+# chunks by norms and by acts. The budget is the whole call's: a date lookup alone may take
+# act_dates.LOOKUP_BUDGET (15 s), and what is not settled in time comes back
+# `source_unavailable`, for the browser to ask again in a smaller chunk.
+LINKS_BATCH_MAX_NORMS = 200
+LINKS_BATCH_MAX_ACTS = 30
+LINKS_BATCH_MAX_BYTES = 48 * 1024
+LINKS_BATCH_BUDGET = 20.0
+# Acts settled at once; the norms of one act in turn, so its date and index are read once.
+LINKS_ACT_CONCURRENCY = 4
+_LINK_FIELDS = ('act_type', 'act_number', 'date', 'article', 'annex')
+_LINK_FIELD_MAX = {'act_type': 120}
+_LINK_FIELD_DEFAULT_MAX = 40
+# «1,2», «1 e 2», «4-6», «4 - 6»: more than one article. «1-bis» and «270-bis.1» are one.
+_LINK_RANGE_OR_LIST = re.compile(r",|;|\s+e\s+|^\s*\d+\s*-\s*\d+")
+# The two sources' own pages, as the web's `sourceAddress` (#385) checks them again.
+_LINK_HOSTS = frozenset({'www.normattiva.it', 'normattiva.it', 'eur-lex.europa.eu'})
+LINK_REASONS = ('ok', 'date_incomplete', 'article_missing', 'ambiguous_part',
+                'source_unavailable', 'not_linkable')
+
+
+def _link_norm(item):
+    """One norm of a /fetch_norm_links body, as the address function reads it, or the
+    message of the 400 it deserves. Only the five fields are kept; `annex` '' (the act's own
+    text, chosen by the user) is kept as ''."""
+    if not isinstance(item, dict):
+        return "Each norm must be an object"
+    norm = {}
+    for key in _LINK_FIELDS:
+        value = item.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            return f"{key} must be a string"
+        value = str(value).strip()
+        if len(value) > _LINK_FIELD_MAX.get(key, _LINK_FIELD_DEFAULT_MAX):
+            return f"{key} at most {_LINK_FIELD_MAX.get(key, _LINK_FIELD_DEFAULT_MAX)} characters"
+        if value or key == 'annex':
+            norm[key] = value
+    if not norm.get('act_type') or not norm.get('article'):
+        return "Each norm needs act_type and article"
+    return norm
+
+
+def _link_refused_before_lookup(norm):
+    """The reason a norm gets no link before any request, or None: a reading that names no
+    act, and a range or a list (the browser sends the first article, §4.4; a range would
+    read the act's index for nothing)."""
+    if not identifies_act(norm) or _LINK_RANGE_OR_LIST.search(norm['article']):
+        return 'not_linkable'
+    return None
+
+
+def _link_act_key(norm):
+    """What counts as one act toward LINKS_BATCH_MAX_ACTS, before any lookup."""
+    return (normalize_act_type(norm['act_type']).lower(), norm.get('act_number', ''), norm.get('date', ''))
+
+
+def _link_pin_day(value):
+    """`(day, None)`: the day the link's text is fixed to (`!vig=<day>`); or `(None, message)`
+    for a 400. Absent, it is today in Rome: the link to the text in force always carries the
+    day (G-395). A later day is refused: Normattiva answers it with the current text."""
+    today = today_in_rome()
+    if value is None:
+        return today.isoformat(), None
+    malformed = "pin_day must be an ISO day (YYYY-MM-DD)"
+    if not isinstance(value, str) or not _ISO_DAY.match(value):
+        return None, malformed
+    try:
+        day = _date.fromisoformat(value)
+    except ValueError:
+        return None, malformed
+    if day > today:
+        return None, "pin_day cannot be after today"
+    return value, None
+
+
+def _source_href(href):
+    """`href` when it is an https address of Normattiva or EUR-Lex, else None."""
+    if not isinstance(href, str):
+        return None
+    try:
+        parsed = urlparse(href)
+    except ValueError:
+        return None
+    return href if parsed.scheme == 'https' and parsed.hostname in _LINK_HOSTS else None
+
+
+# The act types read from EUR-Lex (`get_scraper_for_norma`).
+EU_ACT_TYPES = ('tue', 'tfue', 'cdfue', 'regolamento ue', 'direttiva ue')
+_ISO_DAY = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+
+@dataclass
+class NormAddress:
+    """Where a request's articles are, and how sure that is (`resolve_norm_address`).
+
+    `annex_basis` says where the part came from: 'asked' (the caller named the annex),
+    'dispositivo' (the caller asked the act's own text, annex ''), 'table' (a code's annex, or
+    the annex that is the act's text), 'lookup' (looked for in the act's index: `parts` lists,
+    per article as asked, every part holding it, None for the act's text), 'unread' (the index
+    answered nothing usable), 'not_looked_up' (the lookup failed, or the act has no address).
+    `checked` is `[(article as the act spells it, exists)]`, `exists` True, False or None
+    (unknown); `date_complete` whether the act's date is a full day after completion, and
+    `date_unavailable` (strict only) whether the year stood because the lookup did not answer.
+    """
+    norma: Norma
+    is_eu: bool = False
+    date_complete: bool = False
+    date_unavailable: bool = False
+    articles: list = field(default_factory=list)
+    annex: str | None = None
+    explicit_dispositivo: bool = False
+    asked_annex: str | None = None
+    annex_basis: str | None = None
+    parts: dict = field(default_factory=dict)
+    checked: list = field(default_factory=list)
 
 
 def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
@@ -459,6 +580,11 @@ class NormaController:
         # §4.4). Routed by the ingress's /parse_query* and Vite's '/parse_query' prefix; priced
         # by the scrape gate on its own path.
         self.app.add_url_rule('/parse_query_batch', view_func=self.parse_query_batch, methods=['POST'])
+        # The addresses of up to 200 norms for the links of a filing, null with a reason instead
+        # of any guess; counts only in the logs. «Analizza documento» puts the hyperlinks in
+        # (design 2026-10-31-document-hyperlinks §3.1). Routed by the ingress's @legal and Vite's
+        # proxy; priced 5 points by the scrape gate.
+        self.app.add_url_rule('/fetch_norm_links', view_func=self.fetch_norm_links, methods=['POST'])
         # Contextual citation linker — finds normative references embedded in free
         # text. Used by MERL-T's query NER (Loop β #2) to detect refs inside a
         # natural-language question. Mirrors /api/extract_citations on the prefixed
@@ -482,6 +608,14 @@ class NormaController:
         self.app.add_url_rule('/fetch_massimario', view_func=self.fetch_massimario, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only (not routed by the ingress).
         self.app.add_url_rule('/resolve_act_dates', view_func=self.resolve_act_dates, methods=['POST'])
+        # The Massimario's reviews citing a norm, from the core's store (design
+        # 2026-10-30-rassegne-without-merlt, G-394): read by the article page. The web and the
+        # ingress take it in the next PR (Vite proxy, the ingress's @legal list, behind the login).
+        self.app.add_url_rule('/fetch_rassegne', view_func=self.fetch_rassegne, methods=['GET'])
+        # Internal: a volume's paragraph records for MERL-T's ingestion. Not routed by the
+        # ingress nor proxied by Vite, like /fetch_massimario.
+        self.app.add_url_rule('/massimario/volume/<volume_id>/records', view_func=self.massimario_volume_records,
+                              methods=['GET'])
         # Internal: the server's POST /api/dossiers/:id/decisions only (design 2026-10-12 §2.1).
         # Not routed by the ingress (/parse_query* does not cover it) nor proxied by Vite.
         self.app.add_url_rule('/parse_decision', view_func=self.parse_decision, methods=['POST'])
@@ -540,189 +674,13 @@ class NormaController:
             reject_original_with_a_date(data.get('version'), data.get('version_date'))
             reject_future_version_date(data.get('version_date'))
 
-        act_type = data.get('act_type')
-        act_number = data.get('act_number')
-        norma_date = data.get('date')
-
-        # A consolidated EU version. Validated here so a Normattiva request
-        # carrying the field fails loudly instead of being silently ignored.
-        celex_consolidated = data.get('celex_consolidated') or None
-        if celex_consolidated and normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
-            raise ValidationError(
-                "celex_consolidated vale solo per atti EUR-Lex (regolamento ue, direttiva ue)"
-            )
-
-        # Check if this is a codice with extractable details (e.g., "codice civile" -> "regio decreto 262/1942")
-        codice_details = extract_codice_details(act_type) if act_type else None
-        tipo_atto_reale = None
-        if codice_details and not norma_date and not act_number:
-            log.info("Extracted codice details from URN map", codice_details=codice_details)
-            norma_date = codice_details['data']
-            act_number = codice_details['numero_atto']
-            tipo_atto_reale = codice_details['tipo_atto_reale']
-            # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
-
-        norma_date = await complete_request_date(act_type, norma_date, act_number)
-        log.info("Using date", norma_date=norma_date)
-
-        norma = Norma(
-            tipo_atto=act_type,
-            data=norma_date if norma_date else None,
-            numero_atto=act_number,
-            tipo_atto_reale=tipo_atto_reale,
-            celex_consolidated=celex_consolidated
-        )
-        log.info("Norma instance created", norma=norma)
-
-        articles = await parse_article_input(str(data.get('article') or ''), norma.url)
-        log.info("Articles parsed", articles=articles)
-
-        # parse_article_input returns an error DICT rather than raising. Without
-        # this guard the loop below iterates the dict's KEYS and builds one
-        # NormaVisitata with numero_articolo='error', whose URN ends in ~arterror.
-        if isinstance(articles, dict) and 'error' in articles:
-            raise article_input_error(articles)
-        if (part or comma) and len(articles) != 1:
-            raise ValidationError("La parte o il comma valgono per un solo articolo")
-
-        # Validate and sanitize annex parameter
-        annex_value = data.get('annex')
-        # Track if user explicitly requested dispositivo (empty string)
-        # This is different from "no preference" (null/undefined)
-        explicit_dispositivo = False
-
-        if annex_value is not None:
-            if isinstance(annex_value, str):
-                annex_value = annex_value.strip()
-                if annex_value == '':
-                    # Empty string = user explicitly wants dispositivo (skip smart lookup)
-                    explicit_dispositivo = True
-                    annex_value = None
-                elif annex_value.lower() == 'null' or annex_value.lower() == 'undefined':
-                    # null/undefined string = no preference (smart lookup may apply)
-                    annex_value = None
-            # Convert to string if it's a number
-            elif isinstance(annex_value, (int, float)):
-                annex_value = str(int(annex_value))
-
-        # The annex the caller named, before a code's default one is filled in: only
-        # that one can be pointed elsewhere when the article is not in it.
-        asked_annex = annex_value
-
-        # If no annex specified (and not explicit dispositivo), check if this is a codice with a default annex
-        # e.g., "codice civile" maps to "regio.decreto:1942-03-16;262:2" where :2 is the annex
-        if annex_value is None and not explicit_dispositivo:
-            import re
-            normalized_type = normalize_act_type(act_type)
-            # codice_urn() matches case-insensitively: six keys in the table
-            # carry capitals ("codice del Terzo settore") while normalize_act_type
-            # returns the table's own spelling, so a bare `in` test missed them
-            # and those codici lost their default annex.
-            codice_fragment = codice_urn(normalized_type)
-            log.info("Checking for default annex", act_type=act_type, normalized_type=normalized_type,
-                     in_codici_map=bool(codice_fragment))
-            if codice_fragment:
-                log.info("Found codice URN", codice_urn=codice_fragment)
-                # Extract annex from URN pattern like "regio.decreto:1942-03-16;262:2"
-                # The annex is after the last colon if there's a number;number:annex pattern
-                annex_match = re.search(r';\d+:(\d+)$', codice_fragment)
-                log.info("Annex regex match", match=str(annex_match))
-                if annex_match:
-                    annex_value = annex_match.group(1)
-                    log.info("Using default annex from codice URN", codice=normalized_type, default_annex=annex_value)
-                    if normalized_type.lower() in CODE_ROWS_OF_SEVERAL_CODES:
-                        # The row names two codes: the war code's article is not
-                        # «non presente» in the codici penali militari, it is in annex 2.
-                        asked_annex = annex_value
-            else:
-                # An act cited by type, date and number whose text is its annex (the TULPS,
-                # annex 1 of r.d. 773/1931): keyed like a code, by the annex.
-                annex_value = act_default_annex(norma.url)
-                if annex_value:
-                    log.info("Using the annex that is the act's text", act=norma.url, default_annex=annex_value)
-
-        log.info("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
-
-        # Smart article lookup: if no annex specified and not a hardcoded codice,
-        # check if the article actually exists in the dispositivo or in an annex
-        # SKIP smart lookup if user explicitly requested dispositivo (empty string)
-        if annex_value is None and not explicit_dispositivo and norma.url:
-            try:
-                # Fetch tree with metadata to check article locations
-                tree_result = await get_tree(norma.url, link=False, details=False, return_metadata=True)
-                if len(tree_result) == 3:
-                    tree_data, tree_count, tree_metadata = tree_result
-                    log.info("Smart lookup: fetched tree", article_count=tree_count, has_metadata=bool(tree_metadata))
-
-                    if tree_metadata and 'annexes' in tree_metadata and tree_count > 0:
-                        annexes = tree_metadata['annexes']
-                        log.info("Smart lookup: found annexes", annex_count=len(annexes))
-                        # Each part's numbers as canonical keys, once: normalising them for
-                        # every requested article cost ~0.6 s of blocking CPU on a range of
-                        # 100 articles of a code.
-                        part_keys = [
-                            {comparable_article_key(art) for art in annex_info.get('article_numbers', [])}
-                            for annex_info in annexes
-                        ]
-
-                        # For each requested article, check where it exists
-                        for article in articles:
-                            # Canonical keys on both sides, either spelling of the ordinal: the
-                            # tree writes "21 nonies" and the request "21-nonies", and a raw
-                            # comparison never found a suffixed article in its annex, so the
-                            # request went to the dispositivo and Normattiva answered its art. 1.
-                            wanted = comparable_article_key(article.strip())
-                            wanted_keys = {wanted, other_ordinal_spelling(wanted)} - {None}
-                            found_in_dispositivo = False
-                            found_in_annex = None
-                            best_annex = None
-                            best_annex_count = 0
-
-                            for annex_info, keys in zip(annexes, part_keys):
-                                annex_num = annex_info.get('number')  # None for dispositivo
-                                article_count = annex_info.get('article_count', 0)
-
-                                # Check if article exists in this section
-                                article_exists = not keys.isdisjoint(wanted_keys)
-
-                                if article_exists:
-                                    if annex_num is None:
-                                        # Found in dispositivo
-                                        found_in_dispositivo = True
-                                        log.info("Smart lookup: article found in dispositivo", article=article)
-                                    else:
-                                        # Found in an annex - track the one with most articles
-                                        if article_count > best_annex_count:
-                                            best_annex = annex_num
-                                            best_annex_count = article_count
-                                        log.info("Smart lookup: article found in annex", article=article,
-                                                 annex=annex_num, annex_article_count=article_count)
-
-                            # If article NOT in dispositivo but found in annex, auto-redirect
-                            if not found_in_dispositivo and best_annex is not None:
-                                annex_value = best_annex
-                                log.info("Smart lookup: auto-redirecting to annex",
-                                         article=article, target_annex=annex_value)
-                                break  # Use same annex for all articles in this request
-
-            except Exception as e:
-                log.warning("Smart lookup failed, proceeding without", error=str(e))
-
-        log.info("Final annex value after smart lookup", annex=annex_value)
-
-        # Where the existence check looks: the dispositivo alone ('') when the caller asked for
-        # it explicitly, otherwise the annex settled above, or the whole act (None). Without
-        # this an article that exists only in an annex passed the check, and Normattiva then
-        # answered the dispositivo's request with its art. 1.
-        scope = '' if explicit_dispositivo else annex_value
+        address = await self.resolve_norm_address(data, one_article=bool(part or comma))
+        norma, annex_value = address.norma, address.annex
+        explicit_dispositivo, asked_annex = address.explicit_dispositivo, address.asked_annex
 
         norma_visitata_list = []
         missing_articles = []
-        for article in articles:
-            cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
-            log.info("Processing article", article=cleaned_article)
-
-            cleaned_article, exists = await self._source_spelling(norma, cleaned_article, scope)
+        for cleaned_article, exists in address.checked:
             if exists is False:
                 log.info("Requested article is not in the act",
                          article=cleaned_article, norma=str(norma))
@@ -760,6 +718,243 @@ class NormaController:
 
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
         return norma_visitata_list
+
+    async def resolve_norm_address(self, data, one_article=False, strict=False):
+        """Where a request's articles are: the act, its date, the part, the articles as the act
+        spells them and whether the act holds them, with how sure each step is (`NormAddress`).
+
+        The address half of `create_norma_visitata_from_data`, shared with `/fetch_norm_links`
+        so that a fetch and a link cannot drift (design 2026-10-31-document-hyperlinks §3.1).
+        The fetch keeps its guesses (the biggest annex, the body over an annex, the whole act
+        when the index cannot be read); the link route reads `annex_basis`, `parts` and the
+        existence answers and refuses every guess. `strict` (the link route) stops before any
+        lookup when the date is not complete, never takes the AKN index's answer for a part it
+        cannot locate, and checks no article whose part could not be read.
+
+        Every line it logs that names the norm is at debug: the norms of a document the user
+        may hold confidential pass here, and the logs keep counts only.
+        """
+        act_type = data.get('act_type')
+        act_number = data.get('act_number')
+        norma_date = data.get('date')
+
+        # A consolidated EU version. Validated here so a Normattiva request
+        # carrying the field fails loudly instead of being silently ignored.
+        celex_consolidated = data.get('celex_consolidated') or None
+        if celex_consolidated and normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
+            raise ValidationError(
+                "celex_consolidated vale solo per atti EUR-Lex (regolamento ue, direttiva ue)"
+            )
+
+        # Check if this is a codice with extractable details (e.g., "codice civile" -> "regio decreto 262/1942")
+        codice_details = extract_codice_details(act_type) if act_type else None
+        tipo_atto_reale = None
+        if codice_details and not norma_date and not act_number:
+            log.debug("Extracted codice details from URN map", codice_details=codice_details)
+            norma_date = codice_details['data']
+            act_number = codice_details['numero_atto']
+            tipo_atto_reale = codice_details['tipo_atto_reale']
+            # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
+
+        date_unavailable = False
+        if strict:
+            # Whether a year stood only because Normattiva did not answer: «try again», not
+            # «complete the date».
+            norma_date, date_unavailable = await read_request_date(act_type, norma_date, act_number)
+        else:
+            norma_date = await complete_request_date(act_type, norma_date, act_number)
+        log.debug("Using date", norma_date=norma_date)
+
+        norma = Norma(
+            tipo_atto=act_type,
+            data=norma_date if norma_date else None,
+            numero_atto=act_number,
+            tipo_atto_reale=tipo_atto_reale,
+            celex_consolidated=celex_consolidated
+        )
+        log.debug("Norma instance created", norma=norma)
+        address = NormAddress(
+            norma=norma,
+            is_eu=norma.tipo_atto.lower() in EU_ACT_TYPES,
+            date_complete=bool(norma.data and _ISO_DAY.match(norma.data)),
+            date_unavailable=date_unavailable,
+        )
+        if strict and not address.is_eu and not address.date_complete:
+            # The year stood: the address would carry «<year>-01-01», another act's day.
+            return address
+
+        articles = await parse_article_input(str(data.get('article') or ''), norma.url)
+        log.debug("Articles parsed", articles=articles)
+
+        # parse_article_input returns an error DICT rather than raising. Without
+        # this guard the loop below iterates the dict's KEYS and builds one
+        # NormaVisitata with numero_articolo='error', whose URN ends in ~arterror.
+        if isinstance(articles, dict) and 'error' in articles:
+            raise article_input_error(articles)
+        if one_article and len(articles) != 1:
+            raise ValidationError("La parte o il comma valgono per un solo articolo")
+        address.articles = articles
+
+        # Validate and sanitize annex parameter
+        annex_value = data.get('annex')
+        # Track if user explicitly requested dispositivo (empty string)
+        # This is different from "no preference" (null/undefined)
+        explicit_dispositivo = False
+
+        if annex_value is not None:
+            if isinstance(annex_value, str):
+                annex_value = annex_value.strip()
+                if annex_value == '':
+                    # Empty string = user explicitly wants dispositivo (skip smart lookup)
+                    explicit_dispositivo = True
+                    annex_value = None
+                elif annex_value.lower() == 'null' or annex_value.lower() == 'undefined':
+                    # null/undefined string = no preference (smart lookup may apply)
+                    annex_value = None
+            # Convert to string if it's a number
+            elif isinstance(annex_value, (int, float)):
+                annex_value = str(int(annex_value))
+
+        # The annex the caller named, before a code's default one is filled in: only
+        # that one can be pointed elsewhere when the article is not in it.
+        asked_annex = annex_value
+        if explicit_dispositivo:
+            address.annex_basis = 'dispositivo'
+        elif annex_value is not None:
+            address.annex_basis = 'asked'
+
+        # If no annex specified (and not explicit dispositivo), check if this is a codice with a default annex
+        # e.g., "codice civile" maps to "regio.decreto:1942-03-16;262:2" where :2 is the annex
+        if annex_value is None and not explicit_dispositivo:
+            normalized_type = normalize_act_type(act_type)
+            # codice_urn() matches case-insensitively: six keys in the table
+            # carry capitals ("codice del Terzo settore") while normalize_act_type
+            # returns the table's own spelling, so a bare `in` test missed them
+            # and those codici lost their default annex.
+            codice_fragment = codice_urn(normalized_type)
+            log.debug("Checking for default annex", act_type=act_type, normalized_type=normalized_type,
+                      in_codici_map=bool(codice_fragment))
+            if codice_fragment:
+                log.debug("Found codice URN", codice_urn=codice_fragment)
+                # Extract annex from URN pattern like "regio.decreto:1942-03-16;262:2"
+                # The annex is after the last colon if there's a number;number:annex pattern
+                annex_match = re.search(r';\d+:(\d+)$', codice_fragment)
+                log.debug("Annex regex match", match=str(annex_match))
+                if annex_match:
+                    annex_value = annex_match.group(1)
+                    address.annex_basis = 'table'
+                    log.debug("Using default annex from codice URN", codice=normalized_type, default_annex=annex_value)
+                    if normalized_type.lower() in CODE_ROWS_OF_SEVERAL_CODES:
+                        # The row names two codes: the war code's article is not
+                        # «non presente» in the codici penali militari, it is in annex 2.
+                        asked_annex = annex_value
+            else:
+                # An act cited by type, date and number whose text is its annex (the TULPS,
+                # annex 1 of r.d. 773/1931): keyed like a code, by the annex.
+                annex_value = act_default_annex(norma.url)
+                if annex_value:
+                    address.annex_basis = 'table'
+                    log.debug("Using the annex that is the act's text", act=norma.url, default_annex=annex_value)
+
+        log.debug("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
+
+        # Smart article lookup: if no annex specified and not a hardcoded codice,
+        # check if the article actually exists in the dispositivo or in an annex
+        # SKIP smart lookup if user explicitly requested dispositivo (empty string)
+        if annex_value is None and not explicit_dispositivo:
+            address.annex_basis = 'not_looked_up'
+        if annex_value is None and not explicit_dispositivo and norma.url:
+            try:
+                # Fetch tree with metadata to check article locations
+                tree_result = await get_tree(norma.url, link=False, details=False, return_metadata=True)
+                address.annex_basis = 'unread'
+                if len(tree_result) == 3:
+                    tree_data, tree_count, tree_metadata = tree_result
+                    log.debug("Smart lookup: fetched tree", article_count=tree_count, has_metadata=bool(tree_metadata))
+
+                    if tree_metadata and 'annexes' in tree_metadata and tree_count > 0:
+                        address.annex_basis = 'lookup'
+                        annexes = tree_metadata['annexes']
+                        log.debug("Smart lookup: found annexes", annex_count=len(annexes))
+                        # Each part's numbers as canonical keys, once: normalising them for
+                        # every requested article cost ~0.6 s of blocking CPU on a range of
+                        # 100 articles of a code.
+                        part_keys = [
+                            {comparable_article_key(art) for art in annex_info.get('article_numbers', [])}
+                            for annex_info in annexes
+                        ]
+
+                        # For each requested article, check where it exists
+                        for article in articles:
+                            # Canonical keys on both sides, either spelling of the ordinal: the
+                            # tree writes "21 nonies" and the request "21-nonies", and a raw
+                            # comparison never found a suffixed article in its annex, so the
+                            # request went to the dispositivo and Normattiva answered its art. 1.
+                            wanted = comparable_article_key(article.strip())
+                            wanted_keys = {wanted, other_ordinal_spelling(wanted)} - {None}
+                            found_in_dispositivo = False
+                            best_annex = None
+                            best_annex_count = 0
+                            # Every part that holds it: more than one is a guess below, which
+                            # the link route refuses.
+                            holding = address.parts.setdefault(article, [])
+
+                            for annex_info, keys in zip(annexes, part_keys):
+                                annex_num = annex_info.get('number')  # None for dispositivo
+                                article_count = annex_info.get('article_count', 0)
+
+                                # Check if article exists in this section
+                                article_exists = not keys.isdisjoint(wanted_keys)
+
+                                if article_exists:
+                                    holding.append(annex_num)
+                                    if annex_num is None:
+                                        # Found in dispositivo
+                                        found_in_dispositivo = True
+                                        log.debug("Smart lookup: article found in dispositivo", article=article)
+                                    else:
+                                        # Found in an annex - track the one with most articles
+                                        if article_count > best_annex_count:
+                                            best_annex = annex_num
+                                            best_annex_count = article_count
+                                        log.debug("Smart lookup: article found in annex", article=article,
+                                                  annex=annex_num, annex_article_count=article_count)
+
+                            # If article NOT in dispositivo but found in annex, auto-redirect
+                            if not found_in_dispositivo and best_annex is not None:
+                                annex_value = best_annex
+                                log.debug("Smart lookup: auto-redirecting to annex",
+                                          article=article, target_annex=annex_value)
+                                break  # Use same annex for all articles in this request
+
+            except Exception as e:
+                address.annex_basis = 'not_looked_up'
+                # The type only at warning: the message may carry the act's address.
+                log.warning("Smart lookup failed, proceeding without", error_type=type(e).__name__)
+                log.debug("Smart lookup failure", error=str(e))
+
+        log.debug("Final annex value after smart lookup", annex=annex_value)
+        address.annex = annex_value
+        address.explicit_dispositivo = explicit_dispositivo
+        address.asked_annex = asked_annex
+
+        # Where the existence check looks: the dispositivo alone ('') when the caller asked for
+        # it explicitly, otherwise the annex settled above, or the whole act (None). Without
+        # this an article that exists only in an annex passed the check, and Normattiva then
+        # answered the dispositivo's request with its art. 1.
+        scope = '' if explicit_dispositivo else annex_value
+        # A part that could not be read is not a link: the article is not looked for.
+        unlocated = strict and not address.is_eu and address.annex_basis in ('unread', 'not_looked_up')
+        for article in articles:
+            cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
+            log.debug("Processing article", article=cleaned_article)
+            if unlocated:
+                address.checked.append((cleaned_article, None))
+                continue
+            cleaned_article, exists = await self._source_spelling(
+                norma, cleaned_article, scope, akn_fallback=not strict)
+            address.checked.append((cleaned_article, exists))
+        return address
 
     async def _name_the_part(self, nv, part, comma):
         """Set `nv.parte` from the request's `parte` or `comma` (G-387 (a), G-389).
@@ -823,7 +1018,7 @@ class NormaController:
             and comparable_article_key(entry.get('numero', '')) == wanted
         ]
 
-    async def _source_spelling(self, norma, article, annex):
+    async def _source_spelling(self, norma, article, annex, akn_fallback=True):
         """`article` as the act spells its ordinal, and whether the act holds it.
 
         Returns `(article, exists)`, `exists` as `_article_exists_in_tree` answers it.
@@ -837,18 +1032,19 @@ class NormaController:
         the stored norm are the act's. Anything else, the tree unreadable included, keeps
         what was asked. One existence check for any other article, at most two for one
         whose ordinal has two spellings (a tree that failed is not cached).
+        `akn_fallback` as `_article_exists_in_tree` takes it.
         """
-        exists = await self._article_exists_in_tree(norma, article, annex)
+        exists = await self._article_exists_in_tree(norma, article, annex, akn_fallback)
         if exists is not False:
             return article, exists
         other = other_ordinal_spelling(comparable_article_key(article))
-        if other is not None and await self._article_exists_in_tree(norma, other, annex):
-            log.info("Article asked with the other spelling of its ordinal",
-                     asked=article, act_spelling=other)
+        if other is not None and await self._article_exists_in_tree(norma, other, annex, akn_fallback):
+            log.debug("Article asked with the other spelling of its ordinal",
+                      asked=article, act_spelling=other)
             return other, True
         return article, exists
 
-    async def _article_exists_in_tree(self, norma, article, annex):
+    async def _article_exists_in_tree(self, norma, article, annex, akn_fallback=True):
         """Whether `article` is in the act's article tree.
 
         Returns True/False, or None when neither the tree nor the AKN index can
@@ -870,6 +1066,12 @@ class NormaController:
         "669 terdecies" c.p.c., "2409 octiesdecies" c.c.) and a normaliser that
         stopped at its last entry would silently turn every article beyond it
         into "does not exist".
+
+        `akn_fallback=False` (the link route) answers None for an unusable tree instead of
+        asking the AKN index, which lists the act's articles without their part: the
+        article may be in the act and not in the part asked.
+
+        The lines it logs name no act: the address goes to debug.
         """
         act_url = getattr(norma, 'url', None) or str(norma)
         try:
@@ -886,20 +1088,22 @@ class NormaController:
             else:
                 articles = tree_result
         except Exception as exc:  # noqa: BLE001 - never fail the request on a tree error
-            log.warning("Tree unavailable, skipping existence check",
-                        error=str(exc), url=str(act_url)[:100])
+            log.warning("Tree unavailable, skipping existence check", error_type=type(exc).__name__)
+            log.debug("Tree unavailable", error=str(exc), url=str(act_url)[:100])
             return None
 
         # get_tree reports failures as a STRING in the articles slot.
         if isinstance(articles, str) or not articles:
-            log_ctx = {"tree": str(articles)[:120], "url": str(act_url)[:100]}
+            # The tree's message may quote the address: debug only.
+            log.debug("Tree unusable", tree=str(articles)[:120], url=str(act_url)[:100])
+            if not akn_fallback:
+                return None
             index = await fetch_act_index(norma)
             if index is not None:
-                log.info("Tree unusable, answered from the AKN index", **log_ctx)
+                log.info("Tree unusable, answered from the AKN index")
                 wanted = comparable_article_key(article)
                 return any(comparable_article_key(k) == wanted for k in index.keys)
-            log.warning("Tree unusable and no AKN index, skipping existence check",
-                        **log_ctx)
+            log.warning("Tree unusable and no AKN index, skipping existence check")
             return None
 
         wanted = comparable_article_key(article)
@@ -951,7 +1155,7 @@ class NormaController:
     def get_scraper_for_norma(self, normavisitata):
         act_type_normalized = normavisitata.norma.tipo_atto.lower()
         log.debug("Determining scraper for norma", act_type=act_type_normalized)
-        if act_type_normalized in ['tue', 'tfue', 'cdfue', 'regolamento ue', 'direttiva ue']:
+        if act_type_normalized in EU_ACT_TYPES:
             return eurlex_scraper
         else:
             return normattiva_scraper
@@ -1289,6 +1493,151 @@ class NormaController:
             # The type only: an exception's message may quote the string that raised it.
             log.error("Error in parse_query_batch", error_type=type(e).__name__)
             return jsonify({"error": "Internal error"}), 500
+
+    async def fetch_norm_links(self):
+        """The source's address of each norm, for the links of a filing, and no guess.
+
+        Body `{"norms": [{act_type, act_number?, date?, article, annex?}, ...], "pin_day"?}`:
+        1 to 200 norms of at most 30 distinct acts, one article each, the body at most 48 KB;
+        anything else is a 400 that names the limit. Answer `{"results": [{href, reason}]}` in
+        the order asked, `href` set only with reason `ok` (`LINK_REASONS`; design
+        2026-10-31-document-hyperlinks §3.1). Each norm goes through `resolve_norm_address`, the
+        fetch's own address function, strict: a year not completed is `date_incomplete`, an
+        article in more than one part `ambiguous_part`, an index or a source that does not
+        answer `source_unavailable` (never the act's text by default). The address is the text
+        in force on `pin_day`, today in Rome when absent (G-395); an act of the Union links its
+        EUR-Lex page, which has no address per article. The whole call has LINKS_BATCH_BUDGET
+        seconds: what is not settled by then is `source_unavailable`. The log line holds the
+        counts and the duration, never a norm: they are the citations of a document the user may
+        hold confidential.
+        """
+        started = time()
+        try:
+            if (request.content_length or 0) > LINKS_BATCH_MAX_BYTES:
+                return jsonify({"error": f"Body over {LINKS_BATCH_MAX_BYTES // 1024} KB"}), 400
+            raw = await request.get_data()
+            if len(raw) > LINKS_BATCH_MAX_BYTES:
+                return jsonify({"error": f"Body over {LINKS_BATCH_MAX_BYTES // 1024} KB"}), 400
+            try:
+                data = json.loads(raw)
+            except (ValueError, RecursionError):
+                return jsonify({"error": "Body must be JSON"}), 400
+            items = data.get("norms") if isinstance(data, dict) else None
+            if not isinstance(items, list) or not items:
+                return jsonify({"error": "norms must be a non-empty list"}), 400
+            if len(items) > LINKS_BATCH_MAX_NORMS:
+                return jsonify({"error": f"At most {LINKS_BATCH_MAX_NORMS} norms"}), 400
+            norms = []
+            for item in items:
+                norm = _link_norm(item)
+                if isinstance(norm, str):
+                    return jsonify({"error": norm}), 400
+                norms.append(norm)
+            pin_day, refused = _link_pin_day(data.get("pin_day"))
+            if refused:
+                return jsonify({"error": refused}), 400
+
+            # Each distinct norm once, grouped by act.
+            acts, keys = {}, []
+            for norm in norms:
+                key = tuple(norm.get(field) for field in _LINK_FIELDS)
+                keys.append(key)
+                acts.setdefault(_link_act_key(norm), {})[key] = norm
+            if len(acts) > LINKS_BATCH_MAX_ACTS:
+                return jsonify({"error": f"At most {LINKS_BATCH_MAX_ACTS} distinct acts"}), 400
+
+            budget = LINKS_BATCH_BUDGET - (time() - started)
+            settled = await self._norm_links(acts.values(), pin_day, budget)
+            results = []
+            for key in keys:
+                href, reason = settled.get(key, (None, 'source_unavailable'))
+                results.append({"href": href, "reason": reason})
+            log.info("fetch_norm_links", norms=len(norms), distinct=sum(len(n) for n in acts.values()),
+                     acts=len(acts), reasons=dict(Counter(r["reason"] for r in results)),
+                     duration_ms=round((time() - started) * 1000))
+            return jsonify({"results": results})
+        except Exception as e:
+            # The type only: an exception's message may quote a norm.
+            log.error("Error in fetch_norm_links", error_type=type(e).__name__)
+            return jsonify({"error": "Internal error"}), 500
+
+    async def _norm_links(self, acts, pin_day, budget):
+        """`{norm key: (href, reason)}` for the norms settled within `budget` seconds: the acts
+        LINKS_ACT_CONCURRENCY at a time, the norms of one act in turn (its date and index are
+        read once, then cached; when either fails, the act's other norms take the same reason
+        without asking again). A norm left out was not settled in time."""
+        settled = {}
+        gate = asyncio.Semaphore(LINKS_ACT_CONCURRENCY)
+
+        async def one_act(norms):
+            async with gate:
+                act_failed = None
+                for key, norm in norms.items():
+                    refused = _link_refused_before_lookup(norm)
+                    if refused:
+                        settled[key] = (None, refused)
+                        continue
+                    if act_failed is not None:
+                        # The act's date or index did not come: a failure is not cached, and
+                        # asking again for each of its norms would hold the source's queue.
+                        settled[key] = act_failed
+                        continue
+                    href, reason, act_wide = await self._norm_link(norm, pin_day)
+                    settled[key] = (href, reason)
+                    if act_wide:
+                        act_failed = (None, reason)
+
+        tasks = [asyncio.create_task(one_act(norms)) for norms in acts]
+        _done, pending = await asyncio.wait(tasks, timeout=max(budget, 0))
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        return settled
+
+    async def _norm_link(self, norm, pin_day):
+        """`(href, reason, act_wide)` for one norm: `resolve_norm_address`, strict, and every
+        guess of the fetch path refused (design 2026-10-31-document-hyperlinks §3.1).
+        `act_wide` is true when the reason holds for every norm of the act: its date not
+        completed, its index or its date lookup not answering."""
+        refused = _link_refused_before_lookup(norm)
+        if refused:
+            return None, refused, False
+        try:
+            address = await self.resolve_norm_address(norm, strict=True)
+        except (ValidationError, ValueError):
+            # A type with no address, a date or an article that cannot be read.
+            return None, 'not_linkable', False
+        except ResourceNotFoundError:
+            return None, 'article_missing', False
+        except Exception as exc:  # noqa: BLE001 - the index, the rate limit, the network
+            log.warning("fetch_norm_links: a norm not settled", error_type=type(exc).__name__)
+            return None, 'source_unavailable', True
+        if not address.is_eu and not address.date_complete:
+            # The year stood: «<year>-01-01» is another act's day, never sent as an address.
+            # Normattiva silent or slow is the source's fault, not the text's: «Riprova».
+            return None, ('source_unavailable' if address.date_unavailable else 'date_incomplete'), True
+        if len(address.checked) != 1:
+            return None, 'not_linkable', False
+        article, exists = address.checked[0]
+        if not address.is_eu:
+            if address.annex_basis in ('unread', 'not_looked_up'):
+                return None, 'source_unavailable', True
+            if address.annex_basis == 'lookup' and len(address.parts.get(address.articles[0], ())) > 1:
+                # The body and an annex, or two annexes: the fetch's guess is never a link.
+                return None, 'ambiguous_part', False
+        if exists is None:
+            # The index of the part did not answer (a code's annex, an EU act's page).
+            return None, 'source_unavailable', True
+        if exists is False:
+            return None, 'article_missing', False
+        if address.is_eu:
+            href = address.norma.url
+        else:
+            href = NormaVisitata(norma=address.norma, numero_articolo=article, versione='vigente',
+                                 data_versione=pin_day, allegato=address.annex).urn
+        href = _source_href(href)
+        return (href, 'ok', False) if href else (None, 'not_linkable', False)
 
     async def extract_citations_endpoint(self):
         """Detect normative citations embedded in free text (shared linker).
@@ -1652,6 +2001,28 @@ class NormaController:
             return jsonify({'kind': kind, 'id': element_id, 'data': data})
         except Exception as exc:
             return self._error_response(exc, 'fetch_massimario')
+
+    async def fetch_rassegne(self):
+        """The Massimario's review paragraphs citing a norm, by year, a page at a time
+        (`rassegne_routes`): 200 (`total: 0` when no store is built), 400
+        `richiesta_non_valida`, 503 `rassegne_non_disponibili` (a store that cannot be read or
+        of an unknown schema). Reads a local file only."""
+        try:
+            answer, status = await rassegne_routes.fetch_rassegne(request.args)
+        except Exception:
+            log.exception("Rassegne lookup failed unexpectedly")
+            return jsonify({'detail': 'errore_interno'}), 500
+        return jsonify(answer), status
+
+    async def massimario_volume_records(self, volume_id):
+        """A volume's paragraph records and parse report from the store. Internal route
+        (MERL-T): 200, 400, 404 `volume_non_presente`, 503 `rassegne_non_disponibili`."""
+        try:
+            answer, status = await rassegne_routes.volume_records(volume_id)
+        except Exception:
+            log.exception("Massimario volume records failed unexpectedly")
+            return jsonify({'detail': 'errore_interno'}), 500
+        return jsonify(answer), status
 
     async def parse_decision(self):
         """Decisions as a lawyer writes them → the references /fetch_decision takes (design

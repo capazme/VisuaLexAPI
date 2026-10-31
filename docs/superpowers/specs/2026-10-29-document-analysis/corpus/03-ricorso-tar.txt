@@ -1,0 +1,28 @@
+TRIBUNALE AMMINISTRATIVO REGIONALE PER LA REGIONE DI ESEMPIO
+RICORSO
+
+proposto da Gamma S.r.l. contro il Comune di Esempio, per l'annullamento, previa sospensione, del provvedimento prot. n. 4521/2024 con cui è stata ordinata la demolizione di una tettoia.
+
+FATTO
+
+Il Comune, con il provvedimento impugnato, ha qualificato la tettoia come nuova costruzione priva di permesso di costruire e ne ha ordinato la demolizione ai sensi dell'[[art. 31 del d.P.R. 6 giugno 2001, n. 380|decreto del presidente della repubblica|380|2001|31]], senza comunicare l'avvio del procedimento.
+
+DIRITTO
+
+I. Violazione degli [[artt. 7 e 8 della legge 7 agosto 1990, n. 241|legge|241|1990|7,8]]. L'amministrazione ha omesso la comunicazione di avvio del procedimento. Né può invocarsi [[l'art. 21-octies, comma 2|legge|241|1990|21-octies|ctx]], perché il contenuto del provvedimento non era vincolato: la qualificazione dell'opera richiedeva valutazioni tecniche.
+
+II. Violazione dell'[[art. 3 l. 241/90|legge|241|1990|3]]. Il provvedimento non indica i presupposti di fatto né le ragioni giuridiche della qualificazione. La motivazione per relationem è ammessa solo se l'atto richiamato è reso disponibile (comma 3 dello stesso articolo).
+
+III. Violazione dell'[[art. 3, comma 1, lett. e.5), del Testo unico edilizia|decreto del presidente della repubblica|380|2001|3]]. La tettoia, di superficie inferiore a 20 mq e priva di pareti, è pertinenza e non nuova costruzione; rientra semmai nell'edilizia libera di cui all'[[art. 6 T.U.E.|decreto del presidente della repubblica|380|2001|6]] o, al più, è soggetta a SCIA ai sensi dell'[[art. 22 del d.P.R. n. 380/2001|decreto del presidente della repubblica|380|2001|22]], con la sola sanzione pecuniaria dell'[[art. 37|decreto del presidente della repubblica|380|2001|37|ctx]] del medesimo decreto.
+
+IV. Violazione del principio di proporzionalità ([[art. 1 della legge n. 241 del 1990|legge|241|1990|1]]) e dell'[[art. 97 Cost.|costituzione|||97]]. L'ordine di demolizione colpisce un manufatto realizzato da oltre vent'anni, senza alcuna ponderazione dell'affidamento.
+
+V. Sulla domanda cautelare. Sussistono i presupposti dell'[[art. 55 c.p.a.|codice del processo amministrativo|||55]]: il fumus emerge dai motivi che precedono; il periculum dall'imminente esecuzione della demolizione, pregiudizio grave e irreparabile. Si chiede in subordine la definizione del giudizio in camera di consiglio ai sensi dell'[[art. 60 cod. proc. amm.|codice del processo amministrativo|||60]].
+
+VI. Sulla competenza e sul termine. Il ricorso è tempestivo, perché notificato entro sessanta giorni dalla piena conoscenza ([[art. 29 c.p.a.|codice del processo amministrativo|||29]]), e il Tribunale adito è competente per territorio ai sensi dell'[[art. 13 c.p.a.|codice del processo amministrativo|||13]].
+
+Si rammenta, infine, che la Corte costituzionale (sent. n. 140/2018) ha escluso che l'ordinanza di demolizione possa prescindere dall'accertamento della consistenza dell'opera, e che la delibera della Giunta n. 12/2020 non ha valore di regolamento edilizio.
+
+P.Q.M.
+
+Si chiede l'annullamento del provvedimento impugnato, previa sospensione. Si dichiara che il contributo unificato è dovuto nella misura di cui all'[[art. 13, comma 6-bis, del d.P.R. 30 maggio 2002, n. 115|decreto del presidente della repubblica|115|2002|13]].
