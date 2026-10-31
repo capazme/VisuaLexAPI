@@ -314,7 +314,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
       showToast(display.copyBlockedReason ?? '', 'info');
       return;
     }
-    const pinDay = linkPinDay(norma, display?.citeAs ?? article?.validity, article?.upcoming, todayInRome());
+    const pinDay = linkPinDay(norma, display?.citeAs ?? article?.validity, todayInRome());
     const link = normLink({ ...norma, urn: linkUrn }, citationNow(), pinDay);
     if (!link) return;
     try {

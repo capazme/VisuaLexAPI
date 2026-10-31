@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatNormCitation } from './citation';
 import { copyNormLink, linkPinDay, normLink, normLinkActionLabel, normLinkHtml, normLinkToast } from './normattivaLink';
+import { todayInRome } from './dateUtils';
 import type { ArticleValidity } from '../types';
 
 const CC = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043';
@@ -41,26 +42,70 @@ describe('normLink', () => {
 
   it('fixes an undated address to the text on screen when Normattiva would open another (G-355)', () => {
     const today = '2026-10-21';
-    const upcoming = { change: 'abrogated', valid_from: '2027-01-01', version_number: null };
     const current: ArticleValidity = { state: 'current', valid_from: '2005-01-01', valid_to: null, version_number: 3, act_updated: null, request_in_window: null };
-    const pin = linkPinDay(civil, current, upcoming, today);
+    const pin = linkPinDay(civil, current, today);
     expect(pin).toBe(today);
     expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, pin)?.href).toBe(`${CC}!vig=${today}`);
     expect(normLink(civil, null, pin)?.href).toBe(`${CC}!vig=${today}`);
     // Past the day of the change, the citation names the closed window (`citeAs`): so does the link.
     const closed: ArticleValidity = { state: 'historical', valid_from: '2005-01-01', valid_to: '2026-12-31', version_number: 3, act_updated: null, request_in_window: null };
-    expect(linkPinDay(civil, closed, upcoming, '2027-01-05')).toBe('2026-12-31');
-    expect(linkPinDay(civil, { ...closed, valid_to: null }, undefined, today)).toBe('2005-01-01');
-    // Nothing announced: the undated address is the text in force.
-    expect(linkPinDay(civil, current, undefined, today)).toBeUndefined();
+    expect(linkPinDay(civil, closed, '2027-01-05')).toBe('2026-12-31');
+    expect(linkPinDay(civil, { ...closed, valid_to: null }, today)).toBe('2005-01-01');
+    // Nothing announced: the text in force is still fixed to today (G-395).
+    expect(linkPinDay(civil, current, today)).toBe(today);
+    expect(linkPinDay(civil, undefined, today)).toBe(today);
+    // Without a pin day an address stays as the API gave it.
     expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, undefined)?.href).toBe(`${CC}!vig=`);
   });
 
+  it('carries today’s day in the link to the text in force, and says so in the toast (G-395)', () => {
+    const current: ArticleValidity = { state: 'current', valid_from: '2005-01-01', valid_to: null, version_number: 3, act_updated: null, request_in_window: null };
+    const link = normLink({ ...civil, urn: `${CC}!vig=` }, null, linkPinDay(civil, current, '2026-10-31'));
+    expect(link?.href).toBe(`${CC}!vig=2026-10-31`);
+    expect(normLinkToast(link!)).toBe('Link Normattiva copiato (apre il testo in vigore al 31 ottobre 2026)');
+    // Elision and ordinal, as the citations write them.
+    const toast = (day: string) => normLinkToast(normLink({ ...civil, urn: `${CC}!vig=` }, null, day)!);
+    expect(toast('2026-11-08')).toContain("in vigore all'8 novembre 2026");
+    expect(toast('2026-11-01')).toContain('in vigore al 1° novembre 2026');
+    // No pin, no date in the toast.
+    expect(normLinkToast(normLink(civil, null)!)).toBe('Link Normattiva copiato');
+  });
+
+  it('follows the text on screen when a «current» text starts after today (G-395)', () => {
+    const ahead: ArticleValidity = { state: 'current', valid_from: '2026-12-01', valid_to: null, version_number: 4, act_updated: null, request_in_window: null };
+    expect(linkPinDay(civil, ahead, '2026-10-31')).toBe('2026-12-01');
+    expect(linkPinDay(civil, { ...ahead, valid_from: '2026-10-31' }, '2026-10-31')).toBe('2026-10-31');
+    expect(linkPinDay(civil, { ...ahead, valid_from: '2005-01-01' }, '2026-10-31')).toBe('2026-10-31');
+    expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, linkPinDay(civil, ahead, '2026-10-31'))?.href).toBe(`${CC}!vig=2026-12-01`);
+  });
+
+  it('keeps the day the reader chose when the answer is the current text (G-395)', () => {
+    const current: ArticleValidity = { state: 'current', valid_from: '1942-04-21', valid_to: null, version_number: 1, act_updated: null, request_in_window: true };
+    const day = linkPinDay(civil, current, '2026-10-31', '2005-06-01');
+    expect(day).toBe('2005-06-01');
+    expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, day)?.href).toBe(`${CC}!vig=2005-06-01`);
+    // An Italian spelling is read as the day; an unreadable one falls back to today.
+    expect(linkPinDay(civil, current, '2026-10-31', '1/6/2005')).toBe('2005-06-01');
+    expect(linkPinDay(civil, current, '2026-10-31', 'ieri')).toBe('2026-10-31');
+    // No day chosen: today. An act of the Union ignores the day.
+    expect(linkPinDay(civil, current, '2026-10-31', undefined)).toBe('2026-10-31');
+    expect(linkPinDay({ tipo_atto: 'regolamento ue' }, current, '2026-10-31', '2005-06-01')).toBeUndefined();
+  });
+
+  it('takes the day in Rome around midnight, not the UTC one', () => {
+    const at = (iso: string) => todayInRome(new Date(iso));
+    // 22:30 UTC on 31 Oct is still the 31st in Rome (CET, 23:30); 23:30 UTC is already 1 Nov.
+    expect(at('2026-10-31T22:30:00Z')).toBe('2026-10-31');
+    expect(at('2026-10-31T23:30:00Z')).toBe('2026-11-01');
+    expect(at('2026-10-24T22:30:00Z')).toBe('2026-10-25'); // CEST, UTC+2
+    const day = at('2026-10-31T23:30:00Z');
+    expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, linkPinDay(civil, undefined, day))?.href).toBe(`${CC}!vig=2026-11-01`);
+  });
+
   it('never moves an address that names its text, nor an act of the Union', () => {
-    const upcoming = { change: 'amended', valid_from: '2027-01-01', version_number: null };
-    expect(linkPinDay({ ...civil, versione: 'vigente', data_versione: '2010-01-01' }, undefined, upcoming, '2026-10-21')).toBeUndefined();
-    expect(linkPinDay({ ...civil, versione: 'originale' }, undefined, upcoming, '2026-10-21')).toBeUndefined();
-    expect(linkPinDay({ tipo_atto: 'regolamento ue' }, undefined, upcoming, '2026-10-21')).toBeUndefined();
+    expect(linkPinDay({ ...civil, versione: 'vigente', data_versione: '2010-01-01' }, undefined, '2026-10-21')).toBeUndefined();
+    expect(linkPinDay({ ...civil, versione: 'originale' }, undefined, '2026-10-21')).toBeUndefined();
+    expect(linkPinDay({ tipo_atto: 'regolamento ue' }, undefined, '2026-10-21')).toBeUndefined();
     expect(normLink({ ...civil, urn: `${CC}!vig=2010-01-01` }, null, '2026-10-21')?.href).toBe(`${CC}!vig=2010-01-01`);
     expect(normLink({ ...civil, urn: `${CC}@originale` }, null, '2026-10-21')?.href).toBe(`${CC}@originale`);
     expect(normLink(civil, null, 'not a day')?.href).toBe(CC);
