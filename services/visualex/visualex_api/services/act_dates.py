@@ -118,6 +118,12 @@ async def _resolve_one(urn: str) -> Optional[str]:
     return full
 
 
+def is_year_only(urn: object) -> bool:
+    """Whether `resolve_many` takes this URN: `urn:nir:<authority>:<type>:<year>;<number>`,
+    no annex, no article (the reviews' store asks only for these, `massimario/build.py`)."""
+    return isinstance(urn, str) and bool(_YEAR_ONLY.fullmatch(urn))
+
+
 async def resolve_many(urns) -> dict[str, Optional[str]]:
     """Validate every URN first, then resolve them one by one (the client paces requests).
 

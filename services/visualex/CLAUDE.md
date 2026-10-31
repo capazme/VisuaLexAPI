@@ -125,9 +125,20 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     from the part's page (it states its window but not the act's `act_updated`), `parti` from the article page;
     `testo_parziale` is true (also when the article page has left the cache and `parti` is null). After a restart a part's page is read again in its session, never requested by its
     key (`_page_left_the_cache`)
-  - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
-    portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
-    down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
+  - `massimario_portal.py` — one element of the Massimario portal (MERL-T's internal
+    `/fetch_massimario`, and the store's build with `--portal`), behind a firewall, so paced
+    (≥ 1.5 s, the environment can only slow it down), the client's own retries off, a 403 or
+    429 is a stop (`429` to the caller).
+  - `massimario/` — the Massimario's annual reviews in the core (design
+    docs/superpowers/specs/2026-10-30-rassegne-without-merlt-design.md, option (a), G-394): the
+    parsing moved from MERL-T (`paragraphs`, `citations`, `urns`, `rv_bands` + `rv_bands.json`,
+    `identity`, the reading half of `volume`), the paragraph records with the volume's parse report
+    (`records`, `PARSER_VERSION`), the store (`store`), its build command (`build`), the `Rv.` table's
+    builder (`rv_bands_build`) and the two routes (`routes`). It never imports MERL-T; MERL-T may read
+    the records. `identity.py` is a copy of MERL-T's graph key, pinned to the golden file's decision keys
+    (`tests/test_massimario_identity.py`), without the labels: the web writes a decision's label from
+    its fields. Until MERL-T's adapter reads records (PR 3 of the design), MERL-T keeps its own copies of
+    the parsing modules: a fix to the grammar lands in both, and is measured on the whole archive.
   - `act_dates.py` — acts cited by year only → their full date, through Normattiva's
     resolver, verified by the page's title (type, year and number; State acts of nine
     kinds only, because the resolver answers a regional URN with the State's act of the
@@ -423,6 +434,23 @@ POST unless noted, JSON bodies.
 - `GET /fetch_alias_catalog` — `act_names` (the names that name an act on their own, no bare
   type word: what «Analizza documento» looks for in the browser), the presets we ship plus the act names the
   resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
+- `GET /fetch_rassegne?urn=&anno=&archivio=&cursor=&limit=` — the Massimario's review paragraphs
+  citing a norm, from the store (`massimario/store.py`), for the article page: `urn` up to 500
+  characters, put through `normalize_norm_urn`; `anno` 1900–2100; `archivio` civile | penale; `cursor`
+  up to six digits; `limit` 1–50 (10). 200 `{urn, total, anni: [{anno, passi}], archivi, anno, items,
+  next_cursor}` (newest year first; the page of `anno` when it has paragraphs, else of the newest), each
+  item the panel's `RassegnePasso` (decisions without `label`); 200 with `total: 0` when no store is
+  built; 400 `richiesta_non_valida` with `errori`; 503 `rassegne_non_disponibili` for a store that
+  cannot be read or of an unknown schema. A local file only: no request leaves, no MERL-T hop. Not yet
+  in the Vite proxy nor the ingress (PR 2 of the design adds it to both, behind the login)
+- `GET /massimario/volume/<id>/records` — internal (MERL-T's ingestion, PR 3 of the design; not
+  routed by the ingress, not proxied by Vite): a volume's records in reading order and its parse
+  report, `{volume, parser_version, built_at, source, report, records}`; 404 `volume_non_presente`,
+  400, 503 as above. A record: `paragraph_key`, `ordine`, `anno`, `archivio`, `text`, `volume`,
+  `parte`, `capitolo {id, nome, titolo, autori, materie}`, `sezione`, `url`, `fonte`, `norme` (URN as
+  `normalize_norm_urn` writes it, `start`, `end`, `citazione`, `comma`, `articolo`), `decisioni` (`key`
+  or null with `motivo_senza_identita`, the citation's fields, de-duplicated by key), `pieces` (the
+  `[start, end]` of `split_for_vectors`, ≤ 2,000 characters)
 - `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
 - `POST /resolve_act_dates {"urns": [...]}` — internal (MERL-T): up to 20 year-only URNs (`urn:nir:stato:legge:1983;184`) → full URNs, through Normattiva's resolver; found dates cached a year. Only State acts of the nine kinds in
   `act_dates._TITLES` are resolved; any other URN, a page whose title is not that act's, a network failure and
@@ -668,7 +696,8 @@ only, which a read-only container needs),
 call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory;
 a few tens of KB for an ordinary act, a few hundred KB for a codice because of
 the per-article fingerprints), `HEALTH_DETAILED_TTL` (`120` — seconds the
-`/health/detailed` probe is cached, read at call time). Template in
+`/health/detailed` probe is cached, read at call time), `RASSEGNE_STORE` (unset:
+`data/rassegne-v<schema>.sqlite3`; a file path for another store). Template in
 `.env.example`.
 
 Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
@@ -700,6 +729,31 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
   door) and never sees the login token (`header_up -Authorization`). The login check is
   timed out after ten seconds (a `504`), so a server that hangs fails the request instead
   of holding it.
+
+## The Massimario's reviews store
+
+`data/rassegne-v1.sqlite3` (the schema version is in the name; `data/` is the `scrapers_data`
+volume in a container, ignored by git). Built by hand, never by `./start.sh`: an empty store means
+no panel, and a deploy never waits on the portal.
+
+- **Build** (from `services/visualex`; in a container, `docker compose exec scrapers …`):
+  `python -m visualex_api.services.massimario.build --archive <dir> [--volume N …]` reads a local
+  archive in the portal's JSON (no portal request; the whole corpus of 63 volumes takes about 45 s);
+  `--portal --volume N` reads the portal through the paced client (a few dozen requests a volume);
+  `--remove N`, `--list`. Year-only acts are completed through Normattiva and remembered in the
+  store (`resolved_acts`), so a rebuild does not ask again; `--no-resolve` asks nothing. The other
+  volumes are kept; the new file is put in place whole, or not at all; a store that cannot be read
+  stops the build (delete it and build again).
+- **Size** (31 October 2026): vol. 96 about 4 MB; the 63 volumes about 222 MB (40 MB gzipped).
+  Reading is one indexed query: art. 2043 c.c. (218 paragraphs over 14 years) in about 20 ms.
+- **Backups.** Not in `scripts/datakit`: the store is derived, and deleting it costs one rebuild.
+- **Schema changes.** The API refuses a store whose schema version it does not know (503, never a
+  guess at an older layout). A release that raises `SCHEMA_VERSION` adds a step to the release
+  checklist: rebuild or copy the new store before the deploy. A change that alters a record of the
+  same raw volume raises `PARSER_VERSION` (stored per volume; anchors, if ever decided, pin it).
+- **Rights.** The prose is the Office's (design §7): never in the repository. Tests use the
+  synthetic volume (`tests/massimario_fixture.py`); `tests/test_massimario_local.py` runs on a local
+  archive when `MASSIMARIO_ARCHIVE` names it.
 
 ## Critical Files
 

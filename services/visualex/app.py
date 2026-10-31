@@ -30,6 +30,7 @@ from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
 from visualex_api.services.akn_parser import comparable_article_key
 from visualex_api.tools.article_suffixes import other_ordinal_spelling
 from visualex_api.services import act_dates, massimario_portal
+from visualex_api.services.massimario import routes as rassegne_routes
 from visualex_api.services.normattiva_validity import (
     read_upcoming_request,
     read_validity,
@@ -482,6 +483,14 @@ class NormaController:
         self.app.add_url_rule('/fetch_massimario', view_func=self.fetch_massimario, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only (not routed by the ingress).
         self.app.add_url_rule('/resolve_act_dates', view_func=self.resolve_act_dates, methods=['POST'])
+        # The Massimario's reviews citing a norm, from the core's store (design
+        # 2026-10-30-rassegne-without-merlt, G-394): read by the article page. The web and the
+        # ingress take it in the next PR (Vite proxy, the ingress's @legal list, behind the login).
+        self.app.add_url_rule('/fetch_rassegne', view_func=self.fetch_rassegne, methods=['GET'])
+        # Internal: a volume's paragraph records for MERL-T's ingestion. Not routed by the
+        # ingress nor proxied by Vite, like /fetch_massimario.
+        self.app.add_url_rule('/massimario/volume/<volume_id>/records', view_func=self.massimario_volume_records,
+                              methods=['GET'])
         # Internal: the server's POST /api/dossiers/:id/decisions only (design 2026-10-12 §2.1).
         # Not routed by the ingress (/parse_query* does not cover it) nor proxied by Vite.
         self.app.add_url_rule('/parse_decision', view_func=self.parse_decision, methods=['POST'])
@@ -1652,6 +1661,28 @@ class NormaController:
             return jsonify({'kind': kind, 'id': element_id, 'data': data})
         except Exception as exc:
             return self._error_response(exc, 'fetch_massimario')
+
+    async def fetch_rassegne(self):
+        """The Massimario's review paragraphs citing a norm, by year, a page at a time
+        (`rassegne_routes`): 200 (`total: 0` when no store is built), 400
+        `richiesta_non_valida`, 503 `rassegne_non_disponibili` (a store that cannot be read or
+        of an unknown schema). Reads a local file only."""
+        try:
+            answer, status = await rassegne_routes.fetch_rassegne(request.args)
+        except Exception:
+            log.exception("Rassegne lookup failed unexpectedly")
+            return jsonify({'detail': 'errore_interno'}), 500
+        return jsonify(answer), status
+
+    async def massimario_volume_records(self, volume_id):
+        """A volume's paragraph records and parse report from the store. Internal route
+        (MERL-T): 200, 400, 404 `volume_non_presente`, 503 `rassegne_non_disponibili`."""
+        try:
+            answer, status = await rassegne_routes.volume_records(volume_id)
+        except Exception:
+            log.exception("Massimario volume records failed unexpectedly")
+            return jsonify({'detail': 'errore_interno'}), 500
+        return jsonify(answer), status
 
     async def parse_decision(self):
         """Decisions as a lawyer writes them → the references /fetch_decision takes (design
