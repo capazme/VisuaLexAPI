@@ -444,7 +444,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   on `{normaKey, articleId, version}` with comments, toggled votes and
   reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
   `requireAdmin`. `sort=recent|active|popular` orders by `createdAt`,
-  `updatedAt`, vote count. A thread may carry a `passage` (quotation, plain-text
+  `lastActivityAt` (set at creation and by a reply, by nothing else), vote count. A thread may carry a `passage` (quotation, plain-text
   offset, 32-char prefix and suffix), `articleUrn` and `textHash` (SHA-256 of the plain
   projection when the thread was opened); the title is optional only for passage
   threads; `GET /article-discussions/passages` lists an article's passage threads
@@ -469,7 +469,53 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   sets `passage_released_by` null and keeps the release (the CHECK allows it).
   Every discussion route answers its 400s and 404s in Italian (`parseItalian`,
   not the global handler's English prefix); moderation on a missing thread is a
-  404 «Discussione non trovata».
+  404 «Glossa non trovata».
+- **The Forum's Community** (spec `docs/superpowers/specs/2026-10-20-forum-community-glosse-design.md`,
+  G-304, G-392): discussion on someone's glossa, built on the tables above. Pull request 1 (migrations
+  `20261031100000_community_licence_key`, `20261031100001_forum_community`) holds the data: a glossa, a
+  reply or a comment **outlives its author's account** (`user_id` SET NULL; every view says «utente
+  cancellato» and a null author is nobody's own, G-307); a report names its item by a **plain id, no
+  foreign key**, and keeps `reported_text` (the item as reported) for the moderators until 90 days after
+  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes, also deletes
+  notifications read 90 days ago); `article_comment_reports`, `forum_notifications`,
+  `forum_moderation_log`, `users.forum_moderator`; accepted answer, edit/delete marks (emptied text is
+  `''`, a CHECK), lock, `materia`, `licence_text_id` (the version of `CONTRIBUTO_COMMUNITY` a row was
+  written under). `GET /auth/export` adds the user's votes, reports (never their copy, who closed them or
+  why) and notifications, drops `lockedById`, and counts anonymous replies among the others'. The closed lists (report reasons and hiding categories, `forum/reportReasons.ts`;
+  statuses; notification kinds; log actions) are CHECKs. **Pending PR2c** (the reader's panel cannot
+  meet them yet): a free report reason is read as `altro` with its text in `details`; no licence check
+  (`licence_text_id` stays null); releasing a quotation needs no reason; voting on one's own content is
+  allowed.
+  Pull request 2, the routes (`controllers/communityController.ts`, `forumModerationController.ts`,
+  `forumNotificationController.ts`, `routes/forumCommunity.ts`; helpers in `src/forum/`):
+  `GET /article-discussions/feed` (every listed glossa: `sort=active` by default |recent|popular|unanswered;
+  `kind`, `act`, `normaKey`, `court`, `materia`, `mine`, `participated`, `accepted`; pages of 1–50) and
+  `GET /article-discussions/:threadId` (replies with their comments nested, a stored third level flattened;
+  the accepted reply first, then votes, then the oldest), both carried over from #205 and withholding a
+  decision's quotation (`forum/views.ts` `isPassageWithheld`); `PATCH`/`DELETE` on a glossa and on
+  `/article-discussion-comments/:id` (the author; a deletion is `deleted` when nothing of anyone else's,
+  hidden included, hangs on it, else `emptied`); `POST …/:threadId/accept { commentId | null }`;
+  `POST /article-discussion-comments/:id/report`; replies at **two levels** (400 under a comment, a
+  comment 1–2,000 characters), 409 on a locked glossa. **Every write that adds under a glossa or decides
+  about what hangs on it locks the glossa, then the reply** (`forum/locks.ts`, `SELECT … FOR UPDATE`),
+  in that order. Visible = not hidden, not emptied (`VISIBLE`); a list shows an emptied glossa only while
+  something visible hangs on it (`LISTED_THREAD`), without its author's name. Moderation (moderators =
+  `users.forum_moderator` or admins, read from the database on every call, `forum/roles.ts`):
+  `GET /moderation/reports?status=` (one row per item, its text even hidden, its anchor whole, each
+  report's copy, `deleted` when gone for good; reporters not named), `POST /moderation/reports/:kind/:itemId/resolve
+  { action: hide|dismiss, category?, reason }` (one decision closes every pending report of the item; hiding
+  something gone is a 409), `PATCH /moderation/threads/:id { hidden?, locked?, category?, reason }`,
+  `PATCH /moderation/comments/:id { hidden, category?, reason }`, `POST /moderation/:kind/:itemId/empty
+  { reason }` (admins, anonymous contributions only); each act in `forum_moderation_log`. The admin route
+  `PATCH /admin/article-discussions/:id` no longer hides (400) and logs releases. `PUT /admin/users/:id
+  { forumModerator, reason }` appoints and revokes, with a required reason, logged. Notifications
+  (`forum/notify.ts`, in the event's transaction, never one's own act, never naming who acted):
+  `GET /forum/notifications`, `POST /forum/notifications/read { ids | all }`; the Forum's badge
+  (`/notifications/forum-unread-count`) adds `community` to its total, and `pendingReports` (items, not in
+  the total) for moderators. Daily per-user limits (`forum/limits.ts`, 24 hours from the first write:
+  `FORUM_DAILY_GLOSSE` 10, `FORUM_DAILY_REPLIES` 60, `FORUM_DAILY_REPORTS` 20, `FORUM_DAILY_EDITS` 60;
+  an Italian 429; a refused write gives its point back; fail-open). None of these routes is in
+  `oauth/delegatedRoutes.ts`: a connected application can neither read nor write the Community.
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing
@@ -860,8 +906,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   tokens; the MERL-T consent and its history as `data.merltConsenso` and
   `data.merltConsensoStorico`, with the notice version of each choice) and
   `DELETE /auth/account` (password re-checked; every relation to
-  `User` cascades, except the community's study cards, which stay without an
-  author, and the validators' votes and the text versions an administrator wrote,
+  `User` cascades, except the community's study cards and the Community's glosse,
+  replies and comments, which stay without an author, the reports and moderation
+  acts, which stay without their person, and the validators' votes and the text versions an administrator wrote,
   which stay anonymous: see LingoLex cards). A person who ever gave MERL-T a
   consent also gets an erasure request in MERL-T, written in the deletion's
   transaction and retried until MERL-T confirms (`services/merlt/userData.ts`,
