@@ -43,7 +43,7 @@ export interface Stub {
   }[];
   introspectionDown?: boolean;
   /** What GET /api/features answers (public, asked at each session's start; not recorded in apiCalls). */
-  features?: { assistantPassages?: boolean; assistantGlosses?: boolean } | 'down';
+  features?: { assistantPassages?: boolean; assistantGlosses?: boolean; lingoCourses?: boolean; articleParts?: boolean } | 'down';
   /** The user's study cards, as GET /api/lingo/cards answers them. */
   cards: {
     id: string;
@@ -55,10 +55,37 @@ export interface Stub {
     createdAt: string;
     ancore?: { normaKey: string; articleId: string; urn: string; isPrimary: boolean }[];
   }[];
+  /** Percorsi (S1's routes): the user's courses as `GET /lingo/corsi/:id/struttura` answers them. */
+  courses: StubCourse[];
+  /** Whether the user accepted the declaration `MATERIALE_STUDIO`: until then creating a course is a 409. */
+  declarationAccepted: boolean;
+}
+
+export interface StubCourse {
+  id: string;
+  titolo: string;
+  materia: string;
+  moduliPrevisti: number;
+  competenze: { codice: string; ordine: number; testo: string }[];
+  moduli: {
+    id: string;
+    ordine: number;
+    titolo: string;
+    minuti: number | null;
+    domandePrima: string[];
+    sostituisceId: string | null;
+    competenze: string[];
+    blocchi: { ordine: number; titolo: string | null; testo: string; parole: number; citazioni: unknown[] }[];
+    domande: { id: string; tipo: string; testo: string; competenze: string[]; blocco: number | null; [key: string]: unknown }[];
+  }[];
+  esami: { id: string; perIscrizione: boolean; consegnato: boolean; createdAt: string; domande: { id: string; testo: string; competenze: string[]; [key: string]: unknown }[] }[];
+  stato: string;
+  segnalazioni: { domandaId: string; motivo: string | null; segnalataIl: string }[];
+  giudizi: { moduloId: string; giudizio: number; nota: string | null }[];
 }
 
 export async function startStubs() {
-  const stub: Stub = { tokens: {}, apiCalls: [], exchanges: [], dossiers: [], cards: [] };
+  const stub: Stub = { tokens: {}, apiCalls: [], exchanges: [], dossiers: [], cards: [], courses: [], declarationAccepted: true };
   const as = express();
   as.use(express.urlencoded({ extended: false }));
   as.use(express.json());
@@ -123,6 +150,59 @@ export async function startStubs() {
     if (req.method === 'GET' && card) {
       const found = stub.cards.find((c) => c.id === card[1]);
       return void (found ? res.json(found) : res.status(404).json({ detail: 'Scheda non trovata.' }));
+    }
+    // Percorsi, as S1 answers (apps/server routes/lingoCorsi.ts): every course the caller's, anything else 404.
+    if (req.method === 'GET' && path === '/lingo/corsi') {
+      return void res.json(
+        stub.courses.map((c) => ({
+          id: c.id,
+          titolo: c.titolo,
+          materia: c.materia,
+          stato: c.stato,
+          competenze: { acquisite: 0, totale: c.competenze.length },
+          moduli: { contati: c.moduli.length, previsti: c.moduliPrevisti },
+          prossimo: c.moduli[0] ? { tipo: 'modulo', id: c.moduli[0].id, ordine: c.moduli[0].ordine, titolo: c.moduli[0].titolo } : null,
+          createdAt: '2026-10-29T10:00:00.000Z',
+        })),
+      );
+    }
+    if (req.method === 'POST' && path === '/lingo/corsi') {
+      if (!stub.declarationAccepted) {
+        return void res.status(409).json({
+          detail: 'Prima di creare un percorso devi accettare la dichiarazione sul materiale di studio, in VisuaLex › Percorsi.',
+          richiedeTesto: { id: 't1', chiave: 'MATERIALE_STUDIO', versione: 1 },
+          link: '/studia/percorsi',
+        });
+      }
+      const dossier = stub.dossiers.find((d) => d.id === req.body.dossierId);
+      if (!dossier) return void res.status(404).json({ detail: 'Dossier non trovato.' });
+      const competenze = (req.body.competenze as { testo: string }[]).map((c, i) => ({ codice: `C${i + 1}`, ordine: i + 1, testo: c.testo }));
+      const course: StubCourse = { id: `p${stub.courses.length + 1}`, titolo: req.body.titolo, materia: req.body.materia, moduliPrevisti: req.body.moduliPrevisti, competenze, moduli: [], esami: [], stato: 'in-preparazione', segnalazioni: [], giudizi: [] };
+      stub.courses.push(course);
+      return void res.status(201).json({ id: course.id, titolo: course.titolo, materia: course.materia, moduliPrevisti: course.moduliPrevisti, competenze: competenze.map(({ codice, testo }) => ({ codice, testo })), dossier: { id: dossier.id, name: dossier.name } });
+    }
+    const course = path.match(/^\/lingo\/corsi\/([^/]+)\/(moduli|esami|struttura)$/);
+    if (course) {
+      const found = stub.courses.find((c) => c.id === course[1]);
+      if (!found) return void res.status(404).json({ detail: 'Percorso non trovato.' });
+      if (req.method === 'GET' && course[2] === 'struttura') return void res.json(found);
+      if (req.method === 'POST' && course[2] === 'moduli') {
+        const blocks = req.body.blocchi as { citazioni?: unknown[] }[];
+        return void res.status(201).json({
+          id: `m-new`,
+          ordine: req.body.ordine,
+          titolo: req.body.titolo,
+          sostituisceId: req.body.sostituisceId ?? null,
+          blocchi: blocks.length,
+          parole: 0,
+          citazioni: blocks.reduce((n, b) => n + (b.citazioni?.length ?? 0), 0),
+          domande: (req.body.quiz as unknown[]).length + 1,
+          corso: { moduli: { contati: found.moduli.length + 1, previsti: found.moduliPrevisti } },
+        });
+      }
+      if (req.method === 'POST' && course[2] === 'esami') {
+        return void res.status(201).json({ id: 'e-new', domande: (req.body.domande as unknown[]).length + 1, perIscrizione: found.esami.length > 0 });
+      }
     }
     const trashItems = path.match(/^\/dossiers\/([^/]+)\/trash-items$/);
     if (req.method === 'POST' && trashItems) {

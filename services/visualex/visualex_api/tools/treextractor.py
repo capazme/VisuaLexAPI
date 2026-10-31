@@ -11,7 +11,7 @@ from .cache_manager import get_cache_manager
 from .egress import is_allowed
 from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
-from ..services.akn_parser import normalize_article_key
+from ..services.akn_parser import comparable_article_key, normalize_article_key
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..services import eurlex_fetch
 from ..services.http_client import http_client
@@ -23,11 +23,14 @@ logging.basicConfig(level=logging.INFO,
 
 # Persistent cache for tree structures (survives restarts)
 _tree_cache = PersistentCache("tree", ttl=86400)  # 24 hours
+# The shape of the trees the keys hold: a tree stored before an article split into parts
+# became one article with its parts (G-387 (a)) is not read back.
+_TREE_FORMAT = "parts"
 
 
 def _full_key(normurn, link):
     """The persistent key of the widest Normattiva tree: section labels and metadata."""
-    return f"{normurn}|link={link}|details=True|metadata=True"
+    return f"{normurn}|link={link}|details=True|metadata=True|{_TREE_FORMAT}"
 
 
 def _narrow(result, count, metadata, details, return_metadata):
@@ -50,7 +53,7 @@ async def _eurlex_page(normurn):
     every article of the act."""
     cached_html = await get_cache_manager().get_persistent("eurlex").get(normurn)
     if eurlex_fetch.is_act_page(cached_html):
-        logging.info(f"EUR-Lex page from the scraper's cache: {normurn[:80]}")
+        logging.debug(f"EUR-Lex page from the scraper's cache: {normurn[:80]}")
         return cached_html, True
     return await eurlex_fetch.fetch_act_page(normurn, timeout_ms=45000), False
 
@@ -87,7 +90,7 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
         tuple: Se return_metadata=True: (articles, count, metadata)
                Altrimenti: (articles, count)
     """
-    logging.info(f"Fetching tree for norm URN: {normurn} (metadata={return_metadata})")
+    logging.debug(f"Fetching tree for norm URN: {normurn} (metadata={return_metadata})")
     if not normurn or not isinstance(normurn, str):
         logging.error("Invalid URN provided")
         if return_metadata:
@@ -95,12 +98,12 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
         return "Invalid URN provided", 0
 
     # Build cache key including options
-    cache_key = f"{normurn}|link={link}|details={details}|metadata={return_metadata}"
+    cache_key = f"{normurn}|link={link}|details={details}|metadata={return_metadata}|{_TREE_FORMAT}"
 
     # Check persistent cache first (survives server restarts)
     cached_result = await _tree_cache.get(cache_key)
     if cached_result:
-        logging.info(f"Persistent cache hit for tree: {normurn[:50]}")
+        logging.debug(f"Persistent cache hit for tree: {normurn[:50]}")
         if return_metadata:
             return (cached_result.get("result", []),
                    cached_result.get("count", 0),
@@ -118,7 +121,7 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
     if is_normattiva:
         full = await _tree_cache.get(_full_key(normurn, link))
         if full:
-            logging.info(f"Persistent cache hit for the full tree: {normurn[:50]}")
+            logging.debug(f"Persistent cache hit for the full tree: {normurn[:50]}")
             return _narrow(full.get("result", []), full.get("count", 0),
                            full.get("metadata", {}), details, return_metadata)
 
@@ -146,10 +149,12 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     # `normurn` comes from the caller (POST /fetch_tree): only a declared host is visited, by
     # the browser as by the client, and only Normattiva's or EUR-Lex's host.
     if not is_allowed(normurn):
-        logging.error(f"Tree refused for an undeclared host: {normurn[:80]}")
+        logging.error("Tree refused for an undeclared host")
+        logging.debug(f"Tree refused for an undeclared host: {normurn[:80]}")
         return failure(f"Host non consentito: {normurn[:80]}")
     if not is_eurlex and _source_of(normurn) != "normattiva":
-        logging.warning(f"Unrecognized norm URN format: {normurn}")
+        logging.warning("Unrecognized norm URN format")
+        logging.debug(f"Unrecognized norm URN format: {normurn}")
         return failure("Unrecognized norm URN format")
 
     try:
@@ -166,14 +171,18 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
             text = (await http_client.request("GET", normurn, source="normattiva",
                                               max_retries=0)).text
     except (NetworkError, DocumentNotFoundError) as e:
-        logging.error(f"HTTP error while fetching page: {e}")
+        # The type only above debug: the message carries the address.
+        logging.error("HTTP error while fetching the tree's page: %s", type(e).__name__)
+        logging.debug(f"HTTP error while fetching page: {e}")
         return failure(f"Failed to retrieve the page: {e}")
     except Exception as e:
-        logging.error(f"Unexpected error: {e}", exc_info=True)
+        logging.error("Unexpected error while fetching the tree's page: %s", type(e).__name__)
+        logging.debug(f"Unexpected error: {e}", exc_info=True)
         return failure(f"Unexpected error: {e}")
 
     if not text or len(text) < 500:
-        logging.error(f"Empty or too short response from {normurn[:50]}")
+        logging.error("Empty or too short response for a tree")
+        logging.debug(f"Empty or too short response from {normurn[:50]}")
         return failure("Empty response from server")
 
     soup = BeautifulSoup(text, 'html.parser')
@@ -184,7 +193,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         if count > 0:
             await _tree_cache.set(_full_key(normurn, link),
                                   {"result": result, "count": count, "metadata": metadata})
-            logging.info(f"Stored full tree in persistent cache: {normurn[:50]}, {count} articles")
+            logging.info(f"Stored full tree in persistent cache: {count} articles")
         return _narrow(result, count, metadata, details, return_metadata) + (from_copy,)
     else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
@@ -195,12 +204,12 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
 
     # Store in persistent cache for future restarts
     if count > 0:
-        cache_key = f"{normurn}|link={link}|details={details}|metadata={return_metadata}"
+        cache_key = f"{normurn}|link={link}|details={details}|metadata={return_metadata}|{_TREE_FORMAT}"
         cache_data = {"result": result, "count": count}
         if return_metadata:
             cache_data["metadata"] = metadata
         await _tree_cache.set(cache_key, cache_data)
-        logging.info(f"Stored tree in persistent cache: {normurn[:50]}, {count} articles")
+        logging.info(f"Stored tree in persistent cache: {count} articles")
 
     if return_metadata:
         return result, count, metadata, from_copy
@@ -227,6 +236,9 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
     - urn:...;262:1~art2 → art. 2 del primo allegato
     - urn:...;262:2~art7 → art. 7 del secondo allegato
     """
+    # Imported here: normattiva_parts reaches this module through text_op.
+    from ..services.normattiva_parts import _PART_LABEL
+
     logging.info("Parsing Normattiva structure (flat stateful iteration)")
     tree_div = soup.find('div', id='albero')
 
@@ -243,6 +255,9 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
     current_attachment = None
     annex_counter = 0
     in_allegati_section = False  # True after we see box_articoli "Allegati"
+
+    # (annex, article key) of each article seen split into parts: its first part is the article
+    split_seen = set()
 
     # Initialize main text (dispositivo) tracking - will be populated before annexes
     annexes_metadata[None] = {'articles': [], 'count': 0}
@@ -281,7 +296,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
                     annex_counter += 1
                     current_attachment = str(annex_counter)
 
-            logging.info(f"Detected link_allegato: {current_attachment} (label: {original_label})")
+            logging.debug(f"Detected link_allegato: {current_attachment} (label: {original_label})")
             if current_attachment not in annexes_metadata:
                 annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
                 annex_labels[current_attachment] = original_label
@@ -303,9 +318,9 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
                     current_attachment = str(annex_counter)
                     annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
                     annex_labels[current_attachment] = original_label
-                    logging.info(f"Detected box_allegati -> new Allegato {current_attachment}: {original_label}")
+                    logging.debug(f"Detected box_allegati -> new Allegato {current_attachment}: {original_label}")
                 else:
-                    logging.info(f"Detected box_allegati (before Allegati section, ignoring): {original_label}")
+                    logging.debug(f"Detected box_allegati (before Allegati section, ignoring): {original_label}")
 
                 if details:
                     result.append(original_label)
@@ -322,7 +337,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
             current_attachment = str(annex_counter)
             annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
             annex_labels[current_attachment] = original_label
-            logging.info(f"Detected box_allegati_small -> new Allegato {current_attachment}: {original_label}")
+            logging.debug(f"Detected box_allegati_small -> new Allegato {current_attachment}: {original_label}")
 
             if details:
                 result.append(original_label)
@@ -345,6 +360,20 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
             # Skip invalid article numbers (e.g., "orig", empty strings, non-article text)
             if not article_num or not re.match(r'^[\dIVXLCDM]', article_num, re.IGNORECASE):
                 logging.debug(f"Skipping invalid article number: '{article_num}'")
+                continue
+
+            part = _PART_LABEL.match(" ".join(article_num.split()))
+            if part:
+                # «1 (commi 101-200)»: one part of art. 1, never an article of its own.
+                article_num, article_data = _normattiva_part(part, normurn, link, current_attachment, split_seen)
+                result.append(article_data)
+                if article_data["parte"] is not None:
+                    continue
+                count_articles += 1
+                if return_metadata:
+                    annexes_metadata.setdefault(current_attachment, {'articles': [], 'count': 0})
+                    annexes_metadata[current_attachment]['count'] += 1
+                    annexes_metadata[current_attachment]['articles'].append(article_num)
                 continue
 
             article_data = _extract_normattiva_article(a_tag, normurn, link, attachment_number=current_attachment)
@@ -385,6 +414,33 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
     if return_metadata:
         return result, count_articles, metadata
     return result, count_articles
+
+
+def _normattiva_part(match, normurn, link, attachment_number, split_seen):
+    """`(article number, entry)` of one part of a split article, from its label's match.
+
+    Normattiva lists a long article as entries «1 (commi 1-100)» … «1 (commi 1301-1364)»
+    (art. 1 l. 296/2006). Each was an «article» numbered «1 (commi 101-200)», with a URL
+    built as if that were its number, so the index opened an article that does not exist.
+    Now each is an entry of article «1» with its range in `commi` and Normattiva's label in
+    `label`; the first one listed is the article itself (`parte` None, what its URN serves),
+    every other one names its part (`parte`: "101-200"), as a request names it (G-389).
+    """
+    number = match.group(1).strip()
+    commi = f"{match.group(2).lower()}-{match.group(3).lower()}"
+    seen = (attachment_number, comparable_article_key(number))
+    first = seen not in split_seen
+    split_seen.add(seen)
+    entry = {
+        "numero": number,
+        "allegato": attachment_number,
+        "parte": None if first else commi,
+        "commi": commi,
+        "label": match.group(0),
+    }
+    if link:
+        entry["url"] = _generate_article_url(normurn, number, attachment_number=attachment_number)
+    return number, entry
 
 
 def _extract_normattiva_article(a_tag, normurn, link, attachment_number=None):
@@ -439,7 +495,7 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     Returns:
         str: URL completo per l'articolo specifico.
     """
-    logging.info(f"Generating article URL for article_number: {article_number}, attachment_number: {attachment_number} based on normurn: {normurn}")
+    logging.debug(f"Generating article URL for article_number: {article_number}, attachment_number: {attachment_number} based on normurn: {normurn}")
 
     # Normalize article_number: rimuovi spazi e trattini, converti in minuscolo.
     # "270 bis.1" -> art270bis.1, "19-bis.1" -> art19bis.1, "314/2" -> art314/2,
@@ -468,12 +524,12 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     # Aggiungi il numero dell'allegato se fornito
     if attachment_number is not None:
         base_urn = f"{base_urn}:{attachment_number}"
-        logging.info(f"Added attachment number to URN: {base_urn}")
+        logging.debug(f"Added attachment number to URN: {base_urn}")
 
     # Costruisci il nuovo URN con l'articolo
     new_urn = f"{base_urn}~art{article_number}{sep}{suffix}" if suffix else f"{base_urn}~art{article_number}"
 
-    logging.info(f"Generated article URL: {new_urn}")
+    logging.debug(f"Generated article URL: {new_urn}")
     return new_urn
 
 

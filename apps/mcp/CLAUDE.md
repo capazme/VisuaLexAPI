@@ -39,8 +39,10 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   the protected resource metadata (RFC 9728,
   `/.well-known/oauth-protected-resource/mcp`). A tool whose scope the token
   lacks: 403 `insufficient_scope` (`TOOL_SCOPES` in `src/tools/dossier.ts`,
-  `CARD_TOOL_SCOPES` in `src/tools/cards.ts`),
-  decided before the request reaches the tools.
+  `CARD_TOOL_SCOPES` in `src/tools/cards.ts`, `GLOSS_TOOL_SCOPES`, `COURSE_TOOL_SCOPES`; `lingolex_salva_card`
+  with a `modulo` also needs `lingo:courses:write`),
+  decided before the request reaches the tools. A client signing in asks for every scope but `content:delete`
+  (`ALL_SCOPES` in `src/server.ts`), the courses' two included whether or not their switch is on.
 - **Calling the API** (`src/exchange.ts`) — `callApi` exchanges the client's
   token for a two-minute API token for every call (RFC 8693), with the
   narrowest scope, and maps the API's 400/401/403/404/409/429/503 to Italian
@@ -74,7 +76,9 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   then does not give up and retry. A cancelled call stops the steps not yet begun, and its log line says
   `outcome=cancelled`),
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
+  checked by `apps/server`; while `GET /features` says `articleParts: true`, the switch `article_parts`, its
+  description says a reference with a comma adds the part of a split article that holds it, G-387 (a)),
+  `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
   words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
   the Cassazione, the Corte costituzionale, the Court of Justice and the General Court of the
   Union (by their case), the Consiglio di Stato, the C.G.A.R.S. and the TAR (by kind, and a TAR by
@@ -133,7 +137,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   VisuaLex shows it, and the glosses this application proposed still to validate; for a norm, the server adds
   Normattiva's update notes after `testo`, on every part, as `note_aggiornamento` (absent when the text already holds
   them, as for the codes), and `avviso_note` when some could not be read — never inside the text, G-386; `avviso_testo_parziale` when the
-  text is one part of an article Normattiva splits, G-387; scope `dossier:text`), **always
+  text is one part of an article Normattiva splits, G-387, naming the part served for one stored as an entry; scope
+  `dossier:text`; its `parte` is still the page number), **always
   listed**: it is how an application quotes an entry verbatim (G-372). `omnilex_glossa_voce` (an optional general gloss
   up to 4,000 characters, which becomes a note about the entry through `POST /dossiers/:id/notes`, and 1–10 glosses on
   passages `{ testo 15–2000, nota ≤ 1500, prima?, dopo? }`, no colour; the passages first, so a call refused whole writes
@@ -159,6 +164,33 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   the card dialog a card is named only by what the server set — its subject,
   the article of its primary anchor, its state, its date and the start of its
   id — never by its question or answer, which a model may have written.
+- **Gymnasium's courses, «Percorsi»** (`src/tools/courses.ts`; spec
+  `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md` §9, M1, over S1's routes `/lingo/corsi`) —
+  listed only while `apps/server`'s `GET /features` says `lingoCourses: true` (the switch `lingo_courses`, asked
+  with the glosses' at each session's start by `src/features.ts`, closed when it cannot say); off, neither the tools
+  nor `lingolex_salva_card`'s `modulo` and `competenze` nor the courses' rules in `lingolex_schema_card` are listed.
+  Scopes `lingo:courses:read` and `lingo:courses:write` on the one consent (G-379: no group of their own until
+  #318's groups). `lingolex_crea_percorso` (title, subject, planned modules, competences as plain strings — the server
+  gives C1, C2… —, the study dossier by id or exact name; until the user accepts the declaration `MATERIALE_STUDIO`
+  the server's 409 names the page in words, and the error says to retry once the user has), `lingolex_aggiungi_modulo`
+  (a module whole, lesson and verification, the body S1 takes) and `lingolex_aggiungi_esame` write. Their other 409s,
+  and a course card's past its module's limit, are rules of the course's state, passed on as the server words them,
+  never with «Riprova» (`conflictIsState` in `callApi`); a write that got no answer says to check with
+  `lingolex_percorsi` before writing again, since a retry could make a second course or module; `lingolex_percorsi`
+  reads: the list, or one course without its lessons and items (`GET /struttura`, outlined here: a course of 40
+  modules runs to millions of characters), each flag with its module and question, or with `modulo` that module
+  whole with its flags and judgement. The input schemas carry the shape only: the limits and the rules (the
+  lesson's Markdown subset, citations as entries of the course's dossier, the shares of application questions)
+  are in `lingolex_schema_card`'s text and the server checks them all, naming the part. A module's `blocchi`,
+  `quiz` and `aperta`, and an exam's `domande` and `aperta`, are not even shaped in the definitions (G-391): they
+  are plain objects there (`z.looseObject({})`), their shape is in the schema text, and the handlers check them
+  against `MODULE_PARTS` and `EXAM_PARTS` with the SDK's words before anything is sent. They are the server's only
+  open object schemas (`{"type":"object","properties":{},"additionalProperties":{}}`): Claude takes them, but a
+  client that turns tool schemas into a strict function-calling mode may refuse or mangle them (the optional
+  properties elsewhere already keep strict modes out), so whoever switches `lingo_courses` on creates one module
+  from LibreLex first. Nothing edits, withdraws or deletes a course or a module (G-377, Q9): a correction is a new module with
+  `sostituisceId`. The definitions' size is held by `tests/courses.test.ts`: with the switch on they pass §10.6's
+  18,000 characters, an overshoot accepted until the groups of 1b keep the courses for those who use them (G-391).
 - **Hardening** — binds to `127.0.0.1` by default. On every bind it refuses a
   `Host` other than `MCP_RESOURCE`'s hostname or the loopback names (DNS
   rebinding; the port does not count). It refuses a browser `Origin` not in

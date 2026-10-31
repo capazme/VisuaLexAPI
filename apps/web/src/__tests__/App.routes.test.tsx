@@ -85,6 +85,7 @@ vi.mock('../services/corsiService', async (importOriginal) => ({
   corsiService: {
     list: vi.fn().mockResolvedValue([]),
     get: vi.fn().mockRejectedValue({ status: 404 }),
+    module: vi.fn().mockRejectedValue({ status: 404 }),
     declaration: vi.fn().mockResolvedValue({ id: 't', chiave: 'MATERIALE_STUDIO', versione: 1, titolo: 'T', corpo: 'C', conferma: 'c', azione: 'a', accettata: true }),
   },
 }));
@@ -275,6 +276,14 @@ describe('App routing — Studia', () => {
     renderAt('/studia/percorsi/c1');
     expect(await screen.findByRole('heading', { level: 1, name: 'Percorsi' })).toBeInTheDocument();
     expect(await screen.findByText('Questo percorso non c’è: forse è stato eliminato.')).toBeInTheDocument();
+  });
+
+  it('opens a module\'s session at /studia/percorsi/:id/moduli/:moduloId in the lesson\'s frame, over the area (§6.5)', async () => {
+    features.lingoCourses = true;
+    renderAt('/studia/percorsi/c1/moduli/m1');
+    expect(await screen.findByTestId('lesson-frame')).toBeInTheDocument();
+    expect(await screen.findByText('Questo modulo non c’è più: forse è stato eliminato.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Percorsi' })).toBeNull();
   });
 
   it('with the switch off, /studia/percorsi goes back to Oggi', async () => {

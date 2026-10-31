@@ -26,6 +26,7 @@
  */
 
 import { ARTICLE_ORDINAL_SUFFIXES } from '../utils/articleSuffixes';
+import { isSwitchOn } from '../assistant/switches';
 import { citeArticle } from './citation';
 
 export type ReferenceOutcome = 'resolved' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
@@ -42,6 +43,8 @@ export interface NormaVisitata {
   tipo_atto_reale?: string | null;
   versione?: string | null;
   data_versione?: string | null;
+  /** One part of a split article ("701-800", G-387 (a)), when the reference's comma is in it. */
+  parte?: string;
 }
 
 export interface Resolution {
@@ -136,8 +139,13 @@ async function identify(reference: string): Promise<Resolution> {
     return { outcome: 'ambiguous', display, detail: 'Il riferimento indica più articoli: scrivine uno per riferimento.' };
   }
 
-  const fetched = await postLegalApi('/fetch_norma_data', params);
-  if (NOT_PRESENT.test(String(fetched.data.error ?? ''))) {
+  // The API reads a single article's comma (or a part's label) and answers the part of a split article that holds
+  // it (G-387 (a)). Until the web opens a part (the switch `article_parts`), a reference is stored as the article,
+  // as before: its comma is not sent on.
+  const { comma: _comma, parte: _parte, ...article } = params;
+  const fetched = await postLegalApi('/fetch_norma_data', (await isSwitchOn('article_parts')) ? params : article);
+  // «Articolo … non presente», and for a part: a comma past the article's last, a range it does not have.
+  if (NOT_PRESENT.test(String(fetched.data.error ?? '')) || (fetched.status === 404 && typeof fetched.data.error === 'string')) {
     return { outcome: 'does_not_exist', display, detail: String(fetched.data.error) };
   }
   if (sourceFailed(fetched.status)) throw new SourceUnavailable(`fetch_norma_data ${fetched.status}`);

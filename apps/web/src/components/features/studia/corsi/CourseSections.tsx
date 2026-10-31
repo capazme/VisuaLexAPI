@@ -6,7 +6,7 @@ import { CopyableCode } from '../../../../features/connections/CopyableCode';
 import type { CompetenzaPagina, CorsoPagina, EsamePagina, Mancanze, ModuloPagina } from '../../../../types/corsi';
 import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
 import { MasteryChip, ModuleStateChip } from './CourseChips';
-import { closingOpensExam, competenceNumbers, completeSentence, fromDay, missingLines, newExamSentence, onDay, thePercent } from './corsiLabels';
+import { closingOpensExam, competenceNumbers, completeSentence, fromDay, missingLines, moduleOpenLabel, modulePath, newExamSentence, onDay, thePercent } from './corsiLabels';
 
 /** The course page's parts (courses spec §6.4), drawn from `GET /lingo/corsi/:id`. */
 
@@ -95,12 +95,12 @@ export interface ModuleActions {
   busy: ReadonlySet<string>;
 }
 
-/** Whether a module can go to the trash: never opened, never withdrawn. */
-const deletable = (m: ModuloPagina) => m.stato === 'da-iniziare' && !m.ritirato;
-/** Whether «Ritira questo modulo» is offered: opened, superseded by a live correction, not yet withdrawn. */
-const withdrawable = (m: ModuloPagina) => m.stato !== 'da-iniziare' && m.sostituitoDa !== null && !m.ritirato;
+/** The server says what a module allows: the trash for one never opened, «Ritira» for one a live correction supersedes. */
+const deletable = (m: ModuloPagina) => m.eliminabile;
+const withdrawable = (m: ModuloPagina) => m.ritirabile;
 
-export function ModulesSection({ moduli, actions, headingRef, offer }: {
+export function ModulesSection({ corsoId, moduli, actions, headingRef, offer }: {
+  corsoId: string;
   moduli: ModuloPagina[];
   actions: ModuleActions;
   headingRef?: RefObject<HTMLHeadingElement | null>;
@@ -122,46 +122,52 @@ export function ModulesSection({ moduli, actions, headingRef, offer }: {
             const corrects = m.sostituisceId ? byId.get(m.sostituisceId) : undefined;
             const busy = actions.busy.has(m.id);
             return (
-              <li key={m.id} className={cn('grid grid-cols-1 gap-2 p-4', m.ritirato && 'opacity-70')}>
+              <li key={m.id} className={cn('grid grid-cols-1 gap-2 p-4', m.stato === 'ritirato' && 'opacity-70')}>
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                   <h4 className="min-w-0 flex-1 basis-64 break-words text-base font-medium text-slate-900 dark:text-slate-50">
                     <span className={cn('mr-2 text-sm font-semibold', MUTED_TEXT)}>Modulo {m.ordine}</span>
                     {m.titolo}
                   </h4>
-                  <ModuleStateChip stato={m.stato} ritirato={m.ritirato} />
+                  <ModuleStateChip stato={m.stato} />
                 </div>
                 <p className={cn('flex flex-wrap gap-x-3 gap-y-1 text-sm', MUTED_TEXT)}>
                   {m.competenze.length > 0 && <span>Competenze {m.competenze.join(', ')}</span>}
                   {m.minuti !== null && <span>circa {m.minuti} minuti</span>}
-                  {m.creatoDa && <span className="break-words">creato da {m.creatoDa}</span>}
+                  {m.creatoDa?.clientName && <span className="break-words">creato da {m.creatoDa.clientName}</span>}
                   {m.sostituisceId && <span>correzione {corrects ? `del modulo ${corrects.ordine}` : 'di un modulo'}</span>}
                 </p>
-                {m.ritirato && <p className={cn('text-sm', MUTED_TEXT)}>Ritirato: le sue risposte non contano più, conta la correzione.</p>}
-                {(deletable(m) || withdrawable(m)) && (
-                  <div className="flex flex-wrap gap-2">
-                    {deletable(m) && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => actions.onDelete(m)}
-                        aria-label={`Elimina il modulo ${m.ordine}, ${m.titolo}`}
-                        className={cn(QUIET_BUTTON, 'mx-0 text-red-700 disabled:opacity-60 dark:text-red-300')}
-                      >
-                        Elimina
-                      </button>
-                    )}
-                    {withdrawable(m) && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => actions.onWithdraw(m)}
-                        className={cn(SECONDARY_BUTTON, 'disabled:opacity-60')}
-                      >
-                        Ritira questo modulo
-                      </button>
-                    )}
-                  </div>
-                )}
+                {m.stato === 'ritirato' && <p className={cn('text-sm', MUTED_TEXT)}>Ritirato: le sue risposte non contano più, conta la correzione.</p>}
+                <div className="flex flex-wrap gap-2">
+                  {/* The session (§6.5): a module not yet started opens on its start, where it can be read first. */}
+                  <Link
+                    to={modulePath(corsoId, m.id)}
+                    aria-label={`${moduleOpenLabel(m.stato)} il modulo ${m.ordine}, ${m.titolo}`}
+                    className={cn(SECONDARY_BUTTON, 'inline-flex items-center')}
+                  >
+                    {moduleOpenLabel(m.stato)}
+                  </Link>
+                  {deletable(m) && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => actions.onDelete(m)}
+                      aria-label={`Elimina il modulo ${m.ordine}, ${m.titolo}`}
+                      className={cn(QUIET_BUTTON, 'mx-0 text-red-700 disabled:opacity-60 dark:text-red-300')}
+                    >
+                      Elimina
+                    </button>
+                  )}
+                  {withdrawable(m) && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => actions.onWithdraw(m)}
+                      className={cn(SECONDARY_BUTTON, 'disabled:opacity-60')}
+                    >
+                      Ritira questo modulo
+                    </button>
+                  )}
+                </div>
               </li>
             );
           })}
@@ -172,7 +178,7 @@ export function ModulesSection({ moduli, actions, headingRef, offer }: {
 }
 
 /** The final exam's state (§6.4); taking it comes with the web's pull request (d). */
-export function ExamSection({ titolo, esame, inPreparazione }: { titolo: string; esame: EsamePagina | null; inPreparazione: boolean }) {
+export function ExamSection({ titolo, esame, inPreparazione }: { titolo: string; esame: EsamePagina; inPreparazione: boolean }) {
   return (
     <section aria-labelledby="corso-esame" className={cn(TILE, 'grid grid-cols-1 gap-2 p-5')}>
       <h3 id="corso-esame" className={BLOCK_HEADING}>
@@ -183,38 +189,42 @@ export function ExamSection({ titolo, esame, inPreparazione }: { titolo: string;
   );
 }
 
-function ExamState({ titolo, esame, inPreparazione }: { titolo: string; esame: EsamePagina | null; inPreparazione: boolean }) {
+function ExamState({ titolo, esame, inPreparazione }: { titolo: string; esame: EsamePagina; inPreparazione: boolean }) {
   const text = 'max-w-[65ch] text-sm leading-relaxed text-slate-700 dark:text-slate-300';
-  if (esame === null) {
-    return <p className={text}>{inPreparazione ? 'Il tuo assistente non ha ancora scritto l’esame.' : 'Nessun esame.'}</p>;
-  }
+  const attempt = esame.tentativo;
   switch (esame.stato) {
+    case 'assente':
+      return <p className={text}>{inPreparazione ? 'Il tuo assistente non ha ancora scritto l’esame.' : 'Nessun esame.'}</p>;
     case 'bloccato':
       return <p className={text}>Si apre quando hai fatto tutti i moduli.</p>;
     case 'aperto':
       return <p className={text}>Aperto: hai fatto tutti i moduli.</p>;
+    case 'in-corso':
+      return <p className={text}>Iniziato, non ancora consegnato.</p>;
     case 'superato':
       return (
         <p className={text}>
-          Superato {onDay(esame.giorno)}, con {thePercent(esame.percentuale)}.
+          Superato{attempt?.giorno ? ` ${onDay(attempt.giorno)}` : ''}
+          {attempt?.percentuale != null ? `, con ${thePercent(attempt.percentuale)}` : ''}.
         </p>
       );
     case 'non-superato':
       return (
         <div className="grid grid-cols-1 gap-2">
           <p className={text}>
-            Non superato ({esame.percentuale}%).
-            {esame.sotto60.length > 0 && ` Sotto il 60%: ${esame.sotto60.join(', ')}; il ripasso ${esame.sotto60.length === 1 ? 'te la propone' : 'te le propone'}.`}
+            Non superato{attempt?.percentuale != null ? ` (${attempt.percentuale}%)` : ''}.
+            {esame.competenzeSotto.length > 0 &&
+              ` Sotto il 60%: ${esame.competenzeSotto.join(', ')}; il ripasso ${esame.competenzeSotto.length === 1 ? 'te la propone' : 'te le propone'}.`}
           </p>
-          {esame.nuovoPossibile ? (
+          {esame.chiediNuovoEsame ? (
             <>
               <p className={cn(text, 'font-medium text-slate-900 dark:text-slate-50')}>Chiedi al tuo assistente un nuovo esame:</p>
               <div className="max-w-2xl">
-                <CopyableCode code={newExamSentence(titolo, esame.sotto60)} label="la frase per un nuovo esame" />
+                <CopyableCode code={newExamSentence(titolo, esame.competenzeSotto)} label="la frase per un nuovo esame" />
               </div>
             </>
           ) : (
-            <p className={text}>Un nuovo esame si può chiedere {fromDay(esame.nuovoDal)}.</p>
+            esame.nuovoEsameDal && <p className={text}>Un nuovo esame si può chiedere {fromDay(esame.nuovoEsameDal)}.</p>
           )}
         </div>
       );

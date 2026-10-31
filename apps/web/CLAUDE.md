@@ -87,7 +87,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
   redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
   turns the switch off; the server's trash then hides a course and a module too). A review session with `?corso=` waits
-  behind the same gate (the server refuses `?corso=` with a 400 until S2 narrows the session to a course).
+  behind the same gate (S2, #375, narrows the session to the course and adds its check cards after the due and new ones,
+  `verifica: true`, counted in `conteggi.verifica`; before S2 the server refuses `?corso=` with a 400).
   Nothing of a course is created in the web: the assistant creates it (§3), and an empty «Percorsi» says how, with the
   sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, where permissions are chosen and that a connection made before the
   courses lacks it (no promise of what a new one brings: the MCP asks for the scope from M1).
@@ -105,8 +106,53 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   JSON, the trash with the toast «Il dossier «X» resta in Dossier»). «Oggi»'s row (`TodayCourses`, in the day block's
   cell so the grid keeps its rows) offers a course's due cards first (`/studia/ripasso/sessione?corso=`, never with a
   subject; its end has «Torna a Oggi» alone) and then «Modulo del giorno: <titolo> · <percorso>», which opens the
-  course page until the module session (pull request b) exists. `GET /:id` and `GET /oggi` are S2's: their shapes in
-  `types/corsi.ts` are the web's reading of §10.5, to be checked against S2. `corsi.guard.test.ts` keeps the folder's
+  module's session, as each module's row does on the course page («Apri» not yet started, «Riprendi», «Rileggi»).
+  **A module's session** (pull request b; §5 steps 1–4, §6.5, §10.3) is `/studia/percorsi/:id/moduli/:moduloId` — by the
+  module's id, since a correction shares its order — `ModuleSession`, in `LessonFrame` as the review (`StudiaPage`'s
+  `isLesson`; `LessonLoading` goes back to the course): the header says «Passo 4 di 11 · Richiamo» (`moduleSteps.ts`:
+  the start, each block's reading and recall, then a waiting screen until pull request c brings the quiz, which counts as
+  no step and says «Fine della lettura»), the step in the middle (keyed by step and by the recall's phase, its heading
+  focused in the commit), the one action in `LessonBar`; while the switch is read, `LessonLoading` keeps the close
+  button and Esc around `CoursesGate`. `GET …/moduli/:moduloId` is read once (the content is frozen once opened); its
+  404 reads the features again before «Questo modulo non c’è più» is said, so a switch turned off goes back to Oggi. The start says what the module is
+  for (its competences with their words), its pre-questions and, not yet started, that starting keeps it in the course:
+  «Inizia il modulo» posts `apri`, «Leggi senza iniziare» shows every block in one page and opens nothing. A block is read
+  with an indicative time (`blockMinutes`: its share of the module's minutes by words, else 100 words a minute), a line
+  under the header that follows the scroll (never a timer), the pre-questions folded above it, and a pause suggested
+  every 25 minutes in the bar. The lesson is drawn by the web's own parser (`lessonFormat.ts`, `LessonText`: the closed
+  Markdown subset, everything else React text; `corsi.guard.test.ts` refuses HTML written from a string); a citation
+  `[testo](#c1)` is a button that opens the copy the block stored (`lessonCitations.ts`: a norm in `DossierItemReader`, a
+  decision in `DossierDecisionReader`) beside the text on a computer (its heading takes the focus, which goes back to the
+  citation as it closes), in a `Sheet` on a phone (`CitationPanel`); it belongs to the view it was opened in (a recall's
+  next phase closes it, the phase's heading taking the focus); Esc closes it first, and a link or «Apri su Dashboard»
+  inside it leaves through the same question as the close button. A citation's words are `INK_TEXT`. A `###` is one level under the step's
+  heading (`headingLevel`). Highlights are the session's (`Span`s over the block's plain text, `numberLeaves` giving
+  each leaf its offset; emphasis is read around a citation held by a placeholder): a selection brings «Evidenzia» (44
+  px, under it; a press on it holds it until its click, or 400 ms after the release); the text is a Tab stop where
+  Shift and the arrows select from its start (`Selection.modify`, a word with Ctrl or Alt: a text not editable has no
+  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each, never inside a citation's
+  button, where its pieces are only drawn: nothing interactive sits in a button), or words selected inside a highlight,
+  bring «Togli» (from a selection it goes with the selection, unless the focus is on it). The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
+  elementi, le eccezioni, un caso»), «Confronta con il testo» sets what was written beside the block, then the block's
+  questions as real radio buttons (`RecallQuestion`: the server grades, `POST …/risposte { domandaId, scelta }` and
+  nothing else; the explanations, the right one and the reader's marked in words, the outcome in a live region; «Non
+  registrato: riprova», or the server's words on a 4xx; once graded the focus moves to the question, «Rispondi» gone). Nothing written, highlighted or reached leaves the browser (§8;
+  the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`) and an opened
+  module resumes there, and each block's recall, highlights and phase are kept in this tab (`sessionStorage`,
+  `visualex.studia.percorsi.lavoro`, `readWork`/`saveWork`), so a reload, the browser's back or a swipe back lose
+  nothing (there is no navigation block: the app's `BrowserRouter` is not a data router, so `useBlocker` is not there);
+  both forgotten with `seenProgress` at sign-in, sign-up and sign-out (`forgetModuleSessions`). While something is written
+  or highlighted the browser asks before the tab closes or reloads (`beforeunload`, which cannot tell the two apart).
+  Closing or Esc leaves at once with nothing written or highlighted, else asks «Interrompi il modulo?» (`WireConfirm`,
+  «Continua il modulo» evident), whose «Interrompi» forgets the module's work; at the end of the reading leaving asks
+  nothing and forgets it. A 404 from `apri` reads the features again too. `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
+  exposes», the user's session only: a token gets 403), typed in `types/corsi.ts` as #375 answers them: the course page's
+  competences carry `sessioni: { contate, servono }` and `ultima: { giorno, percentuale }`, its modules `stato` with
+  «ritirato», `eliminabile` and `ritirabile` (the page offers the trash and «Ritira» from them, never deciding itself) and
+  `sostituitoDa` as the live corrections' ids, «in preparazione» `manca.esame`, `competenzeSenzaModulo` and `schede[].servono`,
+  the exam a state always there (`assente`, `bloccato`, `aperto`, `in-corso`, `non-superato`, `superato`) with its
+  attempt, `nuovoEsameDal` and `chiediNuovoEsame`; «Oggi»'s row is `{ corso, modulo, schede: { dovute, verifica } }`, the
+  due and check cards offered as one count. `corsi.guard.test.ts` keeps the folder's
   targets at 44 px and its text at 11 px or more,
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
@@ -916,16 +962,31 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 code's own); on a computer «Note» and
 «Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Colore» (`HighlightColorMenu`, H1, below),
 «Al dossier», then «⋯» («Altre azioni sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia»,
-«Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
+«Copia link Normattiva», «Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
 status's row, «⋯» adding Study Mode, the source and, last under its own title, the four colours (the compact bar of a
-window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo» and
-«Copia»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
+window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo»,
+«Copia» and «Copia link Normattiva»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
 highlight (`lockedReason`); quiet
 neutral buttons, 36 px on a computer and 44 on a phone; «Cerca nel testo» says «Chiudi la ricerca nel testo» only while
 the window is pointed at this very text (`useFindWindowScopedTo(…, exact)`), else it points the window here. Nothing of it is inside the text root, root rule 23). Keys are `buildItemKey(norma)` and
 `uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
 uses the same two functions, and they must stay byte-identical or annotations
 made on one surface stop appearing on the other.
+
+**The source's link** («Copia link Normattiva», `utils/normattivaLink.ts`): for the hyperlinks of a filing. It copies
+the address the API returned (`norma_data.urn`; in the dossier the fetched article's, the stored item's only if that
+has none), never one built here: the code's annex and the version marker come with it (`!vig=` empty for the text in
+force, `!vig=<day>` for a past text, `@originale`). An undated one is fixed to a day only where Normattiva would open
+another text (`linkPinDay`; it answers an undated URN with its latest version, also one not in force yet, G-355): a
+closed window served as today's (`historical`, or `citeAs`) to its last day, an announced change (`upcoming`) to
+today. One `navigator.clipboard.write` puts the address as `text/plain` and
+the citation as a link as `text/html` (`<a href>` with `citeNorm`, or a past text's `formatNormCitation(...).short`),
+so Word or Pages paste the linked citation and a plain field the address; with no `ClipboardItem`, or a refusal, the
+address alone (`writeText`). Only `https` addresses of Normattiva or EUR-Lex are copied (a dossier can be imported):
+otherwise the action is not offered. An act of the Union says «Copia link EUR-Lex» and copies the act's address
+(EUR-Lex has none per article: said under the entry and in the toast). It is locked where «Copia» is
+(`copyBlockedReason`); in the dossier where «Copia citazione» is; the past-version banner offers it beside «Copia
+citazione» (`copy_link`).
 
 **The text is structured, never rewritten** (round A, spec
 `docs/superpowers/specs/2026-09-25-lettura-testo-design.md`).
@@ -2186,8 +2247,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   evidenziata o annotata».
 - **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
   inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
-  composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
-  expanded footer. `ArticleViewerModal` no longer exists.
+  composer and popover). "Apri su Dashboard", "Copia citazione" and «Copia link Normattiva» (below,
+  «The source's link») live in the expanded footer. `ArticleViewerModal` no longer exists.
 - **Fetching**: `utils/articleFetchCache.ts` — session-only cache, in-flight
   de-dup, max 3 concurrent fetches, errors not cached so "Riprova" really
   refetches.

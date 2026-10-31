@@ -1,7 +1,10 @@
+import asyncio
 import re
+import warnings
 from typing import Tuple, Optional, Union, Dict, Any
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+import aiohttp
+from bs4 import BeautifulSoup, NavigableString, Tag, XMLParsedAsHTMLWarning
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 import structlog
@@ -9,13 +12,19 @@ import structlog
 from ..tools.norma import NormaVisitata
 from ..tools.sys_op import BaseScraper
 from ..tools.cache_manager import get_cache_manager
-from ..tools.exceptions import DocumentNotFoundError, ParsingError
+from ..tools.config import HTTP_TIMEOUT
+from ..tools.exceptions import DocumentNotFoundError, IndexUnavailableError, ParsingError, ResourceNotFoundError
 from ..tools.text_op import parse_date
 from ..tools.selectors import NormattivaSelectors
 from .akn_fetch import fetch_act_article
+from .http_client import http_client
+from .normattiva_parts import extract_parts, part_cache_key, part_range, ranges_in_words
 
 # Configure structured logger
 log = structlog.get_logger()
+
+# A part's page opens with an XML declaration; html.parser reads it as before.
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 
 def _akn_vigenza(version_date) -> "str | None":
@@ -47,6 +56,8 @@ class NormattivaScraper(BaseScraper):
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:
         log.info("Fetching Normattiva document", norma=str(normavisitata))
+        if normavisitata.parte:
+            return await self._get_part(normavisitata)
         urn: str = normavisitata.urn
         log.info("Requesting URL", urn=urn[:100])
 
@@ -97,6 +108,83 @@ class NormattivaScraper(BaseScraper):
         else:
             log.info("Returning full document text")
             return html_content, urn
+
+    async def _get_part(self, nv: NormaVisitata) -> Tuple[str, str]:
+        """`(text, key)` of one part of an article Normattiva splits into parts (G-387 (a)).
+
+        The part's page is kept in the persistent cache under `part_cache_key` («<URN>#commi
+        701-800»), which is also the `url` the answer carries; read when missing
+        (`read_part_page`). Its text is the same extractor's on that page (gotcha 23), and
+        never the AKN export's: the export holds the whole article, about 1.3 M characters
+        for art. 1 l. 296/2006, never one part of it.
+        """
+        key = part_cache_key(nv.urn, nv.parte)
+        page = await self.cache.get(key)
+        if page:
+            log.info("Cache hit", source="normattiva_persistent", parte=nv.parte)
+            return await self._part_text(page, nv), key
+        _, text = await self._read_part(nv)
+        return text, key
+
+    async def read_part_page(self, nv: NormaVisitata) -> str:
+        """A part's page, read from Normattiva and stored under its key (`_read_part`)."""
+        page, _ = await self._read_part(nv)
+        return page
+
+    async def _read_part(self, nv: NormaVisitata) -> Tuple[str, str]:
+        """`(page, text)` of a part, read from Normattiva; the page stored under its key.
+
+        The page (`/atto/caricaArticolo?…&art.progressivo=k`) opens only with the cookies of
+        the article's page (without them Normattiva answers 500), so both are read in a
+        session of their own, with its own cookie jar: the shared client's session has one
+        jar for every request, and two parts of two acts read at once would share it. The rate
+        limit, the host check and the retry budget are the shared client's. The part's address
+        is the one the article page's tree gives; the article page is the request's own (its
+        date, its version), stored as `get_document` stores it when the cache lacks it. A page
+        that is not the part asked for is never stored.
+        """
+        timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
+        async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(), timeout=timeout) as session:
+            article_page = (await http_client.request("GET", nv.urn, source="normattiva", session=session)).text
+            if article_page and not await self.cache.get(nv.urn):
+                await self.cache.set(nv.urn, article_page)
+            parts = await asyncio.to_thread(extract_parts, article_page or "", article=nv.numero_articolo)
+            part = self._listed_part(nv, parts)
+            page = (await http_client.request("GET", part["url"], source="normattiva", session=session)).text
+        text = await self._part_text(page, nv)
+        await self.cache.set(part_cache_key(nv.urn, nv.parte), page)
+        log.info("Read a part of a split article", norma=str(nv), progressivo=part["progressivo"])
+        return page, text
+
+    @staticmethod
+    def _listed_part(nv: NormaVisitata, parts) -> Dict[str, Any]:
+        """The part `nv` names among those the article page lists, or the error in words: a
+        part saved before Normattiva split the article again is refused with today's parts,
+        never answered with another range (G-389, Q3). The first part is the article itself
+        (Q1): asked as a part, it is refused, never kept under a second key."""
+        article = f"L'art. {nv.numero_articolo} di {nv.norma}"
+        if parts is None:
+            raise IndexUnavailableError(f"Non riesco a leggere le parti dell'art. {nv.numero_articolo} di {nv.norma} su Normattiva")
+        if not parts:
+            raise ResourceNotFoundError(f"{article} non è diviso in parti")
+        if part_range(parts[0]) == nv.parte:
+            raise ResourceNotFoundError(f"I commi {nv.parte} sono l'art. {nv.numero_articolo} di {nv.norma} stesso: va chiesto senza parte")
+        for part in parts:
+            if part_range(part) == nv.parte:
+                return part
+        raise ResourceNotFoundError(
+            f"{article} non ha la parte commi {nv.parte}: oggi è diviso in "
+            f"{ranges_in_words([part_range(p) for p in parts])}")
+
+    async def _part_text(self, page: str, nv: NormaVisitata) -> str:
+        """The extractor's text of a part's page, checked to open the part asked for: its first
+        comma («701.») stands at the start of a line. Anything else is an error."""
+        text = await self.estrai_da_html(page) if page else None
+        first = nv.parte.split("-", 1)[0]
+        if not isinstance(text, str) or not re.search(rf"(?m)^[\W_]{{0,6}}{re.escape(first)}(?![0-9])", text):
+            log.error("A part's page is not the part asked for", norma=str(nv))
+            raise ParsingError(f"Impossibile leggere i commi {nv.parte} dell'art. {nv.numero_articolo} di {nv.norma}")
+        return text
 
     async def estrai_da_html(
         self, atto: str, comma: Optional[str] = None, get_link_dict: bool = False
