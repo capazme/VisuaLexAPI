@@ -294,8 +294,24 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
-  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded, no
-  request at all — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. The
+  user chooses or drops on the box — read in the browser (`documentFile.ts`; an HTML ends each block with a line
+  break, so a paragraph is a line), never uploaded. The citations are found and read as the search reads them
+  (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts
+  (`/fetch_alias_catalog`'s `act_names`, asked once when the page opens) and the user's aliases make the vocabulary;
+  candidates are «article, then act», «act, then article», «act alone» (context only) and «bare article», each with
+  the query string a lawyer would type (the clause never in it); each distinct string is read by the client parser
+  (`readNormQuery`), and what it cannot settle goes to `/parse_query_batch` in chunks of 200 strings / 48 KB, one
+  after the other (`documentServer.ts`, `legalFetch`, 8 s each). **What leaves the browser:** those query strings
+  only — never the text, a passage, a bare article, the file's name. A bare article takes the act of the last
+  resolved candidate of its line, or across lines with «del medesimo decreto» and its kin; a candidate the page
+  cannot read, and a bare article followed by something else («del contratto»), end that context. When the catalog
+  or a chunk does not answer, today's matcher keeps its matches inside the unanswered candidates, the client's own
+  names make the vocabulary, and a line above the list says so with «Riprova» (asks only for what is still
+  unanswered). The rows not resolved are counted («· 3 da completare») and not yet listed: their group, the picker
+  and the promise's new words are PR 3 of the spec. `documentCorpus.test.ts` runs the spec's invented corpus with
+  the server's answers recorded (`__tests__/corpus/server.json`, `record_server.py`), prints §3.2's table and fails
+  below 98 found or on any wrong one. Each citation opens the reader through `navigate('/')` + `triggerSearch`,
+  gotcha 15. The
   document is drawn as it is (`DocumentText`: every character once and in order, the citations only
   wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
@@ -2306,6 +2322,14 @@ Duplicating any of these is a defect, not a shortcut.
   `caseLawYears.ts` (a row's years, the counts, the range, the order — pure), `caseLawFilter.ts` (the text
   filter, folded as the find window folds: `findMatches`), `authorityColor`, `caseLawFiltersContext`. A new
   source of case law draws `CaseLawRow` and reads `useCaseLawFilters`, it does not bring its own filter.
+- `utils/normQuery.ts` — the search's reading of a norm, shared by `useSearchQuery` and «Analizza documento»:
+  `readNormQuery(query, customAliases)` (the client parser, whether the reading is searchable, the words to ask
+  the server), `citationFromServer` (an answer of `/parse_query` or `/parse_query_batch` in the client's shape),
+  `preferredReading` (the client wins when searchable). `utils/sources/numberedActTypes.ts` — the web's copy of
+  `conventions/sources/numbered-act-types.json` (its test compares the two) and `identifiesAct`: `isSearchReady`,
+  the palette's «needs a number and a date» and the parser's own list all read it; the d.m. and the DPCM with no
+  number name no act, and the types compare with their case folded (gotcha 28). `ACT_TYPES_REQUIRING_DETAILS`
+  is gone.
 - `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.
@@ -2893,7 +2917,9 @@ meant to stay split; add new features as new files, not inside the shells:
   dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` (the page), `DropZone.tsx` (the box), `DocumentRow.tsx`
   (the document's row and `SheetFlight`), `documentJob.ts`, `DocumentText.tsx`, `CitationList.tsx`,
-  `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
+  `citationGroups.ts`, `documentFile.ts`, `documentCandidates.ts` (vocabulary, candidates, resolution, inheritance,
+  fallback: pure), `documentServer.ts` (the catalog and `/parse_query_batch`); invented sample files for the tests
+  in `__tests__/fixtures.ts`, the spec's corpus scored by `__tests__/documentCorpus.test.ts`.
 
 ## Gotchas
 

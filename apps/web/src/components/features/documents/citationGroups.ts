@@ -1,7 +1,7 @@
 /**
  * The citations of a document, as «Analizza documento» lists them: grouped by the act they cite
  * («Codice civile · 4», «l. 241/1990 · 2»), each with its article and the passage around it.
- * Pure: the page reads the document and finds the citations (`extractCitations`), this only arranges them.
+ * Pure: the page reads the document and finds the citations (`documentCandidates.ts`), this only arranges them.
  */
 import { formatCitationLabel, type CitationMatch } from '../../../utils/citationMatcher';
 import { NAMED_HEADINGS, shortAct } from '../../../utils/sources';
@@ -58,7 +58,8 @@ function heading(citation: CitationMatch): string {
 
 function articleLabel(citation: CitationMatch): string {
   const article = citation.parsed.article.trim();
-  return article ? `art. ${article}` : formatCitationLabel(citation.parsed);
+  if (!article) return formatCitationLabel(citation.parsed);
+  return citation.parsed.following ? `art. ${article} e ss.` : `art. ${article}`;
 }
 
 /**
@@ -101,7 +102,10 @@ export function groupCitationsByAct(text: string, citations: readonly CitationMa
   return Array.from(groups.values());
 }
 
-/** «12 citazioni in 5 atti», «1 citazione in 1 atto». */
-export function citationCountLabel(citations: number, acts: number): string {
-  return `${citations} ${citations === 1 ? 'citazione' : 'citazioni'} in ${acts} ${acts === 1 ? 'atto' : 'atti'}`;
+/** «12 citazioni in 5 atti», «1 citazione in 1 atto», «24 citazioni in 6 atti · 3 da completare», «Nessuna citazione». */
+export function citationCountLabel(citations: number, acts: number, toComplete = 0): string {
+  const found = citations === 0
+    ? 'Nessuna citazione'
+    : `${citations} ${citations === 1 ? 'citazione' : 'citazioni'} in ${acts} ${acts === 1 ? 'atto' : 'atti'}`;
+  return toComplete > 0 ? `${found} · ${toComplete} da completare` : found;
 }

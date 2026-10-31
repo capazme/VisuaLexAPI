@@ -1,6 +1,6 @@
 /**
  * Reads the document «Analizza documento» is given, in the browser: the file is never sent anywhere.
- * TXT and Markdown as they are, HTML as its text, DOCX from its main XML part.
+ * TXT and Markdown as they are, HTML as its text with a line break after each block, DOCX from its main XML part.
  */
 
 /** 15 MB: the limit the page announces. */
@@ -11,12 +11,45 @@ export const DOCUMENT_ACCEPT = '.txt,.md,.markdown,.html,.htm,.docx,.pdf';
 
 export type DocumentReading = { ok: true; text: string } | { ok: false; error: string };
 
+/** The elements that end a paragraph: each ends with one line break in the text read (design 2026-10-29 §4.6). */
+const HTML_BLOCKS = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'TR', 'BLOCKQUOTE']);
+
+/**
+ * An HTML document's text: its characters as `textContent` gives them, and a line break at the end of each block
+ * (`p`, `div`, `li`, `h1`–`h6`, `tr`, `blockquote`) and for each `br` — a paragraph is a line for «Analizza
+ * documento», and `textContent` put none between two `<p>`. Nothing else is added or dropped. A block nested in
+ * another adds no second break.
+ */
+export function htmlText(content: string): string {
+  const body = new DOMParser().parseFromString(content, 'text/html').body;
+  const parts: string[] = [];
+  let endsWithBreak = true;
+  const add = (piece: string) => {
+    if (!piece) return;
+    parts.push(piece);
+    endsWithBreak = piece.endsWith('\n');
+  };
+  const walk = (node: Node) => {
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.CDATA_SECTION_NODE) {
+        add(child.nodeValue ?? '');
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = (child as Element).tagName.toUpperCase();
+        if (tag === 'BR') {
+          add('\n');
+          continue;
+        }
+        walk(child);
+        if (HTML_BLOCKS.has(tag) && !endsWithBreak) add('\n');
+      }
+    }
+  };
+  walk(body);
+  return parts.join('');
+}
+
 function readableText(fileName: string, content: string): string {
-  if (/\.html?$/i.test(fileName)) {
-    const document = new DOMParser().parseFromString(content, 'text/html');
-    return document.body.textContent ?? '';
-  }
-  return content;
+  return /\.html?$/i.test(fileName) ? htmlText(content) : content;
 }
 
 function decodeXml(value: string): string {

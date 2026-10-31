@@ -9,7 +9,7 @@ import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarke
 import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 import { labelFromParams } from './sources';
-import { ACT_TYPES_REQUIRING_DETAILS } from '../constants/actTypes';
+import { identifiesAct, isNumberedActType } from './sources/numberedActTypes';
 import { ANNEX_SIGLE, CODES_TABLE } from './sources/actTypes';
 
 export interface ParsedCitation {
@@ -213,21 +213,15 @@ const ANNEX_ABBREVIATIONS = Object.entries(ANNEX_SIGLE)
 
 // Atti che senza numero e anno non si aprono: nominati per esteso senza
 // numero ("della legge") non sono un bersaglio, e li leggono i pattern
-// numerati.
-const NUMBERED_ACT_TYPES = new Set([
-  'legge', 'decreto legge', 'decreto legislativo',
-  'decreto del presidente della repubblica', 'regio decreto',
-  'legge costituzionale', 'regio decreto legge', 'decreto legislativo luogotenenziale',
-  'Regolamento UE', 'Direttiva UE',
-]);
-
+// numerati. La lista è una sola, quella della convenzione
+// (sources/numberedActTypes.ts).
 /**
  * The spellings of numbered act types the palette accepts ("legge cost.", "l. costituzionale",
  * "decreto-legge"), each with the type it resolves to: the find window's citation search
  * (citationSearch.ts) adds them to the forms of the act-type table (sources/actTypes.ts).
  */
 export const NUMBERED_ACT_SPELLINGS: ReadonlyArray<readonly [string, string]> = Object.entries(ABBREVIATION_MAP)
-  .filter(([, actType]) => NUMBERED_ACT_TYPES.has(actType));
+  .filter(([, actType]) => isNumberedActType(actType));
 
 /**
  * Atti che un testo può nominare per esteso ("del codice civile", "della
@@ -242,8 +236,17 @@ export const NUMBERED_ACT_SPELLINGS: ReadonlyArray<readonly [string, string]> = 
  */
 export const FULL_ACT_NAMES: ReadonlyArray<readonly [string, string]> = Object.entries(ABBREVIATION_MAP)
   .filter(([name, actType]) =>
-    !name.includes('.') && (name.includes(' ') || name.length >= 8) && !NUMBERED_ACT_TYPES.has(actType))
+    !name.includes('.') && (name.includes(' ') || name.length >= 8) && !isNumberedActType(actType))
   .sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * The names of the acts the client parser reads with no number («c.c.», «codice del consumo», «cost.»): the
+ * vocabulary «Analizza documento» falls back on when the server's catalog does not answer (design
+ * 2026-10-29-document-analysis §4.7). The numbered types are left out: «legge» names an act only with its number.
+ */
+export const CLIENT_ACT_NAMES: readonly string[] = Object.entries(ABBREVIATION_MAP)
+  .filter(([name, actType]) => name.length >= 2 && !isNumberedActType(actType))
+  .map(([name]) => name);
 
 /**
  * Un articolo: numero, eventuale suffisso (bis, ter, ... terdecies) o
@@ -669,19 +672,11 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
 }
 
 /**
- * Verifica se il parsing è completo per eseguire una ricerca
+ * The reading can be searched: it names an act (`identifiesAct`, the convention's numbered types: a code needs
+ * nothing more, a numbered type its number and date) and an article.
  */
 export function isSearchReady(parsed: ParsedCitation | null): boolean {
-  if (!parsed) return false;
-
-  // Deve avere act_type e article
-  if (!parsed.act_type || !parsed.article) return false;
-
-  // Se è un codice (non richiede numero/data) → pronto
-  if (!ACT_TYPES_REQUIRING_DETAILS.includes(parsed.act_type)) return true;
-
-  // Se richiede dettagli, deve avere numero e data
-  return !!(parsed.act_number && parsed.date);
+  return Boolean(parsed?.article) && identifiesAct(parsed);
 }
 
 /** The palette's preview of what it read: the short label of the source convention. */

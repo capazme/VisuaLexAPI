@@ -36,6 +36,10 @@ export interface ParsedCitationData {
   date?: string;
   article: string;
   confidence: number;
+  /** The annex a reading named («disp. att. c.p.a.»): «Analizza documento» opens the norm with it. */
+  annex?: string;
+  /** «art. 167 e ss.»: the list closed with «e seguenti» on this article («Analizza documento»'s label). */
+  following?: boolean;
 }
 
 // Mappa abbreviazioni → tipo atto normalizzato

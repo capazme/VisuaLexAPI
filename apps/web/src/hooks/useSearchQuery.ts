@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../utils/citationParser';
+import { isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../utils/citationParser';
+import { citationFromServer, preferredReading, readNormQuery } from '../utils/normQuery';
 import { parseItalianDate } from '../utils/dateUtils';
 import type { SearchFilters, SearchParams } from '../types';
 import { parseDecisionCitation } from '../utils/decisionCitationParser';
@@ -41,11 +42,13 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
     [inputValue, customAliases],
   );
 
-  // Include custom aliases for resolution: "art 5 gdpr" resolves "gdpr" into Regolamento UE 679/2016.
-  const localCitation = useMemo<ParsedCitation | null>(() => {
-    if (!inputValue || inputValue.length < 2 || decisionRef) return null;
-    return parseLegalCitation(inputValue, customAliases);
-  }, [inputValue, customAliases, decisionRef]);
+  // The client half of the reading (`readNormQuery`, shared with «Analizza documento»), with the custom
+  // aliases: "art 5 gdpr" resolves "gdpr" into Regolamento UE 679/2016.
+  const localReading = useMemo(
+    () => (decisionRef ? null : readNormQuery(inputValue, customAliases)),
+    [inputValue, customAliases, decisionRef],
+  );
+  const localCitation = localReading?.citation ?? null;
 
   // Server-side fallback for act names the client does not carry.
   //
@@ -69,10 +72,7 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
   // here: "statuto dei lavoratori" the client cannot name at all, and "gdpr"
   // it names as regolamento UE but without the number and year that
   // isSearchReady requires — so both left the palette on ENTER COMPLETA.
-  const remoteQuery = useMemo(() => {
-    const query = inputValue.trim();
-    return query.length >= 3 && !decisionRef && !isSearchReady(localCitation) ? query : null;
-  }, [inputValue, localCitation, decisionRef]);
+  const remoteQuery = localReading?.askServer ?? null;
 
   useEffect(() => {
     if (!remoteQuery) return;
@@ -90,21 +90,7 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
           return res.json();
         })
         .then(payload => {
-          const parsed = payload?.recognized ? payload.parsed : null;
-          setServerResult({
-            query: remoteQuery,
-            citation: parsed?.act_type
-              ? {
-                  act_type: parsed.act_type,
-                  act_number: parsed.act_number || undefined,
-                  date: parsed.date || undefined,
-                  article: parsed.article || undefined,
-                  annex: parsed.annex || undefined,
-                  // Named by the server's curated tables, not guessed.
-                  confidence: 0.9,
-                }
-              : null,
-          });
+          setServerResult({ query: remoteQuery, citation: citationFromServer(payload) });
         })
         .catch(err => {
           if ((err as Error).name === 'AbortError') return;
@@ -131,7 +117,7 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
   // The client wins when its own parse is already searchable; otherwise the
   // server fills in. Nothing that resolves locally today changes.
   const parsedCitation = useMemo<ParsedCitation | null>(
-    () => (decisionRef ? null : isSearchReady(localCitation) ? localCitation : serverCitation ?? localCitation),
+    () => (decisionRef ? null : preferredReading(localCitation, serverCitation)),
     [localCitation, serverCitation, decisionRef]
   );
 
