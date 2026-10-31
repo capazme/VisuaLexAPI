@@ -11,6 +11,10 @@ import pytest
 
 import app as app_module
 from app import NormaController
+from visualex_api.services import act_dates
+from visualex_api.services.act_dates import YearLookup
+from visualex_api.services.http_client import HttpResult
+from visualex_api.tools.exceptions import DocumentNotFoundError, NetworkError
 
 pytestmark = pytest.mark.asyncio
 
@@ -59,11 +63,12 @@ async def _links(controller, norms, tree=None, pin_day=None, date_lookup=None):
             raise value
         return value
 
-    async def fake_complete_year(act_type, year, act_number):
-        return date_lookup(act_type, year, act_number) if date_lookup else year
+    async def fake_lookup_year(act_type, year, act_number):
+        found = date_lookup(act_type, year, act_number) if date_lookup else year
+        return found if isinstance(found, YearLookup) else YearLookup(found)
 
     with patch("app.get_tree", new=AsyncMock(side_effect=fake_tree)) as get_tree, \
-            patch("visualex_api.tools.urngenerator.complete_year", new=AsyncMock(side_effect=fake_complete_year)):
+            patch("visualex_api.tools.urngenerator.lookup_year", new=AsyncMock(side_effect=fake_lookup_year)):
         status, answer = await _post(controller, body)
     assert status == 200, answer
     return answer["results"], get_tree
@@ -104,6 +109,66 @@ async def test_a_year_the_lookup_cannot_complete_is_date_incomplete_and_no_index
     assert results == [{"href": None, "reason": "date_incomplete"}]
     # The «1990-01-01» fallback is never looked up, nor sent.
     assert get_tree.await_count == 0
+
+
+class _Memory:
+    def __init__(self):
+        self.data = {}
+
+    async def get(self, key):
+        return self.data.get(key)
+
+    async def set(self, key, value, *args, **kwargs):
+        self.data[key] = value
+
+
+async def _year_through_the_resolver(controller, answer, monkeypatch, budget=None):
+    """One year-only norm, the lookup run for real against `answer` (the shared client's)."""
+    memory = _Memory()
+    monkeypatch.setattr(act_dates, "get_cache_manager", lambda: type("M", (), {"get_persistent": lambda self, n: memory})())
+    if budget is not None:
+        monkeypatch.setattr(act_dates, "LOOKUP_BUDGET", budget)
+    norm = {"act_type": "decreto legislativo", "date": "2001", "act_number": "231", "article": "5"}
+    with patch.object(act_dates.http_client, "request", new=answer), \
+            patch("app.get_tree", new=AsyncMock(return_value=_tree([("5", None)]))) as get_tree:
+        status, body = await _post(controller, {"norms": [norm, {**norm, "article": "6"}]})
+    assert status == 200
+    return body["results"], get_tree
+
+
+@pytest.mark.parametrize("failure", [NetworkError("down", status_code=503), NetworkError("wait", status_code=429)])
+async def test_a_year_lookup_the_network_fails_is_source_unavailable(controller, monkeypatch, failure):
+    # Normattiva silent: nothing is wrong in the user's text, «Riprova» is the honest answer.
+    results, get_tree = await _year_through_the_resolver(controller, AsyncMock(side_effect=failure), monkeypatch)
+    assert results == [{"href": None, "reason": "source_unavailable"}] * 2
+    assert get_tree.await_count == 0
+
+
+async def test_a_year_lookup_past_its_budget_is_source_unavailable(controller, monkeypatch):
+    async def slow(*args, **kwargs):
+        await asyncio.sleep(5)
+
+    results, _ = await _year_through_the_resolver(controller, AsyncMock(side_effect=slow), monkeypatch, budget=0.05)
+    assert results == [{"href": None, "reason": "source_unavailable"}] * 2
+
+
+@pytest.mark.parametrize("answer", [
+    AsyncMock(return_value=HttpResult(text="<title>DECRETO LEGISLATIVO 8 giugno 2002, n. 231 - Normattiva</title>",
+                                      status=200, headers={})),
+    AsyncMock(side_effect=DocumentNotFoundError("no page", urn="x")),
+])
+async def test_a_year_lookup_that_found_no_date_is_date_incomplete(controller, monkeypatch, answer):
+    results, get_tree = await _year_through_the_resolver(controller, answer, monkeypatch)
+    assert results == [{"href": None, "reason": "date_incomplete"}] * 2
+    assert get_tree.await_count == 0 and answer.await_count == 1
+
+
+async def test_a_year_lookup_that_found_the_day_links(controller, monkeypatch):
+    page = "<title>DECRETO LEGISLATIVO 8 giugno 2001, n. 231 - Normattiva</title>"
+    results, _ = await _year_through_the_resolver(
+        controller, AsyncMock(return_value=HttpResult(text=page, status=200, headers={})), monkeypatch)
+    assert results[0] == {"href": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:"
+                                  "2001-06-08;231~art5!vig=2026-10-31", "reason": "ok"}
 
 
 async def test_an_article_only_in_one_annex_links_that_annex(controller):

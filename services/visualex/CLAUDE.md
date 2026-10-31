@@ -132,7 +132,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     resolver, verified by the page's title (type, year and number; State acts of nine
     kinds only, because the resolver answers a regional URN with the State's act of the
     same number), found dates cached a year. `complete_year` serves a search
-    (see Date System); `resolve_many` serves MERL-T (`/resolve_act_dates`).
+    (see Date System), `lookup_year` the same with whether the year stood only because the
+    source did not answer (`/fetch_norm_links`); `resolve_many` serves MERL-T (`/resolve_act_dates`).
   - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
     `model.py` (identity and reference), `citation.py` (a decision cited in words → its
     reference, the palette's patterns in Python, pinned to the golden file's `decision_citations`),
@@ -341,8 +342,10 @@ POST unless noted, JSON bodies.
   article each, the body at most 48 KB (anything else a 400 that names the limit) →
   `{"results": [{href, reason}]}` in order, `href` only with `ok`. Each norm goes through
   `resolve_norm_address`, the address half of `create_norma_visitata_from_data` that both share,
-  `strict`: the fetch keeps its guesses, the link refuses them. `date_incomplete` (the year stood
-  after the lookup: the `-01-01` fallback is never looked up nor sent), `article_missing` (not in
+  `strict`: the fetch keeps its guesses, the link refuses them. `date_incomplete` (the lookup ran
+  and found no date for the act, so the year stood: the `-01-01` fallback is never looked up nor
+  sent; a lookup the network failed or past its budget is `source_unavailable`, told apart by
+  `act_dates.lookup_year` and `urngenerator.read_request_date`), `article_missing` (not in
   the part's index), `ambiguous_part` (in the body and an annex, or two annexes, and the norm names
   none; `annex` '' or a number is the user's choice), `source_unavailable` (an index, a lookup or
   EUR-Lex that does not answer, an existence left unknown: never the body by default, never the AKN

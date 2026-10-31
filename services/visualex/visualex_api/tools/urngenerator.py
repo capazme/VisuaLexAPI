@@ -7,7 +7,7 @@ from .text_op import normalize_act_type, parse_date
 from .map import EURLEX, codice_urn
 from .exceptions import ValidationError
 from ..services.eurlex_scraper import EurlexScraper
-from ..services.act_dates import complete_year
+from ..services.act_dates import complete_year, lookup_year
 
 # Configure logging. The lines that name an act, an article or an address are at debug: the
 # norms of a document the user may hold confidential pass here (/fetch_norm_links).
@@ -28,19 +28,36 @@ async def complete_request_date(act_type, date, act_number):
     year stands, never another act's date. A full date is read into ISO for the types
     above and passed on unchanged for the others; no date stays no date.
     """
+    return (await _request_date(act_type, date, act_number, _year_only))[0]
+
+
+async def read_request_date(act_type, date, act_number):
+    """`(date, unavailable)`: `complete_request_date`'s date, and whether a year stood only
+    because Normattiva did not answer the lookup (`act_dates.lookup_year`). The links of a
+    filing answer that «source unavailable», not «date incomplete» (/fetch_norm_links)."""
+    return await _request_date(act_type, date, act_number, lookup_year)
+
+
+async def _year_only(act_type, year, act_number):
+    # complete_year by its module name, so a test that patches it reaches the fetch path.
+    return await complete_year(act_type, year, act_number), False
+
+
+async def _request_date(act_type, date, act_number, complete):
     if date is None or str(date).strip() == '':
-        return None
+        return None, False
     date = str(date).strip()
     if re.fullmatch(r"\d{4}", date):
         if not act_number:
-            return date
-        return await complete_year(act_type, date, act_number)
+            return date, False
+        found, unavailable = await complete(act_type, date, act_number)
+        return found, unavailable
     if act_type in _SPELLED_DATE_TYPES:
         try:
-            return parse_date(date)
+            return parse_date(date), False
         except ValueError:
             raise ValidationError(f"Data non valida: {date}")
-    return date
+    return date, False
 
 
 def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None,

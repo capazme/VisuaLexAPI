@@ -62,7 +62,7 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, export_version_date, pdf_cache_path
+from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, read_request_date, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
@@ -213,11 +213,13 @@ class NormAddress:
     per article as asked, every part holding it, None for the act's text), 'unread' (the index
     answered nothing usable), 'not_looked_up' (the lookup failed, or the act has no address).
     `checked` is `[(article as the act spells it, exists)]`, `exists` True, False or None
-    (unknown); `date_complete` whether the act's date is a full day after completion.
+    (unknown); `date_complete` whether the act's date is a full day after completion, and
+    `date_unavailable` (strict only) whether the year stood because the lookup did not answer.
     """
     norma: Norma
     is_eu: bool = False
     date_complete: bool = False
+    date_unavailable: bool = False
     articles: list = field(default_factory=list)
     annex: str | None = None
     explicit_dispositivo: bool = False
@@ -745,7 +747,13 @@ class NormaController:
             tipo_atto_reale = codice_details['tipo_atto_reale']
             # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
 
-        norma_date = await complete_request_date(act_type, norma_date, act_number)
+        date_unavailable = False
+        if strict:
+            # Whether a year stood only because Normattiva did not answer: «try again», not
+            # «complete the date».
+            norma_date, date_unavailable = await read_request_date(act_type, norma_date, act_number)
+        else:
+            norma_date = await complete_request_date(act_type, norma_date, act_number)
         log.debug("Using date", norma_date=norma_date)
 
         norma = Norma(
@@ -760,6 +768,7 @@ class NormaController:
             norma=norma,
             is_eu=norma.tipo_atto.lower() in EU_ACT_TYPES,
             date_complete=bool(norma.data and _ISO_DAY.match(norma.data)),
+            date_unavailable=date_unavailable,
         )
         if strict and not address.is_eu and not address.date_complete:
             # The year stood: the address would carry «<year>-01-01», another act's day.
@@ -1597,7 +1606,8 @@ class NormaController:
             return None, 'source_unavailable', True
         if not address.is_eu and not address.date_complete:
             # The year stood: «<year>-01-01» is another act's day, never sent as an address.
-            return None, 'date_incomplete', True
+            # Normattiva silent or slow is the source's fault, not the text's: «Riprova».
+            return None, ('source_unavailable' if address.date_unavailable else 'date_incomplete'), True
         if len(address.checked) != 1:
             return None, 'not_linkable', False
         article, exists = address.checked[0]
