@@ -79,6 +79,19 @@ describe('normLink', () => {
     expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, linkPinDay(civil, ahead, '2026-10-31'))?.href).toBe(`${CC}!vig=2026-12-01`);
   });
 
+  it('keeps the day the reader chose when the answer is the current text (G-395)', () => {
+    const current: ArticleValidity = { state: 'current', valid_from: '1942-04-21', valid_to: null, version_number: 1, act_updated: null, request_in_window: true };
+    const day = linkPinDay(civil, current, '2026-10-31', '2005-06-01');
+    expect(day).toBe('2005-06-01');
+    expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, day)?.href).toBe(`${CC}!vig=2005-06-01`);
+    // An Italian spelling is read as the day; an unreadable one falls back to today.
+    expect(linkPinDay(civil, current, '2026-10-31', '1/6/2005')).toBe('2005-06-01');
+    expect(linkPinDay(civil, current, '2026-10-31', 'ieri')).toBe('2026-10-31');
+    // No day chosen: today. An act of the Union ignores the day.
+    expect(linkPinDay(civil, current, '2026-10-31', undefined)).toBe('2026-10-31');
+    expect(linkPinDay({ tipo_atto: 'regolamento ue' }, current, '2026-10-31', '2005-06-01')).toBeUndefined();
+  });
+
   it('takes the day in Rome around midnight, not the UTC one', () => {
     const at = (iso: string) => todayInRome(new Date(iso));
     // 22:30 UTC on 31 Oct is still the 31st in Rome (CET, 23:30); 23:30 UTC is already 1 Nov.

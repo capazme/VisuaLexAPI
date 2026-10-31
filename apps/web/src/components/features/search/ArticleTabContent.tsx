@@ -526,7 +526,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             showToast(display.copyBlockedReason ?? '', 'info');
             return;
         }
-        const pinDay = linkPinDay(norma_data, display.citeAs ?? data.validity, todayInRome());
+        const pinDay = linkPinDay(norma_data, display.citeAs ?? data.validity, todayInRome(), versionInfo?.requestedDate);
         const link = normLink(norma_data, citationNow(), pinDay);
         if (!link) return;
         try {

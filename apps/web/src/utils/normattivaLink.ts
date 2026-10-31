@@ -2,7 +2,7 @@ import type { ArticleValidity, NormaVisitata } from '../types';
 import type { NormCitation } from './citation';
 import { formatDateForCitation, withPreposition } from './dateUtils';
 import { citeNorm } from './sources';
-import { isEuropeanAct, requestIsHistorical, type VersionRequest } from './versionDisplay';
+import { isEuropeanAct, requestedVersion, requestIsHistorical, type VersionRequest } from './versionDisplay';
 
 /**
  * «Copia link Normattiva»: the source's own address of the article, for the hyperlinks of a
@@ -57,8 +57,14 @@ export function linkPinDay(
   norma: Pick<NormaVisitata, 'tipo_atto'> & VersionRequest,
   validity: ArticleValidity | undefined,
   today: string,
+  /** The day the reader chose («Testo alla data»), when the answer does not echo it. */
+  askedDay?: string,
 ): string | undefined {
   if (isEuropeanAct(norma.tipo_atto) || requestIsHistorical(norma)) return undefined;
+  // The server answers with the current text when nothing changed since the day asked: the
+  // link still cites the text at that day (G-395).
+  const asked = askedDay ? requestedVersion({ data_versione: askedDay }) : undefined;
+  if (asked?.kind === 'date' && ISO_DAY.test(asked.date)) return asked.date;
   if (validity?.state === 'historical') {
     const day = validity.valid_to ?? validity.valid_from;
     if (day) return day;
