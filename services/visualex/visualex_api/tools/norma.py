@@ -96,12 +96,16 @@ class NormaVisitata:
     versione: str = None
     data_versione: str = None
     _urn: str = field(default=None, repr=False)
+    # The comma range of one part of an article Normattiva splits into parts ("701-800",
+    # G-387 (a)). None for an article that is not split and for its first part, which is
+    # what the article's URN serves: their requests, keys and texts are those of before.
+    parte: str = None
     #timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def __hash__(self):
         return hash((self.norma.tipo_atto_urn, self.norma.data, self.norma.numero_atto,
                      self.norma.celex_consolidated, self.numero_articolo, self.versione,
-                     self.data_versione))
+                     self.data_versione, self.parte))
 
     def __eq__(self, other):
         if not isinstance(other, NormaVisitata):
@@ -112,7 +116,8 @@ class NormaVisitata:
                 self.norma.celex_consolidated == other.norma.celex_consolidated and
                 self.numero_articolo == other.numero_articolo and
                 self.versione == other.versione and
-                self.data_versione == other.data_versione and self.allegato == other.allegato)
+                self.data_versione == other.data_versione and self.allegato == other.allegato and
+                self.parte == other.parte)
 
     def __post_init__(self):
         log.debug(f"NormaVisitata initialized: {self}")
@@ -138,6 +143,8 @@ class NormaVisitata:
         base_str = str(self.norma)
         if self.numero_articolo:
             base_str += f" art. {self.numero_articolo}"
+        if self.parte:
+            base_str += f" (commi {self.parte})"
         return base_str
 
     def to_dict(self):
@@ -150,6 +157,9 @@ class NormaVisitata:
             #'timestamp': self.timestamp,
             'urn': self.urn,
         })
+        if self.parte:
+            # Written only for a part: the first part's norma_data stays what it was.
+            base_dict['parte'] = self.parte
         return base_dict
 
     @staticmethod
@@ -168,7 +178,8 @@ class NormaVisitata:
             numero_articolo=data.get('numero_articolo'),
             versione=data.get('versione'),
             data_versione=data.get('data_versione'),
-            allegato = data.get('allegato')
+            allegato = data.get('allegato'),
+            parte=data.get('parte') or None,
             #timestamp=data.get('timestamp')
         )
         log.debug(f"NormaVisitata created: {norma_visitata}")

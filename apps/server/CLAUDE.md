@@ -39,7 +39,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   minute: a flood with no token stops here), `authenticate`, the user's quota
   (`SCRAPE_QUOTA_POINTS`, 300 points per `SCRAPE_QUOTA_WINDOW_SECONDS`, charged by the route
   the ingress names in `X-Forwarded-Uri`: an export 20, a stream 3, a whole act 5, the
-  detailed health page 5, a decision lookup 2, anything else 1), then `204`. A `401` or `429`
+  detailed health page 5, a decision lookup 2, a batch of norm readings
+  (`/parse_query_batch`, up to 200 strings) 3, anything else 1), then `204`. A `401` or `429`
   (with `Retry-After`) goes back to the browser as it is. Mounted **before** the general
   limiter in `app.ts` on purpose: it has limits of its own, and reading many articles must
   not spend the quota of every other call. Both caps count over
@@ -137,13 +138,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   23), with the same original position, boundary move and note states as a proposal. The general gloss on a norm is the
   dossier note about the whole article (`POST /dossiers/:id/notes` with `aboutItemId`), unchanged. Two runtime switches
   (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET /api/features` is public, mounted before every
-  limiter, and answers `{ assistantPassages, assistantGlosses }` from five seconds' memory, which an admin's change clears;
+  limiter, and answers `{ assistantPassages, assistantGlosses, lingoCourses, articleParts }` from five seconds' memory, which an admin's change clears;
   an admin switches them with `PUT /api/admin/switches/:key { enabled }`): `assistant_passages` is the web app's side (off,
   its routes below answer 404 and the dossier answers carry no state); `assistant_glosses` is the connected application's
   side of glosses (off, the glosses route answers 404 and the MCP does not list `omnilex_glossa_voce`). An entry's text is
   behind no switch: it is how an application quotes it verbatim (G-372). The glosses route needs **both** switches (a
   gloss written while the web's side is off is one the user could neither see nor remove), and `assistant_glosses` is
-  switched on only once the web shows glosses: today's web draws an unknown colour as yellow.
+  switched on only once the web shows glosses: today's web draws an unknown colour as yellow. `article_parts` (G-387 (a),
+  spec 2026-10-29): a part of an article Normattiva splits as an entry of its own; on, a reference's comma reaches the
+  API and the part that holds it is stored (`parte`, below); off, the article is stored as before. Switched on only once
+  the web opens parts (3c).
   **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
   table): `GET /dossiers/:id/items/:itemId/text?parte=` (`dossier:text`, a point and a page of the
   counter `text`) gives a norm's or a decision's text in pages of 20,000 characters cut at a line end,
@@ -151,7 +155,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   API's list, unless the text already holds them, `note_nel_testo`; `avviso_note` «note di aggiornamento non lette:
   verificare su Normattiva» when some could not be read; `assistant/entryText.ts` `updateNotesOf`, a malformed note
   counted as not read), `avviso_testo_parziale` when the text is one part of an article Normattiva splits («testo
-  parziale: commi 1-100 di 1364 (diviso in 14 parti)», G-387, `partialNoticeOf`), and the glosses this application proposed still `proposed`, as the model wrote them (`glosse: [{ testo,
+  parziale: commi 1-100 di 1364 (diviso in 14 parti)», G-387, `partialNoticeOf`; for a part stored as an entry, the part
+  served: «commi 701-800 di 1364»), and the glosses this application proposed still `proposed`, as the model wrote them (`glosse: [{ testo,
   nota }]`; never the user's marks, a saved coloured proposal, a state, a comment, an edit or moved boundaries);
   `POST /dossiers/:id/items/:itemId/glosses { glosse }` (`dossier:write` **and** `dossier:text`, an exchanged token only;
   1–10 glosses `{ testo 15–2000, nota 1–1500 UTF-16 units, prima?, dopo? }`, no colour, two points and one of the counter
@@ -166,7 +171,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,
   `decisionProjection`, pinned to the web's code by `tests/assistant/entryText.test.ts` and
   `ruleTwentyThree.test.ts`, which proposes on the web's fixtures and finds the marks in the web's
-  renderer); a text the reader shows read-only is refused (400), an article or a decision the source says is
+  renderer; a part of a split article, `parte` in the content, is read as that part and keyed with one more
+  segment, `…--1--c701-800` and `1~c701-800`, as the spec says the web writes it from 3c; a part the article no
+  longer has (Normattiva split it again, G-389 Q3) is a 400 in the API's words, never a 503 to try again; every
+  reader takes `parte` through `norms/parts.ts` `partOf` (the API's shape, «701-800»); the watcher reads a
+  watched part as that part; a Forum proposal keeps a `parte` of the form «701-800»; LingoLex anchors and the
+  MERL-T graph keep the article, one per article, G-389 Q4); a text the reader shows read-only is refused (400), an article or a decision the source says is
   not there is a 400, a source that cannot answer now is a 503, an entry changed while its text was read a 409.
   The dossier's row lock holds at most 30 open proposals per entry, glosses and saved marks together (a mark with no note,
   or a note not validated). **A proposal** (a saved coloured mark or a gloss) is a `Highlight` with the connection's mark,
@@ -267,7 +277,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
-  norm as the reader stores it), then existence once per act: the
+  norm as the reader stores it; the `comma` or `parte` the parser reads is sent
+  on only while `article_parts` is on, G-387 (a): then «art. 1, comma 773, l.
+  296/2006» stores part 8, `parte: "701-800"`, an entry apart from its article
+  (`normIdentity`), cited «art. 1, commi 701-800, l. 27 dicembre 2006, n. 296»;
+  a comma the article does not have is `does_not_exist` in the API's words. Off,
+  the article is stored as before), then existence once per act: the
   fingerprints for a single-part Normattiva act, the tree's (annex, article)
   pairs for an act with annexes, the article's own text for an EU act. Never
   the text alone for Normattiva: it answers a missing article with the act's
@@ -772,8 +787,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   nothing), and the course's review: `GET /srs/sessione?corso=` adds **check cards** (`verifica: true`) for the
   competences whose next session counts today, «da riprendere» first, never a new card or one graded today, none for a
   competence whose reviewed cards cannot reach five answers today (they would be drilled daily), at most once every
-  seven Rome days (`wantsCheckCards`; whether «acquisita» and «da iniziare» competences get them too is
-  G-390, the constants `CHECK_ACQUIRED` and `CHECK_UNSTARTED`). **Missions:** «Completa un modulo» (30, at 70%, at
+  seven Rome days (`wantsCheckCards`); after them an «acquisita» competence weekly from its last valid session, then
+  a «da iniziare» one with answers from the day after its first ones, then weekly (G-390: the constants
+  `CHECK_ACQUIRED` and `CHECK_UNSTARTED`, both on). **Missions:** «Completa un modulo» (30, at 70%, at
   most two a Rome day, the rest credited by a later event or the course page) and «Supera un percorso» (100, for three
   competences and three counting modules at least), settled in `settleMissions` with the events `modulo`, `esame`,
   `corso` and a course card's `revisione`; neither is in «Le missioni di oggi».

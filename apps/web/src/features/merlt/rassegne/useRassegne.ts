@@ -1,6 +1,7 @@
 // apps/web/src/features/merlt/rassegne/useRassegne.ts
 import { useEffect, useState } from 'react';
 import { fetchRassegne } from './rassegneApi';
+import { isMerltDisabled } from '../consent/consentRead';
 import type { RassegneQuery, RassegneResponse } from './types';
 
 /**
@@ -42,7 +43,8 @@ export type RassegneState =
       /** another archive failed to load: `data` is the last summary of this article */
       failed?: boolean;
     }
-  | { status: 'error' };
+  /** `disabled`: the server runs without MERL-T (404 `merlt_disabled`), so there is nothing to offer */
+  | { status: 'error'; disabled: boolean };
 
 /**
  * The article's summary for an archive filter. While another archive loads, or after it
@@ -66,8 +68,10 @@ export function useRassegneSummary(urn: string | undefined, archivio?: Archivio)
         setShown({ urn, archivio, data });
       },
       (err: unknown) => {
-        console.error('[rassegne] load failed', { urn, archivio, err });
-        if (!cancelled) setState({ key, value: { status: 'error' } });
+        const disabled = isMerltDisabled(err);
+        // a server without MERL-T is a configuration, not a failure
+        if (!disabled) console.error('[rassegne] load failed', { urn, archivio, err });
+        if (!cancelled) setState({ key, value: { status: 'error', disabled } });
       },
     );
     return () => {
