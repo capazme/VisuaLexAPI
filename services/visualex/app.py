@@ -486,7 +486,7 @@ class NormaController:
         # The Massimario's reviews citing a norm, from the core's store (design
         # 2026-10-30-rassegne-without-merlt, G-394): read by the article page. The web and the
         # ingress take it in the next PR (Vite proxy, the ingress's @legal list, behind the login).
-        self.app.add_url_rule('/fetch_rassegne', view_func=self.fetch_rassegne, methods=['GET'])
+        self.app.add_url_rule('/fetch_rassegne', view_func=self.fetch_rassegne, methods=['GET', 'POST'])
         # Internal: a volume's paragraph records for MERL-T's ingestion. Not routed by the
         # ingress nor proxied by Vite, like /fetch_massimario.
         self.app.add_url_rule('/massimario/volume/<volume_id>/records', view_func=self.massimario_volume_records,
@@ -1666,9 +1666,16 @@ class NormaController:
         """The Massimario's review paragraphs citing a norm, by year, a page at a time
         (`rassegne_routes`): 200 (`total: 0` when no store is built), 400
         `richiesta_non_valida`, 503 `rassegne_non_disponibili` (a store that cannot be read or
-        of an unknown schema). Reads a local file only."""
+        of an unknown schema). Reads a local file only. GET takes the query string; POST a JSON
+        body, the only place a keyword query (`q`) is taken: an address keeps no search."""
         try:
-            answer, status = await rassegne_routes.fetch_rassegne(request.args)
+            if request.method == 'POST':
+                args, error = rassegne_routes.body_args(await request.get_json(silent=True))
+                if error:
+                    return jsonify(error[0]), error[1]
+                answer, status = await rassegne_routes.fetch_rassegne(args, allow_q=True)
+            else:
+                answer, status = await rassegne_routes.fetch_rassegne(request.args)
         except Exception:
             log.exception("Rassegne lookup failed unexpectedly")
             return jsonify({'detail': 'errore_interno'}), 500

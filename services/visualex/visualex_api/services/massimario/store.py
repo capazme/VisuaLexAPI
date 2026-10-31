@@ -13,6 +13,12 @@ a missing store answers like a store with no paragraph for the norm (the panel d
 a store that exists but cannot be read, or whose schema version this code does not know, is
 `StoreUnavailable` (a 503 at the route; design §2.5, §8: never a guess at an older layout).
 
+A keyword search over a norm's paragraphs reads a full-text index (SQLite FTS5) of their text and
+of where they sit (the volume, part, chapter and section titles, the chapter's authors). The index
+is contentless (it keeps no copy of the text) and is written whole at the end of every build, from
+the paragraphs the new file holds. A query is a list of words, each read as the start of a word
+(`terms`): never the user's text as FTS syntax.
+
 The store is derived: deleting it costs one rebuild, and it is not in `scripts/datakit`.
 """
 from __future__ import annotations
@@ -31,7 +37,8 @@ from typing import Iterable, Iterator, Optional
 from ...tools.config import BASE_PATH
 from .records import VolumeRecords, volume_dict
 
-SCHEMA_VERSION = 1
+# 2: the full-text index `paragraphs_fts` (31 October 2026).
+SCHEMA_VERSION = 2
 STORE_NAME = f"rassegne-v{SCHEMA_VERSION}.sqlite3"
 _OLDER = re.compile(r"rassegne-v(\d+)\.sqlite3")
 
@@ -65,7 +72,31 @@ CREATE TABLE decision_links (
   PRIMARY KEY (decision_key, paragraph_key)
 );
 CREATE TABLE resolved_acts (year_only_urn TEXT PRIMARY KEY, full_urn TEXT NOT NULL, resolved_at TEXT NOT NULL);
+CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
+  testo, contesto, content='', prefix='2', tokenize='unicode61 remove_diacritics 2'
+);
 """
+# The index's rows, one per paragraph by its rowid: the text, and where it sits. `content=''` keeps
+# no copy of the text; `prefix='2'` makes the two-letter starts of words cheap (a query of eight
+# three-letter starts over the most cited act takes about 60 ms on the 63 volumes, and the index
+# adds about 64 MB to their 222; measured 31 October 2026). Accents are folded both ways.
+_INDEX = """
+INSERT INTO paragraphs_fts (rowid, testo, contesto)
+SELECT rowid, json_extract(record, '$.text'),
+  ifnull(json_extract(record, '$.volume.titolo'), '') || ' ' ||
+  ifnull(json_extract(record, '$.parte.titolo'), '') || ' ' ||
+  ifnull(json_extract(record, '$.capitolo.nome'), '') || ' ' ||
+  ifnull(json_extract(record, '$.capitolo.titolo'), '') || ' ' ||
+  ifnull(json_extract(record, '$.sezione.titolo'), '') || ' ' ||
+  ifnull((SELECT group_concat(value, ' ') FROM json_each(record, '$.capitolo.autori')), '')
+FROM paragraphs
+"""
+
+# The limits of a keyword query (the route refuses more): its length, its words, a word's length.
+MAX_QUERY_CHARS = 200
+MAX_TERMS = 8
+MIN_TERM_CHARS = 2
+_WORD = re.compile(r"[^\W_]+")
 _VOLUME_TABLES = ("volumes", "sections", "paragraphs", "norm_links", "decision_links")
 _VOLUME_COLUMN = {"volumes": "id", "sections": "volume_id", "paragraphs": "volume_id",
                   "norm_links": "volume_id", "decision_links": "volume_id"}
@@ -119,6 +150,19 @@ def _record(text: str) -> dict:
         raise StoreUnavailable(f"record illeggibile: {exc}") from exc
 
 
+def terms(query: str) -> list[str]:
+    """The words of a keyword query, as the index reads them: letters and digits, the rest a
+    separator, words shorter than `MIN_TERM_CHARS` dropped, each once, in the order typed. The
+    caller checks the limits (`MAX_QUERY_CHARS`, `MAX_TERMS`)."""
+    return list(dict.fromkeys(w for w in _WORD.findall(query) if len(w) >= MIN_TERM_CHARS))
+
+
+def _match(words: list[str]) -> str:
+    """The FTS5 query for `words`: every one, as the start of a word. Each is letters and digits
+    only (`terms`), so quoting it leaves no operator, column filter or syntax error to the user."""
+    return " ".join(f'"{w}"*' for w in words)
+
+
 def _empty(urn: str) -> dict:
     return {"urn": urn, "total": 0, "anni": [], "archivi": [], "anno": None, "items": [], "next_cursor": None}
 
@@ -145,27 +189,43 @@ def _item(record: dict, urn: str) -> dict:
     }
 
 
+# Only the paragraphs in the index's answer: read as a set of rowids that the norm's own
+# paragraphs are checked against (the norm's links come first, so a common word costs one pass
+# over the index's list for it, not a lookup of every paragraph that holds it).
+_IN_INDEX = " AND p.rowid IN (SELECT rowid FROM paragraphs_fts WHERE paragraphs_fts MATCH ?)"
+_LINKS = "norm_links n JOIN paragraphs p ON p.key = n.paragraph_key"
+
+
 def by_norma(path: Path, urn: str, *, anno: Optional[int], archivio: Optional[str],
-             offset: int, limit: int) -> dict:
+             offset: int, limit: int, words: Optional[list[str]] = None) -> dict:
     """The paragraphs citing `urn` (already the norm's identity), grouped by year, newest year
-    first: the page of `anno` when it has paragraphs, else of the newest year."""
+    first: the page of `anno` when it has paragraphs, else of the newest year. With `words`
+    (from `terms`), only the paragraphs holding every one of them: the counts, the archives and
+    the pages alike."""
     with _read(path) as conn:
         if conn is None:
             return _empty(urn)
+        source = _LINKS if words else "norm_links n"
         where, params = "n.urn = ?", [urn]
-        if archivio:
-            where, params = where + " AND n.archivio = ?", params + [archivio]
-        counts = dict(conn.execute(
-            f"SELECT n.anno, COUNT(*) FROM norm_links n WHERE {where} GROUP BY n.anno", params).fetchall())
+        if words:
+            where, params = where + _IN_INDEX, params + [_match(words)]
+        # one pass for the years and the archives (the index is read once for both)
+        groups = conn.execute(
+            f"SELECT n.anno, n.archivio, COUNT(*) FROM {source} WHERE {where} GROUP BY n.anno, n.archivio",
+            params).fetchall()
+        archivi = sorted({g[1] for g in groups if g[1]})
+        counts: dict[int, int] = {}
+        for year, kind, count in groups:
+            if not archivio or kind == archivio:
+                counts[year] = counts.get(year, 0) + count
         if not counts:
             return _empty(urn)
-        archivi = sorted(r[0] for r in conn.execute(
-            "SELECT DISTINCT archivio FROM norm_links WHERE urn = ?", (urn,)).fetchall() if r[0])
+        if archivio:
+            where, params = where + " AND n.archivio = ?", params + [archivio]
         years = sorted(counts, reverse=True)
         target = anno if anno in counts else years[0]
         rows = conn.execute(
-            f"SELECT p.record FROM norm_links n JOIN paragraphs p ON p.key = n.paragraph_key "
-            f"WHERE {where} AND n.anno = ? ORDER BY n.ordine LIMIT ? OFFSET ?",
+            f"SELECT p.record FROM {_LINKS} WHERE {where} AND n.anno = ? ORDER BY n.ordine LIMIT ? OFFSET ?",
             params + [target, limit + 1, offset]).fetchall()
     page = [_record(r[0]) for r in rows[:limit]]
     return {
@@ -308,6 +368,9 @@ def rewrite(path: Path, replacing: Iterable[int]) -> Iterator[Rewrite]:
                 if readable:
                     _copy(path, conn, replacing)
                 yield Rewrite(conn, built_at, replacing)
+                # the index of every paragraph the new file holds, copied and added alike
+                conn.execute(_INDEX)
+                conn.execute("INSERT INTO paragraphs_fts (paragraphs_fts) VALUES ('optimize')")
                 conn.commit()
             finally:
                 conn.close()

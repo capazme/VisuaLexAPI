@@ -434,15 +434,22 @@ POST unless noted, JSON bodies.
 - `GET /fetch_alias_catalog` — `act_names` (the names that name an act on their own, no bare
   type word: what «Analizza documento» looks for in the browser), the presets we ship plus the act names the
   resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
-- `GET /fetch_rassegne?urn=&anno=&archivio=&cursor=&limit=` — the Massimario's review paragraphs
+- `GET /fetch_rassegne?urn=&anno=&archivio=&cursor=&limit=`, or `POST /fetch_rassegne` with the same
+  fields in a JSON body plus `q` — the Massimario's review paragraphs
   citing a norm, from the store (`massimario/store.py`), for the article page: `urn` up to 500
   characters, put through `normalize_norm_urn`; `anno` 1900–2100; `archivio` civile | penale; `cursor`
   up to six digits; `limit` 1–50 (10). 200 `{urn, total, anni: [{anno, passi}], archivi, anno, items,
   next_cursor}` (newest year first; the page of `anno` when it has paragraphs, else of the newest), each
   item the panel's `RassegnePasso` (decisions without `label`); 200 with `total: 0` when no store is
   built; 400 `richiesta_non_valida` with `errori`; 503 `rassegne_non_disponibili` for a store that
-  cannot be read or of an unknown schema. A local file only: no request leaves, no MERL-T hop. Not yet
-  in the Vite proxy nor the ingress (PR 2 of the design adds it to both, behind the login)
+  cannot be read or of an unknown schema. A local file only: no request leaves, no MERL-T hop. `q`
+  (G-399, POST only: a GET with `q` is a 400, since an address ends up in access logs; never logged
+  here either) keeps the paragraphs holding every word, each read as the start of a word, accents and
+  case folded, in the text or where it sits (volume, part, chapter, section, authors): at most 200
+  characters and 8 words of two letters or digits or more (`store.terms`; never the user's text as FTS
+  syntax), a blank `q` is no search; the counts, `archivi` and the pages all follow it. A body that is
+  not an object, or a field that is not a string or a whole number, is a 400. In the Vite proxy and the
+  ingress's `@legal` list, behind the login (ADR-001); the web calls it with POST through `legalFetch`
 - `GET /massimario/volume/<id>/records` — internal (MERL-T's ingestion, PR 3 of the design; not
   routed by the ingress, not proxied by Vite): a volume's records in reading order and its parse
   report, `{volume, parser_version, built_at, source, report, records}`; 404 `volume_non_presente`,
@@ -732,7 +739,7 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
 
 ## The Massimario's reviews store
 
-`data/rassegne-v1.sqlite3` (the schema version is in the name; `data/` is the `scrapers_data`
+`data/rassegne-v2.sqlite3` (the schema version is in the name; `data/` is the `scrapers_data`
 volume in a container, ignored by git). Built by hand, never by `./start.sh`: an empty store means
 no panel, and a deploy never waits on the portal.
 
@@ -744,8 +751,15 @@ no panel, and a deploy never waits on the portal.
   store (`resolved_acts`), so a rebuild does not ask again; `--no-resolve` asks nothing. The other
   volumes are kept; the new file is put in place whole, or not at all; a store that cannot be read
   stops the build (delete it and build again).
-- **Size** (31 October 2026): vol. 96 about 4 MB; the 63 volumes about 222 MB (40 MB gzipped).
-  Reading is one indexed query: art. 2043 c.c. (218 paragraphs over 14 years) in about 20 ms.
+- **Size** (31 October 2026): vol. 96 about 4 MB; the 63 volumes about 222 MB (40 MB gzipped)
+  without the keyword index, which schema 2 adds: 295 MB on disk, about 70 MB gzipped. Reading is one
+  indexed query: art. 2043 c.c. (218 paragraphs over 14 years) in under 1 ms, a few ms in the API.
+- **The keyword index** (schema 2): `paragraphs_fts`, SQLite FTS5, contentless (no copy of the
+  text), `prefix='2'`, `unicode61 remove_diacritics 2`; rebuilt whole at the end of every build from
+  the paragraphs the new file holds (about 3 s for the corpus). Measured on the 63 volumes, a search
+  within a norm's paragraphs: one or two words a few ms; a two-letter word ~20–40 ms; eight
+  three-letter starts ~220 ms (the worst the limits allow). FTS5 and the JSON functions are in the
+  production image's SQLite (`python:3.12-slim-bookworm`, 3.40.1) and in macOS's.
 - **Backups.** Not in `scripts/datakit`: the store is derived, and deleting it costs one rebuild.
 - **Schema changes.** The API refuses a store whose schema version it does not know (503, never a
   guess at an older layout). A release that raises `SCHEMA_VERSION` adds a step to the release

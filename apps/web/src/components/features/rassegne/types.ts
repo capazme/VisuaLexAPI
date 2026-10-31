@@ -1,11 +1,11 @@
 /**
- * The Massimario's review paragraphs citing a norm: mirrors the BFF's proxy of MERL-T
- * (apps/server/src/services/merlt/rassegneTypes.ts), snake_case verbatim — never invent
- * camelCase fields.
+ * The Massimario's review paragraphs citing a norm: mirrors the Python API's `/fetch_rassegne`
+ * (`services/visualex/visualex_api/services/massimario/store.py`, `_item`), snake_case verbatim —
+ * never invent camelCase fields. A decision carries no label: the web writes it from the fields
+ * (`formatDecisionShort`).
  */
 export interface RassegnaPronuncia {
   key: string | null;
-  label: string;
   corte: string;
   archivio: string | null;
   numero: number;
@@ -52,4 +52,6 @@ export interface RassegneQuery {
   anno?: number;
   archivio?: 'civile' | 'penale';
   cursor?: string;
+  /** the words to search for (`searchWords`), joined by spaces; sent in the body, never in an address */
+  q?: string;
 }

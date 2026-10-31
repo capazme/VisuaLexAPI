@@ -64,13 +64,22 @@ test('every scraping path is a prefix match, like a Vite proxy key', () => {
 
 test('nothing else of the Python API is routed to it', () => {
   // The Python API keeps a global search history and a dossier file of its own,
-  // and a circuit-breaker status page. None of them is for the outside.
-  for (const forbidden of ['/history', '/dossiers', '/api/circuit-breakers']) {
+  // and a circuit-breaker status page. None of them is for the outside. Nor are the
+  // Massimario's internal routes: the portal's paced client and a volume's records,
+  // which MERL-T reads from inside.
+  for (const forbidden of ['/history', '/dossiers', '/api/circuit-breakers', '/fetch_massimario', '/massimario']) {
     assert.ok(
       !caddyLegalTokens().some((token) => token.startsWith(forbidden)),
       `${forbidden} must not be routed to the scrapers`,
     );
   }
+});
+
+test('the Massimario\'s reviews are read behind the login (ADR-001)', () => {
+  // The reviews' prose reaches signed-in users only: the reader's route is in @legal,
+  // which asks the server before it proxies, and never among the open paths.
+  assert.ok(caddyLegalTokens().includes('/fetch_rassegne*'));
+  assert.ok(!caddyOpenPaths().some((token) => token.startsWith('/fetch_rassegne')));
 });
 
 test('only /version and /health stay open, and each exactly', () => {

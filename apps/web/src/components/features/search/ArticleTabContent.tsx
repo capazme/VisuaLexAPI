@@ -1015,7 +1015,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 articleUrn={norma_data.urn}
                 tabId={originTabId ?? tabId}
                 backEntry={decisionBackEntry}
-                isHistorical={readOnly}
             />
 
             {url && (

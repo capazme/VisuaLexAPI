@@ -601,7 +601,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the selection popup's «Segnala come citazione» and `MissedCitationReporter`, all gated in
   `ArticleTabContent`, on top of the consent gates); the server's guards stay the real barrier.
   Not behind it: the RLCF trackers and the consent screen (collection is the owner's separate
-  decision), the Massimario's panel (`article_case_law`), `article_content_after`, `global` and the
+  decision), the Massimario's panel (no plugin, see «Giurisprudenza»), `article_content_after`, `global` and the
   implicit citation feedback on a click. The citation preview's feedback bar (✓ / ✗ / correct) is a
   citation report, and is behind it. The mode is unrelated to the Q&A view's own `useQaDevMode`
   (a local toggle for the pipeline trace).
@@ -1017,9 +1017,9 @@ The renderer also accepts, at the same offset, a stored text that differs only
 in whitespace, so those older highlights show again.
 
 **«Giurisprudenza» under the article** (`CaseLawSection`, after the text): an accordion closed by default (state per host in
-`sessionStorage`) holding the Massimario's panel (the plugin slot
-`article_case_law`, which takes `articleUrn`, `isHistorical`, `besideId`,
-`backEntry`), the Cassazione's decisions that mention the article, searched
+`sessionStorage`) holding the Massimario's panel (`components/features/rassegne/RassegnePanel`, a block of
+the section, mounted with MERL-T on or off: it reads the Python API's own store, `POST /fetch_rassegne` through
+`legalFetch`, `services/rassegneService.ts`; design `2026-10-30-rassegne-without-merlt` §3 (a), PR 2), the Cassazione's decisions that mention the article, searched
 only when the reader presses the button (`DecisionResultList`; not offered on an act of the Union,
 `isEuropeanAct`), and «Cerca sentenze sul tema dell’articolo»: a topic search of the Cassazione by the
 article's rubric (`topic`, `getRubricText`; no rubric, no link; not on an act of the Union, nor when the
@@ -1039,7 +1039,7 @@ one colour key) and the section's header holds the one set of controls (`CaseLaw
 years «dal / al», a chip per year with the count of the rows loaded, the order (newest first, reversible)
 and one text filter; on a phone they sit behind «Filtri». The blocks do not own a filter and no block
 scrolls inside itself. The controls reach them through `CaseLawFiltersContext` (`useCaseLawFilters`;
-the Massimario's panel is a plugin whose slot props are a contract, so it reads the same context) and
+the Massimario's panel reads the same context) and
 each block reports its years back with `useReportCaseLawYears(source, counts)` — `YearCount[]`, memoised;
 the section adds them up into the chips (`mergeYearCounts`; a year is «circa» when any block's count is
 approximate). What a row answers to is the source's to say (`YearsOf`: a passage's
@@ -1054,7 +1054,18 @@ count, not for the next one if that fails; the range is clamped to 1900 – this
 that answers «none» without a request). On the Cassazione the reversed order applies once every
 decision is loaded; until then the archive's order (newest first) stands and a line says so. Filters reset
 with the article.
-**An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
+**The Massimario's panel** («Nelle rassegne della Cassazione») is a closed row with the article's own count and
+years (every volume in the store, G-399), there only when a passage cites the article: no store, or none citing it,
+draws nothing; a 404 (an API without the route) draws nothing; a 503 or no answer leaves the row alone with «Non
+disponibili al momento». The section's text filter is sent to the store as `q` once it has stayed still for 350 ms
+(cleared at once): `searchWords` reads the words as the API does (letters and digits, two or more, at most 8 and 200
+characters; more says so and filters only the passages loaded), each the start of a word in the passage's text or
+where it sits, so the store's passages are not filtered again by the text; «N passi con le parole cercate» or
+«Nessun passo con le parole cercate» is said inside, the row keeping the article's count. «Rassegne di un altro
+articolo» reads a reference through `/parse_query` (`readArticleReference`: one article, else it says why) and shows
+that article's passages until «Torna all’articolo». The words searched never reach the console (`failureOf`), and the
+session cache (`useRassegne`, keyed by the query) is cleared at logout. The paragraphs carry no anchor (rule 23 does
+not bind them: Q3 unanswered). **An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
 regulation or a directive: `utils/euCaseLaw.ts` derives the act's CELEX from the norm
 (`3` + the year + `R`/`L` + the number on four digits, as the API's `sources.eu_identity` does — the norm
 carries none; a pair written in `numero_atto` is not guessed at) and the plain-number article; a Treaty, or an article that is not a plain number, has no query

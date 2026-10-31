@@ -107,6 +107,8 @@ export default defineConfig({
       '/fetch_decision_pdf': 'http://localhost:5000',
       '/search_decisions': 'http://localhost:5000',
       '/search_eu_case_law': 'http://localhost:5000',
+      // the Massimario's reviews, from the API's own store (POST for a keyword search)
+      '/fetch_rassegne': 'http://localhost:5000',
       '/parse_query': 'http://localhost:5000',
       '/extract_citations': 'http://localhost:5000',
       '/export_pdf': 'http://localhost:5000',
