@@ -2,6 +2,7 @@ import asyncio
 import random
 import time
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 import aiohttp
 import structlog
@@ -19,6 +20,15 @@ from ..tools.egress import is_allowed
 from ..tools.exceptions import DocumentNotFoundError, NetworkError
 
 log = structlog.get_logger()
+
+
+def _host_of(url: str) -> Optional[str]:
+    """The host alone, for the lines above debug: a source's address names the act asked
+    (Normattiva's URN in the query), and the norms of a filing pass here (/fetch_norm_links)."""
+    try:
+        return urlparse(url).hostname
+    except ValueError:
+        return None
 
 
 class HttpResult:
@@ -78,7 +88,7 @@ class ThrottledHttpClient:
         rate limit, the host check and the retry budget are the same."""
         retries = HTTP_MAX_RETRIES if max_retries is None else max_retries
         if not is_allowed(url):
-            log.error("Blocked request to undeclared host", url=url[:120], source=source)
+            log.error("Blocked request to undeclared host", host=_host_of(url), source=source)
             raise NetworkError(
                 f"Host non consentito: {url[:80]}",
                 status_code=403,
@@ -115,7 +125,7 @@ class ThrottledHttpClient:
                                 "Rate limit signal detected",
                                 extra={
                                     "source": source,
-                                    "url": url,
+                                    "host": _host_of(url),
                                     "status": status,
                                     "retry_after": wait_time,
                                 },
@@ -136,7 +146,8 @@ class ThrottledHttpClient:
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request failed; retrying",
-                        extra={"source": source, "url": url, "attempt": attempt, "error": str(exc)},
+                        extra={"source": source, "host": _host_of(url), "attempt": attempt,
+                               "error_type": type(exc).__name__},
                     )
                     attempt += 1
                     await self._wait_before(attempt, retries, wait_time)
@@ -145,7 +156,7 @@ class ThrottledHttpClient:
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request timeout; retrying",
-                        extra={"source": source, "url": url, "attempt": attempt},
+                        extra={"source": source, "host": _host_of(url), "attempt": attempt},
                     )
                     attempt += 1
                     await self._wait_before(attempt, retries, wait_time)

@@ -53,7 +53,7 @@ async def _eurlex_page(normurn):
     every article of the act."""
     cached_html = await get_cache_manager().get_persistent("eurlex").get(normurn)
     if eurlex_fetch.is_act_page(cached_html):
-        logging.info(f"EUR-Lex page from the scraper's cache: {normurn[:80]}")
+        logging.debug(f"EUR-Lex page from the scraper's cache: {normurn[:80]}")
         return cached_html, True
     return await eurlex_fetch.fetch_act_page(normurn, timeout_ms=45000), False
 
@@ -90,7 +90,7 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
         tuple: Se return_metadata=True: (articles, count, metadata)
                Altrimenti: (articles, count)
     """
-    logging.info(f"Fetching tree for norm URN: {normurn} (metadata={return_metadata})")
+    logging.debug(f"Fetching tree for norm URN: {normurn} (metadata={return_metadata})")
     if not normurn or not isinstance(normurn, str):
         logging.error("Invalid URN provided")
         if return_metadata:
@@ -103,7 +103,7 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
     # Check persistent cache first (survives server restarts)
     cached_result = await _tree_cache.get(cache_key)
     if cached_result:
-        logging.info(f"Persistent cache hit for tree: {normurn[:50]}")
+        logging.debug(f"Persistent cache hit for tree: {normurn[:50]}")
         if return_metadata:
             return (cached_result.get("result", []),
                    cached_result.get("count", 0),
@@ -121,7 +121,7 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
     if is_normattiva:
         full = await _tree_cache.get(_full_key(normurn, link))
         if full:
-            logging.info(f"Persistent cache hit for the full tree: {normurn[:50]}")
+            logging.debug(f"Persistent cache hit for the full tree: {normurn[:50]}")
             return _narrow(full.get("result", []), full.get("count", 0),
                            full.get("metadata", {}), details, return_metadata)
 
@@ -149,10 +149,12 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     # `normurn` comes from the caller (POST /fetch_tree): only a declared host is visited, by
     # the browser as by the client, and only Normattiva's or EUR-Lex's host.
     if not is_allowed(normurn):
-        logging.error(f"Tree refused for an undeclared host: {normurn[:80]}")
+        logging.error("Tree refused for an undeclared host")
+        logging.debug(f"Tree refused for an undeclared host: {normurn[:80]}")
         return failure(f"Host non consentito: {normurn[:80]}")
     if not is_eurlex and _source_of(normurn) != "normattiva":
-        logging.warning(f"Unrecognized norm URN format: {normurn}")
+        logging.warning("Unrecognized norm URN format")
+        logging.debug(f"Unrecognized norm URN format: {normurn}")
         return failure("Unrecognized norm URN format")
 
     try:
@@ -169,14 +171,18 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
             text = (await http_client.request("GET", normurn, source="normattiva",
                                               max_retries=0)).text
     except (NetworkError, DocumentNotFoundError) as e:
-        logging.error(f"HTTP error while fetching page: {e}")
+        # The type only above debug: the message carries the address.
+        logging.error("HTTP error while fetching the tree's page: %s", type(e).__name__)
+        logging.debug(f"HTTP error while fetching page: {e}")
         return failure(f"Failed to retrieve the page: {e}")
     except Exception as e:
-        logging.error(f"Unexpected error: {e}", exc_info=True)
+        logging.error("Unexpected error while fetching the tree's page: %s", type(e).__name__)
+        logging.debug(f"Unexpected error: {e}", exc_info=True)
         return failure(f"Unexpected error: {e}")
 
     if not text or len(text) < 500:
-        logging.error(f"Empty or too short response from {normurn[:50]}")
+        logging.error("Empty or too short response for a tree")
+        logging.debug(f"Empty or too short response from {normurn[:50]}")
         return failure("Empty response from server")
 
     soup = BeautifulSoup(text, 'html.parser')
@@ -187,7 +193,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         if count > 0:
             await _tree_cache.set(_full_key(normurn, link),
                                   {"result": result, "count": count, "metadata": metadata})
-            logging.info(f"Stored full tree in persistent cache: {normurn[:50]}, {count} articles")
+            logging.info(f"Stored full tree in persistent cache: {count} articles")
         return _narrow(result, count, metadata, details, return_metadata) + (from_copy,)
     else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
@@ -203,7 +209,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         if return_metadata:
             cache_data["metadata"] = metadata
         await _tree_cache.set(cache_key, cache_data)
-        logging.info(f"Stored tree in persistent cache: {normurn[:50]}, {count} articles")
+        logging.info(f"Stored tree in persistent cache: {count} articles")
 
     if return_metadata:
         return result, count, metadata, from_copy
@@ -290,7 +296,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
                     annex_counter += 1
                     current_attachment = str(annex_counter)
 
-            logging.info(f"Detected link_allegato: {current_attachment} (label: {original_label})")
+            logging.debug(f"Detected link_allegato: {current_attachment} (label: {original_label})")
             if current_attachment not in annexes_metadata:
                 annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
                 annex_labels[current_attachment] = original_label
@@ -312,9 +318,9 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
                     current_attachment = str(annex_counter)
                     annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
                     annex_labels[current_attachment] = original_label
-                    logging.info(f"Detected box_allegati -> new Allegato {current_attachment}: {original_label}")
+                    logging.debug(f"Detected box_allegati -> new Allegato {current_attachment}: {original_label}")
                 else:
-                    logging.info(f"Detected box_allegati (before Allegati section, ignoring): {original_label}")
+                    logging.debug(f"Detected box_allegati (before Allegati section, ignoring): {original_label}")
 
                 if details:
                     result.append(original_label)
@@ -331,7 +337,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
             current_attachment = str(annex_counter)
             annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
             annex_labels[current_attachment] = original_label
-            logging.info(f"Detected box_allegati_small -> new Allegato {current_attachment}: {original_label}")
+            logging.debug(f"Detected box_allegati_small -> new Allegato {current_attachment}: {original_label}")
 
             if details:
                 result.append(original_label)
@@ -489,7 +495,7 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     Returns:
         str: URL completo per l'articolo specifico.
     """
-    logging.info(f"Generating article URL for article_number: {article_number}, attachment_number: {attachment_number} based on normurn: {normurn}")
+    logging.debug(f"Generating article URL for article_number: {article_number}, attachment_number: {attachment_number} based on normurn: {normurn}")
 
     # Normalize article_number: rimuovi spazi e trattini, converti in minuscolo.
     # "270 bis.1" -> art270bis.1, "19-bis.1" -> art19bis.1, "314/2" -> art314/2,
@@ -518,12 +524,12 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     # Aggiungi il numero dell'allegato se fornito
     if attachment_number is not None:
         base_urn = f"{base_urn}:{attachment_number}"
-        logging.info(f"Added attachment number to URN: {base_urn}")
+        logging.debug(f"Added attachment number to URN: {base_urn}")
 
     # Costruisci il nuovo URN con l'articolo
     new_urn = f"{base_urn}~art{article_number}{sep}{suffix}" if suffix else f"{base_urn}~art{article_number}"
 
-    logging.info(f"Generated article URL: {new_urn}")
+    logging.debug(f"Generated article URL: {new_urn}")
     return new_urn
 
 

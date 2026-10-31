@@ -1,0 +1,31 @@
+PARERE
+
+Oggetto: trattamento dei dati dei dipendenti mediante sistema di geolocalizzazione dei veicoli aziendali.
+
+1. Premessa normativa
+
+Il trattamento è disciplinato dal [[Regolamento (UE) 2016/679|regolamento ue|679|2016||act]] (di seguito, GDPR) e dal [[d.lgs. 30 giugno 2003, n. 196|decreto legislativo|196|2003||act]], come modificato dal [[d.lgs. n. 101/2018|decreto legislativo|101|2018||act]]. Rileva altresì [[l'art. 4 della legge 20 maggio 1970, n. 300|legge|300|1970|4]] sui controlli a distanza, richiamato dall'[[art. 114 del Codice privacy|codice in materia di protezione dei dati personali|||114]].
+
+2. Base giuridica
+
+La base giuridica non può essere il consenso dei lavoratori, che nel rapporto di lavoro non è di regola libero (considerando 43). Il datore potrà invece fondarsi sull'[[art. 6, par. 1, lett. f), GDPR|regolamento ue|679|2016|6]], previo bilanciamento, o sull'[[art. 6, paragrafo 1, lettera c), del Regolamento|regolamento ue|679|2016|6|ctx]] ove il trattamento sia imposto da un obbligo di legge. Per le categorie particolari di dati occorre una delle condizioni dell'[[articolo 9 GDPR|regolamento ue|679|2016|9]]; per i trattamenti nell'ambito del rapporto di lavoro si veda l'[[art. 88 del GDPR|regolamento ue|679|2016|88]] e, sul piano interno, l'[[art. 2-ter d.lgs. 196/2003|decreto legislativo|196|2003|2-ter]].
+
+3. Informativa e principi
+
+L'informativa deve contenere gli elementi elencati agli [[artt. 13 e 14 GDPR|regolamento ue|679|2016|13,14]]. Il trattamento deve rispettare i principi di minimizzazione e limitazione della conservazione ([[art. 5, par. 1, lett. c) ed e), GDPR|regolamento ue|679|2016|5]]). La nozione di «titolare» è quella dell'[[art. 4, n. 7, GDPR|regolamento ue|679|2016|4]]; quella di «responsabile» è data dal successivo n. 8, e i suoi obblighi dall'[[art. 28 GDPR|regolamento ue|679|2016|28]].
+
+4. Valutazione d'impatto
+
+Il trattamento sistematico della posizione dei lavoratori richiede una valutazione d'impatto ai sensi dell'[[articolo 35 del regolamento (UE) 2016/679|regolamento ue|679|2016|35]]. Nei casi dubbi va consultata l'autorità di controllo secondo [[l'articolo 36|regolamento ue|679|2016|36|ctx]].
+
+5. Sanzioni
+
+La violazione dei principi di base espone alle sanzioni amministrative dell'[[art. 83, par. 5, GDPR|regolamento ue|679|2016|83]], fino a 20 milioni di euro o al 4% del fatturato; sul piano interno restano ferme le sanzioni penali degli [[artt. 167 e ss. del Codice privacy|codice in materia di protezione dei dati personali|||167]]. Il lavoratore leso può agire per il risarcimento ai sensi dell'[[art. 82 GDPR|regolamento ue|679|2016|82]].
+
+6. Trasferimenti
+
+Se il fornitore del sistema conserva i dati fuori dall'Unione, si applica il capo V del Regolamento: in particolare l'[[art. 46|regolamento ue|679|2016|46|ctx]] sulle garanzie adeguate. La [[direttiva 95/46/CE|direttiva ue|46|1995||act]] è abrogata e non rileva.
+
+7. Conclusioni
+
+Il trattamento è lecito a condizione che: (i) sia preceduto dall'accordo sindacale o dall'autorizzazione dell'ispettorato previsti dall'[[art. 4, comma 1, St. lav.|legge|300|1970|4]]; (ii) sia resa l'informativa di cui all'art. 3 della policy aziendale; (iii) sia svolta la valutazione d'impatto. Resta salvo quanto disposto dall'[[art. 8 della l. n. 300 del 1970|legge|300|1970|8]] sul divieto di indagini sulle opinioni.

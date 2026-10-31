@@ -10,7 +10,9 @@ import { createLimiter, getClientIp, sendTooManyRequests } from './rateLimiter';
  * articles in one request; the detailed health page reaches the three sources for real;
  * a decision lookup can query both Cassazione archives or download a Corte
  * costituzionale bundle; a batch of norm readings reads up to 200 strings, for which one
- * reading costs 1 (design 2026-10-29-document-analysis §4.4).
+ * reading costs 1 (design 2026-10-29-document-analysis §4.4); a batch of link addresses
+ * reaches Normattiva (a date lookup and an index per new act, both cached) for up to 200
+ * norms of 30 acts (design 2026-10-31-document-hyperlinks §3.1).
  */
 export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/export_pdf': 20,
@@ -19,6 +21,7 @@ export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/health/detailed': 5,
   '/fetch_decision': 2,
   '/parse_query_batch': 3,
+  '/fetch_norm_links': 5,
 };
 
 /**
