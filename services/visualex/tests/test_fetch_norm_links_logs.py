@@ -28,6 +28,8 @@ pytestmark = pytest.mark.asyncio
 FIXTURES = Path(__file__).parent / "fixtures"
 LANDING = (FIXTURES / "akn" / "landing_legge_241_1990.html").read_text(encoding="utf-8")
 GDPR = (FIXTURES / "eurlex" / "gdpr_oj_trimmed.html").read_text(encoding="utf-8")
+# An act with annexes: its labels are written while the index is parsed.
+DLGS36 = (FIXTURES / "normattiva" / "dlgs36_2023_tree_trimmed.html").read_text(encoding="utf-8")
 GDPR_URL = "https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita"
 
 NORMS = [
@@ -41,11 +43,15 @@ NORMS = [
     {"act_type": "regolamento ue", "date": "2016", "act_number": "679", "article": "4"},
     {"act_type": "direttiva ue", "date": "2019", "act_number": "790", "article": "17"},
     {"act_type": "codice civile", "article": "2043"},
+    # an act whose index has annexes; a range; an article that cannot be read
+    {"act_type": "decreto legislativo", "date": "2023-03-31", "act_number": "36", "article": "1"},
+    {"act_type": "codice civile", "article": "4-6"},
+    {"act_type": "legge", "date": "1990-08-07", "act_number": "241", "article": "1!!"},
 ]
 # What would name a norm of the request, or its address (a source's host alone names none).
 WORDS = ("legge", "decreto", "regolamento", "direttiva", "codice", "urn:nir", "n2ls", "uri-res", "/eli/",
          "celex:", "resource/celex", "1990-08-07", "2001-06-08", "1942-03-16", "nonies", "novies", "undecies",
-         "32016r0679", "32019l0790")
+         "32016r0679", "32019l0790", "2023-03-31", "allegato i.")
 NUMBERS = re.compile(r"(?<![\d.])(241|231|679|790|262|2043|9999|1990|2001|2016|2019)(?![\d])")
 
 
@@ -92,6 +98,8 @@ class FakeSession:
     def request(self, method, url, **kwargs):
         if "legge:1990" in url and ";241" in url:
             return FakeResponse(LANDING)
+        if "decreto.legislativo:2023-03-31;36" in url:
+            return FakeResponse(DLGS36)
         if "decreto.legislativo:2001;231" in url:
             return FakeResponse("Not here", status=404)
         # Every other source fails, the address in the error as aiohttp's errors carry it.
@@ -142,7 +150,7 @@ async def test_the_route_and_what_it_calls_log_no_norm(isolated, caplog):
     results = (await response.get_json())["results"]
     assert [r["reason"] for r in results] == [
         "ok", "article_missing", "date_incomplete", "source_unavailable", "ok", "source_unavailable",
-        "source_unavailable",
+        "source_unavailable", "ambiguous_part", "not_linkable", "not_linkable",
     ]
     assert results[0]["href"].endswith("legge:1990-08-07;241~art21novies!vig=2026-10-31")
     assert results[4]["href"] == GDPR_URL

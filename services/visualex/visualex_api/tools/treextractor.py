@@ -296,7 +296,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
                     annex_counter += 1
                     current_attachment = str(annex_counter)
 
-            logging.info(f"Detected link_allegato: {current_attachment} (label: {original_label})")
+            logging.debug(f"Detected link_allegato: {current_attachment} (label: {original_label})")
             if current_attachment not in annexes_metadata:
                 annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
                 annex_labels[current_attachment] = original_label
@@ -318,9 +318,9 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
                     current_attachment = str(annex_counter)
                     annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
                     annex_labels[current_attachment] = original_label
-                    logging.info(f"Detected box_allegati -> new Allegato {current_attachment}: {original_label}")
+                    logging.debug(f"Detected box_allegati -> new Allegato {current_attachment}: {original_label}")
                 else:
-                    logging.info(f"Detected box_allegati (before Allegati section, ignoring): {original_label}")
+                    logging.debug(f"Detected box_allegati (before Allegati section, ignoring): {original_label}")
 
                 if details:
                     result.append(original_label)
@@ -337,7 +337,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
             current_attachment = str(annex_counter)
             annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
             annex_labels[current_attachment] = original_label
-            logging.info(f"Detected box_allegati_small -> new Allegato {current_attachment}: {original_label}")
+            logging.debug(f"Detected box_allegati_small -> new Allegato {current_attachment}: {original_label}")
 
             if details:
                 result.append(original_label)

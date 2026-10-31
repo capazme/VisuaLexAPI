@@ -349,14 +349,17 @@ POST unless noted, JSON bodies.
   index's answer, which has no parts), `not_linkable` (names no act, a range or a list, an address
   off the two hosts). The address is the text in force fixed to `pin_day` (`!vig=<day>`), today in
   Rome when absent (G-395; a later day is a 400); an EU act links its EUR-Lex page once its tree
-  holds the article. The whole call has `LINKS_BATCH_BUDGET` = 20 s, the acts four at a time, each
-  act's norms in turn: what is not settled in time is `source_unavailable`. It logs the counts, the
+  holds the article. A range or a list is refused before any request. The whole call has
+  `LINKS_BATCH_BUDGET` = 20 s, the acts four at a time, each act's norms in turn; an act whose date
+  or index did not come gives its other norms the same reason without asking again (a failure is
+  not cached, and each retry would hold the shared client's queue toward Normattiva): what is not
+  settled in time is `source_unavailable`. It logs the counts, the
   reasons and the duration, never a norm: every line on its path that names an act, an article or
   an address (`resolve_norm_address`, the existence check, `urngenerator`, `treextractor`,
-  `act_dates.complete_year`, `eurlex_scraper.get_uri`, `eurlex_fetch`, the shared client's
+  `act_dates.complete_year`, `eurlex_scraper.get_uri`, `eurlex_fetch`, `text_op.parse_article_input`, the shared client's
   warnings, which name the host only) is at debug, which the deployed app does not write
-  (`tests/test_fetch_norm_links_logs.py` fakes the network under the shared client and captures
-  both kinds of record). Priced 5 points by the scrape gate; routed by the ingress's `@legal` and
+  (`tests/test_fetch_norm_links_logs.py` fakes the network under the shared client, reads an act
+  with annexes, whose labels may name a code, and captures both kinds of record). Priced 5 points by the scrape gate; routed by the ingress's `@legal` and
   Vite's proxy, its own prefix on both
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
   AKN index, and the act's `title` (`presentable_title`: no Gazzetta code, no

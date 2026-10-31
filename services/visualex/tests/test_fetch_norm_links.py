@@ -163,12 +163,43 @@ async def test_an_unknown_existence_in_a_code_annex_is_source_unavailable(contro
     assert akn.await_count == 0
 
 
-async def test_a_reading_that_names_no_act_or_a_range_is_not_linkable(controller):
-    norms = [{"act_type": "decreto ministeriale", "article": "5"},
-             {"act_type": "codice civile", "article": "1,2"}]
-    results, _ = await _links(controller, norms, tree=_tree([("1", "2"), ("2", "2")]))
-    assert [r["reason"] for r in results] == ["not_linkable", "not_linkable"]
+async def test_a_reading_that_names_no_act_or_a_range_is_not_linkable_with_no_request(controller):
+    norms = [{"act_type": "decreto ministeriale", "article": "5"}] + [
+        {"act_type": "codice civile", "article": article} for article in ("1,2", "4-6", "4 - 6", "1 e 2")]
+    results, get_tree = await _links(controller, norms, tree=_tree([("1", "2"), ("2", "2")]))
+    assert [r["reason"] for r in results] == ["not_linkable"] * 5
     assert all(r["href"] is None for r in results)
+    assert get_tree.await_count == 0
+
+
+async def test_a_suffixed_article_is_one_article(controller):
+    results, _ = await _links(controller, [{"act_type": "codice civile", "article": "2645-bis"}],
+                              tree=_tree([("2645 bis", "2")]))
+    assert results == [{"href": f"{CODE}:2~art2645bis!vig=2026-10-31", "reason": "ok"}]
+
+
+async def test_an_act_whose_index_fails_is_asked_once_for_all_its_norms(controller):
+    # A failed index is not cached: asking again for each norm would hold Normattiva's queue.
+    norms = [{"act_type": "legge", "date": "1990-08-07", "act_number": "241", "article": str(n)}
+             for n in range(1, 21)]
+    results, get_tree = await _links(controller, norms, tree=("Failed to retrieve the page", 0, {}))
+    assert {r["reason"] for r in results} == {"source_unavailable"}
+    assert get_tree.await_count == 1
+
+
+async def test_an_act_whose_date_is_not_completed_is_looked_up_once(controller):
+    norms = [{"act_type": "legge", "date": "1990", "act_number": "241", "article": str(n)} for n in range(1, 6)]
+    lookups = []
+    results, get_tree = await _links(controller, norms, tree=_tree([("1", None)]),
+                                     date_lookup=lambda t, year, n: lookups.append(year) or year)
+    assert {r["reason"] for r in results} == {"date_incomplete"}
+    assert len(lookups) == 1 and get_tree.await_count == 0
+
+
+async def test_an_article_missing_does_not_stop_the_act_other_norms(controller):
+    norms = [{"act_type": "codice civile", "article": "9999"}, {"act_type": "codice civile", "article": "2043"}]
+    results, _ = await _links(controller, norms, tree=_tree([("2043", "2")]))
+    assert [r["reason"] for r in results] == ["article_missing", "ok"]
 
 
 async def test_an_eu_act_links_its_eurlex_page_when_the_article_is_in_it(controller):

@@ -123,6 +123,8 @@ LINKS_ACT_CONCURRENCY = 4
 _LINK_FIELDS = ('act_type', 'act_number', 'date', 'article', 'annex')
 _LINK_FIELD_MAX = {'act_type': 120}
 _LINK_FIELD_DEFAULT_MAX = 40
+# «1,2», «1 e 2», «4-6», «4 - 6»: more than one article. «1-bis» and «270-bis.1» are one.
+_LINK_RANGE_OR_LIST = re.compile(r",|;|\s+e\s+|^\s*\d+\s*-\s*\d+")
 # The two sources' own pages, as the web's `sourceAddress` (#385) checks them again.
 _LINK_HOSTS = frozenset({'www.normattiva.it', 'normattiva.it', 'eur-lex.europa.eu'})
 LINK_REASONS = ('ok', 'date_incomplete', 'article_missing', 'ambiguous_part',
@@ -150,6 +152,15 @@ def _link_norm(item):
     if not norm.get('act_type') or not norm.get('article'):
         return "Each norm needs act_type and article"
     return norm
+
+
+def _link_refused_before_lookup(norm):
+    """The reason a norm gets no link before any request, or None: a reading that names no
+    act, and a range or a list (the browser sends the first article, §4.4; a range would
+    read the act's index for nothing)."""
+    if not identifies_act(norm) or _LINK_RANGE_OR_LIST.search(norm['article']):
+        return 'not_linkable'
+    return None
 
 
 def _link_act_key(norm):
@@ -1535,14 +1546,28 @@ class NormaController:
     async def _norm_links(self, acts, pin_day, budget):
         """`{norm key: (href, reason)}` for the norms settled within `budget` seconds: the acts
         LINKS_ACT_CONCURRENCY at a time, the norms of one act in turn (its date and index are
-        read once, then cached). A norm left out was not settled in time."""
+        read once, then cached; when either fails, the act's other norms take the same reason
+        without asking again). A norm left out was not settled in time."""
         settled = {}
         gate = asyncio.Semaphore(LINKS_ACT_CONCURRENCY)
 
         async def one_act(norms):
             async with gate:
+                act_failed = None
                 for key, norm in norms.items():
-                    settled[key] = await self._norm_link(norm, pin_day)
+                    refused = _link_refused_before_lookup(norm)
+                    if refused:
+                        settled[key] = (None, refused)
+                        continue
+                    if act_failed is not None:
+                        # The act's date or index did not come: a failure is not cached, and
+                        # asking again for each of its norms would hold the source's queue.
+                        settled[key] = act_failed
+                        continue
+                    href, reason, act_wide = await self._norm_link(norm, pin_day)
+                    settled[key] = (href, reason)
+                    if act_wide:
+                        act_failed = (None, reason)
 
         tasks = [asyncio.create_task(one_act(norms)) for norms in acts]
         _done, pending = await asyncio.wait(tasks, timeout=max(budget, 0))
@@ -1553,44 +1578,47 @@ class NormaController:
         return settled
 
     async def _norm_link(self, norm, pin_day):
-        """`(href, reason)` for one norm: `resolve_norm_address`, strict, and every guess of the
-        fetch path refused (design 2026-10-31-document-hyperlinks §3.1)."""
-        if not identifies_act(norm):
-            return None, 'not_linkable'
+        """`(href, reason, act_wide)` for one norm: `resolve_norm_address`, strict, and every
+        guess of the fetch path refused (design 2026-10-31-document-hyperlinks §3.1).
+        `act_wide` is true when the reason holds for every norm of the act: its date not
+        completed, its index or its date lookup not answering."""
+        refused = _link_refused_before_lookup(norm)
+        if refused:
+            return None, refused, False
         try:
             address = await self.resolve_norm_address(norm, strict=True)
         except (ValidationError, ValueError):
             # A type with no address, a date or an article that cannot be read.
-            return None, 'not_linkable'
+            return None, 'not_linkable', False
         except ResourceNotFoundError:
-            return None, 'article_missing'
+            return None, 'article_missing', False
         except Exception as exc:  # noqa: BLE001 - the index, the rate limit, the network
             log.warning("fetch_norm_links: a norm not settled", error_type=type(exc).__name__)
-            return None, 'source_unavailable'
+            return None, 'source_unavailable', True
         if not address.is_eu and not address.date_complete:
             # The year stood: «<year>-01-01» is another act's day, never sent as an address.
-            return None, 'date_incomplete'
+            return None, 'date_incomplete', True
         if len(address.checked) != 1:
-            # A range or a list: the browser sends the first article (§4.4).
-            return None, 'not_linkable'
+            return None, 'not_linkable', False
         article, exists = address.checked[0]
         if not address.is_eu:
             if address.annex_basis in ('unread', 'not_looked_up'):
-                return None, 'source_unavailable'
+                return None, 'source_unavailable', True
             if address.annex_basis == 'lookup' and len(address.parts.get(address.articles[0], ())) > 1:
                 # The body and an annex, or two annexes: the fetch's guess is never a link.
-                return None, 'ambiguous_part'
+                return None, 'ambiguous_part', False
         if exists is None:
-            return None, 'source_unavailable'
+            # The index of the part did not answer (a code's annex, an EU act's page).
+            return None, 'source_unavailable', True
         if exists is False:
-            return None, 'article_missing'
+            return None, 'article_missing', False
         if address.is_eu:
             href = address.norma.url
         else:
             href = NormaVisitata(norma=address.norma, numero_articolo=article, versione='vigente',
                                  data_versione=pin_day, allegato=address.annex).urn
         href = _source_href(href)
-        return (href, 'ok') if href else (None, 'not_linkable')
+        return (href, 'ok', False) if href else (None, 'not_linkable', False)
 
     async def extract_citations_endpoint(self):
         """Detect normative citations embedded in free text (shared linker).
