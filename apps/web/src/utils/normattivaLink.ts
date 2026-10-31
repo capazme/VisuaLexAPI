@@ -49,7 +49,7 @@ const DATED = /!vig=\d|@originale/;
  * export's `pdf_urn_in_force`). A text served as today's whose window has closed (`historical`
  * with no day asked: the source's, or `citeAs` past the day of an announced change) is fixed
  * to a day of that window, its last (else its first), the text the citation names; any other
- * text in force is fixed to today (G-395): an act cites the norm as it reads when it is
+ * text in force is fixed to today (G-395), or to its own start day when that is still ahead: an act cites the norm as it reads when it is
  * written, and the link must stay faithful to that after an amendment. A request with a day
  * or for the original carries it already; EUR-Lex has no such marker.
  */
@@ -62,6 +62,11 @@ export function linkPinDay(
   if (validity?.state === 'historical') {
     const day = validity.valid_to ?? validity.valid_from;
     if (day) return day;
+  }
+  // A text shown as «current» whose effect starts after today is not the one in force today:
+  // the link follows the text on screen.
+  if (validity?.state === 'current' && validity.valid_from && ISO_DAY.test(validity.valid_from) && validity.valid_from > today) {
+    return validity.valid_from;
   }
   return today;
 }

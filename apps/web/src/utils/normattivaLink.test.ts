@@ -65,10 +65,18 @@ describe('normLink', () => {
     expect(normLinkToast(link!)).toBe('Link Normattiva copiato (apre il testo in vigore al 31 ottobre 2026)');
     // Elision and ordinal, as the citations write them.
     const toast = (day: string) => normLinkToast(normLink({ ...civil, urn: `${CC}!vig=` }, null, day)!);
-    expect(toast('2026-11-08')).toContain('in vigore all'8 novembre 2026');
+    expect(toast('2026-11-08')).toContain("in vigore all'8 novembre 2026");
     expect(toast('2026-11-01')).toContain('in vigore al 1° novembre 2026');
     // No pin, no date in the toast.
     expect(normLinkToast(normLink(civil, null)!)).toBe('Link Normattiva copiato');
+  });
+
+  it('follows the text on screen when a «current» text starts after today (G-395)', () => {
+    const ahead: ArticleValidity = { state: 'current', valid_from: '2026-12-01', valid_to: null, version_number: 4, act_updated: null, request_in_window: null };
+    expect(linkPinDay(civil, ahead, '2026-10-31')).toBe('2026-12-01');
+    expect(linkPinDay(civil, { ...ahead, valid_from: '2026-10-31' }, '2026-10-31')).toBe('2026-10-31');
+    expect(linkPinDay(civil, { ...ahead, valid_from: '2005-01-01' }, '2026-10-31')).toBe('2026-10-31');
+    expect(normLink({ ...civil, urn: `${CC}!vig=` }, null, linkPinDay(civil, ahead, '2026-10-31'))?.href).toBe(`${CC}!vig=2026-12-01`);
   });
 
   it('takes the day in Rome around midnight, not the UTC one', () => {
