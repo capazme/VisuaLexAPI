@@ -62,7 +62,8 @@ function normaliseLines(text: string): string {
 
 /**
  * Character data as written → as read: line ends normalised, then entities decoded. The reader's offsets inside a
- * `w:t` count in this text; a writer that maps them back to the source must use the same function.
+ * `w:t` count in the text tokens decoded by this function (a CDATA section is taken as it is, a comment skipped); a
+ * writer that maps them back to the source must use the same function, token by token.
  */
 export function decodeXmlText(raw: string): string {
   return decodeEntities(normaliseLines(raw));

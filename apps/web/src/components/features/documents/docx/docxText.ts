@@ -35,8 +35,9 @@ export const NOTES_HEADING = 'Note';
  */
 export type DocxOrigin =
   | { kind: 'text'; part: DocxPartName; element: string; runStart: number; tagStart: number; contentStart: number; contentEnd: number }
-  // (`element` as written, prefix included; a `text` segment's `offset` counts in the content decoded by
-  // `decodeXmlText`, the same function a writer must use to go back to the source.)
+  // (`element` as written, prefix included; a `text` segment's `offset` counts in the content as read: each text
+  // token of the `w:t` decoded by `decodeXmlText`, joined. Word writes one plain text token per `w:t`; a writer that
+  // meets a CDATA section or a comment inside one must walk its tokens, not decode the whole slice.)
   | { kind: 'mark'; part: DocxPartName; element: string; runStart: number; tagStart: number; tagEnd: number }
   | { kind: 'added' };
 
