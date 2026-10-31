@@ -439,7 +439,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -450,13 +450,15 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.environment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.quickNorm.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.customAlias.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-    // The user's own replies are in `comments`; the others' are counted, never read.
+    // The user's own replies are in `comments`; the others' are counted, never read. A reply whose
+    // author deleted their account (user_id null) is someone else's too.
     prisma.articleThread.findMany({
       where: { userId },
-      include: { _count: { select: { comments: { where: { userId: { not: userId } } } } } },
+      include: { _count: { select: { comments: { where: { OR: [{ userId: { not: userId } }, { userId: null }] } } } } },
       orderBy: { createdAt: 'asc' },
     }),
-    prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    // Whether a reply was accepted lives on the glossa, someone else's: it travels as a mark, not as that row.
+    prisma.articleComment.findMany({ where: { userId }, include: { acceptedIn: { select: { id: true } } }, orderBy: { createdAt: 'asc' } }),
     // A course's card carries its module and the codes of its competences (Percorsi, A1).
     prisma.lingoCard.findMany({
       where: { autoreId: userId },
@@ -515,6 +517,25 @@ export const exportAccountData = async (req: Request, res: Response) => {
     // Gymnasium's courses the user wrote, whole but for the keys of an exam not yet handed in, with the user's own
     // enrolment (spec 2026-10-23 §10.9): never another learner's.
     exportUserCourses(userId),
+    // The Community (spec 2026-10-20-forum-community-glosse-design §7.4): what the user voted, reported and
+    // was told. A report's copy of the reported text and its closing (who, why) are the moderators' record.
+    prisma.articleThreadVote.findMany({ where: { userId }, select: { threadId: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleCommentVote.findMany({ where: { userId }, select: { commentId: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleThreadReport.findMany({
+      where: { userId },
+      select: { threadId: true, reason: true, details: true, status: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.articleCommentReport.findMany({
+      where: { userId },
+      select: { commentId: true, threadId: true, reason: true, details: true, status: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.forumNotification.findMany({
+      where: { userId },
+      select: { kind: true, threadId: true, commentId: true, createdAt: true, readAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
   const others = await othersIn([
@@ -552,9 +573,10 @@ export const exportAccountData = async (req: Request, res: Response) => {
       // an alias's expansion and description) travel as they are, like a taken note's text.
       quickNorms: quickNorms.map((norm) => withoutOriginalAuthor({ ...norm, searchParams: withoutAuthors(norm.searchParams, own, false) })),
       customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own, false) })),
-      // The release time is the author's; the releasing admin's id is another person's identifier.
-      threads: threads.map(({ passageReleasedById: _releasedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
-      comments,
+      // The release and lock times are the author's; the admin's and the moderator's ids are other people's identifiers.
+      threads: threads.map(({ passageReleasedById: _releasedBy, lockedById: _lockedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
+      comments: comments.map(({ acceptedIn, ...comment }) => ({ ...comment, accepted: acceptedIn.length > 0 })),
+      threadVotes, commentVotes, threadReports, commentReports, forumNotifications,
       lingoCards: lingoCards.map(({ competenze, ...card }) => ({ ...card, competenze: competenze.map((c) => c.competenza.codice) })),
       lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
@@ -579,9 +601,9 @@ export const exportAccountData = async (req: Request, res: Response) => {
 
 /**
  * Permanently delete the authenticated account after explicit confirmation.
- * Prisma relations are configured with cascading ownership deletes, with one
- * exception: the study cards the community has taken up stay, without their
- * author (see `deleteUserAccount`).
+ * Prisma relations are configured with cascading ownership deletes, with two
+ * exceptions: the study cards the community has taken up, and the Community's
+ * glosse, replies and comments, stay without their author (see `deleteUserAccount`).
  */
 export const deleteAccount = async (req: Request, res: Response) => {
   const { password, confirmation } = deleteAccountSchema.parse(req.body);

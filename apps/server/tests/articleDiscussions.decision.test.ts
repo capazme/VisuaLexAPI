@@ -45,9 +45,11 @@ describe('discussions anchored on a court decision', () => {
     const report = await request(app).post(`/api/article-discussions/${created.body.id}/report`).set(authHeader(bob)).send({ reason: 'spam' });
     expect(report.status).toBe(204);
 
-    const hidden = await request(app).patch(`/api/admin/article-discussions/${created.body.id}`).set(authHeader(admin)).send({ hidden: true });
+    // Hiding goes through the Community's moderation, with a category and a reason (spec 2026-10-20 §5.7).
+    const hidden = await request(app).patch(`/api/moderation/threads/${created.body.id}`).set(authHeader(admin))
+      .send({ hidden: true, category: 'spam', reason: 'Pubblicità ripetuta' });
     expect(hidden.status).toBe(200);
-    expect(hidden.body.isHidden).toBe(true);
+    expect(hidden.body.hidden).toBe(true);
     const after = await request(app).get('/api/article-discussions').set(authHeader(bob)).query({ normaKey: KEY, articleId: '' });
     expect(after.body.data).toHaveLength(0);
   });
@@ -94,7 +96,7 @@ describe('discussions anchored on a court decision', () => {
       expect(res.status, path).toBe(400);
       expect(res.body.detail, path).toBe('La norma o la decisione è obbligatoria');
     }
-    const missing = await request(app).patch('/api/admin/article-discussions/no-such-thread').set(authHeader(admin)).send({ hidden: true });
+    const missing = await request(app).patch('/api/admin/article-discussions/no-such-thread').set(authHeader(admin)).send({ passageReleased: true });
     expect(missing.status).toBe(404);
     expect(missing.body.detail).toBe('Glossa non trovata');
   });
@@ -146,11 +148,12 @@ describe('discussions anchored on a court decision', () => {
     const created = await open(alice);
     const url = `/api/admin/article-discussions/${created.body.id}`;
     const empty = await request(app).patch(url).set(authHeader(admin)).send({});
-    expect(empty.body.detail).toBe('Nessuna modifica richiesta');
+    expect(empty.body.detail).toBe('«passageReleased» deve essere vero o falso');
     const notBool = await request(app).patch(url).set(authHeader(admin)).send({ passageReleased: 'yes' });
     expect(notBool.status).toBe(400);
     expect(notBool.body.detail).toContain('vero o falso');
-    expect((await request(app).patch(url).set(authHeader(admin)).send({ hidden: 'yes' })).body.detail).toContain('vero o falso');
+    // The admin route no longer hides: the Community's moderation does, with a category and a reason.
+    expect((await request(app).patch(url).set(authHeader(admin)).send({ hidden: true })).body.detail).toBe('Per nascondere una glossa usa la moderazione della Community');
   });
 
   it('answers the body, comment and report 400s in Italian', async () => {
@@ -230,14 +233,27 @@ describe('discussions anchored on a court decision', () => {
       expect(res.status).toBe(404);
     });
 
-    it('refuses the release of an article thread and leaves hidden unchanged', async () => {
+    it('refuses the release of an article thread', async () => {
       const article = await request(app).post('/api/article-discussions').set(authHeader(alice)).send({
         normaKey: 'norma-a', articleId: '1', body: 'Sul passo.', passage: PASSAGE,
       });
-      const res = await request(app).patch(`/api/admin/article-discussions/${article.body.id}`).set(authHeader(admin)).send({ hidden: true, passageReleased: true });
+      const res = await request(app).patch(`/api/admin/article-discussions/${article.body.id}`).set(authHeader(admin)).send({ passageReleased: true });
       expect(res.status).toBe(400);
       expect(res.body.detail).toContain('rimesso in chiaro');
-      expect((await prisma.articleThread.findUniqueOrThrow({ where: { id: article.body.id } })).isHidden).toBe(false);
+      expect((await prisma.articleThread.findUniqueOrThrow({ where: { id: article.body.id } })).passageReleasedAt).toBeNull();
+    });
+
+    // Pending PR2c: the reader's panel sends no reason, so a release without one is still taken, and logged.
+    it('logs a release and a withholding, with the reason when given (optional until PR2c)', async () => {
+      const created = await open(alice, { title: undefined, passage: PASSAGE });
+      const url = `/api/admin/article-discussions/${created.body.id}`;
+      expect((await request(app).patch(url).set(authHeader(admin)).send({ passageReleased: true })).status).toBe(200);
+      expect((await request(app).patch(url).set(authHeader(admin)).send({ passageReleased: false, reason: 'Massima ritirata' })).status).toBe(200);
+      const log = await prisma.forumModerationLog.findMany({ where: { targetId: created.body.id }, orderBy: { createdAt: 'asc' } });
+      expect(log.map((row) => [row.action, row.reason, row.actorId])).toEqual([
+        ['release_passage', null, admin.id], ['withhold_passage', 'Massima ritirata', admin.id],
+      ]);
+      expect((await request(app).patch(url).set(authHeader(admin)).send({ passageReleased: true, reason: 'no' })).status).toBe(400);
     });
 
     it('refuses a thread that is not a decision passage', async () => {
@@ -268,11 +284,14 @@ describe('discussions anchored on a court decision', () => {
       expect(thread.passageReleasedAt).toEqual(expect.any(String));
     });
 
-    it('removes the thread with the account', async () => {
+    // G-307: a glossa outlives its author's account, without an author.
+    it('keeps the thread without its author when the account goes', async () => {
       const created = await open(alice);
       const res = await request(app).delete('/api/auth/account').set(authHeader(alice)).send({ password: 'test-password', confirmation: 'ELIMINA ACCOUNT' });
       expect(res.status).toBe(204);
-      expect(await prisma.articleThread.count({ where: { id: created.body.id } })).toBe(0);
+      const row = await prisma.articleThread.findUniqueOrThrow({ where: { id: created.body.id } });
+      expect(row.userId).toBeNull();
+      expect(row.decisionKey).toBe(created.body.normaKey);
     });
 
     it("leaves passage_released_by null when the releasing admin is deleted", async () => {

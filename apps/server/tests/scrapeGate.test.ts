@@ -26,6 +26,7 @@ describe('scrapeCost', () => {
     expect(scrapeCost('/health/detailed')).toBe(5);
     expect(scrapeCost('/fetch_decision')).toBe(2);
     expect(scrapeCost('/parse_query_batch')).toBe(3);
+    expect(scrapeCost('/fetch_norm_links')).toBe(5);
     expect(scrapeCost('/parse_query')).toBe(1);
     expect(scrapeCost('/fetch_article_text')).toBe(1);
   });
