@@ -13,6 +13,10 @@ import type { RassegnePasso } from './types';
 
 type Archivio = 'civile' | 'penale';
 
+/** Said inside the panel when a year or an archive fails to load: a quiet line, never an alert. */
+const UNAVAILABLE = 'Le rassegne non sono disponibili al momento.';
+const NOTICE = 'text-sm text-slate-500 dark:text-slate-400';
+
 const passi = (n: number): string => (n === 1 ? '1 passo' : `${n.toLocaleString('it-IT')} passi`);
 
 function years(anni: { anno: number }[]): string {
@@ -89,7 +93,7 @@ function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry 
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {shown.map((p) => <RassegnaPassage key={p.id} passo={p} besideId={besideId} backEntry={backEntry} />)}
           </ul>
-          {failed && <p className="text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
+          {failed && <p className={NOTICE}>{UNAVAILABLE}</p>}
           {next && !loading && (
             <button type="button" onClick={() => load(next)}
               className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400">
@@ -117,6 +121,11 @@ export interface RassegnePanelProps {
  * the slot's other props, bar the place it opens decisions beside. The section's controls reach it
  * through `useCaseLawFilters` (the slot's props are a contract): it narrows the passages loaded
  * and puts the review years in their order.
+ *
+ * MERL-T is the reviews' source, not the reader's: a server without it (404 `merlt_disabled`)
+ * shows nothing, and one that cannot answer now (503, the network) leaves the panel's row alone,
+ * saying quietly where the count would be that the reviews are not available — the row is seen
+ * only by whoever opened «Giurisprudenza», and nothing else in the reader mentions it.
  */
 export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanelProps) {
   const { order } = useCaseLawFilters();
@@ -133,7 +142,14 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
 
   if (!articleUrn || summary.status === 'idle' || summary.status === 'loading') return null;
   if (summary.status === 'error') {
-    return <p className="mt-6 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>;
+    if (summary.disabled) return null;
+    // nothing to open: the row itself says it
+    return (
+      <div className="mt-8 flex min-h-[44px] flex-wrap items-center justify-between gap-x-3 border-t border-slate-200 pt-4 md:min-h-0 dark:border-slate-800">
+        <h4 className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</h4>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Non disponibili al momento</p>
+      </div>
+    );
   }
   const { data } = summary;
   const shownArchivio = summary.archivio; // the year sections follow the data on screen
@@ -168,7 +184,7 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
               ))}
             </div>
           )}
-          {summary.failed && <p className="mb-2 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
+          {summary.failed && <p className={cn('mb-2', NOTICE)}>{UNAVAILABLE}</p>}
           {[...data.anni].sort((a, b) => (order === 'desc' ? b.anno - a.anno : a.anno - b.anno)).map(({ anno, passi: count }) => (
             <YearSection key={`${shownArchivio ?? ''}-${anno}`} urn={articleUrn} archivio={shownArchivio} anno={anno} count={count}
               besideId={besideId} backEntry={backEntry}

@@ -543,6 +543,27 @@ describe('omnilex_aggiungi_norme_dossier', () => {
     expect(write).toMatchObject({ path: '/dossiers/d1/norms', bearer: 'api-token-for-dossier:write', body: { references: ['art. 2043 c.c.', 'art. 99999 c.c.'] } });
   });
 
+  it('says a comma adds the part that holds it only while the server stores parts (G-387 (a))', async () => {
+    const description = async () => {
+      const own = new Client({ name: 'parts', version: '1.0.0' });
+      await own.connect(new StreamableHTTPClientTransport(new URL(env.mcpUrl), { requestInit: { headers: { Authorization: 'Bearer good' } } }));
+      const { tools } = await own.listTools();
+      await own.close();
+      return ['omnilex_aggiungi_norme_dossier', 'omnilex_crea_dossier'].map((name) => tools.find((t) => t.name === name)!.description).join('\n');
+    };
+    const before = env.stub.features;
+    try {
+      env.stub.features = { articleParts: true };
+      expect((await description()).match(/comma 773.*commi 701-800/g)).toHaveLength(2);
+      for (const features of [{ articleParts: false }, {}, 'down' as const]) {
+        env.stub.features = features;
+        expect(await description()).not.toMatch(/comma/);
+      }
+    } finally {
+      env.stub.features = before;
+    }
+  });
+
   it('takes 1 to 50 references', async () => {
     for (const riferimenti of [[], Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`)]) {
       const result = await client.callTool({ name: 'omnilex_aggiungi_norme_dossier', arguments: { dossier: 'd1', riferimenti } });

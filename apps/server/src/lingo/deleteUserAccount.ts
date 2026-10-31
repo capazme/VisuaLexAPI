@@ -18,6 +18,10 @@ export const PERSONAL_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'ARCHIVIATA
  * and the administrator's); deleting the user row by hand would leave their
  * drafts behind, anonymous and of no use to anyone.
  *
+ * The Community's glosse, replies and comments stay too, without an author («utente cancellato»,
+ * G-307), and so do the replies others wrote under them: the foreign keys set `user_id` to NULL.
+ * The person's votes and notifications go with the row; their reports stay without a reporter.
+ *
  * MERL-T keeps its own copy of what a consenting person did there: when the person ever gave
  * MERL-T a consent, the same transaction records an erasure request, which outlives the user
  * row and is sent to MERL-T until it confirms (`services/merlt/userData.ts`). One attempt is

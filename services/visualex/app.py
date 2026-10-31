@@ -41,7 +41,10 @@ from visualex_api.services.normattiva_validity import (
     versions_between,
 )
 from visualex_api.services.normattiva_notes import extract_update_notes, update_notes_fields
-from visualex_api.services.normattiva_parts import extract_parts, parts_fields
+from visualex_api.services.normattiva_parts import (
+    PART_KEY_MARK, article_page_key, extract_parts, normalize_comma, normalize_range, parts_fields,
+    range_holding, ranges_in_words,
+)
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
@@ -62,9 +65,9 @@ from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details
-from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import cite_act, cite_article
-from visualex_api.tools.alias_resolver import resolve_alias
+from visualex_api.tools.act_identity import identifies_act
+from visualex_api.tools.norm_query import act_names, read_norm_query
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
 from visualex_api.tools.exceptions import (
@@ -97,6 +100,32 @@ structlog.configure(
     cache_logger_on_first_use=True,
 )
 log = structlog.get_logger()
+
+# /parse_query_batch's limits (design 2026-10-29-document-analysis §4.4). 200 strings of 200
+# characters can pass 48 KB once accents and JSON escapes are counted: the caller cuts its
+# chunks by count and by bytes.
+PARSE_BATCH_MAX_QUERIES = 200
+PARSE_BATCH_MAX_CHARS = 200
+PARSE_BATCH_MAX_BYTES = 48 * 1024
+
+
+def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
+    """Each string read as /parse_query reads one; one that makes the reading raise is
+    unrecognised, and counted. Returns (results in order, failures)."""
+    results, failed = [], 0
+    for query in queries:
+        try:
+            params, source = read_norm_query(query)
+        except Exception:
+            params, source = None, None
+            failed += 1
+        results.append({
+            "recognized": params is not None,
+            "parsed": params,
+            "source": source,
+            "identifies_act": identifies_act(params),
+        })
+    return results, failed
 
 # Funzione per il conteggio dei token (numero di parole) in modo ricorsivo
 def count_tokens(data):
@@ -214,16 +243,40 @@ def _asks_for_text_in_force(nv) -> bool:
             and not (isinstance(version, str) and version.strip().lower() == 'originale'))
 
 
-def _read_page_extras(raw, article):
+def _part_request(data):
+    """`(parte, comma)` as the request names them, normalised; (None, None) when it names
+    neither (G-387 (a)). A part is named by its range («701-800») or by a comma it holds
+    («773»), never both."""
+    def given(value):
+        return value is not None and value != ''
+
+    raw_part, raw_comma = data.get('parte'), data.get('comma')
+    if given(raw_part) and given(raw_comma):
+        raise ValidationError("Indicare la parte o il comma dell'articolo, non entrambi")
+    if given(raw_part):
+        part = normalize_range(raw_part)
+        if part is None:
+            raise ValidationError(f"Parte non valida: {str(raw_part)[:40]} (per esempio «701-800»)")
+        return part, None
+    if given(raw_comma):
+        comma = normalize_comma(raw_comma)
+        if comma is None:
+            raise ValidationError(f"Comma non valido: {str(raw_comma)[:40]} (per esempio «773»)")
+        return None, comma
+    return None, None
+
+
+def _read_page_extras(raw, article, tree_raw=None):
     """(update notes, parts) of one cached Normattiva page, each None when unreadable: one
-    reader's failure never costs the other's answer."""
+    reader's failure never costs the other's answer. A part's page has no tree: its parts
+    are read from the article's page (`tree_raw`)."""
     try:
         notes = extract_update_notes(raw, article=article)
     except Exception as exc:  # noqa: BLE001 - best effort by contract
         log.warning("Update notes could not be read", error=str(exc))
         notes = None
     try:
-        parts = extract_parts(raw, article=article)
+        parts = extract_parts(tree_raw or raw, article=article)
     except Exception as exc:  # noqa: BLE001 - best effort by contract
         log.warning("Article parts could not be read", error=str(exc))
         parts = None
@@ -401,6 +454,11 @@ class NormaController:
         # server alongside the other /fetch_*, /health, /version endpoints —
         # /api/* is reserved for the Node BFF.
         self.app.add_url_rule('/parse_query', view_func=self.parse_query, methods=['POST'])
+        # Up to 200 strings read as /parse_query reads one, and no further: no URN, no request
+        # out, no string in the logs. «Analizza documento» (design 2026-10-29-document-analysis
+        # §4.4). Routed by the ingress's /parse_query* and Vite's '/parse_query' prefix; priced
+        # by the scrape gate on its own path.
+        self.app.add_url_rule('/parse_query_batch', view_func=self.parse_query_batch, methods=['POST'])
         # Contextual citation linker — finds normative references embedded in free
         # text. Used by MERL-T's query NER (Loop β #2) to detect refs inside a
         # natural-language question. Mirrors /api/extract_citations on the prefixed
@@ -468,6 +526,7 @@ class NormaController:
             raise ValidationError("Campo obbligatorio mancante: act_type")
         if 'article' not in data or data.get('article') in (None, ''):
             raise ValidationError("Campo obbligatorio mancante: article")
+        part, comma = _part_request(data)
 
         # Normattiva answers a date after today with the current text and says
         # nothing. Refused here, before any network call, so that no door skips
@@ -523,6 +582,8 @@ class NormaController:
         # NormaVisitata with numero_articolo='error', whose URN ends in ~arterror.
         if isinstance(articles, dict) and 'error' in articles:
             raise article_input_error(articles)
+        if (part or comma) and len(articles) != 1:
+            raise ValidationError("La parte o il comma valgono per un solo articolo")
 
         # Validate and sanitize annex parameter
         annex_value = data.get('annex')
@@ -694,8 +755,73 @@ class NormaController:
                 f"Articolo {', '.join(missing_articles)} non presente {where} {norma}{hint}"
             )
 
+        if part or comma:
+            await self._name_the_part(norma_visitata_list[0], part, comma)
+
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
         return norma_visitata_list
+
+    async def _name_the_part(self, nv, part, comma):
+        """Set `nv.parte` from the request's `parte` or `comma` (G-387 (a), G-389).
+
+        The ranges come from the act's tree, which the existence check has just read (cached,
+        no request). The first part has no `parte` (Q1): asked by its range or by one of its
+        commas, it is the article as before, with the same keys. A comma of an article that is
+        not split is in it: the article. A comma past the last range, a range the tree does not
+        list, or a range of an article the tree lists whole, is a 404 in words. With a tree that
+        cannot be read, a comma is a 503 in words (which part holds it cannot be told, and the
+        first part must not be stored as if it did), and a range is left to the reader, which
+        reads the article page itself; neither is ever «does not exist», and a request with
+        neither fails open as before. EUR-Lex articles have no parts: a comma is in the article, a part is
+        refused.
+        """
+        if self.get_scraper_for_norma(nv) is not normattiva_scraper:
+            if part:
+                raise ValidationError("Le parti di un articolo valgono solo per i testi di Normattiva")
+            return
+        ranges = await self._ranges_in_tree(nv)
+        article = f"art. {nv.numero_articolo} di {nv.norma}"
+        if comma:
+            if ranges is None:
+                # Which part holds the comma cannot be told: never the first part served as if it did.
+                raise IndexUnavailableError(
+                    f"Non riesco a leggere l'indice dell'{article} su Normattiva per trovare il comma {comma}: "
+                    "riprova più tardi")
+            if not ranges:
+                return
+            held = range_holding(ranges, comma)
+            if held is None:
+                first, last = ranges[0].split('-', 1)[0], ranges[-1].rsplit('-', 1)[-1]
+                raise ResourceNotFoundError(f"Il comma {comma} non è nell'{article} (commi {first}-{last})")
+            nv.parte = None if held == ranges[0] else held
+            return
+        if ranges == []:
+            raise ResourceNotFoundError(f"L'{article} non è diviso in parti")
+        if ranges and part == ranges[0]:
+            return
+        if ranges and part not in ranges:
+            raise ResourceNotFoundError(
+                f"L'{article} non ha la parte commi {part}: è diviso in {ranges_in_words(ranges)}")
+        nv.parte = part
+
+    async def _ranges_in_tree(self, nv):
+        """The comma ranges of `nv`'s article in the act's tree, in order («1-100», …), `[]`
+        when the tree lists it whole, None when the tree cannot be read."""
+        try:
+            tree_result = await get_tree(nv.norma.url, link=False, details=False, return_metadata=True)
+        except Exception as exc:  # noqa: BLE001 - never fail the request on a tree error
+            log.warning("Tree unavailable, parts not checked", error=str(exc))
+            return None
+        entries = tree_result[0] if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3 else tree_result
+        if isinstance(entries, str) or not entries:
+            return None
+        wanted = comparable_article_key(nv.numero_articolo)
+        return [
+            entry['commi'] for entry in entries
+            if isinstance(entry, dict) and entry.get('commi')
+            and str(entry.get('allegato') or '') == str(nv.allegato or '')
+            and comparable_article_key(entry.get('numero', '')) == wanted
+        ]
 
     async def _source_spelling(self, norma, article, annex):
         """`article` as the act spells its ordinal, and whether the act holds it.
@@ -882,24 +1008,26 @@ class NormaController:
         in_force = NormaVisitata(
             norma=nv.norma, allegato=nv.allegato, numero_articolo=nv.numero_articolo,
             versione='vigente', data_versione=today_in_rome().isoformat(),
+            parte=getattr(nv, 'parte', None),
         )
         try:
             text_today, url_today = await scraper.get_document(in_force)
         except Exception as exc:  # noqa: BLE001 - the page already read still stands
             log.warning("Text in force today could not be read", error=str(exc))
             return None
-        return text_today, url_today, await self._validity_of_page(scraper, nv, url_today)
+        return text_today, url_today, await self._validity_of_page(scraper, nv, url_today, in_force)
 
-    async def _validity_of_page(self, scraper, nv, url):
+    async def _validity_of_page(self, scraper, nv, url, page_nv=None):
         """`_validity_for`, reading the page once more when it has left the cache.
 
         The text comes from the scraper's memory (a day from when it was filled) and the
         page from the persistent cache (a day from when it was written): after a restart
         the page can expire first, and without it a later version would go out
-        unrecognised, and today's text without its window."""
+        unrecognised, and today's text without its window. `page_nv` is the request that page
+        answered, when it is not `nv` (today's text): a part's page is read again for it."""
         validity = await self._validity_for(scraper, nv, url)
         if (validity is None and isinstance(scraper, NormattivaScraper)
-                and await self._page_left_the_cache(scraper, url)):
+                and await self._page_left_the_cache(scraper, url, page_nv or nv)):
             validity = await self._validity_for(scraper, nv, url)
         return validity
 
@@ -939,15 +1067,19 @@ class NormaController:
         }
 
     @staticmethod
-    async def _page_left_the_cache(scraper, url):
+    async def _page_left_the_cache(scraper, url, nv=None):
         """True when the page for `url` was missing from the scraper's persistent cache
-        and has been read again and stored; False when it was there, or cannot be read."""
+        and has been read again and stored; False when it was there, or cannot be read.
+        A part's page is read again by the scraper, in the article page's session: its key
+        is no address to request."""
         cache = getattr(scraper, 'cache', None)
         if cache is None or not url:
             return False
         try:
             if await cache.get(url):
                 return False
+            if PART_KEY_MARK in url:
+                return bool(nv is not None and nv.parte and await scraper.read_part_page(nv))
             page = await scraper.request_document(url, source="normattiva")
             if not page:
                 return False
@@ -979,11 +1111,17 @@ class NormaController:
         try:
             cache = getattr(scraper, 'cache', None)
             raw = await cache.get(url) if cache is not None and url else None
+            # A part's page (its key holds PART_KEY_MARK) has no tree: the article page has.
+            tree_raw = await cache.get(article_page_key(url)) if raw and PART_KEY_MARK in url else None
             if isinstance(raw, str) and raw:
-                notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo)
+                notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo, tree_raw)
         except Exception as exc:  # noqa: BLE001 - best effort: the text already read stands
             log.warning("Page extras could not be read", error=str(exc), url=str(url)[:100])
-        return {**update_notes_fields(notes), **parts_fields(parts)}
+        fields = {**update_notes_fields(notes), **parts_fields(parts)}
+        if getattr(nv, 'parte', None):
+            # A part is one part, also when the article page that lists them has left the cache.
+            fields['testo_parziale'] = True
+        return fields
 
     @staticmethod
     async def _validity_for(scraper, nv, url):
@@ -1059,17 +1197,11 @@ class NormaController:
             if not query:
                 return jsonify({"error": "Missing required field: query"}), 400
 
-            # 1. Preset alias first ("gdpr" → Regolamento UE 2016/679, ecc.).
-            parsed_params = resolve_alias(query)
-            source = "alias" if parsed_params else None
-
-            # 2. Fall back to the NL parser ("art 1453 cc", "art 3 cost", ...).
-            if not parsed_params:
-                parsed = parse_nl_query(query)
-                if parsed is None:
-                    return jsonify({"parsed": None, "recognized": False})
-                parsed_params = parsed.to_api_params()
-                source = "nl_parser"
+            # 1-2. Preset alias first ("gdpr" → Regolamento UE 2016/679), then the NL
+            # parser ("art 1453 cc", "art 3 cost"): the reading /parse_query_batch shares.
+            parsed_params, source = read_norm_query(query)
+            if parsed_params is None:
+                return jsonify({"parsed": None, "recognized": False, "identifies_act": False})
 
             # 3. Best-effort URN: build a NormaVisitata with the same pipeline
             # `fetch_norma_data` uses, then pick its .urn. If the URN cannot be
@@ -1078,7 +1210,12 @@ class NormaController:
             urn = None
             display = None
             try:
-                normavisitate = await self.create_norma_visitata_from_data(parsed_params)
+                try:
+                    normavisitate = await self.create_norma_visitata_from_data(parsed_params)
+                except IndexUnavailableError:
+                    # Which part holds the comma cannot be told now; the article's URN can (it names no part).
+                    normavisitate = await self.create_norma_visitata_from_data(
+                        {k: v for k, v in parsed_params.items() if k not in ('comma', 'parte')})
                 if normavisitate:
                     nv = normavisitate[0]
                     urn = getattr(nv, "urn", None)
@@ -1100,6 +1237,8 @@ class NormaController:
             return jsonify({
                 "recognized": True,
                 "parsed": parsed_params,
+                # The convention's predicate (act_identity.py): «art. 2 d.m.» reads, and names no act.
+                "identifies_act": identifies_act(parsed_params),
                 "urn": urn,
                 "display": display,
                 "source": source,
@@ -1107,6 +1246,49 @@ class NormaController:
         except Exception as e:
             log.error("Error in parse_query", error=str(e))
             return jsonify({"error": str(e)}), 500
+
+    async def parse_query_batch(self):
+        """Read up to 200 norms, each as `/parse_query` reads one, and stop at the reading.
+
+        Body `{"queries": [string, ...]}`: 1 to 200 strings, each non-empty and at most 200
+        characters, the body at most 48 KB. Anything else is a 400 that names the limit.
+        Answer `{"results": [{recognized, parsed, source, identifies_act}]}`, in the order
+        asked. No URN, so no request leaves (the URN step asks Normattiva and logs the norm);
+        the log line holds the count and the duration, never a string: the strings are the
+        citations of a document the user may hold confidential (design
+        2026-10-29-document-analysis §4.4, §6.2).
+        """
+        started = time()
+        try:
+            if (request.content_length or 0) > PARSE_BATCH_MAX_BYTES:
+                return jsonify({"error": f"Body over {PARSE_BATCH_MAX_BYTES // 1024} KB"}), 400
+            raw = await request.get_data()
+            if len(raw) > PARSE_BATCH_MAX_BYTES:
+                return jsonify({"error": f"Body over {PARSE_BATCH_MAX_BYTES // 1024} KB"}), 400
+            try:
+                data = json.loads(raw)
+            except (ValueError, RecursionError):  # 48 KB of «[[[[…» passes the parser's depth
+                return jsonify({"error": "Body must be JSON"}), 400
+            queries = data.get("queries") if isinstance(data, dict) else None
+            if not isinstance(queries, list) or not queries:
+                return jsonify({"error": "queries must be a non-empty list"}), 400
+            if len(queries) > PARSE_BATCH_MAX_QUERIES:
+                return jsonify({"error": f"At most {PARSE_BATCH_MAX_QUERIES} queries"}), 400
+            for query in queries:
+                if not isinstance(query, str) or not query.strip():
+                    return jsonify({"error": "Each query must be a non-empty string"}), 400
+                if len(query) > PARSE_BATCH_MAX_CHARS:
+                    return jsonify({"error": f"Each query at most {PARSE_BATCH_MAX_CHARS} characters"}), 400
+
+            # Regexes and table lookups, a few ms for 200 strings: off the event loop all the same.
+            results, failed = await asyncio.to_thread(_read_norm_queries, [q.strip() for q in queries])
+            log.info("parse_query_batch", queries=len(queries), failed=failed,
+                     duration_ms=round((time() - started) * 1000))
+            return jsonify({"results": results})
+        except Exception as e:
+            # The type only: an exception's message may quote the string that raised it.
+            log.error("Error in parse_query_batch", error_type=type(e).__name__)
+            return jsonify({"error": "Internal error"}), 500
 
     async def extract_citations_endpoint(self):
         """Detect normative citations embedded in free text (shared linker).
@@ -1559,6 +1741,10 @@ class NormaController:
         - `known_acts`: the act names the resolver understands on its own
           ("statuto dei lavoratori", "legge fornero", "TUSL"). Not aliases —
           these need no shortcut, and an alias for one is a duplicate.
+        - `act_names`: the names of both lists that name an act on their own,
+          without a number («codice civile», «gdpr»; never «legge» or «d.lgs.»):
+          what «Analizza documento» looks for in a document, in the browser
+          (design 2026-10-29-document-analysis §4.2).
 
         Named `/fetch_...` deliberately: nginx routes the Python API by that
         prefix, so this needs no server-config change to be reachable.
@@ -1569,8 +1755,9 @@ class NormaController:
 
             presets = get_all_presets()
             known = known_act_names()
-            log.info("Alias catalog served", presets=len(presets), known_acts=len(known))
-            return jsonify({'presets': presets, 'known_acts': known})
+            names = act_names()
+            log.info("Alias catalog served", presets=len(presets), known_acts=len(known), act_names=len(names))
+            return jsonify({'presets': presets, 'known_acts': known, 'act_names': names})
         except Exception as e:
             return self._error_response(e, 'fetch_alias_catalog')
 

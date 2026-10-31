@@ -1,6 +1,6 @@
 import { useRef, type Ref } from 'react';
 import type { ArticleData } from '../../../types';
-import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, Link2, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FOCUS_RING } from '../../../constants/interactions';
@@ -13,6 +13,8 @@ import { highlightColorItems } from './highlightColorItems';
 import { useAppStore } from '../../../store/useAppStore';
 import { useHighlightColorMeanings } from '../../../hooks/useHighlightColorMeanings';
 import { namedAnnex } from '../../../utils/sources';
+import { EUROPEAN_LINK_NOTE, normLinkActionLabel } from '../../../utils/normattivaLink';
+import { isEuropeanAct } from '../../../utils/versionDisplay';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
@@ -49,6 +51,8 @@ export interface ReadingToolbarProps {
     onOpenCopyModal: () => void;
     onOpenDossier: () => void;
     onShareLink: () => void;
+    /** «Copia link Normattiva» (the source's address, for a filing's hyperlinks); absent when the norm holds none. */
+    onCopyLink?: () => void;
     onOpenAdvancedExport: () => void;
     onOpenVersionInput: () => void;
     onCompare: () => void;
@@ -105,6 +109,7 @@ export function ReadingToolbar({
     onOpenCopyModal,
     onOpenDossier,
     onShareLink,
+    onCopyLink,
     onOpenAdvancedExport,
     onOpenVersionInput,
     onCompare,
@@ -157,6 +162,13 @@ export function ReadingToolbar({
             disabled: Boolean(copyLockedReason),
             description: copyLockedReason,
         },
+        ...(onCopyLink ? [{
+            label: normLinkActionLabel(normaData),
+            icon: Link2,
+            onSelect: onCopyLink,
+            disabled: Boolean(copyLockedReason),
+            description: copyLockedReason ?? (isEuropeanAct(normaData.tipo_atto) ? EUROPEAN_LINK_NOTE : undefined),
+        }] : []),
         ...(compact ? [] : [
             ...(phone ? [
                 { label: 'Modalità studio', icon: BookOpen, onSelect: () => onOpenStudyMode?.(), disabled: Boolean(lockedReason) || !onOpenStudyMode, description: lockedReason },
