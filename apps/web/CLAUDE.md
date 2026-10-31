@@ -295,7 +295,47 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `documents`
   (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
   user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded, no
-  request at all — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. The
+  request at all; a DOCX through `docx/` (spec #391 L2): a ZIP reader with bounds (`zipPackage.ts`: at most 2,000
+  entries, a part 50 MB inflated, the parts read 120 MB together, a deflated part's declared ratio 200:1, the
+  inflating stream cut at the declared size; ZIP64, encrypted entries, duplicate names (without case), `..` or a
+  leading slash refused), a tokenizer that knows the five entities, refuses a `<!DOCTYPE` and a part nested past 512 levels, and gives
+  the one decoding (`decodeXmlText`) the map's offsets count in (`xmlTokens.ts`), and
+  `docxText.ts`, which reads what Word shows — never `w:delText`/`w:del`/`w:moveFrom`, a field's instruction,
+  `mc:Fallback`, a run hidden by `w:vanish` — with tabs, breaks (a page break too), `w:cr`, the hyphens and `w:sym`
+  as characters, then the footnotes and endnotes under «Note» in the order the body refers to them («1.», endnotes
+  «i.»; a mark of the author's own is the note's own text), a field's characters counted inside a revision too
+  (a field closed in a deletion still closes), the namespaces resolved on a stack (not the prefix), and a map from every character back to its part, its `w:t` and its offset (`locateChar`; L4 splices on
+  it). Same text as the old regular expressions on a DOCX without those defects (`legacyDocxText` in the tests).
+  It runs in a Web Worker (`docxReader.worker.ts`, handed the `File`; in the page where there is none, as in
+  jsdom, or if it fails before saying `ready`; once ready, a failure is the file's and is refused, never read again
+  in the page), stopped after 60 s; a CFB file, Strict Open XML and the bounds have their own words.
+  Headers and footers are not read. Fixtures: unpacked synthetic XML in `__tests__/docx/` (`.rels` named in the
+  glob on its own: it skips dot names), zipped by `__tests__/docxZip.ts` — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. **The writer** (spec #391 L4, no screen
+  yet: L5 wires it) is `writeDocxLinks` (`writeDocxPackage.ts`), in its own Worker (`docxWriterClient.ts`,
+  `docxWriter.worker.ts`, the same rules as the reader's, 60 s): it takes the file, the citations as `[start, end)`
+  of the reading's text with their address, and the text they count in (`expectedText`: a file that reads otherwise
+  is refused), and returns a new package and one outcome per citation (linked, with its part and relationship id,
+  or a reason: `already_linked`, `in_field`, `in_revision`, `in_content_control`, `across_comment`, `structure`,
+  `not_in_document` (a range cutting a surrogate pair too), `invalid_address` — not `sourceAddress`, or a space, a
+  control character, a backslash in it —, `overlap`; the page chooses the words). It places
+  each citation on the runs through the reader's map, checks the runs and the paragraph's children it covers
+  (`docxRuns.ts`, one walk recording every run, its children, its wrappers and the complex field it sits in;
+  `checkLink` in `docxSplice.ts`: only `w:proofErr` and bookmarks may lie between its runs, a tab, a break, a
+  drawing, a field, a revision, a content control, a comment's edge, a text box, a hidden run leave it as it is,
+  as does a part written with WordprocessingML as its default namespace,
+  and the runs must spell its text) and splices `w:hyperlink` into the original XML: a run cut at an edge keeps its
+  whole `w:rPr` in both halves, a half with a space at its cut gets `xml:space="preserve"` (a `w:t` without it and
+  with a space at its own edge is not cut), the link's look goes in by the schema's order (`RPR_ORDER`; extensions
+  last) — the Hyperlink character style found by its name (`Collegamentoipertestuale` in Italian Word) or added as
+  Word adds it under a free id, a run with its own `w:rStyle` keeps it and takes the colour and underline it lacks,
+  no styles part means direct formatting —, relationships `rIdVlx<n>` free in the part, a note part's
+  relationships created when it has none (and the content types' `rels` default when missing). A signed package
+  (`_xmlsignatures/`) is refused (`signed`). `zipWriter.ts` copies every entry not changed raw (local header, data,
+  descriptor; the central record with only its offset rewritten), deflates the changed parts with
+  `CompressionStream`, keeps a part's encoding (UTF-16, a BOM) and the end record's comment, and refuses entries that share their bytes. The tests
+  (`docxWriter.test.ts`) prove §10.2's round trip on `__tests__/docx/links/` and its variants and on a package
+  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `tools/e2e/docx-roundtrip/run.mjs` opens
+  the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR. The
   document is drawn as it is (`DocumentText`: every character once and in order, the citations only
   wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
@@ -2893,7 +2933,11 @@ meant to stay split; add new features as new files, not inside the shells:
   dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` (the page), `DropZone.tsx` (the box), `DocumentRow.tsx`
   (the document's row and `SheetFlight`), `documentJob.ts`, `DocumentText.tsx`, `CitationList.tsx`,
-  `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
+  `citationGroups.ts`, `documentFile.ts`, `docx/` (the DOCX reader: `zipPackage.ts`, `xmlTokens.ts`,
+  `docxText.ts`, `readDocxPackage.ts`, `docxWorkerClient.ts`, `docxReader.worker.ts`, `docxErrors.ts`; the writer:
+  `writeDocxPackage.ts`, `docxRuns.ts`, `docxSplice.ts`, `zipWriter.ts`, `docxWriterClient.ts`,
+  `docxWriter.worker.ts`); invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
+  `__tests__/docx-saved/`.
 
 ## Gotchas
 

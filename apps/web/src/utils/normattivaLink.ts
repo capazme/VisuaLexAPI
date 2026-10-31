@@ -25,7 +25,7 @@ type LinkedNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_articolo'>
 // must not put another address (a `javascript:` one) under a citation pasted into a filing.
 const SOURCE_HOSTS: ReadonlySet<string> = new Set(['www.normattiva.it', 'normattiva.it', 'eur-lex.europa.eu']);
 
-function sourceAddress(urn: string | undefined): string | null {
+export function sourceAddress(urn: string | undefined): string | null {
   const href = urn?.trim();
   if (!href) return null;
   try {

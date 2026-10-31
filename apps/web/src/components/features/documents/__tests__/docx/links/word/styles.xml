@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normale"><w:name w:val="Normal"/><w:qFormat/></w:style>
+  <w:style w:type="character" w:default="1" w:styleId="Carpredefinitoparagrafo"><w:name w:val="Default Paragraph Font"/><w:uiPriority w:val="1"/><w:semiHidden/><w:unhideWhenUsed/></w:style>
+  <w:style w:type="character" w:styleId="Citazione"><w:name w:val="Quote Char"/><w:rPr><w:i/></w:rPr></w:style>
+  <w:style w:type="character" w:styleId="Collegamentoipertestuale"><w:name w:val="Hyperlink"/><w:basedOn w:val="Carpredefinitoparagrafo"/><w:uiPriority w:val="99"/><w:unhideWhenUsed/><w:rPr><w:color w:val="0563C1" w:themeColor="hyperlink"/><w:u w:val="single"/></w:rPr></w:style>
+</w:styles>
