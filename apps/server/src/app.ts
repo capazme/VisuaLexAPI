@@ -25,6 +25,7 @@ import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
 import articleDiscussionRoutes from './routes/articleDiscussions';
+import forumCommunityRoutes from './routes/forumCommunity';
 import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
 import lingoCardsRoutes from './routes/lingoCards';
@@ -177,6 +178,7 @@ app.use('/api', quickNormRoutes);
 app.use('/api', customAliasRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api', articleDiscussionRoutes);
+app.use('/api', forumCommunityRoutes);
 
 // 404 handler
 app.use((_req, res) => {

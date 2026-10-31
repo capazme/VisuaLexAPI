@@ -50,6 +50,9 @@ async function seedBobEverywhere(alice: TestUser, bob: TestUser) {
   await prisma.forumNotification.create({ data: { userId: bob.id, kind: 'comment', threadId: thread.id, commentId: bobComment.id } });
   await prisma.forumModerationLog.create({ data: { actorId: bob.id, action: 'lock', targetKind: 'thread', targetId: thread.id, reason: said('motivo') } });
   await prisma.articleThreadVote.create({ data: { threadId: bobThread.id, userId: alice.id } });
+  // Bob accepted Alice's reply under his glossa: her reply says so, his glossa does not travel.
+  const aliceUnderBob = await prisma.articleComment.findFirstOrThrow({ where: { threadId: bobThread.id, userId: alice.id } });
+  await prisma.articleThread.update({ where: { id: bobThread.id }, data: { acceptedCommentId: aliceUnderBob.id } });
   // A reply whose author deleted their account is someone else's: counted, never read.
   await prisma.articleComment.create({ data: { threadId: thread.id, body: said('risposta anonima'), userId: null } });
 
@@ -223,6 +226,9 @@ describe('the account export, against a second user who touches everything', () 
     expect(commentVotes).toEqual([]);
     expect(threadReports).toEqual([{ threadId: expect.any(String), reason: 'spam', details: 'Segnalazione di Alice', status: 'dismissed', createdAt: expect.any(String) }]);
     expect(commentReports).toEqual([]);
+    const { comments } = response.body.data;
+    expect(comments.find((c: { body: string }) => c.body === 'Alice sotto la glossa di Bob')).toMatchObject({ accepted: true });
+    expect(comments.find((c: { body: string }) => c.body === 'Risposta di Alice')).toMatchObject({ accepted: false });
     expect(forumNotifications).toEqual([{ kind: 'reply', threadId: hers.id, commentId: expect.any(String), createdAt: expect.any(String), readAt: null }]);
   });
 
