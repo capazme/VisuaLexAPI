@@ -12,8 +12,9 @@ export interface DocxReading extends DocxText {
   signed: boolean;
 }
 
-/** A part's XML as a string: UTF-8 (a BOM dropped), or UTF-16 when it starts with its BOM. */
-function decodePart(bytes: Uint8Array): string {
+/** A part's XML as a string: UTF-8 (a BOM dropped), or UTF-16 when it starts with its BOM. The writer (L4) reads the
+ * parts with it too, so its offsets are the reader's. */
+export function decodePart(bytes: Uint8Array): string {
   try {
     if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le', { fatal: true }).decode(bytes);
     if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be', { fatal: true }).decode(bytes);

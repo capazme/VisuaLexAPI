@@ -5,7 +5,9 @@
  */
 import { deflateRawSync } from 'node:zlib';
 
-const fixtureFiles = import.meta.glob('./docx/**/*', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+// `.rels` named on its own: the glob skips names that start with a dot, and a package without `_rels/.rels` has no
+// main part for Word or LibreOffice.
+const fixtureFiles = import.meta.glob(['./docx/**/*', './docx/**/.rels'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 /**
  * As Word writes a part: no line break between tags. The fixtures are indented to be read; the indentation would be
