@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DocxError } from '../docx/docxErrors';
 import { docxText, locateChar, roman, type DocxText } from '../docx/docxText';
-import { decodeEntities, tokenize } from '../docx/xmlTokens';
+import { MAX_DEPTH, decodeXmlText, tokenize } from '../docx/xmlTokens';
 import { DOCX_XML, paragraph } from './fixtures';
 import { compactXml, fixtureParts, legacyDocxText } from './docxZip';
 
@@ -92,6 +92,23 @@ describe('docxText — what Word does not show is not read (spec #391 §2.1)', (
     expect(docxText({ document: xml }).text).toBe('risultato poi');
   });
 
+  it('closes a field opened outside a deletion and closed inside it, so the text after it is read', () => {
+    const xml = body([
+      `<w:p><w:r><w:t xml:space="preserve">Prima </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r>`,
+      `<w:r><w:instrText> REF x </w:instrText></w:r>`,
+      `<w:del w:id="1" w:author="Autore di prova"><w:r><w:fldChar w:fldCharType="separate"/></w:r>`,
+      `<w:r><w:delText>vecchio</w:delText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:del>`,
+      `<w:r><w:t xml:space="preserve"> dopo</w:t></w:r></w:p>`,
+      paragraph('art. 5 c.c.'),
+    ].join(''));
+    expect(docxText({ document: xml }).text).toBe('Prima  dopo\nart. 5 c.c.');
+  });
+
+  it('does not count the field characters of a fallback copy', () => {
+    const xml = body(`<w:p><w:r><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="a"><w:t>uno</w:t></mc:Choice><mc:Fallback><w:r><w:fldChar w:fldCharType="begin"/></w:r></mc:Fallback></mc:AlternateContent></w:r></w:p>${paragraph('due')}`);
+    expect(docxText({ document: xml }).text).toBe('uno\ndue');
+  });
+
   it('reads the first choice of an alternate content and none of the others', () => {
     const xml = body(`<w:p><w:r><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="a"><w:t>uno</w:t></mc:Choice><mc:Choice Requires="b"><w:t>due</w:t></mc:Choice><mc:Fallback><w:t>tre</w:t></mc:Fallback></mc:AlternateContent></w:r></w:p>`);
     expect(docxText({ document: xml }).text).toBe('uno');
@@ -134,7 +151,7 @@ describe('docxText — footnotes and endnotes under «Note»', () => {
     expect(reading.notes).toEqual([
       { kind: 'footnote', id: '3', label: '1' },
       { kind: 'footnote', id: '2', label: '2' },
-      { kind: 'footnote', id: '6', label: '*' },
+      { kind: 'footnote', id: '6', label: '' },
       { kind: 'endnote', id: '2', label: 'i' },
     ]);
     expect(reading.text).not.toContain('cancellata');
@@ -171,7 +188,7 @@ describe('docxText — the map from each character to the XML', () => {
         if (origin.kind === 'text') {
           const xml = parts[origin.part];
           expect(xml.slice(origin.tagStart).startsWith(`<${origin.element}`)).toBe(true);
-          expect(decodeEntities(xml.slice(origin.contentStart, origin.contentEnd))[offset], `${name} ${at}`).toBe(text[at]);
+          expect(decodeXmlText(xml.slice(origin.contentStart, origin.contentEnd))[offset], `${name} ${at}`).toBe(text[at]);
           if (origin.runStart >= 0) expect(xml.slice(origin.runStart, origin.runStart + 5)).toMatch(/^<[wm]:r[ >]/);
         } else if (origin.kind === 'mark') {
           const tag = parts[origin.part].slice(origin.tagStart, origin.tagEnd);
@@ -233,6 +250,32 @@ describe('docxText — refusals', () => {
   });
 });
 
+describe('docxText — a hostile part ends quickly', () => {
+  it('refuses a part nested deeper than Word ever nests', () => {
+    const deep = `<w:document ${W_NS}>${'<w:sdt>'.repeat(MAX_DEPTH)}${'</w:sdt>'.repeat(MAX_DEPTH)}</w:document>`;
+    expect(code(() => docxText({ document: deep }))).toBe('unsafe');
+  });
+
+  it('costs a new prefix on every level its length, not its square', () => {
+    const levels = MAX_DEPTH - 4; // the document, the paragraph, the run and the text take the other four
+    let xml = `<w:document ${W_NS}>`;
+    for (let level = 0; level < levels; level += 1) xml += `<w:sdt xmlns:p${level}="urn:x">`;
+    xml += `<w:p><w:r><w:t>fondo</w:t></w:r></w:p>${'</w:sdt>'.repeat(levels)}</w:document>`;
+    const started = performance.now();
+    expect(docxText({ document: xml }).text).toBe('fondo');
+    expect(performance.now() - started).toBeLessThan(1000);
+    // A prefix declared deep down is gone once its element closes.
+    expect(docxText({ document: `<w:document ${W_NS}><w:body><w:sdt xmlns:q="${'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}"></w:sdt><w:p><q:r><q:t>no</q:t></q:r></w:p></w:body></w:document>` }).text).toBe('');
+  });
+
+  it('reads many fields left open in linear time', () => {
+    const fields = '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>'.repeat(20_000);
+    const started = performance.now();
+    expect(docxText({ document: body(`<w:p>${fields}<w:r>${'<w:tab/>'.repeat(20_000)}<w:t>x</w:t></w:r></w:p>`) }).text).toMatch(/x$/);
+    expect(performance.now() - started).toBeLessThan(3000);
+  });
+});
+
 describe('tokenize', () => {
   it('reports each token where it lies, reading quoted > and CDATA, skipping comments and declarations', () => {
     const source = '<?xml version="1.0"?><a x="1 > 0" y=\'&amp;\'><!-- c --><b/>t&lt;<![CDATA[<raw>]]></a>';
@@ -247,6 +290,10 @@ describe('tokenize', () => {
       if (token.type === 'text') expect(source.slice(token.start, token.end)).toBe(token.raw);
     }
     expect(source.slice(close.start, close.end)).toBe('</a>');
+  });
+
+  it('normalises a literal line end, never an escaped one', () => {
+    expect(decodeXmlText('a\r\nb\rc&#13;d')).toBe('a\nb\nc\rd');
   });
 
   it('keeps the indentation helper honest: compacting leaves a w:t’s spaces alone', () => {

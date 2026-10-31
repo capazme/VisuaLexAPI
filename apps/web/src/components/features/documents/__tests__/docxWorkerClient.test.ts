@@ -82,6 +82,16 @@ describe('readDocxFile', () => {
     expect(FakeWorker.last!.terminated).toBe(true);
   });
 
+  it('refuses, and never reads the file in the page, when a ready Worker fails on it', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    const pending = readDocxFile(file());
+    const worker = FakeWorker.last!;
+    worker.fire('message', { ready: true });
+    worker.fire('error');
+    await expect(pending).rejects.toMatchObject({ code: 'malformed' });
+    expect(worker.terminated).toBe(true);
+  });
+
   it('stops a Worker that does not answer in time', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('Worker', FakeWorker);

@@ -55,10 +55,21 @@ export function decodeEntities(raw: string): string {
   });
 }
 
-/** XML's end-of-line handling: CRLF and a lone CR read as LF. */
+/** XML's end-of-line handling: a literal CRLF or lone CR reads as LF (a `&#13;` stays a CR). */
 function normaliseLines(text: string): string {
   return text.includes('\r') ? text.replace(/\r\n?/g, '\n') : text;
 }
+
+/**
+ * Character data as written → as read: line ends normalised, then entities decoded. The reader's offsets inside a
+ * `w:t` count in this text; a writer that maps them back to the source must use the same function.
+ */
+export function decodeXmlText(raw: string): string {
+  return decodeEntities(normaliseLines(raw));
+}
+
+/** Deeper than this the part is refused: Word nests a few dozen levels, a table in a text box in a note included. */
+export const MAX_DEPTH = 512;
 
 function readAttributes(source: string, from: number, to: number): XmlAttribute[] {
   const attributes: XmlAttribute[] = [];
@@ -83,7 +94,7 @@ function readAttributes(source: string, from: number, to: number): XmlAttribute[
     if (raw.includes('<')) malformed('< in attribute');
     if (seen.has(name)) malformed('duplicate attribute');
     seen.add(name);
-    attributes.push({ name, value: normaliseLines(decodeEntities(raw)) });
+    attributes.push({ name, value: decodeXmlText(raw) });
     at = valueEnd + 1;
   }
   return attributes;
@@ -125,7 +136,7 @@ export function* tokenize(source: string): Generator<XmlToken> {
       if (open.length === 0) {
         if (raw.trim()) malformed('text outside the root');
       } else {
-        yield { type: 'text', raw, text: normaliseLines(decodeEntities(raw)), start: at, end: textEnd };
+        yield { type: 'text', raw, text: decodeXmlText(raw), start: at, end: textEnd };
       }
     }
     if (lt < 0) break;
@@ -166,7 +177,10 @@ export function* tokenize(source: string): Generator<XmlToken> {
       if (open.length === 0 && rootDone) malformed('second root');
       const attributes = readAttributes(source, nameEnd, inner);
       yield { type: 'open', name, attributes, selfClosing, start: lt, end: end + 1 };
-      if (!selfClosing) open.push(name);
+      if (!selfClosing) {
+        if (open.length >= MAX_DEPTH) throw new DocxError('unsafe', 'nesting');
+        open.push(name);
+      }
       else if (open.length === 0) rootDone = true;
       at = end + 1;
     }

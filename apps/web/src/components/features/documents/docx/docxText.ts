@@ -35,6 +35,8 @@ export const NOTES_HEADING = 'Note';
  */
 export type DocxOrigin =
   | { kind: 'text'; part: DocxPartName; element: string; runStart: number; tagStart: number; contentStart: number; contentEnd: number }
+  // (`element` as written, prefix included; a `text` segment's `offset` counts in the content decoded by
+  // `decodeXmlText`, the same function a writer must use to go back to the source.)
   | { kind: 'mark'; part: DocxPartName; element: string; runStart: number; tagStart: number; tagEnd: number }
   | { kind: 'added' };
 
@@ -55,7 +57,7 @@ export interface DocxCharMap {
 export interface DocxNote {
   kind: 'footnote' | 'endnote';
   id: string;
-  /** As drawn before the note: «1», «ii», «*». */
+  /** As drawn before the note: «1», «ii»; empty for a mark of the author's own, which the note's text carries. */
   label: string;
 }
 
@@ -100,14 +102,18 @@ interface NoteReference {
 interface Frame {
   ns: string;
   local: string;
-  prefixes: Record<string, string>;
+  /** The prefixes this element declares: undone when it closes. */
+  declared: string[] | null;
   skip: boolean;
+  /** A tracked deletion or move away: hidden, but its field characters still count (a field's structure is the same
+   *  with or without the revision). */
+  revision: boolean;
   /** For a run: where its tag starts, and whether its own properties hide it. */
   run?: { start: number; hidden: boolean };
   /** For `mc:AlternateContent`: whether a `mc:Choice` was already read. */
   choiceTaken?: boolean;
   /** For a `w:t`/`m:t` being read. */
-  text?: { pieces: string[]; tagStart: number; contentStart: number; contentEnd: number; runStart: number };
+  text?: { name: string; pieces: string[]; tagStart: number; contentStart: number; contentEnd: number; runStart: number };
   /** For a note in a notes part: its id. */
   note?: string;
 }
@@ -123,15 +129,38 @@ function isOn(value: string | undefined): boolean {
   return value === undefined || !['false', '0', 'off'].includes(value);
 }
 
-function declare(attributes: XmlAttribute[], inherited: Record<string, string>): Record<string, string> {
-  let prefixes = inherited;
-  for (const { name, value } of attributes) {
-    if (name !== 'xmlns' && !name.startsWith('xmlns:')) continue;
-    if (value === W_STRICT) throw new DocxError('strict');
-    if (prefixes === inherited) prefixes = { ...inherited };
-    prefixes[name === 'xmlns' ? '' : name.slice(6)] = value;
+/**
+ * The namespaces in scope: each prefix's declarations, innermost last. An element pushes what it declares and pops
+ * it when it closes, so a deep part with a new prefix on every level costs its length, not its length squared.
+ */
+class NamespaceScope {
+  private readonly bindings = new Map<string, string[]>(
+    Object.entries(DEFAULT_PREFIXES).map(([prefix, uri]) => [prefix, [uri]]),
+  );
+
+  /** Declares the element's `xmlns` attributes; returns the prefixes declared, or `null` for none. */
+  declare(attributes: XmlAttribute[]): string[] | null {
+    let declared: string[] | null = null;
+    for (const { name, value } of attributes) {
+      if (name !== 'xmlns' && !name.startsWith('xmlns:')) continue;
+      if (value === W_STRICT) throw new DocxError('strict');
+      const prefix = name === 'xmlns' ? '' : name.slice(6);
+      const stack = this.bindings.get(prefix);
+      if (stack) stack.push(value);
+      else this.bindings.set(prefix, [value]);
+      (declared ??= []).push(prefix);
+    }
+    return declared;
   }
-  return prefixes;
+
+  undeclare(declared: string[] | null): void {
+    for (const prefix of declared ?? []) this.bindings.get(prefix)?.pop();
+  }
+
+  resolve(prefix: string): string {
+    const stack = this.bindings.get(prefix);
+    return stack && stack.length > 0 ? stack[stack.length - 1] : '';
+  }
 }
 
 /** Counts in lower-case roman numerals, as Word numbers endnotes by default. */
@@ -165,7 +194,12 @@ function walkPart(xml: string, part: DocxPartName): WalkResult {
   const stack: Frame[] = [];
   /** Open fields, innermost last: in its instruction until `separate`, then in its result. */
   const fields: Array<'instruction' | 'result'> = [];
+  /** How many of `fields` are in their instruction. */
+  let instructions = 0;
+  const scope = new NamespaceScope();
   let skipDepth = 0;
+  /** How many of the skipped frames open are revisions (`w:del`, `w:moveFrom`). */
+  let revisionDepth = 0;
   let hiddenRuns = 0;
   let currentNote: Piece[] | null = null;
 
@@ -180,7 +214,7 @@ function walkPart(xml: string, part: DocxPartName): WalkResult {
     return undefined;
   };
   const visible = () => skipDepth === 0 && hiddenRuns === 0 && (!isNotesPart || currentNote !== null);
-  const inInstruction = () => fields.includes('instruction');
+  const inInstruction = () => instructions > 0;
 
   for (const token of tokenize(xml)) {
     if (token.type === 'text') {
@@ -201,7 +235,7 @@ function walkPart(xml: string, part: DocxPartName): WalkResult {
           emit({
             text,
             origin: {
-              kind: 'text', part, element: frame.local === 't' && frame.ns === M ? 'm:t' : 'w:t',
+              kind: 'text', part, element: frame.text.name,
               runStart: frame.text.runStart, tagStart: frame.text.tagStart,
               contentStart: frame.text.contentStart, contentEnd: frame.text.contentEnd,
             },
@@ -213,20 +247,23 @@ function walkPart(xml: string, part: DocxPartName): WalkResult {
       }
       if (frame.run?.hidden) hiddenRuns -= 1;
       if (frame.skip) skipDepth -= 1;
+      if (frame.revision) revisionDepth -= 1;
       if (frame.note !== undefined) currentNote = null;
+      scope.undeclare(frame.declared);
       continue;
     }
 
     // An open tag.
     const parent = stack[stack.length - 1];
-    const prefixes = declare(token.attributes, parent?.prefixes ?? DEFAULT_PREFIXES);
+    const declared = scope.declare(token.attributes);
     const colon = token.name.indexOf(':');
     const prefix = colon < 0 ? '' : token.name.slice(0, colon);
     const local = colon < 0 ? token.name : token.name.slice(colon + 1);
-    const ns = prefixes[prefix] ?? '';
-    const frame: Frame = { ns, local, prefixes, skip: false };
+    const ns = scope.resolve(prefix);
+    const frame: Frame = { ns, local, declared, skip: false, revision: false };
 
     if (ns === W && SKIPPED_W.has(local)) frame.skip = true;
+    if (ns === W && (local === 'del' || local === 'moveFrom')) frame.revision = true;
     if (ns === MC && local === 'Fallback') frame.skip = true;
     if (ns === MC && local === 'Choice' && parent?.ns === MC && parent.local === 'AlternateContent') {
       if (parent.choiceTaken) frame.skip = true;
@@ -256,13 +293,21 @@ function walkPart(xml: string, part: DocxPartName): WalkResult {
     }
 
     const inRun = parent?.run !== undefined;
-    if (skipDepth === 0 && !frame.skip && ns === W && inRun) {
-      if (local === 'fldChar') {
-        const type = attribute(token.attributes, 'fldCharType');
-        if (type === 'begin') fields.push('instruction');
-        else if (type === 'separate' && fields.length > 0) fields[fields.length - 1] = 'result';
-        else if (type === 'end') fields.pop();
-      } else if (visible() && !inInstruction()) {
+    // A field's characters count inside a revision too: a field opened outside a deletion and closed inside it
+    // must still close, or everything after it would read as its instruction.
+    if (local === 'fldChar' && ns === W && inRun && skipDepth === revisionDepth) {
+      const type = attribute(token.attributes, 'fldCharType');
+      if (type === 'begin') {
+        fields.push('instruction');
+        instructions += 1;
+      } else if (type === 'separate' && fields[fields.length - 1] === 'instruction') {
+        fields[fields.length - 1] = 'result';
+        instructions -= 1;
+      } else if (type === 'end' && fields.length > 0) {
+        if (fields.pop() === 'instruction') instructions -= 1;
+      }
+    } else if (skipDepth === 0 && !frame.skip && ns === W && inRun) {
+      if (visible() && !inInstruction()) {
         const runStart = parent.run!.start;
         let char: string | undefined = MARK_CHARS[local];
         if (local === 'sym') {
@@ -290,6 +335,7 @@ function walkPart(xml: string, part: DocxPartName): WalkResult {
 
     if ((ns === W || ns === M) && local === 't' && !frame.skip) {
       frame.text = {
+        name: token.name,
         pieces: [], tagStart: token.start, contentStart: token.end, contentEnd: token.end,
         runStart: nearestRun()?.start ?? -1,
       };
@@ -299,9 +345,11 @@ function walkPart(xml: string, part: DocxPartName): WalkResult {
       // Nothing to close: a self-closed run, skip element or note leaves no state behind.
       if (frame.run?.hidden) hiddenRuns -= 1;
       if (frame.note !== undefined) currentNote = null;
+      scope.undeclare(frame.declared);
       continue;
     }
     if (frame.skip) skipDepth += 1;
+    if (frame.revision) revisionDepth += 1;
     stack.push(frame);
   }
 
@@ -405,16 +453,17 @@ export function docxText(parts: DocxPartsXml): DocxText {
       const notePieces = (kind === 'footnote' ? footnotes : endnotes).get(reference.id);
       if (seen.has(key) || !notePieces) continue;
       seen.add(key);
+      // A mark of the author's own (`customMarkFollows`) is written in the note's text too, as Word does: no label.
       let label: string;
-      if (reference.custom) label = '*';
+      if (reference.custom) label = '';
       else if (kind === 'footnote') label = String(++footnoteNumber);
       else label = roman(++endnoteNumber);
       if (notes.length === 0) pieces.push({ text: `\n\n${NOTES_HEADING}\n`, origin: { kind: 'added' } });
       notes.push({ kind, id: reference.id, label });
-      // «1.», «i.»; a mark of the author's own («*») stands as it is.
-      const head = reference.custom ? label : `${label}.`;
-      const startsWithSpace = /^\s/.test(notePieces[0]?.text ?? '');
-      pieces.push({ text: startsWithSpace ? head : `${head} `, origin: { kind: 'added' } });
+      if (!reference.custom) {
+        const startsWithSpace = /^\s/.test(notePieces[0]?.text ?? '');
+        pieces.push({ text: startsWithSpace ? `${label}.` : `${label}. `, origin: { kind: 'added' } });
+      }
       pieces.push(...notePieces);
       if (notePieces[notePieces.length - 1]?.text !== '\n') pieces.push({ text: '\n', origin: { kind: 'added' } });
     }

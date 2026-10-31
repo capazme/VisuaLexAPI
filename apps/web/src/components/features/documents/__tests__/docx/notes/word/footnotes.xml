@@ -6,5 +6,5 @@
   <w:footnote w:id="3"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t>Cfr. art. 2043 c.c.</w:t></w:r></w:p><w:p><w:r><w:t>Seconda riga della nota.</w:t></w:r></w:p></w:footnote>
   <w:footnote w:id="4"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> Nota cancellata, art. 1 c.c.</w:t></w:r></w:p></w:footnote>
   <w:footnote w:id="5"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> Nota senza richiamo.</w:t></w:r></w:p></w:footnote>
-  <w:footnote w:id="6"><w:p><w:r><w:t xml:space="preserve"> Nota con segno proprio.</w:t></w:r></w:p></w:footnote>
+  <w:footnote w:id="6"><w:p><w:r><w:rPr><w:rStyle w:val="Rimandonotaapidipagina"/></w:rPr><w:t>*</w:t></w:r><w:r><w:t xml:space="preserve"> Nota con segno proprio.</w:t></w:r></w:p></w:footnote>
 </w:footnotes>
