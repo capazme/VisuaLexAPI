@@ -63,13 +63,17 @@ describe('normLink', () => {
     const link = normLink({ ...civil, urn: `${CC}!vig=` }, null, linkPinDay(civil, current, '2026-10-31'));
     expect(link?.href).toBe(`${CC}!vig=2026-10-31`);
     expect(normLinkToast(link!)).toBe('Link Normattiva copiato (apre il testo in vigore al 31 ottobre 2026)');
+    // Elision and ordinal, as the citations write them.
+    const toast = (day: string) => normLinkToast(normLink({ ...civil, urn: `${CC}!vig=` }, null, day)!);
+    expect(toast('2026-11-08')).toContain('in vigore all’8 novembre 2026');
+    expect(toast('2026-11-01')).toContain('in vigore al 1° novembre 2026');
     // No pin, no date in the toast.
     expect(normLinkToast(normLink(civil, null)!)).toBe('Link Normattiva copiato');
   });
 
   it('takes the day in Rome around midnight, not the UTC one', () => {
     const at = (iso: string) => todayInRome(new Date(iso));
-    // 22:30 UTC on 31 Oct is already 1 Nov in Rome (CET after the clocks go back on 25 Oct: UTC+1 → 23:30 on the 31st).
+    // 22:30 UTC on 31 Oct is still the 31st in Rome (CET, 23:30); 23:30 UTC is already 1 Nov.
     expect(at('2026-10-31T22:30:00Z')).toBe('2026-10-31');
     expect(at('2026-10-31T23:30:00Z')).toBe('2026-11-01');
     expect(at('2026-10-24T22:30:00Z')).toBe('2026-10-25'); // CEST, UTC+2

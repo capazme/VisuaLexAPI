@@ -1,6 +1,6 @@
 import type { ArticleValidity, NormaVisitata } from '../types';
 import type { NormCitation } from './citation';
-import { formatDateItalianLong } from './dateUtils';
+import { formatDateForCitation, withPreposition } from './dateUtils';
 import { citeNorm } from './sources';
 import { isEuropeanAct, requestIsHistorical, type VersionRequest } from './versionDisplay';
 
@@ -128,6 +128,6 @@ export async function copyNormLink(link: NormLink): Promise<'rich' | 'plain'> {
 export function normLinkToast(link: NormLink): string {
   if (link.european) return 'Link EUR-Lex dell’atto copiato (EUR-Lex non ha un indirizzo per articolo)';
   return link.pinnedDay
-    ? `Link Normattiva copiato (apre il testo in vigore al ${formatDateItalianLong(link.pinnedDay)})`
+    ? `Link Normattiva copiato (apre il testo in vigore ${withPreposition('al', formatDateForCitation(link.pinnedDay))})`
     : 'Link Normattiva copiato';
 }
