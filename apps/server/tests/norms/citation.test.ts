@@ -74,7 +74,9 @@ describe('citeAct', () => {
       const norma = c.input;
       const article = citeArticle(norma).replace(/ \(Allegato [^)]*\)$/, '');
       const act = citeAct(norma);
-      expect([`art. ${norma.numero_articolo} ${act}`, `art. ${norma.numero_articolo}, ${act}`]).toContain(article);
+      // A part of a split article names its commas after the article (G-389, Q2).
+      const head = `art. ${norma.numero_articolo}${norma.parte ? `, commi ${norma.parte}` : ''}`;
+      expect([`${head} ${act}`, `${head}, ${act}`]).toContain(article);
     }
   });
 
@@ -161,5 +163,20 @@ describe('an act whose text is its annex', () => {
   it('names no annex, and names another', () => {
     expect(citeArticle(tulps)).toBe('art. 86, r.d. 18 giugno 1931, n. 773');
     expect(citeArticle({ ...tulps, allegato: '2' })).toBe('art. 86, r.d. 18 giugno 1931, n. 773 (Allegato 2)');
+  });
+});
+
+
+describe('a part of a split article (G-389, Q2)', () => {
+  const ART_1 = { tipo_atto: 'legge', data: '2006-12-27', numero_atto: '296', numero_articolo: '1' };
+
+  it('names its commas after the article', () => {
+    expect(citeArticle({ ...ART_1, parte: '701-800' })).toBe('art. 1, commi 701-800, l. 27 dicembre 2006, n. 296');
+    expect(shortNorm({ ...ART_1, parte: '701-800' })).toBe('art. 1 (commi 701-800) l. 296/2006');
+    expect(citeStoredNorm('norm', { ...ART_1, parte: '701-800' })).toBe('art. 1, commi 701-800, l. 27 dicembre 2006, n. 296');
+  });
+
+  it('the first part is the article', () => {
+    expect(citeArticle(ART_1)).toBe('art. 1, l. 27 dicembre 2006, n. 296');
   });
 });

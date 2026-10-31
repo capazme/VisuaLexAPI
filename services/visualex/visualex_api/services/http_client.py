@@ -65,6 +65,7 @@ class ThrottledHttpClient:
         source: str = "generic",
         text_encoding: Optional[str] = None,
         max_retries: Optional[int] = None,
+        session: Optional[aiohttp.ClientSession] = None,
         **kwargs,
     ) -> HttpResult:
         """`text_encoding` overrides the codec that turns the body into `HttpResult.text`.
@@ -72,7 +73,9 @@ class ThrottledHttpClient:
         every existing caller. Pass "latin-1" for a binary body (a zip): latin-1 maps the
         bytes 0-255 one to one, so `text.encode("latin-1")` recovers them exactly.
         `max_retries` bounds the retries after the first attempt; None is the configured
-        HTTP_MAX_RETRIES."""
+        HTTP_MAX_RETRIES. `session` is the caller's own session, for a page that opens only
+        with the cookies of the page read before it (a part of a Normattiva article); the
+        rate limit, the host check and the retry budget are the same."""
         retries = HTTP_MAX_RETRIES if max_retries is None else max_retries
         if not is_allowed(url):
             log.error("Blocked request to undeclared host", url=url[:120], source=source)
@@ -90,9 +93,9 @@ class ThrottledHttpClient:
             while attempt <= retries:
                 await self._respect_source_pause(source)
                 await self._respect_min_interval()
-                session = await self._get_session()
+                client = session or await self._get_session()
                 try:
-                    async with session.request(method, url, **kwargs) as response:
+                    async with client.request(method, url, **kwargs) as response:
                         text = await response.text(encoding=text_encoding)
                         headers = dict(response.headers)
                         status = response.status

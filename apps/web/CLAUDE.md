@@ -962,16 +962,31 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 code's own); on a computer «Note» and
 «Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Colore» (`HighlightColorMenu`, H1, below),
 «Al dossier», then «⋯» («Altre azioni sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia»,
-«Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
+«Copia link Normattiva», «Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
 status's row, «⋯» adding Study Mode, the source and, last under its own title, the four colours (the compact bar of a
-window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo» and
-«Copia»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
+window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo»,
+«Copia» and «Copia link Normattiva»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
 highlight (`lockedReason`); quiet
 neutral buttons, 36 px on a computer and 44 on a phone; «Cerca nel testo» says «Chiudi la ricerca nel testo» only while
 the window is pointed at this very text (`useFindWindowScopedTo(…, exact)`), else it points the window here. Nothing of it is inside the text root, root rule 23). Keys are `buildItemKey(norma)` and
 `uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
 uses the same two functions, and they must stay byte-identical or annotations
 made on one surface stop appearing on the other.
+
+**The source's link** («Copia link Normattiva», `utils/normattivaLink.ts`): for the hyperlinks of a filing. It copies
+the address the API returned (`norma_data.urn`; in the dossier the fetched article's, the stored item's only if that
+has none), never one built here: the code's annex and the version marker come with it (`!vig=` empty for the text in
+force, `!vig=<day>` for a past text, `@originale`). An undated one is fixed to a day only where Normattiva would open
+another text (`linkPinDay`; it answers an undated URN with its latest version, also one not in force yet, G-355): a
+closed window served as today's (`historical`, or `citeAs`) to its last day, an announced change (`upcoming`) to
+today. One `navigator.clipboard.write` puts the address as `text/plain` and
+the citation as a link as `text/html` (`<a href>` with `citeNorm`, or a past text's `formatNormCitation(...).short`),
+so Word or Pages paste the linked citation and a plain field the address; with no `ClipboardItem`, or a refusal, the
+address alone (`writeText`). Only `https` addresses of Normattiva or EUR-Lex are copied (a dossier can be imported):
+otherwise the action is not offered. An act of the Union says «Copia link EUR-Lex» and copies the act's address
+(EUR-Lex has none per article: said under the entry and in the toast). It is locked where «Copia» is
+(`copyBlockedReason`); in the dossier where «Copia citazione» is; the past-version banner offers it beside «Copia
+citazione» (`copy_link`).
 
 **The text is structured, never rewritten** (round A, spec
 `docs/superpowers/specs/2026-09-25-lettura-testo-design.md`).
@@ -2232,8 +2247,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   evidenziata o annotata».
 - **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
   inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
-  composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
-  expanded footer. `ArticleViewerModal` no longer exists.
+  composer and popover). "Apri su Dashboard", "Copia citazione" and «Copia link Normattiva» (below,
+  «The source's link») live in the expanded footer. `ArticleViewerModal` no longer exists.
 - **Fetching**: `utils/articleFetchCache.ts` — session-only cache, in-flight
   de-dup, max 3 concurrent fetches, errors not cached so "Riprova" really
   refetches.

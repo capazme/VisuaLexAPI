@@ -341,7 +341,10 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   `ArticleResult` (`get_article`) and `update_notes_block` labels them for a model;
   likewise `parti` / `testo_parziale` for an article Normattiva splits into parts
   (G-387), whose notice `partial_text_notice` writes («testo parziale: commi 1-100
-  di 1364 (diviso in 14 parti)»).
+  di 1364 (diviso in 14 parti)»; for a part asked as such, the part served, «commi
+  701-800 di 1364»). `fetch_article_text` takes `parte` («701-800») or `comma`
+  («773»), G-387 (a); the graph keeps one node per article and ingestion reads
+  the first part, as before (G-389 Q4).
   `get_document` still gives the text alone, which is what ingestion stores. Only
   `tools/search.ArticleFetchTool` puts the notice and the block after the text it
   hands an expert (its `oltre_il_testo`, read by
