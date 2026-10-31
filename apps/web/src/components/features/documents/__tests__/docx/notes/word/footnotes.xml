@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>
+  <w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>
+  <w:footnote w:id="2"><w:p><w:pPr><w:pStyle w:val="Testonotaapidipagina"/></w:pPr><w:r><w:rPr><w:rStyle w:val="Rimandonotaapidipagina"/></w:rPr><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> V. art. 7 l. 241/1990.</w:t></w:r></w:p></w:footnote>
+  <w:footnote w:id="3"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t>Cfr. art. 2043 c.c.</w:t></w:r></w:p><w:p><w:r><w:t>Seconda riga della nota.</w:t></w:r></w:p></w:footnote>
+  <w:footnote w:id="4"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> Nota cancellata, art. 1 c.c.</w:t></w:r></w:p></w:footnote>
+  <w:footnote w:id="5"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> Nota senza richiamo.</w:t></w:r></w:p></w:footnote>
+  <w:footnote w:id="6"><w:p><w:r><w:rPr><w:rStyle w:val="Rimandonotaapidipagina"/></w:rPr><w:t>*</w:t></w:r><w:r><w:t xml:space="preserve"> Nota con segno proprio.</w:t></w:r></w:p></w:footnote>
+</w:footnotes>
