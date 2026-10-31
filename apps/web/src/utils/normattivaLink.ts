@@ -1,5 +1,6 @@
-import type { ArticleUpcoming, ArticleValidity, NormaVisitata } from '../types';
+import type { ArticleValidity, NormaVisitata } from '../types';
 import type { NormCitation } from './citation';
+import { formatDateItalianLong } from './dateUtils';
 import { citeNorm } from './sources';
 import { isEuropeanAct, requestIsHistorical, type VersionRequest } from './versionDisplay';
 
@@ -16,6 +17,8 @@ export interface NormLink {
   /** The citation the link reads as: a past text's version, else the plain one. */
   label: string;
   european: boolean;
+  /** The day an undated address was fixed to (the text in force on that day), for the toast. */
+  pinnedDay?: string;
 }
 
 type LinkedNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_articolo'>
@@ -45,14 +48,14 @@ const DATED = /!vig=\d|@originale/;
  * answers an undated URN with its latest version, also one not in force yet (G-355, as the
  * export's `pdf_urn_in_force`). A text served as today's whose window has closed (`historical`
  * with no day asked: the source's, or `citeAs` past the day of an announced change) is fixed
- * to a day of that window, its last (else its first), the text the citation names; with a
- * later text announced (`upcoming`) to today, the text on screen. A request with a day or for
- * the original carries it already; EUR-Lex has no such marker.
+ * to a day of that window, its last (else its first), the text the citation names; any other
+ * text in force is fixed to today (G-395): an act cites the norm as it reads when it is
+ * written, and the link must stay faithful to that after an amendment. A request with a day
+ * or for the original carries it already; EUR-Lex has no such marker.
  */
 export function linkPinDay(
   norma: Pick<NormaVisitata, 'tipo_atto'> & VersionRequest,
   validity: ArticleValidity | undefined,
-  upcoming: ArticleUpcoming | undefined,
   today: string,
 ): string | undefined {
   if (isEuropeanAct(norma.tipo_atto) || requestIsHistorical(norma)) return undefined;
@@ -60,7 +63,7 @@ export function linkPinDay(
     const day = validity.valid_to ?? validity.valid_from;
     if (day) return day;
   }
-  return upcoming ? today : undefined;
+  return today;
 }
 
 function pinned(href: string, day: string | undefined): string {
@@ -75,7 +78,13 @@ function pinned(href: string, day: string | undefined): string {
 export function normLink(norma: LinkedNorma, citation: NormCitation | null, pinDay?: string): NormLink | null {
   const href = sourceAddress(norma.urn);
   if (!href) return null;
-  return { href: pinned(href, pinDay), label: citation ? citation.short : citeNorm(norma), european: isEuropeanAct(norma.tipo_atto) };
+  const fixed = pinned(href, pinDay);
+  return {
+    href: fixed,
+    label: citation ? citation.short : citeNorm(norma),
+    european: isEuropeanAct(norma.tipo_atto),
+    ...(fixed !== href && pinDay ? { pinnedDay: pinDay } : {}),
+  };
 }
 
 /** The menu's and the button's words: an act of the Union is not on Normattiva. */
@@ -117,5 +126,8 @@ export async function copyNormLink(link: NormLink): Promise<'rich' | 'plain'> {
 
 /** The toast after a copy, in the words of the other copy toasts. */
 export function normLinkToast(link: NormLink): string {
-  return link.european ? 'Link EUR-Lex dell’atto copiato (EUR-Lex non ha un indirizzo per articolo)' : 'Link Normattiva copiato';
+  if (link.european) return 'Link EUR-Lex dell’atto copiato (EUR-Lex non ha un indirizzo per articolo)';
+  return link.pinnedDay
+    ? `Link Normattiva copiato (apre il testo in vigore al ${formatDateItalianLong(link.pinnedDay)})`
+    : 'Link Normattiva copiato';
 }

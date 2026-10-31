@@ -60,9 +60,10 @@ describe('DossierItemReader — «Copia link Normattiva»', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Copia link Normattiva' }));
     await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
     const [[[item]]] = write.mock.calls as unknown as [[[FakeClipboardItem]]];
-    expect(await blobText(item.items['text/plain'])).toBe(URN);
-    expect(await blobText(item.items['text/html'])).toBe(`<a href="${URN}">art. 1284 c.c.</a>`);
-    expect(showToast).toHaveBeenCalledWith('Link Normattiva copiato', 'success');
+    const dated = `${URN}!vig=${todayInRome()}`;
+    expect(await blobText(item.items['text/plain'])).toBe(dated);
+    expect(await blobText(item.items['text/html'])).toBe(`<a href="${dated}">art. 1284 c.c.</a>`);
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Link Normattiva copiato \(apre il testo in vigore al /), 'success');
   });
 
   it('keeps a past text’s version in the link and reads as that version', async () => {
@@ -89,7 +90,7 @@ describe('DossierItemReader — «Copia link Normattiva»', () => {
     vi.stubGlobal('ClipboardItem', undefined);
     read(CURRENT_ITEM, URN);
     fireEvent.click(await screen.findByRole('button', { name: 'Copia link Normattiva' }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(URN));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${URN}!vig=${todayInRome()}`));
     expect(write).not.toHaveBeenCalled();
   });
 
