@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { inDecisionKeySpace, readDecisionKey } from '../norms/decisionKey';
+import { readReportReason } from '../forum/reportReasons';
+import { maybeSweepCommunity } from '../forum/sweep';
 
 const anchorSchema = z.object({
   normaKey: z.string({ message: 'La norma o la decisione è obbligatoria' }).min(1, 'La norma o la decisione è obbligatoria')
@@ -91,13 +93,21 @@ const reportSchema = z.object({
   details: z.string({ message: 'I dettagli non sono validi' }).trim().max(1000, 'I dettagli possono avere al massimo 1000 caratteri').optional(),
 });
 
-function userView(user: { id: string; username: string }) {
-  return { id: user.id, username: user.username };
+/** What every view says for a contribution whose author deleted their account (G-307). */
+export const DELETED_AUTHOR = 'utente cancellato';
+
+/** A contribution outlives its author's account: the author is then null, and nobody's own. */
+function userView(user: { id: string; username: string } | null) {
+  return user ? { id: user.id, username: user.username } : { id: null, username: DELETED_AUTHOR };
+}
+
+function isOwn(authorId: string | null, userId: string) {
+  return authorId !== null && authorId === userId;
 }
 
 function commentView(comment: {
-  id: string; threadId: string; parentId: string | null; body: string; userId: string;
-  isHidden: boolean; createdAt: Date; updatedAt: Date; user: { id: string; username: string };
+  id: string; threadId: string; parentId: string | null; body: string; userId: string | null;
+  isHidden: boolean; createdAt: Date; updatedAt: Date; user: { id: string; username: string } | null;
   votes: { userId: string }[];
 }, userId: string) {
   return {
@@ -111,7 +121,7 @@ function commentView(comment: {
     updatedAt: comment.updatedAt,
     voteCount: comment.votes.length,
     userVoted: comment.votes.some(vote => vote.userId === userId),
-    isOwner: comment.userId === userId,
+    isOwner: isOwn(comment.userId, userId),
   };
 }
 
@@ -132,12 +142,12 @@ function threadView(thread: {
   passageReleasedAt: Date | null;
   title: string;
   body: string;
-  user: { id: string; username: string };
+  user: { id: string; username: string } | null;
   createdAt: Date;
   updatedAt: Date;
   votes: { userId: string }[];
   comments: Parameters<typeof commentView>[0][];
-  userId?: string;
+  userId: string | null;
 }, userId: string) {
   return {
     id: thread.id,
@@ -166,7 +176,7 @@ function threadView(thread: {
     updatedAt: thread.updatedAt,
     voteCount: thread.votes.length,
     userVoted: thread.votes.some(vote => vote.userId === userId),
-    isOwner: (thread.userId ?? thread.user.id) === userId,
+    isOwner: isOwn(thread.userId, userId),
     comments: thread.comments.map(comment => commentView(comment, userId)),
   };
 }
@@ -206,7 +216,7 @@ export const listThreads = async (req: Request, res: Response) => {
       orderBy: sort === 'popular'
         ? { votes: { _count: 'desc' } }
         : sort === 'active'
-          ? { updatedAt: 'desc' }
+          ? { lastActivityAt: 'desc' }
           : { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
@@ -267,6 +277,7 @@ export const listPassages = async (req: Request, res: Response) => {
 
 export const createThread = async (req: Request, res: Response) => {
   const data = parseItalian(createThreadSchema, req.body);
+  await maybeSweepCommunity();
   const target = parseItalian(targetSchema, req.body?.target);
   const kind = checkAnchor(data);
   if (target) {
@@ -308,6 +319,7 @@ export const createThread = async (req: Request, res: Response) => {
 
 export const createComment = async (req: Request, res: Response) => {
   const data = parseItalian(createCommentSchema, req.body);
+  await maybeSweepCommunity();
   const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
   if (!thread || thread.isHidden) throw new AppError(404, 'Glossa non trovata');
 
@@ -328,7 +340,8 @@ export const createComment = async (req: Request, res: Response) => {
     data: { threadId: thread.id, parentId: data.parentId ?? null, body: data.body, userId: req.user!.id },
     include: { user: { select: { id: true, username: true } }, votes: true },
   });
-  await prisma.articleThread.update({ where: { id: thread.id }, data: { updatedAt: new Date() } });
+  // The feed's «Attive» reads the last activity, which only moves forward (two replies may land out of order).
+  await prisma.articleThread.updateMany({ where: { id: thread.id, lastActivityAt: { lt: comment.createdAt } }, data: { lastActivityAt: comment.createdAt } });
   res.status(201).json(commentView(comment, req.user!.id));
 };
 
@@ -352,14 +365,23 @@ export const toggleCommentVote = async (req: Request, res: Response) => {
   res.json({ voted: !existing, voteCount });
 };
 
+/** What a report keeps of a glossa for the moderators (G-308): its title, if any, and its body. */
+function reportedThreadText(thread: { title: string; body: string }) {
+  return thread.title ? `${thread.title}\n\n${thread.body}` : thread.body;
+}
+
 export const reportThread = async (req: Request, res: Response) => {
   const data = parseItalian(reportSchema, req.body);
+  await maybeSweepCommunity();
   const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
   if (!thread) throw new AppError(404, 'Glossa non trovata');
+  const { reason, details } = readReportReason(data.reason, data.details);
+  // A second report replaces the first, with a new copy of the text, and is pending again.
+  const report = { reason, details, status: 'pending', reportedText: reportedThreadText(thread), resolvedAt: null, resolvedById: null, resolutionNote: null };
   await prisma.articleThreadReport.upsert({
     where: { threadId_userId: { threadId: thread.id, userId: req.user!.id } },
-    create: { threadId: thread.id, userId: req.user!.id, reason: data.reason, details: data.details },
-    update: { reason: data.reason, details: data.details, status: 'pending' },
+    create: { threadId: thread.id, userId: req.user!.id, ...report },
+    update: report,
   });
   res.status(204).send();
 };

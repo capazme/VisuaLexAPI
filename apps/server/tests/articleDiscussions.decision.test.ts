@@ -268,11 +268,14 @@ describe('discussions anchored on a court decision', () => {
       expect(thread.passageReleasedAt).toEqual(expect.any(String));
     });
 
-    it('removes the thread with the account', async () => {
+    // G-307: a glossa outlives its author's account, without an author.
+    it('keeps the thread without its author when the account goes', async () => {
       const created = await open(alice);
       const res = await request(app).delete('/api/auth/account').set(authHeader(alice)).send({ password: 'test-password', confirmation: 'ELIMINA ACCOUNT' });
       expect(res.status).toBe(204);
-      expect(await prisma.articleThread.count({ where: { id: created.body.id } })).toBe(0);
+      const row = await prisma.articleThread.findUniqueOrThrow({ where: { id: created.body.id } });
+      expect(row.userId).toBeNull();
+      expect(row.decisionKey).toBe(created.body.normaKey);
     });
 
     it("leaves passage_released_by null when the releasing admin is deleted", async () => {
