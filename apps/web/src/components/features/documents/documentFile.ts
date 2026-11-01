@@ -1,7 +1,9 @@
 /**
  * Reads the document «Analizza documento» is given, in the browser: the file is never sent anywhere.
- * TXT and Markdown as they are, HTML as its text, DOCX from its main XML part.
+ * TXT and Markdown as they are, HTML as its text, DOCX through `docx/` (its body and its notes).
  */
+import { DocxError, type DocxErrorCode } from './docx/docxErrors';
+import { readDocxFile } from './docx/docxWorkerClient';
 
 /** 15 MB: the limit the page announces. */
 export const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
@@ -19,61 +21,22 @@ function readableText(fileName: string, content: string): string {
   return content;
 }
 
-function decodeXml(value: string): string {
-  const parser = new DOMParser();
-  return parser.parseFromString(`<span>${value}</span>`, 'text/html').body.textContent ?? value;
-}
-
-/** Extracts the main XML part from a DOCX without sending the file anywhere. */
+/**
+ * The text of a DOCX, as Word shows it, read in a Web Worker with the package's bounds (`docx/`, spec #391 §6.1):
+ * the body, then its footnotes and endnotes under «Note». The map from each character back to the XML is in
+ * `readDocxFile`'s answer; this keeps the text only.
+ */
 export async function readDocx(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const decoder = new TextDecoder();
-  const eocd = 0x06054b50;
-  let end = -1;
-  for (let offset = bytes.length - 22; offset >= Math.max(0, bytes.length - 65557); offset -= 1) {
-    if (view.getUint32(offset, true) === eocd) { end = offset; break; }
-  }
-  if (end < 0) throw new Error('Archivio DOCX non valido');
-
-  const entries = view.getUint16(end + 10, true);
-  const centralOffset = view.getUint32(end + 16, true);
-  let cursor = centralOffset;
-  let documentXml: Uint8Array | null = null;
-  for (let index = 0; index < entries; index += 1) {
-    if (view.getUint32(cursor, true) !== 0x02014b50) throw new Error('Indice DOCX non valido');
-    const method = view.getUint16(cursor + 10, true);
-    const compressedSize = view.getUint32(cursor + 20, true);
-    const nameLength = view.getUint16(cursor + 28, true);
-    const extraLength = view.getUint16(cursor + 30, true);
-    const commentLength = view.getUint16(cursor + 32, true);
-    const localOffset = view.getUint32(cursor + 42, true);
-    const name = decoder.decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
-    if (name === 'word/document.xml') {
-      const localNameLength = view.getUint16(localOffset + 26, true);
-      const localExtraLength = view.getUint16(localOffset + 28, true);
-      const start = localOffset + 30 + localNameLength + localExtraLength;
-      const compressed = bytes.subarray(start, start + compressedSize);
-      if (method === 0) documentXml = compressed;
-      else if (method === 8) {
-        const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-        documentXml = new Uint8Array(await new Response(stream).arrayBuffer());
-      } else throw new Error('Compressione DOCX non supportata');
-      break;
-    }
-    cursor += 46 + nameLength + extraLength + commentLength;
-  }
-  if (!documentXml) throw new Error('Testo principale DOCX non trovato');
-
-  const xml = decoder.decode(documentXml);
-  return decodeXml(xml
-    .replace(/<w:tab\s*\/?\s*>/gi, '\t')
-    .replace(/<w:br\s*\/?\s*>/gi, '\n')
-    .replace(/<\/w:p>/gi, '\n')
-    .replace(/<w:t[^>]*>([\s\S]*?)<\/w:t>/gi, '$1')
-    .replace(/<[^>]+>/g, ''))
-    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return (await readDocxFile(file)).text;
 }
+
+/** The words for a DOCX refused for a reason the user can act on; any other gets the page's general words. */
+const DOCX_REFUSALS: Partial<Record<DocxErrorCode, string>> = {
+  encrypted: 'Il documento è protetto da password: aprilo in Word, togli la password e salvalo di nuovo.',
+  strict: 'Salva il file da Word come «Documento Word» e riprova.',
+  too_large: 'Il documento ha parti troppo grandi o troppo compresse per leggerlo nel browser in sicurezza.',
+  timeout: 'La lettura del documento ha richiesto troppo tempo. Il file non è stato inviato al server.',
+};
 
 /** The checks and the words of the page, in the order it has always made them. */
 export async function readDocumentFile(file: File): Promise<DocumentReading> {
@@ -90,7 +53,8 @@ export async function readDocumentFile(file: File): Promise<DocumentReading> {
     const content = /\.docx$/i.test(file.name) ? await readDocx(file) : readableText(file.name, await file.text());
     if (!content.trim()) return { ok: false, error: 'Il documento non contiene testo leggibile.' };
     return { ok: true, text: content };
-  } catch {
-    return { ok: false, error: 'Impossibile leggere il documento localmente.' };
+  } catch (error) {
+    const refusal = error instanceof DocxError ? DOCX_REFUSALS[error.code] : undefined;
+    return { ok: false, error: refusal ?? 'Impossibile leggere il documento localmente.' };
   }
 }
