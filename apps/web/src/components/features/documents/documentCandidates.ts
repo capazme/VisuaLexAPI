@@ -177,6 +177,21 @@ function actPhrase(vocabulary: Vocabulary, flags: string): RegExp {
   return new RegExp(`${NOT_AFTER_WORD}(?:${EU_ACT}|${NUMBERED_ACT}${NOT_BEFORE_WORD}${names})`, flags);
 }
 
+/**
+ * The act patterns of a vocabulary, compiled once: with some 420 names each takes tens of milliseconds to build, and a
+ * page builds the same vocabulary for every document. Keyed by the pattern's source; the last few are kept.
+ */
+const ACT_PATTERNS = new Map<string, { sticky: RegExp; global: RegExp; search: RegExp }>();
+function actPatterns(vocabulary: Vocabulary) {
+  let patterns = ACT_PATTERNS.get(vocabulary.source);
+  if (!patterns) {
+    patterns = { sticky: actPhrase(vocabulary, 'yiu'), global: actPhrase(vocabulary, 'giu'), search: actPhrase(vocabulary, 'iu') };
+    if (ACT_PATTERNS.size >= 4) ACT_PATTERNS.delete(ACT_PATTERNS.keys().next().value!);
+    ACT_PATTERNS.set(vocabulary.source, patterns);
+  }
+  return patterns;
+}
+
 // ── Candidates ───────────────────────────────────────────────────────────────────────────────────────────────
 
 export type CandidateKind = 'article-act' | 'act-article' | 'act' | 'bare';
@@ -282,8 +297,7 @@ export function findCandidates(text: string, vocabulary: Vocabulary): Candidate[
   };
   const take = (from: number, to: number) => used.fill(1, from, to);
   const candidates: Candidate[] = [];
-  const stickyAct = actPhrase(vocabulary, 'yiu');
-  const nearAct = actPhrase(vocabulary, 'iu');
+  const { sticky: stickyAct, global: globalAct, search: nearAct } = actPatterns(vocabulary);
 
   const heads: Array<{ start: number; end: number; run: ArticleRun }> = [];
   ARTICLE_HEAD.lastIndex = 0;
@@ -309,7 +323,6 @@ export function findCandidates(text: string, vocabulary: Vocabulary): Candidate[
   }
 
   const headAt = new Map(heads.map((head) => [head.start, head]));
-  const globalAct = actPhrase(vocabulary, 'giu');
   const acts: Array<{ start: number; end: number; phrase: string }> = [];
   globalAct.lastIndex = 0;
   for (let act = globalAct.exec(text); act; act = globalAct.exec(text)) {
