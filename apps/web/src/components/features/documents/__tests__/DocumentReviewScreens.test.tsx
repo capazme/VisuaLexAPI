@@ -121,7 +121,7 @@ describe('«Da completare» and the picker (#376 §5)', () => {
     expect(within(dialog).getByText('Codice civile', { selector: 'span' })).toBeInTheDocument();
     await userEvent.keyboard('{Enter}');
     // Where it goes: the identical «art. 2043» is the default.
-    const identical = within(dialog).getByRole('radio', { name: 'Anche alle altre 1 «art. 2043» da completare' });
+    const identical = within(dialog).getByRole('radio', { name: 'Anche all’altra «art. 2043» da completare' });
     expect(identical).toBeChecked();
     expect(within(dialog).getByRole('radio', { name: 'A tutte le 3 da completare' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Applica' })).toHaveFocus();

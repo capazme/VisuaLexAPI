@@ -110,7 +110,7 @@ export function LinksPanel(props: LinksPanelProps) {
             {summary.notLinked > 0 && (
               <>
                 {' · '}{summary.notLinked} no:{' '}
-                <button type="button" aria-expanded={why} aria-controls="doc-links-why" onClick={() => setWhy((v) => !v)} className={cn('font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800 dark:text-primary-300', FOCUS_RING)}>
+                <button type="button" aria-expanded={why} aria-controls="doc-links-why" onClick={() => setWhy((v) => !v)} className={cn('inline-flex min-h-[44px] items-center font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800 md:min-h-0 dark:text-primary-300', FOCUS_RING)}>
                   {why ? 'nascondi perché' : 'vedi perché'}
                 </button>
               </>
@@ -180,7 +180,7 @@ export function LinksPanel(props: LinksPanelProps) {
                   <ul className="mt-1 flex flex-col gap-1">
                     {report.skipped.map((row) => (
                       <li key={row.index} className={HINT}>
-                        <button type="button" onClick={() => onSelect(row.index)} className={cn('font-medium text-slate-800 underline underline-offset-2 dark:text-slate-200', FOCUS_RING)}>{row.label}</button>
+                        <button type="button" onClick={() => onSelect(row.index)} className={cn('inline-flex min-h-[44px] items-center font-medium text-slate-800 underline underline-offset-2 md:min-h-0 dark:text-slate-200', FOCUS_RING)}>{row.label}</button>
                         {' '}— {row.reason}
                       </li>
                     ))}

@@ -805,7 +805,7 @@ export function DocumentReviewPage() {
                 {reviewing && (
                   <p role="status" className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
                     Mostro le citazioni da confermare.{' '}
-                    <button type="button" onClick={() => setReviewing(false)} className={cn('font-medium text-primary-700 underline underline-offset-2 dark:text-primary-300', RING)}>Mostra tutte</button>
+                    <button type="button" onClick={() => setReviewing(false)} className={cn('inline-flex min-h-[44px] items-center font-medium text-primary-700 underline underline-offset-2 md:min-h-0 dark:text-primary-300', RING)}>Mostra tutte</button>
                   </p>
                 )}
                 <div ref={listBodyRef} className={PANEL_BODY}>

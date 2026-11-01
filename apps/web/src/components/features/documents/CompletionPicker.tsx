@@ -16,7 +16,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import {
-  FloatingFocusManager, FloatingPortal, autoUpdate, flip, offset, shift, size,
+  FloatingFocusManager, FloatingPortal, autoPlacement, autoUpdate, offset, shift, size,
   useDismiss, useFloating, useInteractions, useRole,
 } from '@floating-ui/react';
 import { Check, CloudOff, X } from 'lucide-react';
@@ -290,7 +290,9 @@ export function CompletionPicker(props: CompletionPickerProps) {
             <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Dove lo applico?</legend>
             {([
               ['row', 'Solo a questa citazione', 1],
-              ...(scopes.identical.length > 1 ? [['identical', `Anche alle altre ${scopes.identical.length - 1} «${articleLabel(row)}» da completare`, scopes.identical.length]] : []),
+              ...(scopes.identical.length > 1 ? [['identical', scopes.identical.length === 2
+                ? `Anche all’altra «${articleLabel(row)}» da completare`
+                : `Anche alle altre ${scopes.identical.length - 1} «${articleLabel(row)}» da completare`, scopes.identical.length]] : []),
               ['all', `A tutte le ${scopes.all.length} da completare`, scopes.all.length],
             ] as Array<[CompletionScope, string, number]>).map(([value, label]) => (
               <label key={value} className={cn('mt-1 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg px-2 text-sm text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/60')}>
@@ -346,7 +348,7 @@ export function CompletionPicker(props: CompletionPickerProps) {
   );
 }
 
-/** A computer's dialog by the row: under it or over it, as room allows, never wider than 26 rem. */
+/** A computer's dialog by the row: under it or over it, where there is more room, never wider than 26 rem. */
 function AnchoredDialog({ anchor, titleId, title, onClose, initialFocus, children }: {
   anchor: HTMLElement | null;
   titleId: string;
@@ -358,12 +360,13 @@ function AnchoredDialog({ anchor, titleId, title, onClose, initialFocus, childre
   const { refs, floatingStyles, context } = useFloating({
     open: true,
     onOpenChange: (next) => { if (!next) onClose(); },
-    placement: 'bottom-end',
     // The anchor from the first render, so the first position is right (gotcha 13).
     elements: { reference: anchor },
     middleware: [
       offset(6),
-      flip({ fallbackPlacements: ['top-end', 'left-start'] }),
+      // Under the row or over it, where there is more room — never beside it, over the text column (#376 §5.6); the
+      // height then fits the side chosen.
+      autoPlacement({ allowedPlacements: ['bottom-end', 'top-end'] }),
       shift({ padding: 12 }),
       size({
         padding: 12,
