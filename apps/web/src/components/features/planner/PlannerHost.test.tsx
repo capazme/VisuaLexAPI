@@ -43,7 +43,8 @@ describe('«c», the quick add from anywhere', () => {
     fireEvent.keyDown(window, { key: 'c' });
     const dialog = await screen.findByRole('dialog', { name: 'Nuovo compito' });
     expect(within(dialog).getByLabelText('Dossier')).toHaveValue('d1');
-    expect(within(dialog).getByLabelText('Titolo')).toHaveFocus();
+    // The dialog gives its first focus in a timeout (`useDialogFocus`): under load it lands after the dialog is found.
+    await waitFor(() => expect(within(dialog).getByLabelText('Titolo')).toHaveFocus());
   });
 
   it('works from a task\'s checkbox, where the arrows leave the focus', async () => {
