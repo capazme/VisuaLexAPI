@@ -17,7 +17,7 @@ export interface CitedPassage {
 }
 
 export interface CitationEntry {
-  /** The citation's position in the array `extractCitations` returned: the page's selection. */
+  /** The citation's index on the page (its row in the analysis): the page's selection. */
   index: number;
   citation: CitationMatch;
   /** «art. 1453»: the act is the group's heading. */
@@ -82,10 +82,14 @@ export function citedPassage(text: string, start: number, end: number): CitedPas
   return { before: words(before), match: words(text.slice(start, end)), after: words(after), cutBefore, cutAfter };
 }
 
-/** The citations by act, the acts in the order the document first cites them, each act's citations in the text's order. */
-export function groupCitationsByAct(text: string, citations: readonly CitationMatch[]): ActGroup[] {
+/**
+ * The citations by act, the acts in the order the document first cites them, each act's citations in the text's order.
+ * `indices` gives each citation's index on the page (the rows of the analysis); by default its place in `citations`.
+ */
+export function groupCitationsByAct(text: string, citations: readonly CitationMatch[], indices?: readonly number[]): ActGroup[] {
   const groups = new Map<string, ActGroup>();
-  citations.forEach((citation, index) => {
+  citations.forEach((citation, at) => {
+    const index = indices?.[at] ?? at;
     const key = actKey(citation);
     let group = groups.get(key);
     if (!group) {
