@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DocumentCitation } from '../documentCandidates';
 import {
-  applyAct, clearAct, completionScopes, documentActs, hasChoices, linkInputs, pickerPassage, restore, reviewRows,
+  applyAct, clearAct, completionScopes, confirmRow, documentActs, hasChoices, linkInputs, pickerPassage, restore, reviewRows,
   rowKey, rowsToConfirm, setChoice, snapshot, linksToFirst,
 } from '../documentReview';
 import { settleLinks } from '../documentLinks';
@@ -46,7 +46,7 @@ describe('the user\'s choices on the rows (#376 §5.4)', () => {
 
   it('a new act asks for a new confirmation; «Torna da completare» drops the act', () => {
     const key = rowKey(ROWS[5]);
-    let choices = setChoice(new Map(), key, { confirmed: true });
+    let choices = confirmRow(new Map(), reviewRows(ROWS, new Map())[5]);
     expect(rowsToConfirm(reviewRows(ROWS, choices), choices).map((r) => r.index)).toEqual([]);
     choices = applyAct(choices, [key], L241, 'bulk');
     expect(choices.get(key)).toEqual({ act: L241, by: 'bulk' });
@@ -57,13 +57,26 @@ describe('the user\'s choices on the rows (#376 §5.4)', () => {
 
   it('a dismissed row is never linked, and confirmed rows get their link', () => {
     let choices = setChoice(new Map(), rowKey(ROWS[4]), { dismissed: true });
-    choices = setChoice(choices, rowKey(ROWS[5]), { confirmed: true });
+    choices = confirmRow(choices, reviewRows(ROWS, choices)[5]);
     const rows = reviewRows(ROWS, choices);
     const input = linkInputs(rows, choices);
     const answers = new Map([[JSON.stringify(['codice civile', '', '', '2', null]), { href: 'https://www.normattiva.it/x~art2', reason: 'ok' as const }]]);
     const links = settleLinks(input.rows, input.choices, answers);
     expect(links[4]).toEqual({ linked: false, reason: 'not_resolved' });
     expect(links[5]).toMatchObject({ linked: true });
+  });
+});
+
+describe('a confirmation holds for the act confirmed (#391 §4.3)', () => {
+  it('is dropped when «Riprova» gives the inherited row another act', () => {
+    const choices = confirmRow(new Map(), reviewRows(ROWS, new Map())[5]);
+    expect(reviewRows(ROWS, choices)[5].confirmed).toBe(true);
+    const again = ROWS.map((row, i) => (i === 5 ? { ...row, act: L241 } : row));
+    const rows = reviewRows(again, choices);
+    expect(rows[5].confirmed).toBe(false);
+    expect(rowsToConfirm(rows, choices).map((r) => r.index)).toEqual([5]);
+    const input = linkInputs(rows, choices);
+    expect(input.choices.get(5)).toBeUndefined();
   });
 });
 

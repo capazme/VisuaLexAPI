@@ -36,7 +36,7 @@ import { CompletionPicker, type CompletionScope } from './CompletionPicker';
 import { LinksPanel, type DownloadReport, type UnlinkedRow } from './LinksPanel';
 import {
   DOCX_SKIP_WORDS, NO_LINK_WORDS, applyAct, articleLabel, asMatch, clearAct, hasChoices, linkInputs, listedRows,
-  restore, reviewRows, rowsToConfirm, setChoice, snapshot, toCompleteRows,
+  confirmRow, restore, reviewRows, rowsToConfirm, setChoice, snapshot, toCompleteRows,
   type DocumentAct, type ReviewedRow, type RowChoice,
 } from './documentReview';
 import {
@@ -71,6 +71,8 @@ const askActNames = (signal?: AbortSignal) => fetchActNames(signal).catch((error
 
 /** «Atto applicato a 4 citazioni» stays this long with «Annulla» (#376 §5.4). */
 const APPLY_UNDO_MS = 8000;
+/** «The list's first row», for the focus after a row leaves the list. */
+const FIRST_ROW = -1;
 /** The title of a text pasted in the box (#391 §5.1). */
 const PASTED_TITLE = 'Testo incollato';
 
@@ -177,6 +179,11 @@ export function DocumentReviewPage() {
   const [retrying, setRetrying] = useState(false);
   // «Riconosci solo nel browser» (#376 §6.3, Q3): off by default, for the page's life only.
   const [localOnly, setLocalOnly] = useState(false);
+  // Read when the analysis starts, not when the file was chosen: the switch can change while a long DOCX is read.
+  const localOnlyRef = useRef(localOnly);
+  useEffect(() => {
+    localOnlyRef.current = localOnly;
+  }, [localOnly]);
   // What the user said of the rows, by the row's span: in memory, for this document only (§5.5, Q4).
   const [choices, setChoices] = useState<Map<string, RowChoice>>(() => new Map());
   const [picker, setPicker] = useState<{ index: number; mode: 'complete' | 'change'; anchor: HTMLElement | null } | null>(null);
@@ -260,7 +267,7 @@ export function DocumentReviewPage() {
     const index = focusRowRef.current;
     if (index === null) return;
     focusRowRef.current = null;
-    const target = listBodyRef.current?.querySelector<HTMLElement>(`[data-cite-row="${index}"] button`)
+    const target = (index === FIRST_ROW ? null : listBodyRef.current?.querySelector<HTMLElement>(`[data-cite-row="${index}"] button`))
       ?? listBodyRef.current?.querySelector<HTMLElement>('[data-cite-row] button, h3 button');
     target?.focus({ preventScroll: false });
   });
@@ -345,7 +352,7 @@ export function DocumentReviewPage() {
     const signal = startAnalysis();
     let run: Awaited<ReturnType<typeof analyse>>;
     try {
-      run = await analyse(text, signal, undefined, localOnly);
+      run = await analyse(text, signal, undefined, localOnlyRef.current);
     } catch (error) {
       // An abort: another file, or the page has gone. Anything else is a fault, said on the row and in the console.
       if (signal.aborted || id !== readingRef.current) return;
@@ -377,14 +384,14 @@ export function DocumentReviewPage() {
   };
 
   /**
-   * «Riprova»: asks again for what is still unresolved, keeping what the server already answered. `leaveLocal`: the
-   * user turned «Riconosci solo nel browser» off for this document. The choices stay where the same citation stands.
+   * «Riprova»: asks again for what is still unresolved, keeping what the server already answered. Also «Riconosci con
+   * VisuaLex questo documento»: this document only, the switch stays as it is for the next one (`local` follows the
+   * analysis). The choices stay where the same citation stands.
    */
-  const retry = async (leaveLocal = false) => {
+  const retry = async () => {
     if (!loaded || retrying) return;
     const id = readingRef.current;
     setRetrying(true);
-    if (leaveLocal) setLocalOnly(false);
     const signal = startAnalysis();
     try {
       const run = await analyse(loaded.text, signal, loaded.answers);
@@ -476,6 +483,7 @@ export function DocumentReviewPage() {
     const keys = indices.map((index) => rows[index].key);
     const before = snapshot(choices, keys);
     const own = rows[target].key;
+    const reading = readingRef.current;
     setPicker(null);
     focusRowRef.current = target;
     // The row in the picker was looked at: it is the user's choice for it. The others were reached in bulk (#391 Q8).
@@ -486,12 +494,17 @@ export function DocumentReviewPage() {
     };
     void showUndoToast({
       action: () => setChoices(next),
-      undo: () => setChoices((current) => restore(current, before)),
+      // On another document by now: its rows are not these, nothing to put back.
+      undo: () => { if (readingRef.current === reading) setChoices((current) => restore(current, before)); },
       message: keys.length === 1 ? 'Atto applicato a 1 citazione' : `Atto applicato a ${keys.length} citazioni`,
       duration: APPLY_UNDO_MS,
     });
   };
 
+  const confirm = (index: number) => {
+    focusRowRef.current = index;
+    setChoices((current) => confirmRow(current, rows[index]));
+  };
   const changeRow = (index: number, change: Partial<RowChoice>, focus: number | null = index) => {
     focusRowRef.current = focus;
     setChoices((current) => setChoice(current, rows[index].key, change));
@@ -500,7 +513,8 @@ export function DocumentReviewPage() {
     const pending = toCompleteRows(rows);
     const at = pending.findIndex((row) => row.index === index);
     const next = pending[at + 1] ?? pending[at - 1];
-    changeRow(index, { dismissed: true }, next ? next.index : null);
+    // The last one to complete gone: the focus goes to the list's first row, never to the page's body.
+    changeRow(index, { dismissed: true }, next ? next.index : FIRST_ROW);
   };
   const uncomplete = (index: number) => {
     focusRowRef.current = index;
@@ -508,7 +522,7 @@ export function DocumentReviewPage() {
   };
   const confirmAll = () => setChoices((current) => {
     let out = current;
-    for (const row of waiting) out = setChoice(out, row.key, { confirmed: true });
+    for (const row of waiting) out = confirmRow(out, row);
     return out;
   });
   // Nothing left to review: the list shows all its rows again.
@@ -598,7 +612,8 @@ export function DocumentReviewPage() {
         skipped.push({ index: row.index, label: rowLabel(loaded.text, row), reason: DOCX_SKIP_WORDS[outcome.reason] });
       });
       skipped.sort((a, b) => rows[a.index].start - rows[b.index].start);
-      setReport({ ok: true, fileName: name, linked: copy.linked, skipped });
+      const inNotes = copy.outcomes.filter((outcome) => outcome.linked && outcome.part !== 'word/document.xml').length;
+      setReport({ ok: true, fileName: name, linked: copy.linked, inNotes, skipped });
     } catch (error) {
       console.error('«Analizza documento»: the copy with the links could not be written', (error as Error)?.message);
       setReport({
@@ -714,7 +729,7 @@ export function DocumentReviewPage() {
               />
               <PasteBox busy={job !== null && job.stage !== 'error'} onAnalyse={(text) => void handleText(text)} />
               </div>
-              <LocalSwitch on={localOnly} onChange={setLocalOnly} />
+              <LocalSwitch on={localOnly} onChange={setLocalOnly} disabled={job !== null && job.stage !== 'error'} />
               {/* The document's row; a refusal slides away with its ✕. A new row takes the old one's place at once
                   (`popLayout`), so the sheet thrown to it lands where it stays. */}
               <AnimatePresence initial={false} mode="popLayout">
@@ -757,7 +772,7 @@ export function DocumentReviewPage() {
             </div>
             <LinksPanel
               localOnly={local}
-              onLeaveLocal={() => void retry(true)}
+              onLeaveLocal={() => void retry()}
               phase={prepared ? 'ready' : linksPhase === 'preparing' ? 'preparing' : 'idle'}
               refreshing={prepared && linksPhase === 'preparing'}
               summary={summary}
@@ -809,7 +824,7 @@ export function DocumentReviewPage() {
                     onDismiss={dismissRow}
                     onRestore={(index) => changeRow(index, { dismissed: false })}
                     onUncomplete={uncomplete}
-                    onConfirm={(index) => changeRow(index, { confirmed: true })}
+                    onConfirm={confirm}
                     onLeaveOut={(index, leftOut) => changeRow(index, { leftOut })}
                   />
                 </div>
@@ -854,7 +869,7 @@ export function DocumentReviewPage() {
  * «Riconosci solo nel browser» (#376 §6.3, Q3): off by default. On, nothing about the document leaves the computer —
  * not even the citations — the recognition is the browser's own, and no link can be asked (#391 §8).
  */
-function LocalSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+function LocalSwitch({ on, onChange, disabled }: { on: boolean; onChange: (on: boolean) => void; disabled: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
       <button
@@ -862,8 +877,9 @@ function LocalSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) =>
         role="switch"
         aria-checked={on}
         aria-describedby="doc-local-hint"
+        disabled={disabled}
         onClick={() => onChange(!on)}
-        className={cn('inline-flex min-h-11 items-center gap-2.5 rounded-lg pr-2 text-sm font-medium text-slate-800 dark:text-slate-200', RING)}
+        className={cn('inline-flex min-h-11 items-center gap-2.5 rounded-lg pr-2 text-sm font-medium text-slate-800 disabled:cursor-wait disabled:opacity-60 dark:text-slate-200', RING)}
       >
         <span aria-hidden="true" className={cn('relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600 dark:bg-primary-500' : 'bg-slate-300 dark:bg-slate-600')}>
           <span className={cn('absolute top-0.5 size-5 rounded-full bg-white shadow-sm transition-[left] motion-reduce:transition-none', on ? 'left-[1.125rem]' : 'left-0.5')} />

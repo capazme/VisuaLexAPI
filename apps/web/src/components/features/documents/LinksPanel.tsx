@@ -20,7 +20,7 @@ export interface UnlinkedRow {
 
 /** What the copy of the Word file did (§6.7 point 3). */
 export type DownloadReport =
-  | { ok: true; fileName: string; linked: number; skipped: UnlinkedRow[] }
+  | { ok: true; fileName: string; linked: number; /** Of `linked`, those in the footnotes and endnotes. */ inNotes: number; skipped: UnlinkedRow[] }
   | { ok: false; error: string };
 
 export interface LinksPanelProps {
@@ -171,6 +171,7 @@ export function LinksPanel(props: LinksPanelProps) {
             <>
               <p className={LINE}>
                 <span className="font-medium text-slate-900 dark:text-slate-50">Copia scaricata: {report.linked} {report.linked === 1 ? 'link inserito' : 'link inseriti'}</span>
+                {report.inNotes > 0 && ` (${report.linked - report.inNotes} nel testo, ${report.inNotes} nelle note)`}
                 {' '}in «{report.fileName}».
               </p>
               {report.skipped.length > 0 && (

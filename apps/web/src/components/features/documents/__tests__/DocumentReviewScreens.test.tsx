@@ -108,6 +108,7 @@ describe('«Da completare» and the picker (#376 §5)', () => {
     // Esc closes, the focus back on the row's button.
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Completa art. 7' })).toHaveFocus());
   });
 
   it('reads the act typed as the search does, picks it with Enter, applies to the identical ones by default, and undoes', async () => {
@@ -226,6 +227,38 @@ describe('«Riconosci solo nel browser» (#376 §6.3)', () => {
   });
 });
 
+describe('«Riconosci solo nel browser», kept', () => {
+  it('stays on for the next document after «Riconosci con VisuaLex questo documento», and the picker asks nothing', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await userEvent.click(screen.getByRole('switch', { name: 'Riconosci solo nel browser' }));
+    await choose(container, BRIEF);
+    await userEvent.click(screen.getByRole('button', { name: 'Completa art. 7' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('combobox'), 'testo unico edilizia');
+    await act(async () => { await new Promise((done) => setTimeout(done, 400)); });
+    expect(server.readOnServer).not.toHaveBeenCalled();
+    expect(dialog).toHaveTextContent('leggo solo nel browser');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Riconosci con VisuaLex questo documento' }));
+    await waitFor(() => expect(server.readOnServer).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    expect(await screen.findByRole('switch', { name: 'Riconosci solo nel browser' })).toHaveAttribute('aria-checked', 'true');
+    await choose(container, BRIEF, 'altro.txt');
+    expect(server.readOnServer).toHaveBeenCalledTimes(1);
+  });
+
+  it('cannot be changed while a document is read', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const slow = testFile(['art. 2043 c.c.'], 'lento.txt');
+    let finish: (text: string) => void = () => {};
+    Object.assign(slow, { text: () => new Promise<string>((done) => { finish = done; }) });
+    await userEvent.upload(input(container), slow);
+    expect(screen.getByRole('switch', { name: 'Riconosci solo nel browser' })).toBeDisabled();
+    await act(async () => finish('art. 2043 c.c.'));
+    await screen.findByRole('heading', { level: 2, name: 'lento.txt' });
+  });
+});
+
 describe('the paste box (#391 §5.1)', () => {
   it('reads a pasted text as a file, titled «Testo incollato»', async () => {
     render(<DocumentReviewPage />);
@@ -265,6 +298,35 @@ describe('the links (#391 §4.2, §5.2, §6.7)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Prepara i link mancanti' }));
     await screen.findByText('5 citazioni avranno il link');
     expect((linkServer.fetchNormLinks.mock.calls[1][0] as LinkNorm[]).map((n) => n.article)).toEqual(['18']);
+  });
+
+  it('leaves out of the copy a row completed in bulk until confirmed, and a row left «Senza link»', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    const items: Array<Record<string, Promise<Blob>>> = [];
+    vi.stubGlobal('ClipboardItem', class { constructor(item: Record<string, Promise<Blob>>) { items.push(item); } });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write, writeText: vi.fn() } });
+    try {
+      const { container } = render(<DocumentReviewPage />);
+      await choose(container, 'L’art. 5 e poi l’art. 5 ancora.\nSi richiama l’art. 2043 c.c.');
+      await userEvent.click(within(list()).getAllByRole('button', { name: 'Completa art. 5' })[0]);
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(within(dialog).getByRole('combobox'), 'c.c.{Enter}');
+      await userEvent.keyboard('{Enter}');
+      await userEvent.click(screen.getByRole('button', { name: 'Prepara i link' }));
+      await screen.findByText('2 citazioni avranno il link');
+      await userEvent.click(screen.getByRole('button', { name: 'Altre azioni per art. 2043 c.c.' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Senza link' }));
+      await screen.findByText('1 citazione avrà il link');
+      await userEvent.click(screen.getByRole('button', { name: 'Copia con i link' }));
+      await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+      const html = await readBlob(await items[0]['text/html']);
+      // The first «art. 5» was chosen for itself; the second, in bulk, waits; art. 2043 was left out.
+      expect(html.match(/<a /g)).toHaveLength(1);
+      expect(html).toMatch(/^<p>L’<a href="[^"]+">art\. 5<\/a> e poi l’art\. 5 ancora\.<\/p><p>Si richiama l’art\. 2043 c\.c\.<\/p>$/);
+    } finally {
+      vi.unstubAllGlobals();
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('copies the text with its links as HTML and plain text, in one write', async () => {

@@ -30,6 +30,11 @@ export interface RowChoice {
   dismissed?: boolean;
   /** «Conferma»: an inherited row, or one completed in bulk, may be linked. */
   confirmed?: boolean;
+  /**
+   * The act confirmed (`actIdentity`): a confirmation holds only while the row has that act — after «Riprova» an
+   * inherited row may take another, which the user never saw (#391 §4.3).
+   */
+  confirmedAct?: string;
   /** «Senza link». */
   leftOut?: boolean;
 }
@@ -49,6 +54,8 @@ export interface ReviewedRow extends DocumentCitation {
   dismissed: boolean;
   /** The act the analysis gave it, when the user changed it: «Cambia atto» on an inherited row. */
   analysedAct?: DocumentAct;
+  /** Confirmed for its link, with the act it has now. */
+  confirmed: boolean;
 }
 
 /** A row's identity across readings of the same text. */
@@ -60,15 +67,17 @@ export function reviewRows(citations: readonly DocumentCitation[], choices: Choi
     const key = rowKey(citation);
     const choice = choices.get(key);
     const dismissed = Boolean(choice?.dismissed);
+    const act = choice?.act ?? citation.act;
+    const confirmed = Boolean(choice?.confirmed && act && choice.confirmedAct === actIdentity(act));
     if (choice?.act) {
       return {
-        ...citation, index, key, dismissed,
+        ...citation, index, key, dismissed, confirmed,
         state: 'resolved', act: choice.act, origin: 'chosen', chosenBy: choice.by ?? 'row',
         ...(citation.act ? { analysedAct: citation.act } : {}),
       };
     }
     const origin: RowOrigin = citation.state === 'incomplete' ? 'incomplete' : citation.state === 'inherited' ? 'context' : 'own';
-    return { ...citation, index, key, dismissed, origin };
+    return { ...citation, index, key, dismissed, origin, confirmed };
   });
 }
 
@@ -116,7 +125,12 @@ export function setChoice(choices: Choices, key: string, change: Partial<RowChoi
 
 /** «Torna da completare»: the act chosen by hand is dropped (and with it its confirmation). */
 export function clearAct(choices: Choices, key: string): Map<string, RowChoice> {
-  return setChoice(choices, key, { act: undefined, by: undefined, confirmed: undefined });
+  return setChoice(choices, key, { act: undefined, by: undefined, confirmed: undefined, confirmedAct: undefined });
+}
+
+/** «Conferma»: the row's link may be written, for the act it has now. */
+export function confirmRow(choices: Choices, row: Pick<ReviewedRow, 'key' | 'act'>): Map<string, RowChoice> {
+  return row.act ? setChoice(choices, row.key, { confirmed: true, confirmedAct: actIdentity(row.act) }) : new Map(choices);
 }
 
 /** The previous choices of `keys`, to put back on «Annulla». */
@@ -233,7 +247,7 @@ export function linkInputs(rows: readonly ReviewedRow[], choices: Choices): {
   const linkChoices = new Map<number, LinkChoice>();
   const linkRows = rows.map((row) => {
     const choice = choices.get(row.key);
-    if (choice?.confirmed || choice?.leftOut) linkChoices.set(row.index, { confirmed: choice.confirmed, leftOut: choice.leftOut });
+    if (row.confirmed || choice?.leftOut) linkChoices.set(row.index, { confirmed: row.confirmed, leftOut: choice?.leftOut });
     return row.dismissed ? { ...row, state: 'incomplete' as const, act: undefined } : row;
   });
   return { rows: linkRows, choices: linkChoices };
@@ -241,7 +255,7 @@ export function linkInputs(rows: readonly ReviewedRow[], choices: Choices): {
 
 /** Rows that wait for «Conferma» before they get a link: inherited, or completed in bulk, not yet confirmed. */
 export function rowsToConfirm(rows: readonly ReviewedRow[], choices: Choices): ReviewedRow[] {
-  return rows.filter((r) => !r.dismissed && (r.origin === 'context' || r.chosenBy === 'bulk') && !choices.get(r.key)?.confirmed && !choices.get(r.key)?.leftOut);
+  return rows.filter((r) => !r.dismissed && (r.origin === 'context' || r.chosenBy === 'bulk') && !r.confirmed && !choices.get(r.key)?.leftOut);
 }
 
 /** Why a row has no link, in the page's words (the report, the summary, the row). */

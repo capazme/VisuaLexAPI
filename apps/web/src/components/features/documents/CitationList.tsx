@@ -176,7 +176,7 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
               const motion = cascade();
               const label = formatCitationLabel(entry.citation.parsed);
               const choice = choices.get(row.key);
-              const waits = (row.origin === 'context' || row.chosenBy === 'bulk') && !choice?.confirmed && !choice?.leftOut;
+              const waits = (row.origin === 'context' || row.chosenBy === 'bulk') && !row.confirmed && !choice?.leftOut;
               const items: MenuItem[] = [];
               if (row.origin === 'context' || row.origin === 'chosen') {
                 items.push({ label: 'Cambia atto', icon: PencilLine, onSelect: (event) => onPick(row.index, 'change', (event.currentTarget.closest('li') as HTMLElement | null) ?? event.currentTarget) });

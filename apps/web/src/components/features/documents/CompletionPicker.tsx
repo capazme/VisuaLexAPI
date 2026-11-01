@@ -127,7 +127,8 @@ export function CompletionPicker(props: CompletionPickerProps) {
   const titleId = useId();
   const listId = useId();
   const [query, setQuery] = useState('');
-  const [active, setActive] = useState(-1);
+  // The active option by its act, not its place: the server's reading may come and put a row above it.
+  const [activeAct, setActiveAct] = useState<string | null>(null);
   const [chosen, setChosen] = useState<DocumentAct | null>(null);
   const reading = useActReading(query, localOnly, customAliases);
 
@@ -158,6 +159,9 @@ export function CompletionPicker(props: CompletionPickerProps) {
   }, [reading, rows, analysis, row.start, query, listId]);
 
 
+  const active = activeAct === null ? -1 : options.findIndex((o) => actIdentity(o.act) === activeAct);
+  const setActive = (index: number) => setActiveAct(index < 0 ? null : actIdentity(options[index].act));
+
   const pick = (act: DocumentAct) => {
     if (!withScopes) {
       onApply(act, [row.index], 'row');
@@ -181,7 +185,7 @@ export function CompletionPicker(props: CompletionPickerProps) {
       event.preventDefault();
       if (options.length === 0) return;
       const step = event.key === 'ArrowDown' ? 1 : -1;
-      setActive((at) => (at + step + options.length) % options.length);
+      setActive((Math.max(active, step > 0 ? -1 : 0) + step + options.length) % options.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
       const option = options[active];
