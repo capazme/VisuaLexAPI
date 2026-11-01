@@ -1,4 +1,3 @@
-// apps/web/src/features/merlt/rassegne/RassegnaPassage.tsx
 import type { ReactNode } from 'react';
 import { DecisionChip } from './DecisionChip';
 import { CaseLawRow } from '../../../components/features/search/caseLaw/CaseLawRow';
@@ -51,7 +50,7 @@ export function RassegnaPassage({ passo, besideId, backEntry }: { passo: Rassegn
         <>
           {passo.pronunce.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {passo.pronunce.map((p, i) => <DecisionChip key={`${p.key ?? p.label}-${i}`} pronuncia={p} besideId={besideId} backEntry={backEntry} />)}
+              {passo.pronunce.map((p, i) => <DecisionChip key={`${p.key ?? 'senza-chiave'}-${i}`} pronuncia={p} besideId={besideId} backEntry={backEntry} />)}
             </div>
           )}
           <p className="text-xs text-slate-600 dark:text-slate-400">
