@@ -350,8 +350,21 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   unanswered). The rows not resolved are counted («· 3 da completare») and not yet listed: their group, the picker
   and the promise's new words are PR 3 of the spec. `documentCorpus.test.ts` runs the spec's invented corpus with
   the server's answers recorded (`__tests__/corpus/server.json`, `record_server.py`), prints §3.2's table and fails
-  below 98 found or on any wrong one. Each citation opens the reader through `navigate('/')` + `triggerSearch`,
-  gotcha 15. The
+  below 98 found or on any wrong one. **The links** (spec `2026-10-31-document-hyperlinks` L3, no screen yet: L5
+  draws them) are `documentLinks.ts` (pure): a row read from its own words or chosen for itself is linked once
+  `/fetch_norm_links` gives its address; an inherited row or one completed in bulk only once confirmed (Q8); a row
+  left out or to complete never; a range or «e ss.» to its first article (Q7); an address that fails
+  `sourceAddress` is dropped. `linkSpan` cuts a link to the head and the act (no «l'», no trailing comma, never
+  across a line); `documentLinks` gives the `{start, end, href}` the DOCX writer (L4) takes; `buildLinkedPaste`
+  writes the paste — one `<p>` a line, every character escaped, `<a href>` only, and the plain text with the
+  address in brackets — and `copyLinkedPaste` puts both in the clipboard in one write (items as promises, the plain
+  text alone when refused). `prepareLinks` is «Prepara i link» and «Riprova»: it asks only for the distinct norms not
+  answered yet, or answered «source silent». `documentLinkServer.ts` asks `/fetch_norm_links` in chunks of 200
+  norms / 30 acts / 48 KB, one after another, 25 s each, no `pin_day` (the server dates the link to today, G-395);
+  what it sends is the norms' readings, never the text. `documentLinksCorpus.test.ts` replays the route's answers
+  recorded on the spec's corpus (`__tests__/corpus/links.json`, `record_links.py`, which asks a running API) and
+  fails on any link whose act or article differs from the corpus's mark. Each citation opens the reader through
+  `navigate('/')` + `triggerSearch`, gotcha 15. The
   document is drawn as it is (`DocumentText`: every character once and in order, the citations only
   wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
@@ -2961,7 +2974,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `docxText.ts`, `readDocxPackage.ts`, `docxWorkerClient.ts`, `docxReader.worker.ts`, `docxErrors.ts`; the writer:
   `writeDocxPackage.ts`, `docxRuns.ts`, `docxSplice.ts`, `zipWriter.ts`, `docxWriterClient.ts`,
   `docxWriter.worker.ts`), `documentCandidates.ts` (vocabulary, candidates, resolution, inheritance, fallback: pure),
-  `documentServer.ts` (the catalog and `/parse_query_batch`); invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
+  `documentServer.ts` (the catalog and `/parse_query_batch`), `documentLinks.ts` and `documentLinkServer.ts` (the
+  links: which rows, their addresses, the paste); invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
   `__tests__/docx-saved/`; the spec's corpus scored by `__tests__/documentCorpus.test.ts`.
 
 ## Gotchas
