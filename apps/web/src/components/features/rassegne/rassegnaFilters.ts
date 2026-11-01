@@ -46,7 +46,7 @@ export type SearchWords =
  */
 export function searchWords(text: string): SearchWords {
   if (text.length > MAX_QUERY_CHARS) return { kind: 'too_many' };
-  const words = [...new Set((text.match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length >= MIN_WORD_CHARS))];
+  const words = [...new Set((text.match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => [...w].length >= MIN_WORD_CHARS))];
   if (words.length === 0) return { kind: 'none' };
   if (words.length > MAX_WORDS) return { kind: 'too_many' };
   return { kind: 'words', q: words.join(' ') };

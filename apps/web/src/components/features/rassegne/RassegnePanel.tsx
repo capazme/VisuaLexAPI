@@ -5,7 +5,7 @@ import { RassegnaPassage } from './RassegnaPassage';
 import { MAX_QUERY_CHARS, MAX_WORDS, searchWords, textOfPassage, yearsOfPassage } from './rassegnaFilters';
 import { useCaseLawFilters, useReportCaseLawYears } from '../search/caseLaw/caseLawFiltersContext';
 import { applyCaseLawFilters, isNarrowing, type CaseLawFilters } from '../search/caseLaw/caseLawFilter';
-import { yearCounts, type YearOrder } from '../search/caseLaw/caseLawYears';
+import { yearCounts, type YearCount, type YearOrder } from '../search/caseLaw/caseLawYears';
 import { failureOf, loadRassegne, useRassegneSummary } from './useRassegne';
 import { readArticleReference, type ArticleReference } from '../../../services/rassegneService';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
@@ -18,6 +18,7 @@ const UNAVAILABLE = 'Le rassegne non sono disponibili al momento.';
 const NOTICE = 'text-sm text-slate-500 dark:text-slate-400';
 /** The pause after the last key before the store is asked for the words typed. */
 const SEARCH_DELAY_MS = 350;
+const NO_YEARS: YearCount[] = [];
 
 const passi = (n: number): string => (n === 1 ? '1 passo' : `${n.toLocaleString('it-IT')} passi`);
 
@@ -44,6 +45,9 @@ interface YearProps {
   archivio?: Archivio;
   /** the words the store searched for: its passages already hold them */
   q?: string;
+  /** whether its decisions' years go to the section's chips: not for another article's passages,
+   *  whose years would count beside the article's own blocks */
+  report: boolean;
   anno: number;
   count: number;
   initial?: { items: RassegnePasso[]; next: string | null };
@@ -51,7 +55,7 @@ interface YearProps {
   backEntry?: ReadingBackEntry;
 }
 
-function YearSection({ urn, archivio, q, anno, count, initial, besideId, backEntry }: YearProps) {
+function YearSection({ urn, archivio, q, report, anno, count, initial, besideId, backEntry }: YearProps) {
   const [open, setOpen] = useState(Boolean(initial));
   const [items, setItems] = useState<RassegnePasso[]>(initial?.items ?? []);
   const [next, setNext] = useState<string | null>(initial?.next ?? null);
@@ -64,7 +68,7 @@ function YearSection({ urn, archivio, q, anno, count, initial, besideId, backEnt
     () => (q ? { ...sectionFilters, text: '' } : sectionFilters),
     [q, sectionFilters],
   );
-  const years = useMemo(() => yearCounts(items, yearsOfPassage), [items]);
+  const years = useMemo(() => (report ? yearCounts(items, yearsOfPassage) : NO_YEARS), [items, report]);
   useReportCaseLawYears(`rassegne-${archivio ?? 'tutte'}-${anno}`, years);
   const shown = useMemo(
     () => applyCaseLawFilters(items, { yearsOf: yearsOfPassage, textOf: textOfPassage }, filters),
@@ -332,6 +336,7 @@ function PanelBody({ view, urn, otherLabel, order, archivio, onArchivio, besideI
       {view.failed && <p className={cn('mb-2', NOTICE)}>{UNAVAILABLE}</p>}
       {[...data.anni].sort((a, b) => (order === 'desc' ? b.anno - a.anno : a.anno - b.anno)).map(({ anno, passi: count }) => (
         <YearSection key={`${urn}-${shownArchivio ?? ''}-${view.q ?? ''}-${anno}`} urn={urn} archivio={shownArchivio} q={view.q}
+          report={!otherLabel}
           anno={anno} count={count} besideId={besideId} backEntry={backEntry}
           initial={anno === data.anno ? { items: data.items, next: data.next_cursor } : undefined} />
       ))}

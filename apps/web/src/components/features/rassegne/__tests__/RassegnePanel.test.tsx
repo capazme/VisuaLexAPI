@@ -43,8 +43,10 @@ const SUMMARY: RassegneResponse = {
   anno: 2024, items: [passo('a', 2024)], next_cursor: '1',
 };
 
+const reportYears = vi.fn();
+
 function renderPanel(text = '') {
-  const filters = { filters: { ...NO_FILTERS, text }, reportYears: () => {} };
+  const filters = { filters: { ...NO_FILTERS, text }, reportYears };
   return render(
     <MemoryRouter>
       <CaseLawFiltersContext.Provider value={filters}><RassegnePanel articleUrn={URN} /></CaseLawFiltersContext.Provider>
@@ -62,6 +64,7 @@ describe('RassegnePanel', () => {
     clearRassegneCache();
     fetchRassegne.mockReset();
     readArticleReference.mockReset();
+    reportYears.mockReset();
   });
 
   it('renders nothing when no paragraph cites the article', async () => {
@@ -278,6 +281,31 @@ describe('RassegnePanel', () => {
     expect(screen.getByRole('button', { name: /Nelle rassegne della Cassazione/ })).toBeInTheDocument();
   });
 
+  it('asks the store once the words have stayed still, not at every key', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fetchRassegne.mockResolvedValue(SUMMARY);
+      const filtersOf = (text: string) => ({ filters: { ...NO_FILTERS, text }, reportYears });
+      const view = (text: string) => (
+        <MemoryRouter>
+          <CaseLawFiltersContext.Provider value={filtersOf(text)}><RassegnePanel articleUrn={URN} /></CaseLawFiltersContext.Provider>
+        </MemoryRouter>
+      );
+      const { rerender } = render(view(''));
+      await waitFor(() => expect(fetchRassegne).toHaveBeenCalledTimes(1));
+      rerender(view('dan'));
+      await act(async () => { vi.advanceTimersByTime(200); });
+      rerender(view('danno'));
+      await act(async () => { vi.advanceTimersByTime(200); });
+      expect(fetchRassegne).toHaveBeenCalledTimes(1); // still typing: nothing asked
+      await act(async () => { vi.advanceTimersByTime(200); });
+      await waitFor(() => expect(fetchRassegne).toHaveBeenCalledTimes(2));
+      expect(fetchRassegne).toHaveBeenLastCalledWith({ urn: URN, q: 'danno' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('asks nothing of the store for more than eight words, and says the filter is on the passages loaded', async () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel('uno due tre quattro cinque sei sette otto nove');
@@ -304,8 +332,10 @@ describe('RassegnePanel', () => {
   it('shows another article’s passages by its reference, and goes back', async () => {
     const OTHER = URN.replace('art2043', 'art1218');
     readArticleReference.mockResolvedValue({ esito: 'articolo', urn: OTHER, label: 'art. 1218 c.c.' });
+    const base = passo('o', 2020, 'Un passo sull\'inadempimento.');
+    const cites1999 = { ...base, pronunce: [{ ...base.pronunce[0], key: 'cassazione:civile:1:1999', numero: 1, anno: 1999 }] };
     fetchRassegne.mockImplementation(async (query: { urn: string }) => (query.urn === OTHER
-      ? { ...SUMMARY, urn: OTHER, total: 1, anni: [{ anno: 2020, passi: 1 }], anno: 2020, items: [passo('o', 2020, 'Un passo sull\'inadempimento.')], next_cursor: null }
+      ? { ...SUMMARY, urn: OTHER, total: 1, anni: [{ anno: 2020, passi: 1 }], anno: 2020, items: [cites1999], next_cursor: null }
       : SUMMARY));
     renderPanel();
     await openPanel();
@@ -315,6 +345,9 @@ describe('RassegnePanel', () => {
     expect(await screen.findByText('Un passo sull\'inadempimento.')).toBeInTheDocument();
     expect(screen.getByText('art. 1218 c.c.')).toBeInTheDocument();
     expect(fetchRassegne).toHaveBeenCalledWith({ urn: OTHER });
+    // another article's passages do not count in the section's year chips, which serve the article's blocks
+    const reported = reportYears.mock.calls.filter(([, counts]) => counts && counts.length > 0).map(([, counts]) => counts);
+    expect(reported.flat().some((c: { year: number }) => c.year === 1999)).toBe(false);
     // the form went away: the focus is on the way back, and comes back to the form
     expect(screen.getByRole('button', { name: 'Torna all’articolo' })).toHaveFocus();
     await userEvent.click(screen.getByRole('button', { name: 'Torna all’articolo' }));

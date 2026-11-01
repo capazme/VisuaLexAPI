@@ -6,6 +6,8 @@ describe('searchWords: the words the store searches for, read as the API reads t
     expect(searchWords('Danno, ingiusto: art. 2043 a')).toEqual({ kind: 'words', q: 'Danno ingiusto art 2043' });
     expect(searchWords('danno danno_x')).toEqual({ kind: 'words', q: 'danno' });
     expect(searchWords('responsabilità')).toEqual({ kind: 'words', q: 'responsabilità' });
+    // a character outside the basic plane is one, as the API counts it
+    expect(searchWords('\u{1D400}')).toEqual({ kind: 'none' });
   });
 
   it('is no search with no word of two characters', () => {

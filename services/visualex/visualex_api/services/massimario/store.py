@@ -2,7 +2,7 @@
 """The reviews' store: one SQLite file keyed by norm URN (design 2026-10-30-rassegne-without-merlt
 §3 (a)).
 
-The file name carries the schema version (`rassegne-v1.sqlite3`, in the API's data directory,
+The file name carries the schema version (`rassegne-v2.sqlite3`, in the API's data directory,
 which git ignores). Every build writes a temporary file beside it and puts it in place whole
 (`os.replace`), so a reader never sees half a store: a build of some volumes copies the other
 volumes' rows from the current store, `remove_volumes` copies all but the ones named, and a
@@ -77,9 +77,10 @@ CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
 );
 """
 # The index's rows, one per paragraph by its rowid: the text, and where it sits. `content=''` keeps
-# no copy of the text; `prefix='2'` makes the two-letter starts of words cheap (a query of eight
-# three-letter starts over the most cited act takes about 60 ms on the 63 volumes, and the index
-# adds about 64 MB to their 222; measured 31 October 2026). Accents are folded both ways.
+# no copy of the text; `prefix='2'` makes the two-letter starts of words cheap. Measured on the 63
+# volumes, 31 October 2026: the index adds about 73 MB to their 222; a search within a norm's
+# paragraphs takes a few ms, and about 220 ms for eight three-letter starts, the worst the limits
+# allow (`services/visualex/CLAUDE.md`). Accents are folded both ways.
 _INDEX = """
 INSERT INTO paragraphs_fts (rowid, testo, contesto)
 SELECT rowid, json_extract(record, '$.text'),
