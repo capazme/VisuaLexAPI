@@ -51,6 +51,8 @@ export interface ZipPackage {
   byName: Map<string, ZipEntry>;
   /** Where the central directory starts: no entry's data lies at or beyond it. */
   centralStart: number;
+  /** Where the end-of-central-directory record starts: the writer (L4) carries its comment over. */
+  endOffset: number;
 }
 
 function startsWithCfb(bytes: Uint8Array): boolean {
@@ -153,7 +155,7 @@ export function openZip(bytes: Uint8Array): ZipPackage {
     cursor += centralLength;
   }
 
-  return { bytes, entries, byName, centralStart };
+  return { bytes, entries, byName, centralStart, endOffset: end };
 }
 
 export function findEntry(pkg: ZipPackage, name: string): ZipEntry | undefined {

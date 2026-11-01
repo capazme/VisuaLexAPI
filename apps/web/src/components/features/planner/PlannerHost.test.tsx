@@ -43,7 +43,7 @@ describe('«c», the quick add from anywhere', () => {
     fireEvent.keyDown(window, { key: 'c' });
     const dialog = await screen.findByRole('dialog', { name: 'Nuovo compito' });
     expect(within(dialog).getByLabelText('Dossier')).toHaveValue('d1');
-    // The dialog gives the focus 50 ms after it opens (useDialogFocus): waited for, not raced.
+    // The dialog gives its first focus in a timeout (`useDialogFocus`): under load it lands after the dialog is found.
     await waitFor(() => expect(within(dialog).getByLabelText('Titolo')).toHaveFocus());
   });
 
