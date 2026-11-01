@@ -67,7 +67,7 @@ from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date,
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
-from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details
+from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
 from visualex_api.tools.sources import cite_act, cite_article
 from visualex_api.tools.act_identity import identifies_act
 from visualex_api.tools.norm_query import act_names, read_norm_query
@@ -776,7 +776,9 @@ class NormaController:
         address = NormAddress(
             norma=norma,
             is_eu=norma.tipo_atto.lower() in EU_ACT_TYPES,
-            date_complete=bool(norma.data and _ISO_DAY.match(norma.data)),
+            # The Costituzione has neither date nor number: its fixed URN is the whole address.
+            date_complete=bool(norma.data and _ISO_DAY.match(norma.data))
+            or (not norma.data and not act_number and has_fixed_urn_without_date(normalize_act_type(act_type))),
             date_unavailable=date_unavailable,
         )
         if strict and not address.is_eu and not address.date_complete:
