@@ -73,6 +73,14 @@ test('nothing else of the Python API is routed to it', () => {
   }
 });
 
+test('the links of «Analizza documento» go to the scrapers behind the login, by their own path', () => {
+  // /fetch_norm_links matches no other prefix (not /fetch_norma_data*): it needs its own entry
+  // on both sides (design 2026-10-31-document-hyperlinks §3.1).
+  assert.ok(caddyLegalTokens().includes('/fetch_norm_links*'));
+  assert.ok(vitePythonPaths().includes('/fetch_norm_links'));
+  assert.ok(!caddyLegalTokens().some((t) => t !== '/fetch_norm_links*' && '/fetch_norm_links'.startsWith(t.replace(/\*$/, ''))));
+});
+
 test('only /version and /health stay open, and each exactly', () => {
   assert.deepEqual([...caddyOpenPaths()].sort(), ['/health', '/version']);
   for (const token of caddyOpenPaths()) {

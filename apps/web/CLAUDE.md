@@ -294,8 +294,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
-  user chooses or drops on the box — read in the browser (`documentFile.ts`; an HTML ends each block with a line
-  break, so a paragraph is a line), never uploaded. The citations are found and read as the search reads them
+  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded; a DOCX through `docx/` (spec #391 L2): a ZIP reader with bounds (`zipPackage.ts`: at most 2,000
+  entries, a part 50 MB inflated, the parts read 120 MB together, a deflated part's declared ratio 200:1, the
+  inflating stream cut at the declared size; ZIP64, encrypted entries, duplicate names (without case), `..` or a
+  leading slash refused), a tokenizer that knows the five entities, refuses a `<!DOCTYPE` and a part nested past 512 levels, and gives
+  the one decoding (`decodeXmlText`) the map's offsets count in (`xmlTokens.ts`), and
+  `docxText.ts`, which reads what Word shows — never `w:delText`/`w:del`/`w:moveFrom`, a field's instruction,
+  `mc:Fallback`, a run hidden by `w:vanish` — with tabs, breaks (a page break too), `w:cr`, the hyphens and `w:sym`
+  as characters, then the footnotes and endnotes under «Note» in the order the body refers to them («1.», endnotes
+  «i.»; a mark of the author's own is the note's own text), a field's characters counted inside a revision too
+  (a field closed in a deletion still closes), the namespaces resolved on a stack (not the prefix), and a map from every character back to its part, its `w:t` and its offset (`locateChar`; L4 splices on
+  it). Same text as the old regular expressions on a DOCX without those defects (`legacyDocxText` in the tests).
+  It runs in a Web Worker (`docxReader.worker.ts`, handed the `File`; in the page where there is none, as in
+  jsdom, or if it fails before saying `ready`; once ready, a failure is the file's and is refused, never read again
+  in the page), stopped after 60 s; a CFB file, Strict Open XML and the bounds have their own words.
+  Headers and footers are not read. Fixtures: unpacked synthetic XML in `__tests__/docx/`, zipped by
+  `__tests__/docxZip.ts`. An HTML ends each block with a line break, so a paragraph is a line.
+  The citations are found and read as the search reads them
   (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts
   (`/fetch_alias_catalog`'s `act_names`, asked once when the page opens) and the user's aliases make the vocabulary;
   candidates are «article, then act», «act, then article», «act alone» (context only) and «bare article», each with
@@ -2917,9 +2932,11 @@ meant to stay split; add new features as new files, not inside the shells:
   dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` (the page), `DropZone.tsx` (the box), `DocumentRow.tsx`
   (the document's row and `SheetFlight`), `documentJob.ts`, `DocumentText.tsx`, `CitationList.tsx`,
-  `citationGroups.ts`, `documentFile.ts`, `documentCandidates.ts` (vocabulary, candidates, resolution, inheritance,
-  fallback: pure), `documentServer.ts` (the catalog and `/parse_query_batch`); invented sample files for the tests
-  in `__tests__/fixtures.ts`, the spec's corpus scored by `__tests__/documentCorpus.test.ts`.
+  `citationGroups.ts`, `documentFile.ts`, `docx/` (the DOCX reader: `zipPackage.ts`, `xmlTokens.ts`,
+  `docxText.ts`, `readDocxPackage.ts`, `docxWorkerClient.ts`, `docxReader.worker.ts`, `docxErrors.ts`),
+  `documentCandidates.ts` (vocabulary, candidates, resolution, inheritance, fallback: pure), `documentServer.ts` (the
+  catalog and `/parse_query_batch`); invented sample files for the tests in `__tests__/fixtures.ts` and
+  `__tests__/docx/`, the spec's corpus scored by `__tests__/documentCorpus.test.ts`.
 
 ## Gotchas
 
