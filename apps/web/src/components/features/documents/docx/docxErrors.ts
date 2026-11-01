@@ -16,7 +16,9 @@ export type DocxErrorCode =
   /** No `word/document.xml`. */
   | 'no_document'
   /** The reading did not end in time (the Worker is stopped). */
-  | 'timeout';
+  | 'timeout'
+  /** A copy cannot be written: the package is digitally signed, and a changed copy would lose the signature (L4). */
+  | 'signed';
 
 export class DocxError extends Error {
   readonly code: DocxErrorCode;
@@ -30,5 +32,5 @@ export class DocxError extends Error {
 
 export function isDocxErrorCode(value: unknown): value is DocxErrorCode {
   return typeof value === 'string'
-    && ['malformed', 'encrypted', 'strict', 'too_large', 'unsafe', 'no_document', 'timeout'].includes(value);
+    && ['malformed', 'encrypted', 'strict', 'too_large', 'unsafe', 'no_document', 'timeout', 'signed'].includes(value);
 }

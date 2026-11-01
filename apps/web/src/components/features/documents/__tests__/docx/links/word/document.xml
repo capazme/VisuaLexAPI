@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Invented text for the tests of the writer (spec #391 §10.2): one structure per paragraph. -->
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14">
+  <w:body>
+    <w:p w14:paraId="1A2B3C01" w:rsidR="00A1B2C3">
+      <w:r w:rsidRPr="00D4E5F6"><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Ai sensi dell'art. </w:t></w:r>
+      <w:proofErr w:type="spellStart"/>
+      <w:r w:rsidRPr="00D4E5F6"><w:rPr><w:b/><w:i/></w:rPr><w:t>2043</w:t></w:r>
+      <w:proofErr w:type="spellEnd"/>
+      <w:bookmarkStart w:id="0" w:name="_GoBack"/>
+      <w:bookmarkEnd w:id="0"/>
+      <w:r w:rsidRPr="00D4E5F6"><w:rPr><w:i/></w:rPr><w:t xml:space="preserve"> c.c. il danno va risarcito.</w:t></w:r>
+      <w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="1"/></w:r>
+    </w:p>
+    <w:p>
+      <w:r w:rsidR="00A1B2C3"><w:t>Visti gli artt. 1223 e 1225 c.c., e l'art. 18 l. 300/1970.</w:t></w:r>
+      <w:r><w:endnoteReference w:id="1"/></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Richiamato l'</w:t></w:r>
+      <w:r><w:rPr><w:rStyle w:val="Citazione"/><w:color w:val="C00000"/></w:rPr><w:t>art. 1453 c.c.</w:t></w:r>
+      <w:r><w:t xml:space="preserve"> e l'</w:t></w:r>
+      <w:r><w:rPr><w:rFonts w:ascii="Garamond" w:hAnsi="Garamond"/><w:b/><w:sz w:val="26"/><w14:ligatures w14:val="standard"/></w:rPr><w:t>art. 1455 c.c.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Cfr. l&#8217;art. 3 d.lgs. 23/2015 &amp; succ. mod.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Già collegato: </w:t></w:r>
+      <w:hyperlink r:id="rIdVlx1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Collegamentoipertestuale"/></w:rPr><w:t>art. 1 c.c.</w:t></w:r></w:hyperlink>
+      <w:r><w:t xml:space="preserve">; campo: </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText xml:space="preserve"> HYPERLINK "https://www.normattiva.it/" </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>art. 2 c.c.</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t xml:space="preserve">; rinvio: </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText xml:space="preserve"> REF _Ref1 \h </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>art. 3 c.c.</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t xml:space="preserve">; semplice: </w:t></w:r>
+      <w:fldSimple w:instr=" REF _Ref2 \h "><w:r><w:t>art. 4 c.c.</w:t></w:r></w:fldSimple>
+      <w:r><w:t>.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Revisione: </w:t></w:r>
+      <w:ins w:id="11" w:author="Autore di prova" w:date="2026-10-31T00:00:00Z"><w:r><w:t>art. 5 c.c.</w:t></w:r></w:ins>
+      <w:r><w:t xml:space="preserve">; formato: </w:t></w:r>
+      <w:r><w:rPr><w:b/><w:rPrChange w:id="12" w:author="Autore di prova" w:date="2026-10-31T00:00:00Z"><w:rPr/></w:rPrChange></w:rPr><w:t>art. 6 c.c.</w:t></w:r>
+      <w:r><w:t xml:space="preserve">; modulo: </w:t></w:r>
+      <w:sdt><w:sdtPr><w:id w:val="13"/></w:sdtPr><w:sdtContent><w:r><w:t>art. 8 c.c.</w:t></w:r></w:sdtContent></w:sdt>
+      <w:r><w:t xml:space="preserve">; commento: art. </w:t></w:r>
+      <w:commentRangeStart w:id="0"/>
+      <w:r><w:t>9 c.c.</w:t></w:r>
+      <w:commentRangeEnd w:id="0"/>
+      <w:r><w:commentReference w:id="0"/></w:r>
+      <w:r><w:t xml:space="preserve">; tabulazione: art.</w:t></w:r>
+      <w:r><w:tab/><w:t>10 c.c.</w:t></w:r>
+      <w:r><w:t xml:space="preserve">; etichetta: </w:t></w:r>
+      <w:smartTag w:uri="urn:esempio" w:element="norma"><w:r><w:t>art. 11 c.c.</w:t></w:r></w:smartTag>
+    </w:p>
+    <w:p>
+      <w:r>
+        <mc:AlternateContent>
+          <mc:Choice Requires="wps">
+            <w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="914400" cy="457200"/><wps:wsp><wps:txbx><w:txbxContent><w:p><w:r><w:t>art. 12 c.c.</w:t></w:r></w:p></w:txbxContent></wps:txbx></wps:wsp></wp:anchor></w:drawing>
+          </mc:Choice>
+          <mc:Fallback>
+            <w:pict><v:shape><v:textbox><w:txbxContent><w:p><w:r><w:t>art. 12 c.c.</w:t></w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict>
+          </mc:Fallback>
+        </mc:AlternateContent>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Trattino: art. 21</w:t></w:r>
+      <w:r><w:noBreakHyphen/><w:t xml:space="preserve">bis l. 241/1990 e </w:t></w:r>
+      <w:r><w:rPr><w:u w:val="double"/></w:rPr><w:t>art. 2 c.p.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Cancellato: art. 13</w:t></w:r>
+      <w:del w:id="21" w:author="Autore di prova" w:date="2026-10-31T00:00:00Z"><w:r><w:delText>0</w:delText></w:r></w:del>
+      <w:r><w:t xml:space="preserve"> c.c.; spostato: </w:t></w:r>
+      <w:moveTo w:id="22" w:author="Autore di prova" w:date="2026-10-31T00:00:00Z"><w:r><w:t>art. 14 c.c.</w:t></w:r></w:moveTo>
+      <w:r><w:t xml:space="preserve">; nascosto: art. 1</w:t></w:r>
+      <w:r><w:rPr><w:vanish/></w:rPr><w:t>9</w:t></w:r>
+      <w:r><w:t xml:space="preserve">5 c.c.</w:t></w:r>
+    </w:p>
+    <w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>
+  </w:body>
+</w:document>

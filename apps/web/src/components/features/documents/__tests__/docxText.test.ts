@@ -302,10 +302,11 @@ describe('tokenize', () => {
 });
 
 describe('the fixtures are clean (the repository is public, spec #391 §10.2)', () => {
-  const files = import.meta.glob('./docx/**/*', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+  const files = import.meta.glob(['./docx/**/*', './docx/**/.rels'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
   it('carry no path, no e-mail address and no author but the neutral one', () => {
     expect(Object.keys(files).length).toBeGreaterThan(0);
+    expect(Object.keys(files).some(path => path.endsWith('/_rels/.rels'))).toBe(true);
     for (const [path, content] of Object.entries(files)) {
       expect(content, path).not.toMatch(/\/Users\/|\/home\/|[A-Za-z]:\\|\\\\/);
       expect(content, path).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
