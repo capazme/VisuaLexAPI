@@ -10,7 +10,7 @@ vi.mock('../../../../utils/decisionFetchCache', () => ({
 }));
 
 const PRONUNCIA: RassegnaPronuncia = {
-  key: 'cassazione:civile:1234:2024', label: 'Sez. U, n. 1234/2024', corte: 'cassazione',
+  key: 'cassazione:civile:1234:2024', corte: 'cassazione',
   archivio: 'civile', numero: 1234, anno: 2024, sezione: 'U', rv: [],
 };
 const BACK = { tabId: 't1', blockId: 'b1', articleId: 'a1', label: 'art. 2043 c.c.' };
