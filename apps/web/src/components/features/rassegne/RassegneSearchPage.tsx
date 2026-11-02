@@ -26,7 +26,8 @@ type Archivio = 'civile' | 'penale';
 type View =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'ready'; search: RememberedSearch; more: 'idle' | 'loading' | 'failed' }
+  /** `refreshing`: another archive is being asked; the list stays, so the focus stays on the filter */
+  | { kind: 'ready'; search: RememberedSearch; more: 'idle' | 'loading' | 'failed'; refreshing?: boolean }
   | { kind: 'no_store' }
   | { kind: 'error'; busy: boolean };
 
@@ -80,10 +81,15 @@ export function RassegneSearchPage() {
     focusIndex.current = null;
   }, [view]);
 
-  const run = useCallback((asked: { text: string; q: string; archivio: Archivio | null }) => {
+  const run = useCallback((asked: { text: string; q: string; archivio: Archivio | null }, keepList = false) => {
     const id = ++request.current;
     pending.current = asked;
-    setView((prev) => (prev.kind === 'error' ? { kind: 'error', busy: true } : { kind: 'loading' }));
+    setView((prev) => {
+      if (keepList && prev.kind === 'ready') {
+        return { kind: 'ready', search: { ...prev.search, archivio: asked.archivio }, more: 'idle', refreshing: true };
+      }
+      return prev.kind === 'error' ? { kind: 'error', busy: true } : { kind: 'loading' };
+    });
     searchRassegne({ q: asked.q, ...(asked.archivio ? { archivio: asked.archivio } : {}) }).then(
       (data) => {
         if (id !== request.current) return;
@@ -113,7 +119,7 @@ export function RassegneSearchPage() {
     const wrong = fieldProblem(text);
     setProblem(wrong);
     if (words.kind !== 'words') {
-      if (!wrong) fieldRef.current?.focus();
+      fieldRef.current?.focus();
       return;
     }
     const archivio = view.kind === 'ready' && view.search.q === words.q ? view.search.archivio : null;
@@ -122,11 +128,11 @@ export function RassegneSearchPage() {
 
   const chooseArchive = (archivio: Archivio | null) => {
     if (view.kind !== 'ready' || view.search.archivio === archivio) return;
-    run({ text: view.search.text, q: view.search.q, archivio });
+    run({ text: view.search.text, q: view.search.q, archivio }, true);
   };
 
   const loadMore = () => {
-    if (view.kind !== 'ready' || !view.search.next || view.more === 'loading') return;
+    if (view.kind !== 'ready' || !view.search.next || view.more === 'loading' || view.refreshing) return;
     const { search } = view;
     const id = request.current;
     setView({ kind: 'ready', search, more: 'loading' });
@@ -191,7 +197,7 @@ export function RassegneSearchPage() {
               Cerca
             </Button>
           </div>
-          {problem && <p id={problemId} className="text-xs text-red-600 dark:text-red-400">{problem}</p>}
+          {problem && <p id={problemId} role="alert" className="text-xs text-red-600 dark:text-red-400">{problem}</p>}
         </form>
 
         <div aria-live="polite" className="flex flex-col gap-3 empty:hidden">
@@ -211,12 +217,14 @@ export function RassegneSearchPage() {
           )}
           {ready && ready.total === 0 && <p className={NOTICE}>Nessun passo contiene tutte queste parole.</p>}
           {ready && ready.total > 0 && (
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{passi(ready.total)}</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {view.kind === 'ready' && view.refreshing ? 'Aggiorno…' : passi(ready.total)}
+            </p>
           )}
         </div>
 
         {ready && showArchives && (
-          <div role="radiogroup" aria-label="Archivio" className="flex flex-wrap gap-2">
+          <div role="group" aria-label="Archivio" aria-busy={view.kind === 'ready' && view.refreshing ? true : undefined} className="flex flex-wrap gap-2">
             {ARCHIVES.map(({ value, label }) => {
               const checked = ready.archivio === value;
               const count = value ? counts.get(value) ?? 0 : allCount;
@@ -224,8 +232,7 @@ export function RassegneSearchPage() {
                 <button
                   key={label}
                   type="button"
-                  role="radio"
-                  aria-checked={checked}
+                  aria-pressed={checked}
                   onClick={() => chooseArchive(value)}
                   className={cn(
                     'rounded-full px-3 py-1 text-sm ring-1 ring-inset',
@@ -244,7 +251,7 @@ export function RassegneSearchPage() {
         )}
 
         {ready && ready.items.length > 0 && (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          <ul className={cn('divide-y divide-slate-100 dark:divide-slate-800', view.kind === 'ready' && view.refreshing && 'opacity-60')}>
             {ready.items.map((passo, i) => (
               <RassegnaResult
                 key={passo.id}

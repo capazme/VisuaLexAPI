@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { excerptStart, findWords } from '../searchExcerpt';
+import { anchorWord, excerptStart, findWords } from '../searchExcerpt';
 
 const marked = (text: string, q: string) => findWords(text, q).map((s) => text.slice(s.start, s.end));
 
@@ -43,5 +43,13 @@ describe('excerptStart', () => {
     expect(start).toBeGreaterThan(0);
     expect(spans[0].start - start).toBeGreaterThanOrEqual(70);
     expect(text[start - 1]).toBe(' ');
+  });
+});
+
+describe('anchorWord', () => {
+  it('is the longest word searched, the first on a tie', () => {
+    expect(anchorWord('di chance perdita')).toBe('perdita');
+    expect(anchorWord('di la')).toBe('di');
+    expect(anchorWord('')).toBe('');
   });
 });

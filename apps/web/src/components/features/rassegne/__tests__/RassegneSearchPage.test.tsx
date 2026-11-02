@@ -118,8 +118,9 @@ describe('RassegneSearchPage', () => {
   it('refuses words past the limits without asking, and says why', async () => {
     render(<RassegneSearchPage />);
     await search('uno due tre quattro cinque sei sette otto nove');
-    expect(screen.getByText('Al massimo 8 parole e 200 caratteri.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Al massimo 8 parole e 200 caratteri.');
     expect(screen.getByRole('searchbox')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('searchbox')).toHaveFocus();
     await search('a b');
     expect(screen.getByText('Scrivi parole di almeno due lettere o cifre.')).toBeInTheDocument();
     expect(searchRassegne).not.toHaveBeenCalled();
@@ -156,8 +157,8 @@ describe('RassegneSearchPage', () => {
     render(<RassegneSearchPage />);
     const user = await search('danno');
     expect(await screen.findByText('4 passi')).toBeInTheDocument();
-    const group = screen.getByRole('radiogroup', { name: 'Archivio' });
-    expect(within(group).getByRole('radio', { name: 'Tutti 4' })).toHaveAttribute('aria-checked', 'true');
+    const group = screen.getByRole('group', { name: 'Archivio' });
+    expect(within(group).getByRole('button', { name: 'Tutti 4' })).toHaveAttribute('aria-pressed', 'true');
 
     searchRassegne.mockResolvedValueOnce(answer([passo('c3', 2022, 'Altro danno.')]));
     await user.click(screen.getByRole('button', { name: 'Altri passi' }));
@@ -166,11 +167,20 @@ describe('RassegneSearchPage', () => {
     expect(screen.getAllByRole('listitem')[2]).toHaveFocus();
     expect(screen.queryByRole('button', { name: 'Altri passi' })).toBeNull();
 
-    searchRassegne.mockResolvedValueOnce(answer([penale], { total: 1, archivi }));
-    await user.click(within(group).getByRole('radio', { name: 'Penale 1' }));
+    // another archive keeps the list and the filter while it loads: the focus stays where it was
+    let answerPenale: (value: RassegneSearchResponse) => void = () => {};
+    searchRassegne.mockReturnValueOnce(new Promise<RassegneSearchResponse>((resolve) => { answerPenale = resolve; }));
+    const penaleButton = within(group).getByRole('button', { name: 'Penale 1' });
+    await user.click(penaleButton);
     expect(searchRassegne).toHaveBeenLastCalledWith({ q: 'danno', archivio: 'penale' });
+    expect(screen.getByText('Aggiorno…')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(penaleButton).toHaveFocus();
+    expect(penaleButton).toHaveAttribute('aria-pressed', 'true');
+    answerPenale(answer([penale], { total: 1, archivi }));
     expect(await screen.findByText('1 passo')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Penale 1' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(penaleButton).toHaveFocus();
   });
 
   it('finds the last search as it was on the way back from an article, and forgets it at logout', async () => {

@@ -1061,11 +1061,14 @@ in whitespace, so those older highlights show again.
 article, `POST /search_rassegne` through `legalFetch` (`searchRassegne`). A form (`role="search"`, the field focused on
 arrival) that asks only on submit — a corpus-wide query is not a keystroke's work — with the panel's limits read in the
 browser (`searchWords`: a query past them is not sent, and the line under the field says why). The passages come newest
-review first, «N passi» and the states in a polite live region; «Tutti / Civile / Penale» with their counts (a
-`radiogroup`) when both archives have matches; «Altri passi» appends the next page and hands the focus to the first
-passage it brought. A passage (`RassegnaResult`, an `<li>`): the panel's provenance and authors, the text opened on the
+review first, «N passi» and the states in a polite live region; «Tutti / Civile / Penale» with their counts (buttons
+with `aria-pressed` in a `group`, one Tab each) when both archives have matches — another archive keeps the list on screen
+(«Aggiorno…», `refreshing`) until it answers, so the focus stays on the button pressed; «Altri passi» appends the next
+page and hands the focus to the first passage it brought; a query refused in the browser is said in a `role="alert"`
+line and the field takes the focus. A passage (`RassegnaResult`, an `<li>`): the panel's provenance and authors, the text opened on the
 lines around the first word found (`searchExcerpt.ts`: `findWords` folds case and accents as the index does, a word's
-start only, the whole word marked in `<mark>` text nodes; `excerptStart` a word boundary about a line before it), cut at
+start only, the whole word marked in `<mark>` text nodes; `excerptStart` a word boundary about a line before the longest
+word searched, `anchorWord`, when it is past 80 characters — under four lines of a phone), cut at
 four lines with «Leggi tutto il passo» / «Mostra meno» (`aria-expanded`), «Articoli citati» as buttons labelled by the
 source convention (`articleLink`: `shortNorm(normFromUrn)`, the passage's own words when the URN names no act; opened
 with `searchParamsFromAnchor` — not `normRefToSearchParams`, which reads a code's article as «1» and «10bis» as «10b» —,

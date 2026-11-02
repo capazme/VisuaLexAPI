@@ -64,14 +64,23 @@ export function findWords(text: string, words: string): Span[] {
   return merged;
 }
 
-/** A first word found further in than this opens the passage a little before it. */
-const LEAD = 160;
+/**
+ * The word the excerpt opens on: the longest searched (the likeliest to say what was looked for —
+ * «chance» rather than «di»), the first of them on a tie.
+ */
+export function anchorWord(words: string): string {
+  return words.split(/\s+/).filter(Boolean).reduce((best, w) => ([...w].length > [...best].length ? w : best), '');
+}
+
+/** A first word found further in than this opens the passage a little before it: under four lines of a phone. */
+const LEAD = 80;
 /** How much comes before that word: about a line. */
 const BEFORE = 70;
 
 /**
  * Where the excerpt starts: 0 when the first word found is near the beginning (or none is, the
- * word being in where the passage sits); else at a word boundary about a line before it.
+ * word being in where the passage sits); else at a word boundary about a line before it. The
+ * caller passes the spans of the word it opens on (`anchorWord`).
  */
 export function excerptStart(text: string, spans: Span[]): number {
   const first = spans[0];

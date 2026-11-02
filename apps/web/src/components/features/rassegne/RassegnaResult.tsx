@@ -4,7 +4,7 @@ import { FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interact
 import type { SearchParams } from '../../../types';
 import { articleLink } from './articleLink';
 import { provenance } from './rassegnaFilters';
-import { excerptStart, findWords, type Span } from './searchExcerpt';
+import { anchorWord, excerptStart, findWords, type Span } from './searchExcerpt';
 import type { RassegnaRisultato } from './types';
 
 /** A passage longer than this (from where the excerpt starts) may be cut at its four lines. */
@@ -52,7 +52,11 @@ export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function Rassegna
   const textId = useId();
   const [whole, setWhole] = useState(false);
   const spans = useMemo(() => findWords(passo.testo, q), [passo.testo, q]);
-  const start = useMemo(() => excerptStart(passo.testo, spans), [passo.testo, spans]);
+  // opened on the longest word searched, else on the first word found
+  const start = useMemo(() => {
+    const anchor = findWords(passo.testo, anchorWord(q));
+    return excerptStart(passo.testo, anchor.length > 0 ? anchor : spans);
+  }, [passo.testo, q, spans]);
   const articles = useMemo(() => passo.articoli.map(articleLink), [passo.articoli]);
   const cut = start > 0 || passo.testo.length > LONG;
 

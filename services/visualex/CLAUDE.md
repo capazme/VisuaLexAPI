@@ -799,7 +799,13 @@ no panel, and a deploy never waits on the portal.
   text), `prefix='2'`, `unicode61 remove_diacritics 2`; rebuilt whole at the end of every build from
   the paragraphs the new file holds (about 3 s for the corpus). Measured on the 63 volumes, a search
   within a norm's paragraphs: one or two words a few ms; a two-letter word ~20–40 ms; eight
-  three-letter starts ~220 ms (the worst the limits allow). FTS5 and the JSON functions are in the
+  three-letter starts ~220 ms (the worst the limits allow).
+  The search in every volume (`store.search`, `/search_rassegne`; 2 November 2026, the 63 volumes, on a
+  development Mac under heavy load, load average ~35, medians): a rare word under 1 ms; «usucapione»,
+  «danno ingiusto», «responsabilità medica» 2–6 ms; «danno» (7,250 passages) ~15 ms; «di» (96,386) ~80 ms;
+  eight three-letter starts, the worst the limits allow, ~150 ms (single runs up to about 1 s while the
+  machine was busiest). One statement reads the index once for the counts and the page (`MATERIALIZED`);
+  a deep page (offset 2,000) costs the same. FTS5 and the JSON functions are in the
   production image's SQLite (`python:3.12-slim-bookworm`, 3.40.1) and in macOS's.
 - **Backups.** Not in `scripts/datakit`: the store is derived, and deleting it costs one rebuild.
 - **Schema changes.** The API refuses a store whose schema version it does not know (503, never a
