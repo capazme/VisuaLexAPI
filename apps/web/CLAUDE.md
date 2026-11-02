@@ -294,8 +294,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
-  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded, no
-  request at all; a DOCX through `docx/` (spec #391 L2): a ZIP reader with bounds (`zipPackage.ts`: at most 2,000
+  user chooses or drops on the box, or pastes in «Oppure incolla il testo» (`PasteBox`, plain text, two million
+  characters at most, read as a TXT file, titled «Testo incollato») — read in the browser (`documentFile.ts`), never
+  uploaded; a DOCX through `docx/` (spec #391 L2): a ZIP reader with bounds (`zipPackage.ts`: at most 2,000
   entries, a part 50 MB inflated, the parts read 120 MB together, a deflated part's declared ratio 200:1, the
   inflating stream cut at the declared size; ZIP64, encrypted entries, duplicate names (without case), `..` or a
   leading slash refused), a tokenizer that knows the five entities, refuses a `<!DOCTYPE` and a part nested past 512 levels, and gives
@@ -310,8 +311,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   jsdom, or if it fails before saying `ready`; once ready, a failure is the file's and is refused, never read again
   in the page), stopped after 60 s; a CFB file, Strict Open XML and the bounds have their own words.
   Headers and footers are not read. Fixtures: unpacked synthetic XML in `__tests__/docx/` (`.rels` named in the
-  glob on its own: it skips dot names), zipped by `__tests__/docxZip.ts` — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. **The writer** (spec #391 L4, no screen
-  yet: L5 wires it) is `writeDocxLinks` (`writeDocxPackage.ts`), in its own Worker (`docxWriterClient.ts`,
+  glob on its own: it skips dot names), zipped by `__tests__/docxZip.ts`. An HTML ends each block with a line break, so a paragraph is a line. **The writer** (spec #391 L4; «Scarica una copia con i link», L5) is `writeDocxLinks` (`writeDocxPackage.ts`), in its own Worker (`docxWriterClient.ts`,
   `docxWriter.worker.ts`, the same rules as the reader's, 60 s): it takes the file, the citations as `[start, end)`
   of the reading's text with their address, and the text they count in (`expectedText`: a file that reads otherwise
   is refused), and returns a new package and one outcome per citation (linked, with its part and relationship id,
@@ -335,7 +335,67 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `CompressionStream`, keeps a part's encoding (UTF-16, a BOM) and the end record's comment, and refuses entries that share their bytes. The tests
   (`docxWriter.test.ts`) prove §10.2's round trip on `__tests__/docx/links/` and its variants and on a package
   saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `tools/e2e/docx-roundtrip/run.mjs` opens
-  the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR. The
+  the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR.
+  The citations are found and read as the search reads them
+  (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts
+  (`/fetch_alias_catalog`'s `act_names`, asked once when the page opens) and the user's aliases make the vocabulary;
+  candidates are «article, then act», «act, then article», «act alone» (context only) and «bare article», each with
+  the query string a lawyer would type (the clause never in it); each distinct string is read by the client parser
+  (`readNormQuery`), and what it cannot settle goes to `/parse_query_batch` in chunks of 200 strings / 48 KB, one
+  after the other (`documentServer.ts`, `legalFetch`, 8 s each). **What leaves the browser** — the page is not «no request at
+  all», and its words say so (#376 §6.4, G-401: «Il documento resta sul tuo computer: a VisuaLex arrivano solo le
+  citazioni trovate, come in una ricerca»): the names of the acts come in; those query strings go out, and the act
+  typed in the picker, alone; on «Prepara i link» only, the norms to link as readings (`/fetch_norm_links`) — never
+  the text, a passage, the place of a citation, the file's name, how a row was found. With «Riconosci solo nel
+  browser» on (`LocalSwitch`, off by default, for the page's life) nothing about the document leaves: the client's own
+  names and parser, the matcher inside the candidates as in the fallback but not called «degraded» (`localOnly`,
+  `analysis.local`), the picker reads in the browser, the links are off and the panel offers «Riconosci con VisuaLex
+  questo documento» (a new reading of the same text, the choices kept). A bare article inherits an act only when its
+  words tie it to one named before (G-402): «del medesimo decreto», «della stessa legge», «Reg. cit.», «ivi» take the
+  last act read of the kind they name, «dello stesso art. 18», «art. 18 cit.» the last cited with that article; with
+  no such words, or when the words could mean two acts, it is to complete, even right after an act; a candidate the
+  page cannot read, and a bare article followed by something else («del contratto»), end what may be referred to. When the catalog
+  or a chunk does not answer, today's matcher keeps its matches inside the unanswered candidates, the client's own
+  names make the vocabulary, and a line above the list says so with «Riprova» (asks only for what is still
+  unanswered). **Completion by hand** (#376 §5, PR 3; `documentReview.ts`, pure): the user's choices live in the page's memory,
+  keyed by the row's span (`rowKey`, so «Riprova» keeps them), never sent or stored; the browser asks before a reload
+  while there are any (`beforeunload`, Q4). `reviewRows` lays them over the analysis: «Da completare» first (its
+  count the page's one amber badge), each row with the passage, «seguito da «del contratto»», «Completa» and «Non è
+  una norma» in its menu; the act groups, an inherited row «dal contesto: …», one chosen «scelto da te» («applicato a
+  più citazioni» in bulk), with «Cambia atto» and «Torna da completare» (or «Rimetti l'atto di prima» for a row the
+  page had read); «Non sono norme (N)» collapsed at the end with «Ripristina». In the text a resolved or chosen row is
+  underlined solid, an inherited one dashed, one to complete dotted in ink (`TextMark.kind`); a dismissed one is not
+  marked. **The picker** (`CompletionPicker`): the sentence around the citation (`pickerPassage`, 240 characters each
+  side within the line); a combobox that reads the act alone as the search does (`readNormQuery`, then
+  `/parse_query_batch` with that one string after 250 ms, never with the article; client only when local or silent,
+  said under the field); «Atti citati in questo documento» (`documentActs`: own words and acts named alone, the
+  nearest above first, never an inherited one), then the palette's acts that identify themselves; arrows, Enter picks,
+  then «Dove lo applico?» — «Solo a questa citazione», «Anche alle altre N …» (same article, written alike; the
+  default when there are any), «A tutte le N da completare» — and a second Enter applies. The row in the picker is
+  chosen «for itself», the others «in bulk» (they wait for «Conferma» before a link, #391 Q8). «Atto applicato a N
+  citazioni» with «Annulla» for 8 s (`showUndoToast`). A dialog anchored to the row from `lg`, a `Sheet` below it; the
+  focus goes to the row in its new place. `documentCorpus.test.ts` runs the spec's invented corpus with
+  the server's answers recorded (`__tests__/corpus/server.json`, `record_server.py`), prints §3.2's table and fails
+  below 92 found (98 before G-402, which left 6 of the 7 inherited rows to complete) or on any wrong one. **The links** (spec `2026-10-31-document-hyperlinks` L3; drawn by L5 in `LinksPanel`: «Prepara i link» with the
+  line on what it sends, the summary «N citazioni avranno il link · M no: vedi perché» by reason, each row a button,
+  «N citazioni non avranno il link finché non le confermi» with «Rivedile» (the list filtered) and «Conferma tutte»,
+  «Conferma» and «Senza link» on the rows, «Copia con i link», «Scarica una copia con i link» for a DOCX with «Il file
+  originale non viene modificato.», «Riprova» / «Prepara i link mancanti» — a choice made after asks nothing until
+  pressed —, the Word paste line and the PDF line (export, not print), and after a download «Copia scaricata: N link
+  inseriti» with every citation left out and why, the page's reasons and the writer's) are `documentLinks.ts` (pure): a row read from its own words or chosen for itself is linked once
+  `/fetch_norm_links` gives its address; an inherited row or one completed in bulk only once confirmed (Q8); a row
+  left out or to complete never; a range or «e ss.» to its first article (Q7); an address that fails
+  `sourceAddress` is dropped. `linkSpan` cuts a link to the head and the act (no «l'», no trailing comma, never
+  across a line); `documentLinks` gives the `{start, end, href}` the DOCX writer (L4) takes; `buildLinkedPaste`
+  writes the paste — one `<p>` a line, every character escaped, `<a href>` only, and the plain text with the
+  address in brackets — and `copyLinkedPaste` puts both in the clipboard in one write (items as promises, the plain
+  text alone when refused). `prepareLinks` is «Prepara i link» and «Riprova»: it asks only for the distinct norms not
+  answered yet, or answered «source silent». `documentLinkServer.ts` asks `/fetch_norm_links` in chunks of 200
+  norms / 30 acts / 48 KB, one after another, 25 s each, no `pin_day` (the server dates the link to today, G-395);
+  what it sends is the norms' readings, never the text. `documentLinksCorpus.test.ts` replays the route's answers
+  recorded on the spec's corpus (`__tests__/corpus/links.json`, `record_links.py`, which asks a running API) and
+  fails on any link whose act or article differs from the corpus's mark. Each citation opens the reader through
+  `navigate('/')` + `triggerSearch`, gotcha 15. The
   document is drawn as it is (`DocumentText`: every character once and in order, the citations only
   wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
@@ -358,7 +418,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   amber, Markdown and TXT slate), the name cut with an ellipsis, the size, «Leggo il documento…» then «Cerco le
   citazioni…» (the search after a frame, so the words are on screen) over a bar that slides — no percentage it
   does not know —, the check for 450 ms, then the text; a refusal turns it red, shakes it once (`vlx-shake`, 300 ms)
-  with its reason, and ✕ slides it away. «Il file resta nel tuo browser» is in the box in every state; a phone
+  with its reason, and ✕ slides it away. «Il documento resta sul tuo computer» is in the box in every state; a phone
   says «Tocca per scegliere un documento». A polite live region says «Documento in lettura» (the search for citations is too short
   to say), «Pronto», the refusal, then the count. Several files let go at once: the first is read, and its row says
   «Letto il primo dei N file: uno alla volta». Under reduced motion the dashes stand, the sheets change place without
@@ -2379,6 +2439,14 @@ Duplicating any of these is a defect, not a shortcut.
   `caseLawYears.ts` (a row's years, the counts, the range, the order — pure), `caseLawFilter.ts` (the text
   filter, folded as the find window folds: `findMatches`), `authorityColor`, `caseLawFiltersContext`. A new
   source of case law draws `CaseLawRow` and reads `useCaseLawFilters`, it does not bring its own filter.
+- `utils/normQuery.ts` — the search's reading of a norm, shared by `useSearchQuery` and «Analizza documento»:
+  `readNormQuery(query, customAliases)` (the client parser, whether the reading is searchable, the words to ask
+  the server), `citationFromServer` (an answer of `/parse_query` or `/parse_query_batch` in the client's shape),
+  `preferredReading` (the client wins when searchable). `utils/sources/numberedActTypes.ts` — the web's copy of
+  `conventions/sources/numbered-act-types.json` (its test compares the two) and `identifiesAct`: `isSearchReady`,
+  the palette's «needs a number and a date» and the parser's own list all read it; the d.m. and the DPCM with no
+  number name no act, and the types compare with their case folded (gotcha 28). `ACT_TYPES_REQUIRING_DETAILS`
+  is gone.
 - `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.
@@ -2969,8 +3037,11 @@ meant to stay split; add new features as new files, not inside the shells:
   `citationGroups.ts`, `documentFile.ts`, `docx/` (the DOCX reader: `zipPackage.ts`, `xmlTokens.ts`,
   `docxText.ts`, `readDocxPackage.ts`, `docxWorkerClient.ts`, `docxReader.worker.ts`, `docxErrors.ts`; the writer:
   `writeDocxPackage.ts`, `docxRuns.ts`, `docxSplice.ts`, `zipWriter.ts`, `docxWriterClient.ts`,
-  `docxWriter.worker.ts`); invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
-  `__tests__/docx-saved/`.
+  `docxWriter.worker.ts`), `documentCandidates.ts` (vocabulary, candidates, resolution, inheritance, fallback: pure),
+  `documentServer.ts` (the catalog and `/parse_query_batch`), `documentLinks.ts` and `documentLinkServer.ts` (the
+  links: which rows, their addresses, the paste), `documentReview.ts` (the user's choices, pure), `CompletionPicker.tsx`,
+  `LinksPanel.tsx`, `PasteBox.tsx`; invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
+  `__tests__/docx-saved/`; the spec's corpus scored by `__tests__/documentCorpus.test.ts`.
 
 ## Gotchas
 
