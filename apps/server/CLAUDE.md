@@ -972,11 +972,20 @@ schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 
 ## Tests
 
-Only through `npm test`: its setup runs `prisma migrate reset` and refuses a
-database whose name lacks "test". The per-test `TRUNCATE … users CASCADE` also empties
-`lingo_testi_versioni` (it references `users`), so the setup reads the versions the migrations
-wrote once and puts them back after each truncation: every test starts with version 1 of each
-text to accept, as a fresh database has. The suite's environment is `.env.test` and the setup's own
+Only through `npm test`: the setup refuses a database whose name lacks "test". The database is
+reset once per run (`tests/globalSetup.ts`, vitest's `globalSetup`: `prisma migrate reset`), and
+before every test `tests/setup.ts` empties every table of `public` but `_prisma_migrations` and
+puts back the text versions the migrations insert (`lingo_testi_versioni`, read once right after
+the reset): every test starts from empty tables plus version 1 of each text to accept, as a fresh
+database has. The seeded `lingo_impostazioni` rows are not put back: a missing row reads as the
+default, as it always has in the suite. The tables come from the catalog, so a new table is
+emptied with no change to the setup; one statement deletes them, each table after those that
+reference it (`tests/testDatabase.ts` `deletionOrder`; the two cycles among the keys, a dossier
+and its Forum copy, a glossa and its accepted reply, are broken at a `SET NULL` key). A `TRUNCATE`
+cost about 200 ms a test, the DELETEs a few. No table has a sequence or an identity column and
+the migrations create no trigger, so a `TRUNCATE` reset nothing the DELETEs leave behind. A test
+that changes the schema (a `CHECK` added for a moment) undoes it in a `finally`: the next files
+no longer start from a fresh database. The suite's environment is `.env.test` and the setup's own
 values, never a development `.env`: `dotenv` is mocked in the setup (so `src/config.ts` reads
 nothing); `@prisma/client` is wrapped there too, because Prisma loads `apps/server/.env` (when the
 client was generated in a checkout that has one) at the import and again at every construction,
