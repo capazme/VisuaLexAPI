@@ -33,7 +33,7 @@ jobs:
   # on main and develop requires by name: that job waits for the four above and
   # passes only when every one of them passed.
   web-tests:
-    name: Web tests (${{ matrix.shard }}/3)
+    name: Web tests (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     strategy:
       # Every shard runs to the end, so one shard's failure does not hide another's.
@@ -54,7 +54,7 @@ jobs:
       - run: npm ci
       # Vitest sorts the test files by a hash of their path and gives each shard
       # one slice of that list: every file runs once, in exactly one shard.
-      - run: npm run test -- --run --shard=${{ matrix.shard }}/3
+      - run: npm run test -- --run --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
   web-build:
     name: Web build and lint
@@ -81,14 +81,25 @@ jobs:
     # skipped check would count as passed.
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
     steps:
-      # The matrix's result is success only when all three shards succeeded.
+      # needs.web-tests.result folds the shards into one result, and GitHub has
+      # been seen to report success for a shard cancelled before any runner took
+      # it. So the run's own list of jobs is asked too: the four jobs above must
+      # all be there, each a success. A job renamed or added there turns this red
+      # until the count here follows.
       - name: Every web job passed
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null
+          jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
+            --jq '[.jobs[] | select((.name | startswith("Web tests (")) or .name == "Web build and lint") | {name, conclusion}]')
+          echo "$jobs" | jq -r '.[] | "\(.name): \(.conclusion)"'
+          echo "$jobs" | jq -e 'length == 4 and all(.[]; .conclusion == "success")' > /dev/null
         env:
           NEEDS: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
 
   mcp:
     name: MCP server build and test
