@@ -460,7 +460,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a link to `/` that puts the cursor on the search page's field, `focusSearchField({ focus: true })`, with no
   window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
   carries ⌘K, the palette; the quick norms' dot sits under it;
-  `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
+  `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
   Gymnasium in two groups (Gymnasium spec §4), «Studia»
@@ -1055,6 +1055,25 @@ from `getSelectionAnchor` (`utils/selectionOffset.ts`), which reads
 per line or comma boundary, which made every cross-comma highlight unmatched.
 The renderer also accepts, at the same offset, a stored text that differs only
 in whitespace, so those older highlights show again.
+
+**«Rassegne»** (`/rassegne`, `components/features/rassegne/RassegneSearchPage`, a Corpus page; spec
+`2026-11-01-rassegne-search-page`, G-404): words searched in every review of the Massimario without starting from an
+article, `POST /search_rassegne` through `legalFetch` (`searchRassegne`). A form (`role="search"`, the field focused on
+arrival) that asks only on submit — a corpus-wide query is not a keystroke's work — with the panel's limits read in the
+browser (`searchWords`: a query past them is not sent, and the line under the field says why). The passages come newest
+review first, «N passi» and the states in a polite live region; «Tutti / Civile / Penale» with their counts (a
+`radiogroup`) when both archives have matches; «Altri passi» appends the next page and hands the focus to the first
+passage it brought. A passage (`RassegnaResult`, an `<li>`): the panel's provenance and authors, the text opened on the
+lines around the first word found (`searchExcerpt.ts`: `findWords` folds case and accents as the index does, a word's
+start only, the whole word marked in `<mark>` text nodes; `excerptStart` a word boundary about a line before it), cut at
+four lines with «Leggi tutto il passo» / «Mostra meno» (`aria-expanded`), «Articoli citati» as buttons labelled by the
+source convention (`articleLink`: `shortNorm(normFromUrn)`, the passage's own words when the URN names no act; opened
+with `searchParamsFromAnchor` — not `normRefToSearchParams`, which reads a code's article as «1» and «10bis» as «10b» —,
+`navigate('/')` then `triggerSearch`; a URN with no article is plain text), and the credit with the portal's link. The
+last search and the passages loaded stay in memory for the session (`searchMemory.ts`; never the address, never
+storage), so the way back from an article finds the list; `clearRassegneCache` (the logout) forgets it. No store
+(`volumi: 0`) says «Le rassegne non sono ancora caricate su questa installazione.»; a 503 or no answer «Le rassegne non
+sono disponibili al momento.» with «Riprova», a 429 the quota's line. No anchors, notes or highlights (G-399's Q3).
 
 **«Giurisprudenza» under the article** (`CaseLawSection`, after the text): an accordion closed by default (state per host in
 `sessionStorage`) holding the Massimario's panel (`components/features/rassegne/RassegnePanel`, a block of

@@ -82,6 +82,15 @@ test('the Massimario\'s reviews are read behind the login (ADR-001)', () => {
   assert.ok(!caddyOpenPaths().some((token) => token.startsWith('/fetch_rassegne')));
 });
 
+test('the page «Rassegne» searches every volume behind the login, by its own path', () => {
+  // /search_rassegne matches no other prefix (not /search_decisions*): its own entry on both sides
+  // (design 2026-11-01-rassegne-search-page §2), and never among the open paths.
+  assert.ok(caddyLegalTokens().includes('/search_rassegne*'));
+  assert.ok(vitePythonPaths().includes('/search_rassegne'));
+  assert.ok(!caddyOpenPaths().some((token) => token.startsWith('/search_rassegne')));
+  assert.ok(!caddyLegalTokens().some((t) => t !== '/search_rassegne*' && '/search_rassegne'.startsWith(t.replace(/\*$/, ''))));
+});
+
 test('the links of «Analizza documento» go to the scrapers behind the login, by their own path', () => {
   // /fetch_norm_links matches no other prefix (not /fetch_norma_data*): it needs its own entry
   // on both sides (design 2026-10-31-document-hyperlinks §3.1).

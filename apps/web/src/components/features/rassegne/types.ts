@@ -55,3 +55,30 @@ export interface RassegneQuery {
   /** the words to search for (`searchWords`), joined by spaces; sent in the body, never in an address */
   q?: string;
 }
+
+/** An article a passage cites: its URN and the words that cite it there. */
+export interface RassegnaArticolo {
+  urn: string;
+  citazione: string;
+}
+
+/** A passage found by `/search_rassegne`: the panel's passage (no highlight) and the articles it cites. */
+export interface RassegnaRisultato extends RassegnePasso {
+  articoli: RassegnaArticolo[];
+}
+
+/** `/search_rassegne`'s answer: `volumi` 0 means no store is built on this installation. */
+export interface RassegneSearchResponse {
+  total: number;
+  volumi: number;
+  archivi: { archivio: string; passi: number }[];
+  items: RassegnaRisultato[];
+  next_cursor: string | null;
+}
+
+export interface RassegneSearchQuery {
+  /** the words (`searchWords`), joined by spaces; sent in the body, never in an address */
+  q: string;
+  archivio?: 'civile' | 'penale';
+  cursor?: string;
+}

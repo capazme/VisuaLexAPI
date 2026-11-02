@@ -18,7 +18,7 @@ import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
 /** Opus's entries: the planner's three views, then the dossiers. */
-const OPUS_HREFS = ['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier'];
+const OPUS_HREFS = ['/', '/documents', '/rassegne', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -171,7 +171,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
           <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} />
         </MemoryRouter>,
       );
-      expect(hrefs().slice(0, 2)).toEqual(['/', '/documents']);
+      expect(hrefs().slice(0, 3)).toEqual(['/', '/documents', '/rassegne']);
       unmount();
     }
   });
@@ -199,13 +199,13 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
 
   it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
     renderSidebar('/studia/schede');
-    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
     const study = screen.getByRole('group', { name: 'Studia' });
     expect(within(study).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier']);
     expect(screen.getByRole('group', { name: 'Gymnasium' })).toContainElement(study);
     cleanupAndRender('/studia/schede', () => { account.isValidator = true; });
-    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede', '/studia/valida']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede', '/studia/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
     expect(within(contribute).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Le mie schede', 'Da validare']);
     // The tours still find the dossiers.
@@ -220,7 +220,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
 
   it('Forum: «Dossier pubblici» with its count, and «Community»; «Forum» is the group, written once', () => {
     renderSidebar('/forum');
-    expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/forum', '/forum/community']);
     const forum = screen.getByRole('group', { name: 'Forum' });
     expect(within(forum).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Dossier pubblici, 3 notifiche', 'Community']);
     expect(screen.queryByRole('link', { name: /^Forum/ })).toBeNull();
@@ -238,7 +238,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it('Academia: «Assistente» and «Grafo», with the development mode only (S12)', () => {
     account.devMode = true;
     renderSidebar('/merlt');
-    expect(hrefs()).toEqual(['/', '/documents', '/merlt', '/grafo']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/merlt', '/grafo']);
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
     expect(hrefs()).toEqual(OPUS_HREFS);
@@ -249,9 +249,9 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     account.devMode = true;
     vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'false');
     renderSidebar('/merlt');
-    expect(hrefs()).toEqual(['/', '/documents', '/merlt']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/merlt']);
     cleanupAndRender('/merlt', () => vi.stubEnv('VITE_FEATURE_MERLT', 'false'));
-    expect(hrefs()).toEqual(['/', '/documents']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne']);
   });
 
   it('offers no Gymnasium when VITE_FEATURE_STUDIA is off', () => {
@@ -274,7 +274,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
     expect(screen.getByTestId('where')).toHaveTextContent('/forum');
     expect(handlers.closeMobile).toHaveBeenCalled();
-    expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/forum', '/forum/community']);
   });
 
   it('fades in the new section\'s entries only, never the Corpus ones above them (T1)', () => {

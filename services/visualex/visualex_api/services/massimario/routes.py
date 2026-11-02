@@ -1,5 +1,5 @@
 # services/visualex/visualex_api/services/massimario/routes.py
-"""The two routes over the reviews' store (design 2026-10-30-rassegne-without-merlt §3 (a)).
+"""The routes over the reviews' store (design 2026-10-30-rassegne-without-merlt §3 (a)).
 
 - `GET /fetch_rassegne?urn=&anno=&archivio=&cursor=&limit=`, or `POST /fetch_rassegne` with the
   same fields in a JSON body and, there only, `q`: the paragraphs citing a norm, for the reader.
@@ -9,6 +9,10 @@
   refused in a query string, which access logs keep, and never logged here. No store: 200 with
   `total: 0`. A store that cannot be read, or of an unknown schema: 503
   `rassegne_non_disponibili`.
+- `POST /search_rassegne` with `{q, archivio?, cursor?, limit?}` in a JSON body: the paragraphs of
+  every volume holding each word of `q`, for the page «Rassegne» (design
+  2026-11-01-rassegne-search-page, G-404). The same limits on `q`, which is required, never in an
+  address (the route takes no GET) and never logged. No store: 200 with `total: 0, volumi: 0`.
 - `GET /massimario/volume/<id>/records`: a volume's records and parse report, for MERL-T's
   ingestion. Internal: not in the ingress, the Vite proxy or `legalFetch`.
 
@@ -111,6 +115,39 @@ async def fetch_rassegne(args: Mapping[str, str], *, allow_q: bool = False) -> t
     urn = query.pop("urn")
     try:
         answer = await asyncio.to_thread(store.by_norma, store.default_path(), urn, **query)
+    except store.StoreUnavailable as exc:
+        log.error("rassegne.store_unavailable", error=str(exc))
+        return _UNAVAILABLE
+    return answer, 200
+
+
+SEARCH_DEFAULT_LIMIT = 20
+
+
+async def search_rassegne(args: Mapping[str, str]) -> tuple[dict[str, Any], int]:
+    """Fields from a POST's body (`body_args`). `urn`, `anno` are not this route's: refused, never
+    ignored, so a caller that meant the panel's route is told."""
+    for field in ("urn", "anno"):
+        if args.get(field) is not None:
+            return _invalid(field, "non previsto nella ricerca in tutte le rassegne")
+    words, error = _words(args.get("q"))
+    if error:
+        return error
+    if not words:
+        return _invalid("q", "attese le parole da cercare")
+    archivio = args.get("archivio") or None
+    if archivio is not None and archivio not in ("civile", "penale"):
+        return _invalid("archivio", "atteso civile o penale")
+    cursor = args.get("cursor") or None
+    if cursor is not None and not _CURSOR.fullmatch(cursor):
+        return _invalid("cursor", "atteso un numero")
+    limit = args.get("limit") or None
+    if limit is not None and not (_LIMIT.fullmatch(limit) and 1 <= int(limit) <= MAX_LIMIT):
+        return _invalid("limit", f"atteso un numero tra 1 e {MAX_LIMIT}")
+    try:
+        answer = await asyncio.to_thread(
+            store.search, store.default_path(), words, archivio=archivio,
+            offset=int(cursor) if cursor else 0, limit=int(limit) if limit else SEARCH_DEFAULT_LIMIT)
     except store.StoreUnavailable as exc:
         log.error("rassegne.store_unavailable", error=str(exc))
         return _UNAVAILABLE

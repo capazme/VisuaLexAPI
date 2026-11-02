@@ -479,6 +479,18 @@ POST unless noted, JSON bodies.
   syntax), a blank `q` is no search; the counts, `archivi` and the pages all follow it. A body that is
   not an object, or a field that is not a string or a whole number, is a 400. In the Vite proxy and the
   ingress's `@legal` list, behind the login (ADR-001); the web calls it with POST through `legalFetch`
+- `POST /search_rassegne` — `{q, archivio?, cursor?, limit?}` in a JSON body: the paragraphs of every
+  volume holding each word of `q` (`store.search`), for the page «Rassegne» (spec
+  `2026-11-01-rassegne-search-page`, G-404). `q` required, with `/fetch_rassegne`'s limits and reading;
+  `archivio` civile | penale; `cursor` up to six digits; `limit` 1–50 (20); `urn` and `anno` are refused
+  (that is the panel's route). Newest review first (year, then volume), then the volume's reading order.
+  200 `{total, volumi, archivi: [{archivio, passi}], items, next_cursor}`: `total` under the archive
+  chosen, `archivi` whatever is chosen, `volumi` the store's (0: no store built); each item the panel's
+  `RassegnePasso` with no highlight, plus `articoli` (`{urn, citazione}`, each article once, in the order
+  the text first cites it; an act without an article left out). 400 `richiesta_non_valida`, 503
+  `rassegne_non_disponibili` as above. POST only (a GET is 405: no address keeps the words), never
+  logged. In the Vite proxy and the ingress's `@legal` list, behind the login, at the quota's default
+  price (a local file, nothing asked outside)
 - `GET /massimario/volume/<id>/records` — internal (MERL-T's ingestion, PR 3 of the design; not
   routed by the ingress, not proxied by Vite): a volume's records in reading order and its parse
   report, `{volume, parser_version, built_at, source, report, records}`; 404 `volume_non_presente`,

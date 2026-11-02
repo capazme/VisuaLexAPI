@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import { fetchRassegne, RassegneError } from '../../../services/rassegneService';
 import type { RassegneQuery, RassegneResponse } from './types';
+import { rememberSearch } from './searchMemory';
 
 /**
  * Session cache by query, with in-flight dedupe: the article view is mounted twice (mobile
  * accordion and desktop column), and each copy mounts the panel — one request, not two.
  * A failed load is forgotten so the next mount retries. It holds the words searched (in its
- * keys), so it is cleared at logout (`useAuth`), as the other readers' caches are.
+ * keys), so it is cleared at logout (`useAuth`), as the other readers' caches are; so is the page
+ * «Rassegne»'s last search (`searchMemory`).
  */
 const cache = new Map<string, Promise<RassegneResponse>>();
 
 export function clearRassegneCache(): void {
   cache.clear();
+  rememberSearch(null);
 }
 
 export function loadRassegne(query: RassegneQuery): Promise<RassegneResponse> {

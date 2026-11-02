@@ -30,6 +30,7 @@ describe('the pages loaded with their route (P1)', () => {
     expect(pageCodeFor('/forum')).toBe(PAGE_CODE.forum);
     expect(pageCodeFor('/forum/community')).toBe(PAGE_CODE.community);
     expect(pageCodeFor('/documents')).toBe(PAGE_CODE.documents);
+    expect(pageCodeFor('/rassegne')).toBe(PAGE_CODE.rassegne);
     expect(pageCodeFor('/crediti')).toBe(PAGE_CODE.credits);
     expect(pageCodeFor('/collega-app')).toBe(PAGE_CODE.connectAiApp);
     expect(pageCodeFor('/opus/oggi')).toBe(PAGE_CODE.opus);
@@ -48,7 +49,7 @@ describe('the pages loaded with their route (P1)', () => {
     const pages = new Set([
       'components/features/dossier/DossierPage', 'components/features/history/HistoryView',
       'components/features/bulletin/BulletinBoardPage', 'components/features/bulletin/ForumCommunityPage',
-      'components/features/documents/DocumentReviewPage', 'pages/CreditsPage', 'features/connections/ConnectAiAppPage',
+      'components/features/documents/DocumentReviewPage', 'components/features/rassegne/RassegneSearchPage', 'pages/CreditsPage', 'features/connections/ConnectAiAppPage',
       'components/features/planner/OpusPage', 'components/features/planner/OpusViews',
       // A folder's index that would re-export one of them (the connections had one, with «Collega un'app AI»).
       'features/connections',

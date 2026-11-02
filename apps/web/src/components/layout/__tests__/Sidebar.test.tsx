@@ -88,14 +88,14 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     account.devMode = true;
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/documents', '/merlt', '/grafo']);
+    expect(hrefs).toEqual(['/', '/documents', '/rassegne', '/merlt', '/grafo']);
     // exactly one hub entry
     expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
   });
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar('/');
-    expect(navHrefs()).toEqual(['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier']);
+    expect(navHrefs()).toEqual(['/', '/documents', '/rassegne', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -103,7 +103,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     isMerltEnabledMock.mockReturnValue(false);
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/documents']);
+    expect(hrefs).toEqual(['/', '/documents', '/rassegne']);
     expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
   });
 });

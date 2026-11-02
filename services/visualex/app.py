@@ -612,6 +612,10 @@ class NormaController:
         # 2026-10-30-rassegne-without-merlt, G-394): read by the article page. The web and the
         # ingress take it in the next PR (Vite proxy, the ingress's @legal list, behind the login).
         self.app.add_url_rule('/fetch_rassegne', view_func=self.fetch_rassegne, methods=['GET', 'POST'])
+        # A word searched in every volume, for the page «Rassegne» (design
+        # 2026-11-01-rassegne-search-page, G-404): POST only, so no address keeps the words;
+        # behind the login (the ingress's @legal list) and in the Vite proxy.
+        self.app.add_url_rule('/search_rassegne', view_func=self.search_rassegne, methods=['POST'])
         # Internal: a volume's paragraph records for MERL-T's ingestion. Not routed by the
         # ingress nor proxied by Vite, like /fetch_massimario.
         self.app.add_url_rule('/massimario/volume/<volume_id>/records', view_func=self.massimario_volume_records,
@@ -2020,6 +2024,21 @@ class NormaController:
                 answer, status = await rassegne_routes.fetch_rassegne(request.args)
         except Exception:
             log.exception("Rassegne lookup failed unexpectedly")
+            return jsonify({'detail': 'errore_interno'}), 500
+        return jsonify(answer), status
+
+    async def search_rassegne(self):
+        """The paragraphs of every volume holding the words of `q`, newest review first, a page at
+        a time (`rassegne_routes.search_rassegne`): 200 (`total: 0, volumi: 0` when no store is
+        built), 400 `richiesta_non_valida`, 503 `rassegne_non_disponibili`. Reads a local file
+        only; the words are never logged."""
+        try:
+            args, error = rassegne_routes.body_args(await request.get_json(silent=True))
+            if error:
+                return jsonify(error[0]), error[1]
+            answer, status = await rassegne_routes.search_rassegne(args)
+        except Exception:
+            log.exception("Rassegne search failed unexpectedly")
             return jsonify({'detail': 'errore_interno'}), 500
         return jsonify(answer), status
 
