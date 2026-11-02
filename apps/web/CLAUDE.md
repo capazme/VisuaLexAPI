@@ -350,9 +350,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   browser» on (`LocalSwitch`, off by default, for the page's life) nothing about the document leaves: the client's own
   names and parser, the matcher inside the candidates as in the fallback but not called «degraded» (`localOnly`,
   `analysis.local`), the picker reads in the browser, the links are off and the panel offers «Riconosci con VisuaLex
-  questo documento» (a new reading of the same text, the choices kept). A bare article takes the act of the last
-  resolved candidate of its line, or across lines with «del medesimo decreto» and its kin; a candidate the page
-  cannot read, and a bare article followed by something else («del contratto»), end that context. When the catalog
+  questo documento» (a new reading of the same text, the choices kept). A bare article inherits an act only when its
+  words tie it to one named before (G-402): «del medesimo decreto», «della stessa legge», «Reg. cit.», «ivi» take the
+  last act read of the kind they name, «dello stesso art. 18», «art. 18 cit.» the last cited with that article; with
+  no such words, or when the words could mean two acts, it is to complete, even right after an act; a candidate the
+  page cannot read, and a bare article followed by something else («del contratto»), end what may be referred to. When the catalog
   or a chunk does not answer, today's matcher keeps its matches inside the unanswered candidates, the client's own
   names make the vocabulary, and a line above the list says so with «Riprova» (asks only for what is still
   unanswered). **Completion by hand** (#376 §5, PR 3; `documentReview.ts`, pure): the user's choices live in the page's memory,
@@ -374,7 +376,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   citazioni» with «Annulla» for 8 s (`showUndoToast`). A dialog anchored to the row from `lg`, a `Sheet` below it; the
   focus goes to the row in its new place. `documentCorpus.test.ts` runs the spec's invented corpus with
   the server's answers recorded (`__tests__/corpus/server.json`, `record_server.py`), prints §3.2's table and fails
-  below 98 found or on any wrong one. **The links** (spec `2026-10-31-document-hyperlinks` L3; drawn by L5 in `LinksPanel`: «Prepara i link» with the
+  below 92 found (98 before G-402, which left 6 of the 7 inherited rows to complete) or on any wrong one. **The links** (spec `2026-10-31-document-hyperlinks` L3; drawn by L5 in `LinksPanel`: «Prepara i link» with the
   line on what it sends, the summary «N citazioni avranno il link · M no: vedi perché» by reason, each row a button,
   «N citazioni non avranno il link finché non le confermi» with «Rivedile» (the list filtered) and «Conferma tutte»,
   «Conferma» and «Senza link» on the rows, «Copia con i link», «Scarica una copia con i link» for a DOCX with «Il file
