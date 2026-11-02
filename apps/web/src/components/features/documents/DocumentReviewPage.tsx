@@ -1,14 +1,16 @@
 /**
- * «Analizza documento»: the norms a document cites, found in the browser (brief D2). The file is read
- * here and never sent anywhere — the promise of the page; each citation opens the reader as a search
- * would (`openCitation`, gotcha 15). The document is drawn as it is, its citations marked in it, and
- * listed beside it by act.
+ * «Analizza documento»: the norms a document cites (brief D2; design 2026-10-29-document-analysis). The file is
+ * read here and never sent anywhere; its citations are found in the browser (`documentCandidates.ts`) and read as
+ * the search reads them — the client parser first, then `/parse_query_batch` for the query strings it cannot
+ * settle, never the text around them (`documentServer.ts`, §6.1). Each citation opens the reader as a search would
+ * (`openCitation`, gotcha 15). The document is drawn as it is, its citations marked in it, and listed beside it
+ * by act.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { FileText, RotateCcw, ShieldCheck } from 'lucide-react';
-import { extractCitations, type CitationMatch } from '../../../utils/citationMatcher';
+import { CloudOff, FileText, RotateCcw, ShieldCheck } from 'lucide-react';
+import type { CitationMatch } from '../../../utils/citationMatcher';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../ui/Button';
 import { FOCUS_RING } from '../../../constants/interactions';
@@ -21,14 +23,27 @@ import { DocumentText } from './DocumentText';
 import { DropZone, type DropPhase } from './DropZone';
 import { DocumentRow, SheetFlight } from './DocumentRow';
 import { documentKind, type DocumentJob } from './documentJob';
+import { analyseDocument, listedMatches, type DocumentAnalysis } from './documentCandidates';
+import { fetchActNames, readOnServer } from './documentServer';
+import type { ServerNormReading } from '../../../utils/normQuery';
 import { PageFrame } from '../../layout/PageFrame';
 
 interface LoadedDocument {
   fileName: string;
   text: string;
   /** Found while the row said «Cerco le citazioni…». */
-  citations: CitationMatch[];
+  analysis: DocumentAnalysis;
+  /** The server's answers for this document: «Riprova» asks only for the rest. */
+  answers: Map<string, ServerNormReading>;
 }
+
+/** The names of the acts, asked once when the page opens (§4.2); null when the server did not answer. */
+const askActNames = (signal?: AbortSignal) => fetchActNames(signal).catch((error: unknown) => {
+  if (signal?.aborted) return null;
+  // Never swallowed (gotcha 18): the page falls back on the client's own names and says so above the list.
+  console.error('«Analizza documento»: the catalog of act names did not come', (error as Error)?.message);
+  return null;
+});
 
 /** How long the check stays on the row before the text comes (D6): the time to see it. */
 const DONE_MS = 450;
@@ -91,6 +106,7 @@ const COLUMN_HEIGHT = 'lg:h-[calc(100dvh-15rem-var(--page-foot,2rem))] lg:min-h-
 
 export function DocumentReviewPage() {
   const triggerSearch = useAppStore(s => s.triggerSearch);
+  const customAliases = useAppStore(s => s.customAliases);
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +118,13 @@ export function DocumentReviewPage() {
   // The reading in flight: a file chosen while another is read wins, the older answer is dropped.
   const readingRef = useRef(0);
   const focusAfterRef = useRef<'result' | 'zone' | null>(null);
+  // The names of the acts, asked when the page opens, so a file waits on nothing (§4.2).
+  const actNamesRef = useRef<Promise<string[] | null> | null>(null);
+  // Aborted when the page goes: an answer then has nowhere to land.
+  const pageAbortRef = useRef<AbortController | null>(null);
+  // The analysis in flight (a file, or «Riprova»): aborted by the next one, by «Scegli un altro documento» and when the
+  // page goes, so a superseded document sends no more chunks.
+  const analysisAbortRef = useRef<AbortController | null>(null);
 
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null);
   // The file being read, or refused: its row under the box.
@@ -113,10 +136,52 @@ export function DocumentReviewPage() {
   const [flight, setFlight] = useState<DOMRect | null>(null);
   const [touch] = useState(isTouch);
   const [selected, setSelected] = useState<number | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
-  const citations = useMemo(() => loaded?.citations ?? [], [loaded]);
+  useEffect(() => {
+    const controller = new AbortController();
+    pageAbortRef.current = controller;
+    actNamesRef.current = askActNames(controller.signal);
+    return () => {
+      controller.abort();
+      analysisAbortRef.current?.abort();
+    };
+  }, []);
+
+  /** A new analysis: the one before it is aborted. */
+  const startAnalysis = useCallback(() => {
+    analysisAbortRef.current?.abort();
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
+    return controller.signal;
+  }, []);
+
+  const citations = useMemo(() => (loaded ? listedMatches(loaded.text, loaded.analysis.citations) : []), [loaded]);
+  const toComplete = useMemo(() => loaded?.analysis.citations.filter(c => c.state === 'incomplete').length ?? 0, [loaded]);
   const groups = useMemo(() => (loaded ? groupCitationsByAct(loaded.text, citations) : []), [loaded, citations]);
-  const countLabel = citations.length === 0 ? 'Nessuna citazione' : citationCountLabel(citations.length, groups.length);
+  const countLabel = citationCountLabel(citations.length, groups.length, toComplete);
+
+  /**
+   * The citations of a text: the names of the acts (asked again if they did not come), then the candidates, the
+   * client's readings, the server's for the rest. Never throws: what the server does not answer falls back on the
+   * browser (§4.7).
+   */
+  const analyse = useCallback(async (text: string, signal: AbortSignal, known?: Map<string, ServerNormReading>) => {
+    let names = await (actNamesRef.current ?? askActNames(pageAbortRef.current?.signal));
+    if (names === null && known) {
+      // «Riprova»: the catalog too, if it was what failed.
+      actNamesRef.current = askActNames(pageAbortRef.current?.signal);
+      names = await actNamesRef.current;
+    }
+    // The catalog answers null when the page went while it was asked: nothing more is sent.
+    signal.throwIfAborted();
+    return analyseDocument(text, {
+      serverNames: names,
+      customAliases,
+      known,
+      ask: (queries) => readOnServer(queries, signal),
+    });
+  }, [customAliases]);
 
   // The focus follows the change once its target is mounted: the box and the result take turns
   // (AnimatePresence, `mode="wait"`), so the target appears only after the other has left.
@@ -155,14 +220,44 @@ export function DocumentReviewPage() {
     setJob({ ...base, stage: 'searching' });
     await nextPaint();
     if (id !== readingRef.current) return;
-    const found = extractCitations(result.text);
+    const signal = startAnalysis();
+    let run: Awaited<ReturnType<typeof analyse>>;
+    try {
+      run = await analyse(result.text, signal);
+    } catch (error) {
+      // An abort: another file, or the page has gone. Anything else is a fault, said on the row and in the console.
+      if (signal.aborted || id !== readingRef.current) return;
+      console.error('«Analizza documento»: the citations could not be found', error);
+      setJob({ ...base, stage: 'error', error: 'Non è stato possibile cercare le citazioni in questo documento.' });
+      return;
+    }
+    if (id !== readingRef.current) return;
     setJob({ ...base, stage: 'done' });
     await new Promise((resolve) => setTimeout(resolve, DONE_MS));
     if (id !== readingRef.current) return;
     focusAfterRef.current = 'result';
     setJob(null);
-    setLoaded({ fileName: file.name, text: result.text, citations: found });
+    setLoaded({ fileName: file.name, text: result.text, analysis: run.analysis, answers: run.answers });
     setSelected(null);
+  };
+
+  /** «Riprova»: asks again for what is still unresolved, keeping what the server already answered. */
+  const retry = async () => {
+    if (!loaded || retrying) return;
+    const id = readingRef.current;
+    setRetrying(true);
+    const signal = startAnalysis();
+    try {
+      const run = await analyse(loaded.text, signal, loaded.answers);
+      if (id !== readingRef.current) return;
+      setLoaded({ ...loaded, analysis: run.analysis, answers: run.answers });
+      setSelected(null);
+    } catch (error) {
+      // An abort: the page or the document has gone. A fault keeps the result as it was, and is said in the console.
+      if (!signal.aborted) console.error('«Analizza documento»: «Riprova» failed', error);
+    } finally {
+      setRetrying(false);
+    }
   };
   // The window's listeners (below) live once; the file goes to the handler of the latest render.
   const handleFileRef = useRef(handleFile);
@@ -219,12 +314,14 @@ export function DocumentReviewPage() {
 
   const dismissJob = () => {
     readingRef.current += 1;
+    analysisAbortRef.current?.abort();
     setJob(null);
     zoneRef.current?.focus();
   };
 
   const chooseAnother = () => {
     readingRef.current += 1;
+    analysisAbortRef.current?.abort();
     setJob(null);
     setPhase('idle');
     setSelected(null);
@@ -264,6 +361,7 @@ export function DocumentReviewPage() {
       act_number: citation.parsed.act_number ?? '',
       date: citation.parsed.date ?? '',
       article: citation.parsed.article,
+      ...(citation.parsed.annex ? { annex: citation.parsed.annex } : {}),
       version: 'vigente',
       version_date: '',
     });
@@ -366,6 +464,13 @@ export function DocumentReviewPage() {
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_25rem]">
               <aside aria-labelledby="doc-citations" className={cn(PANEL, COLUMN_HEIGHT, 'max-h-[55dvh] lg:col-start-2 lg:row-start-1 lg:max-h-none')}>
                 <h2 id="doc-citations" className={PANEL_HEAD}>Citazioni</h2>
+                {loaded.analysis.degraded && (
+                  <div role="status" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+                    <CloudOff aria-hidden="true" size={16} className="shrink-0 text-slate-500 dark:text-slate-400" />
+                    <p className="min-w-0 flex-1 basis-48">VisuaLex non risponde: ho riconosciuto solo le forme che conosco nel browser.</p>
+                    <Button variant="secondary" size="sm" loading={retrying} onClick={() => void retry()} className="md:min-h-11">Riprova</Button>
+                  </div>
+                )}
                 <div ref={listBodyRef} className={PANEL_BODY}>
                   <CitationList groups={groups} selected={selected} onSelect={selectFromList} onOpen={openCitation} />
                 </div>

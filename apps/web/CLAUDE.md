@@ -294,8 +294,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
-  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded, no
-  request at all; a DOCX through `docx/` (spec #391 L2): a ZIP reader with bounds (`zipPackage.ts`: at most 2,000
+  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded; a DOCX through `docx/` (spec #391 L2): a ZIP reader with bounds (`zipPackage.ts`: at most 2,000
   entries, a part 50 MB inflated, the parts read 120 MB together, a deflated part's declared ratio 200:1, the
   inflating stream cut at the declared size; ZIP64, encrypted entries, duplicate names (without case), `..` or a
   leading slash refused), a tokenizer that knows the five entities, refuses a `<!DOCTYPE` and a part nested past 512 levels, and gives
@@ -310,7 +309,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   jsdom, or if it fails before saying `ready`; once ready, a failure is the file's and is refused, never read again
   in the page), stopped after 60 s; a CFB file, Strict Open XML and the bounds have their own words.
   Headers and footers are not read. Fixtures: unpacked synthetic XML in `__tests__/docx/` (`.rels` named in the
-  glob on its own: it skips dot names), zipped by `__tests__/docxZip.ts` — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. **The writer** (spec #391 L4, no screen
+  glob on its own: it skips dot names), zipped by `__tests__/docxZip.ts`. An HTML ends each block with a line break, so a paragraph is a line. **The writer** (spec #391 L4, no screen
   yet: L5 wires it) is `writeDocxLinks` (`writeDocxPackage.ts`), in its own Worker (`docxWriterClient.ts`,
   `docxWriter.worker.ts`, the same rules as the reader's, 60 s): it takes the file, the citations as `[start, end)`
   of the reading's text with their address, and the text they count in (`expectedText`: a file that reads otherwise
@@ -335,7 +334,24 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `CompressionStream`, keeps a part's encoding (UTF-16, a BOM) and the end record's comment, and refuses entries that share their bytes. The tests
   (`docxWriter.test.ts`) prove §10.2's round trip on `__tests__/docx/links/` and its variants and on a package
   saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `tools/e2e/docx-roundtrip/run.mjs` opens
-  the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR. The
+  the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR.
+  The citations are found and read as the search reads them
+  (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts
+  (`/fetch_alias_catalog`'s `act_names`, asked once when the page opens) and the user's aliases make the vocabulary;
+  candidates are «article, then act», «act, then article», «act alone» (context only) and «bare article», each with
+  the query string a lawyer would type (the clause never in it); each distinct string is read by the client parser
+  (`readNormQuery`), and what it cannot settle goes to `/parse_query_batch` in chunks of 200 strings / 48 KB, one
+  after the other (`documentServer.ts`, `legalFetch`, 8 s each). **What leaves the browser:** those query strings
+  only — never the text, a passage, a bare article, the file's name. A bare article takes the act of the last
+  resolved candidate of its line, or across lines with «del medesimo decreto» and its kin; a candidate the page
+  cannot read, and a bare article followed by something else («del contratto»), end that context. When the catalog
+  or a chunk does not answer, today's matcher keeps its matches inside the unanswered candidates, the client's own
+  names make the vocabulary, and a line above the list says so with «Riprova» (asks only for what is still
+  unanswered). The rows not resolved are counted («· 3 da completare») and not yet listed: their group, the picker
+  and the promise's new words are PR 3 of the spec. `documentCorpus.test.ts` runs the spec's invented corpus with
+  the server's answers recorded (`__tests__/corpus/server.json`, `record_server.py`), prints §3.2's table and fails
+  below 98 found or on any wrong one. Each citation opens the reader through `navigate('/')` + `triggerSearch`,
+  gotcha 15. The
   document is drawn as it is (`DocumentText`: every character once and in order, the citations only
   wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
@@ -2357,6 +2373,14 @@ Duplicating any of these is a defect, not a shortcut.
   `caseLawYears.ts` (a row's years, the counts, the range, the order — pure), `caseLawFilter.ts` (the text
   filter, folded as the find window folds: `findMatches`), `authorityColor`, `caseLawFiltersContext`. A new
   source of case law draws `CaseLawRow` and reads `useCaseLawFilters`, it does not bring its own filter.
+- `utils/normQuery.ts` — the search's reading of a norm, shared by `useSearchQuery` and «Analizza documento»:
+  `readNormQuery(query, customAliases)` (the client parser, whether the reading is searchable, the words to ask
+  the server), `citationFromServer` (an answer of `/parse_query` or `/parse_query_batch` in the client's shape),
+  `preferredReading` (the client wins when searchable). `utils/sources/numberedActTypes.ts` — the web's copy of
+  `conventions/sources/numbered-act-types.json` (its test compares the two) and `identifiesAct`: `isSearchReady`,
+  the palette's «needs a number and a date» and the parser's own list all read it; the d.m. and the DPCM with no
+  number name no act, and the types compare with their case folded (gotcha 28). `ACT_TYPES_REQUIRING_DETAILS`
+  is gone.
 - `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.
@@ -2947,8 +2971,9 @@ meant to stay split; add new features as new files, not inside the shells:
   `citationGroups.ts`, `documentFile.ts`, `docx/` (the DOCX reader: `zipPackage.ts`, `xmlTokens.ts`,
   `docxText.ts`, `readDocxPackage.ts`, `docxWorkerClient.ts`, `docxReader.worker.ts`, `docxErrors.ts`; the writer:
   `writeDocxPackage.ts`, `docxRuns.ts`, `docxSplice.ts`, `zipWriter.ts`, `docxWriterClient.ts`,
-  `docxWriter.worker.ts`); invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
-  `__tests__/docx-saved/`.
+  `docxWriter.worker.ts`), `documentCandidates.ts` (vocabulary, candidates, resolution, inheritance, fallback: pure),
+  `documentServer.ts` (the catalog and `/parse_query_batch`); invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
+  `__tests__/docx-saved/`; the spec's corpus scored by `__tests__/documentCorpus.test.ts`.
 
 ## Gotchas
 
