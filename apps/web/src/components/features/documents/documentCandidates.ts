@@ -605,6 +605,13 @@ export interface DocumentAnalysis {
   citations: DocumentCitation[];
   /** Some candidates were left to the browser because the server or the catalog did not answer. */
   degraded: boolean;
+  /**
+   * The acts named alone that the readings settled («Regolamento (UE) 2016/679»), where they stand: the context of the
+   * bare articles, and the acts the picker offers first (#376 §5.3).
+   */
+  actsNamed?: Array<{ start: number; act: NonNullable<DocumentCitation['act']> }>;
+  /** Read with «Riconosci solo nel browser» on: nothing was asked of the server (#376 §6.3). */
+  local?: boolean;
 }
 
 /** The readings the resolution gathered: the client's and the server's, each settling its query. */
@@ -751,6 +758,7 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
   };
   let fallbackMatches: CitationMatch[] | null = null;
   let degraded = false;
+  const actsNamed: NonNullable<DocumentAnalysis['actsNamed']> = [];
 
   for (const candidate of candidates) {
     const at = lineAt(candidate.start);
@@ -759,6 +767,7 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
       if (reading) {
         const act = actOf(reading);
         remember(act, candidate.actPhrase ? writtenKind(candidate.actPhrase) : null, candidate, at);
+        if (candidate.kind === 'act') actsNamed.push({ start: candidate.start, act });
         for (const { start, end, item } of marks(candidate)) {
           citations.push({ start, end, article: item.article, ...(item.following ? { following: true } : {}), state: 'resolved', act });
         }
@@ -805,7 +814,7 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
   }
 
   citations.sort((a, b) => a.start - b.start);
-  return { citations, degraded };
+  return { citations, degraded, actsNamed };
 }
 
 /** The rows the list shows today (resolved and inherited) in the matcher's shape, which the list and the text draw. */
@@ -847,6 +856,11 @@ export async function analyseDocument(
     customAliases?: CustomAlias[];
     known?: ReadonlyMap<string, ServerNormReading>;
     ask: (queries: string[]) => Promise<{ answers: ReadonlyMap<string, ServerNormReading>; unanswered: readonly string[] }>;
+    /**
+     * «Riconosci solo nel browser» (#376 §6.3, Q3): nothing is asked; what the client parser cannot settle is read by the
+     * browser's own matcher inside its candidate, as when the server is silent (§4.7), but by choice — not «degraded».
+     */
+    localOnly?: boolean;
   },
 ): Promise<AnalysisRun> {
   const vocabulary = buildVocabulary(options.serverNames, options.customAliases);
@@ -855,12 +869,15 @@ export async function analyseDocument(
   const answers = new Map(options.known ?? []);
   const toAsk = candidateQueries(candidates).filter((query) => !client.has(query) && !answers.has(query));
   let unanswered: readonly string[] = [];
-  if (toAsk.length > 0) {
+  if (options.localOnly) {
+    unanswered = toAsk;
+  } else if (toAsk.length > 0) {
     const reading = await options.ask(toAsk);
     reading.answers.forEach((answer, query) => answers.set(query, answer));
     unanswered = reading.unanswered;
   }
   const settled = new Map([...settledByServer(candidates, answers), ...client]);
   const analysis = settleCitations(text, candidates, { settled, unanswered: new Set(unanswered) });
+  if (options.localOnly) return { analysis: { ...analysis, degraded: false, local: true }, answers };
   return { analysis: { ...analysis, degraded: analysis.degraded || !vocabulary.fromServer }, answers };
 }

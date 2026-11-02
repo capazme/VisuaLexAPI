@@ -50,12 +50,16 @@ beforeEach(() => {
 });
 
 describe('DocumentReviewPage — before a document', () => {
-  it('has a title with its phrase and says, to a screen reader too, that nothing leaves the browser', () => {
+  it('has a title with its phrase and says, to a screen reader too, what stays and what goes (#376 §6.4, G-401)', () => {
     render(<DocumentReviewPage />);
     expect(screen.getByRole('heading', { level: 1, name: 'Analizza documento' })).toHaveClass('font-serif');
-    expect(screen.getByText('Trova le norme citate in un atto: il file resta nel tuo browser.')).toBeInTheDocument();
-    const badge = screen.getByText(/^Resta nel tuo browser/);
-    expect(badge).toHaveTextContent('Resta nel tuo browser: il documento non viene inviato al server né salvato.');
+    expect(screen.getByText('Trova le norme citate in un atto. Il documento resta sul tuo computer: a VisuaLex arrivano solo le citazioni trovate, come in una ricerca.')).toBeInTheDocument();
+    const badge = screen.getByText(/^Il documento resta sul tuo computer/, { selector: 'p' });
+    expect(badge).toHaveTextContent('Il testo del documento non viene inviato né salvato.');
+    expect(badge).toHaveTextContent('per esempio «art. 82 GDPR»');
+    expect(badge).toHaveTextContent('con «Prepara i link» arriva a VisuaLex solo l’elenco delle norme citate, mai il testo.');
+    // Nothing on the page says any more that nothing leaves the browser.
+    expect(document.body.textContent).not.toMatch(/resta nel tuo browser/i);
   });
 
   it('opens the file picker from the box, with Enter and Space as with a click', async () => {
@@ -175,12 +179,12 @@ describe('DocumentReviewPage — before a document', () => {
     expect(zone).not.toHaveAttribute('data-tab-hidden');
   });
 
-  it('keeps the promise in sight in every state: the file stays in the browser', () => {
+  it('keeps the promise in sight in every state: the document stays on the computer', () => {
     render(<DocumentReviewPage />);
     const zone = screen.getByRole('button', { name: /Scegli un documento/ });
-    expect(zone).toHaveTextContent('Il file resta nel tuo browser');
+    expect(zone).toHaveTextContent('Il documento resta sul tuo computer');
     fireEvent.dragOver(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
-    expect(zone).toHaveTextContent('Il file resta nel tuo browser');
+    expect(zone).toHaveTextContent('Il documento resta sul tuo computer');
   });
 
   it('refuses a file let go outside the box, so the browser does not open it in place of the app', () => {
@@ -500,8 +504,14 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     expect(within(list).getByRole('heading', { level: 3, name: /^d\.lgs\. 81\/2008\s+1 citazione$/ })).toBeInTheDocument();
     expect(within(list).getByText('art. 167 e ss.')).toBeInTheDocument();
     // A list marks each article on its own number.
-    const marks = Array.from(textBody().querySelectorAll('mark')).map((mark) => mark.textContent);
-    expect(marks).toEqual(['art. 82 GDPR', 'artt. 13', '14 GDPR', 'art. 18', 'artt. 167 e ss. del Codice privacy']);
+    // An inherited one is dashed, one to complete dotted (#376 §5.6).
+    const marks = Array.from(textBody().querySelectorAll('mark')).map((mark) => [mark.textContent, mark.dataset.kind]);
+    expect(marks).toEqual([
+      ['art. 82 GDPR', 'own'], ['artt. 13', 'own'], ['14 GDPR', 'own'], ['art. 18', 'context'], ['art. 7', 'incomplete'],
+      ['artt. 167 e ss. del Codice privacy', 'own'],
+    ]);
+    expect(textBody().querySelector('[data-kind="context"]')!.className).toMatch(/decoration-dashed/);
+    expect(textBody().querySelector('[data-kind="incomplete"]')!.className).toMatch(/decoration-dotted decoration-slate-400/);
     expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull();
   });
 

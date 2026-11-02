@@ -199,11 +199,12 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
       {/* Positioned, so they are drawn over the tinted ground (itself positioned). */}
       <span className="pointer-events-none relative font-serif text-xl text-slate-900 dark:text-slate-50">{title}</span>
       <span className="pointer-events-none relative mt-1.5 text-sm text-slate-600 dark:text-slate-400">{line}</span>
-      {/* The page's promise, in every state: VisuaLex never sends the file anywhere. Seen, not part of the button's
-          name: the page's badge says it to a screen reader. */}
+      {/* The page's promise, in every state (#376 §6.4, G-401): the document stays on the computer; only the citations
+          found are read by VisuaLex, as in a search. Seen, not part of the button's name: the page's badge says it to a
+          screen reader. */}
       <span aria-hidden className="pointer-events-none relative mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
         <ShieldCheck aria-hidden size={14} />
-        Il file resta nel tuo browser
+        Il documento resta sul tuo computer
       </span>
     </button>
   );
