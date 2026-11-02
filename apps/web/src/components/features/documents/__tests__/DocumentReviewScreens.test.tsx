@@ -39,10 +39,12 @@ const linkAll = async (norms: LinkNorm[]) => ({
   unanswered: [],
 });
 
+// art. 18 is the inherited row: under G-402 a bare article inherits only when its words name the act's kind, so it says
+// «del medesimo decreto» (as DocumentReviewPage.test.tsx's brief does); alone it would be one more row to complete.
 const BRIEF = [
   'Memoria del convenuto, Mario Bianchi.',
   'Il datore risponde ai sensi dell’art. 82 GDPR e degli artt. 13 e 14 GDPR.',
-  'Visto il d.lgs. 81/2008, l’art. 18 impone obblighi di sicurezza.',
+  'Visto il d.lgs. 81/2008, l’art. 18 del medesimo decreto impone obblighi di sicurezza.',
   'L’art. 7 del contratto prevede una penale; restano gli artt. 167 e ss. del Codice privacy.',
   'Quanto all’art. 2043 il danno va provato, come per l’art. 2043 già detto.',
 ].join('\n');
