@@ -28,9 +28,18 @@ jobs:
       - run: python -m pytest tests/ -q
         working-directory: tools/archivio-normativo
 
-  web:
-    name: Web build, test, lint
+  # The web tests run in three shards, each on a runner of its own, and build and
+  # lint on a fourth, all at once. "Web build, test, lint" is a check the ruleset
+  # on main and develop requires by name: that job waits for the four above and
+  # passes only when every one of them passed.
+  web-tests:
+    name: Web tests (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      # Every shard runs to the end, so one shard's failure does not hide another's.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: apps/web
@@ -43,10 +52,43 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
-      - run: npm run test -- --run
+      # Vitest sorts the test files by a hash of their path and gives each shard
+      # one slice of that list: every file runs once, in exactly one shard.
+      - run: npm run test -- --run --shard=${{ matrix.shard }}/3
+
+  web-build:
+    name: Web build and lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
       # tsc -b is the real type-check: a bare tsc --noEmit reports a false green.
       - run: npm run build
       - run: npm run lint
+
+  web:
+    name: Web build, test, lint
+    needs: [web-tests, web-build]
+    # Always, so that a failed or cancelled job above turns this check red: a
+    # skipped check would count as passed.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # The matrix's result is success only when all three shards succeeded.
+      - name: Every web job passed
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null
+        env:
+          NEEDS: ${{ toJSON(needs) }}
 
   mcp:
     name: MCP server build and test
@@ -93,6 +135,23 @@ jobs:
         working-directory: apps/server
     steps:
       - uses: actions/checkout@v4
+      # The database is thrown away with the job, so the writes fsync makes durable
+      # are not worth waiting for. A service takes no server options, hence ALTER
+      # SYSTEM: all three settings take effect on a reload, checked from a new session.
+      - name: Postgres without fsync
+        run: |
+          psql -v ON_ERROR_STOP=1 -d "$DATABASE_URL" \
+            -c 'ALTER SYSTEM SET fsync = off' \
+            -c 'ALTER SYSTEM SET synchronous_commit = off' \
+            -c 'ALTER SYSTEM SET full_page_writes = off' \
+            -c 'SELECT pg_reload_conf()'
+          for attempt in 1 2 3 4 5; do
+            settings=$(psql -d "$DATABASE_URL" -tA -c "SELECT string_agg(name || '=' || setting, ' ' ORDER BY name) FROM pg_settings WHERE name IN ('fsync', 'full_page_writes', 'synchronous_commit')")
+            echo "$settings"
+            [ "$settings" = 'fsync=off full_page_writes=off synchronous_commit=off' ] && exit 0
+            sleep 1
+          done
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -148,6 +207,21 @@ jobs:
         with:
           # test_brocardi_off.py reads the vendored mcp-legal-it's source bindings.
           submodules: true
+      # As in "Server tests": a disposable database, written without fsync.
+      - name: Postgres without fsync
+        run: |
+          psql -v ON_ERROR_STOP=1 -d "$DATABASE_URL" \
+            -c 'ALTER SYSTEM SET fsync = off' \
+            -c 'ALTER SYSTEM SET synchronous_commit = off' \
+            -c 'ALTER SYSTEM SET full_page_writes = off' \
+            -c 'SELECT pg_reload_conf()'
+          for attempt in 1 2 3 4 5; do
+            settings=$(psql -d "$DATABASE_URL" -tA -c "SELECT string_agg(name || '=' || setting, ' ' ORDER BY name) FROM pg_settings WHERE name IN ('fsync', 'full_page_writes', 'synchronous_commit')")
+            echo "$settings"
+            [ "$settings" = 'fsync=off full_page_writes=off synchronous_commit=off' ] && exit 0
+            sleep 1
+          done
+          exit 1
       - uses: actions/setup-python@v5
         with:
           # The image is python:3.11-slim (services/merlt/Dockerfile).
