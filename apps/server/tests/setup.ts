@@ -1,7 +1,7 @@
-import { beforeAll, beforeEach, vi } from 'vitest';
-import { execSync } from 'child_process';
+import { beforeAll, beforeEach, inject, vi } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { dropDevelopmentEnv } from './devEnvGuard';
+import { SCHEMA_FINGERPRINT, assertTestDatabase, type TestDatabase } from './testDatabase';
 
 // The suite's environment is `.env.test` alone (`tests/devEnvGuard.ts`). `src/config.ts` calls
 // `dotenv.config()`, which would read a development `apps/server/.env` into the run: a no-op here.
@@ -30,16 +30,6 @@ const prisma = new PrismaClient();
 // A guarded name exported by the shell, or anywhere else outside `.env.test`.
 dropDevelopmentEnv();
 
-// The texts the migrations insert (version 1 of the notice to accept). The TRUNCATE
-// below empties their table, since it references `users`; they are read once after
-// the reset and put back after every truncation, so the migration stays the one
-// place that holds their wording and every test starts from "one version, number 1".
-type TextVersionRow = {
-  id: string; chiave: string; versione: number; titolo: string; corpo: string;
-  conferma: string; azione: string; created_at: Date; autore_id: string | null;
-};
-let seededTexts: TextVersionRow[] = [];
-
 // The OAuth endpoints' own rate limits are per address, and the whole suite
 // comes from 127.0.0.1: lift them here (the flood test builds its own router
 // with a low one), and give the MCP server's credential a test value.
@@ -50,90 +40,32 @@ process.env.OAUTH_REQUESTS_PER_15_MINUTES = '100000';
 process.env.OAUTH_MCP_CLIENT_SECRET = 'test-mcp-client-secret';
 process.env.OAUTH_DELEGATION_SECRET = 'test-delegation-secret';
 
-// SAFETY GUARD: this setup resets the database (drops everything). If vitest is
-// run WITHOUT the `dotenv -e .env.test` wrapper (i.e. `npx vitest` instead of
-// `npm test`), Prisma loads `.env` and DATABASE_URL points at the DEV database
-// (visualex_platform) — the reset then wipes dev data. Refuse to run unless the
-// target DB name clearly looks like a test database.
-function assertTestDatabase(): void {
-  const url = process.env.DATABASE_URL ?? '';
-  const dbName = url.split('/').pop()?.split('?')[0] ?? '';
-  if (!/test/i.test(dbName)) {
-    throw new Error(
-      `Refusing to run tests: DATABASE_URL points at "${dbName || '(unset)'}", ` +
-        `which does not look like a test database. Run tests via "npm test" ` +
-        `(which loads .env.test) — never "npx vitest" directly.`
-    );
-  }
-}
+// The database was reset once for the run (`tests/globalSetup.ts`). Before each test every
+// table is emptied, with DELETEs in the order the foreign keys allow (a TRUNCATE costs about
+// 200 ms each time, rewriting each table's files, against a few ms), and the text versions the
+// migrations insert are put back: every test starts from empty tables plus version 1 of each
+// text to accept, as a fresh database has. Each file first checks that the schema is still the
+// one the migrations made: no reset runs between files any more.
+let database: TestDatabase;
 
 beforeAll(async () => {
   assertTestDatabase();
-  // Pass process.env explicitly so the child process uses the test DATABASE_URL
-  // (dotenv-cli sets it in process.env before vitest starts, but execSync forks
-  // a new shell that would otherwise fall back to loading .env instead of .env.test).
-  execSync('npx prisma migrate reset --force --skip-seed', {
-    stdio: 'ignore',
-    env: process.env,
-  });
-  seededTexts = await prisma.$queryRaw<TextVersionRow[]>`
-    SELECT id, chiave::text AS chiave, versione, titolo, corpo, conferma, azione, created_at, autore_id
-    FROM lingo_testi_versioni`;
-  if (seededTexts.length === 0) throw new Error('The migrations seed no text version: expected version 1 of PROPOSTA_SCHEDA.');
+  database = inject('testDatabase');
+  const [schema] = await prisma.$queryRawUnsafe<{ fingerprint: string }[]>(SCHEMA_FINGERPRINT);
+  if (schema.fingerprint !== database.schema) {
+    throw new Error(
+      'The test database schema is no longer the one the migrations made at the start of the run: ' +
+        'a test in an earlier file changed it and did not undo it (one that timed out before its `finally`?), ' +
+        'or a migration was applied during `test:watch`. Fix that test, or restart watch mode: a new run resets the database.'
+    );
+  }
 });
 
 beforeEach(async () => {
-  // Truncate all tables in one statement, fastest teardown.
-  await prisma.$executeRawUnsafe(`
-    TRUNCATE TABLE
-      "merlt_erasure_requests",
-      "merlt_qa_jobs",
-      "merlt_ingestion_jobs",
-      "merlt_extraction_jobs",
-      "merlt_consent_audits",
-      "merlt_user_preferences",
-      "merlt_user_authority_cache",
-      "suggestion_items",
-      "environment_suggestions",
-      "shared_environment_versions",
-      "shared_environment_likes",
-      "shared_environment_reports",
-      "shared_environments",
-      "annotations",
-      "highlights",
-      "dossier_items",
-      "dossiers",
-      "quick_norms",
-      "custom_aliases",
-      "environments",
-      "bookmarks",
-      "folders",
-      "search_history",
-      "feedbacks",
-      "lingo_tracce",
-      "lingo_stato_ripasso",
-      "lingo_revisioni_srs",
-      "lingo_preferenze_studio",
-      "lingo_card_ancore",
-      "lingo_validazioni_card",
-      "lingo_accettazioni_testi",
-      "lingo_cards",
-      "lingo_testi_versioni",
-      "oauth_tokens",
-      "trash_entries",
-      "app_switches",
-      "oauth_authorization_codes",
-      "oauth_grants",
-      "oauth_authorization_requests",
-      "oauth_clients",
-      "users"
-    RESTART IDENTITY CASCADE;
-  `);
-  for (const t of seededTexts) {
-    await prisma.$executeRaw`
-      INSERT INTO lingo_testi_versioni (id, chiave, versione, titolo, corpo, conferma, azione, created_at, autore_id)
-      VALUES (${t.id}, ${t.chiave}::"LingoTestoChiave", ${t.versione}, ${t.titolo}, ${t.corpo}, ${t.conferma}, ${t.azione}, ${t.created_at}, ${t.autore_id})`;
-  }
+  await prisma.$executeRawUnsafe(database.emptyEveryTable);
+  await prisma.$executeRaw`
+    INSERT INTO lingo_testi_versioni
+    SELECT * FROM json_populate_recordset(NULL::lingo_testi_versioni, ${database.seededTexts}::json)`;
 });
 
 export { prisma };

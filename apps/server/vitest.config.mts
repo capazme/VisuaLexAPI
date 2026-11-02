@@ -19,13 +19,14 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
+    // The reset, once per run; then, in every file, the tables emptied before each test.
+    globalSetup: ['./tests/globalSetup.ts'],
     setupFiles: ['./tests/setup.ts'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // Each file in a fork of its own (vitest's default `isolate: true`), one file at a time so the
+    // shared test DB is fully isolated by the DELETEs before each test.
     pool: 'forks',
-    forks: {
-      singleFork: true, // single process
-    },
-    fileParallelism: false, // run test files sequentially so the shared test DB is fully isolated by beforeEach TRUNCATE
+    fileParallelism: false,
   },
 });
