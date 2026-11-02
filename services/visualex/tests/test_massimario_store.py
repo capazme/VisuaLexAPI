@@ -462,3 +462,108 @@ async def test_route_never_logs_the_keywords(client, path, capsys, caplog):
     assert response.status_code == 503
     out = capsys.readouterr()
     assert secret not in out.out + out.err + caplog.text
+
+
+# --- A word in every volume (G-404) -----------------------------------------------------------
+
+def find(path, words, **kw):
+    return store.search(path, words, **{"archivio": None, "offset": 0, "limit": 10, **kw})
+
+
+def test_a_search_without_a_store_says_so(path):
+    assert find(path, ["danno"]) == {"total": 0, "volumi": 0, "archivi": [], "items": [], "next_cursor": None}
+
+
+def test_a_search_reads_every_volume_newest_first(path):
+    store.write_volumes(path, [(records(volume(9001, 2019, "CIVILE")), "archivio"),
+                               (records(volume(9002, 2024, "PENALE")), "archivio")])
+    answer = find(path, ["ingiusto"])
+    assert ids(answer) == ["massimario|9002|9111|0", "massimario|9001|9111|0"]
+    assert answer["total"] == 2 and answer["volumi"] == 2 and answer["next_cursor"] is None
+    assert answer["archivi"] == [{"archivio": "civile", "passi": 1}, {"archivio": "penale", "passi": 1}]
+    # every word; a paragraph's place counts as in the panel
+    assert ids(find(path, ["richiama", "Gialli"])) == ["massimario|9002|9121|0", "massimario|9001|9121|0"]
+    assert find(path, ["richiama", "ingiusto"])["total"] == 0
+
+
+def test_a_search_in_reading_order_within_a_volume_and_paged(path):
+    store.write_volumes(path, [(records(), "archivio")])
+    every = find(path, ["2043"])  # the citation's words are text too
+    assert ids(every) == ["massimario|9001|9111|0", "massimario|9001|9121|0"]
+    first = find(path, ["2043"], limit=1)
+    assert ids(first) == ["massimario|9001|9111|0"] and first["next_cursor"] == "1" and first["total"] == 2
+    second = find(path, ["2043"], limit=1, offset=1)
+    assert ids(second) == ["massimario|9001|9121|0"] and second["next_cursor"] is None
+
+
+def test_a_search_in_one_archive_keeps_the_counts_of_both(path):
+    store.write_volumes(path, [(records(volume(9001, 2019, "CIVILE")), "archivio"),
+                               (records(volume(9002, 2024, "PENALE")), "archivio")])
+    civile = find(path, ["ingiusto"], archivio="civile")
+    assert ids(civile) == ["massimario|9001|9111|0"] and civile["total"] == 1
+    assert [a["archivio"] for a in civile["archivi"]] == ["civile", "penale"]
+
+
+def test_a_result_names_the_articles_it_cites_once_in_order(path):
+    store.write_volumes(path, [(records(), "archivio")])
+    item = find(path, ["richiama"])["items"][0]
+    assert [a["urn"] for a in item["articoli"]] == [CC_1453, CC_2043]
+    assert item["articoli"][0]["citazione"] == "art. 1453 c.c."
+    assert item["evidenziazioni"] == [] and item["volume"]["id"] == 9001 and item["testo"]
+    # an act cited without an article is no article to open
+    legge = find(path, ["resta", "ferma"])["items"][0]
+    assert legge["articoli"] == []
+
+
+async def test_route_search_in_every_volume(client, path):
+    store.write_volumes(path, [(records(), "archivio")])
+    response = await client.post("/search_rassegne", json={"q": "2043", "limit": 1})
+    body = await response.get_json()
+    assert response.status_code == 200 and body["total"] == 2 and body["next_cursor"] == "1"
+    assert ids(body) == ["massimario|9001|9111|0"]
+    more = await client.post("/search_rassegne", json={"q": "2043", "cursor": "1", "archivio": "civile"})
+    assert ids(await more.get_json()) == ["massimario|9001|9121|0"]
+
+
+async def test_route_search_without_a_store(client):
+    response = await client.post("/search_rassegne", json={"q": "danno"})
+    assert response.status_code == 200 and (await response.get_json())["volumi"] == 0
+
+
+@pytest.mark.parametrize("body,field", [
+    ({}, "q"),
+    ({"q": "   "}, "q"),
+    ({"q": "a b c"}, "q"),
+    ({"q": "x" * 201}, "q"),
+    ({"q": " ".join(f"parola{i}" for i in range(9))}, "q"),
+    ({"q": "danno", "archivio": "tributario"}, "archivio"),
+    ({"q": "danno", "cursor": "-1"}, "cursor"),
+    ({"q": "danno", "limit": 51}, "limit"),
+    ({"q": "danno", "urn": CC_2043}, "urn"),
+    ({"q": "danno", "anno": 2024}, "anno"),
+    ({"q": ["danno"]}, "q"),
+])
+async def test_route_search_validation(client, body, field):
+    response = await client.post("/search_rassegne", json=body)
+    answer = await response.get_json()
+    assert response.status_code == 400 and answer["detail"] == "richiesta_non_valida" and field in answer["errori"]
+
+
+async def test_route_search_takes_no_address(client, path):
+    store.write_volumes(path, [(records(), "archivio")])
+    response = await client.get("/search_rassegne", query_string={"q": "ingiusto"})
+    assert response.status_code == 405
+    response = await client.post("/search_rassegne", json=["q"])
+    assert response.status_code == 400
+
+
+async def test_route_search_unknown_schema_is_a_503_and_never_logs_the_words(client, path, capsys, caplog):
+    store.write_volumes(path, [(records(), "archivio")])
+    secret = "parolasegretissima"
+    await client.post("/search_rassegne", json={"q": secret})
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE meta SET value = '99' WHERE key = 'schema_version'")
+    response = await client.post("/search_rassegne", json={"q": secret})
+    assert response.status_code == 503 and (await response.get_json())["detail"] == "rassegne_non_disponibili"
+    out = capsys.readouterr()
+    assert secret not in out.out + out.err + caplog.text

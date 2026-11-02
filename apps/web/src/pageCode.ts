@@ -9,6 +9,7 @@ export const PAGE_CODE = {
   forum: () => import('./components/features/bulletin/BulletinBoardPage'),
   community: () => import('./components/features/bulletin/ForumCommunityPage'),
   documents: () => import('./components/features/documents/DocumentReviewPage'),
+  rassegne: () => import('./components/features/rassegne/RassegneSearchPage'),
   credits: () => import('./pages/CreditsPage'),
   connectAiApp: () => import('./features/connections/ConnectAiAppPage'),
   // Opus's frame and its views together: one wait, not two in a row.
@@ -24,6 +25,7 @@ export function pageCodeFor(pathname: string): (() => Promise<unknown>) | null {
   if (under(pathname, '/forum/community')) return PAGE_CODE.community;
   if (under(pathname, '/forum')) return PAGE_CODE.forum;
   if (under(pathname, '/documents')) return PAGE_CODE.documents;
+  if (under(pathname, '/rassegne')) return PAGE_CODE.rassegne;
   if (under(pathname, '/crediti')) return PAGE_CODE.credits;
   if (under(pathname, '/collega-app')) return PAGE_CODE.connectAiApp;
   if (under(pathname, '/opus')) return PAGE_CODE.opus;

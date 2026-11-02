@@ -240,6 +240,62 @@ def by_norma(path: Path, urn: str, *, anno: Optional[int], archivio: Optional[st
     }
 
 
+def _articles(record: dict) -> list[dict]:
+    """The articles a paragraph cites, each once, in the order the text first cites them: the
+    norm's URN and the words that cite it there. An act cited without an article is left out."""
+    seen: dict[str, dict] = {}
+    for norm in sorted(record.get("norme", []), key=lambda n: n["start"]):
+        if norm.get("articolo") and norm["urn"] not in seen:
+            seen[norm["urn"]] = {"urn": norm["urn"], "citazione": norm["citazione"]}
+    return list(seen.values())
+
+
+# The matches with what sorts and counts them, read once (`MATERIALIZED`, SQLite 3.35+): one row per
+# archive with its count (rowid NULL), then the page's rowids, newest review first, in reading order.
+_SEARCH = """
+WITH hits AS MATERIALIZED (
+  SELECT p.rowid AS id, p.archivio, p.anno, p.volume_id, p.ordine FROM paragraphs p
+  WHERE p.rowid IN (SELECT rowid FROM paragraphs_fts WHERE paragraphs_fts MATCH ?)
+)
+SELECT NULL, archivio, COUNT(*) FROM hits GROUP BY archivio
+UNION ALL
+SELECT * FROM (SELECT id, NULL, NULL FROM hits {keep}ORDER BY anno DESC, volume_id DESC, ordine LIMIT ? OFFSET ?)
+"""
+
+
+def search(path: Path, words: list[str], *, archivio: Optional[str], offset: int, limit: int) -> dict:
+    """The paragraphs of every volume holding each of `words` (from `terms`), newest review first,
+    then in reading order (design 2026-11-01-rassegne-search-page §2). `archivi` counts the matches
+    of each archive whatever `archivio` keeps; `volumi` is how many volumes the store holds, so a
+    store not built (0) is told apart from a search that finds nothing. The page's rowids are
+    chosen first and their records read after, so the sort never carries the prose."""
+    with _read(path) as conn:
+        if conn is None:
+            return {"total": 0, "volumi": 0, "archivi": [], "items": [], "next_cursor": None}
+        (volumi,) = conn.execute("SELECT COUNT(*) FROM volumes").fetchone()
+        keep, params = ("WHERE archivio = ? ", [archivio]) if archivio else ("", [])
+        # One statement, so the index is read once for the counts and the page alike.
+        rows = conn.execute(_SEARCH.format(keep=keep), [_match(words), *params, limit + 1, offset]).fetchall()
+        counts = {kind: count for rowid, kind, count in rows if rowid is None}
+        rowids = [rowid for rowid, _, _ in rows if rowid is not None]
+        page = rowids[:limit]
+        by_rowid = dict(conn.execute(
+            f"SELECT rowid, record FROM paragraphs WHERE rowid IN ({','.join('?' * len(page))})",
+            page).fetchall()) if page else {}
+    total = counts.get(archivio, 0) if archivio else sum(counts.values())
+    items = []
+    for rowid in page:
+        record = _record(by_rowid[rowid])
+        items.append({**_item(record, ""), "articoli": _articles(record)})
+    return {
+        "total": total,
+        "volumi": volumi,
+        "archivi": [{"archivio": kind, "passi": counts[kind]} for kind in sorted(k for k in counts if k)],
+        "items": items,
+        "next_cursor": str(offset + limit) if len(rowids) > limit else None,
+    }
+
+
 def volume_records(path: Path, volume_id: int) -> Optional[dict]:
     """A volume's records in reading order, with its parse report; None when the store does not
     hold it (or there is no store)."""

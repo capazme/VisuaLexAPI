@@ -479,6 +479,18 @@ POST unless noted, JSON bodies.
   syntax), a blank `q` is no search; the counts, `archivi` and the pages all follow it. A body that is
   not an object, or a field that is not a string or a whole number, is a 400. In the Vite proxy and the
   ingress's `@legal` list, behind the login (ADR-001); the web calls it with POST through `legalFetch`
+- `POST /search_rassegne` — `{q, archivio?, cursor?, limit?}` in a JSON body: the paragraphs of every
+  volume holding each word of `q` (`store.search`), for the page «Rassegne» (spec
+  `2026-11-01-rassegne-search-page`, G-404). `q` required, with `/fetch_rassegne`'s limits and reading;
+  `archivio` civile | penale; `cursor` up to six digits; `limit` 1–50 (20); `urn` and `anno` are refused
+  (that is the panel's route). Newest review first (year, then volume), then the volume's reading order.
+  200 `{total, volumi, archivi: [{archivio, passi}], items, next_cursor}`: `total` under the archive
+  chosen, `archivi` whatever is chosen, `volumi` the store's (0: no store built); each item the panel's
+  `RassegnePasso` with no highlight, plus `articoli` (`{urn, citazione}`, each article once, in the order
+  the text first cites it; an act without an article left out). 400 `richiesta_non_valida`, 503
+  `rassegne_non_disponibili` as above. POST only (a GET is 405: no address keeps the words), never
+  logged. In the Vite proxy and the ingress's `@legal` list, behind the login, at the quota's default
+  price (a local file, nothing asked outside)
 - `GET /massimario/volume/<id>/records` — internal (MERL-T's ingestion, PR 3 of the design; not
   routed by the ingress, not proxied by Vite): a volume's records in reading order and its parse
   report, `{volume, parser_version, built_at, source, report, records}`; 404 `volume_non_presente`,
@@ -787,7 +799,13 @@ no panel, and a deploy never waits on the portal.
   text), `prefix='2'`, `unicode61 remove_diacritics 2`; rebuilt whole at the end of every build from
   the paragraphs the new file holds (about 3 s for the corpus). Measured on the 63 volumes, a search
   within a norm's paragraphs: one or two words a few ms; a two-letter word ~20–40 ms; eight
-  three-letter starts ~220 ms (the worst the limits allow). FTS5 and the JSON functions are in the
+  three-letter starts ~220 ms (the worst the limits allow).
+  The search in every volume (`store.search`, `/search_rassegne`; 2 November 2026, the 63 volumes, on a
+  development Mac under heavy load, load average ~35, medians): a rare word under 1 ms; «usucapione»,
+  «danno ingiusto», «responsabilità medica» 2–6 ms; «danno» (7,250 passages) ~15 ms; «di» (96,386) ~80 ms;
+  eight three-letter starts, the worst the limits allow, ~150 ms (single runs up to about 1 s while the
+  machine was busiest). One statement reads the index once for the counts and the page (`MATERIALIZED`);
+  a deep page (offset 2,000) costs the same. FTS5 and the JSON functions are in the
   production image's SQLite (`python:3.12-slim-bookworm`, 3.40.1) and in macOS's.
 - **Backups.** Not in `scripts/datakit`: the store is derived, and deleting it costs one rebuild.
 - **Schema changes.** The API refuses a store whose schema version it does not know (503, never a

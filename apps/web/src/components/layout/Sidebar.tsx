@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, CalendarCheck, CalendarDays, Inbox, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, type LucideIcon } from 'lucide-react';
+import { Search, Folder, FolderOpen, CalendarCheck, CalendarDays, Inbox, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -472,6 +472,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       >
         <NavItem to="/" icon={Search} label="Ricerca" hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
+        <NavItem to="/rassegne" icon={Library} label="Rassegne" onClick={closeMobile} layout={layout} />
         {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
             Each section names its own active dot, so the dot does not slide from the old section's entries. */}
         <LayoutGroup id={section}>

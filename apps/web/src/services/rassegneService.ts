@@ -2,10 +2,11 @@
  * The Massimario's reviews, read from the Python API's own store (`POST /fetch_rassegne`, through
  * legalFetch: behind the login, ADR-001), and the reference of another article read by
  * `/parse_query`. Design `2026-10-30-rassegne-without-merlt` §3 (a), PR 2; the keyword search is
- * G-399. No MERL-T hop: the reviews show with MERL-T off.
+ * G-399; the search in every volume (`POST /search_rassegne`) is the page «Rassegne», G-404. No MERL-T
+ * hop: the reviews show with MERL-T off.
  */
 import { legalFetch } from './legalFetch';
-import type { RassegneQuery, RassegneResponse } from '../components/features/rassegne/types';
+import type { RassegneQuery, RassegneResponse, RassegneSearchQuery, RassegneSearchResponse } from '../components/features/rassegne/types';
 
 /** A load that did not answer the reviews: `status` is the HTTP status, undefined when no answer came. */
 export class RassegneError extends Error {
@@ -40,6 +41,32 @@ export async function fetchRassegne(query: RassegneQuery): Promise<RassegneRespo
   if (!response.ok) throw new RassegneError(response.status);
   try {
     return (await response.json()) as RassegneResponse;
+  } catch {
+    throw new RassegneError(response.status);
+  }
+}
+
+/**
+ * A page of the passages of every volume holding the words of `query.q` (the page «Rassegne»). A POST
+ * only, so the words never sit in an address.
+ */
+export async function searchRassegne(query: RassegneSearchQuery): Promise<RassegneSearchResponse> {
+  const body: Record<string, string> = { q: query.q };
+  if (query.archivio) body.archivio = query.archivio;
+  if (query.cursor) body.cursor = query.cursor;
+  let response: Response;
+  try {
+    response = await legalFetch('/search_rassegne', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new RassegneError(undefined);
+  }
+  if (!response.ok) throw new RassegneError(response.status);
+  try {
+    return (await response.json()) as RassegneSearchResponse;
   } catch {
     throw new RassegneError(response.status);
   }
