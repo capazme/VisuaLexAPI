@@ -9,10 +9,9 @@ import { searchNorma } from '../../../utils/decisionSearchNorma';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
-import { PluginSlot } from '../../../plugins/PluginSlot';
-import { getSlotComponents } from '../../../plugins/registry';
 import { DecisionResultList } from '../decisions/DecisionResultList';
 import { EuCaseLawBlock } from '../decisions/EuCaseLawBlock';
+import { RassegnePanel } from '../rassegne/RassegnePanel';
 import { CaseLawControls } from './caseLaw/CaseLawControls';
 import { CaseLawFiltersContext } from './caseLaw/caseLawFiltersContext';
 import { narrowingCount, NO_FILTERS, type CaseLawFilters } from './caseLaw/caseLawFilter';
@@ -31,8 +30,6 @@ interface CaseLawSectionProps {
   tabId?: string;
   /** The way back to the article, recorded when a decision is opened from here. */
   backEntry?: ReadingBackEntry;
-  /** A past text: the section stays, and so do the Massimario and the Cassazione's search. */
-  isHistorical?: boolean;
 }
 
 const storageKey = (tabId: string) => `visualex:case-law-open:${tabId}`;
@@ -56,8 +53,8 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
 }
 
 /**
- * «Giurisprudenza» under the article text: the Massimario's reviews (a plugin panel in the
- * `article_case_law` slot), on request the decisions of the Cassazione that mention the article, and
+ * «Giurisprudenza» under the article text: the Massimario's reviews (`RassegnePanel`, read from the
+ * Python API's own store, with MERL-T on or off), on request the decisions of the Cassazione that mention the article, and
  * a topic search of the Cassazione by the article's rubric (it took the place of the Brocardi
  * glossary's «Sentenze su questo tema», D-078). Closed by default; its state is kept
  * per host for the session. An act of the Union gets the Court of Justice's block (`EuCaseLawBlock`, loaded
@@ -69,7 +66,7 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
  * can search both archives only from a request sent without one (Task 15), so each opening of
  * the section starts from the route's own choice.
  */
-export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isHistorical = false }: CaseLawSectionProps) {
+export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: CaseLawSectionProps) {
   const panelId = useId();
   const [open, setOpen] = useState(() => readOpen(tabId));
   const [searched, setSearched] = useState(false);
@@ -111,7 +108,6 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isH
 
   // A generic rubric («Definizioni», «Oggetto»…) alone would find every act's decisions: no link for it.
   const tema = topic?.trim() && !isGenericRubric(topic) ? topic.trim() : undefined;
-  const hasMassimario = getSlotComponents('article_case_law').length > 0;
   const offersCassazione = !isEuropeanAct(norma.tipo_atto);
 
   return (
@@ -162,14 +158,9 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isH
 
             {/* The Massimario's panel is its own heading ("Nelle rassegne della Cassazione", with the
                 count) and renders nothing when there are no reviews, so no wrapper of ours names it. */}
-            {hasMassimario && (
-              <div>
-                <PluginSlot
-                  slot="article_case_law"
-                  props={{ articleUrn, isHistorical, besideId: tabId, backEntry }}
-                />
-              </div>
-            )}
+            <div>
+              <RassegnePanel articleUrn={articleUrn} besideId={tabId} backEntry={backEntry} />
+            </div>
 
             {offersCassazione && <section aria-labelledby={`${panelId}-cassazione`} className="space-y-3">
               <h4 id={`${panelId}-cassazione`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">

@@ -1,13 +1,12 @@
-// apps/web/src/features/merlt/rassegne/__tests__/useRassegne.test.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { _clearRassegneCacheForTests, loadRassegne } from '../useRassegne';
+import { clearRassegneCache, loadRassegne } from '../useRassegne';
 
 const fetchRassegne = vi.fn();
-vi.mock('../rassegneApi', () => ({ fetchRassegne: (...args: unknown[]) => fetchRassegne(...args) }));
+vi.mock('../../../../services/rassegneService', () => ({ fetchRassegne: (...args: unknown[]) => fetchRassegne(...args), RassegneError: class extends Error {} }));
 
 describe('loadRassegne', () => {
   beforeEach(() => {
-    _clearRassegneCacheForTests();
+    clearRassegneCache();
     fetchRassegne.mockReset();
   });
 
@@ -21,5 +20,15 @@ describe('loadRassegne', () => {
     fetchRassegne.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce({ total: 0 });
     await expect(loadRassegne({ urn: 'u' })).rejects.toThrow('down');
     await expect(loadRassegne({ urn: 'u' })).resolves.toEqual({ total: 0 });
+  });
+
+  it('keeps a search apart from the plain list, and forgets both at logout', async () => {
+    fetchRassegne.mockResolvedValue({ total: 0 });
+    await loadRassegne({ urn: 'u' });
+    await loadRassegne({ urn: 'u', q: 'danno' });
+    expect(fetchRassegne).toHaveBeenCalledTimes(2);
+    clearRassegneCache();
+    await loadRassegne({ urn: 'u', q: 'danno' });
+    expect(fetchRassegne).toHaveBeenCalledTimes(3);
   });
 });

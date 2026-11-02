@@ -67,7 +67,7 @@ from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date,
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
-from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details
+from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
 from visualex_api.tools.sources import cite_act, cite_article
 from visualex_api.tools.act_identity import identifies_act
 from visualex_api.tools.norm_query import act_names, read_norm_query
@@ -611,7 +611,7 @@ class NormaController:
         # The Massimario's reviews citing a norm, from the core's store (design
         # 2026-10-30-rassegne-without-merlt, G-394): read by the article page. The web and the
         # ingress take it in the next PR (Vite proxy, the ingress's @legal list, behind the login).
-        self.app.add_url_rule('/fetch_rassegne', view_func=self.fetch_rassegne, methods=['GET'])
+        self.app.add_url_rule('/fetch_rassegne', view_func=self.fetch_rassegne, methods=['GET', 'POST'])
         # Internal: a volume's paragraph records for MERL-T's ingestion. Not routed by the
         # ingress nor proxied by Vite, like /fetch_massimario.
         self.app.add_url_rule('/massimario/volume/<volume_id>/records', view_func=self.massimario_volume_records,
@@ -776,7 +776,9 @@ class NormaController:
         address = NormAddress(
             norma=norma,
             is_eu=norma.tipo_atto.lower() in EU_ACT_TYPES,
-            date_complete=bool(norma.data and _ISO_DAY.match(norma.data)),
+            # The Costituzione has neither date nor number: its fixed URN is the whole address.
+            date_complete=bool(norma.data and _ISO_DAY.match(norma.data))
+            or (not norma.data and not act_number and has_fixed_urn_without_date(normalize_act_type(act_type))),
             date_unavailable=date_unavailable,
         )
         if strict and not address.is_eu and not address.date_complete:
@@ -2006,9 +2008,16 @@ class NormaController:
         """The Massimario's review paragraphs citing a norm, by year, a page at a time
         (`rassegne_routes`): 200 (`total: 0` when no store is built), 400
         `richiesta_non_valida`, 503 `rassegne_non_disponibili` (a store that cannot be read or
-        of an unknown schema). Reads a local file only."""
+        of an unknown schema). Reads a local file only. GET takes the query string; POST a JSON
+        body, the only place a keyword query (`q`) is taken: an address keeps no search."""
         try:
-            answer, status = await rassegne_routes.fetch_rassegne(request.args)
+            if request.method == 'POST':
+                args, error = rassegne_routes.body_args(await request.get_json(silent=True))
+                if error:
+                    return jsonify(error[0]), error[1]
+                answer, status = await rassegne_routes.fetch_rassegne(args, allow_q=True)
+            else:
+                answer, status = await rassegne_routes.fetch_rassegne(request.args)
         except Exception:
             log.exception("Rassegne lookup failed unexpectedly")
             return jsonify({'detail': 'errore_interno'}), 500

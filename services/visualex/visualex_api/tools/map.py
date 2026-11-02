@@ -11,6 +11,14 @@ def codice_urn(codice_name: str) -> str | None:
     return _URN_CODICI_LOWER.get(codice_name.lower().strip())
 
 
+def has_fixed_urn_without_date(act_name: str) -> bool:
+    """True for an act the codici table addresses by a URN that carries no date and no number
+    (the Costituzione: `urn:nir:stato:costituzione`). Its address is complete as it stands;
+    `extract_codice_details` has nothing to read from it."""
+    urn = codice_urn(act_name) if act_name else None
+    return bool(urn) and extract_codice_details(act_name) is None and ';' not in urn
+
+
 def extract_codice_details(codice_name: str) -> dict | None:
     """
     Extracts date and act number from a codice URN in NORMATTIVA_URN_CODICI.

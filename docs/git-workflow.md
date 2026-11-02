@@ -111,6 +111,11 @@ A release is cut when the owners say so. The checklist, in order:
    `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`; write the
    Italian note in `apps/web/src/content/novita/X.Y.Z.md`, in the same pull request (the web suite fails
    on a `version.txt` with no note). Pull request into `develop`, merge.
+   **The reviews' store:** if `SCHEMA_VERSION` in
+   `services/visualex/visualex_api/services/massimario/store.py` changed since the last release, the
+   host needs a store of the new schema before the deploy (build it there, or copy one built from the
+   archive: `services/visualex/CLAUDE.md`); until then the panel says the reviews are not available.
+   A one-volume build does not read an older schema's store, and deletes it.
 4. **Pull request `develop → main`**, titled `merge: develop — release X.Y.Z`.
    The check "Release source" accepts only `develop` and `hotfix/…` as the
    source of a pull request into `main`. Merge it with a merge commit.

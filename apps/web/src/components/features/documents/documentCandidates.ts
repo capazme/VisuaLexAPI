@@ -9,8 +9,9 @@
  *    for it; four kinds, claimed in this order, a character belonging to one candidate at most.
  * 3. **Resolution** (§4.4): each distinct query string read by the client parser (`readNormQuery`), the rest by
  *    `/parse_query_batch` (the caller asks: `documentServer.ts`).
- * 4. **Inheritance** (§4.6): a bare article takes the act of the last resolved candidate of its paragraph (a
- *    line), or across paragraphs when it is followed by «del medesimo decreto» and its kin.
+ * 4. **Inheritance** (§4.6, G-402): a bare article takes an act named before only when the text ties it to one —
+ *    «del medesimo decreto», «della stessa legge», «Reg. cit.», «ivi», «dello stesso art. 18»; otherwise it is to
+ *    complete.
  * 5. **The fallback** (§4.7): for a candidate the server could not read, today's matcher's matches inside it.
  *
  * Every pattern reads a run of spaces in one way only (never two adjacent `\s*`), as the in-text matcher does
@@ -157,8 +158,153 @@ const ACT_ARTICLE_GAP = /[^\S\n]*(?:,[^\S\n]*)?/y;
 /** §4.3: an act alone is context only when it is numbered or of the Union, or a name that opens with an act word. */
 const CONTEXT_PHRASE = new RegExp(`^(?:${EU_ACT}|${NUMBERED_ACT})$`, 'iu');
 const ACT_WORD = /^(?:codice|cod\.|legge|l\.|decreto|testo\s+unico|t\.\s*u\.|tu\s|regolamento|direttiva|statuto|disp\.|ordinamento)/iu;
-/** What follows a bare article: «del medesimo decreto» inherits across paragraphs. */
-const SAME_ACT = /^\s*(?:,\s*)?(?:del|della|dello)\s+(?:medesim[oa]|stess[oa]|citat[oa]|predett[oa]|suddett[oa])(?!\p{L})/iu;
+// ── The words that tie a bare article to an act named before (§4.6, G-402) ──────────────────────────────────
+
+/**
+ * The kind of act a back-reference names: «del medesimo **decreto**», «della stessa **legge**», «**Reg.** cit.».
+ * `any` for the words that name no kind («del medesimo **provvedimento**», «del medesimo»), «ivi», «ult. cit.».
+ */
+export type ActKind =
+  | 'any' | 'decree' | 'legislative decree' | 'decree-law' | 'presidential decree' | 'ministerial decree'
+  | 'prime minister decree' | 'law' | 'code' | 'consolidated text' | 'regulation' | 'directive' | 'constitution' | 'treaty';
+
+/** The nouns a back-reference names, longest first, each with its kind. */
+const KIND_NOUNS: ReadonlyArray<readonly [ActKind, string]> = [
+  // «d.lgs» takes its dot whenever it has one: never «d.lgs» before «. n. 196», which would look like a noun alone.
+  ['legislative decree', 'decreto\\s+legislativo|d\\.\\s*lgs(?:\\.|(?!\\.))|dlgs'],
+  ['decree-law', 'decreto[-\\s]legge|d\\.\\s*l\\.'],
+  ['presidential decree', 'decreto\\s+del\\s+presidente\\s+della\\s+repubblica|d\\.\\s*p\\.\\s*r\\.|dpr'],
+  ['prime minister decree', 'd\\.\\s*p\\.\\s*c\\.\\s*m\\.|dpcm'],
+  ['ministerial decree', 'decreto\\s+ministeriale|d\\.\\s*m\\.'],
+  ['decree', 'decreto'],
+  ['consolidated text', 'testo\\s+unico|t\\.\\s*u\\.'],
+  ['any', 'testo\\s+normativo|provvedimento|articolato|testo|atto'],
+  ['law', 'legge|l\\.'],
+  ['code', 'codice|cod\\.'],
+  ['regulation', 'regolamento|reg\\.'],
+  ['directive', 'direttiva|dir\\.'],
+  ['constitution', 'costituzione|cost\\.'],
+  ['treaty', 'trattato'],
+];
+const KIND_NOUN = KIND_NOUNS.map(([, source]) => `(?:${source})`).join('|');
+const KIND_OF_NOUN = KIND_NOUNS.map(([kind, source]) => [kind, new RegExp(`^(?:${source})$`, 'iu')] as const);
+/** The kind a noun names; `any` for one of the general nouns. */
+const kindOfNoun = (noun: string): ActKind =>
+  KIND_OF_NOUN.find(([, pattern]) => pattern.test(noun.replace(/\s+/g, ' ')))?.[0] ?? 'any';
+/** The first noun of a kind in an act as written: «l. fall.» is a law, «nuovo codice appalti» a code. */
+const WRITTEN_NOUN = new RegExp(`(?<![\\p{L}.])(?=(${KIND_NOUN}))\\1(?!\\p{L})`, 'iu');
+const DECREES: ReadonlySet<ActKind> = new Set([
+  'decree', 'legislative decree', 'decree-law', 'presidential decree', 'ministerial decree', 'prime minister decree',
+]);
+/**
+ * The word a lawyer uses for an act of each kind, whole or abbreviated: what, written in passing, may be another act of
+ * it («la l.r. Lombardia 12/2005», «il reg. condominiale», «il cod. etico»).
+ */
+const DECREE_WORD = 'decret|d\\.\\s*(?:lgs|l|m|p\\.\\s*r|p\\.\\s*c\\.\\s*m)\\.?';
+const KIND_WORD: Partial<Record<ActKind, string>> = {
+  decree: DECREE_WORD, 'legislative decree': DECREE_WORD, 'decree-law': DECREE_WORD, 'presidential decree': DECREE_WORD,
+  'ministerial decree': DECREE_WORD, 'prime minister decree': DECREE_WORD, law: 'legg|l\\.', code: 'codic|cod\\.',
+  'consolidated text': 'testo\\s+unico|t\\.\\s*u\\.', regulation: 'regolament|reg\\.', directive: 'direttiv|dir\\.',
+  constitution: 'costituzion|cost\\.', treaty: 'trattat',
+};
+/** «medesimo», «stessa», «citato», «predetta»…, and «cit.» after a preposition («del cit. decreto»). */
+const SAME_WORD = '(?:medesim|stess|citat|predett|suddett|anzidett|ricordat|richiamat|menzionat)[oaie](?!\\p{L})';
+const PREPOSITION = "(?:del|della|dello|dei|degli|delle)\\s+|dell['’]\\s*";
+/**
+ * A noun that goes on, on its line, with a number, a date or a bracket («del citato d.lgs. n. 196», «della medesima
+ * legge 7 agosto 1990») names an act of its own, not one named before; nor is «la stessa legge regionale» a state law.
+ * A full stop ends the noun: «della medesima legge.» then «7. Il provvedimento» on the next line is a back-reference.
+ */
+const NOT_AN_ACT_OF_ITS_OWN = '(?![^\\S\\n]*(?:n[.°º]|\\d|\\()|\\s+(?:regional|provincial|costituzional|delega|quadro|comunitari|europe))';
+/**
+ * What follows a bare article and ties it to an act named before:
+ * - «del medesimo decreto», «della stessa legge», «del citato decreto-legge», «del predetto», «dello stesso testo»;
+ * - «Reg. cit.», «della legge cit.», «d.lgs. ult. cit.»;
+ * - «cit.» alone, or «citato», «stesso», «predetto» with no preposition («l'art. 13 citato»): the article cited
+ *   before, with that citation's act.
+ *
+ * The noun is read whole (a lookahead, then the same text again): «del citato decreto legislativo 30 giugno 2003» is
+ * never read as «del citato decreto», which the number after it would no longer rule out.
+ */
+const BACK_REFERENCE_AFTER = new RegExp(
+  '^\\s*(?:,\\s*)?(?:' +
+    // the noun after «medesimo»; a «medesimo» with no noun is followed by no word at all.
+    `(?:(?<prep>${PREPOSITION})?${SAME_WORD}|(?<citPrep>${PREPOSITION})cit\\.)` +
+      `(?:\\s*(?=(?<noun>${KIND_NOUN}))\\k<noun>(?!\\p{L})${NOT_AN_ACT_OF_ITS_OWN}|(?=\\s*(?:[^\\p{L}\\s]|$)))` +
+    // the noun before «cit.»
+    `|(?:${PREPOSITION})?(?=(?<citedNoun>${KIND_NOUN}))\\k<citedNoun>\\s*(?:ult\\.\\s*)?cit\\.` +
+    // «ult. cit.» alone, «cit.» alone
+    '|(?<ult>ult\\.\\s*)?cit\\.' +
+  ')',
+  'iu',
+);
+/** «(ivi, art. 30)»: right before the article, the place cited last. Never «ivi compreso l'art. 5». */
+const IVI_BEFORE = /(?<!\p{L})ivi[^\S\n]*,?[^\S\n]*$/iu;
+/** «dello stesso art. 18», «il citato art. 18»: right before the article, the article cited before. */
+const SAME_ARTICLE_BEFORE = /(?<!\p{L})(?:medesim|stess|citat|predett|suddett|richiamat|ricordat)[oaie][^\S\n]+$/iu;
+
+/** How the words around a bare article tie it to an act the text named before (§4.6). */
+export interface BackReference {
+  /** The kind of act the words name: the act inherited is the last one of that kind. */
+  kind: ActKind;
+  /** «dello stesso art. 18», «art. 18 cit.»: the act of the last citation of this very article. */
+  sameArticle?: boolean;
+}
+
+/** The back-reference in the words after a bare article (`tail`); none if none. */
+function referenceAfter(tail: string): (BackReference & { length: number }) | null {
+  const match = BACK_REFERENCE_AFTER.exec(tail);
+  const after = match?.groups;
+  if (!match || !after) return null;
+  const length = match[0].length;
+  const noun = after.noun ?? after.citedNoun;
+  if (noun) return { kind: kindOfNoun(noun), length };
+  // «ult. cit.»: the act cited last; «cit.» alone, «citato» with no preposition: the article cited before.
+  if (after.ult) return { kind: 'any', length };
+  if (after.prep || after.citPrep) return { kind: 'any', length };
+  return { kind: 'any', sameArticle: true, length };
+}
+
+/** The back-reference in the words right before a bare article, on its line (`before`); none if none. */
+function referenceBefore(before: string): BackReference | null {
+  if (IVI_BEFORE.test(before)) return { kind: 'any' };
+  if (SAME_ARTICLE_BEFORE.test(before)) return { kind: 'any', sameArticle: true };
+  return null;
+}
+
+/** The kind of an act as written, from its first noun of a kind; none when it has none («GDPR», «c.c.»). */
+export function writtenKind(phrase: string): ActKind | null {
+  const noun = WRITTEN_NOUN.exec(phrase)?.[1];
+  return noun ? kindOfNoun(noun) : null;
+}
+
+/** An act written with a noun of kind `written` answers to a back-reference of kind `kind`. */
+function fitsWrittenKind(kind: ActKind, written: ActKind | null): boolean {
+  if (kind === 'any') return true;
+  if (!written || written === 'any') return false;
+  return written === kind || (kind === 'decree' && DECREES.has(written));
+}
+
+/** An act of this type answers to a back-reference of this kind. */
+export function fitsKind(kind: ActKind, actType: string): boolean {
+  const type = actType.toLowerCase();
+  switch (kind) {
+    case 'any': return true;
+    case 'decree': return /(?:^|\s)decreto(?:\s|$)/.test(type);
+    case 'legislative decree': return type.startsWith('decreto legislativo');
+    case 'decree-law': return type === 'decreto legge' || type === 'regio decreto legge';
+    case 'presidential decree': return type === 'decreto del presidente della repubblica';
+    case 'ministerial decree': return type === 'decreto ministeriale';
+    case 'prime minister decree': return type === 'decreto del presidente del consiglio dei ministri';
+    case 'law': return type.startsWith('legge');
+    case 'code': return type.startsWith('codice') || type.startsWith('codici');
+    case 'consolidated text': return type.startsWith('testo unico') || /(?:^|\s)decreto(?:\s|$)/.test(type);
+    case 'regulation': return type.startsWith('regolamento');
+    case 'directive': return type.startsWith('direttiva');
+    case 'constitution': return type === 'costituzione';
+    case 'treaty': return type === 'tue' || type === 'tfue' || type.startsWith('trattato');
+  }
+}
 /** «del contratto», «delle condizioni generali»: the article belongs to something the page could not read. */
 const OF_SOMETHING = /^\s*(?:,\s*)?(?:(?:del|della|dello|dei|degli|delle)\s+|dell['’]\s*)\S/iu;
 /** …or a capital, or an abbreviation of up to four letters with a dot («St.», «T.U.»). */
@@ -212,9 +358,16 @@ export interface Candidate {
   end: number;
   /** The words a lawyer would type in the search bar for it; none for a bare article, which is never sent. */
   query: string | null;
+  /** The act as written, for a candidate that names one: what a back-reference compares its noun with (§4.6). */
+  actPhrase?: string;
   articles: CandidateArticle[];
-  /** A bare article followed by «del medesimo decreto» and its kin: it inherits across paragraphs. */
-  sameAct?: boolean;
+  /** A bare article tied to an act named before («del medesimo decreto», «ivi», «Reg. cit.»): the only one inherited. */
+  backReference?: BackReference;
+  /**
+   * Where the words of the back-reference after it end («l'art. 6 della medesima legge|»): an inherited row is
+   * remembered from there, so that its own «legge» does not stop the next («; l'art. 7 della stessa legge»).
+   */
+  referenceEnd?: number;
   /** A bare article followed by something else («del contratto», a capital, «St.»): never inherited. */
   followedBy?: string;
 }
@@ -318,7 +471,7 @@ export function findCandidates(text: string, vocabulary: Vocabulary): Candidate[
     const end = act.index + act[0].length;
     const query = articleQuery(vocabulary, run.articles, act[0]);
     if (query.length > MAX_QUERY_LENGTH || !free(start, end)) continue;
-    candidates.push({ kind: 'article-act', start, end, query, articles: run.articles });
+    candidates.push({ kind: 'article-act', start, end, query, actPhrase: fold(act[0]), articles: run.articles });
     take(start, end);
   }
 
@@ -345,7 +498,7 @@ export function findCandidates(text: string, vocabulary: Vocabulary): Candidate[
     if (OF_SOMETHING.test(text.slice(head.run.end, head.run.end + 60))) continue;
     const query = articleQuery(vocabulary, head.run.articles, act.phrase);
     if (query.length > MAX_QUERY_LENGTH || !free(act.start, head.run.end)) continue;
-    candidates.push({ kind: 'act-article', start: act.start, end: head.run.end, query, articles: head.run.articles });
+    candidates.push({ kind: 'act-article', start: act.start, end: head.run.end, query, actPhrase: fold(act.phrase), articles: head.run.articles });
     take(act.start, head.run.end);
   }
 
@@ -354,7 +507,7 @@ export function findCandidates(text: string, vocabulary: Vocabulary): Candidate[
     if (!free(act.start, act.end) || !canBeContext(act.phrase)) continue;
     const query = sentAct(vocabulary, act.phrase);
     if (query.length > MAX_QUERY_LENGTH) continue;
-    candidates.push({ kind: 'act', start: act.start, end: act.end, query, articles: [] });
+    candidates.push({ kind: 'act', start: act.start, end: act.end, query, actPhrase: fold(act.phrase), articles: [] });
     take(act.start, act.end);
   }
 
@@ -362,16 +515,22 @@ export function findCandidates(text: string, vocabulary: Vocabulary): Candidate[
   for (const { start, run } of heads) {
     if (!free(start, run.end)) continue;
     const tail = text.slice(run.end, run.end + 60);
-    const sameAct = SAME_ACT.test(tail);
+    // The words right before it, on its line: «(ivi, art. 30)», «dello stesso art. 18».
+    const before = text.slice(Math.max(0, start - 30), start);
+    const after = referenceAfter(tail);
     // An act a few words on, on the same line and before a «;», is this article's even when the words between could
     // not be read («art. 18, ottavo e nono comma, della legge …»): never another act's by inheritance.
     const line = text.slice(run.end, run.end + NEAR_ACT_REACH + MAX_QUERY_LENGTH).split(/[;\n]/)[0];
-    const found = sameAct ? null : nearAct.exec(line);
+    const found = after ? null : nearAct.exec(line);
     const near = found && found.index <= NEAR_ACT_REACH ? found : null;
-    const other = !sameAct && (OF_SOMETHING.test(tail) || SOMETHING_ELSE.test(tail) || near !== null);
+    const other = !after && (OF_SOMETHING.test(tail) || SOMETHING_ELSE.test(tail) || near !== null);
+    // The words before count only when nothing after names something else: «il citato art. 2 del contratto», «ivi,
+    // art. 30 del regolamento condominiale» are the contract's and the regulation's.
+    const reference = after ?? (other ? null : referenceBefore(before.slice(before.lastIndexOf('\n') + 1)));
     candidates.push({
       kind: 'bare', start, end: run.end, query: null, articles: run.articles,
-      ...(sameAct ? { sameAct } : {}),
+      ...(reference ? { backReference: { kind: reference.kind, ...(reference.sameArticle ? { sameArticle: true } : {}) } } : {}),
+      ...(after ? { referenceEnd: run.end + after.length } : {}),
       ...(other ? { followedBy: near && !OF_SOMETHING.test(tail) && !SOMETHING_ELSE.test(tail) ? fold(near[0]) : followedWords(tail) } : {}),
     });
     take(start, run.end);
@@ -483,25 +642,119 @@ function marks(candidate: Candidate): Array<{ start: number; end: number; item: 
   }));
 }
 
+/** How many acts read before a bare article it may look back on: a reference further back is to complete. */
+const HISTORY = 64;
+
+/** An act read before, with the articles cited of it there and its paragraph: what a back-reference looks for. */
+interface ReadAct {
+  act: NonNullable<DocumentCitation['act']>;
+  /** The kind its own words name («l. fall.» a law, «nuovo codice appalti» a code), whatever the server's type. */
+  written: ActKind | null;
+  articles: readonly string[];
+  line: number;
+  /** Where its citation ends in the text. */
+  end: number;
+}
+
+const sameActAs = (a: ReadAct['act'], b: ReadAct['act']) =>
+  a.act_type.toLowerCase() === b.act_type.toLowerCase() && a.act_number === b.act_number && a.date === b.date && a.annex === b.annex;
+
+/** Acts that are never another kind's under a name: the Costituzione, the Treaties, the Charter. */
+const ONLY_ITSELF = new Set(['costituzione', 'tue', 'tfue', 'cdfue']);
+
+/** An act a kind search may not pass over: its words say no kind, it has no number, or it is a code (§4.6). */
+function mayBeOfAnyKind({ act, written }: ReadAct): boolean {
+  const type = act.act_type.toLowerCase();
+  if (ONLY_ITSELF.has(type)) return false;
+  return written === null || written === 'any' || !act.act_number || type.startsWith('codice') || written === 'code';
+}
+
+/**
+ * The act a back-reference names: the last one of its kind (by the server's type or by its own words), or the last
+ * cited with this very article. None when:
+ * - nothing fits;
+ * - the search would pass over an act whose own words do not say its kind («c.c.», «jobs act», «tusl»), an act with no
+ *   number, or a code: each may well be of the kind under another name (the Codice privacy is a legislative decree,
+ *   the jobs act a law);
+ * - the paragraph of the act found names another that fits as well («l'art. 5 del d.lgs. 28/2010, come modificato dal
+ *   d.lgs. 149/2022 … l'art. 12-bis del medesimo decreto»): the words could mean either;
+ * - the word of the kind is written, outside any citation, between the act found and the article («il regolamento
+ *   condominiale, all'art. 5 del medesimo regolamento»): it may be that one, which the page cannot read.
+ */
+function referredAct(
+  history: readonly ReadAct[], reference: BackReference, articles: readonly CandidateArticle[],
+  mentioned: (kind: ActKind, from: number) => boolean,
+) {
+  const byKind = !reference.sameArticle && reference.kind !== 'any';
+  const fits = ({ act, written, articles: cited }: ReadAct) => (reference.sameArticle
+    ? articles.every((a) => cited.includes(a.article))
+    : fitsKind(reference.kind, act.act_type) || fitsWrittenKind(reference.kind, written));
+  let found = -1;
+  for (let i = history.length - 1; i >= 0 && found < 0; i -= 1) {
+    if (fits(history[i])) found = i;
+    else if (byKind && mayBeOfAnyKind(history[i])) return null;
+  }
+  if (found < 0) return null;
+  const { act, line, end } = history[found];
+  if (history.some((other) => other.line === line && fits(other) && !sameActAs(other.act, act))) return null;
+  if (byKind && mentioned(reference.kind, end)) return null;
+  return history[found];
+}
+
 /**
  * The rows of a document (§4.4–§4.7), in the order of the text: what the readings settle is resolved; a bare
- * article inherits the act of the last resolved candidate of its paragraph (or across paragraphs with «del medesimo
- * decreto»); a candidate the server did not answer keeps the browser matcher's matches inside it; the rest is to
- * complete.
+ * article the text ties to an act named before («del medesimo decreto», «ivi», «Reg. cit.») inherits that act; a
+ * candidate the server did not answer keeps the browser matcher's matches inside it; the rest is to complete.
  *
- * Two rules keep a guess out of the inheritance: a candidate that names an act the page could not read, and a bare
- * article followed by something else («del contratto»), end the context — the next bare article is to complete
- * rather than given an act the text has moved away from.
+ * Inheritance is never a guess (G-402): a bare article with no such words is to complete, even right after an act.
+ * The words choose the act: the last read of the kind they name («del citato decreto-legge»), or the last cited with
+ * the same article («dello stesso art. 18», «art. 18 cit.»). Two things end what may be referred to: a candidate
+ * that names an act the page could not read, and a bare article followed by something else («del contratto»).
  */
 export function settleCitations(text: string, candidates: readonly Candidate[], readings: Readings): DocumentAnalysis {
   const citations: DocumentCitation[] = [];
-  let context: { act: NonNullable<DocumentCitation['act']>; line: number } | null = null;
+  let history: ReadAct[] = [];
   let line = 0;
   let counted = 0;
   const lineAt = (position: number) => {
     for (let i = text.indexOf('\n', counted); i !== -1 && i < position; i = text.indexOf('\n', i + 1)) line += 1;
     counted = Math.max(counted, position);
     return line;
+  };
+  const remember = (act: ReadAct['act'], written: ActKind | null, candidate: Candidate, at: number) => {
+    const end = Math.max(candidate.end, candidate.referenceEnd ?? 0);
+    history.push({ act, written, articles: candidate.articles.map((a) => a.article), line: at, end });
+    if (history.length > HISTORY) history = history.slice(-HISTORY);
+  };
+  // Where the word of each kind is written outside every candidate, found once per kind when first asked.
+  const words = new Map<string, number[]>();
+  const outside = (position: number) => {
+    let low = 0;
+    let high = candidates.length - 1;
+    while (low <= high) {
+      const middle = (low + high) >> 1;
+      if (candidates[middle].start <= position) low = middle + 1;
+      else high = middle - 1;
+    }
+    return high < 0 || position >= candidates[high].end;
+  };
+  /** The word of `kind` is written, outside any candidate, after `from` and before `to`. */
+  const mentionedBetween = (kind: ActKind, from: number, to: number) => {
+    const stem = KIND_WORD[kind];
+    if (!stem) return false;
+    let positions = words.get(stem);
+    if (!positions) {
+      positions = [...text.matchAll(new RegExp(`(?<!\\p{L})(?:${stem})`, 'giu'))].map((m) => m.index).filter(outside);
+      words.set(stem, positions);
+    }
+    let low = 0;
+    let high = positions.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (positions[middle] < from) low = middle + 1;
+      else high = middle;
+    }
+    return low < positions.length && positions[low] < to;
   };
   let fallbackMatches: CitationMatch[] | null = null;
   let degraded = false;
@@ -513,14 +766,14 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
       const reading = readings.settled.get(candidate.query);
       if (reading) {
         const act = actOf(reading);
-        context = { act, line: at };
+        remember(act, candidate.actPhrase ? writtenKind(candidate.actPhrase) : null, candidate, at);
         if (candidate.kind === 'act') actsNamed.push({ start: candidate.start, act });
         for (const { start, end, item } of marks(candidate)) {
           citations.push({ start, end, article: item.article, ...(item.following ? { following: true } : {}), state: 'resolved', act });
         }
         continue;
       }
-      context = null;
+      history = [];
       if (readings.unanswered.has(candidate.query)) {
         degraded = true;
         fallbackMatches ??= extractCitations(text);
@@ -543,8 +796,13 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
     }
 
     // A bare article.
-    const inherits = context && !candidate.followedBy && (candidate.sameAct || context.line === at) ? context.act : null;
-    if (candidate.followedBy) context = null;
+    const reference = candidate.backReference;
+    const referred = reference
+      ? referredAct(history, reference, candidate.articles, (kind, from) => mentionedBetween(kind, from, candidate.start))
+      : null;
+    const inherits = referred?.act ?? null;
+    if (candidate.followedBy) history = [];
+    if (referred) remember(referred.act, referred.written, candidate, at);
     for (const { start, end, item } of marks(candidate)) {
       citations.push({
         start, end, article: item.article,
