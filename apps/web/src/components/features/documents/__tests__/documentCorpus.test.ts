@@ -13,8 +13,13 @@ import { emptyScore, loadCorpus, scoreDocument, type Score } from './corpus/corp
 // recorded from the API's own functions (corpus/server.json, corpus/record_server.py): no request is made. It prints
 // §3.2's table and fails below the floor. The figure the owners judge is the blind corpus's (§3.3), not this one.
 
-/** The floor: on PR 1's code the spec measured 98 of 103 within the paragraph, with no wrong citation (§3.2). */
-const FLOOR = 98;
+/**
+ * The floor. PR 2 found 98 of 103, 7 of them inherited within the paragraph. G-402 keeps only the inheritance the text
+ * states («del medesimo decreto», «ivi», «Reg. cit.»): on this corpus one of the 7 («art. 37 del medesimo decreto»),
+ * so 92, the other 6 to complete. The blind corpus is why (§3.3): there the paragraph's inheritance was wrong as often
+ * as it was right.
+ */
+const FLOOR = 92;
 
 const recorded = JSON.parse(readFileSync(join(__dirname, 'corpus', 'server.json'), 'utf8')) as {
   act_names: string[];
@@ -82,7 +87,7 @@ describe('«Analizza documento» on the corpus of spec 2026-10-29-document-analy
       '| Path | Found | Wrong or invented | To complete by hand | Missed | Non-norms to dismiss |',
       '| --- | ---: | ---: | ---: | ---: | ---: |',
       row('Today: the page’s `extractCitations`', before),
-      row('**This PR**: candidates, the client then the server, inheritance within the paragraph', total),
+      row('**This PR**: candidates, the client then the server, inheritance only where the text states it', total),
       '',
       `Of ${total.total} article citations; acts named alone read as context: ${total.actsFound} of ${total.acts}.`,
       `By document, today → this PR: ${perDocument.join('; ')}.`,

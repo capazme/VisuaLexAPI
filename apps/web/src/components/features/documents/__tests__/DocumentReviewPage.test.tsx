@@ -463,7 +463,7 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
   const BRIEF = [
     'Memoria del convenuto, Mario Bianchi.',
     'Il datore risponde ai sensi dell’art. 82 GDPR e degli artt. 13 e 14 GDPR.',
-    'Visto il d.lgs. 81/2008, l’art. 18 impone obblighi di sicurezza.',
+    'Visto il d.lgs. 81/2008, l’art. 18 del medesimo decreto impone obblighi di sicurezza.',
     'L’art. 7 del contratto prevede una penale; restano gli artt. 167 e ss. del Codice privacy.',
   ].join('\n');
 
@@ -505,7 +505,7 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull();
   });
 
-  it('opens an inherited citation with the act of its paragraph', async () => {
+  it('opens an inherited citation with the act its words name («del medesimo decreto»)', async () => {
     const { container } = render(<DocumentReviewPage />);
     await choose(container, BRIEF, 'memoria.txt');
     await userEvent.click(screen.getByRole('button', { name: 'Apri art. 18 d.lgs. 81/2008' }));
