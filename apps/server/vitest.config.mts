@@ -24,10 +24,9 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // Each file in a process of its own (vitest 4 has no single shared fork), one file at a time
+    // so the shared test DB is fully isolated by the DELETEs before each test.
     pool: 'forks',
-    forks: {
-      singleFork: true, // single process
-    },
-    fileParallelism: false, // run test files sequentially so the shared test DB is fully isolated by the DELETEs before each test
+    fileParallelism: false,
   },
 });

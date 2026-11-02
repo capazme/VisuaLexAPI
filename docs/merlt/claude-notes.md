@@ -1070,10 +1070,9 @@ the worker share.
 ### MERL-T testing
 
 - **Backend.** vitest + supertest on a real Postgres test DB, with nock
-  through `apps/server/tests/nockShim.ts`. `apps/server/tests/setup.ts` truncates
-  `merlt_qa_jobs`, `merlt_ingestion_jobs`, `merlt_extraction_jobs`,
-  `merlt_consent_audits`, `merlt_user_preferences` and
-  `merlt_user_authority_cache` between tests.
+  through `apps/server/tests/nockShim.ts`. `apps/server/tests/setup.ts` empties
+  every table before each test, the `merlt_*` ones included (`apps/server/CLAUDE.md`,
+  Tests).
 - **Frontend.** vitest + jsdom.
 - **CI.** `.github/workflows/ci.yml` runs on `main` and `develop`. Its
   `merlt` job, on `develop` and on pull requests into it, runs the MERL-T suite on Python 3.11

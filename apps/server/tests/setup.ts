@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, inject, vi } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { dropDevelopmentEnv } from './devEnvGuard';
-import { assertTestDatabase, type TestDatabase } from './testDatabase';
+import { SCHEMA_FINGERPRINT, assertTestDatabase, type TestDatabase } from './testDatabase';
 
 // The suite's environment is `.env.test` alone (`tests/devEnvGuard.ts`). `src/config.ts` calls
 // `dotenv.config()`, which would read a development `apps/server/.env` into the run: a no-op here.
@@ -44,12 +44,21 @@ process.env.OAUTH_DELEGATION_SECRET = 'test-delegation-secret';
 // table is emptied, with DELETEs in the order the foreign keys allow (a TRUNCATE costs about
 // 200 ms each time, rewriting each table's files, against a few ms), and the text versions the
 // migrations insert are put back: every test starts from empty tables plus version 1 of each
-// text to accept, as a fresh database has.
+// text to accept, as a fresh database has. Each file first checks that the schema is still the
+// one the migrations made: no reset runs between files any more.
 let database: TestDatabase;
 
-beforeAll(() => {
+beforeAll(async () => {
   assertTestDatabase();
   database = inject('testDatabase');
+  const [schema] = await prisma.$queryRawUnsafe<{ fingerprint: string }[]>(SCHEMA_FINGERPRINT);
+  if (schema.fingerprint !== database.schema) {
+    throw new Error(
+      'The test database schema is no longer the one the migrations made at the start of the run: ' +
+        'a test in an earlier file changed it and did not undo it (one that timed out before its `finally`?). ' +
+        'Fix that test; the next run resets the database.'
+    );
+  }
 });
 
 beforeEach(async () => {
