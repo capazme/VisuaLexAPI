@@ -76,7 +76,9 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   then does not give up and retry. A cancelled call stops the steps not yet begun, and its log line says
   `outcome=cancelled`),
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
+  checked by `apps/server`; while `GET /features` says `articleParts: true`, the switch `article_parts`, its
+  description says a reference with a comma adds the part of a split article that holds it, G-387 (a)),
+  `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
   words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
   the Cassazione, the Corte costituzionale, the Court of Justice and the General Court of the
   Union (by their case), the Consiglio di Stato, the C.G.A.R.S. and the TAR (by kind, and a TAR by
@@ -135,7 +137,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   VisuaLex shows it, and the glosses this application proposed still to validate; for a norm, the server adds
   Normattiva's update notes after `testo`, on every part, as `note_aggiornamento` (absent when the text already holds
   them, as for the codes), and `avviso_note` when some could not be read — never inside the text, G-386; `avviso_testo_parziale` when the
-  text is one part of an article Normattiva splits, G-387; scope `dossier:text`), **always
+  text is one part of an article Normattiva splits, G-387, naming the part served for one stored as an entry; scope
+  `dossier:text`; its `parte` is still the page number), **always
   listed**: it is how an application quotes an entry verbatim (G-372). `omnilex_glossa_voce` (an optional general gloss
   up to 4,000 characters, which becomes a note about the entry through `POST /dossiers/:id/notes`, and 1–10 glosses on
   passages `{ testo 15–2000, nota ≤ 1500, prima?, dopo? }`, no colour; the passages first, so a call refused whole writes
@@ -178,10 +181,16 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   modules runs to millions of characters), each flag with its module and question, or with `modulo` that module
   whole with its flags and judgement. The input schemas carry the shape only: the limits and the rules (the
   lesson's Markdown subset, citations as entries of the course's dossier, the shares of application questions)
-  are in `lingolex_schema_card`'s text and the server checks them all, naming the part. Nothing edits, withdraws
-  or deletes a course or a module (G-377, Q9): a correction is a new module with `sostituisceId`. The definitions'
-  size is held by `tests/courses.test.ts`: with the switch on they pass §10.6's 18,000 characters, which the groups
-  of 1b are meant to keep for those who switch the courses on.
+  are in `lingolex_schema_card`'s text and the server checks them all, naming the part. A module's `blocchi`,
+  `quiz` and `aperta`, and an exam's `domande` and `aperta`, are not even shaped in the definitions (G-391): they
+  are plain objects there (`z.looseObject({})`), their shape is in the schema text, and the handlers check them
+  against `MODULE_PARTS` and `EXAM_PARTS` with the SDK's words before anything is sent. They are the server's only
+  open object schemas (`{"type":"object","properties":{},"additionalProperties":{}}`): Claude takes them, but a
+  client that turns tool schemas into a strict function-calling mode may refuse or mangle them (the optional
+  properties elsewhere already keep strict modes out), so whoever switches `lingo_courses` on creates one module
+  from LibreLex first. Nothing edits, withdraws or deletes a course or a module (G-377, Q9): a correction is a new module with
+  `sostituisceId`. The definitions' size is held by `tests/courses.test.ts`: with the switch on they pass §10.6's
+  18,000 characters, an overshoot accepted until the groups of 1b keep the courses for those who use them (G-391).
 - **Hardening** — binds to `127.0.0.1` by default. On every bind it refuses a
   `Host` other than `MCP_RESOURCE`'s hostname or the loopback names (DNS
   rebinding; the port does not count). It refuses a browser `Origin` not in

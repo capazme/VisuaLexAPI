@@ -87,6 +87,8 @@ def walk_tree(items: list) -> list[IndexedArticle]:
         raw = item.get("numero")
         if not raw or not str(raw).strip():
             continue
+        if item.get("parte"):
+            continue  # a part of a split article after its first: the article is listed once (G-387 (a))
         annex = item.get("allegato")
         annex = str(annex) if annex is not None else None
         if seen_any and annex != current_annex:

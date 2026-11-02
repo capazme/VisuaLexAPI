@@ -131,5 +131,13 @@ Trimmed captures of 2026-10-29, for the parts of a split article (`normattiva_pa
 - `dlgs23_2015_tree_trimmed.html` — the whole tree of d.lgs. 23/2015 as art. 3's page serves it: every article
   whole, `art.progressivo=0`.
 
+A trimmed capture of 2026-10-30, for reading one part (`NormattivaScraper.read_part_page`, G-387 (a),
+`tests/test_normattiva_part_entries.py`):
+
+- `l296_2006_art1_part_701-800_trimmed.html` — part 8 of art. 1 l. 296/2006, «1 (commi 701-800)», as
+  `/atto/caricaArticolo?…&art.progressivo=8` serves it in the article page's session (an XML declaration,
+  then a fragment with `div.bodyTesto`), cut byte for byte to its first three commas (701-703): the
+  `art-comma-div-akn` blocks from comma 704 to 800 are removed, everything else is as served.
+
 The extractor's output for every file here is frozen (CLAUDE.md gotcha 23:
 `article_text` is the offset space of every stored highlight and note).

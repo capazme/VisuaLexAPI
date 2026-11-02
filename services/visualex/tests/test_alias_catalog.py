@@ -66,3 +66,32 @@ class TestEndpointShape:
         exactly how /parse_query shipped dead once already."""
         source = open('app.py', encoding='utf-8').read()
         assert "'/fetch_alias_catalog'" in source
+
+
+class TestActNames:
+    """`act_names`: the names «Analizza documento» looks for in a document, in the browser
+    (design 2026-10-29-document-analysis §4.2) — every name that names an act on its own."""
+
+    def test_names_that_identify_an_act_and_no_bare_type_word(self):
+        from visualex_api.tools.norm_query import act_names
+
+        names = act_names()
+        assert len(names) >= 400, "the act-name list shrank"
+        for name in ("codice civile", "c.c.", "gdpr", "statuto dei lavoratori", "tusl", "st. lav.", "costituzione"):
+            assert name in names
+        for word in ("legge", "d.lgs.", "decreto legislativo", "dpcm", "d.m.", "regolamento ue"):
+            assert word not in names
+
+    def test_each_name_reads_to_an_identified_act(self):
+        from visualex_api.tools.act_identity import identifies_act
+        from visualex_api.tools.norm_query import act_names, read_norm_query
+
+        assert all(identifies_act(read_norm_query(name)[0]) for name in act_names())
+
+    @pytest.mark.asyncio
+    async def test_served_beside_the_other_two(self):
+        controller = NormaController()
+        response = await controller.app.test_client().get("/fetch_alias_catalog")
+        body = await response.get_json()
+        assert set(body) == {"presets", "known_acts", "act_names"}
+        assert body["act_names"] == sorted(body["act_names"])

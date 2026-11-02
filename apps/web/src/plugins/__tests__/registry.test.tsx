@@ -18,9 +18,6 @@ vi.mock('../../features/merlt/ArticleMerltSlot', () => ({
 vi.mock('../../features/merlt/graph/side-rail/ArticleGraphSideRail', () => ({
   ArticleGraphSideRail: () => null,
 }));
-vi.mock('../../features/merlt/rassegne/RassegnePanel', () => ({
-  RassegnePanel: () => null,
-}));
 
 import { getSlotComponents } from '../registry';
 import { PluginSlot } from '../PluginSlot';
@@ -34,26 +31,21 @@ afterEach(() => {
 });
 
 describe('getSlotComponents', () => {
-  it('returns the tracker after the article and the reviews panel in the case-law slot (flag unset)', () => {
+  it('returns the tracker after the article (flag unset); the reviews panel is no plugin', () => {
     const components = getSlotComponents('article_content_after');
     expect(components.map((c) => c.id)).toEqual(['merlt-article-tracker']);
     expect(components[0].pluginId).toBe('visualex-merlt');
     expect(components[0].requiredFlag).toBe('VITE_FEATURE_MERLT');
-    const caseLaw = getSlotComponents('article_case_law');
-    expect(caseLaw.map((c) => c.id)).toEqual(['merlt-article-rassegne']);
-    expect(caseLaw[0].requiredFlag).toBe('VITE_FEATURE_MERLT');
   });
 
   it('includes the entries when VITE_FEATURE_MERLT=true', () => {
     vi.stubEnv('VITE_FEATURE_MERLT', 'true');
     expect(getSlotComponents('article_content_after')).toHaveLength(1);
-    expect(getSlotComponents('article_case_law')).toHaveLength(1);
   });
 
   it('excludes the entry when VITE_FEATURE_MERLT=false', () => {
     vi.stubEnv('VITE_FEATURE_MERLT', 'false');
     expect(getSlotComponents('article_content_after')).toHaveLength(0);
-    expect(getSlotComponents('article_case_law')).toHaveLength(0);
   });
 
   it('excludes the entry when VITE_FEATURE_MERLT=0', () => {

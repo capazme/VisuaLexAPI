@@ -59,8 +59,9 @@ describe('the administrator’s texts', () => {
     await save(admin, NEW_VERSION);
     const response = await list(admin);
     expect(response.status).toBe(200);
-    // Every key, each with its versions: the card proposal's, the MERL-T notice and the study material's declaration.
-    expect(response.body.testi.map((t: { chiave: string }) => t.chiave).sort()).toEqual(['INFORMATIVA_MERLT', 'MATERIALE_STUDIO', 'PROPOSTA_SCHEDA']);
+    // Every key, each with its versions: the card proposal's, the MERL-T notice, the study material's declaration
+    // and the Community's licence.
+    expect(response.body.testi.map((t: { chiave: string }) => t.chiave).sort()).toEqual(['CONTRIBUTO_COMMUNITY', 'INFORMATIVA_MERLT', 'MATERIALE_STUDIO', 'PROPOSTA_SCHEDA']);
     const { versioni } = response.body.testi.find((t: { chiave: string }) => t.chiave === 'PROPOSTA_SCHEDA');
     expect(versioni.map((v: { versione: number }) => v.versione)).toEqual([2, 1]);
     expect(versioni[0]).toMatchObject({ ...NEW_VERSION, autore: 'tx-admin' });

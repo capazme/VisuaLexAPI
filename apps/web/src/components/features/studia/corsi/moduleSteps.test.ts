@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { forgetStepsReached, moduleSteps, readStepReached, saveStepReached, stepLine, stopMessage, withOutcome } from './moduleSteps';
+import { EMPTY_WORK, forgetModuleSessions, forgetWork, moduleSteps, readStepReached, readWork, saveStepReached, saveWork, stepLine, stopMessage, withOutcome } from './moduleSteps';
 import { lesson } from './__fixtures__/corsi';
 
-afterEach(() => forgetStepsReached());
+afterEach(() => forgetModuleSessions());
 
 describe('a module\'s steps (§5, §6.5)', () => {
   it('are the start, each block\'s reading and recall, and the quiz', () => {
     const steps = moduleSteps(lesson());
-    expect(steps.map((s) => s.tipo)).toEqual(['inizio', 'lettura', 'richiamo', 'lettura', 'richiamo', 'quiz']);
-    expect(stepLine(2, steps)).toBe('Passo 3 di 6 · Richiamo');
-    expect(stepLine(0, steps)).toBe('Passo 1 di 6 · Prima di leggere');
+    expect(steps.map((s) => s.tipo)).toEqual(['inizio', 'lettura', 'richiamo', 'lettura', 'richiamo', 'attesa']);
+    expect(stepLine(2, steps)).toBe('Passo 3 di 5 · Richiamo');
+    expect(stepLine(0, steps)).toBe('Passo 1 di 5 · Prima di leggere');
+    // The waiting screen until the quiz (pull request c) is no step, and names no quiz.
+    expect(stepLine(5, steps)).toBe('Fine della lettura');
   });
 
   it('keeps the step reached on this device, within the module\'s steps, until a sign-in or sign-out forgets it', () => {
@@ -18,7 +20,7 @@ describe('a module\'s steps (§5, §6.5)', () => {
     expect(readStepReached('m-3', 6)).toBe(4);
     expect(readStepReached('m-3', 4)).toBeNull();
     expect(readStepReached('m-9', 6)).toBeNull();
-    forgetStepsReached();
+    forgetModuleSessions();
     expect(readStepReached('m-4', 6)).toBeNull();
   });
 
@@ -27,6 +29,28 @@ describe('a module\'s steps (§5, §6.5)', () => {
     expect(readStepReached('0', 6)).toBeNull();
     localStorage.setItem('visualex.studia.percorsi.passo', '{"m-3":"2"}');
     expect(readStepReached('m-3', 6)).toBeNull();
+  });
+});
+
+describe('a module\'s work kept in this tab (review of #374)', () => {
+  it('keeps the recall, the highlights and the phase per module, drops what is empty or does not read as work', () => {
+    saveWork('m-3', { 'b-1': { spans: [[2, 9]], scritto: 'ricordo', fase: 'confronta' }, 'b-2': EMPTY_WORK });
+    saveWork('m-4', { 'b-9': { ...EMPTY_WORK, scritto: 'altro' } });
+    expect(readWork('m-3')).toEqual({ 'b-1': { spans: [[2, 9]], scritto: 'ricordo', fase: 'confronta' } });
+    sessionStorage.setItem('visualex.studia.percorsi.lavoro', JSON.stringify({ 'm-5': { 'b-1': { spans: [[9, 2]], scritto: 'x', fase: 'scrivi' }, 'b-2': { scritto: 3 } } }));
+    expect(readWork('m-5')).toEqual({});
+  });
+
+  it('forgets one module with «Interrompi», and every module at sign-in or sign-out', () => {
+    saveWork('m-3', { 'b-1': { ...EMPTY_WORK, scritto: 'ricordo' } });
+    saveWork('m-4', { 'b-9': { ...EMPTY_WORK, scritto: 'altro' } });
+    forgetWork('m-3');
+    expect(readWork('m-3')).toEqual({});
+    expect(readWork('m-4')).not.toEqual({});
+    saveStepReached('m-4', 2);
+    forgetModuleSessions();
+    expect(readWork('m-4')).toEqual({});
+    expect(readStepReached('m-4', 6)).toBeNull();
   });
 });
 

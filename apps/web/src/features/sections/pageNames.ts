@@ -27,6 +27,7 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/forum\/?$/, PUBLIC_DOSSIERS_PAGE],
   [/^\/history(\/|$)/, 'Cronologia'],
   [/^\/documents(\/|$)/, 'Analizza documento'],
+  [/^\/rassegne(\/|$)/, 'Rassegne'],
   [/^\/collega-app(\/|$)/, 'Collega un’app AI'],
   [/^\/merlt\/?$/, ASSISTANT_PAGE],
   [/^\/grafo(\/|$)/, GRAPH_PAGE],

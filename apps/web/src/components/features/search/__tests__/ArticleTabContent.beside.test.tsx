@@ -22,6 +22,7 @@ vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
 vi.mock('../../../../features/devMode/useDevMode', () => ({ useDevMode: () => devMode() }));
 // The slots are named, so the test sees which are drawn.
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: ({ slot }: { slot: string }) => <div data-testid={`slot-${slot}`} /> }));
+vi.mock('../../rassegne/RassegnePanel', () => ({ RassegnePanel: () => <div data-testid="rassegne-panel" /> }));
 
 import { ArticleTabContent } from '../ArticleTabContent';
 import { FindWindow } from '../FindWindow';
@@ -195,11 +196,11 @@ describe('ArticleTabContent variant="row" — without the development mode', () 
     expect(brocardiLeft()).toBeNull();
   });
 
-  it('still draws the tracker, «Giurisprudenza» and the Massimario\'s slot', () => {
+  it('still draws the tracker, «Giurisprudenza» and the Massimario\'s panel', () => {
     show('row', article(), vi.fn());
     expect(screen.getByTestId('slot-article_content_after')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Giurisprudenza/ }));
-    expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
+    expect(screen.getByTestId('rassegne-panel')).toBeInTheDocument();
   });
 });
 

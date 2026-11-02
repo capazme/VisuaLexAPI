@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import type { NormaVisitata } from '../../../types';
 import type { SearchDecisionsAnswer } from '../../../types/decisions';
 
-const { slotCalls } = vi.hoisted(() => ({ slotCalls: [] as Array<{ slot: string; props: Record<string, unknown> }> }));
+const { panelCalls } = vi.hoisted(() => ({ panelCalls: [] as Array<Record<string, unknown>> }));
 vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/decisionSearchService')>()),
   searchDecisions: vi.fn(),
@@ -13,10 +13,10 @@ vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
 vi.mock('../../../services/euCaseLawService', () => ({
   searchEuCaseLaw: vi.fn(async () => ({ esito: 'risultati', celex: '', articolo: '', totale: 0, troncato: false, decisioni: [] })),
 }));
-vi.mock('../../../plugins/PluginSlot', () => ({
-  PluginSlot: ({ slot, props }: { slot: string; props: Record<string, unknown> }) => {
-    slotCalls.push({ slot, props });
-    return <div data-testid={`slot-${slot}`} />;
+vi.mock('../rassegne/RassegnePanel', () => ({
+  RassegnePanel: (props: Record<string, unknown>) => {
+    panelCalls.push(props);
+    return <div data-testid="rassegne-panel" />;
   },
 }));
 import { searchDecisions } from '../../../services/decisionSearchService';
@@ -45,7 +45,7 @@ const toggle = () => screen.getByRole('button', { name: 'Giurisprudenza' });
 
 beforeEach(() => {
   searchMock.mockReset();
-  slotCalls.length = 0;
+  panelCalls.length = 0;
   window.sessionStorage.clear();
 });
 
@@ -57,15 +57,15 @@ describe('CaseLawSection', () => {
     expect(screen.queryByRole('button', { name: /Cerca nell’archivio della Cassazione/ })).toBeNull();
   });
 
-  it('shows the Massimario slot and the Cassazione button, and nothing of Brocardi (D-078)', async () => {
+  it('shows the Massimario\'s panel and the Cassazione button, and nothing of Brocardi (D-078)', async () => {
     show({ backEntry: { tabId: 'tab-1', blockId: 'b', articleId: 'a', label: 'art. 2043 c.c.' } });
     await userEvent.click(toggle());
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByText(/Brocardi/)).toBeNull();
     expect(screen.queryByText(/[Mm]assime/)).toBeNull();
-    expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
-    expect(slotCalls.at(-1)?.props).toMatchObject({
-      articleUrn: NORMA.urn, isHistorical: false, besideId: 'tab-1',
+    expect(screen.getByTestId('rassegne-panel')).toBeInTheDocument();
+    expect(panelCalls.at(-1)).toMatchObject({
+      articleUrn: NORMA.urn, besideId: 'tab-1',
       backEntry: { tabId: 'tab-1', label: 'art. 2043 c.c.' },
     });
     expect(screen.getByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeInTheDocument();
@@ -90,10 +90,12 @@ describe('CaseLawSection', () => {
     );
   });
 
-  it('on a past text keeps the section, the Massimario and the search', async () => {
-    show({ isHistorical: true });
+  it('shows the Massimario\'s panel with MERL-T off: a block of the section, not a plugin', async () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    show();
     await userEvent.click(toggle());
-    expect(slotCalls.at(-1)?.props).toMatchObject({ isHistorical: true });
+    expect(screen.getByTestId('rassegne-panel')).toBeInTheDocument();
+    vi.unstubAllEnvs();
     expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
   });
 
@@ -104,7 +106,7 @@ describe('CaseLawSection', () => {
       expect(screen.queryByRole('button', { name: 'Cerca nell’archivio della Cassazione' }), tipo_atto).toBeNull();
       expect(screen.queryByRole('heading', { name: 'Cassazione — menzionano l’articolo' }), tipo_atto).toBeNull();
       // the rest of the section stays
-      expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
+      expect(screen.getByTestId('rassegne-panel')).toBeInTheDocument();
       view.unmount();
       window.sessionStorage.clear();
     }
@@ -229,12 +231,6 @@ describe('CaseLawSection — «Cerca sentenze sul tema dell’articolo»', () =>
     show({ topic: 'Liceità del trattamento', norma: { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6' } });
     await userEvent.click(toggle());
     expect(topicLink()).toBeNull();
-  });
-
-  it('stays on a past text, with the rest of the section', async () => {
-    show({ topic: RUBRIC, isHistorical: true });
-    await userEvent.click(toggle());
-    expect(topicLink()).not.toBeNull();
   });
 
   it('opens with no host to sit beside when the article has none', async () => {

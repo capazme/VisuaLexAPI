@@ -63,7 +63,7 @@ async function textOf(item: { itemType: string; content: unknown }): Promise<Ent
   } catch (error) {
     if (error instanceof EntryHasNoText) throw new AppError(400, NO_TEXT);
     if (error instanceof EntryUnreadable) throw new AppError(400, 'I dati di questa norma nel dossier sono incompleti: aggiungila di nuovo.');
-    if (error instanceof SourceHasNoText) throw new AppError(400, 'La fonte non ha il testo di questa voce: controlla la norma o la sentenza nel dossier.');
+    if (error instanceof SourceHasNoText) throw new AppError(400, error.message || 'La fonte non ha il testo di questa voce: controlla la norma o la sentenza nel dossier.');
     if (error instanceof TextUnavailable) throw new AppError(503, NOT_YET);
     throw error;
   }

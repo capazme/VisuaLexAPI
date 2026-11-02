@@ -110,10 +110,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   **A module's session** (pull request b; §5 steps 1–4, §6.5, §10.3) is `/studia/percorsi/:id/moduli/:moduloId` — by the
   module's id, since a correction shares its order — `ModuleSession`, in `LessonFrame` as the review (`StudiaPage`'s
   `isLesson`; `LessonLoading` goes back to the course): the header says «Passo 4 di 11 · Richiamo» (`moduleSteps.ts`:
-  the start, each block's reading and recall, then the quiz, which until pull request c is a holding screen), the step
-  in the middle (keyed by step and by the recall's phase, its heading focused in the commit), the one action in
-  `LessonBar`; while the switch is read, `LessonLoading` keeps the close button and Esc around `CoursesGate`. `GET
-  …/moduli/:moduloId` is read once (the content is frozen once opened). The start says what the module is
+  the start, each block's reading and recall, then a waiting screen until pull request c brings the quiz, which counts as
+  no step and says «Fine della lettura»), the step in the middle (keyed by step and by the recall's phase, its heading
+  focused in the commit), the one action in `LessonBar`; while the switch is read, `LessonLoading` keeps the close
+  button and Esc around `CoursesGate`. `GET …/moduli/:moduloId` is read once (the content is frozen once opened); its
+  404 reads the features again before «Questo modulo non c’è più» is said, so a switch turned off goes back to Oggi. The start says what the module is
   for (its competences with their words), its pre-questions and, not yet started, that starting keeps it in the course:
   «Inizia il modulo» posts `apri`, «Leggi senza iniziare» shows every block in one page and opens nothing. A block is read
   with an indicative time (`blockMinutes`: its share of the module's minutes by words, else 100 words a minute), a line
@@ -122,21 +123,29 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Markdown subset, everything else React text; `corsi.guard.test.ts` refuses HTML written from a string); a citation
   `[testo](#c1)` is a button that opens the copy the block stored (`lessonCitations.ts`: a norm in `DossierItemReader`, a
   decision in `DossierDecisionReader`) beside the text on a computer (its heading takes the focus, which goes back to the
-  citation as it closes), in a `Sheet` on a phone (`CitationPanel`); Esc closes it first, and a link or «Apri su
-  Dashboard» inside it leaves through the same question as the close button. A `###` is one level under the step's
+  citation as it closes), in a `Sheet` on a phone (`CitationPanel`); it belongs to the view it was opened in (a recall's
+  next phase closes it, the phase's heading taking the focus); Esc closes it first, and a link or «Apri su Dashboard»
+  inside it leaves through the same question as the close button. A citation's words are `INK_TEXT`. A `###` is one level under the step's
   heading (`headingLevel`). Highlights are the session's (`Span`s over the block's plain text, `numberLeaves` giving
   each leaf its offset; emphasis is read around a citation held by a placeholder): a selection brings «Evidenzia» (44
   px, under it; a press on it holds it until its click, or 400 ms after the release); the text is a Tab stop where
   Shift and the arrows select from its start (`Selection.modify`, a word with Ctrl or Alt: a text not editable has no
-  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each) brings «Togli». The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
+  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each, never inside a citation's
+  button, where its pieces are only drawn: nothing interactive sits in a button), or words selected inside a highlight,
+  bring «Togli» (from a selection it goes with the selection, unless the focus is on it). The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
   elementi, le eccezioni, un caso»), «Confronta con il testo» sets what was written beside the block, then the block's
   questions as real radio buttons (`RecallQuestion`: the server grades, `POST …/risposte { domandaId, scelta }` and
   nothing else; the explanations, the right one and the reader's marked in words, the outcome in a live region; «Non
   registrato: riprova», or the server's words on a 4xx; once graded the focus moves to the question, «Rispondi» gone). Nothing written, highlighted or reached leaves the browser (§8;
-  the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`, forgotten with
-  `seenProgress` at sign-in, sign-up and sign-out) and an opened module resumes there. Closing or Esc leaves at once
-  with nothing written or highlighted, else asks «Interrompere il modulo?» (`WireConfirm`, «Continua il modulo»
-  evident). `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
+  the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`) and an opened
+  module resumes there, and each block's recall, highlights and phase are kept in this tab (`sessionStorage`,
+  `visualex.studia.percorsi.lavoro`, `readWork`/`saveWork`), so a reload, the browser's back or a swipe back lose
+  nothing (there is no navigation block: the app's `BrowserRouter` is not a data router, so `useBlocker` is not there);
+  both forgotten with `seenProgress` at sign-in, sign-up and sign-out (`forgetModuleSessions`). While something is written
+  or highlighted the browser asks before the tab closes or reloads (`beforeunload`, which cannot tell the two apart).
+  Closing or Esc leaves at once with nothing written or highlighted, else asks «Interrompi il modulo?» (`WireConfirm`,
+  «Continua il modulo» evident), whose «Interrompi» forgets the module's work; at the end of the reading leaving asks
+  nothing and forgets it. A 404 from `apri` reads the features again too. `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
   exposes», the user's session only: a token gets 403), typed in `types/corsi.ts` as #375 answers them: the course page's
   competences carry `sessioni: { contate, servono }` and `ultima: { giorno, percentuale }`, its modules `stato` with
   «ritirato», `eliminabile` and `ritirabile` (the page offers the trash and «Ritira» from them, never deciding itself) and
@@ -285,8 +294,108 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
-  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded, no
-  request at all — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. The
+  user chooses or drops on the box, or pastes in «Oppure incolla il testo» (`PasteBox`, plain text, two million
+  characters at most, read as a TXT file, titled «Testo incollato») — read in the browser (`documentFile.ts`), never
+  uploaded; a DOCX through `docx/` (spec #391 L2): a ZIP reader with bounds (`zipPackage.ts`: at most 2,000
+  entries, a part 50 MB inflated, the parts read 120 MB together, a deflated part's declared ratio 200:1, the
+  inflating stream cut at the declared size; ZIP64, encrypted entries, duplicate names (without case), `..` or a
+  leading slash refused), a tokenizer that knows the five entities, refuses a `<!DOCTYPE` and a part nested past 512 levels, and gives
+  the one decoding (`decodeXmlText`) the map's offsets count in (`xmlTokens.ts`), and
+  `docxText.ts`, which reads what Word shows — never `w:delText`/`w:del`/`w:moveFrom`, a field's instruction,
+  `mc:Fallback`, a run hidden by `w:vanish` — with tabs, breaks (a page break too), `w:cr`, the hyphens and `w:sym`
+  as characters, then the footnotes and endnotes under «Note» in the order the body refers to them («1.», endnotes
+  «i.»; a mark of the author's own is the note's own text), a field's characters counted inside a revision too
+  (a field closed in a deletion still closes), the namespaces resolved on a stack (not the prefix), and a map from every character back to its part, its `w:t` and its offset (`locateChar`; L4 splices on
+  it). Same text as the old regular expressions on a DOCX without those defects (`legacyDocxText` in the tests).
+  It runs in a Web Worker (`docxReader.worker.ts`, handed the `File`; in the page where there is none, as in
+  jsdom, or if it fails before saying `ready`; once ready, a failure is the file's and is refused, never read again
+  in the page), stopped after 60 s; a CFB file, Strict Open XML and the bounds have their own words.
+  Headers and footers are not read. Fixtures: unpacked synthetic XML in `__tests__/docx/` (`.rels` named in the
+  glob on its own: it skips dot names), zipped by `__tests__/docxZip.ts`. An HTML ends each block with a line break, so a paragraph is a line. **The writer** (spec #391 L4; «Scarica una copia con i link», L5) is `writeDocxLinks` (`writeDocxPackage.ts`), in its own Worker (`docxWriterClient.ts`,
+  `docxWriter.worker.ts`, the same rules as the reader's, 60 s): it takes the file, the citations as `[start, end)`
+  of the reading's text with their address, and the text they count in (`expectedText`: a file that reads otherwise
+  is refused), and returns a new package and one outcome per citation (linked, with its part and relationship id,
+  or a reason: `already_linked`, `in_field`, `in_revision`, `in_content_control`, `across_comment`, `structure`,
+  `not_in_document` (a range cutting a surrogate pair too), `invalid_address` — not `sourceAddress`, or a space, a
+  control character, a backslash in it —, `overlap`; the page chooses the words). It places
+  each citation on the runs through the reader's map, checks the runs and the paragraph's children it covers
+  (`docxRuns.ts`, one walk recording every run, its children, its wrappers and the complex field it sits in;
+  `checkLink` in `docxSplice.ts`: only `w:proofErr` and bookmarks may lie between its runs, a tab, a break, a
+  drawing, a field, a revision, a content control, a comment's edge, a text box, a hidden run leave it as it is,
+  as does a part written with WordprocessingML as its default namespace,
+  and the runs must spell its text) and splices `w:hyperlink` into the original XML: a run cut at an edge keeps its
+  whole `w:rPr` in both halves, a half with a space at its cut gets `xml:space="preserve"` (a `w:t` without it and
+  with a space at its own edge is not cut), the link's look goes in by the schema's order (`RPR_ORDER`; extensions
+  last) — the Hyperlink character style found by its name (`Collegamentoipertestuale` in Italian Word) or added as
+  Word adds it under a free id, a run with its own `w:rStyle` keeps it and takes the colour and underline it lacks,
+  no styles part means direct formatting —, relationships `rIdVlx<n>` free in the part, a note part's
+  relationships created when it has none (and the content types' `rels` default when missing). A signed package
+  (`_xmlsignatures/`) is refused (`signed`). `zipWriter.ts` copies every entry not changed raw (local header, data,
+  descriptor; the central record with only its offset rewritten), deflates the changed parts with
+  `CompressionStream`, keeps a part's encoding (UTF-16, a BOM) and the end record's comment, and refuses entries that share their bytes. The tests
+  (`docxWriter.test.ts`) prove §10.2's round trip on `__tests__/docx/links/` and its variants and on a package
+  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `tools/e2e/docx-roundtrip/run.mjs` opens
+  the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR.
+  The citations are found and read as the search reads them
+  (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts
+  (`/fetch_alias_catalog`'s `act_names`, asked once when the page opens) and the user's aliases make the vocabulary;
+  candidates are «article, then act», «act, then article», «act alone» (context only) and «bare article», each with
+  the query string a lawyer would type (the clause never in it); each distinct string is read by the client parser
+  (`readNormQuery`), and what it cannot settle goes to `/parse_query_batch` in chunks of 200 strings / 48 KB, one
+  after the other (`documentServer.ts`, `legalFetch`, 8 s each). **What leaves the browser** — the page is not «no request at
+  all», and its words say so (#376 §6.4, G-401: «Il documento resta sul tuo computer: a VisuaLex arrivano solo le
+  citazioni trovate, come in una ricerca»): the names of the acts come in; those query strings go out, and the act
+  typed in the picker, alone; on «Prepara i link» only, the norms to link as readings (`/fetch_norm_links`) — never
+  the text, a passage, the place of a citation, the file's name, how a row was found. With «Riconosci solo nel
+  browser» on (`LocalSwitch`, off by default, for the page's life) nothing about the document leaves: the client's own
+  names and parser, the matcher inside the candidates as in the fallback but not called «degraded» (`localOnly`,
+  `analysis.local`), the picker reads in the browser, the links are off and the panel offers «Riconosci con VisuaLex
+  questo documento» (a new reading of the same text, the choices kept). A bare article inherits an act only when its
+  words tie it to one named before (G-402): «del medesimo decreto», «della stessa legge», «Reg. cit.», «ivi» take the
+  last act read of the kind they name, «dello stesso art. 18», «art. 18 cit.» the last cited with that article; with
+  no such words, or when the words could mean two acts, it is to complete, even right after an act; a candidate the
+  page cannot read, and a bare article followed by something else («del contratto»), end what may be referred to. When the catalog
+  or a chunk does not answer, today's matcher keeps its matches inside the unanswered candidates, the client's own
+  names make the vocabulary, and a line above the list says so with «Riprova» (asks only for what is still
+  unanswered). **Completion by hand** (#376 §5, PR 3; `documentReview.ts`, pure): the user's choices live in the page's memory,
+  keyed by the row's span (`rowKey`, so «Riprova» keeps them), never sent or stored; the browser asks before a reload
+  while there are any (`beforeunload`, Q4). `reviewRows` lays them over the analysis: «Da completare» first (its
+  count the page's one amber badge), each row with the passage, «seguito da «del contratto»», «Completa» and «Non è
+  una norma» in its menu; the act groups, an inherited row «dal contesto: …», one chosen «scelto da te» («applicato a
+  più citazioni» in bulk), with «Cambia atto» and «Torna da completare» (or «Rimetti l'atto di prima» for a row the
+  page had read); «Non sono norme (N)» collapsed at the end with «Ripristina». In the text a resolved or chosen row is
+  underlined solid, an inherited one dashed, one to complete dotted in ink (`TextMark.kind`); a dismissed one is not
+  marked. **The picker** (`CompletionPicker`): the sentence around the citation (`pickerPassage`, 240 characters each
+  side within the line); a combobox that reads the act alone as the search does (`readNormQuery`, then
+  `/parse_query_batch` with that one string after 250 ms, never with the article; client only when local or silent,
+  said under the field); «Atti citati in questo documento» (`documentActs`: own words and acts named alone, the
+  nearest above first, never an inherited one), then the palette's acts that identify themselves; arrows, Enter picks,
+  then «Dove lo applico?» — «Solo a questa citazione», «Anche alle altre N …» (same article, written alike; the
+  default when there are any), «A tutte le N da completare» — and a second Enter applies. The row in the picker is
+  chosen «for itself», the others «in bulk» (they wait for «Conferma» before a link, #391 Q8). «Atto applicato a N
+  citazioni» with «Annulla» for 8 s (`showUndoToast`). A dialog anchored to the row from `lg`, a `Sheet` below it; the
+  focus goes to the row in its new place. `documentCorpus.test.ts` runs the spec's invented corpus with
+  the server's answers recorded (`__tests__/corpus/server.json`, `record_server.py`), prints §3.2's table and fails
+  below 92 found (98 before G-402, which left 6 of the 7 inherited rows to complete) or on any wrong one. **The links** (spec `2026-10-31-document-hyperlinks` L3; drawn by L5 in `LinksPanel`: «Prepara i link» with the
+  line on what it sends, the summary «N citazioni avranno il link · M no: vedi perché» by reason, each row a button,
+  «N citazioni non avranno il link finché non le confermi» with «Rivedile» (the list filtered) and «Conferma tutte»,
+  «Conferma» and «Senza link» on the rows, «Copia con i link», «Scarica una copia con i link» for a DOCX with «Il file
+  originale non viene modificato.», «Riprova» / «Prepara i link mancanti» — a choice made after asks nothing until
+  pressed —, the Word paste line and the PDF line (export, not print), and after a download «Copia scaricata: N link
+  inseriti» with every citation left out and why, the page's reasons and the writer's) are `documentLinks.ts` (pure): a row read from its own words or chosen for itself is linked once
+  `/fetch_norm_links` gives its address; an inherited row or one completed in bulk only once confirmed (Q8); a row
+  left out or to complete never; a range or «e ss.» to its first article (Q7); an address that fails
+  `sourceAddress` is dropped. `linkSpan` cuts a link to the head and the act (no «l'», no trailing comma, never
+  across a line); `documentLinks` gives the `{start, end, href}` the DOCX writer (L4) takes; `buildLinkedPaste`
+  writes the paste — one `<p>` a line, every character escaped, `<a href>` only, and the plain text with the
+  address in brackets — and `copyLinkedPaste` puts both in the clipboard in one write (items as promises, the plain
+  text alone when refused). `prepareLinks` is «Prepara i link» and «Riprova»: it asks only for the distinct norms not
+  answered yet, or answered «source silent». `documentLinkServer.ts` asks `/fetch_norm_links` in chunks of 200
+  norms / 30 acts / 48 KB, one after another, 25 s each, no `pin_day` (the server dates the link to today, G-395);
+  what it sends is the norms' readings, never the text. `documentLinksCorpus.test.ts` replays the route's answers
+  recorded on the spec's corpus (`__tests__/corpus/links.json`, `record_links.py`, which asks a running API) and
+  fails on any link whose act or article differs from the corpus's mark. Each citation opens the reader through
+  `navigate('/')` + `triggerSearch`, gotcha 15. The
   document is drawn as it is (`DocumentText`: every character once and in order, the citations only
   wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
@@ -309,7 +418,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   amber, Markdown and TXT slate), the name cut with an ellipsis, the size, «Leggo il documento…» then «Cerco le
   citazioni…» (the search after a frame, so the words are on screen) over a bar that slides — no percentage it
   does not know —, the check for 450 ms, then the text; a refusal turns it red, shakes it once (`vlx-shake`, 300 ms)
-  with its reason, and ✕ slides it away. «Il file resta nel tuo browser» is in the box in every state; a phone
+  with its reason, and ✕ slides it away. «Il documento resta sul tuo computer» is in the box in every state; a phone
   says «Tocca per scegliere un documento». A polite live region says «Documento in lettura» (the search for citations is too short
   to say), «Pronto», the refusal, then the count. Several files let go at once: the first is read, and its row says
   «Letto il primo dei N file: uno alla volta». Under reduced motion the dashes stand, the sheets change place without
@@ -411,7 +520,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a link to `/` that puts the cursor on the search page's field, `focusSearchField({ focus: true })`, with no
   window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
   carries ⌘K, the palette; the quick norms' dot sits under it;
-  `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
+  `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
   Gymnasium in two groups (Gymnasium spec §4), «Studia»
@@ -592,7 +701,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the selection popup's «Segnala come citazione» and `MissedCitationReporter`, all gated in
   `ArticleTabContent`, on top of the consent gates); the server's guards stay the real barrier.
   Not behind it: the RLCF trackers and the consent screen (collection is the owner's separate
-  decision), the Massimario's panel (`article_case_law`), `article_content_after`, `global` and the
+  decision), the Massimario's panel (no plugin, see «Giurisprudenza»), `article_content_after`, `global` and the
   implicit citation feedback on a click. The citation preview's feedback bar (✓ / ✗ / correct) is a
   citation report, and is behind it. The mode is unrelated to the Q&A view's own `useQaDevMode`
   (a local toggle for the pipeline trace).
@@ -953,16 +1062,31 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 code's own); on a computer «Note» and
 «Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Colore» (`HighlightColorMenu`, H1, below),
 «Al dossier», then «⋯» («Altre azioni sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia»,
-«Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
+«Copia link Normattiva», «Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
 status's row, «⋯» adding Study Mode, the source and, last under its own title, the four colours (the compact bar of a
-window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo» and
-«Copia»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
+window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo»,
+«Copia» and «Copia link Normattiva»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
 highlight (`lockedReason`); quiet
 neutral buttons, 36 px on a computer and 44 on a phone; «Cerca nel testo» says «Chiudi la ricerca nel testo» only while
 the window is pointed at this very text (`useFindWindowScopedTo(…, exact)`), else it points the window here. Nothing of it is inside the text root, root rule 23). Keys are `buildItemKey(norma)` and
 `uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
 uses the same two functions, and they must stay byte-identical or annotations
 made on one surface stop appearing on the other.
+
+**The source's link** («Copia link Normattiva», `utils/normattivaLink.ts`): for the hyperlinks of a filing. It copies
+the address the API returned (`norma_data.urn`; in the dossier the fetched article's, the stored item's only if that
+has none), never one built here: the code's annex and the version marker come with it (`!vig=` empty for the text in
+force, `!vig=<day>` for a past text, `@originale`). An undated one is fixed to a day only where Normattiva would open
+another text (`linkPinDay`; it answers an undated URN with its latest version, also one not in force yet, G-355): a
+closed window served as today's (`historical`, or `citeAs`) to its last day, an announced change (`upcoming`) to
+today. One `navigator.clipboard.write` puts the address as `text/plain` and
+the citation as a link as `text/html` (`<a href>` with `citeNorm`, or a past text's `formatNormCitation(...).short`),
+so Word or Pages paste the linked citation and a plain field the address; with no `ClipboardItem`, or a refusal, the
+address alone (`writeText`). Only `https` addresses of Normattiva or EUR-Lex are copied (a dossier can be imported):
+otherwise the action is not offered. An act of the Union says «Copia link EUR-Lex» and copies the act's address
+(EUR-Lex has none per article: said under the entry and in the toast). It is locked where «Copia» is
+(`copyBlockedReason`); in the dossier where «Copia citazione» is; the past-version banner offers it beside «Copia
+citazione» (`copy_link`).
 
 **The text is structured, never rewritten** (round A, spec
 `docs/superpowers/specs/2026-09-25-lettura-testo-design.md`).
@@ -992,10 +1116,32 @@ per line or comma boundary, which made every cross-comma highlight unmatched.
 The renderer also accepts, at the same offset, a stored text that differs only
 in whitespace, so those older highlights show again.
 
+**«Rassegne»** (`/rassegne`, `components/features/rassegne/RassegneSearchPage`, a Corpus page; spec
+`2026-11-01-rassegne-search-page`, G-404): words searched in every review of the Massimario without starting from an
+article, `POST /search_rassegne` through `legalFetch` (`searchRassegne`). A form (`role="search"`, the field focused on
+arrival) that asks only on submit — a corpus-wide query is not a keystroke's work — with the panel's limits read in the
+browser (`searchWords`: a query past them is not sent, and the line under the field says why). The passages come newest
+review first, «N passi» and the states in a polite live region; «Tutti / Civile / Penale» with their counts (buttons
+with `aria-pressed` in a `group`, one Tab each) when both archives have matches — another archive keeps the list on screen
+(«Aggiorno…», `refreshing`) until it answers, so the focus stays on the button pressed; «Altri passi» appends the next
+page and hands the focus to the first passage it brought; a query refused in the browser is said in a `role="alert"`
+line and the field takes the focus. A passage (`RassegnaResult`, an `<li>`): the panel's provenance and authors, the text opened on the
+lines around the first word found (`searchExcerpt.ts`: `findWords` folds case and accents as the index does, a word's
+start only, the whole word marked in `<mark>` text nodes; `excerptStart` a word boundary about a line before the longest
+word searched, `anchorWord`, when it is past 80 characters — under four lines of a phone), cut at
+four lines with «Leggi tutto il passo» / «Mostra meno» (`aria-expanded`), «Articoli citati» as buttons labelled by the
+source convention (`articleLink`: `shortNorm(normFromUrn)`, the passage's own words when the URN names no act; opened
+with `searchParamsFromAnchor` — not `normRefToSearchParams`, which reads a code's article as «1» and «10bis» as «10b» —,
+`navigate('/')` then `triggerSearch`; a URN with no article is plain text), and the credit with the portal's link. The
+last search and the passages loaded stay in memory for the session (`searchMemory.ts`; never the address, never
+storage), so the way back from an article finds the list; `clearRassegneCache` (the logout) forgets it. No store
+(`volumi: 0`) says «Le rassegne non sono ancora caricate su questa installazione.»; a 503 or no answer «Le rassegne non
+sono disponibili al momento.» with «Riprova», a 429 the quota's line. No anchors, notes or highlights (G-399's Q3).
+
 **«Giurisprudenza» under the article** (`CaseLawSection`, after the text): an accordion closed by default (state per host in
-`sessionStorage`) holding the Massimario's panel (the plugin slot
-`article_case_law`, which takes `articleUrn`, `isHistorical`, `besideId`,
-`backEntry`), the Cassazione's decisions that mention the article, searched
+`sessionStorage`) holding the Massimario's panel (`components/features/rassegne/RassegnePanel`, a block of
+the section, mounted with MERL-T on or off: it reads the Python API's own store, `POST /fetch_rassegne` through
+`legalFetch`, `services/rassegneService.ts`; design `2026-10-30-rassegne-without-merlt` §3 (a), PR 2), the Cassazione's decisions that mention the article, searched
 only when the reader presses the button (`DecisionResultList`; not offered on an act of the Union,
 `isEuropeanAct`), and «Cerca sentenze sul tema dell’articolo»: a topic search of the Cassazione by the
 article's rubric (`topic`, `getRubricText`; no rubric, no link; not on an act of the Union, nor when the
@@ -1015,7 +1161,7 @@ one colour key) and the section's header holds the one set of controls (`CaseLaw
 years «dal / al», a chip per year with the count of the rows loaded, the order (newest first, reversible)
 and one text filter; on a phone they sit behind «Filtri». The blocks do not own a filter and no block
 scrolls inside itself. The controls reach them through `CaseLawFiltersContext` (`useCaseLawFilters`;
-the Massimario's panel is a plugin whose slot props are a contract, so it reads the same context) and
+the Massimario's panel reads the same context) and
 each block reports its years back with `useReportCaseLawYears(source, counts)` — `YearCount[]`, memoised;
 the section adds them up into the chips (`mergeYearCounts`; a year is «circa» when any block's count is
 approximate). What a row answers to is the source's to say (`YearsOf`: a passage's
@@ -1030,7 +1176,18 @@ count, not for the next one if that fails; the range is clamped to 1900 – this
 that answers «none» without a request). On the Cassazione the reversed order applies once every
 decision is loaded; until then the archive's order (newest first) stands and a line says so. Filters reset
 with the article.
-**An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
+**The Massimario's panel** («Nelle rassegne della Cassazione») is a closed row with the article's own count and
+years (every volume in the store, G-399), there only when a passage cites the article: no store, or none citing it,
+draws nothing; a 404 (an API without the route) draws nothing; a 503 or no answer leaves the row alone with «Non
+disponibili al momento». The section's text filter is sent to the store as `q` once it has stayed still for 350 ms
+(cleared at once): `searchWords` reads the words as the API does (letters and digits, two or more, at most 8 and 200
+characters; more says so and filters only the passages loaded), each the start of a word in the passage's text or
+where it sits, so the store's passages are not filtered again by the text; «N passi con le parole cercate» or
+«Nessun passo con le parole cercate» is said inside, the row keeping the article's count. «Rassegne di un altro
+articolo» reads a reference through `/parse_query` (`readArticleReference`: one article, else it says why) and shows
+that article's passages until «Torna all’articolo». The words searched never reach the console (`failureOf`), and the
+session cache (`useRassegne`, keyed by the query) is cleared at logout. The paragraphs carry no anchor (rule 23 does
+not bind them: Q3 unanswered). **An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
 regulation or a directive: `utils/euCaseLaw.ts` derives the act's CELEX from the norm
 (`3` + the year + `R`/`L` + the number on four digits, as the API's `sources.eu_identity` does — the norm
 carries none; a pair written in `numero_atto` is not guessed at) and the plain-number article; a Treaty, or an article that is not a plain number, has no query
@@ -2223,8 +2380,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   evidenziata o annotata».
 - **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
   inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
-  composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
-  expanded footer. `ArticleViewerModal` no longer exists.
+  composer and popover). "Apri su Dashboard", "Copia citazione" and «Copia link Normattiva» (below,
+  «The source's link») live in the expanded footer. `ArticleViewerModal` no longer exists.
 - **Fetching**: `utils/articleFetchCache.ts` — session-only cache, in-flight
   de-dup, max 3 concurrent fetches, errors not cached so "Riprova" really
   refetches.
@@ -2282,6 +2439,14 @@ Duplicating any of these is a defect, not a shortcut.
   `caseLawYears.ts` (a row's years, the counts, the range, the order — pure), `caseLawFilter.ts` (the text
   filter, folded as the find window folds: `findMatches`), `authorityColor`, `caseLawFiltersContext`. A new
   source of case law draws `CaseLawRow` and reads `useCaseLawFilters`, it does not bring its own filter.
+- `utils/normQuery.ts` — the search's reading of a norm, shared by `useSearchQuery` and «Analizza documento»:
+  `readNormQuery(query, customAliases)` (the client parser, whether the reading is searchable, the words to ask
+  the server), `citationFromServer` (an answer of `/parse_query` or `/parse_query_batch` in the client's shape),
+  `preferredReading` (the client wins when searchable). `utils/sources/numberedActTypes.ts` — the web's copy of
+  `conventions/sources/numbered-act-types.json` (its test compares the two) and `identifiesAct`: `isSearchReady`,
+  the palette's «needs a number and a date» and the parser's own list all read it; the d.m. and the DPCM with no
+  number name no act, and the types compare with their case folded (gotcha 28). `ACT_TYPES_REQUIRING_DETAILS`
+  is gone.
 - `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.
@@ -2869,7 +3034,14 @@ meant to stay split; add new features as new files, not inside the shells:
   dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` (the page), `DropZone.tsx` (the box), `DocumentRow.tsx`
   (the document's row and `SheetFlight`), `documentJob.ts`, `DocumentText.tsx`, `CitationList.tsx`,
-  `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
+  `citationGroups.ts`, `documentFile.ts`, `docx/` (the DOCX reader: `zipPackage.ts`, `xmlTokens.ts`,
+  `docxText.ts`, `readDocxPackage.ts`, `docxWorkerClient.ts`, `docxReader.worker.ts`, `docxErrors.ts`; the writer:
+  `writeDocxPackage.ts`, `docxRuns.ts`, `docxSplice.ts`, `zipWriter.ts`, `docxWriterClient.ts`,
+  `docxWriter.worker.ts`), `documentCandidates.ts` (vocabulary, candidates, resolution, inheritance, fallback: pure),
+  `documentServer.ts` (the catalog and `/parse_query_batch`), `documentLinks.ts` and `documentLinkServer.ts` (the
+  links: which rows, their addresses, the paste), `documentReview.ts` (the user's choices, pure), `CompletionPicker.tsx`,
+  `LinksPanel.tsx`, `PasteBox.tsx`; invented sample files for the tests in `__tests__/fixtures.ts`, `__tests__/docx/` and
+  `__tests__/docx-saved/`; the spec's corpus scored by `__tests__/documentCorpus.test.ts`.
 
 ## Gotchas
 

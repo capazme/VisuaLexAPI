@@ -12,9 +12,10 @@ import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
 import { clearEuCaseLawCache } from '../utils/euCaseLawCache';
 import { clearArticleCardsCache } from '../utils/articleCardsCache';
+import { clearRassegneCache } from '../components/features/rassegne/useRassegne';
 import { clearConsentRead } from '../features/merlt/consent/consentRead';
 import { forgetSeenProgress } from '../components/features/studia/progress/seenProgress';
-import { forgetStepsReached } from '../components/features/studia/corsi/moduleSteps';
+import { forgetModuleSessions } from '../components/features/studia/corsi/moduleSteps';
 
 interface AuthState {
   user: UserResponse | null;
@@ -95,7 +96,7 @@ export function useAuth() {
       await authService.login({ email, password });
       // What this browser drew of Gymnasium was the last person's (their points, their level, a module's step reached).
       forgetSeenProgress();
-      forgetStepsReached();
+      forgetModuleSessions();
       const currentUser = await authService.getCurrentUser();
 
       setState({
@@ -126,7 +127,7 @@ export function useAuth() {
       await authService.login({ email, password });
       // What this browser drew of Gymnasium was the last person's (their points, their level, a module's step reached).
       forgetSeenProgress();
-      forgetStepsReached();
+      forgetModuleSessions();
       const user = await authService.getCurrentUser();
 
       setState({
@@ -161,10 +162,11 @@ export function useAuth() {
     clearDecisionCache();
     clearDecisionSearchCache();
     clearEuCaseLawCache();
+    clearRassegneCache();
     clearArticleCardsCache();
     clearConsentRead();
     forgetSeenProgress();
-    forgetStepsReached();
+    forgetModuleSessions();
     resetAssistantProposals();
     setState({
       user: null,

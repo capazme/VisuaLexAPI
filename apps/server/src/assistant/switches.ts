@@ -20,6 +20,10 @@ export const APP_SWITCHES = {
   // declaration's accept route answer 404, the card route refuses a module, the trash hides a course and a module
   // (`trash/trash.ts`), the MCP lists none of the tools. Switching off hides, never deletes.
   lingo_courses: 'Percorsi di studio creati dall’assistente (A1).',
+  // G-387 (a): a part of an article Normattiva splits («art. 1 (commi 701-800)») as an entry of its own. Off: a
+  // reference's comma is not sent on and the article is stored, as before (`norms/resolveReference.ts`); an entry
+  // already stored as a part is still read as that part. Switch this on only once the web opens parts (3c).
+  article_parts: 'Parti di un articolo diviso da Normattiva come voci a sé (G-387).',
 } as const;
 
 export type AppSwitchKey = keyof typeof APP_SWITCHES;

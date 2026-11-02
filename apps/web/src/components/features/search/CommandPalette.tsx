@@ -11,7 +11,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import { ACT_TYPES_REQUIRING_DETAILS } from '../../../constants/actTypes';
+import { isNumberedActType } from '../../../utils/sources/numberedActTypes';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
@@ -52,8 +52,7 @@ const PANEL_MAX_HEIGHT = 640;
  *  picked from the list ("Regolamento UE"), or the palette skips the step that
  *  collects its number and date. */
 function requiresDetails(actValue: string): boolean {
-  const wanted = (actValue || '').toLowerCase();
-  return ACT_TYPES_REQUIRING_DETAILS.some(v => v.toLowerCase() === wanted);
+  return isNumberedActType(actValue);
 }
 
 // One row of the lists: 44 px, a colour change when chosen, never a lift (UI conventions).

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Invented text for the tests: no real client, no real case. -->
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14">
+  <w:body>
+    <w:p w14:paraId="1A2B3C01" w14:textId="77777777" w:rsidR="00A10001" w:rsidRDefault="00A10001">
+      <w:pPr><w:pStyle w:val="Titolo"/><w:jc w:val="center"/></w:pPr>
+      <w:r><w:t>Tribunale di Esempio</w:t></w:r>
+    </w:p>
+    <w:p w:rsidR="00A10001">
+      <w:r><w:rPr><w:b/></w:rPr><w:t>Atto di citazione</w:t></w:r>
+    </w:p>
+    <w:p w:rsidR="00A10001">
+      <w:r><w:t xml:space="preserve">Il sottoscritto avvocato, ai sensi dell&apos;</w:t></w:r>
+      <w:proofErr w:type="spellStart"/>
+      <w:r w:rsidR="00B20002"><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">art. </w:t></w:r>
+      <w:proofErr w:type="spellEnd"/>
+      <w:r><w:rPr><w:b/><w:i/></w:rPr><w:t>2043</w:t></w:r>
+      <w:bookmarkStart w:id="0" w:name="_GoBack"/>
+      <w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve"> c.c.</w:t></w:r>
+      <w:bookmarkEnd w:id="0"/>
+      <w:r><w:t xml:space="preserve"> e dell&#8217;art. 7 l. 241/1990, chiede quanto segue.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:hyperlink r:id="rId9" w:history="1"><w:r><w:rPr><w:rStyle w:val="Collegamentoipertestuale"/></w:rPr><w:t>art. 1453 c.c.</w:t></w:r></w:hyperlink>
+      <w:r><w:t xml:space="preserve"> già richiamato.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Si veda </w:t></w:r>
+      <w:fldSimple w:instr=" REF _Ref1 \h "><w:r><w:t>art. 1218 c.c.</w:t></w:r></w:fldSimple>
+    </w:p>
+    <w:sdt>
+      <w:sdtPr><w:alias w:val="Luogo e data"/><w:id w:val="-1"/></w:sdtPr>
+      <w:sdtContent><w:p><w:r><w:t>Roma, 31 ottobre 2026</w:t></w:r></w:p></w:sdtContent>
+    </w:sdt>
+    <w:tbl>
+      <w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr>
+      <w:tblGrid><w:gridCol w:w="4814"/><w:gridCol w:w="4814"/></w:tblGrid>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4814" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Art. 5 Cost.</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4814" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Art. 24 Cost.</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p>
+      <w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs></w:pPr>
+      <w:r><w:t>Allegato</w:t></w:r><w:r><w:tab/><w:t>1</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>prima riga</w:t><w:br/><w:t>seconda riga</w:t></w:r>
+    </w:p>
+    <w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>
+    <w:p/>
+    <w:p></w:p>
+    <w:p></w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Fine.   </w:t></w:r>
+    </w:p>
+    <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1417" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>
+  </w:body>
+</w:document>

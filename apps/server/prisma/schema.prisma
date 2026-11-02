@@ -33,6 +33,14 @@ model User {
   threadVotes           ArticleThreadVote[]
   commentVotes          ArticleCommentVote[]
   threadReports         ArticleThreadReport[]
+  // The Community (spec 2026-10-20-forum-community-glosse-design): reports on replies, the glosse a
+  // moderator locked, the reports a moderator closed, the user's notifications, the moderation acts.
+  commentReports         ArticleCommentReport[]
+  lockedThreads          ArticleThread[]           @relation("ArticleThreadLockedBy")
+  resolvedThreadReports  ArticleThreadReport[]     @relation("ArticleThreadReportResolvedBy")
+  resolvedCommentReports ArticleCommentReport[]    @relation("ArticleCommentReportResolvedBy")
+  forumNotifications     ForumNotification[]
+  forumModerationActs    ForumModerationLog[]
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
@@ -86,6 +94,8 @@ model User {
   // anonymous, when the account goes), the notice versions they wrote (same) and
   // the ones they accepted (removed with the account).
   lingoValidatore       Boolean                  @default(false) @map("lingo_validatore")
+  // The Community's moderators (G-266): set by an administrator, with a reason in the moderation log.
+  forumModerator        Boolean                  @default(false) @map("forum_moderator")
   lingoValidazioni      LingoValidazioneCard[]
   lingoTestiScritti     LingoTestoVersione[]
   lingoAccettazioni     LingoAccettazioneTesto[]
@@ -632,20 +642,44 @@ model ArticleThread {
   passageReleasedById String?   @map("passage_released_by")
   title       String
   body        String
-  userId      String   @map("user_id")
+  // Null once the author's account is gone: the glossa stays, «utente cancellato» (G-307).
+  userId              String?       @map("user_id")
   isHidden    Boolean  @default(false) @map("is_hidden")
+  // The category a moderator chose when hiding it (the report reasons' closed list, a CHECK); null when visible.
+  hiddenReason        String?       @map("hidden_reason")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  // Set at creation and by a new reply or comment, by nothing else: `updatedAt` moves on every update.
+  lastActivityAt      DateTime      @default(now()) @map("last_activity_at")
+  // The reply its author marked as the one that settled it (G-292).
+  acceptedCommentId   String?       @map("accepted_comment_id")
+  editedAt            DateTime?     @map("edited_at")
+  // Emptied by its author while others' replies hang on it: title and body are '' (a CHECK).
+  deletedAt           DateTime?     @map("deleted_at")
+  // Closed to new replies by a moderator; the moderator only together with the time (a CHECK).
+  lockedAt            DateTime?     @map("locked_at")
+  lockedById          String?       @map("locked_by")
+  materia             LingoMateria?
+  // The version of CONTRIBUTO_COMMUNITY it was written under; null for what came before that text.
+  licenceTextId       String?       @map("licence_text_id")
 
-  user       User                 @relation("ArticleThreadAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  user              User?               @relation("ArticleThreadAuthor", fields: [userId], references: [id], onDelete: SetNull)
   passageReleasedBy User?         @relation("ArticleThreadPassageReleasedBy", fields: [passageReleasedById], references: [id], onDelete: SetNull)
+  lockedBy          User?               @relation("ArticleThreadLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+  acceptedComment   ArticleComment?     @relation("ArticleThreadAccepted", fields: [acceptedCommentId], references: [id], onDelete: SetNull)
+  licenceText       LingoTestoVersione? @relation("ArticleThreadLicence", fields: [licenceTextId], references: [id], onDelete: Restrict)
   comments   ArticleComment[]
   votes      ArticleThreadVote[]
-  reports    ArticleThreadReport[]
+  notifications     ForumNotification[]
 
   @@index([normaKey, articleId, createdAt])
   @@index([userId])
   @@index([passageReleasedById])
+  @@index([lockedById])
+  @@index([acceptedCommentId])
+  @@index([licenceTextId])
+  @@index([isHidden, createdAt])
+  @@index([isHidden, lastActivityAt])
   @@map("article_threads")
 }
 
@@ -654,19 +688,30 @@ model ArticleComment {
   threadId  String   @map("thread_id")
   parentId  String?  @map("parent_id")
   body      String
-  userId    String   @map("user_id")
+  // Null once the author's account is gone (G-307).
+  userId    String?  @map("user_id")
   isHidden  Boolean  @default(false) @map("is_hidden")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  hiddenReason  String?   @map("hidden_reason")
+  editedAt      DateTime? @map("edited_at")
+  // Emptied by its author while something visible hangs on it: body is '' (a CHECK).
+  deletedAt     DateTime? @map("deleted_at")
+  licenceTextId String?   @map("licence_text_id")
 
   thread   ArticleThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
   parent   ArticleComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   children ArticleComment[] @relation("CommentReplies")
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   votes    ArticleCommentVote[]
+  licenceText   LingoTestoVersione? @relation("ArticleCommentLicence", fields: [licenceTextId], references: [id], onDelete: Restrict)
+  acceptedIn    ArticleThread[]     @relation("ArticleThreadAccepted")
+  notifications ForumNotification[]
 
   @@index([threadId, createdAt])
   @@index([parentId])
+  @@index([userId])
+  @@index([licenceTextId])
   @@map("article_comments")
 }
 
@@ -698,21 +743,100 @@ model ArticleCommentVote {
   @@map("article_comment_votes")
 }
 
+// A report names its item by a plain id, with no foreign key: it outlives the item's deletion for
+// good, and the moderators still decide on the copy it kept (G-308). The reporter becomes null with
+// their account; the report stays, as the moderators' evidence. `reason` and `status` are closed
+// lists (CHECKs in the migration).
 model ArticleThreadReport {
   id        String   @id @default(uuid())
   threadId  String   @map("thread_id")
-  userId    String   @map("user_id")
+  userId    String?  @map("user_id")
   reason    String
   details   String?
   status    String   @default("pending")
   createdAt DateTime @default(now()) @map("created_at")
+  // The glossa's title and body when the report was made; erased 90 days after it is closed.
+  reportedText   String?   @map("reported_text")
+  resolvedById   String?   @map("resolved_by")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note")
 
-  thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("ArticleThreadReportResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
 
   @@unique([threadId, userId])
   @@index([status])
+  @@index([userId])
+  @@index([resolvedById])
+  @@index([resolvedAt])
   @@map("article_thread_reports")
+}
+
+// As `ArticleThreadReport`, on a reply or a comment; `threadId` (plain too) keeps the way to its glossa.
+model ArticleCommentReport {
+  id             String    @id @default(uuid())
+  commentId      String    @map("comment_id")
+  threadId       String    @map("thread_id")
+  userId         String?   @map("user_id")
+  reason         String
+  details        String?
+  status         String    @default("pending")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  reportedText   String?   @map("reported_text")
+  resolvedById   String?   @map("resolved_by")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note")
+
+  user       User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("ArticleCommentReportResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([commentId, userId])
+  @@index([status])
+  @@index([userId])
+  @@index([resolvedById])
+  @@index([resolvedAt])
+  @@map("article_comment_reports")
+}
+
+// What happened to a user's contributions: a reply to their glossa, a comment under their reply, their
+// reply accepted, something of theirs hidden. Goes with the account, the glossa or the reply it is about.
+model ForumNotification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  kind      String
+  threadId  String    @map("thread_id")
+  commentId String?   @map("comment_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread  ArticleThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  comment ArticleComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([threadId])
+  @@index([commentId])
+  @@index([readAt])
+  @@map("forum_notifications")
+}
+
+// Append-only: every act of a moderator or an administrator on the Community, with its reason. The
+// actor becomes null with their account; the act stays.
+model ForumModerationLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  targetKind String   @map("target_kind")
+  targetId   String   @map("target_id")
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([targetKind, targetId])
+  @@index([createdAt])
+  @@map("forum_moderation_log")
 }
 
 // ============================================
@@ -1230,6 +1354,7 @@ enum LingoTestoChiave {
   PROPOSTA_SCHEDA
   INFORMATIVA_MERLT
   MATERIALE_STUDIO
+  CONTRIBUTO_COMMUNITY
 }
 
 // A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
@@ -1251,6 +1376,8 @@ model LingoTestoVersione {
   corsi        LingoCorso[]
   merltPreferenze MerltUserPreference[] @relation("MerltPreferenceNotice")
   merltConsensi   MerltConsentAudit[]   @relation("MerltAuditNotice")
+  articleThreads  ArticleThread[]          @relation("ArticleThreadLicence")
+  articleComments ArticleComment[]         @relation("ArticleCommentLicence")
 
   @@unique([chiave, versione])
   @@map("lingo_testi_versioni")

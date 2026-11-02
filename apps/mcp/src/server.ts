@@ -214,7 +214,7 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
         // What the server has on, asked once per session (closed when it cannot say): the glosses (D8) and the
         // courses (Percorsi, M1), whose tools and card parameters are listed only then.
         const features = await readFeatures(config);
-        registerDossierTools(server, config, runner);
+        registerDossierTools(server, config, runner, { articleParts: features.articleParts });
         registerCardTools(server, config, runner, features.courses ? COURSE_SCHEMA_TEXT : undefined);
         // An entry's text, always (G-372).
         registerTextTool(server, config, runner);

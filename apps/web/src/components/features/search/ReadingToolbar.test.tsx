@@ -453,3 +453,37 @@ describe('ReadingToolbar — the colours mean what the user says', () => {
         expect(within(openMore(phoneRow(container))).queryByRole('menuitem', { name: 'Cambia il significato dei colori' })).toBeNull();
     });
 });
+
+describe('ReadingToolbar — «Copia link Normattiva»', () => {
+    it('stands after «Copia» behind «⋯», on a computer, on a phone and in a window', () => {
+        const onCopyLink = vi.fn();
+        const { container } = setup({ onCopyLink });
+        const names = entryNames(openMore(desktopRow(container)));
+        expect(names.indexOf('Copia link Normattiva')).toBe(names.indexOf('Copia') + 1);
+        fireEvent.click(screen.getByRole('menuitem', { name: /Copia link Normattiva/ }));
+        expect(onCopyLink).toHaveBeenCalledTimes(1);
+        expect(entryNames(openMore(phoneRow(container)))).toContain('Copia link Normattiva');
+    });
+
+    it('is in the compact form too', () => {
+        const { container } = setup({ onCopyLink: vi.fn(), compact: true });
+        expect(entryNames(openMore(desktopRow(container)))).toEqual(['Glosse sull’articolo', 'Copia', 'Copia link Normattiva']);
+    });
+
+    it('is not offered without an address', () => {
+        const { container } = setup();
+        expect(entryNames(openMore(desktopRow(container)))).not.toContain('Copia link Normattiva');
+    });
+
+    it('names EUR-Lex for an act of the Union and says the link is the act’s', () => {
+        const { container } = setup({ onCopyLink: vi.fn(), normaData: { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '5' } });
+        const menu = openMore(desktopRow(container));
+        expect(entryNames(menu)).toContain('Copia link EUR-Lex');
+        expect(within(menu).getByRole('menuitem', { name: /Copia link EUR-Lex/ })).toHaveTextContent('EUR-Lex non ha un indirizzo per articolo');
+    });
+
+    it('is switched off with «Copia» when the text may not be copied', () => {
+        const { container } = setup({ onCopyLink: vi.fn(), copyLockedReason: NOT_YET_REASON });
+        expect(within(openMore(desktopRow(container))).getByRole('menuitem', { name: /Copia link Normattiva/ })).toBeDisabled();
+    });
+});

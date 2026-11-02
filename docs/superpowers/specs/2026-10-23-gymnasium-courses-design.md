@@ -128,8 +128,9 @@ A course of 10 modules, one a day; competence C3 is served by modules 2 and 6.
 - **Day 9:** the day C3's next session can count, the course's review adds **check cards** (§10.7, G-377 Q10):
   C3's cards already reviewed, due or not, up to five. 4 graded «Bene» (80%): the second valid session at 80%,
   7 days after the first. **C3 «acquisita».**
-- **Day 23:** 5 check cards, 2 right (40%): **«da riprendere»**; its check cards come first, once a week, and two
-  more sessions 7 days apart bring it back.
+- **Day 23:** an «acquisita» competence takes check cards too, offered from a week after its last valid session
+  (G-390: day 16 here) until they are answered: 5 check cards, 2 right (40%): **«da riprendere»**; its check
+  cards come first, once a week, and two more sessions 7 days apart bring it back.
 - **Day 11:** with the ten modules done, the final exam opens. The course is «superato» when the exam is passed
   and every competence is «acquisita»: a competence served first by module 10 cannot be before day 17, so a
   course ends at the earliest a week after its last module.
@@ -532,8 +533,12 @@ are answered once. So `GET /srs/sessione?corso=<id>` adds, to the due and new ca
 competence «in corso» or «da riprendere» (these first), on the day its next session counts and then **at most
 once every seven Rome days from its last valid session**, the course's cards tagged with it that the user has
 already reviewed, due or not, until five can be answered today (cards graded today left out: one grade a Rome
-day, as recorded). Never a new card, so `nuoveAlGiorno` is untouched, and never daily, so the same cards are
-not drilled every day. `POST /srs/revisioni` already grades a card in scope that is
+day, as recorded). After those two (G-390): an «acquisita» competence, at most once every seven Rome days from
+its last valid session, so a fall is noticed; then a «da iniziare» competence with at least one answer, from the
+Rome day after its first answers and then once every seven Rome days from its last ones, since a module serving
+several competences can give each fewer than five answers. A competence whose reviewed cards cannot reach five
+answers today gets none. Never a new card, so `nuoveAlGiorno` is untouched, and never daily, so the same cards
+are not drilled every day. `POST /srs/revisioni` already grades a card in scope that is
 not due. «Oggi»'s row offers them with the course's due cards. A competence with fewer than five live cards can
 never count a session from the cards alone, so `POST /esami` refuses an exam while one has fewer (the assistant
 adds cards first), and the course stays «in preparazione».

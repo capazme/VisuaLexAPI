@@ -1,6 +1,7 @@
 import { postLegalApi, SourceUnavailable } from '../norms/resolveReference';
 import { decisionKeyOf } from '../norms/resolveDecisions';
 import { parseDecisionItemContent } from '../schemas/decisionItem';
+import { partOf } from '../norms/parts';
 import { wireNormaKey } from '../services/studyImport';
 
 /**
@@ -19,6 +20,8 @@ export interface StoredNorma {
   versione?: string;
   data_versione?: string;
   allegato?: string;
+  /** One part of an article Normattiva splits, by its comma range ("701-800", G-387 (a)); absent for the first. */
+  parte?: string;
 }
 
 /** The norm inside an entry's content: the star's envelope dropped, a Forum entry's `articleRef` read (web `dossierItemFromApi`). */
@@ -38,25 +41,31 @@ export function normaOfContent(content: unknown): StoredNorma | null {
     versione: text('versione'),
     data_versione: text('data_versione'),
     allegato: text('allegato'),
+    ...(partOf(norma.parte) ? { parte: partOf(norma.parte) } : {}),
   };
 }
 
 // web utils/normaKeys.ts: `\w` without the u flag is ASCII, as here.
 const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
 
-/** web `buildItemKey`. */
+/**
+ * web `buildItemKey`. A part of a split article adds one segment, `c701-800` (spec 2026-10-29 §2): the web writes
+ * it from 3c, and a first part, which has no `parte`, keeps the article's key.
+ */
 export function buildItemKey(norma: StoredNorma): string {
   const parts = [norma.tipo_atto];
   if (norma.numero_atto?.trim()) parts.push(norma.numero_atto);
   if (norma.data?.trim()) parts.push(norma.data);
   if (norma.allegato?.trim()) parts.push(`all${norma.allegato}`);
   if (norma.numero_articolo?.trim()) parts.push(norma.numero_articolo);
+  if (norma.parte?.trim()) parts.push(`c${norma.parte}`);
   return parts.map((part) => sanitize(part || '')).join('--');
 }
 
-/** web `uniqueArticleIdFromNorma` (an annex tested for truth, not trimmed, as there). */
-export function uniqueArticleIdFromNorma(norma: Pick<StoredNorma, 'allegato' | 'numero_articolo'>): string {
-  return norma.allegato ? `all${norma.allegato}:${norma.numero_articolo}` : norma.numero_articolo;
+/** web `uniqueArticleIdFromNorma` (an annex tested for truth, not trimmed, as there); a part: `1~c701-800`. */
+export function uniqueArticleIdFromNorma(norma: Pick<StoredNorma, 'allegato' | 'numero_articolo' | 'parte'>): string {
+  const article = norma.parte ? `${norma.numero_articolo}~c${norma.parte}` : norma.numero_articolo;
+  return norma.allegato ? `all${norma.allegato}:${article}` : article;
 }
 
 /** web `fetchArticleForNorma`: the body of `POST /fetch_article_text`. */
@@ -69,6 +78,7 @@ export function articleFetchBody(norma: StoredNorma) {
     version: norma.versione || 'vigente',
     version_date: norma.data_versione || '',
     ...(norma.allegato ? { annex: norma.allegato } : {}),
+    ...(norma.parte ? { parte: norma.parte } : {}),
   };
 }
 
@@ -185,14 +195,20 @@ const isArticlePart = (value: unknown): value is ArticlePart => {
 
 /**
  * «testo parziale: commi 1-100 di 1364 (diviso in 14 parti)» for a text that is one part of a split article (G-387),
- * the notice agreed for mcp-legal-it 3.0.x; undefined otherwise. The article's URN serves its first part.
+ * the notice agreed for mcp-legal-it 3.0.x; undefined otherwise. The part served is the one `norma_data.parte` names
+ * («commi 701-800 di 1364»), else the first, the one the article's URN serves.
  */
-export function partialNoticeOf(answer: { parti?: unknown; testo_parziale?: unknown }): string | undefined {
-  if (answer.testo_parziale !== true || !Array.isArray(answer.parti)) return undefined;
-  const parts = answer.parti.filter(isArticlePart);
-  if (parts.length === 0) return 'testo parziale: l’articolo è diviso in parti, verificare su Normattiva';
+export function partialNoticeOf(answer: { parti?: unknown; testo_parziale?: unknown; norma_data?: unknown }): string | undefined {
+  if (answer.testo_parziale !== true) return undefined;
+  const parte = partOf((answer.norma_data as { parte?: unknown } | undefined)?.parte);
+  const parts = Array.isArray(answer.parti) ? answer.parti.filter(isArticlePart) : [];
+  if (parts.length === 0) {
+    return parte
+      ? `testo parziale: commi ${parte} dell’articolo, diviso in parti`
+      : Array.isArray(answer.parti) ? 'testo parziale: l’articolo è diviso in parti, verificare su Normattiva' : undefined;
+  }
   const [first, last] = [parts[0], parts[parts.length - 1]];
-  return `testo parziale: commi ${first.commi_dal}-${first.commi_al} di ${last.commi_al} (diviso in ${parts.length} parti)`;
+  return `testo parziale: commi ${parte ?? `${first.commi_dal}-${first.commi_al}`} di ${last.commi_al} (diviso in ${parts.length} parti)`;
 }
 
 /** What the server reads of an entry: the projection it searches, the text it shows the model, the key it stores under. */
@@ -222,6 +238,8 @@ export class SourceHasNoText extends Error {}
 // What the Python API's scrapers write for a document or an article that is not there (DocumentNotFoundError,
 // a permanent error): «Document not found …», «Article 999 not found in EUR-Lex …».
 const PERMANENT = /\bnot found\b|does not exist|non esiste|non trovat/i;
+// What the API answers for a part it no longer lists, or for an article no longer split (G-387 (a)).
+const PART_GONE = /non ha la parte commi|non è diviso in parti|va chiesto senza parte/;
 
 /** A budget of 60 seconds for the fetch (§8.5): a cold decision can take minutes at its source. */
 export const TEXT_BUDGET_MS = 60_000;
@@ -245,10 +263,16 @@ async function readNorm(content: unknown, signal: AbortSignal): Promise<EntryTex
   if (!norma) throw new EntryUnreadable();
   const { status, data } = await postLegalApi('/fetch_article_text', articleFetchBody(norma), { signal });
   const first = (Array.isArray(data) ? data[0] : data) as
-    | { article_text?: unknown; error?: unknown; validity?: unknown; note_aggiornamento?: unknown; note_non_lette?: unknown; note_nel_testo?: unknown; parti?: unknown; testo_parziale?: unknown }
+    | { article_text?: unknown; error?: unknown; validity?: unknown; note_aggiornamento?: unknown; note_non_lette?: unknown; note_nel_testo?: unknown; parti?: unknown; testo_parziale?: unknown; norma_data?: unknown }
     | undefined;
   // The request refused as invalid, or a document the source says is not there: asking again will not help.
   if (status === 400 || (first && typeof first.error === 'string' && PERMANENT.test(first.error))) throw new SourceHasNoText();
+  // A part the article no longer has (Normattiva split it again, G-389 Q3), in the API's words, which name today's
+  // parts: refused for good, never «try again».
+  if (norma.parte && (status === 404 || (first && typeof first.error === 'string' && PART_GONE.test(first.error)))) {
+    const said = (first && typeof first.error === 'string' ? first.error : (data as { error?: unknown } | undefined)?.error);
+    throw new SourceHasNoText(typeof said === 'string' ? said.slice(0, 500) : undefined);
+  }
   if (status !== 200 || !first || first.error || typeof first.article_text !== 'string' || !first.article_text) {
     throw new TextUnavailable(`fetch_article_text ${status}`);
   }

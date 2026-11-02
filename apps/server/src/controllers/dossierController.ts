@@ -14,6 +14,7 @@ import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
 import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
 import { readableContent } from '../utils/publishedContent';
 import { assistantFieldsOf, assistantViewFor, type AssistantView } from '../assistant/notes';
+import { partOf } from '../norms/parts';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -630,7 +631,7 @@ const addNormsSchema = z.object({
 
 type NormOutcome = 'added' | 'already_present' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
 
-type NormIdentityFields = { urn: string; numero_articolo: string; allegato: string | null };
+type NormIdentityFields = { urn: string; numero_articolo: string; allegato: string | null; parte?: string };
 
 /**
  * Which article of which act a stored norm is. The urn alone is not enough:
@@ -642,7 +643,9 @@ type NormIdentityFields = { urn: string; numero_articolo: string; allegato: stri
 function normIdentity(norm: Partial<NormIdentityFields>): string | null {
   if (typeof norm.urn !== 'string') return null;
   const article = typeof norm.numero_articolo === 'string' ? norm.numero_articolo.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2') : '';
-  return `${norm.urn}|${norm.allegato ?? ''}|${article}`;
+  // A part of a split article is another entry than its article (G-387 (a)); the first part has no `parte`.
+  const part = partOf(norm.parte) ? `|${norm.parte}` : '';
+  return `${norm.urn}|${norm.allegato ?? ''}|${article}${part}`;
 }
 
 /**

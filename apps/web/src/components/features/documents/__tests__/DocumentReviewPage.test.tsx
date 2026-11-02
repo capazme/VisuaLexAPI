@@ -10,9 +10,22 @@ import { PARERE, testFile } from './fixtures';
 const navigateMock = vi.fn();
 const triggerSearchMock = vi.fn();
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
+const NO_ALIASES: never[] = [];
 vi.mock('../../../../store/useAppStore', () => ({
-  useAppStore: (select: (state: { triggerSearch: typeof triggerSearchMock }) => unknown) => select({ triggerSearch: triggerSearchMock }),
+  useAppStore: (select: (state: { triggerSearch: typeof triggerSearchMock; customAliases: never[] }) => unknown) =>
+    select({ triggerSearch: triggerSearchMock, customAliases: NO_ALIASES }),
 }));
+// The server, as recorded for the corpus test: the catalog's names, and the readings of /parse_query_batch.
+const server = vi.hoisted(() => ({ fetchActNames: vi.fn(), readOnServer: vi.fn() }));
+vi.mock('../documentServer', () => server);
+const RECORDED = JSON.parse(readFileSync(resolve(__dirname, 'corpus/server.json'), 'utf8')) as {
+  act_names: string[];
+  answers: Record<string, unknown>;
+};
+const answerAsRecorded = async (queries: string[]) => ({
+  answers: new Map(queries.map((q) => [q, RECORDED.answers[q] ?? { recognized: false, parsed: null }])),
+  unanswered: [],
+});
 
 const input = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input[type="file"]')!;
 
@@ -32,15 +45,21 @@ beforeEach(() => {
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   navigateMock.mockReset();
   triggerSearchMock.mockReset();
+  server.fetchActNames.mockReset().mockResolvedValue(RECORDED.act_names);
+  server.readOnServer.mockReset().mockImplementation(answerAsRecorded);
 });
 
 describe('DocumentReviewPage — before a document', () => {
-  it('has a title with its phrase and says, to a screen reader too, that nothing leaves the browser', () => {
+  it('has a title with its phrase and says, to a screen reader too, what stays and what goes (#376 §6.4, G-401)', () => {
     render(<DocumentReviewPage />);
     expect(screen.getByRole('heading', { level: 1, name: 'Analizza documento' })).toHaveClass('font-serif');
-    expect(screen.getByText('Trova le norme citate in un atto: il file resta nel tuo browser.')).toBeInTheDocument();
-    const badge = screen.getByText(/^Resta nel tuo browser/);
-    expect(badge).toHaveTextContent('Resta nel tuo browser: il documento non viene inviato al server né salvato.');
+    expect(screen.getByText('Trova le norme citate in un atto. Il documento resta sul tuo computer: a VisuaLex arrivano solo le citazioni trovate, come in una ricerca.')).toBeInTheDocument();
+    const badge = screen.getByText(/^Il documento resta sul tuo computer/, { selector: 'p' });
+    expect(badge).toHaveTextContent('Il testo del documento non viene inviato né salvato.');
+    expect(badge).toHaveTextContent('per esempio «art. 82 GDPR»');
+    expect(badge).toHaveTextContent('con «Prepara i link» arriva a VisuaLex solo l’elenco delle norme citate, mai il testo.');
+    // Nothing on the page says any more that nothing leaves the browser.
+    expect(document.body.textContent).not.toMatch(/resta nel tuo browser/i);
   });
 
   it('opens the file picker from the box, with Enter and Space as with a click', async () => {
@@ -160,12 +179,12 @@ describe('DocumentReviewPage — before a document', () => {
     expect(zone).not.toHaveAttribute('data-tab-hidden');
   });
 
-  it('keeps the promise in sight in every state: the file stays in the browser', () => {
+  it('keeps the promise in sight in every state: the document stays on the computer', () => {
     render(<DocumentReviewPage />);
     const zone = screen.getByRole('button', { name: /Scegli un documento/ });
-    expect(zone).toHaveTextContent('Il file resta nel tuo browser');
+    expect(zone).toHaveTextContent('Il documento resta sul tuo computer');
     fireEvent.dragOver(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
-    expect(zone).toHaveTextContent('Il file resta nel tuo browser');
+    expect(zone).toHaveTextContent('Il documento resta sul tuo computer');
   });
 
   it('refuses a file let go outside the box, so the browser does not open it in place of the app', () => {
@@ -441,5 +460,119 @@ describe('DocumentReviewPage — the worst cases', () => {
     expect(heading).toHaveAttribute('title', name);
     expect(heading.className).toMatch(/\[overflow-wrap:anywhere\]/);
     expect(heading.className).toMatch(/line-clamp-2/);
+  });
+});
+
+describe('DocumentReviewPage — one recognizer with the search (design 2026-10-29-document-analysis)', () => {
+  const BRIEF = [
+    'Memoria del convenuto, Mario Bianchi.',
+    'Il datore risponde ai sensi dell’art. 82 GDPR e degli artt. 13 e 14 GDPR.',
+    'Visto il d.lgs. 81/2008, l’art. 18 del medesimo decreto impone obblighi di sicurezza.',
+    'L’art. 7 del contratto prevede una penale; restano gli artt. 167 e ss. del Codice privacy.',
+  ].join('\n');
+
+  it('asks the names of the acts once, when the page opens, before any file', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await waitFor(() => expect(server.fetchActNames).toHaveBeenCalledTimes(1));
+    await choose(container, BRIEF, 'memoria.txt');
+    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    await screen.findByRole('button', { name: /Scegli un documento/ });
+    await choose(container, PARERE);
+    expect(server.fetchActNames).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the server only the query strings the browser cannot settle, never the text around them', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, BRIEF, 'memoria.txt');
+    expect(server.readOnServer).toHaveBeenCalledTimes(1);
+    const sent = server.readOnServer.mock.calls[0][0] as string[];
+    // «art. 167 Codice privacy» the client parser reads by itself.
+    expect(sent).toEqual(['art. 82 GDPR', 'art. 13 e 14 GDPR']);
+    for (const query of sent) {
+      expect(query).not.toMatch(/Bianchi|datore|contratto|memoria/i);
+      expect(query.length).toBeLessThanOrEqual(200);
+    }
+  });
+
+  it('lists what the search reads, an inherited article with its act, and counts what is left to complete', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, BRIEF, 'memoria.txt');
+    // art. 82, 13, 14 GDPR; art. 18 d.lgs. 81/2008 «dal contesto»; art. 167 e ss. Codice privacy; «art. 7 del contratto» to complete.
+    expect(visible('5 citazioni in 3 atti · 1 da completare')).toBeInTheDocument();
+    const list = screen.getByRole('complementary', { name: 'Citazioni' });
+    expect(within(list).getByRole('heading', { level: 3, name: /^reg\. \(UE\) 2016\/679\s+3 citazioni$/ })).toBeInTheDocument();
+    expect(within(list).getByRole('heading', { level: 3, name: /^d\.lgs\. 81\/2008\s+1 citazione$/ })).toBeInTheDocument();
+    expect(within(list).getByText('art. 167 e ss.')).toBeInTheDocument();
+    // A list marks each article on its own number.
+    // An inherited one is dashed, one to complete dotted (#376 §5.6).
+    const marks = Array.from(textBody().querySelectorAll('mark')).map((mark) => [mark.textContent, mark.dataset.kind]);
+    expect(marks).toEqual([
+      ['art. 82 GDPR', 'own'], ['artt. 13', 'own'], ['14 GDPR', 'own'], ['art. 18', 'context'], ['art. 7', 'incomplete'],
+      ['artt. 167 e ss. del Codice privacy', 'own'],
+    ]);
+    expect(textBody().querySelector('[data-kind="context"]')!.className).toMatch(/decoration-dashed/);
+    expect(textBody().querySelector('[data-kind="incomplete"]')!.className).toMatch(/decoration-dotted decoration-slate-400/);
+    expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull();
+  });
+
+  it('opens an inherited citation with the act its words name («del medesimo decreto»)', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, BRIEF, 'memoria.txt');
+    await userEvent.click(screen.getByRole('button', { name: 'Apri art. 18 d.lgs. 81/2008' }));
+    expect(triggerSearchMock).toHaveBeenCalledWith({
+      act_type: 'decreto legislativo', act_number: '81', date: '2008', article: '18', version: 'vigente', version_date: '',
+    });
+  });
+
+  it('when the server is silent, keeps what the browser reads, says so, and asks again with «Riprova» for the rest only', async () => {
+    server.readOnServer.mockImplementationOnce(async (queries: string[]) => ({ answers: new Map(), unanswered: queries }));
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, BRIEF, 'memoria.txt');
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveTextContent('VisuaLex non risponde: ho riconosciuto solo le forme che conosco nel browser.');
+    // What the browser reads stays found; the GDPR's citations wait.
+    expect(visible('2 citazioni in 2 atti · 4 da completare')).toBeInTheDocument();
+    await userEvent.click(within(notice).getByRole('button', { name: 'Riprova' }));
+    await waitFor(() => expect(visible('5 citazioni in 3 atti · 1 da completare')).toBeInTheDocument());
+    expect(server.readOnServer).toHaveBeenCalledTimes(2);
+    expect(server.readOnServer.mock.calls[1][0]).toEqual(['art. 82 GDPR', 'art. 13 e 14 GDPR']);
+    expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull();
+  });
+
+  it('stops asking the server for a document that was replaced, and says a fault on the row', async () => {
+    let release: () => void = () => {};
+    server.readOnServer.mockImplementationOnce((_queries: string[], signal: AbortSignal) => new Promise((_resolve, reject) => {
+      release = () => reject(new Error('never'));
+      signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+    }));
+    const { container } = render(<DocumentReviewPage />);
+    await userEvent.upload(input(container), testFile([BRIEF], 'prima.txt'));
+    await waitFor(() => expect(server.readOnServer).toHaveBeenCalledTimes(1));
+    const first = server.readOnServer.mock.calls[0][1] as AbortSignal;
+    await choose(container, PARERE, 'seconda.txt');
+    expect(first.aborted).toBe(true);
+    release();
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    server.readOnServer.mockRejectedValueOnce(new TypeError('a bug'));
+    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    await screen.findByRole('button', { name: /Scegli un documento/ });
+    await userEvent.upload(input(container), testFile([BRIEF], 'terza.txt'));
+    await waitFor(() => expect(container.querySelector('[data-stage="error"]')).toHaveTextContent('Non è stato possibile cercare le citazioni in questo documento.'));
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('without the catalog, finds what the client knows by itself and says so; «Riprova» asks for the catalog again', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    server.fetchActNames.mockRejectedValueOnce(new Error('offline'));
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    expect(visible('6 citazioni in 2 atti')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('VisuaLex non risponde');
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await waitFor(() => expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull());
+    expect(server.fetchActNames).toHaveBeenCalledTimes(2);
+    error.mockRestore();
   });
 });

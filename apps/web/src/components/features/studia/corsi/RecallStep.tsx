@@ -61,7 +61,7 @@ export function RecallStep({ blocco, where, fase, scritto, onScritto, spans, onS
               FOCUS_RING,
             )}
           />
-          <p className={cn('text-sm', MUTED_TEXT)}>Resta su questo dispositivo: non viene inviato e si perde quando chiudi il modulo.</p>
+          <p className={cn('text-sm', MUTED_TEXT)}>Resta solo in questa scheda del browser, anche se ricarichi o torni indietro: non viene inviato, e se ne va quando chiudi il modulo o la scheda.</p>
         </div>
       )}
 

@@ -526,3 +526,90 @@ class TestSuffixesPastDecies:
 
     def test_short_suffix_unchanged(self):
         assert parse_nl_query("art. 25-ter cp").article == "25-ter"
+
+
+class TestClausesOfTheDocumentAnalysis:
+    """The clause is the article's, never the act's: the defects «Analizza documento»'s
+    measure found in the search (design 2026-10-29-document-analysis §4.8)."""
+
+    def test_a_number_after_the_article_is_not_the_acts(self):
+        # It was regulation number 7 of 2016: a wrong norm, not a missing one.
+        for query in ("art. 4, n. 7, GDPR", "art. 4 n. 7 GDPR"):
+            r = parse_nl_query(query)
+            assert (r.act_type, r.act_number, r.date, r.article) == ("regolamento ue", "679", "2016", "4")
+
+    def test_a_number_before_the_act_and_its_preposition_is_the_articles(self):
+        for query in ("art. 4 n. 7 del GDPR", "art. 4, n. 7 del GDPR"):
+            r = parse_nl_query(query)
+            assert (r.act_type, r.act_number, r.date, r.article) == ("regolamento ue", "679", "2016", "4")
+        r = parse_nl_query("art. 360 n. 3 del c.p.c.")
+        assert (r.act_type, r.act_number, r.article) == ("codice di procedura civile", None, "360")
+
+    def test_a_letter_does_not_take_the_law_after_it(self):
+        r = parse_nl_query("art. 7 lett. a e l 241/1990")
+        assert (r.act_type, r.act_number, r.date, r.article) == ("legge", "241", "1990", "7")
+
+    def test_a_number_after_the_paragraph_is_not_the_codes(self):
+        r = parse_nl_query("art. 360, comma 1, n. 3, c.p.c.")
+        assert (r.act_type, r.act_number, r.article) == ("codice di procedura civile", None, "360")
+
+    @pytest.mark.parametrize("query, expected", [
+        ("art. 82, par. 1, GDPR", ("regolamento ue", "679", "2016", "82")),
+        ("art. 6, paragrafo 1, lett. a), GDPR", ("regolamento ue", "679", "2016", "6")),
+        ("art. 17, parr. 1 e 2, GDPR", ("regolamento ue", "679", "2016", "17")),
+        ("art. 360, primo comma, n. 3, c.p.c.", ("codice di procedura civile", None, None, "360")),
+        ("art. 2043, secondo comma, c.c.", ("codice civile", None, None, "2043")),
+        ("art. 7, comma 1, lettere c) ed e), l. 241/1990", ("legge", "241", "1990", "7")),
+        ("art. 1453, c. 1 c.c.", ("codice civile", None, None, "1453")),
+    ])
+    def test_every_clause_is_read_and_left_out(self, query, expected):
+        r = parse_nl_query(query)
+        assert (r.act_type, r.act_number, r.date, r.article) == expected
+
+    @pytest.mark.parametrize("query, expected", [
+        # «n.» after the act's type is the act's number, as before
+        ("art. 2 legge n. 241 del 1990", ("legge", "241", "1990", "2")),
+        ("art. 5 n. 3 legge 241/1990", ("legge", "241", "1990", "5")),
+        ("art. 1 l. n. 400/1988", ("legge", "400", "1988", "1")),
+    ])
+    def test_the_acts_own_number_is_still_the_acts(self, query, expected):
+        r = parse_nl_query(query)
+        assert (r.act_type, r.act_number, r.date, r.article) == expected
+
+    def test_a_number_with_its_year_is_never_a_clause(self):
+        # «n. 241/1990» and «n. 241 del 1990» are an act's, so the clause leaves them alone
+        assert parse_nl_query("art. 1 n. 241/1990") is None
+
+
+class TestAmbiguousNames:
+    """«T.U.E.» is the testo unico edilizia in a brief and the Treaty to the tables: refused,
+    so the search asks instead of guessing (Q9)."""
+
+    @pytest.mark.parametrize("query", ["T.U.E.", "t.u.e.", "art. 13 T.U.E.", "art. 13 del T.U.E.", "art. 13 t. u. e."])
+    def test_the_dotted_spelling_is_refused(self, query):
+        from visualex_api.tools.alias_resolver import resolve_alias
+
+        assert resolve_alias(query) is None
+        assert parse_nl_query(query) is None
+
+    def test_the_treaty_without_dots_stays_the_treaty(self):
+        from visualex_api.tools.alias_resolver import resolve_alias
+
+        assert resolve_alias("art. 6 TUE") == {"act_type": "TUE", "article": "6"}
+
+    def test_the_list_names_both_acts(self):
+        from visualex_api.tools.act_resolver import ambiguous_act
+
+        assert len(ambiguous_act("T.U.E.")) == 2
+        assert ambiguous_act("TUE") is None and ambiguous_act("tuel") is None
+
+
+class TestSpellingsOfBriefs:
+    @pytest.mark.parametrize("query, expected", [
+        ("art. 4 St. lav.", {"act_type": "legge", "act_number": "300", "date": "1970", "article": "4"}),
+        ("art. 18 T.U. sicurezza", {"act_type": "decreto legislativo", "act_number": "81", "date": "2008", "article": "18"}),
+    ])
+    def test_resolved_by_the_presets(self, query, expected):
+        from visualex_api.tools.alias_resolver import resolve_alias
+
+        assert resolve_alias(query) == expected

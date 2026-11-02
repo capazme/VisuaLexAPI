@@ -1,7 +1,6 @@
 import { ArticleMerltSlot } from '../features/merlt/ArticleMerltSlot';
 import { GlobalMerltSlot } from '../features/merlt/GlobalMerltSlot';
 import { ArticleGraphSideRail } from '../features/merlt/graph/side-rail/ArticleGraphSideRail';
-import { RassegnePanel } from '../features/merlt/rassegne/RassegnePanel';
 import type { PluginSlotName, SlotComponent } from './types';
 
 /**
@@ -9,9 +8,9 @@ import type { PluginSlotName, SlotComponent } from './types';
  *
  * Future stories (Slice 2-3) may register additional slots here for Q&A
  * panels, graph viewer, admin pages, etc. For Slice 1 the registry only
- * mounts the MERL-T tracker via `article_content_after`; the Massimario's reviews
- * panel ("Nelle rassegne della Cassazione") sits in `article_case_law`, which the
- * article's «Giurisprudenza» section hosts.
+ * mounts the MERL-T tracker via `article_content_after`. The Massimario's reviews
+ * panel ("Nelle rassegne della Cassazione") is no plugin: «Giurisprudenza» mounts it
+ * itself, read from the Python API's own store, with MERL-T on or off.
  */
 // Cast individual components to the generic slot signature. Slots accept
 // `Record<string, unknown>` props at the registry boundary; the host
@@ -23,13 +22,6 @@ const slotComponents: SlotComponent<Record<string, unknown>>[] = [
         pluginId: 'visualex-merlt',
         slot: 'article_content_after',
         component: ArticleMerltSlot as unknown as React.ComponentType<Record<string, unknown>>,
-        requiredFlag: 'VITE_FEATURE_MERLT',
-    },
-    {
-        id: 'merlt-article-rassegne',
-        pluginId: 'visualex-merlt',
-        slot: 'article_case_law',
-        component: RassegnePanel as unknown as React.ComponentType<Record<string, unknown>>,
         requiredFlag: 'VITE_FEATURE_MERLT',
     },
     {

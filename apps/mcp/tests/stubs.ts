@@ -43,7 +43,7 @@ export interface Stub {
   }[];
   introspectionDown?: boolean;
   /** What GET /api/features answers (public, asked at each session's start; not recorded in apiCalls). */
-  features?: { assistantPassages?: boolean; assistantGlosses?: boolean; lingoCourses?: boolean } | 'down';
+  features?: { assistantPassages?: boolean; assistantGlosses?: boolean; lingoCourses?: boolean; articleParts?: boolean } | 'down';
   /** The user's study cards, as GET /api/lingo/cards answers them. */
   cards: {
     id: string;

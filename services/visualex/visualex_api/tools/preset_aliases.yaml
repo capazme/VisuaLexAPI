@@ -93,6 +93,12 @@ statuto dei lavoratori:
   act_number: "300"
   date: "1970"
 
+# As briefs write it (design 2026-10-29-document-analysis §4.8)
+st. lav.:
+  act_type: "legge"
+  act_number: "300"
+  date: "1970"
+
 legge 104:
   act_type: "legge"
   act_number: "104"
@@ -215,6 +221,12 @@ testo unico sicurezza:
   date: "2008"
 
 testo unico sicurezza lavoro:
+  act_type: "decreto legislativo"
+  act_number: "81"
+  date: "2008"
+
+# As briefs write it (design 2026-10-29-document-analysis §4.8)
+t.u. sicurezza:
   act_type: "decreto legislativo"
   act_number: "81"
   date: "2008"

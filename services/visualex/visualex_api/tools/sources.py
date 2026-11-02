@@ -248,7 +248,11 @@ def cite_act(norm: Mapping[str, Any]) -> str:
 
 
 def cite_article(norm: Mapping[str, Any]) -> str:
-    """"art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679"."""
+    """"art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679".
+
+    A part of a split article names its commas after the article (G-389, Q2): "art. 1, commi
+    701-800, l. 27 dicembre 2006, n. 296"; the first part has no `parte` and keeps the article's.
+    """
     act, joiner = _act(norm)
     annex = _text(norm, "allegato")
     kind = _key(_text(norm, "tipo_atto"))
@@ -257,4 +261,6 @@ def cite_article(norm: Mapping[str, Any]) -> str:
     # turismo is «d.lgs. 23 maggio 2011, n. 79», never «… (Allegato 1)»).
     named = (f" (Allegato {annex})" if annex and joiner == ", " and kind not in _EU
              and not _is_default_annex(norm, annex) else "")
-    return f"art. {_text(norm, 'numero_articolo')}{joiner}{act}{named}"
+    part = _text(norm, "parte")
+    commas = f", commi {part}" if part else ""
+    return f"art. {_text(norm, 'numero_articolo')}{commas}{joiner}{act}{named}"

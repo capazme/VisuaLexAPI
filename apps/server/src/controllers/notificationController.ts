@@ -15,7 +15,11 @@ const checkNormaSchema = z.object({
 });
 
 /**
- * Forum-unread aggregate. Two counts:
+ * Forum-unread aggregate. Three counts in the total, and one beside it:
+ * - community: the user's unread Community notifications (a reply, a comment, an
+ *   acceptance, a hiding; spec 2026-10-20-forum-community-glosse-design §6.5);
+ * - pendingReports (moderators and admins only, not in the total): the Community's
+ *   reported items still waiting for a decision.
  * - pendingSuggestions: SuggestionItem rows with status='pending' on envs the
  *   current user owns. Doesn't use a cursor — pending IS the unread state.
  * - newLikes: SharedEnvironmentLike rows since the user's
@@ -27,12 +31,13 @@ export const getForumUnreadCount = async (req: Request, res: Response) => {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { notificationLastSeenAt: true },
+    select: { notificationLastSeenAt: true, isAdmin: true, forumModerator: true },
   });
 
   const since = user?.notificationLastSeenAt ?? undefined;
+  const moderates = Boolean(user?.isAdmin || user?.forumModerator);
 
-  const [pendingSuggestions, newLikes] = await Promise.all([
+  const [pendingSuggestions, newLikes, community, pendingReports] = await Promise.all([
     prisma.suggestionItem.count({
       where: {
         status: 'pending',
@@ -46,14 +51,27 @@ export const getForumUnreadCount = async (req: Request, res: Response) => {
         userId: { not: userId },
       },
     }),
+    prisma.forumNotification.count({ where: { userId, readAt: null } }),
+    moderates ? pendingReportedItems() : Promise.resolve(null),
   ]);
 
   res.json({
     pendingSuggestions,
     newLikes,
-    total: pendingSuggestions + newLikes,
+    community,
+    ...(pendingReports !== null ? { pendingReports } : {}),
+    total: pendingSuggestions + newLikes + community,
   });
 };
+
+/** How many glosse and replies have a report waiting for a decision (one per item, as the queue). */
+async function pendingReportedItems(): Promise<number> {
+  const [threads, comments] = await Promise.all([
+    prisma.articleThreadReport.groupBy({ by: ['threadId'], where: { status: 'pending' } }),
+    prisma.articleCommentReport.groupBy({ by: ['commentId'], where: { status: 'pending' } }),
+  ]);
+  return threads.length + comments.length;
+}
 
 /**
  * Reset the likes cursor. Pending suggestions are NOT cleared by this — they

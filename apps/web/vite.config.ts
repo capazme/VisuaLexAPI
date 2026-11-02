@@ -13,6 +13,7 @@ export const ROUTE_PAGES: ReadonlyArray<readonly [string, readonly string[]]> = 
   ['/forum/community', ['src/components/features/bulletin/ForumCommunityPage.tsx']],
   ['/forum', ['src/components/features/bulletin/BulletinBoardPage.tsx']],
   ['/documents', ['src/components/features/documents/DocumentReviewPage.tsx']],
+  ['/rassegne', ['src/components/features/rassegne/RassegneSearchPage.tsx']],
   ['/crediti', ['src/pages/CreditsPage.tsx']],
   ['/collega-app', ['src/features/connections/ConnectAiAppPage.tsx']],
   ['/opus', ['src/components/features/planner/OpusPage.tsx', 'src/components/features/planner/OpusViews.tsx']],
@@ -107,7 +108,12 @@ export default defineConfig({
       '/fetch_decision_pdf': 'http://localhost:5000',
       '/search_decisions': 'http://localhost:5000',
       '/search_eu_case_law': 'http://localhost:5000',
+      // the Massimario's reviews, from the API's own store (POST for a keyword search)
+      '/fetch_rassegne': 'http://localhost:5000',
+      // a word in every volume, for the page «Rassegne» (POST only)
+      '/search_rassegne': 'http://localhost:5000',
       '/parse_query': 'http://localhost:5000',
+      '/fetch_norm_links': 'http://localhost:5000',
       '/extract_citations': 'http://localhost:5000',
       '/export_pdf': 'http://localhost:5000',
       '/version': 'http://localhost:5000',

@@ -25,6 +25,7 @@ const BulletinBoardPage = lazy(() => PAGE_CODE.forum().then(m => ({ default: m.B
 const HistoryView = lazy(() => PAGE_CODE.history().then(m => ({ default: m.HistoryView })));
 const ForumCommunityPage = lazy(() => PAGE_CODE.community().then(m => ({ default: m.ForumCommunityPage })));
 const DocumentReviewPage = lazy(() => PAGE_CODE.documents().then(m => ({ default: m.DocumentReviewPage })));
+const RassegneSearchPage = lazy(() => PAGE_CODE.rassegne().then(m => ({ default: m.RassegneSearchPage })));
 const CreditsPage = lazy(() => PAGE_CODE.credits().then(m => ({ default: m.CreditsPage })));
 const ConnectAiAppPage = lazy(() => PAGE_CODE.connectAiApp().then(m => ({ default: m.ConnectAiAppPage })));
 const OpusPage = lazy(() => PAGE_CODE.opus().then(([m]) => ({ default: m.OpusPage })));
@@ -154,6 +155,7 @@ function App() {
           <Route path="forum" element={<BulletinBoardPage />} />
           <Route path="forum/community" element={<ForumCommunityPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
+          <Route path="rassegne" element={<RassegneSearchPage />} />
           {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
           <Route path="collega-app" element={<ConnectAiAppPage />} />
           {/* The MERL-T pages are development addresses (spec D6): without the development mode they
