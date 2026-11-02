@@ -11,8 +11,8 @@ import { resolve } from 'node:path';
  * and drops, for the families the suite configures, every `OAUTH_*` and `MERLT_*` that
  * `.env.test` does not name, wherever it came from (a shell export too). A development MCP secret once won this way, and every OAuth
  * exchange answered `invalid_client` in the main checkout only. The global setup's own client,
- * in vitest's main process, whose environment the test processes inherit, is wrapped the same
- * way (`tests/globalSetup.ts`).
+ * in vitest's main process, whose environment the test processes inherit, has what it loads
+ * taken out the same way (`dropAddedSince` around its import and construction, `tests/globalSetup.ts`).
  */
 export const GUARDED = /^(OAUTH|MERLT)_/;
 

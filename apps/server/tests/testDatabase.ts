@@ -24,19 +24,21 @@ declare module 'vitest' {
 // empties its tables. If vitest is run WITHOUT the `dotenv -e .env.test` wrapper (i.e.
 // `npx vitest` instead of `npm test`), Prisma loads `.env` and DATABASE_URL points at the DEV
 // database (visualex_platform) — the reset then wipes dev data. Refuse to run unless the
-// target DB name clearly looks like a test database. The name is the URL's path, never what
-// follows a `/` in its query (`?sslrootcert=/certs/test-ca.pem` names no database).
+// target DB name clearly looks like a test database. The name is the first segment of the
+// URL's path, the one Prisma connects to: never what follows a `/` in the query
+// (`?sslrootcert=/certs/test-ca.pem` names no database) or in a later segment
+// (`/visualex_platform/visualex_test` names `visualex_platform`).
 export function assertTestDatabase(): void {
   const url = process.env.DATABASE_URL ?? '';
   let dbName = '';
   try {
-    dbName = decodeURIComponent(new URL(url).pathname.slice(1));
+    dbName = decodeURIComponent(new URL(url).pathname.split('/')[1] ?? '');
   } catch {
     // Not a URL: no database name, refused below.
   }
   if (!/test/i.test(dbName)) {
     throw new Error(
-      `Refusing to run tests: DATABASE_URL points at "${dbName || '(unset)'}", ` +
+      `Refusing to run tests: DATABASE_URL points at "${dbName || '(no database name)'}", ` +
         `which does not look like a test database. Run tests via "npm test" ` +
         `(which loads .env.test) — never "npx vitest" directly.`
     );
@@ -68,6 +70,11 @@ export const SCHEMA_FINGERPRINT = `
     FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
     WHERE c.relnamespace = 'public'::regnamespace AND NOT t.tgisinternal
     UNION ALL
+    -- Whether each trigger fires, the foreign keys' own included: a DISABLE TRIGGER ALL left behind
+    -- would silently stop checking them.
+    SELECT format('trigger state %s %s', c.relname, t.tgenabled)
+    FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid WHERE c.relnamespace = 'public'::regnamespace
+    UNION ALL
     SELECT format('enum %s %s %s', t.typname, e.enumsortorder, e.enumlabel)
     FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typnamespace = 'public'::regnamespace
   ) AS schema`;
@@ -87,7 +94,8 @@ export type Reference = {
  * item published from it; a glossa and its accepted reply), one table of it goes first: the
  * first by name whose remaining referencing keys are all `ON DELETE SET NULL`, so Postgres only
  * detaches those rows and nothing cascades further. A cycle with no such table stops the run,
- * naming its tables. Ties go by name, so the order is the same on every run.
+ * listing the tables not yet ordered (the cycle's and those it holds back). Ties go by name, so
+ * the order is the same on every run.
  */
 export function deletionOrder(tables: readonly string[], references: readonly Reference[]): string[] {
   const left = new Set([...tables].sort());
@@ -102,7 +110,7 @@ export function deletionOrder(tables: readonly string[], references: readonly Re
     if (ready.length === 0) ready = [...left].filter((table) => !heldBy(table, true)).slice(0, 1);
     if (ready.length === 0) {
       throw new Error(
-        `The foreign keys among ${[...left].join(', ')} form a cycle that no ON DELETE SET NULL key breaks: ` +
+        `A cycle of foreign keys that no ON DELETE SET NULL key breaks holds back ${[...left].join(', ')}: ` +
           'tests/testDatabase.ts cannot order their DELETEs.'
       );
     }

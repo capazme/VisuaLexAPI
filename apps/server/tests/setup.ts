@@ -55,8 +55,8 @@ beforeAll(async () => {
   if (schema.fingerprint !== database.schema) {
     throw new Error(
       'The test database schema is no longer the one the migrations made at the start of the run: ' +
-        'a test in an earlier file changed it and did not undo it (one that timed out before its `finally`?). ' +
-        'Fix that test; the next run resets the database.'
+        'a test in an earlier file changed it and did not undo it (one that timed out before its `finally`?), ' +
+        'or a migration was applied during `test:watch`. Fix that test, or restart watch mode: a new run resets the database.'
     );
   }
 });

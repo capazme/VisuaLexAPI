@@ -74,8 +74,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   consent page words it (`SCOPE_LABELS`); session only, like every `/api/oauth` route but
   the quota. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
   at most every ten minutes: never fire-and-forget it, a background sweep
-  deadlocked the test suite's TRUNCATE (the suite now empties tables with DELETEs,
-  which do not wait for a write in flight: such a write can leave a row for the next test).
+  deadlocked the test suite's TRUNCATE (the suite now empties tables with DELETEs, which
+  take no table lock but still wait on the rows a write in flight holds, and can deadlock
+  with it; a write that commits after its table's DELETE leaves a row for the next test).
 - **Exchanged tokens: how the MCP server acts for a user** (spec section 5).
   `grant_type=urn:ietf:params:oauth:grant-type:token-exchange` on
   `/oauth/token` (`oauth/exchange.ts`), for `mcp-omnilex` only: the client's
@@ -985,8 +986,8 @@ reference it (`tests/testDatabase.ts` `deletionOrder`; the two cycles among the 
 and its Forum copy, a glossa and its accepted reply, are broken at a `SET NULL` key). A `TRUNCATE`
 cost about 200 ms a test, the DELETEs a few. No table has a sequence or an identity column and
 the migrations create no trigger, so there is no counter to restart. Two differences remain. A
-`TRUNCATE` gave each test brand-new table files, so a read without `ORDER BY` came back in
-insertion order; after DELETEs Postgres may put a new row in space freed earlier, so a test that
+`TRUNCATE` gave each test brand-new table files, so a read without `ORDER BY` usually came back
+in insertion order (a sequential scan of rows never updated); after DELETEs Postgres may put a new row in space freed earlier, so a test that
 compares a list in order must ask for one. And a schema change a test leaves behind (a `CHECK`
 added for a moment, undone in a `finally`) would reach the next files: each file compares the
 schema with the one the run started from (`SCHEMA_FINGERPRINT`) and refuses to run when it
