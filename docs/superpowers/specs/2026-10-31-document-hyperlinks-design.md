@@ -59,7 +59,7 @@ decided here: G-395 (a link dated today or undated).
 - PR 1 (#381, merged): `/parse_query_batch` reads up to 200 query strings and **stops at the reading**: no address,
   no network, a log line with the count, the failures and the duration only (`services/visualex/app.py:1285`), priced at 3 points
   (`apps/server/src/middleware/scrapeGate.ts:21`).
-- PR 2 (web, logic, not written): candidates (§4.3 of #376), resolution, inheritance within the paragraph, the HTML
+- PR 2 (web, logic, not written): candidates (§4.3 of #376), resolution, inheritance only when the text says so (G-402: «del medesimo decreto», «della citata legge», of the kind named), the HTML
   reader's line breaks, the fallback.
 - PR 3 (web, screens, not written): «Da completare», the picker, «Non sono norme», the promise's new words, the
   switch «Riconosci solo nel browser» (Q3 of #376, off by default). PR 2 and PR 3 wait for the other owner's words
@@ -183,7 +183,7 @@ are a spec of their own.
 | resolved | its own words read by the client parser or `/parse_query_batch`, identifies the act, has an article | **yes**, once its address is `ok` |
 | «scelto da te», this row | completed by hand on this row (#376 §5.4, «Solo a questa citazione») | **yes**: the user named the act for it |
 | «scelto da te», applied to others | the act applied with «Anche alle altre N» or «A tutte le N da completare» (#376 §5.4) | **no**, until confirmed: the user did not look at each one |
-| «dal contesto» | inherited within the paragraph (#376 §4.6) | **no**, until confirmed (below) |
+| «dal contesto» | inherited from an act the text points back to («del medesimo decreto», «della citata legge»; G-402, #376 §4.6) | **no**, until confirmed (below) |
 | «Da completare» | not resolved | never; completing it makes it «scelto da te» |
 | «Non è una norma» | dismissed | never |
 
@@ -583,7 +583,7 @@ path before the Word file, L4 can follow L5 and L5 shows only «Copia con i link
 6. **Acts named alone** (§4.4). *Recommendation:* not linked in this phase; only article citations.
 7. **Ranges and «e ss.»** (§4.4). *Recommendation:* the link goes to the first article, said on the row.
 8. **Inherited citations and acts applied in bulk** (§4.1). *Recommendation:* no link until confirmed, with «Conferma
-   tutte»: within the paragraph #376 measured no wrong one, but a filing's link is the lawyer's statement, the bulk
+   tutte»: inheritance is now limited to the back-references the text writes (G-402), but a filing's link is the lawyer's statement, the bulk
    scopes of #376 §5.4 reach citations the user did not look at, and the blind corpus has not run yet.
 9. **G-395, a dated or an undated link** — already open, not answered here. This spec is built to take either
    answer (`pin_day`, §3.1); it only adds that a filing is read later than it is written, which may weigh for the

@@ -64,14 +64,14 @@ export function loadCorpus(from: string): CorpusDocument[] {
 const CODES = new Set([...Object.keys(CODES_TABLE).map((k) => k.toLowerCase()), 'tue', 'tfue', 'cdfue', 'cedu']);
 
 /** An act: a code by its name, any other by type, number and year. */
-function actKey(type?: string, number?: string, date?: string): string {
+export function actKey(type?: string, number?: string, date?: string): string {
   const t = (type ?? '').toLowerCase().trim();
   if (CODES.has(t)) return `code:${t}`;
   return `${t}|${(number ?? '').trim()}|${(date ?? '').slice(0, 4)}`;
 }
 
-const sameArticle = (a?: string, b?: string) => (a ?? '').toLowerCase().replace(/\s/g, '') === (b ?? '').toLowerCase().replace(/\s/g, '');
-const overlaps = (a: { start: number; end: number }, b: { start: number; end: number }) => a.start < b.end && b.start < a.end;
+export const sameArticle = (a?: string, b?: string) => (a ?? '').toLowerCase().replace(/\s/g, '') === (b ?? '').toLowerCase().replace(/\s/g, '');
+export const overlaps = (a: { start: number; end: number }, b: { start: number; end: number }) => a.start < b.end && b.start < a.end;
 
 export interface Score {
   /** Article citations expected (each article of a list on its own). */
