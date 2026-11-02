@@ -39,6 +39,22 @@ function settle(text: string, unanswered: string[] = []) {
 
 const civil = { act_type: 'codice civile' };
 
+/**
+ * As `settle`, with the readings of some acts given by hand (`acts`: the act as written → its reading, with the types
+ * of the server's tables, `visualex_api/tools/map.py`): a query that names one of them settles to it.
+ */
+function settleWith(text: string, acts: Record<string, Partial<ParsedCitation>>) {
+  const found = candidates(text);
+  const client = readOnClient(found);
+  const settled = new Map([...settledByServer(found, new Map(Object.entries(recorded.answers))), ...client]);
+  for (const candidate of found) {
+    if (!candidate.query || settled.has(candidate.query)) continue;
+    const act = Object.entries(acts).find(([written]) => candidate.actPhrase?.toLowerCase() === written.toLowerCase());
+    if (act) settled.set(candidate.query, act[1] as ParsedCitation);
+  }
+  return settleCitations(text, found, { settled, unanswered: new Set() });
+}
+
 describe('the vocabulary (§4.2)', () => {
   it('holds the server’s names, longest first, folded', () => {
     expect(vocabulary.fromServer).toBe(true);
@@ -191,8 +207,75 @@ describe('candidates (§4.3)', () => {
     expect(only('art. 13 del Regolamento.').followedBy).toBe('del Regolamento');
     expect(only('art. 4, comma 1, St. lavoratori').followedBy).toBe('St.');
     const same = only('l’art. 13 del medesimo decreto');
-    expect(same.sameAct).toBe(true);
+    expect(same.backReference).toEqual({ kind: 'decree' });
     expect(same.followedBy).toBeUndefined();
+  });
+
+  it('reads the words that tie a bare article to an act named before (G-402)', () => {
+    const reference = (text: string) => only(text).backReference;
+    expect(reference('l’art. 13 della medesima legge')).toEqual({ kind: 'law' });
+    // A sentence's full stop, then the next paragraph's number: still «della medesima legge».
+    expect(reference('l’art. 21-octies, comma 2, della medesima legge.\n\n7. Il provvedimento')).toEqual({ kind: 'law' });
+    expect(reference('l’art. 21-octies della medesima legge. 7 giorni dopo')).toEqual({ kind: 'law' });
+    expect(reference('l’art. 13 dello stesso decreto legislativo')).toEqual({ kind: 'legislative decree' });
+    expect(reference('l’art. 81, comma 18, del citato decreto-legge')).toEqual({ kind: 'decree-law' });
+    expect(reference('l’art. 82 Reg. cit. e')).toEqual({ kind: 'regulation' });
+    expect(reference('l’art. 4 della legge cit., che')).toEqual({ kind: 'law' });
+    expect(reference('l’art. 4 d.lgs. ult. cit.')).toEqual({ kind: 'legislative decree' });
+    expect(reference('l’art. 13 del medesimo provvedimento')).toEqual({ kind: 'any' });
+    expect(reference('l’art. 13 del predetto, che')).toEqual({ kind: 'any' });
+    expect(reference('l’art. 13 del cit. d.P.R., che')).toEqual({ kind: 'presidential decree' });
+    expect(reference('l’art. 4 cit.')).toEqual({ kind: 'any', sameArticle: true });
+    expect(reference('anticipazione (ivi, art. 30), come')).toEqual({ kind: 'any' });
+    expect(reference('l’art. 18 cit. prevede')).toEqual({ kind: 'any', sameArticle: true });
+    expect(reference('il quinto comma dello stesso art. 18 prevede')).toEqual({ kind: 'any', sameArticle: true });
+    expect(reference('il citato art. 81, commi 16 e 17, prevede')).toEqual({ kind: 'any', sameArticle: true });
+  });
+
+  it('a noun is read whole: a long name with a number of its own is never cut back to «decreto» (review of G-402)', () => {
+    for (const tail of [
+      'del citato decreto legislativo 30 giugno 2003, n. 196 prevede',
+      'del citato decreto legislativo n. 196/2003 prevede',
+      'del citato decreto-legge n. 18/2020 prevede',
+      'del medesimo decreto del Presidente della Repubblica n. 115 prevede',
+      'del medesimo testo unico n. 115 prevede',
+      'della stessa legge costituzionale n. 1 prevede',
+    ]) {
+      const text = `Visto il d.lgs. 81/2008.\nL’art. 93 ${tail}.`;
+      const bare = candidates(text).find((c) => c.kind === 'bare');
+      expect(bare?.backReference, tail).toBeUndefined();
+      expect(settle(text).citations.find((c) => c.article === '93')?.state, tail).not.toBe('inherited');
+    }
+  });
+
+  it('the words before an article never win over something else after it (review of G-402)', () => {
+    for (const text of [
+      'L’art. 2 c.c. si applica. Il citato art. 2 del contratto prevede.',
+      'L’art. 30 c.c. (ivi, art. 30 del regolamento condominiale).',
+    ]) {
+      const { citations } = settle(text);
+      expect(citations.at(-1), text).toMatchObject({ state: 'incomplete' });
+      expect(citations.at(-1)?.followedBy, text).toBeDefined();
+    }
+  });
+
+  it('«l’art. 13 citato», «stesso», «predetto» with no preposition are the article cited before (review of G-402)', () => {
+    for (const word of ['citato', 'stesso', 'predetto']) {
+      expect(only(`l’art. 13 ${word}, al comma 2, impone`).backReference, word).toEqual({ kind: 'any', sameArticle: true });
+      const { citations } = settle(`L’art. 13 l. 300/1970.\nL’art. 5 d.lgs. 28/2010.\nL’art. 13 ${word}, al comma 2, impone.`);
+      expect(citations.at(-1), word).toMatchObject({ state: 'inherited', act: { act_type: 'legge', act_number: '300' } });
+    }
+  });
+
+  it('no back-reference without those words, nor when they name something else or an act of their own', () => {
+    const reference = (text: string) => only(text).backReference;
+    expect(reference('l’art. 18 impone obblighi')).toBeUndefined();
+    expect(reference('l’art. 13 del Regolamento.')).toBeUndefined();
+    expect(reference('ivi compreso l’art. 5, che')).toBeUndefined();
+    expect(only('l’art. 13 del medesimo contratto').followedBy).toBe('del medesimo');
+    expect(reference('l’art. 13 della stessa legge regionale')).toBeUndefined();
+    // «del citato d.lgs. n. 196/2003»: an act of its own, with its number — never the last decree by inheritance.
+    expect(candidates('l’art. 93 del citato d.lgs. n. 196/2003')[0].backReference).toBeUndefined();
   });
 
   it('an act before an article that goes on with «del <word>» is not its act (§4.3)', () => {
@@ -259,20 +342,107 @@ describe('the rows (§4.5–§4.7)', () => {
     expect(citations[0].act).toMatchObject(civil);
   });
 
-  it('a bare article inherits the act of its paragraph, «dal contesto»', () => {
-    const text = 'Visto il d.lgs. 81/2008, l’art. 18 impone obblighi.';
-    const { citations } = settle(text);
-    expect(citations).toMatchObject([{ article: '18', state: 'inherited', act: { act_type: 'decreto legislativo', act_number: '81', date: '2008' } }]);
+  it('a bare article with no words tying it to an act is to complete, even in the act’s paragraph (G-402)', () => {
+    expect(settle('Visto il d.lgs. 81/2008, l’art. 18 impone obblighi.').citations)
+      .toMatchObject([{ article: '18', state: 'incomplete' }]);
+    expect(settle('Visto il d.lgs. 81/2008.\nL’art. 18 impone obblighi.').citations[0].state).toBe('incomplete');
   });
 
-  it('not across paragraphs, unless «del medesimo decreto»', () => {
-    expect(settle('Visto il d.lgs. 81/2008.\nL’art. 18 impone obblighi.').citations[0].state).toBe('incomplete');
-    expect(settle('Visto il d.lgs. 81/2008.\nL’art. 18 del medesimo decreto impone obblighi.').citations[0])
-      .toMatchObject({ state: 'inherited', act: { act_number: '81' } });
+  it('«del medesimo decreto» inherits, «dal contesto», in its paragraph and across paragraphs', () => {
+    for (const text of [
+      'Visto il d.lgs. 81/2008, l’art. 18 del medesimo decreto impone obblighi.',
+      'Visto il d.lgs. 81/2008.\nL’art. 18 del medesimo decreto impone obblighi.',
+    ]) {
+      expect(settle(text).citations[0], text)
+        .toMatchObject({ state: 'inherited', act: { act_type: 'decreto legislativo', act_number: '81', date: '2008' } });
+    }
+  });
+
+  it('the words choose the act: the last of the kind they name, the last cited with the same article', () => {
+    const kinds = settle('Ai sensi dell’art. 81 d.l. 112/2008 e dell’art. 53 Cost., e dell’art. 82 del citato decreto-legge.');
+    expect(kinds.citations.map((c) => [c.article, c.state, c.act?.act_type])).toEqual([
+      ['81', 'resolved', 'decreto legge'], ['53', 'resolved', 'costituzione'], ['82', 'inherited', 'decreto legge'],
+    ]);
+    const article = settle('L’art. 18 l. 300/1970 e l’art. 1 d.lgs. 23/2015.\nIl quinto comma dello stesso art. 18 prevede.');
+    expect(article.citations[2]).toMatchObject({ article: '18', state: 'inherited', act: { act_type: 'legge', act_number: '300' } });
+    // A kind no act read before fits: to complete, never the last act of another kind.
+    expect(settle('L’art. 53 Cost.; l’art. 5 della medesima legge.').citations[1].state).toBe('incomplete');
+    expect(settle('L’art. 53 Cost. e l’art. 4 cit.').citations[1].state).toBe('incomplete');
+    // «del citato decreto-legge» with only the Costituzione read before: never the Costituzione (blind corpus, 10/2015).
+    expect(settle('Viola l’art. 53 Cost.\nIl divieto dell’art. 81, comma 18, del citato decreto-legge.').citations[1])
+      .toMatchObject({ article: '81', state: 'incomplete' });
+    // «del medesimo codice» takes a code, never the law read after it.
+    expect(settle('L’art. 1453 c.c. e l’art. 3 l. 241/1990; l’art. 1455 del medesimo codice.').citations[2])
+      .toMatchObject({ article: '1455', state: 'inherited', act: { act_type: 'codice civile' } });
+  });
+
+  it('an act fits a kind by its own words too, and the search never passes over a named act (review of G-402)', () => {
+    // The «l. fall.» is a regio decreto to the server, a law in the text.
+    const lFall = { 'l. fall.': { act_type: 'regio decreto', act_number: '267', date: '1942-03-16' } };
+    const fall = settleWith('L’art. 7 l. 241/1990.\nL’art. 67 l. fall.; l’art. 69 della stessa legge.', lFall);
+    expect(fall.citations.at(-1)).toMatchObject({ article: '69', state: 'inherited', act: { act_type: 'regio decreto', act_number: '267' } });
+    // Two laws in the paragraph: «della stessa legge» could be either.
+    expect(settleWith('L’art. 7 l. 241/1990; l’art. 67 l. fall.; l’art. 69 della stessa legge.', lFall).citations.at(-1))
+      .toMatchObject({ article: '69', state: 'incomplete' });
+    // The new code of public contracts is a legislative decree to the server, a code in the text.
+    const appalti = settleWith('L’art. 2043 c.c.\nL’art. 3 nuovo codice appalti; l’art. 5 del medesimo codice.', {
+      'nuovo codice appalti': { act_type: 'decreto legislativo', act_number: '36', date: '2023-03-31' },
+    });
+    expect(appalti.citations.at(-1)).toMatchObject({ article: '5', state: 'inherited', act: { act_number: '36' } });
+    // The Codice privacy is a legislative decree under a name: «del medesimo decreto legislativo» could be it.
+    const privacy = settle('L’art. 5 d.lgs. 81/2008; l’art. 13 Codice privacy; l’art. 2-ter del medesimo decreto legislativo.');
+    expect(privacy.citations.at(-1)).toMatchObject({ article: '2-ter', state: 'incomplete' });
+    // A name whose words say no kind, which the server reads with a number («jobs act», «tusl»): never passed over.
+    for (const [name, reading] of [
+      ['jobs act', { act_type: 'decreto legislativo', act_number: '23', date: '2015-03-04' }],
+      ['tusl', { act_type: 'decreto legislativo', act_number: '81', date: '2008-04-09' }],
+    ] as const) {
+      const text = `L’art. 7 l. 241/1990.\nL’art. 3 ${name}; l’art. 4 della medesima legge.`;
+      expect(settleWith(text, { [name]: reading }).citations.at(-1), name).toMatchObject({ article: '4', state: 'incomplete' });
+    }
+  });
+
+  it('the word of the kind written in passing between the act and the article: it may be that one (review of G-402)', () => {
+    for (const text of [
+      'L’art. 82 GDPR. Il regolamento condominiale, all’art. 5 del medesimo regolamento, vieta.',
+      'L’art. 2043 c.c. Il codice etico, all’art. 5 del medesimo codice, vieta.',
+      // Abbreviated too.
+      'Vista la l. 241/1990.\nLa l.r. Lombardia 12/2005, all’art. 5 della medesima legge, prevede.',
+      'Vista la l. 241/1990.\nLa l. reg. Lombardia n. 12, all’art. 5 della stessa legge, prevede.',
+      'L’art. 82 GDPR.\nIl reg. condominiale, all’art. 5 del medesimo regolamento, vieta.',
+      'L’art. 82 GDPR.\nIl Reg. di condominio, all’art. 5 del Reg. cit., vieta.',
+      'L’art. 2043 c.c.\nIl cod. etico, all’art. 5 del medesimo codice, vieta.',
+    ]) {
+      expect(settle(text).citations.at(-1), text).toMatchObject({ article: '5', state: 'incomplete' });
+    }
+    // A word inside a citation is that citation's: «l’art. 13 del Regolamento (UE) 2016/679» does not stop the next.
+    expect(settle('L’art. 13 del Regolamento (UE) 2016/679.\nL’art. 15 del medesimo regolamento.').citations.at(-1))
+      .toMatchObject({ state: 'inherited', act: { act_number: '679' } });
+  });
+
+  it('a chain of back-references: each inherits, its own words never stop the next (review of G-402)', () => {
+    const { citations } = settle('Vista la l. 241/1990.\nL’art. 6 della medesima legge; l’art. 7 della stessa legge.');
+    expect(citations.map((c) => [c.article, c.state, c.act?.act_number])).toEqual([
+      ['6', 'inherited', '241'], ['7', 'inherited', '241'],
+    ]);
+  });
+
+  it('«ivi» and «medesimo» with no kind take the last act read', () => {
+    const { citations } = settle('Il contributo dell’art. 13 del d.P.R. 30 maggio 2002, n. 115 e l’anticipazione (ivi, art. 30).');
+    expect(citations[1]).toMatchObject({ article: '30', state: 'inherited', act: { act_number: '115' } });
+  });
+
+  it('two acts of the kind in the paragraph of the one found: the words could mean either, to complete', () => {
+    const text = 'L’art. 5 del d.lgs. 4 marzo 2010, n. 28, come modificato dal d.lgs. 10 ottobre 2022, n. 149, prevede la '
+      + 'mediazione.\nSi chieda che il Tribunale ne tenga conto ai sensi dell’art. 12-bis del medesimo decreto.';
+    expect(settle(text).citations.at(-1)).toMatchObject({ article: '12-bis', state: 'incomplete' });
+    // The same act twice in the paragraph is no doubt.
+    expect(settle('L’art. 5 d.lgs. 28/2010 e l’art. 6 d.lgs. 28/2010.\nL’art. 7 del medesimo decreto.').citations.at(-1))
+      .toMatchObject({ state: 'inherited', act: { act_number: '28' } });
   });
 
   it('never a bare article followed by something else, which also ends the context', () => {
-    const text = 'Ai sensi dell’art. 1453 c.c. e dell’art. 7 del contratto, nonché dell’art. 8, il recesso è valido.';
+    const text = 'Ai sensi dell’art. 1453 c.c. e dell’art. 7 del contratto, nonché dell’art. 8 del medesimo codice, il recesso è valido.';
     const { citations } = settle(text);
     expect(citations.map((c) => [c.article, c.state, c.followedBy])).toEqual([
       ['1453', 'resolved', undefined],
@@ -282,7 +452,7 @@ describe('the rows (§4.5–§4.7)', () => {
   });
 
   it('a candidate the page cannot read ends the context: the next bare article is to complete', () => {
-    const text = 'Visto l’art. 5 l. 241/1990 e l’art. 6 d.m. 5/2020, l’art. 7 si applica.';
+    const text = 'Visto l’art. 5 l. 241/1990 e l’art. 6 d.m. 5/2020, l’art. 7 della medesima legge si applica.';
     const { citations } = settle(text);
     expect(citations.map((c) => [c.article, c.state])).toEqual([['5', 'resolved'], ['6', 'incomplete'], ['7', 'incomplete']]);
     expect(citations[1].query).toBe('art. 6 d.m. 5/2020');

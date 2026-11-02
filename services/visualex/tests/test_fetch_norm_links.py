@@ -83,6 +83,48 @@ async def test_a_code_links_its_annex_with_todays_day(controller):
     assert results == [{"href": f"{CODE}:2~art2043!vig=2026-10-31", "reason": "ok"}]
 
 
+COSTITUZIONE = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione"
+
+
+@pytest.mark.parametrize("spelling", ["costituzione", "Costituzione", "cost", "Cost."])
+async def test_the_costituzione_links_by_its_fixed_urn(controller, spelling):
+    # Neither a date nor a number: the fixed URN of the codici table is the whole address.
+    results, _ = await _links(controller, [{"act_type": spelling, "article": "24"}],
+                              tree=_tree([("24", None), ("1", None)]))
+    assert results == [{"href": f"{COSTITUZIONE}~art24!vig=2026-10-31", "reason": "ok"}]
+
+
+async def test_a_costituzione_article_the_act_lacks_is_article_missing(controller):
+    results, _ = await _links(controller, [{"act_type": "costituzione", "article": "200"}],
+                              tree=_tree([("24", None)]))
+    assert results == [{"href": None, "reason": "article_missing"}]
+
+
+async def test_only_the_costituzione_has_a_fixed_urn_without_a_date():
+    # Every other row of the codici table carries a date and a number; the EU treaties are
+    # EU acts, whose address needs no day.
+    from visualex_api.tools.map import NORMATTIVA_URN_CODICI, has_fixed_urn_without_date
+    assert [k for k in NORMATTIVA_URN_CODICI if has_fixed_urn_without_date(k)] == ["costituzione"]
+
+
+@pytest.mark.parametrize("act", ["preleggi", "disposizioni per l'attuazione del Codice civile e disposizioni transitorie",
+                                 "codice di procedura civile", "tue", "tfue"])
+async def test_the_other_fixed_acts_still_link(controller, act):
+    results, _ = await _links(controller, [{"act_type": act, "article": "1"}],
+                              tree=_tree([("1", "1"), ("1", None)]))
+    assert results[0]["reason"] in ("ok", "ambiguous_part", "source_unavailable"), results
+
+
+async def test_an_act_with_no_date_that_has_no_fixed_urn_is_still_refused(controller):
+    # The Costituzione's exemption is the table's row alone: a law cited by number and a
+    # bare year stays a guess, refused with no index read.
+    for norm in ({"act_type": "legge", "act_number": "241", "article": "3"},
+                 {"act_type": "legge", "date": "1990", "act_number": "241", "article": "3"}):
+        results, get_tree = await _links(controller, [norm], tree=_tree([("3", None)]))
+        assert results[0]["href"] is None and results[0]["reason"] in ("not_linkable", "date_incomplete")
+        assert get_tree.await_count == 0
+
+
 async def test_pin_day_fixes_the_text_in_force_to_that_day(controller):
     results, _ = await _links(controller, [{"act_type": "codice civile", "article": "2043"}],
                               tree=_tree([("2043", "2")]), pin_day="2026-09-01")

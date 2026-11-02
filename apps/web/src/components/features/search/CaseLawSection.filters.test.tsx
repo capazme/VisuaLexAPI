@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { NormaVisitata } from '../../../types';
 import type { SearchDecisionsAnswer } from '../../../types/decisions';
-import type { RassegnePasso, RassegneResponse } from '../../../features/merlt/rassegne/types';
+import type { RassegnePasso, RassegneQuery, RassegneResponse } from '../rassegne/types';
 
 vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/decisionSearchService')>()),
@@ -14,14 +14,12 @@ vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
 vi.mock('../../../services/euCaseLawService');
 import { searchEuCaseLaw } from '../../../services/euCaseLawService';
 const fetchRassegne = vi.fn();
-vi.mock('../../../features/merlt/rassegne/rassegneApi', () => ({ fetchRassegne: (...args: unknown[]) => fetchRassegne(...args) }));
-// the real slot would mount the whole MERL-T registry; only the Massimario's panel matters here
-vi.mock('../../../plugins/registry', async () => {
-  const { RassegnePanel } = await import('../../../features/merlt/rassegne/RassegnePanel');
-  return { getSlotComponents: () => [{ id: 'rassegne', pluginId: 'visualex-merlt', slot: 'article_case_law', component: RassegnePanel }] };
-});
+vi.mock('../../../services/rassegneService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../services/rassegneService')>()),
+  fetchRassegne: (...args: unknown[]) => fetchRassegne(...args),
+}));
 import { searchDecisions } from '../../../services/decisionSearchService';
-import { _clearRassegneCacheForTests } from '../../../features/merlt/rassegne/useRassegne';
+import { clearRassegneCache } from '../rassegne/useRassegne';
 import { CaseLawSection } from './CaseLawSection';
 
 const NORMA: NormaVisitata = {
@@ -40,7 +38,7 @@ const passo = (id: string, testo: string, anni: number[]): RassegnePasso => ({
   id, anno: 2024, archivio: 'civile',
   volume: { id: 96, numero: 1, titolo: 'Massimario 2024 CIVILE Vol. 1' }, parte: null, capitolo: null,
   sezione: { id: 1, numero: '2', titolo: 'Il danno.' }, autori: [], url: 'https://example.org/p', testo, evidenziazioni: [],
-  pronunce: anni.map((anno, i) => ({ key: `cassazione:civile:${i + 1}:${anno}`, label: 'x', corte: 'cassazione', archivio: 'civile', numero: i + 1, anno, sezione: null, rv: [] })),
+  pronunce: anni.map((anno, i) => ({ key: `cassazione:civile:${i + 1}:${anno}`, corte: 'cassazione', archivio: 'civile', numero: i + 1, anno, sezione: null, rv: [] })),
   fonte: 'Ufficio del Massimario',
 });
 const RASSEGNE: RassegneResponse = {
@@ -66,8 +64,14 @@ beforeEach(() => {
     return { ...PAGE, totale: decisioni.length, decisioni } as SearchDecisionsAnswer;
   });
   vi.mocked(searchEuCaseLaw).mockReset();
-  fetchRassegne.mockReset().mockResolvedValue(RASSEGNE);
-  _clearRassegneCacheForTests();
+  // the store keeps the passages holding every word searched, each the start of a word, accents folded
+  fetchRassegne.mockReset().mockImplementation(async (query: RassegneQuery) => {
+    if (!query.q) return RASSEGNE;
+    const fold = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+    const items = RASSEGNE.items.filter((p) => fold(query.q!).split(' ').every((w) => fold(p.testo).split(/[^\p{L}\p{N}]+/u).some((t) => t.startsWith(w))));
+    return { ...RASSEGNE, total: items.length, anni: items.length ? [{ anno: 2024, passi: items.length }] : [], items };
+  });
+  clearRassegneCache();
   window.sessionStorage.clear();
 });
 afterEach(() => { window.matchMedia = savedMatchMedia; });
@@ -172,6 +176,10 @@ describe('CaseLawSection — one control for every source', () => {
     await openAll();
     await userEvent.type(screen.getByRole('searchbox'), 'responsabilita');
     expect(screen.getByText('Passo sulla responsabilità aquiliana.')).toBeInTheDocument();
+    expect(screen.queryByText('Passo sul risarcimento.')).toBeNull();
+    // the Massimario asks its store for the words, beyond the passages loaded
+    await waitFor(() => expect(fetchRassegne).toHaveBeenCalledWith({ urn: NORMA.urn, q: 'responsabilita' }));
+    expect(await screen.findByText('1 passo con le parole cercate.')).toBeInTheDocument();
     expect(screen.queryByText('Passo sul risarcimento.')).toBeNull();
     expect(screen.getByText('Nessuna delle 2 decisioni caricate corrisponde ai filtri.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Azzera i filtri' }));

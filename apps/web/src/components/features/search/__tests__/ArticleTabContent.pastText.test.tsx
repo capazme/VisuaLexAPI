@@ -36,6 +36,7 @@ vi.mock('../../../../plugins/PluginSlot', () => ({
     return null;
   },
 }));
+vi.mock('../../rassegne/RassegnePanel', () => ({ RassegnePanel: () => <div data-testid="rassegne-panel" /> }));
 // The real comparison state, with the call to open it recorded.
 vi.mock('../../../../hooks/useCompare', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../hooks/useCompare')>();
@@ -222,10 +223,10 @@ describe('ArticleTabContent — a past text is a reading', () => {
     expect(screen.queryByText(/Brocardi|Nemo iudex|La ratio|Una massima|Massime/)).not.toBeInTheDocument();
   });
 
-  it('keeps «Giurisprudenza» on a past text, with the Massimario slot told it is one', async () => {
+  it('keeps «Giurisprudenza» on a past text, with the Massimario\'s panel (the reviews cite the article, not a version)', async () => {
     show(article(MIDDLE, PAST));
     fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
-    expect(slotCalls.find((c) => c.slot === 'article_case_law')?.props).toMatchObject({ isHistorical: true });
+    expect(screen.getByTestId('rassegne-panel')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
   });
 

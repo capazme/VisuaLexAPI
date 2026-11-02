@@ -325,10 +325,25 @@ ss.».
 
 ### 4.6 Inheritance
 
-A bare article takes the act of the last resolved candidate in **the same paragraph**, and also across paragraphs
-when it is followed by «del medesimo decreto», «dello stesso regolamento» and their kin. It never inherits when §4.3
-marked it «followed by something else», and an act named alone is context only under §4.3's rule. An act that does
-not identify itself (a type with no number) never becomes the context, as in the linker (`_NUMBERED_ACT_TYPES`).
+**Amended by G-402 (1 November), after the blind corpus (§3.3), where inheritance within the paragraph was wrong as
+often as it was right; this replaces the paragraph scope of Q2 described below.** A bare article takes an act named
+before **only when the text says so**: after it, «del medesimo decreto», «della stessa legge», «del citato
+decreto-legge», «Reg. cit.», «della legge cit.», «d.lgs. ult. cit.»; before it, «(ivi, art. 30)», unless what
+follows it names something else. The noun picks the last act read of its kind (a decree, a law, a code, a
+regulation…), by the server's type or by the act's own words («l. fall.» is a law, «nuovo codice appalti» a code); a
+word with no kind («del medesimo provvedimento», «ivi») the last act read. «Dello stesso art. 18», «il citato art.
+81», «art. 18 cit.», «l'art. 13 citato» take the act of the last citation of that very article. Nothing else inherits,
+in the paragraph or across: a bare article with no such words is to complete. It is to complete as well when no act
+read fits; when the noun goes on with a number of its own («del citato d.lgs. n. 196/2003»); when the search would pass
+over an act whose words say no kind («c.c.», «jobs act»), an act with no number, or a code, each of which may be of
+the kind under its name (the Codice privacy is a decree, the jobs act a law); when the
+paragraph of the act found names another that fits too («l'art. 5 del d.lgs. 28/2010, come modificato dal d.lgs.
+149/2022 … l'art. 12-bis del medesimo decreto»); and when the word of the kind is written outside any citation between
+the act and the article, whole or abbreviated («il regolamento condominiale, all'art. 5 del medesimo regolamento», «la
+l.r. 12/2005, all'art. 5 della medesima legge»). §4.3's «followed by
+something else», and a candidate the page could not read, end what may be referred to; an act named alone is context
+only under §4.3's rule, and an act that does not identify itself (a type with no number) never is, as in the linker
+(`_NUMBERED_ACT_TYPES`).
 
 **A paragraph is a line** of the text as read, in every format. The DOCX reader already ends each Word paragraph
 with one line break (`documentFile.ts`), and also a manual line break (`<w:br/>`): such a break cuts the paragraph,

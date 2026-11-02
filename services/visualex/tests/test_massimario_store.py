@@ -352,3 +352,113 @@ def test_the_routes_never_reach_merlt():
     for source in package.glob("*.py"):
         text = source.read_text(encoding="utf-8")
         assert "import merlt" not in text and "from merlt" not in text, source.name
+
+
+# --- Keywords (G-399) -------------------------------------------------------------------------
+
+def test_the_words_of_a_query():
+    assert store.terms("Danno, ingiusto: art. 2043!") == ["Danno", "ingiusto", "art", "2043"]
+    assert store.terms("a b c") == []  # a single letter is no word to search
+    assert store.terms("danno danno_x \"OR\" NEAR(x)") == ["danno", "OR", "NEAR"]  # each once; '_' separates
+    assert store.terms("responsabilità") == ["responsabilità"]
+
+
+def ids(answer):
+    return [item["id"] for item in answer["items"]]
+
+
+def test_a_keyword_keeps_the_paragraphs_holding_it(path):
+    store.write_volumes(path, [(records(), "archivio")])
+    only = read(path, words=["ingiust"])  # the start of a word
+    assert ids(only) == ["massimario|9001|9111|0"] and only["total"] == 1
+    assert only["anni"] == [{"anno": 2024, "passi": 1}] and only["archivi"] == ["civile"]
+    # every word, in any order
+    assert ids(read(path, words=["richiama", "inadempimento"])) == ["massimario|9001|9121|0"]
+    assert read(path, words=["richiama", "ingiusto"])["total"] == 0
+
+
+def test_a_keyword_reads_where_a_paragraph_sits_and_folds_accents(path):
+    store.write_volumes(path, [(records(), "archivio")])
+    assert ids(read(path, words=["responsabilita"])) == ["massimario|9001|9111|0"]  # the chapter's title
+    assert ids(read(path, words=["Gialli"])) == ["massimario|9001|9121|0"]  # the chapter's author
+    assert ids(read(path, words=["inadempimento"])) == ["massimario|9001|9121|0"]  # the section's title
+    assert read(path, words=["RISOLUZIONE"])["total"] == 1  # case does not count
+
+
+def test_a_keyword_with_the_archive_and_the_year(path):
+    store.write_volumes(path, [(records(volume(9001, 2024, "CIVILE")), "archivio"),
+                               (records(volume(9002, 2023, "PENALE")), "archivio")])
+    both = read(path, words=["ingiusto"])
+    assert both["anni"] == [{"anno": 2024, "passi": 1}, {"anno": 2023, "passi": 1}]
+    assert both["archivi"] == ["civile", "penale"]
+    penale = read(path, words=["ingiusto"], archivio="penale")
+    assert ids(penale) == ["massimario|9002|9111|0"] and penale["archivi"] == ["civile", "penale"]
+    assert read(path, words=["ingiusto"], anno=2023)["anno"] == 2023
+
+
+def test_the_index_follows_every_build(path):
+    store.write_volumes(path, [(records(volume(9001, 2024)), "archivio")])
+    store.write_volumes(path, [(records(volume(9002, 2019)), "archivio")])  # 9001 is copied, not built
+    assert sorted(ids(read(path, words=["ingiusto"]))) == ["massimario|9001|9111|0"]
+    assert read(path, words=["ingiusto"])["total"] == 2  # the 2019 one is on the next year's page
+    store.remove_volumes(path, [9001])
+    assert ids(read(path, words=["ingiusto"])) == ["massimario|9002|9111|0"]
+    assert read(path, words=["ingiusto"])["total"] == 1
+
+
+def test_the_index_keeps_no_copy_of_the_text(path):
+    store.write_volumes(path, [(records(), "archivio")])
+    with sqlite3.connect(path) as conn:
+        (row,) = conn.execute("SELECT testo, contesto FROM paragraphs_fts LIMIT 1").fetchall()
+    assert row == (None, None)  # contentless: the prose lives in `paragraphs` alone
+
+
+async def test_route_keyword_search_in_a_post(client, path):
+    store.write_volumes(path, [(records(), "archivio")])
+    response = await client.post("/fetch_rassegne", json={"urn": CC_2043, "q": "ingiust", "limit": 5})
+    body = await response.get_json()
+    assert response.status_code == 200 and ids(body) == ["massimario|9001|9111|0"] and body["total"] == 1
+    plain = await client.post("/fetch_rassegne", json={"urn": CC_2043})
+    assert (await plain.get_json())["total"] == 2
+    blank = await client.post("/fetch_rassegne", json={"urn": CC_2043, "q": "   "})
+    assert (await blank.get_json())["total"] == 2  # an empty search is no search
+
+
+@pytest.mark.parametrize("body,field", [
+    ({"urn": CC_2043, "q": "x" * 201}, "q"),
+    ({"urn": CC_2043, "q": "a b c"}, "q"),
+    ({"urn": CC_2043, "q": " ".join(f"parola{i}" for i in range(9))}, "q"),
+    ({"urn": CC_2043, "q": ["danno"]}, "q"),
+    ({"urn": CC_2043, "limit": True}, "limit"),
+    ({"urn": CC_2043, "anno": 2024.5}, "anno"),
+    ({"q": "danno"}, "urn"),
+])
+async def test_route_post_validation(client, body, field):
+    response = await client.post("/fetch_rassegne", json=body)
+    answer = await response.get_json()
+    assert response.status_code == 400 and answer["detail"] == "richiesta_non_valida" and field in answer["errori"]
+
+
+async def test_route_post_needs_an_object(client):
+    response = await client.post("/fetch_rassegne", json=["urn"])
+    assert response.status_code == 400 and "corpo" in (await response.get_json())["errori"]
+    response = await client.post("/fetch_rassegne", data="not json", headers={"Content-Type": "application/json"})
+    assert response.status_code == 400
+
+
+async def test_route_refuses_a_keyword_in_the_address(client, path):
+    store.write_volumes(path, [(records(), "archivio")])
+    response = await client.get("/fetch_rassegne", query_string={"urn": CC_2043, "q": "ingiusto"})
+    assert response.status_code == 400 and "q" in (await response.get_json())["errori"]
+
+
+async def test_route_never_logs_the_keywords(client, path, capsys, caplog):
+    store.write_volumes(path, [(records(), "archivio")])
+    secret = "parolasegretissima"
+    await client.post("/fetch_rassegne", json={"urn": CC_2043, "q": secret})
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE meta SET value = '99' WHERE key = 'schema_version'")
+    response = await client.post("/fetch_rassegne", json={"urn": CC_2043, "q": secret})
+    assert response.status_code == 503
+    out = capsys.readouterr()
+    assert secret not in out.out + out.err + caplog.text
