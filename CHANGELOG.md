@@ -12,6 +12,46 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.8] - 2026-11-02
+
+«Analizza documento» rebuilt around the search, with hyperlinks written into the text and into a copy
+of the Word file; «Copia link Normattiva» with the date; the Massimario's reviews served by VisuaLex's
+core; the Forum Community's server; article parts and Gymnasium courses still switched off. Two
+migrations. The reviews panel stays hidden until the archive is installed.
+
+### Reading
+
+- «Copia link Normattiva» (and «Copia link EUR-Lex») in the reader and the dossier: the address
+  VisuaLex holds, dated today for the text in force and at the date asked for a past text, and the
+  citation as a link for Word.
+- The Massimario's reviews come from VisuaLex's core (MERL-T may read them): a panel inside
+  «Giurisprudenza», every volume, a filter by word, the reviews of another article, and a «Rassegne»
+  page to search the whole Massimario by word; with no archive installed the panel says nothing,
+  never an error on every article.
+
+### Analizza documento
+
+- One recognizer with the search (`/parse_query_batch`), the act inherited from the context only when
+  the text names its type, completion by hand of what is missing.
+- Hyperlinks: `/fetch_norm_links` resolves the found citations (the Constitution included); a safe
+  DOCX reader in the browser; «Prepara i link» and a copy of the Word file with the links written in,
+  with a report.
+
+### Forum
+
+- The Community's server (data and routes; licence text as draft v1): the glosses' discussions
+  gathered, ready for the web.
+
+### Sources
+
+- Normattiva articles split into parts: part and paragraph in the article routes, one article with
+  its parts in the index (switch `article_parts`, off until the web shows them).
+
+### Gymnasium
+
+- Courses (switch `lingo_courses`, off): check cards for every competence, module and exam shapes in
+  the MCP's schema tool, the reading web's fixes.
+
 ## [1.10.7] - 2026-10-29
 
 The D8 request: the highlight colours' meanings set by each user, a dossier created in one call
