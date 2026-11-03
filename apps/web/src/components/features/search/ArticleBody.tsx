@@ -2,12 +2,14 @@ import { useRef, type RefObject } from 'react';
 import { SafeHTML } from '../../../utils/sanitize';
 import { cn } from '../../../lib/utils';
 import { SelectionPopup } from './SelectionPopup';
+import type { Ink } from '../../../utils/highlighterRules';
 
 export interface ArticleBodyProps {
     contentRef: RefObject<HTMLDivElement | null>;
     itemKey: string;
     processedContent: string;
-    onPopupHighlight: (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => void;
+    /** The words selected and the highlighter's ink (A4). */
+    onPopupHighlight: (text: string, ink: Ink, startOffset: number) => void;
     onPopupAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onPopupCopy: (text: string) => Promise<void> | void;
     /** Optional "Discuti" action on selected passage. */

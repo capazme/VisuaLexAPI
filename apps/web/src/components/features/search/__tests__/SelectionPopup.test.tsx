@@ -3,6 +3,7 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useRef } from 'react';
 import { SelectionPopup } from '../SelectionPopup';
 import { appStore } from '../../../../store/useAppStore';
+import { readInkSelection } from '../../../../utils/inkTargets';
 
 const TEXT = "Si applica l'art. 2043 c.c. ai danni ingiusti.";
 const RECT = { x: 40, y: 120, width: 90, height: 18 };
@@ -218,3 +219,77 @@ describe('SelectionPopup: the colour chosen in the reading bar (H1)', () => {
   });
 });
 
+
+describe('SelectionPopup: the highlighter as a tool (A4)', () => {
+  afterEach(() => appStore.setState({ readingTool: null, highlighterEraser: false }));
+
+  /** Words selected and the mouse let go, with no bar expected. */
+  const release = (needle: string) => {
+    const textNode = screen.getByText(TEXT).firstChild as Text;
+    const start = TEXT.indexOf(needle);
+    const range = document.createRange();
+    range.setStart(textNode, start);
+    range.setEnd(textNode, start + needle.length);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    fireEvent.mouseUp(screen.getByTestId('container'), { button: 0 });
+  };
+
+  it('«Nessun colore»: the bar\'s button and H take the highlight away, with the eraser\'s icon', async () => {
+    appStore.setState({ highlighterEraser: true });
+    const onHighlight = vi.fn();
+    render(<Harness onHighlight={onHighlight} />);
+    await selectText('art. 2043 c.c.');
+    const button = screen.getByRole('button', { name: 'Togli l’evidenziazione' });
+    expect(button).toHaveAttribute('title', 'Togli l’evidenziazione (H)');
+    fireEvent.click(button);
+    expect(onHighlight).toHaveBeenCalledExactlyOnceWith('art. 2043 c.c.', 'none', TEXT.indexOf('art. 2043'));
+  });
+
+  it('on, every selection takes the ink as it is released, the bar never shows, and the selection is cleared', async () => {
+    appStore.setState((st) => ({ readingTool: 'highlight', settings: { ...st.settings, highlightColor: 'red' } }));
+    try {
+      const onHighlight = vi.fn();
+      render(<Harness onHighlight={onHighlight} />);
+      expect(screen.getByTestId('container')).toHaveClass('vlx-inking');
+      expect(screen.getByTestId('container')).toHaveAttribute('data-ink', 'red');
+      release('danni ingiusti');
+      await waitFor(() => expect(onHighlight).toHaveBeenCalledExactlyOnceWith('danni ingiusti', 'red', TEXT.indexOf('danni')));
+      expect(window.getSelection()!.isCollapsed).toBe(true);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
+    } finally {
+      appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'yellow' } }));
+    }
+  });
+
+  it('on, a text that takes no highlight is left alone: its bar offers «Copia» as before', async () => {
+    appStore.setState({ readingTool: 'highlight' });
+    const onHighlight = vi.fn();
+    render(<Harness copyOnly onHighlight={onHighlight} />);
+    expect(screen.getByTestId('container')).not.toHaveClass('vlx-inking');
+    await selectText('art. 2043 c.c.', /^copia/i);
+    expect(onHighlight).not.toHaveBeenCalled();
+  });
+
+  it('turned off, the cursor goes and the bar is back', async () => {
+    appStore.setState({ readingTool: 'highlight' });
+    render(<Harness />);
+    expect(screen.getByTestId('container')).toHaveClass('vlx-inking');
+    act(() => appStore.setState({ readingTool: null }));
+    expect(screen.getByTestId('container')).not.toHaveClass('vlx-inking');
+    await selectText('art. 2043 c.c.');
+  });
+
+  it('gives the highlighter\'s button the words selected, read as this text stores them', async () => {
+    const onHighlight = vi.fn();
+    render(<Harness onHighlight={onHighlight} />);
+    await selectText('art. 2043 c.c.');
+    const selected = readInkSelection();
+    expect(selected).not.toBeNull();
+    act(() => selected!.apply('blue'));
+    expect(onHighlight).toHaveBeenCalledExactlyOnceWith('art. 2043 c.c.', 'blue', TEXT.indexOf('art. 2043'));
+    expect(window.getSelection()!.isCollapsed).toBe(true);
+    expect(readInkSelection()).toBeNull();
+  });
+});
