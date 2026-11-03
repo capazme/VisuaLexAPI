@@ -410,7 +410,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   owner (the check is unchanged: the user's own rows with no connection, else 404) and its first author
   (`originalAuthorId`, `sourceSuggestionId`, gotcha 21 of the web), so the web's highlighter can shrink a highlight taken
   from the Forum when it cuts a piece out of it (A4) instead of recreating it without its author: the part kept in place
-  keeps it; a second part (a piece cut from the middle) is a new highlight, `POST`, which takes no author. Other keys
+  keeps it; a second part (a piece cut from the middle) is a new highlight, `POST /highlights` with `splitFrom` — the id
+  of the highlight cut (G-418, the owner's decision of 3 November 2026) —, which copies that highlight's
+  `originalAuthorId` and `sourceSuggestionId` onto the new row, and answers `originalAuthor` as `GET` does. Only the
+  user's own highlight with no connection on the same `normaKey` is taken: one unknown or of another user is a 404 (the
+  same answer, as `PUT` and `DELETE`), another text a 400, a value that is not an id a 400; refused, never ignored, so
+  no part is made quietly without its author. A `POST` without it is as before. `tests/highlightsSplit.test.ts`. Other keys
   (the owner, the attribution, `kind`, an assistant's columns) are dropped by the schema, never written. Offsets are
   0 to 2,147,483,647 (the column's integer), in `POST` too. The answer carries `originalAuthor` as `GET /highlights`
   does. `tests/highlightsUpdate.test.ts`.

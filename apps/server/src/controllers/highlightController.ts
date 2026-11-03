@@ -15,6 +15,10 @@ const createHighlightSchema = z.object({
   endOffset: offset,
   note: z.string().optional(),
   bookmarkId: z.string().guid().optional().nullable(),
+  // G-418 (the owner's decision of 3 November 2026): the highlight this one is a part of, when the web's highlighter cuts
+  // a piece out of the middle of a highlight (A4) — the first part shrinks in place (`PUT`), this second one is created
+  // here and takes the cut highlight's attribution, so a highlight taken from the Forum keeps its first author on both.
+  splitFrom: z.string().guid().optional(),
 });
 
 // A highlight's colour and note; and its range (G-417, the owner's decision of 3 November 2026): the words it covers, in
@@ -71,6 +75,26 @@ export const createHighlight = async (req: Request, res: Response) => {
     throw new AppError(400, 'endOffset must be greater than startOffset');
   }
 
+  // The highlight a part is cut from (G-418): the user's own, never an assistant's (D7b), and on the same text. Refused,
+  // not ignored, when it is not: a part made quietly without its author is what the field exists to prevent, and the
+  // web takes its gesture back on a refusal. One unknown and one of another user's answer the same 404, as PUT and
+  // DELETE do, so an id says nothing of another user's rows.
+  let attribution: { originalAuthorId: string | null; sourceSuggestionId: string | null } | null = null;
+  if (data.splitFrom) {
+    const cut = await prisma.highlight.findFirst({
+      where: { id: data.splitFrom, userId: req.user.id, createdByClientId: null },
+      select: { normaKey: true, originalAuthorId: true, sourceSuggestionId: true },
+    });
+    if (!cut) {
+      throw new AppError(404, 'Highlight not found');
+    }
+    if (cut.normaKey !== data.normaKey) {
+      throw new AppError(400, 'splitFrom must name a highlight of the same text');
+    }
+    // Both halves of the attribution contract (gotcha 21 of the web), as the cut highlight holds them.
+    attribution = { originalAuthorId: cut.originalAuthorId, sourceSuggestionId: cut.sourceSuggestionId };
+  }
+
   const highlight = await prisma.highlight.create({
     data: {
       normaKey: data.normaKey,
@@ -81,7 +105,11 @@ export const createHighlight = async (req: Request, res: Response) => {
       note: data.note,
       bookmarkId: data.bookmarkId || null,
       userId: req.user.id,
+      ...(attribution ?? {}),
     },
+    // A part: its original author, as GET /highlights says it, for the web's AttributionChip (gotcha 21). A plain
+    // highlight is answered as before.
+    ...(attribution && { include: { originalAuthor: { select: { id: true, username: true } } } }),
   });
 
   res.status(201).json(highlight);
