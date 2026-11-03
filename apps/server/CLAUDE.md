@@ -409,16 +409,20 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   else 400; not checked against the source's text, as a new highlight's is not. The row stays the same: its id, its
   owner (the check is unchanged: the user's own rows with no connection, else 404) and its first author
   (`originalAuthorId`, `sourceSuggestionId`, gotcha 21 of the web), so the web's highlighter can shrink a highlight taken
-  from the Forum when it cuts a piece out of it (A4) instead of recreating it without its author: the part kept in place
-  keeps it; a second part (a piece cut from the middle) is a new highlight, `POST /highlights` with `splitFrom` — the id
-  of the highlight cut (G-418, the owner's decision of 3 November 2026) —, which copies that highlight's
-  `originalAuthorId` and `sourceSuggestionId` onto the new row, and answers `originalAuthor` as `GET` does. Only the
-  user's own highlight with no connection on the same `normaKey` is taken: one unknown or of another user is a 404 (the
-  same answer, as `PUT` and `DELETE`), another text a 400, a value that is not an id a 400; refused, never ignored, so
-  no part is made quietly without its author. A `POST` without it is as before. `tests/highlightsSplit.test.ts`. Other keys
-  (the owner, the attribution, `kind`, an assistant's columns) are dropped by the schema, never written. Offsets are
-  0 to 2,147,483,647 (the column's integer), in `POST` too. The answer carries `originalAuthor` as `GET /highlights`
+  from the Forum when it cuts a piece out of it (A4) instead of recreating it without its author. Other keys (the owner,
+  the attribution, `kind`, an assistant's columns) are dropped by the schema, never written. Offsets are 0 to
+  2,147,483,647 (the column's integer), in `POST` too. `PUT`'s answer carries `originalAuthor` as `GET /highlights`
   does. `tests/highlightsUpdate.test.ts`.
+- **A part of a highlight cut in the middle keeps its author** (G-418, the owner's decision of 3 November 2026): the
+  first part shrinks in place (`PUT`, above), the second is `POST /highlights` with `splitFrom`, the id of the highlight
+  cut, and takes its `originalAuthorId` and `sourceSuggestionId` (both halves of the attribution contract). Only the
+  user's own highlight with no connection, on the same `normaKey`: an unknown one or another user's is a 404 (the same
+  answer, as `PUT` and `DELETE`), another text or a value that is not an id a 400 — refused, never ignored, so no part
+  is made quietly without its author. The attribution is never taken from the body. When what it names goes between
+  the read and the create (the author's account deleted, the Forum copy's suggestions removed: P2003), it is read again
+  and the part created once more. A part's answer carries `originalAuthor`; a `POST` without `splitFrom` (or with it
+  null) is answered as before. The range is not required to lie inside the cut highlight's, which the web may shrink
+  first. `tests/highlightsSplit.test.ts`.
 - **No bulk delete of notes or highlights**: `DELETE /annotations` and `DELETE /highlights`
   (one request that wiped all of a user's notes, for good) went with environments' «Sostituisci»,
   their only caller (spec `2026-10-13-environments-into-forum`, D10; the owner's answer 185).
