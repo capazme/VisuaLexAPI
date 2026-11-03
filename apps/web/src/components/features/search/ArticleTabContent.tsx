@@ -313,6 +313,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         key: itemKey,
         articleId: uniqueArticleId,
         highlights: articleHighlights,
+        plain: plainArticle,
         showToast,
         enabled: !readOnly,
         onHighlightAdded: (text, color, startOffset) => publishMerltEvent({

@@ -131,7 +131,6 @@ export function StudyMode({
     highlights,
     addAnnotation,
     removeAnnotation,
-    addHighlight,
     removeHighlight,
     addQuickNorm,
     removeQuickNormByParams,
@@ -445,7 +444,6 @@ export function StudyMode({
             highlights={articleHighlights}
             annotations={articleAnnotations}
             normaKey={normaKey}
-            onAddHighlight={addHighlight}
             onRequestAddNote={(anchor) => {
               setNoteAnchor(anchor);
               setShowToolsPanel(true);

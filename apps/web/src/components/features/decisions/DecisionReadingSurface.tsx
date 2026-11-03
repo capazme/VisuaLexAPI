@@ -44,6 +44,7 @@ import { keyPassages } from '../../../utils/decisionKeyPassages';
 import { KeyPassagePopover } from './KeyPassagePopover';
 import { KeyPassagesMenu } from './KeyPassagesMenu';
 import { scrollToMiddle } from '../../../utils/scrollParent';
+import { highlightColorName } from '../../../utils/highlightColors';
 
 // A decision's anchors are stored under its key with no article: the wire key is `<key>::art::`.
 const NO_ARTICLE = '';
@@ -104,7 +105,7 @@ export interface DecisionReadingSurfaceProps {
 export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave, citedNorms, dossierItemId }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
-    removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings, highlightColor,
+    removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings, highlightColor, addHighlight,
   } = useAppStore(useShallow((s) => ({
     showKeyPassages: s.settings.showKeyPassages,
     highlightColor: s.settings.highlightColor,
@@ -116,6 +117,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     removeAnnotation: s.removeAnnotation,
     updateAnnotation: s.updateAnnotation,
     removeHighlight: s.removeHighlight,
+    addHighlight: s.addHighlight,
     loadAnnotationsForArticle: s.loadAnnotationsForArticle,
     loadHighlightsForArticle: s.loadHighlightsForArticle,
   })));
@@ -326,7 +328,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
   const {
     noteAnchor, composerRect, clearAnchor, handlePopupHighlight, handlePopupAddNote, handleAddNote, closeComposer, commitComposer,
-  } = useAnnotationActions({ key, articleId: NO_ARTICLE, highlights: decisionHighlights, showToast });
+  } = useAnnotationActions({ key, articleId: NO_ARTICLE, highlights: decisionHighlights, plain, showToast });
   const { inlineNote, closeInlineNote } = useInlineNoteAnchors(contentRef, decisionNotes);
 
   const exportSlug = slugify(key) || 'decisione';
@@ -390,10 +392,17 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         <KeyPassagePopover
           kind={passages[shownPassage.index].kind}
           anchorEl={shownPassage.el}
-          // the passage becomes a highlight of the reader's, through the ordinary action, in the colour chosen (H1)
+          // the passage becomes a highlight of the reader's, through the ordinary action, in the colour chosen (H1):
+          // a highlight made, never the highlighter's rules (A4), which would take away one already there
           onMakeOwn={() => {
             const p = passages[shownPassage.index];
-            handlePopupHighlight(plain.slice(p.start, p.end), highlightColor, p.start);
+            const words = plain.slice(p.start, p.end);
+            if (decisionHighlights.some((h) => h.startOffset === p.start && h.text.toLowerCase() === words.toLowerCase())) {
+              showToast('Questa occorrenza è già evidenziata', 'info');
+              return;
+            }
+            addHighlight(key, NO_ARTICLE, words, '', highlightColor, p.start);
+            showToast(`Testo evidenziato in ${highlightColorName(highlightColor)}`, 'success');
           }}
           onHideAll={hideKeyPassages}
           onClose={() => setOpenPassage(null)}
