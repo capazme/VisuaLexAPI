@@ -113,10 +113,12 @@ export function SelectionPopup({
     highlightRef.current(anchor.text, ink, anchor.startOffset);
     selection.removeAllRanges();
   });
-  // Turned on with the bar open: the bar goes.
-  useEffect(() => {
-    if (inking) hidePopup();
-  }, [inking, hidePopup]);
+  // Turned on with the bar open: the bar goes, adjusted during render (gotcha 11), so it never comes back stale.
+  const [wasInking, setWasInking] = useState(inking);
+  if (wasInking !== inking) {
+    setWasInking(inking);
+    if (inking && popup.visible) setPopup((prev) => ({ ...prev, visible: false }));
+  }
   // The text's cursor says the tool is on (`index.css`), the eraser's for «Nessun colore»: a class on the container,
   // never in the text (root rule 23).
   useEffect(() => {

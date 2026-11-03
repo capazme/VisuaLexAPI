@@ -20,7 +20,7 @@ import { todayInRome } from '../../../utils/dateUtils';
 import { copyNormLink, EUROPEAN_LINK_NOTE, linkPinDay, normLink, normLinkActionLabel, normLinkToast } from '../../../utils/normattivaLink';
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
-import { HighlightColorMenu } from '../search/HighlightColorMenu';
+import { HighlighterButton } from '../search/HighlighterButton';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
@@ -466,11 +466,10 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         >
           <ExternalLink size={13} /> Apri su Dashboard
         </button>
-        {/* The colour of new highlights (H1): the dossier's reader has no bar of its own, so it sits with its actions;
-            not on a text read only, which takes none. */}
+        {/* The highlighter (H1, A4): the dossier's reader has no bar of its own, so it sits with its actions; not on a text
+            read only, which takes none. */}
         {!readOnly && (
-          <HighlightColorMenu
-            labelled
+          <HighlighterButton
             meaningsGear={meaningsGear}
             placement="auto"
             className="ml-auto"

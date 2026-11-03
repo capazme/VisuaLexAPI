@@ -1,6 +1,7 @@
-import { Circle, Settings } from 'lucide-react';
+import { Circle, Eraser, Settings } from 'lucide-react';
 import type { MenuItem } from '../../ui/MenuButton';
 import { HIGHLIGHT_COLORS, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
+import type { Ink } from '../../../utils/highlighterRules';
 
 /** Each colour's own dot in a menu: its highlight's background, its ink around it. */
 const DOT: Record<HighlightColor, string> = {
@@ -11,7 +12,10 @@ const DOT: Record<HighlightColor, string> = {
 };
 
 /** The title over the four: their own menu's, and in a menu of actions. Each colour's meaning is a suggestion. */
-export const SECTION_HEADING = 'Colore delle nuove evidenziazioni — uso suggerito';
+export const SECTION_HEADING = 'Colore dell’evidenziatore — uso suggerito';
+
+/** «Nessun colore» (A4): the highlighter's ink that takes highlights away. */
+export const NO_COLOUR_LABEL = 'Nessun colore';
 
 /** The way to Impostazioni › «Significato dei colori»: the gear's name and title, and the phone's menu entry. */
 export const CHANGE_MEANINGS_LABEL = 'Cambia il significato dei colori';
@@ -21,17 +25,17 @@ const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const inSentence = (s: string) => (/^\p{Lu}\p{Lu}/u.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
 
 /**
- * The four colours as a menu's choices (H1): the one chosen ticked (`menuitemradio`), each with what it is suggested
- * for under it (`meanings`, the user's own or the default: a hint, any colour is free for anything), and named
- * «Giallo, uso suggerito: punto centrale». `section`, for a menu that holds actions too (a phone's «⋯»): a separator
- * and a title over the four, so they read as a setting and not as «highlight now», and each one's name says what it
- * sets. `onChangeMeanings` adds, after the four, the entry that opens Impostazioni where the meanings are changed —
- * the phone's form of the gear beside the colour.
+ * The highlighter's inks as a menu's choices (H1, A4): the one chosen ticked (`menuitemradio`), each colour with what
+ * it is suggested for under it (`meanings`, the user's own or the default: a hint, any colour is free for anything),
+ * named «Giallo, uso suggerito: punto centrale», then «Nessun colore», which takes highlights away. `section`, for a
+ * menu that holds actions too (a phone's «⋯»): a separator and a title over them, so they read as a setting and not as
+ * «highlight now», and each one's name says what it sets. `onChangeMeanings` adds, after them, the entry that opens
+ * Impostazioni where the meanings are changed — the phone's form of the gear beside the highlighter.
  */
 export function highlightColorItems(
-  current: HighlightColor,
+  current: Ink,
   meanings: Record<HighlightColor, string>,
-  choose: (color: HighlightColor) => void,
+  choose: (ink: Ink) => void,
   { section = false, onChangeMeanings }: { section?: boolean; onChangeMeanings?: () => void } = {},
 ): MenuItem[] {
   const colours: MenuItem[] = HIGHLIGHT_COLORS.map((color, i) => {
@@ -39,7 +43,7 @@ export function highlightColorItems(
     const meaning = inSentence(meanings[color]);
     return {
       label: capitalised(name),
-      ariaLabel: section ? `Nuove evidenziazioni in ${name}, uso suggerito: ${meaning}` : `${capitalised(name)}, uso suggerito: ${meaning}`,
+      ariaLabel: section ? `Evidenziatore in ${name}, uso suggerito: ${meaning}` : `${capitalised(name)}, uso suggerito: ${meaning}`,
       description: meanings[color],
       icon: Circle,
       iconClassName: DOT[color],
@@ -49,5 +53,15 @@ export function highlightColorItems(
       onSelect: () => choose(color),
     };
   });
-  return onChangeMeanings ? [...colours, { label: CHANGE_MEANINGS_LABEL, icon: Settings, onSelect: onChangeMeanings }] : colours;
+  const none: MenuItem = {
+    label: NO_COLOUR_LABEL,
+    ariaLabel: section ? 'Evidenziatore senza colore: toglie le evidenziazioni' : 'Nessun colore: toglie le evidenziazioni',
+    description: 'Toglie le evidenziazioni',
+    icon: Eraser,
+    checked: current === 'none',
+    separatorBefore: true,
+    onSelect: () => choose('none'),
+  };
+  const inks = [...colours, none];
+  return onChangeMeanings ? [...inks, { label: CHANGE_MEANINGS_LABEL, icon: Settings, onSelect: onChangeMeanings }] : inks;
 }

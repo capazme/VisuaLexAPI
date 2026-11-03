@@ -1281,6 +1281,23 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   THE HIGHLIGHTER ON (A4) — the text's cursor while every selection
+   takes the ink (`vlx-inking` and `data-ink` on the selection's
+   container: `SelectionPopup`, `LessonText`). A hint only: the pressed
+   button is the state. Nothing in the text changes (gotcha 23). Ink
+   strokes over a white halo, legible on every paper; the pen's tip is
+   the hot spot. What has a click of its own keeps its own cursor.
+   ═══════════════════════════════════════════════════════════ */
+.vlx-inking,
+.vlx-inking :where(:not(a, button, [role='button'], .vlx-sign, .vlx-ref, .vlx-updates-toggle)) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='white' stroke-width='4'%3E%3Cpath d='m9 11-6 6v3h9l3-3'/%3E%3Cpath d='m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4'/%3E%3C/g%3E%3Cg stroke='%231e293b' stroke-width='2'%3E%3Cpath d='m9 11-6 6v3h9l3-3'/%3E%3Cpath d='m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4'/%3E%3C/g%3E%3C/svg%3E") 3 21, text;
+}
+.vlx-inking[data-ink='none'],
+.vlx-inking[data-ink='none'] :where(:not(a, button, [role='button'], .vlx-sign, .vlx-ref, .vlx-updates-toggle)) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='white' stroke-width='4'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3Cg stroke='%231e293b' stroke-width='2'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3C/svg%3E") 4 19, text;
+}
+
+/* ═══════════════════════════════════════════════════════════
    UTILITIES
    ═══════════════════════════════════════════════════════════ */
 .glass {

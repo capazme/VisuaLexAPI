@@ -41,8 +41,8 @@ beforeEach(() => {
     loadHighlightsForArticle: loadHighlights, loadAnnotationsForArticle: loadAnnotations,
     addHighlight, addAnnotation, removeHighlight, removeAnnotation, pushReadingBack,
   });
-  // The colour of new highlights as it starts (H1): a test that chooses another never leaks it.
-  appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
+  // The colour of new highlights as it starts (H1), the highlighter off (A4): a test that changes them never leaks it.
+  appStore.setState((s) => ({ readingTool: null, highlighterEraser: false, settings: { ...s.settings, highlightColor: 'yellow' } }));
 });
 
 const H = { id: 'h1', normaKey: KEY, articleId: '', rangeSerialized: '', text: 'ricorso', color: 'green', startOffset: 3 } as Highlight;
@@ -249,24 +249,30 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'yellow', 3);
   });
 
-  it('the colour is chosen once in the reading bar, with what each is suggested for, and every new highlight takes it (H1)', async () => {
+  it('the ink is chosen once in the reading bar, with what each colour is suggested for, and every new highlight takes it (H1, A4)', async () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
-    const trigger = screen.getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
-    // The bar's dot alone: its words in a tooltip.
-    expect(trigger).toHaveAttribute('title', 'Colore delle nuove evidenziazioni: giallo');
-    fireEvent.click(trigger);
-    const menu = screen.getByRole('menu', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    // The bar's icon alone: its words in a tooltip.
+    expect(screen.getByRole('button', { name: 'Evidenziatore (giallo)' })).toHaveAttribute('title', expect.stringMatching(/^Evidenziatore \(giallo\): /));
+    fireEvent.click(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
+    const menu = screen.getByRole('menu', { name: 'Colore dell’evidenziatore' });
     const choices = within(menu).getAllByRole('menuitemradio');
     expect(choices.map((c) => c.textContent)).toEqual([
-      'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',
+      'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione', 'Nessun coloreToglie le evidenziazioni',
     ]);
     expect(choices[0]).toHaveAttribute('aria-checked', 'true');
-    // Any colour, whatever it is suggested for.
+    // Any colour, whatever it is suggested for; chosen with nothing selected, it turns the tool on.
     fireEvent.click(choices[2]);
     expect(appStore.getState().settings.highlightColor).toBe('red');
-    expect(screen.getByRole('button', { name: 'Colore: rosso (nuove evidenziazioni)' })).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'Evidenziatore (rosso)' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    // On, the words selected take it as the mouse lets go, with no bar.
     await selectText(container, 3, 10);
-    // Never asked again: one click, or H.
+    await waitFor(() => expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3));
+    expect(screen.queryByRole('button', { name: 'Evidenzia in rosso' })).toBeNull();
+    // Off, the bar is back, and its one click (or H) takes the same ink, never asking.
+    fireEvent.click(toggle);
+    addHighlight.mockClear();
+    await selectText(container, 3, 10);
     expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in rosso' }));
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
