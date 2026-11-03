@@ -126,13 +126,17 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   citation as it closes), in a `Sheet` on a phone (`CitationPanel`); it belongs to the view it was opened in (a recall's
   next phase closes it, the phase's heading taking the focus); Esc closes it first, and a link or «Apri su Dashboard»
   inside it leaves through the same question as the close button. A citation's words are `INK_TEXT`. A `###` is one level under the step's
-  heading (`headingLevel`). Highlights are the session's (`Span`s over the block's plain text, `numberLeaves` giving
-  each leaf its offset; emphasis is read around a citation held by a placeholder): a selection brings «Evidenzia» (44
-  px, under it; a press on it holds it until its click, or 400 ms after the release); the text is a Tab stop where
-  Shift and the arrows select from its start (`Selection.modify`, a word with Ctrl or Alt: a text not editable has no
-  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each, never inside a citation's
-  button, where its pieces are only drawn: nothing interactive sits in a button), or words selected inside a highlight,
-  bring «Togli» (from a selection it goes with the selection, unless the focus is on it). The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
+  heading (`headingLevel`). Highlights are the session's (`Span`s over the block's plain text, `[start, end, colour]`
+  — one saved before A4 has no colour and is yellow —, `numberLeaves` giving each leaf its offset; emphasis is read
+  around a citation held by a placeholder), made with the reader's highlighter (A4, spec
+  `2026-11-03-a4-highlighter-and-notes-design` §4; no floating «Evidenzia» or «Togli» any more): `HighlighterButton`
+  over the text (44 px at every width, no gear), its rules in the lesson's form (`paintSpans`: highlights never overlap,
+  the same colour over words inside one highlight takes the piece out, another colour paints over, «Nessun colore»
+  clears, one colour's highlights that meet are one), its tool (every selection takes the ink as it is released) and
+  its cursor; the text is a Tab stop where Shift and the arrows select from its start (`Selection.modify`, a word with
+  Ctrl or Alt: a text not editable has no caret) and H applies the ink; a highlight is one Tab stop (never inside a
+  citation's button, where its pieces are only drawn: nothing interactive sits in a button), named «Evidenziato in
+  giallo: …», where Enter selects its words. The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
   elementi, le eccezioni, un caso»), «Confronta con il testo» sets what was written beside the block, then the block's
   questions as real radio buttons (`RecallQuestion`: the server grades, `POST …/risposte { domandaId, scelta }` and
   nothing else; the explanations, the right one and the reader's marked in words, the outcome in a live region; «Non
@@ -1060,13 +1064,13 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 (`ReadingToolbar`; R3, «prima il testo»: one line over the text with a hairline, no box — the status in words,
 `VersionStatusChip`, «In vigore dal 1° gennaio 2005» with the date in full, and «Allegato N» (`shownAnnex`: never a
 code's own); on a computer «Note» and
-«Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Colore» (`HighlightColorMenu`, H1, below),
+«Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), the highlighter (`HighlighterButton`, A4, below),
 «Al dossier», then «⋯» («Altre azioni sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia»,
-«Copia link Normattiva», «Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
-status's row, «⋯» adding Study Mode, the source and, last under its own title, the four colours (the compact bar of a
-window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo»,
-«Copia» and «Copia link Normattiva»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
-highlight (`lockedReason`); quiet
+«Copia link Normattiva», «Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone the
+highlighter's toggle, «Al dossier» (icons) and «⋯» on the status's row, «⋯» adding Study Mode, the source and, last
+under its own title, the inks (the compact bar of a window and of the phone's reader: «Note», «Evidenziazioni», the
+highlighter and «⋯» with the glosse, «Cerca nel testo», «Copia» and «Copia link Normattiva»; on a phone the toggle and
+«⋯», the inks in it); the highlighter and the inks are not offered on a text that takes no highlight (`lockedReason`); quiet
 neutral buttons, 36 px on a computer and 44 on a phone; «Cerca nel testo» says «Chiudi la ricerca nel testo» only while
 the window is pointed at this very text (`useFindWindowScopedTo(…, exact)`), else it points the window here. Nothing of it is inside the text root, root rule 23). Keys are `buildItemKey(norma)` and
 `uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
@@ -1326,17 +1330,45 @@ discussion's tint, one passage on the page at a time). A gloss whose words no lo
 (`LostGlossesList`). **Every visible word that names one is in `constants/glossWords.ts`** (`GLOSS_WORDS`), and only
 there: «glossa» is also the Forum's discussion on a passage, and the owners may choose another word.
 
-The colour of new highlights is chosen once, in the reading bar (H1, the owner's decision; `settings.highlightColor`,
-kept on this device with the other reading settings, yellow until chosen, and yellow again for a save holding
-anything else — the persist `merge` checks it, `isHighlightColor`): `HighlightColorMenu` beside «Evidenziazioni» on a
-computer (`ReadingToolbar`, its compact form too; «Colore: giallo», a dot of the highlight's tint inside its ink, named
-«Colore: giallo (nuove evidenziazioni)» — the name starts with the words shown, WCAG 2.5.3 —; where the dot stands
-alone, the decision's bar and Study Mode's header, its words are its `title`), its four choices closing the «⋯» on a
-phone under their own title («Colore delle nuove evidenziazioni — uso suggerito», each named «Nuove evidenziazioni in
-verde, uso suggerito: …» so it reads as a setting, not as «highlight now»), in the decision's bar, in Study Mode's
-header, and with the dossier reader's actions (it has no bar); never on a text that takes no highlight. The menu, under
-the same title, offers the four as `menuitemradio`, each with what it is suggested for, a hint: any colour is free for
-anything. **What a colour means is each user's** (the owner, 29 October 2026: «solo etichette» — the four colours stay, no colour
+**The highlighter** (A4, the owner's decision of 3 November 2026; spec `2026-11-03-a4-highlighter-and-notes-design`):
+a word processor's split button, `HighlighterButton`, in the four reading bars — beside «Evidenziazioni» on a computer
+(`ReadingToolbar`, its compact form too), in the decision's bar, in Study Mode's header, with the dossier reader's
+actions (it has no bar), over a Gymnasium lesson's text —, never on a text that takes no highlight. Its left half is the
+tool, an icon over a bar of the ink (the tint inside its ink; dashed for «Nessun colore»), named «Evidenziatore
+(giallo)», `aria-pressed`: with words selected in a reading text it applies the ink to them at once; with nothing
+selected it turns the tool on, until pressed again or Esc (taken in the capture phase before Study Mode's or the lesson's
+Esc, never from a field, a menu, a dialog, a popover, nor under a modal dialog). The press keeps the selection: the
+button prevents its `mousedown`, and the selection is read as the press starts (`readInkSelection`, over the texts
+registered in `utils/inkTargets.ts` by each reader's `SelectionPopup` and by `LessonText`). Its right half («Colore
+dell’evidenziatore») opens the inks under «Colore dell’evidenziatore — uso suggerito»: the four colours as
+`menuitemradio`, each with what it is suggested for, a hint (any colour is free for anything), then «Nessun colore»,
+which takes highlights away; as in the word processor, a colour chosen applies to the words selected (read as the menu
+opens, or as the press on its arrow started), or turns the tool on with it. On a phone the row has the toggle alone
+(`toggleOnly`) and the inks close the «⋯» under the same title, each named for what it sets («Evidenziatore in verde,
+uso suggerito: …», «Evidenziatore senza colore: …»), which there only sets the ink. **The ink**: the colour is
+`settings.highlightColor` (H1, kept on this device with the other reading settings, yellow until chosen, and yellow
+again for a save holding anything else — the persist `merge` checks it, `isHighlightColor`); «Nessun colore» is
+`highlighterEraser`, session-only, so after a reload the ink is the last colour (`setHighlighterInk`,
+`useHighlighterInk`). **The tool** (`readingTool`, session-only, one for the whole app, absent from `partialize`): on,
+`SelectionPopup` shows no bar and applies the ink to every selection as it is released (`useInkOnRelease`: a mouse's
+`mouseup`; a finger's selection once it has stood still for 700 ms, since the handles move it unseen and the long
+press's release would take one word), a click selecting nothing going its own way; the container takes
+`vlx-inking`/`data-ink`, the highlighter's or the eraser's cursor (`index.css`, nothing in the text); it goes off at
+logout and when the last bar holding a highlighter unmounts. **The rules** (`utils/highlighterRules.ts`, `planInk`,
+pure), the same with the tool, the button, the menu, the popup's «Evidenzia» and H, and Study Mode's keys 1–4, over the
+user's own highlights only (an application's passages and glosses, a decision's key passages are never touched), the
+colour seen being the innermost highlight's: words touching no highlight → a new one (nothing for «Nessun colore»);
+inside highlights whose innermost is the ink → the piece out of every highlight of that colour holding it; inside one of
+another colour → the piece recoloured (the whole highlight selected recoloured in place, `PUT`); reaching out of what
+they touch → a new highlight, overlapping, as before; «Nessun colore» → the piece out of everything it touches. The cut is
+the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`
+(offsets cannot be changed by `PUT`), the server's `note` copied to them. A highlight from the Forum (`sourceSuggestionId`,
+`originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut: removed or recoloured
+whole. `useHighlightInk` turns a plan into the store's calls: a new highlight keeps the reader's toast and the article's
+MERL-T event; a change is `editHighlights`, one gesture behind one «Annulla» («Evidenziazione rimossa»,
+«Evidenziazioni rimosse», «Evidenziazione cambiata in verde»; see «Destructive confirmations»). «Questa occorrenza è già
+evidenziata» is gone: the same words in the same colour take the highlight away. «Fai tua» on a key passage is no
+gesture of the highlighter: it creates in the saved colour, whatever the ink. anything. **What a colour means is each user's** (the owner, 29 October 2026: «solo etichette» — the four colours stay, no colour
 is added, only the words for them change, so no highlight, colour key or anchor moves, root rule 23): the default is
 `HIGHLIGHT_COLOR_MEANINGS` (yellow «Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red
 «Da rivedere»), and a user's own are `settings.highlightColorMeanings` — only the colours given one, trimmed, 1 to 40
@@ -1344,10 +1376,10 @@ characters (`normalizeHighlightMeaning`; the persist `merge` drops anything else
 meaning written back to the default is no meaning of one's own), kept on this device with the other reading settings,
 never sent to the server or to an application (the MCP tool's description gives the defaults). Whatever words a
 colour's meaning reads it through `useHighlightColorMeanings` (`highlightColorItems` takes the meanings; its names lower
-the first letter, not an acronym the user wrote). Beside the colour's trigger one gear and only that (no «?»: the menu
+the first letter, not an acronym the user wrote). Beside the highlighter one gear and only that (no «?»: the menu
 already explains; the gear says «change it»), named and titled «Cambia il significato dei colori»
 (`CHANGE_MEANINGS_LABEL`), the trigger's look with 44 px of width on a phone — the article's bar, the decision's, the
-dossier reader's; on the phone's «⋯» the same words are the entry after the four colours; in Study Mode, whose header
+dossier reader's; on the phone's «⋯» the same words are the entry after the inks; none over a lesson; in Study Mode, whose header
 has a gear already (its own settings, «Impostazioni (S)»), the entry is the last of that panel, not a second gear
 (`meaningsGear={false}`); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
 dialog over it would fight it: Impostazioni stays the user menu's there). All open Impostazioni at «Significato dei colori» (`openSettings('highlightColors')`):
@@ -1359,11 +1391,11 @@ control — and that first focus scrolls the dialog's body alone so the section'
 `HighlightMeaningsSection`, after «Tipografia»: a field per colour (its dot and name as the label, the default as
 placeholder, `maxLength` 40, 44 px on a phone, `FIELD_TEXT`), saved when left or on Enter, an emptied one keeping the
 meaning it had (said in the section's status line), Esc giving up a change without closing the dialog, and «Ripristina
-predefiniti» (`aria-disabled` while nothing differs). Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
-«Evidenzia in giallo», `aria-keyshortcuts="h"`) and H highlight at once in it, its icon in the colour bright on the
-popup's dark surface (`HIGHLIGHT_ICON_ON_DARK`, never the highlight's tint, dark in the dark theme and transparent
-while highlights are hidden) —, a key passage's «Fai tua», and Study Mode's keys 1–4, which highlight in their colour
-and make it the one chosen. Sideways the popup is moved 8 px inside the window by its drawn box — the positioning
+predefiniti» (`aria-disabled` while nothing differs). Every way of highlighting takes the ink: `SelectionPopup` never asks — «Evidenzia» (named
+«Evidenzia in giallo», `aria-keyshortcuts="h"`; «Togli l’evidenziazione», the eraser's icon, for «Nessun colore») and H
+apply it at once, its icon in the colour bright on the popup's dark surface (`HIGHLIGHT_ICON_ON_DARK`, never the
+highlight's tint, dark in the dark theme and transparent while highlights are hidden) —, a key passage's «Fai tua» (the
+colour), and Study Mode's keys 1–4, which apply their colour and make it the ink. Sideways the popup is moved 8 px inside the window by its drawn box — the positioning
 element's first child, the positioning element being `w-max` — (a `marginLeft` set as it is drawn). Study Mode's own keys leave alone a key a menu took or one pressed in a menu (Esc there closes the
 menu, not Study Mode), every key while a dialog is open over it (`[aria-modal="true"]` anywhere in the document, the
 focus inside it or not: Impostazioni opened from its settings — its Esc, arrows and digits are the dialog's), and H and N while text is selected (the popup's). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
@@ -2048,8 +2080,9 @@ anchored note; `InlineNotePopover` when clicking an existing wavy underline;
 the block popover from a sign, for everything one block holds. Deliberately
 distinct entry points — don't collapse them.
 
-**Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
-button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
+**Highlights**: created, removed and recoloured from the selection — `SelectionPopup`'s «Evidenzia» and H, or the
+highlighter (`HighlighterButton`, its tool and its menu, A4) —, always through `useHighlightInk`'s rules. The toolbar's
+«Evidenziazioni» button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
 Hiding them also hides the signs' colour dots and the signs that hold only
 highlights.
@@ -2611,6 +2644,10 @@ Duplicating any of these is a defect, not a shortcut.
   reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
   `getUpdateNoteParagraphs`; `renderArticleHtml` is what `useArticleMarkers`
   calls. Real test texts in `utils/__fixtures__/articleTexts.ts`.
+- `utils/highlighterRules.ts` — `planInk` and `partsOf`: what the highlighter does with a selection (A4), pure;
+  `hooks/useHighlightInk.ts` turns a plan into the store's calls for a reader (`inkMarks`: the user's highlights where
+  they land); `utils/inkTargets.ts` — the texts the highlighter's button applies its ink to; `hooks/useInkOnRelease.ts`
+  — when the tool takes a selection. A new surface that takes highlights goes through these, never `addHighlight` alone.
 - `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
   plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
   Every surface that creates a highlight or an anchored note goes through it.
@@ -2701,7 +2738,10 @@ the D7b bin's pattern, no `beforeunload`): off the screen at once, «Evidenziazi
 `DELETE` sent as the notification closes, or at once as the page goes or is hidden (`pagehide`, `visibilitychange`: a
 phone may discard a tab in the background unannounced; a `keepalive` fetch, the token refreshed as it was removed), so
 «Annulla» is gone once the tab is hidden. «Annulla» puts it back where it was; a refused `DELETE` puts it back with the
-sync error, a 404 is a removal done. One made and removed before the server answered is removed under the id the server
+sync error, a 404 is a removal done. One gesture of the highlighter that removes several (a cut, «Nessun colore» over
+many) is one notification and one «Annulla» (`removeManyWithUndo`, `editHighlights`), which also deletes the parts the
+cut created (`removeAtOnce`, after their creation answers) and puts a colour changed back (`PUT`, after a creation still
+out, `afterSaving`; one highlight's colours sent one after the other). One made and removed before the server answered is removed under the id the server
 gives it, or not at all if its creation failed; sent by the tab being hidden it still waits for that id (the page lives
 on: a desktop's change of tab). A reading meanwhile — the reader's, the PDF's, a Forum publication's
 (`loadPdfMarks`) — leaves out what waits or is out (`isRemovalPending`); a logout drops it unsent, and an answer still out for one sent
