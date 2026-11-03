@@ -37,6 +37,9 @@ describe('a module\'s work kept in this tab (review of #374)', () => {
     saveWork('m-3', { 'b-1': { spans: [[2, 9]], scritto: 'ricordo', fase: 'confronta' }, 'b-2': EMPTY_WORK });
     saveWork('m-4', { 'b-9': { ...EMPTY_WORK, scritto: 'altro' } });
     expect(readWork('m-3')).toEqual({ 'b-1': { spans: [[2, 9]], scritto: 'ricordo', fase: 'confronta' } });
+    // A highlight keeps its colour (A4); one saved before the colours reads as before, yellow when drawn.
+    saveWork('m-6', { 'b-1': { spans: [[2, 9, 'green'], [12, 20]], scritto: '', fase: 'scrivi' } });
+    expect(readWork('m-6')).toEqual({ 'b-1': { spans: [[2, 9, 'green'], [12, 20]], scritto: '', fase: 'scrivi' } });
     sessionStorage.setItem('visualex.studia.percorsi.lavoro', JSON.stringify({ 'm-5': { 'b-1': { spans: [[9, 2]], scritto: 'x', fase: 'scrivi' }, 'b-2': { scritto: 3 } } }));
     expect(readWork('m-5')).toEqual({});
   });

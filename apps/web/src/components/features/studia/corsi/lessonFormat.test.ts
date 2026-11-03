@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addSpan, blockMinutes, citedMarkers, parseInline, parseLesson, plainText, removeSpan, splitLeaf } from './lessonFormat';
+import { blockMinutes, citedMarkers, paintSpans, parseInline, parseLesson, plainText, splitLeaf } from './lessonFormat';
 
 describe('the lesson format (courses spec §10.3)', () => {
   it('reads paragraphs, `###` headings, lists and quotes, a paragraph\'s lines joined by a space', () => {
@@ -47,24 +47,41 @@ describe('the lesson format (courses spec §10.3)', () => {
   });
 });
 
-describe('highlights for the session (§5, step 3)', () => {
-  it('merges a highlight with those it touches or overlaps, and removes one by its start', () => {
-    let spans = addSpan([], [10, 20]);
-    spans = addSpan(spans, [30, 40]);
-    spans = addSpan(spans, [18, 30]);
-    expect(spans).toEqual([[10, 40]]);
-    spans = addSpan(spans, [0, 3]);
-    expect(spans).toEqual([[0, 3], [10, 40]]);
-    expect(removeSpan(spans, 10)).toEqual([[0, 3]]);
-    expect(addSpan(spans, [5, 5])).toEqual(spans);
+describe('highlights for the session (§5, step 3), with the highlighter\'s rules (A4)', () => {
+  it('merges a highlight with those of its colour it touches or overlaps; a saved one with no colour is yellow', () => {
+    let spans = paintSpans([], [10, 20], 'yellow');
+    spans = paintSpans(spans, [30, 40], 'yellow');
+    spans = paintSpans(spans, [18, 30], 'yellow');
+    expect(spans).toEqual([[10, 40, 'yellow']]);
+    spans = paintSpans(spans, [0, 3], 'yellow');
+    expect(spans).toEqual([[0, 3, 'yellow'], [10, 40, 'yellow']]);
+    expect(paintSpans(spans, [5, 5], 'green')).toEqual(spans);
+    expect(paintSpans([[10, 20]], [20, 30], 'yellow')).toEqual([[10, 30, 'yellow']]);
   });
 
-  it('cuts a leaf at the highlights\' edges, each piece naming its highlight', () => {
-    expect(splitLeaf('abcdefgh', 100, [[102, 104], [106, 120]])).toEqual([
-      { text: 'ab', at: 100, highlight: null },
-      { text: 'cd', at: 102, highlight: 102 },
-      { text: 'ef', at: 104, highlight: null },
-      { text: 'gh', at: 106, highlight: 106 },
+  it('the same colour over words inside one highlight takes the piece away, the parts outside staying', () => {
+    expect(paintSpans([[10, 40, 'yellow']], [10, 40], 'yellow')).toEqual([]);
+    expect(paintSpans([[10, 40, 'yellow']], [10, 20], 'yellow')).toEqual([[20, 40, 'yellow']]);
+    expect(paintSpans([[10, 40, 'yellow']], [20, 30], 'yellow')).toEqual([[10, 20, 'yellow'], [30, 40, 'yellow']]);
+  });
+
+  it('another colour paints over what it covers: a piece recoloured, words reaching out painted whole', () => {
+    expect(paintSpans([[10, 40, 'yellow']], [20, 30], 'blue')).toEqual([[10, 20, 'yellow'], [20, 30, 'blue'], [30, 40, 'yellow']]);
+    expect(paintSpans([[10, 40, 'yellow']], [30, 50], 'yellow')).toEqual([[10, 50, 'yellow']]);
+    expect(paintSpans([[10, 20, 'yellow'], [20, 30, 'green']], [15, 25], 'red')).toEqual([[10, 15, 'yellow'], [15, 25, 'red'], [25, 30, 'green']]);
+  });
+
+  it('«Nessun colore» takes the words out of every highlight they touch', () => {
+    expect(paintSpans([[10, 20, 'yellow'], [25, 40, 'green']], [15, 30], 'none')).toEqual([[10, 15, 'yellow'], [30, 40, 'green']]);
+    expect(paintSpans([[10, 20, 'yellow']], [30, 40], 'none')).toEqual([[10, 20, 'yellow']]);
+  });
+
+  it('cuts a leaf at the highlights\' edges, each piece naming its highlight and its colour', () => {
+    expect(splitLeaf('abcdefgh', 100, [[102, 104], [106, 120, 'green']])).toEqual([
+      { text: 'ab', at: 100, highlight: null, color: null },
+      { text: 'cd', at: 102, highlight: 102, color: 'yellow' },
+      { text: 'ef', at: 104, highlight: null, color: null },
+      { text: 'gh', at: 106, highlight: 106, color: 'green' },
     ]);
   });
 });

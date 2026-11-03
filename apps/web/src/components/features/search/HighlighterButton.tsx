@@ -144,10 +144,10 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
         onMouseDown={(event) => event.preventDefault()}
         // As the menu's clicks, it never reaches the card it sits in (a dossier's row).
         onClick={(event) => { event.stopPropagation(); press(); }}
+        // 44 px wide on a phone whatever the bar's padding; a bar that keeps 44 px at every width says so in its classes.
         className={cn(
-          'inline-flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+          'inline-flex min-w-[44px] items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
           triggerClassName,
-          'min-w-[44px] md:min-w-0',
           on && PRESSED,
         )}
       >
@@ -167,7 +167,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
             label="Colore dell’evidenziatore"
             heading={SECTION_HEADING}
             items={highlightColorItems(ink, meanings, choose)}
-            triggerClassName={cn(triggerClassName, 'min-w-[44px] px-1 md:min-w-0')}
+            triggerClassName={cn('min-w-[44px] md:min-w-0', triggerClassName, 'px-1')}
             placement={placement}
             menuClassName="w-64"
             onOpen={keepForMenu}
@@ -185,9 +185,8 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
           aria-label={CHANGE_MEANINGS_LABEL}
           title={CHANGE_MEANINGS_LABEL}
           className={cn(
-            'inline-flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+            'inline-flex min-w-[44px] items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
             triggerClassName,
-            'min-w-[44px] md:min-w-0',
           )}
         >
           <Settings size={16} aria-hidden />

@@ -10,6 +10,8 @@
  * (`plainText`). The renderer gives each leaf its offset, so a selection maps back to offsets and a highlight to leaves.
  */
 
+import type { HighlightColor } from '../../../../utils/highlightColors';
+
 export type Inline =
   /** `at`: the leaf's offset in the block's plain text, once `numberLeaves` has counted it. */
   | { kind: 'text'; text: string; at?: number }
@@ -202,29 +204,54 @@ export function citedMarkers(nodes: LessonNode[]): string[] {
   return out;
 }
 
-/** A highlight: `[start, end)` in the block's plain text. */
-export type Span = readonly [number, number];
+/**
+ * A highlight: `[start, end)` in the block's plain text, and its colour (A4). One saved before the lessons took colours
+ * has none, and is yellow.
+ */
+export type Span = readonly [number, number, HighlightColor?];
 
-/** Adds a highlight, merged with any it touches or overlaps: one colour, so two that meet are one. */
-export function addSpan(spans: readonly Span[], added: Span): Span[] {
-  let [start, end] = added;
+export const spanColor = (span: Span): HighlightColor => span[2] ?? 'yellow';
+
+/**
+ * The highlighter over a block (A4, spec `2026-11-03-a4-highlighter-and-notes-design` §4): the reader's rules
+ * (`planInk`) in the lesson's own form, where highlights never overlap and a colour paints over what it covers. Words
+ * inside one highlight of the ink, or under «Nessun colore», are taken out of what they touch (the parts outside stay);
+ * any other colour paints them. Highlights of one colour that meet are one.
+ */
+export function paintSpans(spans: readonly Span[], [start, end]: readonly [number, number], ink: HighlightColor | 'none'): Span[] {
   if (end <= start) return [...spans];
-  const kept: Span[] = [];
-  for (const [s, e] of spans) {
-    if (e < start || s > end) kept.push([s, e]);
+  const holder = spans.find(([s, e]) => s <= start && end <= e);
+  const erase = ink === 'none' || (holder !== undefined && spanColor(holder) === ink);
+  const kept: [number, number, HighlightColor][] = [];
+  for (const span of spans) {
+    const [s, e] = span;
+    const color = spanColor(span);
+    if (e <= start || s >= end) kept.push([s, e, color]);
     else {
-      start = Math.min(start, s);
-      end = Math.max(end, e);
+      if (s < start) kept.push([s, start, color]);
+      if (e > end) kept.push([end, e, color]);
     }
   }
-  return [...kept, [start, end] as Span].sort((a, b) => a[0] - b[0]);
+  if (!erase) kept.push([start, end, ink as HighlightColor]);
+  kept.sort((a, b) => a[0] - b[0]);
+  const out: [number, number, HighlightColor][] = [];
+  for (const span of kept) {
+    const last = out.at(-1);
+    if (last && last[2] === span[2] && last[1] >= span[0]) last[1] = Math.max(last[1], span[1]);
+    else out.push(span);
+  }
+  return out;
 }
 
-/** Removes the highlight that starts at `start` («Togli»). */
-export const removeSpan = (spans: readonly Span[], start: number): Span[] => spans.filter(([s]) => s !== start);
-
-/** Pieces of the leaf `[from, from + text.length)`, each inside or outside a highlight; the highlight named by its start. */
-export function splitLeaf(text: string, from: number, spans: readonly Span[]): { text: string; at: number; highlight: number | null }[] {
+/**
+ * Pieces of the leaf `[from, from + text.length)`, each inside or outside a highlight; the highlight named by its start,
+ * with its colour.
+ */
+export function splitLeaf(
+  text: string,
+  from: number,
+  spans: readonly Span[],
+): { text: string; at: number; highlight: number | null; color: HighlightColor | null }[] {
   const to = from + text.length;
   const cuts = new Set([from, to]);
   for (const [s, e] of spans) {
@@ -232,11 +259,11 @@ export function splitLeaf(text: string, from: number, spans: readonly Span[]): {
     if (e > from && e < to) cuts.add(e);
   }
   const points = [...cuts].sort((a, b) => a - b);
-  const out: { text: string; at: number; highlight: number | null }[] = [];
+  const out: { text: string; at: number; highlight: number | null; color: HighlightColor | null }[] = [];
   for (let k = 0; k < points.length - 1; k += 1) {
     const [a, b] = [points[k], points[k + 1]];
     const span = spans.find(([s, e]) => s <= a && b <= e);
-    out.push({ text: text.slice(a - from, b - from), at: a, highlight: span ? span[0] : null });
+    out.push({ text: text.slice(a - from, b - from), at: a, highlight: span ? span[0] : null, color: span ? spanColor(span) : null });
   }
   return out;
 }

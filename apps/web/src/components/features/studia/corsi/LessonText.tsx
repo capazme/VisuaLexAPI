@@ -1,22 +1,29 @@
-import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Highlighter, X } from 'lucide-react';
+import { Fragment, useEffect, useId, useMemo, useRef, type ReactNode } from 'react';
 import { cn } from '../../../../lib/utils';
-import { FOCUS_RING, INK_BG, INK_TEXT, ON_INK } from '../progress/tokens';
-import { addSpan, numberLeaves, parseLesson, removeSpan, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
+import { useAppStore } from '../../../../store/useAppStore';
+import { highlightColorName, HIGHLIGHT_STYLES, parseInlineStyle, type HighlightColor } from '../../../../utils/highlightColors';
+import { registerInkTarget } from '../../../../utils/inkTargets';
+import type { Ink } from '../../../../utils/highlighterRules';
+import { useInkOnRelease } from '../../../../hooks/useInkOnRelease';
+import { useHighlighterInk } from '../../../../hooks/useHighlighterInk';
+import { HighlighterButton } from '../../search/HighlighterButton';
+import { FOCUS_RING, INK_TEXT } from '../progress/tokens';
+import { numberLeaves, paintSpans, parseLesson, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
 
 /** The lesson's reading type: the reader's serif at a reading measure (as a card, a step larger: it is read at length). */
 export const LESSON_TEXT = 'max-w-[65ch] break-words font-serif text-lg leading-[1.75] text-slate-900 dark:text-slate-100';
 
-/** One colour for every highlight (§5, step 3), legible in both themes. */
-const MARK = 'rounded-[2px] bg-amber-200 text-inherit dark:bg-amber-400/35';
+/** A highlight's look: the reader's own tint and ink for its colour (A4), legible in both themes. */
+const MARK_STYLE: Record<HighlightColor, React.CSSProperties> = {
+  yellow: parseInlineStyle(HIGHLIGHT_STYLES.yellow),
+  green: parseInlineStyle(HIGHLIGHT_STYLES.green),
+  red: parseInlineStyle(HIGHLIGHT_STYLES.red),
+  blue: parseInlineStyle(HIGHLIGHT_STYLES.blue),
+};
+const MARK = 'rounded-[2px]';
 
-/** The floating «Evidenzia» and «Togli»: 44 px, the ink key's colours. */
-const FLOATING = cn(
-  'absolute z-10 inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 font-sans text-sm font-semibold shadow-md',
-  INK_BG,
-  ON_INK,
-  FOCUS_RING,
-);
+/** The highlighter over the text: the bars' quiet look, 44 px at every width (`corsi.guard.test.ts`). */
+const TOOL = 'min-h-[44px] min-w-[44px] gap-1.5 rounded-lg px-2.5 text-slate-600 hover:bg-slate-100 md:min-w-[44px] dark:text-slate-300 dark:hover:bg-slate-800';
 
 interface LessonTextProps {
   text: string;
@@ -70,123 +77,88 @@ function offsetAt(root: HTMLElement, node: Node, offset: number): number | null 
   return last;
 }
 
-/** Where a floating button goes: under the rectangle, inside the text's box. */
-function placeUnder(rect: DOMRect, box: HTMLElement): { top: number; left: number } {
-  const frame = box.getBoundingClientRect();
-  const left = Math.max(0, Math.min(rect.left - frame.left, frame.width - 160));
-  return { top: rect.bottom - frame.top + 6, left };
+/** The selection's `[start, end)` in the block's plain text, when it lies in the text. */
+function selectedSpan(root: HTMLElement, selection: Selection): readonly [number, number] | null {
+  if (selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  const start = offsetAt(root, range.startContainer, range.startOffset);
+  const end = offsetAt(root, range.endContainer, range.endOffset);
+  return start !== null && end !== null && end > start ? [start, end] : null;
 }
-
-/** «Evidenzia» for words selected; «Togli» for a highlight pressed (which takes the focus) or selected inside (which does not). */
-type Floating =
-  | { kind: 'add'; span: Span; top: number; left: number }
-  | { kind: 'remove'; start: number; top: number; left: number; focus: boolean }
-  | null;
-/** A button the selection brought goes with the selection; «Togli» from a highlight pressed goes with its own focus. */
-const fromSelection = (f: NonNullable<Floating>) => f.kind === 'add' || !f.focus;
 
 /**
  * A block's text in the lesson's format (§10.3), drawn by the web's own parser: every character React text, never HTML.
  * A citation is a button that opens the cited norm or decision beside the text. With `spans`, the reader highlights for
- * the session (§5, step 3): words selected (by mouse, by touch, or from the keyboard: the text is a Tab stop, and Shift
- * with the arrows extends a selection from its start, a word at a time with Ctrl or Alt — `Selection.modify`, since a
- * text that is not editable has no caret of its own) bring «Evidenzia», a 44 px button under the selection, which Tab
- * from the text reaches next; a highlight pressed (a click, or Enter on it: each highlight is one Tab stop) brings
- * «Togli», and so do words selected inside a highlight. Inside a citation's button a highlight is drawn but takes no
- * press (nothing interactive in a button): its pieces outside the citation carry the Tab stop, and one lying wholly in
- * a citation is taken away by selecting its words. One colour, no notes, nothing sent.
+ * the session (§5, step 3) with the reader's highlighter (A4, spec `2026-11-03-a4-highlighter-and-notes-design` §4): the
+ * same button over the text, the same rules (`paintSpans`: the same colour over a highlight takes the piece away,
+ * another colour paints over, «Nessun colore» clears) and the same tool, on which every selection takes the ink as it is
+ * released. Words selected by mouse, by touch, or from the keyboard (the text is a Tab stop, and Shift with the arrows
+ * extends a selection from its start, a word at a time with Ctrl or Alt — `Selection.modify`, since a text that is not
+ * editable has no caret of its own) take it from the button, or from H. Each highlight is one Tab stop, where Enter
+ * selects its words. Inside a citation's button a highlight is drawn but takes no press (nothing interactive in a
+ * button): its pieces outside the citation carry the Tab stop. Four colours, no notes, nothing sent.
  */
 export function LessonText({ text, spans, onSpans, onCite, citations, headingLevel = 3 }: LessonTextProps) {
   const nodes = useMemo(() => numberLeaves(parseLesson(text)), [text]);
   const root = useRef<HTMLDivElement>(null);
-  const box = useRef<HTMLDivElement>(null);
-  const [floating, setFloating] = useState<Floating>(null);
-  const removeButton = useRef<HTMLButtonElement>(null);
-  const addButton = useRef<HTMLButtonElement>(null);
-  // A finger on «Evidenzia»: a tap outside a selection collapses it on a phone before the click arrives, so the button
-  // stays for the press it is under — until its click has been handled, or 400 ms after the release (a press dragged off
-  // the button brings no click, and must not leave the button stuck on words no longer selected).
-  const pressing = useRef(false);
-  useEffect(() => {
-    let timer = 0;
-    const onUp = () => {
-      if (!pressing.current) return;
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        pressing.current = false;
-      }, 400);
-    };
-    document.addEventListener('pointerup', onUp);
-    return () => {
-      document.removeEventListener('pointerup', onUp);
-      window.clearTimeout(timer);
-    };
-  }, []);
   const hintId = useId();
   const keysId = useId();
-  // The selection's listener reads the highlights as they are now.
-  const spansRef = useRef(spans);
-  useEffect(() => {
-    spansRef.current = spans;
-  }, [spans]);
   const highlighting = spans !== undefined && onSpans !== undefined;
+  const ink = useHighlighterInk();
+  const inking = useAppStore((s) => s.readingTool === 'highlight') && highlighting;
 
-  // The selection's words, read as it changes; a selection that leaves the block (or collapses) takes the button away,
-  // but not while the focus is on the button itself (Tab from the text keeps the selection in most browsers).
+  // The highlights and their handler as they are now, for the listeners below.
+  const latest = useRef({ spans, onSpans });
   useEffect(() => {
-    if (!highlighting) return;
-    const onSelection = () => {
-      const el = root.current;
-      const frame = box.current;
-      const selection = document.getSelection();
-      if (!el || !frame || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
-        if (pressing.current) return;
-        const onButton = document.activeElement !== null && [addButton.current, removeButton.current].includes(document.activeElement as HTMLButtonElement);
-        setFloating((f) => (f && fromSelection(f) && !onButton ? null : f));
-        return;
-      }
-      const range = selection.getRangeAt(0);
-      const start = offsetAt(el, range.startContainer, range.startOffset);
-      const end = offsetAt(el, range.endContainer, range.endOffset);
-      if (start === null || end === null || end <= start) {
-        setFloating((f) => (f && fromSelection(f) ? null : f));
-        return;
-      }
-      // Words already highlighted, all of them inside one highlight: «Togli» in place of «Evidenzia».
-      const inside = (spansRef.current ?? []).find(([s, e]) => s <= start && end <= e);
-      const place = placeUnder(range.getBoundingClientRect(), frame);
-      setFloating(inside ? { kind: 'remove', start: inside[0], focus: false, ...place } : { kind: 'add', span: [start, end], ...place });
-    };
-    document.addEventListener('selectionchange', onSelection);
-    return () => document.removeEventListener('selectionchange', onSelection);
-  }, [highlighting]);
-
-  // «Togli» from a highlight pressed takes the focus as it appears, so Enter on a highlight and Enter again removes it;
-  // from a selection it does not (the focus would move under the hand that is still selecting).
-  const removing = floating?.kind === 'remove' && floating.focus ? floating.start : null;
-  useEffect(() => {
-    if (removing !== null) removeButton.current?.focus({ preventScroll: true });
-  }, [removing]);
-
-  const add = (span: Span) => {
-    if (!spans || !onSpans) return;
-    pressing.current = false;
-    onSpans(addSpan(spans, span));
+    latest.current = { spans, onSpans };
+  });
+  /** The ink over the words selected in the text: painted, the selection cleared, the focus back on the text. */
+  const paint = (span: readonly [number, number], chosen: Ink) => {
+    const { spans: now, onSpans: set } = latest.current;
+    if (!now || !set) return;
+    set(paintSpans(now, span, chosen));
     document.getSelection()?.removeAllRanges();
-    setFloating(null);
     root.current?.focus({ preventScroll: true });
   };
-  // From the keyboard: Shift and an arrow start a selection at the text's start when none is in it, then extend it.
+  const paintRef = useRef(paint);
+  useEffect(() => {
+    paintRef.current = paint;
+  });
+
+  // The words selected here, for the highlighter's button.
+  useEffect(() => {
+    if (!highlighting) return;
+    return registerInkTarget({
+      holds: (range) => !!root.current?.contains(range.commonAncestorContainer),
+      read: (selection) => {
+        const el = root.current;
+        const span = el ? selectedSpan(el, selection) : null;
+        return span ? { apply: (chosen) => paintRef.current(span, chosen) } : null;
+      },
+    });
+  }, [highlighting]);
+
+  // The tool on: the selection takes the ink as it is released; the text takes the highlighter's cursor.
+  useInkOnRelease(root, inking, (selection) => {
+    const el = root.current;
+    const span = el ? selectedSpan(el, selection) : null;
+    if (span) paint(span, ink);
+  });
+
+  // From the keyboard: Shift and an arrow start a selection at the text's start when none is in it, then extend it;
+  // H applies the ink to the words selected, as the reader's selection bar does.
   const onTextKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const el = root.current;
     if (!highlighting || !el) return;
-    if (event.key === 'Tab' && !event.shiftKey && floating && event.target === el) {
+    const selection = document.getSelection();
+    if (event.key.toLowerCase() === 'h' && !event.metaKey && !event.ctrlKey && !event.altKey && selection) {
+      const span = selectedSpan(el, selection);
+      if (!span) return;
       event.preventDefault();
-      (floating.kind === 'add' ? addButton : removeButton).current?.focus({ preventScroll: true });
+      paint(span, ink);
       return;
     }
     const by = extendBy(event);
-    const selection = document.getSelection();
     if (!by || event.target !== el || !selection || typeof selection.modify !== 'function') return;
     event.preventDefault();
     const inside = selection.rangeCount > 0 && el.contains(selection.getRangeAt(0).commonAncestorContainer);
@@ -198,56 +170,47 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
     selection.modify('extend', by.direction, by.granularity);
   };
 
-  const remove = (start: number) => {
-    if (!spans || !onSpans) return;
-    pressing.current = false;
-    onSpans(removeSpan(spans, start));
-    setFloating(null);
-    root.current?.focus({ preventScroll: true });
-  };
-  const offerRemoval = (start: number, target: HTMLElement) => {
-    const frame = box.current;
-    if (!frame) return;
-    setFloating({ kind: 'remove', start, focus: true, ...placeUnder(target.getBoundingClientRect(), frame) });
+  /** Enter on a highlight: its words selected, every piece of it, so H or the highlighter's menu acts on them. */
+  const selectHighlight = (start: number) => {
+    const pieces = root.current?.querySelectorAll<HTMLElement>(`mark[data-highlight="${start}"]`);
+    const first = pieces?.[0]?.firstChild;
+    const last = pieces?.[pieces.length - 1]?.lastChild;
+    if (!first || !last) return;
+    document.getSelection()?.setBaseAndExtent(first, 0, last, (last.textContent ?? '').length);
   };
 
   // Each leaf carries its offset in the plain text (`numberLeaves`); a highlight's first piece is its one Tab stop.
   const firstPiece = new Set<number>();
   const leaf = (value: string, from: number, key: string, inButton: boolean): ReactNode =>
     splitLeaf(value, from, spans ?? []).map((piece) => {
-      if (piece.highlight === null) {
+      if (piece.highlight === null || piece.color === null) {
         return (
           <span key={`${key}-${piece.at}`} data-o={piece.at}>
             {piece.text}
           </span>
         );
       }
-      // One Tab stop per highlight, on its first piece outside a citation; every such piece answers a click. Inside a
-      // citation's button a piece is only drawn: nothing interactive may sit in a button.
+      // One Tab stop per highlight, on its first piece outside a citation. Inside a citation's button a piece is only
+      // drawn: nothing interactive may sit in a button.
       const start = piece.highlight;
-      if (inButton) {
-        return (
-          <mark key={`${key}-${piece.at}`} data-o={piece.at} data-highlight={start} className={MARK}>
-            {piece.text}
-          </mark>
-        );
-      }
-      const first = !firstPiece.has(start);
-      firstPiece.add(start);
+      const color = piece.color;
+      const first = !inButton && !firstPiece.has(start);
+      if (first) firstPiece.add(start);
       return (
         <mark
           key={`${key}-${piece.at}`}
           data-o={piece.at}
           data-highlight={start}
-          className={cn(MARK, highlighting && 'cursor-pointer', first && highlighting && FOCUS_RING)}
-          {...(highlighting && first ? { tabIndex: 0, 'aria-describedby': hintId } : {})}
-          onClick={highlighting ? (event) => offerRemoval(start, event.currentTarget) : undefined}
+          data-color={color}
+          className={cn(MARK, first && highlighting && FOCUS_RING)}
+          style={MARK_STYLE[color]}
+          {...(highlighting && first ? { tabIndex: 0, 'aria-describedby': hintId, 'aria-label': `Evidenziato in ${highlightColorName(color)}: ${piece.text}` } : {})}
           onKeyDown={
             highlighting && first
               ? (event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    offerRemoval(start, event.currentTarget);
+                    selectHighlight(start);
                   }
                 }
               : undefined
@@ -327,75 +290,33 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
   };
 
   return (
-    <div
-      ref={box}
-      className="relative"
-      // Esc takes the floating button away first, wherever the focus is in the text or on it; the lesson's Esc waits.
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && floating) {
-          event.stopPropagation();
-          setFloating(null);
-          root.current?.focus({ preventScroll: true });
-        }
-      }}
-    >
+    <div className="relative">
+      {/* The reader's highlighter, over the text it acts on; the colours' meanings stay in Impostazioni. */}
+      {highlighting && (
+        <div className="mb-2 flex justify-end font-sans">
+          <HighlighterButton meaningsGear={false} placement="auto" triggerClassName={TOOL} />
+        </div>
+      )}
       <div
         ref={root}
         tabIndex={highlighting ? 0 : undefined}
         aria-describedby={highlighting ? keysId : undefined}
         data-lesson-text
+        data-ink={inking ? ink : undefined}
         onKeyDown={onTextKeyDown}
-        className={cn(LESSON_TEXT, 'space-y-4 rounded-sm', highlighting ? FOCUS_RING : 'focus:outline-none')}
+        className={cn(LESSON_TEXT, 'space-y-4 rounded-sm', highlighting ? FOCUS_RING : 'focus:outline-none', inking && 'vlx-inking')}
       >
         {nodes.map(block)}
       </div>
       {highlighting && (
         <>
           <p id={hintId} className="sr-only">
-            Evidenziato. Premi Invio per toglierlo.
+            Invio seleziona queste parole: H, con il loro colore, toglie l’evidenziazione.
           </p>
           <p id={keysId} className="sr-only">
-            Per evidenziare, seleziona con Maiusc e le frecce, poi premi Tab per «Evidenzia».
+            Per evidenziare, seleziona con Maiusc e le frecce, poi premi H. Il colore si sceglie con l’evidenziatore sopra il testo.
           </p>
         </>
-      )}
-      {floating?.kind === 'add' && (
-        <button
-          ref={addButton}
-          type="button"
-          // A press must not take the selection away before the click reads it.
-          onMouseDown={(event) => event.preventDefault()}
-          onPointerDown={() => {
-            pressing.current = true;
-          }}
-          onPointerCancel={() => {
-            pressing.current = false;
-          }}
-          onClick={() => add(floating.span)}
-          className={FLOATING}
-          style={{ top: floating.top, left: floating.left }}
-        >
-          <Highlighter size={16} aria-hidden />
-          Evidenzia
-        </button>
-      )}
-      {floating?.kind === 'remove' && (
-        <button
-          type="button"
-          ref={removeButton}
-          onPointerDown={() => {
-            pressing.current = true;
-          }}
-          onClick={() => remove(floating.start)}
-          onBlur={(event) => {
-            if (!box.current?.contains(event.relatedTarget as Node | null)) setFloating(null);
-          }}
-          className={FLOATING}
-          style={{ top: floating.top, left: floating.left }}
-        >
-          <X size={16} aria-hidden />
-          Togli
-        </button>
       )}
     </div>
   );
