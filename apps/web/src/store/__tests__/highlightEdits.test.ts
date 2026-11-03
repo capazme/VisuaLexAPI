@@ -42,7 +42,20 @@ beforeEach(() => {
 afterEach(() => {
   resetNotifications();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
+
+/** A creation the test answers by hand. */
+function heldCreate() {
+  const answers: { ok: () => void; no: () => void }[] = [];
+  vi.mocked(highlightService.create).mockImplementation((data: HighlightCreate) => new Promise((resolve, reject) => {
+    answers.push({
+      ok: () => resolve({ id: `s${++serverIds}`, normaKey: data.normaKey, text: data.text, color: data.color, startOffset: data.startOffset, endOffset: data.endOffset, userId: 'u', createdAt: '' }),
+      no: () => reject({ status: 500, message: 'no' }),
+    });
+  }));
+  return answers;
+}
 
 describe('editHighlights — one gesture of the highlighter, one «Annulla» (A4)', () => {
   const cut = () => appStore.getState().editHighlights({
@@ -115,6 +128,81 @@ describe('editHighlights — one gesture of the highlighter, one «Annulla» (A4
     expect(shown().filter((e) => e.undoable)).toHaveLength(1);
     await undoNotification(last().id);
     expect(marks()).toEqual(['a:uno:yellow', 'b:due:green', 'c:tre:red']);
+  });
+});
+
+describe('editHighlights — what a gesture waits for, and what it never loses (review of A4)', () => {
+  const cut = () => appStore.getState().editHighlights({
+    normaKey: 'k', articleId: '1453', remove: ['h2'], recolor: [],
+    add: [{ text: 'il', startOffset: 20, color: 'yellow', from: 'h2' }, { text: 'ingiusto', startOffset: 29, color: 'yellow', from: 'h2' }],
+    message: 'Evidenziazione rimossa',
+  });
+
+  it('«Annulla» after a colour given to a highlight still being created: the colour goes back once it is saved, by its server id', async () => {
+    const answers = heldCreate();
+    appStore.getState().addHighlight('k', '1453', 'danno', '', 'yellow', 23);
+    const temp = appStore.getState().highlights.at(-1)!.id;
+    appStore.getState().editHighlights({ normaKey: 'k', articleId: '1453', remove: [], recolor: [{ id: temp, color: 'red' }], add: [], message: 'Evidenziazione cambiata in rosso' });
+    answers[0].ok();
+    await flush();
+    expect(marks().at(-1)).toBe('s1:danno:red');
+    await undoNotification(last().id);
+    await flush();
+    expect(marks().at(-1)).toBe('s1:danno:yellow');
+    expect(vi.mocked(highlightService.update).mock.calls).toEqual([['s1', { color: 'red' }], ['s1', { color: 'yellow' }]]);
+  });
+
+  it('the page going while the parts are on their way sends no removal: the highlight stays whole on the server', async () => {
+    const answers = heldCreate();
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    cut();
+    window.dispatchEvent(new Event('pagehide'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(highlightService.delete).not.toHaveBeenCalled();
+    // The page lived on (a desktop's change of tab): once the parts are saved, the highlight is removed.
+    answers.forEach((a) => a.ok());
+    await flush();
+    expect(highlightService.delete).toHaveBeenCalledExactlyOnceWith('h2');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a reading while the removal waits for the parts does not draw the highlight back', async () => {
+    heldCreate();
+    vi.mocked(highlightService.getByNormaKeyPrefix).mockResolvedValue([
+      { id: 'h2', normaKey: 'k::art::1453', text: 'il danno ingiusto', color: 'yellow', startOffset: 20, endOffset: 37 } as never,
+    ]);
+    cut();
+    closeNotification(last().id, 'timeout');
+    await appStore.getState().loadHighlightsForArticle('k', '1453');
+    expect(appStore.getState().highlights.map((h) => h.id)).not.toContain('h2');
+  });
+
+  it('a part refused takes the gesture back: the highlight back whole, the other part deleted, no «Annulla» left', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const answers = heldCreate();
+    cut();
+    answers[0].no();
+    answers[1].ok();
+    await flush();
+    expect(marks()).toEqual(['h1:contratto:yellow', 'h2:il danno ingiusto:yellow']);
+    expect(highlightService.delete).toHaveBeenCalledExactlyOnceWith('s1');
+    expect(shown().some((e) => e.undoable)).toBe(false);
+    expect(appStore.getState().lastSyncError?.message).toBe("Impossibile salvare l'evidenziazione. Riprova.");
+  });
+
+  it('a part held behind another gesture\'s «Annulla» is left to it when the first gesture is undone', async () => {
+    cut();
+    const first = last().id;
+    await flush();
+    // A second gesture removes the part «ingiusto» (s2), behind its own «Annulla».
+    appStore.getState().editHighlights({ normaKey: 'k', articleId: '1453', remove: ['s2'], recolor: [], add: [], message: 'Evidenziazione rimossa' });
+    await undoNotification(first);
+    await flush();
+    expect(highlightService.delete).toHaveBeenCalledExactlyOnceWith('s1');
+    // Undone in turn, the part comes back, as the server still has it.
+    await undoNotification(shown().filter((e) => e.undoable && e.id !== first).at(-1)!.id);
+    expect(marks()).toContain('s2:ingiusto:yellow');
   });
 });
 

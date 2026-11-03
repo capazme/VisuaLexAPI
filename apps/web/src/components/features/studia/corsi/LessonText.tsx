@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, type ReactNode } from 'react';
 import { cn } from '../../../../lib/utils';
 import { useAppStore } from '../../../../store/useAppStore';
-import { highlightColorName, HIGHLIGHT_STYLES, parseInlineStyle, type HighlightColor } from '../../../../utils/highlightColors';
+import { HIGHLIGHT_COLORS, highlightColorName, HIGHLIGHT_STYLES, parseInlineStyle, type HighlightColor } from '../../../../utils/highlightColors';
 import { registerInkTarget } from '../../../../utils/inkTargets';
 import type { Ink } from '../../../../utils/highlighterRules';
 import { useInkOnRelease } from '../../../../hooks/useInkOnRelease';
@@ -204,7 +204,8 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
           data-color={color}
           className={cn(MARK, first && highlighting && FOCUS_RING)}
           style={MARK_STYLE[color]}
-          {...(highlighting && first ? { tabIndex: 0, 'aria-describedby': hintId, 'aria-label': `Evidenziato in ${highlightColorName(color)}: ${piece.text}` } : {})}
+          // No name on a `mark` (ARIA forbids one): its colour and what Enter does are its description.
+          {...(highlighting && first ? { tabIndex: 0, 'aria-describedby': `${hintId}-${color}` } : {})}
           onKeyDown={
             highlighting && first
               ? (event) => {
@@ -310,9 +311,11 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
       </div>
       {highlighting && (
         <>
-          <p id={hintId} className="sr-only">
-            Invio seleziona queste parole: H, con il loro colore, toglie l’evidenziazione.
-          </p>
+          {HIGHLIGHT_COLORS.map((color) => (
+            <p key={color} id={`${hintId}-${color}`} className="sr-only">
+              Evidenziato in {highlightColorName(color)}. Invio seleziona queste parole: H, con il loro colore, toglie l’evidenziazione.
+            </p>
+          ))}
           <p id={keysId} className="sr-only">
             Per evidenziare, seleziona con Maiusc e le frecce, poi premi H. Il colore si sceglie con l’evidenziatore sopra il testo.
           </p>

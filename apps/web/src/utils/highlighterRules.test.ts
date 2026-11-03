@@ -75,6 +75,29 @@ describe('planInk — the highlighter\'s rules (A4 §3)', () => {
     expect(planInk({ start: 30, end: 40, ink: 'yellow', marks: twice })).toMatchObject({ effect: 'removed', remove: ['outer', 'inner'] });
   });
 
+  it('highlights that overlap in part: the colour seen is the one the renderer draws on top (the later start)', () => {
+    // «danno ingiusto» yellow, then «ingiusto obbliga colui» green: «ingiusto» shows green.
+    const marks = [mark('y', 3, 17, 'yellow'), mark('g', 9, 31, 'green')];
+    expect(planInk({ start: 9, end: 17, ink: 'green', marks })).toEqual({
+      kind: 'edit', effect: 'removed', remove: ['g'], recolor: [], add: [{ start: 17, end: 31, color: 'green', from: 'g' }],
+    });
+    // Yellow over it: the green piece goes and the yellow under it shows, no second yellow.
+    expect(planInk({ start: 9, end: 17, ink: 'yellow', marks })).toEqual({
+      kind: 'edit', effect: 'recoloured', color: 'yellow', remove: ['g'], recolor: [], add: [{ start: 17, end: 31, color: 'green', from: 'g' }],
+    });
+    // Two with the same edges: the later one is on top.
+    const twins = [mark('a', 0, 10, 'red'), mark('b', 0, 10, 'blue')];
+    expect(planInk({ start: 2, end: 5, ink: 'blue', marks: twins })).toMatchObject({ effect: 'removed', remove: ['b'] });
+  });
+
+  it('three nested: the piece takes the ink unless the highlight under the one cut already has it', () => {
+    const marks = [mark('y', 0, 100, 'yellow'), mark('g', 10, 90, 'green'), mark('r', 20, 80, 'red')];
+    // Red seen, yellow ink: under the red is the green, so a yellow piece is added.
+    expect(planInk({ start: 30, end: 40, ink: 'yellow', marks })).toMatchObject({ effect: 'recoloured', remove: ['r'], add: expect.arrayContaining([{ start: 30, end: 40, color: 'yellow' }]) });
+    // Red seen, green ink: the green under it shows the piece.
+    expect(planInk({ start: 30, end: 40, ink: 'green', marks })).toMatchObject({ remove: ['r'], add: [{ start: 20, end: 30, color: 'red', from: 'r' }, { start: 40, end: 80, color: 'red', from: 'r' }] });
+  });
+
   it('a highlight that cannot be cut (from the Forum) is acted on whole: removed, or recoloured in place', () => {
     const forum = [mark('f', 10, 30, 'yellow', true)];
     expect(planInk({ start: 15, end: 20, ink: 'yellow', marks: forum })).toEqual({ kind: 'edit', effect: 'removed', remove: ['f'], recolor: [], add: [] });

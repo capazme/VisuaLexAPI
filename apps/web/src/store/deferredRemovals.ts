@@ -159,24 +159,54 @@ export interface DeferredRemovals<T> {
   onRefused: (error: unknown) => void;
   /** «Annulla» also takes back what came with the removals (the parts a cut created, a colour changed), after them. */
   onUndo?: () => void;
+  /**
+   * What the removals wait for (A4: the parts a cut created, still being saved): sent only once it resolves true, so a
+   * page that goes before sends nothing and the items stay on the server, rather than their parts be lost with it.
+   * False (a part refused) takes the gesture back at once — the items put back, `onUndo` run — with no «Ripristinato».
+   */
+  ready?: Promise<boolean>;
 }
 
 /**
  * `removeWithUndo` for one gesture that removes several items (A4: a highlight cut, «Nessun colore» over many): one
  * notification, one «Annulla» that puts them all back (and runs `onUndo`), all sent as it closes or the page goes.
  */
-export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, onUndo }: DeferredRemovals<T>): void {
+export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, onUndo, ready }: DeferredRemovals<T>): void {
   if (targets.length > 0) void getFreshAccessToken().catch(() => null);
+  const madeIn = session;
   let settled = false;
   let notification: number | null = null;
   // Each removed item, retargeted once a creation still out is answered; null when it never reached the server.
   const slots: { target: RemovalTarget<T> | null }[] = targets.map((target) => ({ target }));
+  // `ready`'s answer, once given; and whether the removals, sent, wait for it.
+  let readiness: boolean | null = ready ? null : true;
+  let waiting = false;
 
-  const send = (onExit = false) => {
-    if (settled) return;
-    settled = true;
-    for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
-    if (notification !== null) closeNotification(notification, 'external');
+  /** A part refused: the gesture taken back, as «Annulla» would, with nothing said but the refusal. */
+  const takeBack = () => {
+    for (const slot of slots) {
+      if (!slot.target) continue;
+      pending.delete(slot.target.key);
+      inFlight.delete(slot.target.key);
+      putBack(slot.target.item);
+    }
+    onUndo?.();
+  };
+  ready?.then((ok) => {
+    readiness = ok;
+    // Answered after a logout: the store is the next account's.
+    if (ok || madeIn !== session) return;
+    if (!settled) {
+      settled = true;
+      if (notification !== null) closeNotification(notification, 'external');
+      takeBack();
+    } else if (waiting) {
+      waiting = false;
+      takeBack();
+    }
+  });
+
+  const removeAll = (onExit: boolean) => {
     for (const { target } of slots) {
       if (!target) continue;
       const waiters = saving.get(target.key);
@@ -189,6 +219,28 @@ export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, on
       }
       deleteNow(target, onExit, putBack, onRefused);
     }
+  };
+
+  const send = (onExit = false) => {
+    if (settled) return;
+    settled = true;
+    for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
+    if (notification !== null) closeNotification(notification, 'external');
+    if (readiness === false) return;
+    if (readiness === null) {
+      // What they wait for is still on its way: sent once it is saved, by an ordinary request (the page lived on); a
+      // reading meanwhile still leaves them out.
+      waiting = true;
+      for (const slot of slots) if (slot.target) inFlight.add(slot.target.key);
+      void ready?.then((ok) => {
+        if (!ok || !waiting || madeIn !== session) return;
+        waiting = false;
+        for (const slot of slots) if (slot.target) inFlight.delete(slot.target.key);
+        removeAll(false);
+      });
+      return;
+    }
+    removeAll(onExit);
   };
 
   for (const slot of slots) {

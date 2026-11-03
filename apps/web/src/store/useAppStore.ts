@@ -131,7 +131,6 @@ export interface StructureWindowState {
     position: { x: number; y: number };
 }
 
-/** What an import made of a dossier: the new dossier's id, and how many items the server took or refused. */
 /** One gesture of the highlighter over existing highlights (A4), as `useHighlightInk` turns a plan into it. */
 export interface HighlightEdit {
     normaKey: string;
@@ -145,6 +144,7 @@ export interface HighlightEdit {
     message: string;
 }
 
+/** What an import made of a dossier: the new dossier's id, and how many items the server took or refused. */
 export interface ImportOutcome {
     id: string;
     imported: number;
@@ -641,20 +641,24 @@ const appStore = createStore<AppState>()(
         immer((set, get) => {
             // Per highlight, its colours sent one after the other (A4): «Annulla» right after a change must not land first.
             const colourWrites = new Map<string, Promise<void>>();
+            // A highlight's server id by the temporary one it was shown with (A4): what a gesture recorded under the
+            // temporary id («Annulla», a colour) reaches it once it is saved.
+            const serverIds = new Map<string, string>();
+            const serverIdOf = (id: string) => serverIds.get(id) ?? id;
 
             /**
              * Sends a highlight already on screen (optimistic): its server id replaces the temporary one, keeping a colour
              * changed while it travelled (whose `PUT` waits for the id, `sendHighlightColor`); refused, it goes, and the
-             * reader is told. A removal meanwhile waits for the id (`deferredRemovals`).
+             * reader is told. A removal meanwhile waits for the id (`deferredRemovals`). True once saved.
              */
-            const saveHighlight = (optimistic: Highlight, onSaved?: (saved: Highlight) => void) => {
+            const saveHighlight = (optimistic: Highlight): Promise<boolean> => {
                 const wirePayload = highlightStoreToCreate(optimistic);
                 // No startOffset — cannot persist server-side. Keep the optimistic entry local only (legacy behaviour).
-                if (!wirePayload) return;
+                if (!wirePayload) return Promise.resolve(true);
                 const tempId = optimistic.id;
                 // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
                 savingStarted(`highlight:${tempId}`);
-                highlightService
+                return highlightService
                     .create(wirePayload)
                     .then((serverHighlight) => {
                         const mapped = highlightApiToStore(serverHighlight);
@@ -664,13 +668,14 @@ const appStore = createStore<AppState>()(
                             const idx = state.highlights.findIndex(h => h.id === tempId);
                             if (idx !== -1) state.highlights[idx] = kept;
                         });
-                        onSaved?.(kept);
+                        serverIds.set(tempId, kept.id);
                         savingDone(`highlight:${tempId}`, {
                             key: `highlight:${kept.id}`,
                             path: `/highlights/${encodeURIComponent(kept.id)}`,
                             remove: () => highlightService.delete(kept.id),
                             item: kept,
                         });
+                        return true;
                     })
                     .catch((err) => {
                         savingDone(`highlight:${tempId}`, null);
@@ -679,6 +684,7 @@ const appStore = createStore<AppState>()(
                             state.highlights = state.highlights.filter(h => h.id !== tempId);
                         });
                         get().pushSyncError('Impossibile salvare l\'evidenziazione. Riprova.');
+                        return false;
                     });
             };
 
@@ -691,7 +697,7 @@ const appStore = createStore<AppState>()(
                 afterSaving(`highlight:${id}`, (saved) => {
                     // Its creation failed: there is nothing to colour.
                     if (saved === null) return;
-                    const serverId = saved ? (saved.item as Highlight).id : id;
+                    const serverId = saved ? (saved.item as Highlight).id : serverIdOf(id);
                     const write = (colourWrites.get(serverId) ?? Promise.resolve())
                         .then(() => highlightService.update(serverId, { color }))
                         .then(() => undefined, (err: unknown) => {
@@ -2312,7 +2318,7 @@ const appStore = createStore<AppState>()(
                     ...(typeof startOffset === 'number' ? { startOffset } : {}),
                 };
                 set((state) => { state.highlights.push(optimistic); });
-                saveHighlight(optimistic);
+                void saveHighlight(optimistic);
             },
 
             editHighlights: ({ normaKey, articleId, remove, recolor, add, message }) => {
@@ -2346,9 +2352,13 @@ const appStore = createStore<AppState>()(
                     }
                     state.highlights.push(...created);
                 });
-                // The parts are sent at once; their server ids are what «Annulla» removes.
-                const savedIds = new Map<string, string>();
-                for (const part of created) saveHighlight(part, (saved) => savedIds.set(part.id, saved.id));
+                // The parts are sent at once; the removals wait for them (a page that goes first keeps the highlight
+                // whole), and a part refused takes the whole gesture back.
+                const saved = new Map<string, boolean>();
+                const ready = created.length > 0
+                    ? Promise.all(created.map((part) => saveHighlight(part).then((ok) => { saved.set(part.id, ok); return ok; })))
+                        .then((all) => all.every(Boolean))
+                    : undefined;
                 for (const { id, from, to } of recolored) sendHighlightColor(id, to, from);
 
                 const putBack = (item: Highlight) => set((state) => {
@@ -2370,10 +2380,15 @@ const appStore = createStore<AppState>()(
                     })),
                     putBack,
                     onRefused,
+                    ready,
                     // The parts go (once created, when they are still on their way) and the colours come back.
                     onUndo: () => {
                         for (const part of created) {
-                            const id = savedIds.get(part.id) ?? part.id;
+                            // Never saved: nothing to take back.
+                            if (saved.get(part.id) === false) continue;
+                            const id = serverIdOf(part.id);
+                            // Held behind another gesture's «Annulla»: that one decides (its removal, or putting it back).
+                            if (isRemovalPending(`highlight:${id}`) || isRemovalPending(`highlight:${part.id}`)) continue;
                             const current = get().highlights.find(h => h.id === id || h.id === part.id) ?? part;
                             set((state) => { state.highlights = state.highlights.filter(h => h.id !== id && h.id !== part.id); });
                             removeAtOnce(
@@ -2383,11 +2398,13 @@ const appStore = createStore<AppState>()(
                             );
                         }
                         for (const { id, from, to } of recolored) {
+                            // Recorded under a temporary id, it may have its server id by now.
+                            const current = serverIdOf(id);
                             set((state) => {
-                                const h = state.highlights.find(x => x.id === id);
+                                const h = state.highlights.find(x => x.id === current || x.id === id);
                                 if (h) h.color = from;
                             });
-                            sendHighlightColor(id, from, to);
+                            sendHighlightColor(current, from, to);
                         }
                     },
                 });

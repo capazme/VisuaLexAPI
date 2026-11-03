@@ -17,6 +17,7 @@ vi.mock('../../services/authService', async (importOriginal) => ({
 }));
 
 import { appStore } from '../useAppStore';
+import { forgetRemovals, isRemovalPending, removeAtOnce, removeManyWithUndo, savingDone, savingStarted } from '../deferredRemovals';
 import { highlightService } from '../../services/highlightService';
 import { annotationService } from '../../services/annotationService';
 import { closeNotification, notificationStore, resetNotifications, undoNotification } from '../../components/ui/notifications/notifications';
@@ -248,5 +249,71 @@ describe('removing a note, behind «Annulla»', () => {
     closeNotification(last().id, 'timeout');
     await vi.waitFor(() => expect(appStore.getState().annotations.map((a) => a.id)).toEqual(['n1', 'n2']));
     expect(appStore.getState().lastSyncError?.message).toBe('Impossibile eliminare la nota. Riprova.');
+  });
+});
+
+
+describe('several removals behind one «Annulla» (A4)', () => {
+  const target = (id: string, remove = vi.fn(async () => {})) => ({ key: `x:${id}`, path: `/x/${id}`, remove, item: id });
+
+  it('one notification; as it closes each is removed, and as the page goes each by a keepalive fetch', () => {
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const putBack = vi.fn();
+    const a = target('a');
+    const b = target('b');
+    removeManyWithUndo({ message: 'Evidenziazioni rimosse', targets: [a, b], putBack, onRefused: vi.fn() });
+    expect(shown().filter((e) => e.undoable)).toHaveLength(1);
+    expect(isRemovalPending('x:a') && isRemovalPending('x:b')).toBe(true);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([expect.stringMatching(/\/x\/a$/), expect.stringMatching(/\/x\/b$/)]);
+    expect(a.remove).not.toHaveBeenCalled();
+    expect(putBack).not.toHaveBeenCalled();
+  });
+
+  it('«Annulla» puts every item back, then runs what came with them', async () => {
+    const putBack = vi.fn();
+    const onUndo = vi.fn();
+    removeManyWithUndo({ message: 'Evidenziazioni rimosse', targets: [target('a'), target('b')], putBack, onRefused: vi.fn(), onUndo });
+    await undoNotification(last().id);
+    expect(putBack.mock.calls).toEqual([['a'], ['b']]);
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(isRemovalPending('x:a')).toBe(false);
+  });
+
+  it('one still being created is removed under the id the server gives it', async () => {
+    savingStarted('x:temp');
+    const saved = target('server');
+    removeManyWithUndo({ message: 'Evidenziazioni rimosse', targets: [target('a'), target('temp')], putBack: vi.fn(), onRefused: vi.fn() });
+    savingDone('x:temp', saved);
+    closeNotification(last().id, 'timeout');
+    expect(saved.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('dropped at logout: nothing is sent, now or as the page goes', () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const a = target('a');
+    removeManyWithUndo({ message: 'Evidenziazioni rimosse', targets: [a], putBack: vi.fn(), onRefused: vi.fn() });
+    resetNotifications();
+    forgetRemovals();
+    window.dispatchEvent(new Event('pagehide'));
+    expect(a.remove).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('removeAtOnce: sent now, or once a creation still out answers; refused, put back', async () => {
+    const refused = target('r', vi.fn(async () => { throw { status: 500 }; }));
+    const putBack = vi.fn();
+    const onRefused = vi.fn();
+    removeAtOnce(refused, putBack, onRefused);
+    await vi.waitFor(() => expect(putBack).toHaveBeenCalledWith('r'));
+    expect(onRefused).toHaveBeenCalledTimes(1);
+    savingStarted('x:later');
+    const server = target('server');
+    removeAtOnce(target('later'), vi.fn(), vi.fn());
+    expect(server.remove).not.toHaveBeenCalled();
+    savingDone('x:later', server);
+    expect(server.remove).toHaveBeenCalledTimes(1);
   });
 });

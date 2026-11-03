@@ -284,7 +284,7 @@ describe('highlights and citations, further (§5 step 3, §6.5)', () => {
     fireEvent.keyDown(text, { key: 'h' });
     const mark = document.querySelector<HTMLElement>('mark[tabindex="0"]')!;
     expect(mark).toHaveTextContent('distingu');
-    expect(mark).toHaveAccessibleName('Evidenziato in giallo: distingu');
+    expect(mark).toHaveAccessibleDescription(/^Evidenziato in giallo\. Invio seleziona queste parole/);
     expect(document.getSelection()!.isCollapsed).toBe(true);
     mark.focus();
     fireEvent.keyDown(mark, { key: 'Enter' });

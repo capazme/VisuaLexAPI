@@ -64,6 +64,24 @@ describe('useInkOnRelease — when the tool takes a selection (A4)', () => {
     expect(onRelease.mock.calls[0][0].toString()).toBe('danno ingiusto');
   });
 
+  it('a finger still on the glass keeps it waiting; lifted, the wait starts again from there', () => {
+    vi.useFakeTimers();
+    const onRelease = vi.fn();
+    const { getByTestId } = render(<Text active onRelease={onRelease} />);
+    const root = getByTestId('text');
+    document.dispatchEvent(new Event('touchstart'));
+    press(root, 'touch');
+    select(root, 3, 8);
+    document.dispatchEvent(new Event('selectionchange'));
+    vi.advanceTimersByTime(TOUCH_SETTLE_MS * 3);
+    expect(onRelease).not.toHaveBeenCalled();
+    document.dispatchEvent(new Event('touchend'));
+    vi.advanceTimersByTime(TOUCH_SETTLE_MS - 1);
+    expect(onRelease).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onRelease).toHaveBeenCalledTimes(1);
+  });
+
   it('off, nothing is taken', () => {
     vi.useFakeTimers();
     const onRelease = vi.fn();

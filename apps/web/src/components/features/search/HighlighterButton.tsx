@@ -9,6 +9,7 @@ import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
 import { cn } from '../../../lib/utils';
 import { MenuButton } from '../../ui/MenuButton';
 import { CHANGE_MEANINGS_LABEL, highlightColorItems, SECTION_HEADING } from './highlightColorItems';
+import { TOOLBAR_TOGGLE_ON } from './toolbarToggle';
 
 export interface HighlighterButtonProps {
   /** The look of the bar's buttons, given to each half (and the gear). */
@@ -26,8 +27,8 @@ export interface HighlighterButtonProps {
   toggleOnly?: boolean;
 }
 
-/** The tool's pressed look: the bars' toggles' (`toolbarToggleClass`), over whatever look the bar gives. */
-const PRESSED = 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/40';
+/** The tool's pressed look: the bars' toggles' (`TOOLBAR_TOGGLE_ON`), over whatever look the bar gives, its hover too. */
+const PRESSED = cn(TOOLBAR_TOGGLE_ON, 'hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20 dark:hover:text-primary-400');
 
 /** Bars holding a highlighter now: when the last leaves the screen nobody is left to see the tool on. */
 let mountedButtons = 0;
@@ -38,7 +39,18 @@ let mountedButtons = 0;
  */
 let selectionAtPress: InkSelection | null = null;
 let selectionForMenu: InkSelection | null = null;
-const readAtPress = () => { selectionAtPress = readInkSelection(); };
+const readAtPress = () => {
+  selectionAtPress = readInkSelection();
+  // Forgotten once the press is over, in the next task (after its click): a press dragged off the button, or a touch
+  // that became a scroll, brings no click, and a later press from the keyboard reads the selection as it is then.
+  const forget = () => {
+    window.removeEventListener('pointerup', forget, true);
+    window.removeEventListener('pointercancel', forget, true);
+    window.setTimeout(() => { selectionAtPress = null; }, 0);
+  };
+  window.addEventListener('pointerup', forget, true);
+  window.addEventListener('pointercancel', forget, true);
+};
 const takeAtPress = () => {
   const selected = selectionAtPress ?? readInkSelection();
   selectionAtPress = null;
@@ -73,7 +85,8 @@ function useHighlighterLife(on: boolean, turnOff: () => void) {
       if (event.key !== 'Escape' || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       if (document.querySelector('[aria-modal="true"]')) return;
       const target = event.target;
-      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="dialog"], [role="listbox"], [role="combobox"]')) return;
+      // What has an Esc of its own: a field, a menu, a dialog or a popover, the find window, a notification.
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="dialog"], [role="listbox"], [role="combobox"], [role="search"], [data-floating-tool], [data-notification-id]')) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       turnOff();
@@ -167,7 +180,8 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
             label="Colore dell’evidenziatore"
             heading={SECTION_HEADING}
             items={highlightColorItems(ink, meanings, choose)}
-            triggerClassName={cn('min-w-[44px] md:min-w-0', triggerClassName, 'px-1')}
+            // 44 px wide on a phone; on a computer never under 24 px (WCAG 2.5.8), where the bar lets its buttons shrink.
+            triggerClassName={cn('min-w-[44px] md:min-w-6', triggerClassName?.replace(/\bmd:min-w-0\b/g, 'md:min-w-6'), 'px-1')}
             placement={placement}
             menuClassName="w-64"
             onOpen={keepForMenu}

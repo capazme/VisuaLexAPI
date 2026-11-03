@@ -53,6 +53,23 @@ describe('HighlighterButton — the highlighter as a tool (A4)', () => {
     }
   });
 
+  it('a press dragged off the button leaves no words behind: a later press from the keyboard reads the selection then', async () => {
+    const text = selectedText();
+    try {
+      render(<HighlighterButton />);
+      fireEvent.pointerDown(tool());
+      fireEvent.pointerUp(document.body);
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      window.getSelection()!.removeAllRanges();
+      // Enter on the focused button: a click with no pointer.
+      fireEvent.click(tool(), { detail: 0 });
+      expect(text.apply).not.toHaveBeenCalled();
+      expect(appStore.getState().readingTool).toBe('highlight');
+    } finally {
+      text.done();
+    }
+  });
+
   it('Esc turns it off before anything else hears it; not from a field, nor under a modal dialog', () => {
     const elsewhere = vi.fn();
     window.addEventListener('keydown', elsewhere);

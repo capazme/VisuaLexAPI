@@ -50,7 +50,7 @@ highlighter button leaves the screen (nobody is left to see it on).
 - The text takes the highlighter's cursor (the eraser's for «Nessun colore»): a class on the selection's container
   (`vlx-inking`, `data-ink`), drawn by `index.css`; nothing changes in the text (root rule 23).
 - **Every selection is applied as it is released** and the selection bar does not appear: on `mouseup` with a mouse
-  or a pen; on a touch screen once the selection has stood still for 700 ms after the finger lifted (the selection's
+  or a pen; on a touch screen once the finger has lifted and the selection has stood still for 700 ms (the selection's
   handles move it without any event the page sees, and applying at the release of a long press would take one word
   only). The selection is cleared once applied.
 - A click that selects nothing does nothing: links, citations, signs and references keep their clicks.
@@ -64,14 +64,14 @@ highlights are read: an assistant's passages and glosses (D7b, D8) and a decisio
 and are never touched.
 
 `planInk` (`utils/highlighterRules.ts`, pure) reads the selection `[start, end)` in the projection, the ink, and the
-highlights as they land (`resolveAnchors`). The colour seen at a point is the innermost highlight's (the renderer
-nests marks).
+highlights as they land (`resolveAnchors`). The colour seen at a point is the innermost highlight's, in the renderer's
+own nesting (`byNesting`: the later start, then the earlier end, then the later highlight).
 
 | The selection… | ink X | «Nessun colore» |
 | --- | --- | --- |
 | touches no highlight | a new highlight X | nothing |
 | lies inside highlights, the innermost being X | the piece is taken out of every X highlight that holds it | the piece is taken out of every highlight it touches |
-| lies inside highlights, the innermost another colour | the piece is recoloured X: cut out of that highlight, a new X highlight over it (none when another X highlight already holds it); the whole highlight selected is recoloured in place (`PUT`) | as above |
+| lies inside highlights, the innermost another colour | the piece is recoloured X: cut out of that highlight, a new X highlight over it (none when the highlight drawn under it is already X); the whole highlight selected is recoloured in place (`PUT`) | as above |
 | reaches out of the highlights it touches | a new highlight X, as before (overlapping) | the piece is taken out of every highlight it touches |
 
 **The cut.** Offsets cannot change (`PUT` takes a colour and a note only), so cutting a piece out of a highlight is:
@@ -89,7 +89,8 @@ of the offsets, or a `POST` that copies the author), these are cut too.
 
 - removals go behind one notification with «Annulla» (`removeManyWithUndo`, the D7b bin's pattern that
   `removeHighlight` already follows: off the screen at once, `DELETE` sent when the notification closes, or as the page
-  goes or is hidden);
+  goes or is hidden) — after the new parts are saved: a page that goes before keeps the highlight whole on the server,
+  and a part refused takes the whole gesture back;
 - the new parts are sent at once (`POST`), and a recolouring at once (`PUT`, after the highlight's own creation when it
   is still on its way);
 - «Annulla» puts the removed highlights back, deletes the new parts (after their creation answers, when it has not),

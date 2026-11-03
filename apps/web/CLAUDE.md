@@ -1337,7 +1337,7 @@ actions (it has no bar), over a Gymnasium lesson's text —, never on a text tha
 tool, an icon over a bar of the ink (the tint inside its ink; dashed for «Nessun colore»), named «Evidenziatore
 (giallo)», `aria-pressed`: with words selected in a reading text it applies the ink to them at once; with nothing
 selected it turns the tool on, until pressed again or Esc (taken in the capture phase before Study Mode's or the lesson's
-Esc, never from a field, a menu, a dialog, a popover, nor under a modal dialog). The press keeps the selection: the
+Esc, never from a field, a menu, a dialog, a popover, the find window or a notification, nor under a modal dialog). The press keeps the selection: the
 button prevents its `mousedown`, and the selection is read as the press starts (`readInkSelection`, over the texts
 registered in `utils/inkTargets.ts` by each reader's `SelectionPopup` and by `LessonText`). Its right half («Colore
 dell’evidenziatore») opens the inks under «Colore dell’evidenziatore — uso suggerito»: the four colours as
@@ -1351,13 +1351,14 @@ again for a save holding anything else — the persist `merge` checks it, `isHig
 `highlighterEraser`, session-only, so after a reload the ink is the last colour (`setHighlighterInk`,
 `useHighlighterInk`). **The tool** (`readingTool`, session-only, one for the whole app, absent from `partialize`): on,
 `SelectionPopup` shows no bar and applies the ink to every selection as it is released (`useInkOnRelease`: a mouse's
-`mouseup`; a finger's selection once it has stood still for 700 ms, since the handles move it unseen and the long
-press's release would take one word), a click selecting nothing going its own way; the container takes
+`mouseup`; a finger's selection once the finger has lifted and the selection has stood still for 700 ms, since the
+handles move it unseen and the long press's release would take one word), a click selecting nothing going its own way; the container takes
 `vlx-inking`/`data-ink`, the highlighter's or the eraser's cursor (`index.css`, nothing in the text); it goes off at
 logout and when the last bar holding a highlighter unmounts. **The rules** (`utils/highlighterRules.ts`, `planInk`,
 pure), the same with the tool, the button, the menu, the popup's «Evidenzia» and H, and Study Mode's keys 1–4, over the
 user's own highlights only (an application's passages and glosses, a decision's key passages are never touched), the
-colour seen being the innermost highlight's: words touching no highlight → a new one (nothing for «Nessun colore»);
+colour seen being the innermost highlight's in the renderer's own nesting (`byNesting`: the later start, then the earlier
+end, then the later highlight): words touching no highlight → a new one (nothing for «Nessun colore»);
 inside highlights whose innermost is the ink → the piece out of every highlight of that colour holding it; inside one of
 another colour → the piece recoloured (the whole highlight selected recoloured in place, `PUT`); reaching out of what
 they touch → a new highlight, overlapping, as before; «Nessun colore» → the piece out of everything it touches. The cut is
@@ -1367,8 +1368,10 @@ the word processor's: the parts outside the selection stay, trimmed of whitespac
 whole. `useHighlightInk` turns a plan into the store's calls: a new highlight keeps the reader's toast and the article's
 MERL-T event; a change is `editHighlights`, one gesture behind one «Annulla» («Evidenziazione rimossa»,
 «Evidenziazioni rimosse», «Evidenziazione cambiata in verde»; see «Destructive confirmations»). «Questa occorrenza è già
-evidenziata» is gone: the same words in the same colour take the highlight away. «Fai tua» on a key passage is no
-gesture of the highlighter: it creates in the saved colour, whatever the ink. anything. **What a colour means is each user's** (the owner, 29 October 2026: «solo etichette» — the four colours stay, no colour
+evidenziata» is gone from the highlighter: the same words in the same colour take the highlight away. «Fai tua» on a key
+passage is no gesture of the highlighter: it creates in the saved colour, whatever the ink (and still says «Questa
+occorrenza è già evidenziata» for a passage already made its own). A cut's removals wait for its parts to be saved: a
+page that goes before keeps the highlight whole on the server, and a part refused takes the gesture back. **What a colour means is each user's** (the owner, 29 October 2026: «solo etichette» — the four colours stay, no colour
 is added, only the words for them change, so no highlight, colour key or anchor moves, root rule 23): the default is
 `HIGHLIGHT_COLOR_MEANINGS` (yellow «Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red
 «Da rivedere»), and a user's own are `settings.highlightColorMeanings` — only the colours given one, trimmed, 1 to 40

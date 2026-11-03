@@ -272,6 +272,15 @@ describe('SelectionPopup: the highlighter as a tool (A4)', () => {
     expect(onHighlight).not.toHaveBeenCalled();
   });
 
+  it('turned on with the bar open, the bar goes, and does not come back stale when it is turned off', async () => {
+    render(<Harness />);
+    await selectText('art. 2043 c.c.');
+    act(() => appStore.setState({ readingTool: 'highlight' }));
+    expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
+    act(() => appStore.setState({ readingTool: null }));
+    expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
+  });
+
   it('turned off, the cursor goes and the bar is back', async () => {
     appStore.setState({ readingTool: 'highlight' });
     render(<Harness />);

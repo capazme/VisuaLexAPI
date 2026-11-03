@@ -9,7 +9,8 @@
  * | lies inside, the innermost another     | the piece recoloured X                  | the piece out of all it touches |
  * | reaches out of what it touches         | a new highlight X (overlapping, as ever)| the piece out of all it touches |
  *
- * The colour seen at a point is the innermost highlight's: the renderer nests marks.
+ * The colour seen at a point is the innermost highlight's, in the renderer's own nesting (`articleRender.ts`, `byNesting`):
+ * the one that starts last, then the one that ends first, then the later one.
  */
 import type { HighlightColor } from './highlightColors';
 
@@ -52,9 +53,16 @@ export type InkPlan =
 
 const NOTHING: InkPlan = { kind: 'nothing' };
 
-/** The highlight drawn on top among those holding the selection: the shortest, the later on a tie. */
-function innermost(holders: readonly InkMark[]): InkMark {
-  return holders.reduce((best, m) => (m.end - m.start <= best.end - best.start ? m : best));
+/**
+ * The highlight drawn on top among those holding the selection, as the renderer nests them (`byNesting`): the one that
+ * starts last, then the one that ends first, then the later in the list. Undefined for none.
+ */
+function innermost(holders: readonly InkMark[], order: ReadonlyMap<InkMark, number>): InkMark | undefined {
+  return holders.reduce<InkMark | undefined>((top, m) => {
+    if (!top) return m;
+    const deeper = m.start - top.start || top.end - m.end || (order.get(m) ?? 0) - (order.get(top) ?? 0);
+    return deeper > 0 ? m : top;
+  }, undefined);
 }
 
 export function planInk({ start, end, ink, marks }: { start: number; end: number; ink: Ink; marks: readonly InkMark[] }): InkPlan {
@@ -81,7 +89,8 @@ export function planInk({ start, end, ink, marks }: { start: number; end: number
   const holders = touching.filter((m) => m.start <= start && end <= m.end);
   // Reaching out of what it touches: a new highlight, as before.
   if (holders.length === 0) return { kind: 'create', color: ink };
-  const seen = innermost(holders);
+  const order = new Map(marks.map((m, i) => [m, i]));
+  const seen = innermost(holders, order)!;
   if (seen.color === ink) {
     holders.filter((m) => m.color === ink).forEach(cut);
     return { kind: 'edit', effect: 'removed', remove, recolor, add };
@@ -92,8 +101,8 @@ export function planInk({ start, end, ink, marks }: { start: number; end: number
     recolor.push({ id: seen.id, color: ink });
   } else {
     cut(seen);
-    // Another highlight of the ink already holding the piece shows it once the cut is made.
-    if (!holders.some((m) => m !== seen && m.color === ink)) add.push({ start, end, color: ink });
+    // The highlight drawn under it once it is cut shows the piece: when that one is already of the ink, no new one.
+    if (innermost(holders.filter((m) => m !== seen), order)?.color !== ink) add.push({ start, end, color: ink });
   }
   return { kind: 'edit', effect: 'recoloured', color: ink, remove, recolor, add };
 }

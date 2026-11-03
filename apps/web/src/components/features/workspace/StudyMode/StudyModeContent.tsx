@@ -14,6 +14,7 @@ import { getRubricText, getUpdateNoteParagraphs, parseArticleStructure } from '.
 import { UpdateNotePopover } from '../../search/UpdateNotePopover';
 import { useAppStore } from '../../../../store/useAppStore';
 import { useHighlightInk } from '../../../../hooks/useHighlightInk';
+import { uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 
 const COLOR_SHORTCUTS: Record<string, 'yellow' | 'green' | 'red' | 'blue'> = {
   '1': 'yellow',
@@ -97,10 +98,7 @@ export function StudyModeContent({
   // `uniqueArticleId` mirrors ArticleTabContent's builder: highlights
   // live under `all{N}:{numero}` for annex articles so the main view's
   // articleId filter finds entries created here.
-  const uniqueArticleId = useMemo(
-    () => norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo,
-    [norma_data.allegato, norma_data.numero_articolo],
-  );
+  const uniqueArticleId = uniqueArticleIdFromNorma(norma_data);
   const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
   const plain = useMemo(() => (article_text || '').replace(/\n/g, ''), [article_text]);
   // The highlighter's rules (A4), as in every reader: the same words in the same colour are taken away, another colour
@@ -184,7 +182,7 @@ export function StudyModeContent({
         {/* Article Title */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo}
+            key={uniqueArticleId}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
