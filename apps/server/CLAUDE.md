@@ -403,6 +403,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
   entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
   the controller maps Prisma P2002 to 409.
+- **A highlight's range can change in place** (G-417, the owner's decision of 3 November 2026): `PUT /highlights/:id`
+  takes `color` and `note` as before, and the range whole — `startOffset`, `endOffset` and `text`, all three or none,
+  `endOffset > startOffset` and `endOffset - startOffset` the text's length in UTF-16 units (as the web creates one),
+  else 400; not checked against the source's text, as a new highlight's is not. The row stays the same: its id, its
+  owner (the check is unchanged: the user's own rows with no connection, else 404) and its first author
+  (`originalAuthorId`, `sourceSuggestionId`, gotcha 21 of the web), so the web's highlighter can shrink a highlight taken
+  from the Forum when it cuts a piece out of it (A4) instead of recreating it without its author: the part kept in place
+  keeps it; a second part (a piece cut from the middle) is a new highlight, `POST`, which takes no author. Other keys
+  (the owner, the attribution, `kind`, an assistant's columns) are dropped by the schema, never written. Offsets are
+  0 to 2,147,483,647 (the column's integer), in `POST` too. The answer carries `originalAuthor` as `GET /highlights`
+  does. `tests/highlightsUpdate.test.ts`.
 - **No bulk delete of notes or highlights**: `DELETE /annotations` and `DELETE /highlights`
   (one request that wiped all of a user's notes, for good) went with environments' «Sostituisci»,
   their only caller (spec `2026-10-13-environments-into-forum`, D10; the owner's answer 185).
