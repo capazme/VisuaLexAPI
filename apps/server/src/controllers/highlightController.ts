@@ -3,13 +3,16 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 
+// An offset the column holds (`Int`, PostgreSQL's integer): a larger one was refused by the database with a 500.
+const offset = z.number().int().min(0).max(2_147_483_647);
+
 // Validation schemas
 const createHighlightSchema = z.object({
   normaKey: z.string().min(1),
   text: z.string().min(1),
   color: z.enum(['yellow', 'green', 'blue', 'red', 'purple']).default('yellow'),
-  startOffset: z.number().int().min(0),
-  endOffset: z.number().int().min(0),
+  startOffset: offset,
+  endOffset: offset,
   note: z.string().optional(),
   bookmarkId: z.string().guid().optional().nullable(),
 });
@@ -24,8 +27,8 @@ const updateHighlightSchema = z
     color: z.enum(['yellow', 'green', 'blue', 'red', 'purple']).optional(),
     note: z.string().optional().nullable(),
     text: z.string().min(1).optional(),
-    startOffset: z.number().int().min(0).optional(),
-    endOffset: z.number().int().min(0).optional(),
+    startOffset: offset.optional(),
+    endOffset: offset.optional(),
   })
   .superRefine((data, ctx) => {
     const given = [data.text, data.startOffset, data.endOffset].filter((v) => v !== undefined).length;
