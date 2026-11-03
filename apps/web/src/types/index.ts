@@ -214,6 +214,8 @@ export interface Highlight {
     startOffset?: number;
     sourceSuggestionId?: string | null;
     originalAuthor?: OriginalAuthor | null;
+    /** What the server holds beyond the words (never shown by the web): a highlight cut keeps it on its parts (A4). */
+    note?: string;
     /**
      * A passage a connected application proposed on one dossier entry (D7b): drawn only on that entry, never in the
      * app's own highlights. Absent on the user's own highlights.

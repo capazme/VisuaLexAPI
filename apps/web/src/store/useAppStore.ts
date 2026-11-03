@@ -48,7 +48,8 @@ import {
 } from '../utils/storeApiMappers';
 import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
 import { shiftAiReviewCount } from '../utils/aiReview';
-import { forgetRemovals, isRemovalPending, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
+import { afterSaving, forgetRemovals, isRemovalPending, removeAtOnce, removeManyWithUndo, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
+import type { Ink } from '../utils/highlighterRules';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -131,6 +132,19 @@ export interface StructureWindowState {
 }
 
 /** What an import made of a dossier: the new dossier's id, and how many items the server took or refused. */
+/** One gesture of the highlighter over existing highlights (A4), as `useHighlightInk` turns a plan into it. */
+export interface HighlightEdit {
+    normaKey: string;
+    articleId: string;
+    /** Highlights taken away, behind one «Annulla». */
+    remove: string[];
+    recolor: { id: string; color: Highlight['color'] }[];
+    /** New highlights: the parts a cut leaves (`from` the highlight cut), a piece recoloured. */
+    add: { text: string; startOffset: number; color: Highlight['color']; from?: string }[];
+    /** What the notification says. */
+    message: string;
+}
+
 export interface ImportOutcome {
     id: string;
     imported: number;
@@ -197,6 +211,17 @@ interface AppState {
     aliasManagerOpen: boolean;
     /** Impostazioni (`SettingsModal`, mounted by `Layout`), and the section it opens at: session-only, absent from `partialize`. */
     settingsDialog: { open: boolean; section: SettingsSection | null };
+    /**
+     * The reading tool on (A4): the highlighter, which applies its ink to every selection as it is released, until its
+     * button is pressed again or Esc. One for the whole app, as in a word processor. Session-only, absent from
+     * `partialize`: a tool left on is never found on at the next visit.
+     */
+    readingTool: 'highlight' | null;
+    /**
+     * «Nessun colore» chosen as the highlighter's ink (A4): it takes highlights away. Session-only, absent from
+     * `partialize`: the colour saved stays `settings.highlightColor` (H1), the ink again after a reload.
+     */
+    highlighterEraser: boolean;
     searchPanelState: SearchPanelState;
 
     /**
@@ -512,6 +537,14 @@ interface AppState {
 
     addHighlight: (normaKey: string, articleId: string, text: string, range: string, color: Highlight['color'], startOffset?: number) => void;
     removeHighlight: (id: string) => void;
+    /**
+     * One gesture of the highlighter over existing highlights (A4, `planInk`): the removals behind one «Annulla», the
+     * new parts and the new colours sent at once; «Annulla» puts the removed back and takes the parts and colours back.
+     */
+    editHighlights: (edit: HighlightEdit) => void;
+    setReadingTool: (tool: 'highlight' | null) => void;
+    /** The highlighter's ink (A4): a colour, saved as the colour of new highlights (H1); «Nessun colore» for the session. */
+    setHighlighterInk: (ink: Ink) => void;
     getHighlights: (normaKey: string, articleId: string) => Highlight[];
     loadHighlightsForArticle: (normaKey: string, articleId: string) => Promise<void>;
 
@@ -605,7 +638,77 @@ let migrationNotice: string | null = null;
 
 const appStore = createStore<AppState>()(
     persist(
-        immer((set, get) => ({
+        immer((set, get) => {
+            // Per highlight, its colours sent one after the other (A4): «Annulla» right after a change must not land first.
+            const colourWrites = new Map<string, Promise<void>>();
+
+            /**
+             * Sends a highlight already on screen (optimistic): its server id replaces the temporary one, keeping a colour
+             * changed while it travelled (whose `PUT` waits for the id, `sendHighlightColor`); refused, it goes, and the
+             * reader is told. A removal meanwhile waits for the id (`deferredRemovals`).
+             */
+            const saveHighlight = (optimistic: Highlight, onSaved?: (saved: Highlight) => void) => {
+                const wirePayload = highlightStoreToCreate(optimistic);
+                // No startOffset — cannot persist server-side. Keep the optimistic entry local only (legacy behaviour).
+                if (!wirePayload) return;
+                const tempId = optimistic.id;
+                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
+                savingStarted(`highlight:${tempId}`);
+                highlightService
+                    .create(wirePayload)
+                    .then((serverHighlight) => {
+                        const mapped = highlightApiToStore(serverHighlight);
+                        const current = get().highlights.find(h => h.id === tempId);
+                        const kept = current ? { ...mapped, color: current.color } : mapped;
+                        set((state) => {
+                            const idx = state.highlights.findIndex(h => h.id === tempId);
+                            if (idx !== -1) state.highlights[idx] = kept;
+                        });
+                        onSaved?.(kept);
+                        savingDone(`highlight:${tempId}`, {
+                            key: `highlight:${kept.id}`,
+                            path: `/highlights/${encodeURIComponent(kept.id)}`,
+                            remove: () => highlightService.delete(kept.id),
+                            item: kept,
+                        });
+                    })
+                    .catch((err) => {
+                        savingDone(`highlight:${tempId}`, null);
+                        console.error('Failed to sync highlight:', err);
+                        set((state) => {
+                            state.highlights = state.highlights.filter(h => h.id !== tempId);
+                        });
+                        get().pushSyncError('Impossibile salvare l\'evidenziazione. Riprova.');
+                    });
+            };
+
+            /**
+             * A highlight's new colour sent (A4, `PUT /highlights/:id`), once it has its server id if it is still being
+             * created; refused, the colour on screen goes back to `previous` and the reader is told. One gone meanwhile
+             * (404) needs nothing.
+             */
+            const sendHighlightColor = (id: string, color: Highlight['color'], previous: Highlight['color']) => {
+                afterSaving(`highlight:${id}`, (saved) => {
+                    // Its creation failed: there is nothing to colour.
+                    if (saved === null) return;
+                    const serverId = saved ? (saved.item as Highlight).id : id;
+                    const write = (colourWrites.get(serverId) ?? Promise.resolve())
+                        .then(() => highlightService.update(serverId, { color }))
+                        .then(() => undefined, (err: unknown) => {
+                            if ((err as { status?: number } | null)?.status === 404) return;
+                            console.error('Failed to sync highlight colour:', err);
+                            set((state) => {
+                                const h = state.highlights.find(x => x.id === serverId || x.id === id);
+                                if (h && h.color === color) h.color = previous;
+                            });
+                            get().pushSyncError('Impossibile cambiare il colore dell\'evidenziazione. Riprova.');
+                        });
+                    colourWrites.set(serverId, write);
+                    void write.then(() => { if (colourWrites.get(serverId) === write) colourWrites.delete(serverId); });
+                });
+            };
+
+            return {
             settings: DEFAULT_SETTINGS,
             bookmarks: [],
             dossiers: [],
@@ -645,6 +748,8 @@ const appStore = createStore<AppState>()(
             quickNormsManagerOpen: false,
             aliasManagerOpen: false,
             settingsDialog: { open: false, section: null },
+            readingTool: null,
+            highlighterEraser: false,
             searchPanelState: {
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
@@ -1246,6 +1351,9 @@ const appStore = createStore<AppState>()(
                     state.windowFocusRequest = null;
                     state.phoneReader = null;
                     state.commandPaletteQuery = null;
+                    // The highlighter (A4): the next person on the browser never finds it on.
+                    state.readingTool = null;
+                    state.highlighterEraser = false;
                 });
             },
 
@@ -2194,9 +2302,8 @@ const appStore = createStore<AppState>()(
 
             // ── Highlight actions: optimistic update + server sync ─────────
             addHighlight: (normaKey, articleId, text, range, color, startOffset) => {
-                const tempId = uuidv4();
                 const optimistic: Highlight = {
-                    id: tempId,
+                    id: uuidv4(),
                     normaKey,
                     articleId,
                     text,
@@ -2205,40 +2312,95 @@ const appStore = createStore<AppState>()(
                     ...(typeof startOffset === 'number' ? { startOffset } : {}),
                 };
                 set((state) => { state.highlights.push(optimistic); });
-
-                const wirePayload = highlightStoreToCreate(optimistic);
-                if (!wirePayload) {
-                    // No startOffset — cannot persist server-side. Keep the
-                    // optimistic entry local only (legacy behaviour).
-                    return;
-                }
-
-                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
-                savingStarted(`highlight:${tempId}`);
-                highlightService
-                    .create(wirePayload)
-                    .then((serverHighlight) => {
-                        const mapped = highlightApiToStore(serverHighlight);
-                        set((state) => {
-                            const idx = state.highlights.findIndex(h => h.id === tempId);
-                            if (idx !== -1) state.highlights[idx] = mapped;
-                        });
-                        savingDone(`highlight:${tempId}`, {
-                            key: `highlight:${mapped.id}`,
-                            path: `/highlights/${encodeURIComponent(mapped.id)}`,
-                            remove: () => highlightService.delete(mapped.id),
-                            item: mapped,
-                        });
-                    })
-                    .catch((err) => {
-                        savingDone(`highlight:${tempId}`, null);
-                        console.error('Failed to sync highlight:', err);
-                        set((state) => {
-                            state.highlights = state.highlights.filter(h => h.id !== tempId);
-                        });
-                        get().pushSyncError('Impossibile salvare l\'evidenziazione. Riprova.');
-                    });
+                saveHighlight(optimistic);
             },
+
+            editHighlights: ({ normaKey, articleId, remove, recolor, add, message }) => {
+                const before = get().highlights;
+                // In the order they stood, so each goes back to its own place.
+                const removed = remove
+                    .flatMap((id) => {
+                        const index = before.findIndex(h => h.id === id);
+                        return index === -1 ? [] : [{ index, item: before[index] }];
+                    })
+                    .sort((a, b) => a.index - b.index);
+                const recolored = recolor.flatMap(({ id, color }) => {
+                    const item = before.find(h => h.id === id);
+                    return item && item.color !== color ? [{ id, from: item.color, to: color }] : [];
+                });
+                // A part keeps what the server holds of its highlight beyond the words (its `note`, unused here).
+                const notes = new Map(removed.map(({ item }) => [item.id, item.note]));
+                const created: Highlight[] = add.map((part) => {
+                    const note = part.from ? notes.get(part.from) : undefined;
+                    return {
+                        id: uuidv4(), normaKey, articleId, text: part.text, rangeSerialized: '', color: part.color, startOffset: part.startOffset,
+                        ...(note ? { note } : {}),
+                    };
+                });
+                set((state) => {
+                    const gone = new Set(removed.map(({ item }) => item.id));
+                    state.highlights = state.highlights.filter(h => !gone.has(h.id));
+                    for (const { id, to } of recolored) {
+                        const h = state.highlights.find(x => x.id === id);
+                        if (h) h.color = to;
+                    }
+                    state.highlights.push(...created);
+                });
+                // The parts are sent at once; their server ids are what «Annulla» removes.
+                const savedIds = new Map<string, string>();
+                for (const part of created) saveHighlight(part, (saved) => savedIds.set(part.id, saved.id));
+                for (const { id, from, to } of recolored) sendHighlightColor(id, to, from);
+
+                const putBack = (item: Highlight) => set((state) => {
+                    if (state.highlights.some(h => h.id === item.id)) return;
+                    const index = removed.find(r => r.item.id === item.id)?.index ?? state.highlights.length;
+                    state.highlights.splice(Math.min(index, state.highlights.length), 0, item);
+                });
+                const onRefused = (err: unknown) => {
+                    console.error('Failed to sync highlight delete:', err);
+                    get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
+                };
+                removeManyWithUndo({
+                    message,
+                    targets: removed.map(({ item }) => ({
+                        key: `highlight:${item.id}`,
+                        path: `/highlights/${encodeURIComponent(item.id)}`,
+                        remove: () => highlightService.delete(item.id),
+                        item,
+                    })),
+                    putBack,
+                    onRefused,
+                    // The parts go (once created, when they are still on their way) and the colours come back.
+                    onUndo: () => {
+                        for (const part of created) {
+                            const id = savedIds.get(part.id) ?? part.id;
+                            const current = get().highlights.find(h => h.id === id || h.id === part.id) ?? part;
+                            set((state) => { state.highlights = state.highlights.filter(h => h.id !== id && h.id !== part.id); });
+                            removeAtOnce(
+                                { key: `highlight:${id}`, path: `/highlights/${encodeURIComponent(id)}`, remove: () => highlightService.delete(id), item: current },
+                                (item) => set((state) => { if (!state.highlights.some(h => h.id === item.id)) state.highlights.push(item); }),
+                                onRefused,
+                            );
+                        }
+                        for (const { id, from, to } of recolored) {
+                            set((state) => {
+                                const h = state.highlights.find(x => x.id === id);
+                                if (h) h.color = from;
+                            });
+                            sendHighlightColor(id, from, to);
+                        }
+                    },
+                });
+            },
+
+            setReadingTool: (tool) => set((state) => {
+                state.readingTool = tool;
+            }),
+
+            setHighlighterInk: (ink) => set((state) => {
+                state.highlighterEraser = ink === 'none';
+                if (ink !== 'none') state.settings.highlightColor = ink;
+            }),
 
             // As a note's: behind «Annulla», sent when its notification closes or the page goes.
             removeHighlight: (id) => {
@@ -2619,7 +2781,8 @@ const appStore = createStore<AppState>()(
                     }
                 }
             }
-        })),
+        };
+        }),
         {
             name: STORAGE_NAME,
             // A write the browser refuses (a full localStorage) is caught, never thrown out of `set` (T20).

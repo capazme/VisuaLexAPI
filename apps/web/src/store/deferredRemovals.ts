@@ -79,6 +79,56 @@ export function savingDone<T>(key: string, saved: RemovalTarget<T> | null) {
   for (const waiter of waiters) waiter(saved as RemovalTarget<unknown> | null);
 }
 
+/**
+ * Runs `then` once the creation of `key` has answered — at once when none is out: with the saved item's target, null
+ * when the creation failed, undefined when nothing was out (the item has its server id already). A write on an item
+ * still being created (a colour changed, A4) waits for its id this way.
+ */
+export function afterSaving(key: string, then: (saved: RemovalTarget<unknown> | null | undefined) => void) {
+  const waiters = saving.get(key);
+  if (waiters) waiters.push(then);
+  else then(undefined);
+}
+
+/** The removal itself: by `apiClient`, or as the page goes by a `keepalive` fetch; refused, the item is put back. */
+function deleteNow<T>(what: RemovalTarget<T>, onExit: boolean, putBack: (item: T) => void, onRefused: (error: unknown) => void) {
+  if (onExit) {
+    const token = getAccessToken();
+    void fetch(`${API_BASE_URL}${what.path}`, {
+      method: 'DELETE',
+      keepalive: true,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).catch(() => {});
+    return;
+  }
+  const sentIn = session;
+  inFlight.add(what.key);
+  what.remove()
+    .then(() => { inFlight.delete(what.key); })
+    .catch((error: unknown) => {
+      // Answered after a logout: the store is the next account's, nothing goes back into it.
+      if (sentIn !== session) return;
+      inFlight.delete(what.key);
+      // Already gone from the server: what was wanted.
+      if ((error as { status?: number } | null)?.status === 404) return;
+      putBack(what.item);
+      onRefused(error);
+    });
+}
+
+/**
+ * A removal with no «Annulla» of its own — what an «Annulla» takes back (the parts a cut created, A4): sent now, or once
+ * the creation still out answers (none if it fails). Refused, the item is put back and the caller says so.
+ */
+export function removeAtOnce<T>(target: RemovalTarget<T>, putBack: (item: T) => void, onRefused: (error: unknown) => void) {
+  const waiters = saving.get(target.key);
+  if (waiters) {
+    waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false, putBack, onRefused); });
+    return;
+  }
+  deleteNow(target, false, putBack, onRefused);
+}
+
 export interface DeferredRemoval<T> extends RemovalTarget<T> {
   /** What the notification says: «Evidenziazione rimossa». */
   message: string;
@@ -98,63 +148,60 @@ export interface DeferredRemoval<T> extends RemovalTarget<T> {
  * notification (`dropped`), which forgets what it held.
  */
 export function removeWithUndo<T>({ message, putBack, onRefused, ...first }: DeferredRemoval<T>): void {
-  void getFreshAccessToken().catch(() => null);
-  // What is removed: retargeted once a creation still out is answered; null when it never reached the server.
-  let target: RemovalTarget<T> | null = first;
+  removeManyWithUndo({ message, putBack, onRefused, targets: [first] });
+}
+
+export interface DeferredRemovals<T> {
+  message: string;
+  /** What is removed: none for a gesture that only changes (a colour, A4), whose «Annulla» is `onUndo` alone. */
+  targets: RemovalTarget<T>[];
+  putBack: (item: T) => void;
+  onRefused: (error: unknown) => void;
+  /** «Annulla» also takes back what came with the removals (the parts a cut created, a colour changed), after them. */
+  onUndo?: () => void;
+}
+
+/**
+ * `removeWithUndo` for one gesture that removes several items (A4: a highlight cut, «Nessun colore» over many): one
+ * notification, one «Annulla» that puts them all back (and runs `onUndo`), all sent as it closes or the page goes.
+ */
+export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, onUndo }: DeferredRemovals<T>): void {
+  if (targets.length > 0) void getFreshAccessToken().catch(() => null);
   let settled = false;
   let notification: number | null = null;
-
-  const deleteNow = (what: RemovalTarget<T>, onExit: boolean) => {
-    if (onExit) {
-      const token = getAccessToken();
-      void fetch(`${API_BASE_URL}${what.path}`, {
-        method: 'DELETE',
-        keepalive: true,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }).catch(() => {});
-      return;
-    }
-    const sentIn = session;
-    inFlight.add(what.key);
-    what.remove()
-      .then(() => { inFlight.delete(what.key); })
-      .catch((error: unknown) => {
-        // Answered after a logout: the store is the next account's, nothing goes back into it.
-        if (sentIn !== session) return;
-        inFlight.delete(what.key);
-        // Already gone from the server: what was wanted.
-        if ((error as { status?: number } | null)?.status === 404) return;
-        putBack(what.item);
-        onRefused(error);
-      });
-  };
+  // Each removed item, retargeted once a creation still out is answered; null when it never reached the server.
+  const slots: { target: RemovalTarget<T> | null }[] = targets.map((target) => ({ target }));
 
   const send = (onExit = false) => {
     if (settled) return;
     settled = true;
-    if (target) pending.delete(target.key);
+    for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
     if (notification !== null) closeNotification(notification, 'external');
-    if (!target) return;
-    const waiters = saving.get(target.key);
-    if (waiters) {
-      // Still being created: removed under the server's id once it answers (none if it fails). Even when sent by the
-      // tab being hidden (a desktop's change of tab), the page lives on and the answer comes: dropping it would leave
-      // the mark on the server, back at the next reading. A page that really goes never hears the id.
-      waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false); });
-      return;
+    for (const { target } of slots) {
+      if (!target) continue;
+      const waiters = saving.get(target.key);
+      if (waiters) {
+        // Still being created: removed under the server's id once it answers (none if it fails). Even when sent by the
+        // tab being hidden (a desktop's change of tab), the page lives on and the answer comes: dropping it would leave
+        // the mark on the server, back at the next reading. A page that really goes never hears the id.
+        waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false, putBack, onRefused); });
+        continue;
+      }
+      deleteNow(target, onExit, putBack, onRefused);
     }
-    deleteNow(target, onExit);
   };
 
-  const entry: Pending = {
-    send,
-    retarget: (saved) => {
-      if (target) pending.delete(target.key);
-      target = saved as RemovalTarget<T> | null;
-      if (target) pending.set(target.key, entry);
-    },
-  };
-  pending.set(first.key, entry);
+  for (const slot of slots) {
+    const entry: Pending = {
+      send,
+      retarget: (saved) => {
+        if (slot.target) pending.delete(slot.target.key);
+        slot.target = saved as RemovalTarget<T> | null;
+        if (slot.target) pending.set(slot.target.key, entry);
+      },
+    };
+    if (slot.target) pending.set(slot.target.key, entry);
+  }
   notification = notify({
     type: 'info',
     message,
@@ -162,15 +209,20 @@ export function removeWithUndo<T>({ message, putBack, onRefused, ...first }: Def
     onUndo: () => {
       if (settled) return;
       settled = true;
-      if (!target) return;
-      pending.delete(target.key);
-      putBack(target.item);
+      // Nothing left to put back (every creation failed) and nothing else to take back: no «Ripristinato».
+      if (!onUndo && slots.every((slot) => !slot.target)) return;
+      for (const slot of slots) {
+        if (!slot.target) continue;
+        pending.delete(slot.target.key);
+        putBack(slot.target.item);
+      }
+      onUndo?.();
       notify({ type: 'success', message: 'Ripristinato', duration: RESTORED_MS, after: notification ?? undefined });
     },
     // Dropped at logout: forgotten, so the page going later sends nothing either.
     onClose: (reason) => {
       if (reason === 'dropped') {
-        if (target) pending.delete(target.key);
+        for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
       } else if (reason !== 'undo') send();
     },
   });
