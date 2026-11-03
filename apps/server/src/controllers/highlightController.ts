@@ -14,10 +14,32 @@ const createHighlightSchema = z.object({
   bookmarkId: z.string().guid().optional().nullable(),
 });
 
-const updateHighlightSchema = z.object({
-  color: z.enum(['yellow', 'green', 'blue', 'red', 'purple']).optional(),
-  note: z.string().optional().nullable(),
-});
+// A highlight's colour and note; and its range (G-417, the owner's decision of 3 November 2026): the words it covers, in
+// the projection the anchors count in (root rule 23), so the web's highlighter can shrink it in place when it cuts a
+// piece out (A4) and a highlight taken from the Forum keeps its row, and with it its first author (`originalAuthorId`,
+// gotcha 21). The range comes whole — `startOffset`, `endOffset` and `text`, with `endOffset - startOffset` the text's
+// length in UTF-16 units, as the web creates one — or not at all; it is not checked against the source's text.
+const updateHighlightSchema = z
+  .object({
+    color: z.enum(['yellow', 'green', 'blue', 'red', 'purple']).optional(),
+    note: z.string().optional().nullable(),
+    text: z.string().min(1).optional(),
+    startOffset: z.number().int().min(0).optional(),
+    endOffset: z.number().int().min(0).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const given = [data.text, data.startOffset, data.endOffset].filter((v) => v !== undefined).length;
+    if (given === 0) return;
+    if (given < 3) {
+      ctx.addIssue({ code: 'custom', message: 'startOffset, endOffset and text go together', path: [] });
+      return;
+    }
+    if (data.endOffset! <= data.startOffset!) {
+      ctx.addIssue({ code: 'custom', message: 'endOffset must be greater than startOffset', path: ['endOffset'] });
+    } else if (data.endOffset! - data.startOffset! !== data.text!.length) {
+      ctx.addIssue({ code: 'custom', message: 'endOffset - startOffset must be the length of text', path: ['text'] });
+    }
+  });
 
 // Create highlight
 export const createHighlight = async (req: Request, res: Response) => {
@@ -121,12 +143,16 @@ export const updateHighlight = async (req: Request, res: Response) => {
     throw new AppError(404, 'Highlight not found');
   }
 
+  // The same row: its id, its owner and its first author (`originalAuthorId`, `sourceSuggestionId`) never change here.
   const highlight = await prisma.highlight.update({
     where: { id },
     data: {
       ...(data.color && { color: data.color }),
       ...(data.note !== undefined && { note: data.note }),
+      ...(data.text !== undefined && { text: data.text, startOffset: data.startOffset, endOffset: data.endOffset }),
     },
+    // As GET /highlights: the original author, for the web's AttributionChip (gotcha 21).
+    include: { originalAuthor: { select: { id: true, username: true } } },
   });
 
   res.json(highlight);
