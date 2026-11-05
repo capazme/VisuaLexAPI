@@ -8,15 +8,17 @@ import type { PageWidth } from './frame';
 export const PAGE_TITLE = 'font-serif text-[28px] font-medium leading-tight tracking-tight text-slate-900 md:text-3xl dark:text-slate-50';
 
 /**
- * Room on the right of a header with an action, for `Layout`'s full-screen button (`fixed top-4 right-4`, 44 px, from
- * `md`; below `lg` the page starts under it). The action must end 68 px from the window's right edge (the button's 60
- * and 8 of air). The frame's right edge is `(100vw − --sidebar-width − F) / 2` from it, F the frame's own width — `100%`
- * of the header's containing block, whatever the window, the full screen or the page's width (U1) —; a scrollbar only
- * moves it further. So the header pads `68 px` less that, and nothing once it is past 68: 36 px at 1280 px with the wide
- * sidebar (the 32 px margin), 20 px from 1536 px while the frame fills the window (the 48 px margin), nothing once the
- * window less the sidebar is 136 px wider than the frame.
+ * Room on the right of a top row with controls (a header's action, the practice's table), for `Layout`'s full-screen
+ * button (`fixed top-4 right-4`, 44 px). `Layout` says where the button floats over the page's top right with
+ * `--focus-button-room`, 4.25 rem: from `lg`, and from `md` in full screen, which draws no bar for it to sit in; never on
+ * the search page's field. There a control must end 68 px from the window's right edge (the button's 60 and 8 of air).
+ * The frame's right edge is `(100vw − --sidebar-width − F) / 2` from it, F the frame's own width — `100%` of the row's
+ * containing block, whatever the window, the full screen or the page's width (U1) —; a scrollbar only moves it further.
+ * So the row pads 68 px less that, and nothing once it is past 68: 36 px at 1280 px with the wide sidebar (the 32 px
+ * margin), 20 px from 1536 px while the frame fills the window (the 48 px margin), nothing once the window less the
+ * sidebar is 136 px wider than the frame, or where the button does not float.
  */
-export const FOCUS_BUTTON_CLEARANCE = 'lg:pr-[max(0px,calc(4.25rem_-_(100vw_-_var(--sidebar-width,0px)_-_100%)_/_2))]';
+export const FOCUS_BUTTON_CLEARANCE = 'pr-[max(0px,calc(var(--focus-button-room,0px)_-_(100vw_-_var(--sidebar-width,0px)_-_100%)_/_2))]';
 
 /** The section's line over a title (L-37): Geist, small, quiet. */
 export const PAGE_KICKER = 'text-sm text-slate-600 dark:text-slate-400';

@@ -6,6 +6,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { FIND_WINDOW_ESTIMATED_HEIGHT, FIND_WINDOW_MARGIN, FIND_WINDOW_WIDTH, setFindWindowDefaultPlace } from '../../../utils/findWindowControl';
 import { MAX_BESIDE, practiceCounts, type BesideRef, type Practice } from '../../../utils/practice';
 import { workspaceOrigin } from '../../../utils/workspaceOrigin';
+import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 import { RAIL_WIDTH, besideLayout } from './besideLayout';
 import { PracticeTable, type PracticeTableProps } from './PracticeTable';
 import { ReadingWindow } from './ReadingWindow';
@@ -201,7 +202,9 @@ export function ReadingRow(props: PracticeTableProps) {
         <div
           ref={tableRef}
           data-testid="reading-row-table"
-          className={cn('min-w-0', count === 0 ? 'w-full' : 'flex-none pr-4')}
+          // Alone in the row it ends at the frame's right edge: its header and the act's pinned heading keep clear of
+          // the full-screen button, which floats there in full screen (the last window keeps its own, `clearTopRight`).
+          className={cn('min-w-0', count === 0 ? cn('w-full', FOCUS_BUTTON_CLEARANCE) : 'flex-none pr-4')}
           style={count === 0 ? undefined : { width: tableWidth }}
         >
           <PracticeTable {...props} />

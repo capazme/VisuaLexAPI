@@ -459,7 +459,7 @@
 }
 
 /* A column of the practice's row beside its windows: the page's height less the content area's
-   padding above and below it (`p-8`, 2 rem each, in `Layout`) and less the search page's field
+   padding above and below it (`md:py-8`, 2 rem each, in `Layout`) and less the search page's field
    (`--search-bar-height`, set by `Layout` while the field is drawn), so the scroller's content is never
    taller than the scroller and a `scrollIntoView` inside a window does not move the page. */
 @utility h-app-row {
@@ -468,7 +468,7 @@
 }
 
 /* A dossier's column of two (D7d), at most the window's height less the content area's padding above it
-   (`p-8`) and its foot below (`--page-foot`, the floating feedback button's room; `p-8` without it) and the
+   (`md:py-8`) and its foot below (`--page-foot`, the floating feedback button's room; 2 rem without it) and the
    search page's field: the columns fit the window once the page is scrolled to them, and each scrolls alone. */
 @utility max-h-app-column {
   max-height: calc(100vh - 2rem - var(--page-foot, 2rem) - var(--search-bar-height, 0px));
@@ -800,7 +800,7 @@
    shrink-to-fit ancestor: keep it inside block-level parents. */
 .vlx-frame {
   container: vlx-frame / inline-size;
-  /* The query measures in the column's own font: 70ch is the column (the reading measure). */
+  /* The query measures in this font, close to the column's (1.1875rem): its 70ch is about the reading measure. */
   font-size: 1.125rem;
   @apply font-serif;
 }

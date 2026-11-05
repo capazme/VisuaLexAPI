@@ -34,7 +34,7 @@ const shortcutGroups: ShortcutGroup[] = [
   {
     title: 'Visualizzazione',
     shortcuts: [
-      { keys: [modKey, 'Space'], description: 'Tutto schermo: entra o esci' },
+      { keys: [modKey, 'Spazio'], description: 'Tutto schermo: entra o esci' },
       { keys: ['Esc'], description: 'Chiudi modal/pannello' },
       // The newest «Annulla» of the notifications (L-36), or the last gesture on a highlight, which shows none (A4);
       // outside fields and editors, where it is the browser's undo.

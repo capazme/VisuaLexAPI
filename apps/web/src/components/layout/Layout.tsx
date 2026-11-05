@@ -105,8 +105,9 @@ export function Layout() {
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
   const desktopSidebar = useDesktopSidebar();
   const reduceMotion = useReducedMotion();
-  // The desktop column's width as it is drawn (0 when hidden or in Focus mode), set as `--sidebar-width` for
-  // what would float beside it from `lg`; nothing does since the services pill went into the user menu (S1).
+  // The desktop column's width as it is drawn (0 when hidden or in full screen), set as `--sidebar-width` for what is
+  // placed against the window from `lg`: the room a top row keeps for the full-screen button (`FOCUS_BUTTON_CLEARANCE`)
+  // and the practices' bar (`PracticeBar`).
   const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
@@ -420,13 +421,17 @@ export function Layout() {
             // (`frame.ts`). The padding above and below does not change: the practice row is measured against it.
             PAGE_FRAME, 'py-4 md:py-8',
             settings.focusMode ? 'max-w-frame-full' : cn('max-w-frame', FULL_PAGE_FRAME),
+            // Where the full-screen button floats over the page's top right, the room it takes, which a top row keeps
+            // clear (`FOCUS_BUTTON_CLEARANCE`): from md in full screen, which draws no bar for it to sit in; from lg
+            // otherwise; never over the search page's field, which ends before it.
+            settings.focusMode ? 'md:[--focus-button-room:4.25rem]' : !showSearchBar && 'lg:[--focus-button-room:4.25rem]',
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
             // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
             // The feedback button floats over the page's foot from md, signed in: 24 px off the edge and 46 px tall, and
             // 16 px of air over it, so the last row («Ripassa» of the last subject) scrolls clear of it (G8c). In
             // `--page-foot`, which a page sized to the window takes off its height (the graph's). Not on the search page,
-            // whose practice row is the window less `p-8` (`h-app-row`).
+            // whose practice row is the window less `md:py-8` (`h-app-row`).
             isAuthenticated && !onSearchPage && 'md:[--page-foot:5.375rem] md:pb-[var(--page-foot)]',
           )}>
             <RoutePage>

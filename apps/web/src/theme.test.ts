@@ -47,10 +47,11 @@ describe('the primary colour scale', () => {
 });
 
 describe('the page frame (W2, U1)', () => {
-  it('compiles the room a header leaves for the full-screen button, from `lg`, against the frame\'s own width', async () => {
-    const css = await compile([FOCUS_BUTTON_CLEARANCE]);
-    expect(css).toMatch(/padding-right:\s*max\(0px,\s*calc\(4\.25rem - \(100vw - var\(--sidebar-width,\s*0px\) - 100%\) \/ 2\)\)/);
-    expect(css).toContain('@media (width >= 64rem)');
+  it('compiles the room a top row leaves for the full-screen button, against the frame\'s own width, where `Layout` says it floats', async () => {
+    const css = await compile([FOCUS_BUTTON_CLEARANCE, 'lg:[--focus-button-room:4.25rem]', 'md:[--focus-button-room:4.25rem]']);
+    expect(css).toMatch(/padding-right:\s*max\(0px,\s*calc\(var\(--focus-button-room,\s*0px\) - \(100vw - var\(--sidebar-width,\s*0px\) - 100%\) \/ 2\)\)/);
+    expect(css).toMatch(/@media \(width >= 64rem\)\s*\{\s*--focus-button-room:\s*4\.25rem/);
+    expect(css).toMatch(/@media \(width >= 48rem\)\s*\{\s*--focus-button-room:\s*4\.25rem/);
   }, 30000);
 
   it('declares the frame once, 1600 px and 2400 in full screen, its margins outside it (U1)', async () => {

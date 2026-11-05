@@ -47,6 +47,29 @@ describe('Layout — the frame (U1)', () => {
   });
 });
 
+describe('Layout — where the full-screen button floats over the page (U1)', () => {
+  const FROM_LG = 'lg:[--focus-button-room:4.25rem]';
+  const FROM_MD = 'md:[--focus-button-room:4.25rem]';
+
+  it('gives a top row its room from lg, where the button floats over the page\'s top right', () => {
+    at('/dossier');
+    expect(frame()).toHaveClass(FROM_LG);
+    expect(frame()).not.toHaveClass(FROM_MD);
+  });
+
+  it('from md in full screen, which draws no bar for the button to sit in', () => {
+    fullScreen(true);
+    at('/');
+    expect(frame()).toHaveClass(FROM_MD);
+  });
+
+  it('none over the search page\'s field, which ends before the button', () => {
+    at('/');
+    expect(frame()).not.toHaveClass(FROM_LG);
+    expect(frame()).not.toHaveClass(FROM_MD);
+  });
+});
+
 describe('Layout — the full-screen button (U1)', () => {
   it('is named in Italian, the same in both states, and says its state with `aria-pressed`', () => {
     at('/dossier');

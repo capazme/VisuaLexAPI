@@ -52,6 +52,7 @@ import { CommandPalette } from '../search/CommandPalette';
 import { FOUND, L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 import { besideRefFor, practiceArticleKey, type BesideRef } from '../../../utils/practice';
 import { ReadingRow } from './ReadingRow';
+import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 
 const s = () => appStore.getState();
 const AREA_LEFT = 100;
@@ -283,6 +284,15 @@ describe('ReadingRow — the frame is its one cap, with or without a window besi
     render(row(), { container: inPage() });
     expect(root().style.marginInline).toBe('');
     expect(root().style.width).toBe('');
+  });
+
+  it('keeps the table, alone in the row, clear of the full-screen button; beside a window, the last window does', () => {
+    areaWidth = 1436;
+    const { practiceId, refs } = practiceWithWindows(1);
+    render(row(), { container: inPage() });
+    expect(screen.getByTestId('reading-row-table')).not.toHaveClass(FOCUS_BUTTON_CLEARANCE);
+    act(() => s().closeBeside(practiceId, refs[0].id));
+    expect(screen.getByTestId('reading-row-table')).toHaveClass(FOCUS_BUTTON_CLEARANCE);
   });
 
   it('stays in its parent as a window opens and closes', () => {

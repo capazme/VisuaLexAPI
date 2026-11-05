@@ -1,7 +1,6 @@
 # U1: one frame, one reading measure, and a full screen that widens
 
-Status: decided by the owner on 5 November 2026 (L-46 and L-47 of the proposal on the use of the screen, the owners'
-vault: «Tutto come da raccomandato»). Web only: no route, schema or server change.
+Status: decided by the owner on 5 November 2026 (L-46, L-47). Web only: no route, schema or server change.
 
 Two rounds, in this order:
 
@@ -12,8 +11,8 @@ Two rounds, in this order:
 
 ## Why
 
-The owner, on the full screen: «ottimizzazione pessima della visualizzazione a tutto schermo […] questo si riflette in
-tutta l'applicazione». Measured on `develop` (window 1366, 1920 and 2560 px, the sidebar open and in full screen):
+The owner found the full screen badly used, and the same across the whole application. Measured on `develop` on 5
+November 2026 (window 1366, 1920 and 2560 px, the sidebar open and in full screen):
 
 - every page sits in `Layout`'s `max-w-7xl` with `p-8`: 1216 px at any width (48% of a 2560 px screen);
 - the full screen narrows it instead of widening it: `max-w-4xl py-12`, 832 px (43% of 1920);
@@ -73,9 +72,11 @@ A page declares its width once, in the frame, as one of three:
 The nested caps go: the search page's `ReaderLayout` (deleted: the search page was its only user), the practice's
 `max-w-4xl` and its loading skeleton's, the reviews' `max-w-3xl` (now the page's `reading`), «Collega un'app AI»'s
 `max-w-3xl` (the same). `ReadingRow` no longer reaches past its parent while a window is beside: it escaped the
-`ReaderLayout` cap, which is gone, and on a window wider than the frame it would now break the frame's cap. The header
-of a page with an action keeps clear of the full-screen button by a padding computed against the frame's own width
-(`100%` of the header's containing block), so it holds for every width and in full screen.
+`ReaderLayout` cap, which is gone, and on a window wider than the frame it would now break the frame's cap. A top row
+with controls — the header of a page with an action, the practice's table alone in its row — keeps clear of the
+full-screen button by a padding computed against the frame's own width (`100%` of its containing block), wherever
+`Layout` says the button floats over the page (`--focus-button-room`: from `lg`, and from `md` in full screen, which
+draws no bar for it to sit in), so it holds at every width and in full screen.
 
 Academia's `max-w-2xl` (`MerltHubPage`, `ValidationPage`, `ContribPage`) are short lines and panels under the title;
 they wait for a pass with an account that opens Academia (§7).

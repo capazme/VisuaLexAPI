@@ -468,11 +468,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   small (`kicker`: «Gymnasium · la tua palestra giuridica», `PAGE_KICKER`, Geist `text-sm` slate 600; L-37, the owner,
   22 October 2026) —, the sentence under it (`line`, a short line:
   `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
-  a header with an action pads its right side from `lg` just enough to stay clear of `Layout`'s fixed full-screen
-  button (`FOCUS_BUTTON_CLEARANCE`, from `100vw`, `--sidebar-width` and the frame's own width, `100%` of the header's
-  containing block, so it holds at any frame width and in full screen: 68 px less the frame's distance from the
-  window's edge — 36 px with a 32 px margin, 20 with 48, nothing once the frame is 68 px in; between 1024 and 1550 px
-  the button covered «Svuota cronologia» and «Gestisci»);
+  a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button
+  (`FOCUS_BUTTON_CLEARANCE`, from `100vw`, `--sidebar-width` and the frame's own width, `100%` of the header's
+  containing block, so it holds at any frame width: 68 px less the frame's distance from the window's edge — 36 px
+  with a 32 px margin, 20 with 48, nothing once the frame is 68 px in —, wherever `Layout` says the button floats over
+  the page, `--focus-button-room`: from `lg`, from `md` in full screen, never over the search page's field; between
+  1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»; the practice's table, alone in its row, keeps
+  the same room, its header and the act's pinned heading under the button in full screen otherwise);
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
   `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (`reading`: its body at the reading measure, the
@@ -573,8 +575,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   icon a 44 px box, so widening moves no icon: `Layout` animates the column's width (instantly under reduced
   motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
   and the button's name carries the username it shows («Menu utente di …», label in name).
-  `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in Focus
-  mode), for what would float beside it from `lg`: nothing does since the services pill went into the user menu (S1).
+  `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in full
+  screen), for what is placed against the window from `lg`: the room a top row keeps for the full-screen button
+  (`FOCUS_BUTTON_CLEARANCE`) and the practices' bar (`PracticeBar`).
   The bar's 11 px texts (headings, shortcut) are `SIDEBAR_SMALL_TEXT`, slate 600 / dark slate 400: AA for small
   text on the glass over the page and over the phone's backdrop; `theme.test.ts` composites and checks it.
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
