@@ -40,14 +40,15 @@ The values are theme tokens in `index.css` (`--container-frame`, `--container-fr
 
 ## 2. The full screen widens, never narrows
 
-The button at the top right, ⌘Space (Ctrl+Space elsewhere): it takes the sidebar and the search page's field away (⌘K
+The button at the top right, ⌘⇧F (Ctrl+Shift+F elsewhere; ⌘Space until the owner's change after #413: on a Mac it
+opens Spotlight): it takes the sidebar and the search page's field away (⌘K
 still opens the search menu) and gives the room to the content, whose frame becomes `max-w-frame-full`. `max-w-4xl
 py-12` goes. The narrow column for concentrated reading stays where it already is: Study Mode, untouched (its own
 `max-w-3xl` column, portalled over the page; `.vlx-art--study` has no measure of its own).
 
 ## 3. The button's name
 
-`title`: «Tutto schermo (⌘Spazio)» and «Esci dal tutto schermo (⌘Spazio)» («Ctrl+Spazio» outside a Mac). The
+`title`: «Tutto schermo (⌘⇧F)» and «Esci dal tutto schermo (⌘⇧F)» («Ctrl+⇧F» outside a Mac). The
 accessible name is «Tutto schermo», the same in both states, with `aria-pressed` saying whether it is on (a toggle's
 name does not change with its state, or a screen reader says «Esci dal tutto schermo, premuto»); the `title` is its
 description, and `aria-keyshortcuts` names the key. The icon (⤢, ⤡ while on) now says what the button does. Its hover

@@ -75,23 +75,35 @@ describe('Layout — the full-screen button (U1)', () => {
     at('/dossier');
     const button = screen.getByRole('button', { name: 'Tutto schermo' });
     expect(button).toHaveAttribute('aria-pressed', 'false');
-    expect(button).toHaveAttribute('title', expect.stringMatching(/^Tutto schermo \((?:⌘Spazio|Ctrl\+Spazio)\)$/));
-    expect(button).toHaveAttribute('aria-keyshortcuts', expect.stringMatching(/^(?:Meta|Control)\+Space$/));
+    expect(button).toHaveAttribute('title', expect.stringMatching(/^Tutto schermo \((?:⌘⇧F|Ctrl\+⇧F)\)$/));
+    expect(button).toHaveAttribute('aria-keyshortcuts', expect.stringMatching(/^(?:Meta|Control)\+Shift\+F$/));
     expect(button).toHaveAttribute('type', 'button');
 
     fireEvent.click(button);
     expect(appStore.getState().settings.focusMode).toBe(true);
     const pressed = screen.getByRole('button', { name: 'Tutto schermo' });
     expect(pressed).toHaveAttribute('aria-pressed', 'true');
-    expect(pressed).toHaveAttribute('title', expect.stringMatching(/^Esci dal tutto schermo \((?:⌘Spazio|Ctrl\+Spazio)\)$/));
+    expect(pressed).toHaveAttribute('title', expect.stringMatching(/^Esci dal tutto schermo \((?:⌘⇧F|Ctrl\+⇧F)\)$/));
     expect(screen.queryByRole('button', { name: /Focus Mode/ })).toBeNull();
   });
 
-  it('keeps ⌘Space (Ctrl+Space) as its key', () => {
+  it('takes ⌘⇧F (Ctrl+⇧F) as its key, the letter in either case', () => {
     at('/dossier');
-    fireEvent.keyDown(window, { key: ' ', ctrlKey: true });
-    expect(screen.getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'true');
+    const button = () => screen.getByRole('button', { name: 'Tutto schermo' });
+    fireEvent.keyDown(window, { key: 'F', ctrlKey: true, shiftKey: true });
+    expect(button()).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.keyDown(window, { key: 'f', metaKey: true, shiftKey: true });
+    expect(button()).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('no longer takes ⌘Space, which opens Spotlight on a Mac, nor ⌘F without Shift, nor ⌘⌥⇧F', () => {
+    at('/dossier');
+    const button = () => screen.getByRole('button', { name: 'Tutto schermo' });
     fireEvent.keyDown(window, { key: ' ', metaKey: true });
-    expect(screen.getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.keyDown(window, { key: ' ', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'f', metaKey: true });
+    fireEvent.keyDown(window, { key: 'F', ctrlKey: true, shiftKey: true, altKey: true });
+    expect(button()).toHaveAttribute('aria-pressed', 'false');
+    expect(appStore.getState().settings.focusMode).toBe(false);
   });
 });

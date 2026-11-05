@@ -445,10 +445,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   margins (`PAGE_FRAME`: 16 px, 32 from `md`, 48 from 1536 px, padding outside the frame, `box-content`), at most
   1600 px (`max-w-frame`) and 2400 px in full screen (`max-w-frame-full`), the theme's `--container-frame*` tokens; the
   padding above and below stays 16/32 px (`h-app-row` is measured against it). **The full screen** (`settings.focusMode`,
-  the button at the top right and ⌘Space) widens, never narrows: it takes the sidebar and the search page's field away
+  the button at the top right and ⌘⇧F, Ctrl+Shift+F outside a Mac — not ⌘Space, which opens Spotlight; without Shift,
+  F is the find window's) widens, never narrows: it takes the sidebar and the search page's field away
   (⌘K stays) and gives their room to the frame; the narrow column for reading lives in Study Mode alone. The button is
   a toggle named «Tutto schermo» in both states, `aria-pressed`, `aria-keyshortcuts`, its `title` «Tutto schermo
-  (⌘Spazio)» / «Esci dal tutto schermo (⌘Spazio)» («Ctrl+Spazio» outside a Mac); its hover scale is still under
+  (⌘⇧F)» / «Esci dal tutto schermo (⌘⇧F)» («Ctrl+⇧F» outside a Mac); its hover scale is still under
   reduced motion. **A page declares its width once** (`PageWidth`): `reading` (`PageFrame`'s `width="reading"`: the
   body at the reading measure, the title at the frame's edge — «Rassegne», «Collega un'app AI»), `work` (the frame,
   the default) or `full` (the full screen's frame in the normal view too: the search page, and after U4 the agenda).

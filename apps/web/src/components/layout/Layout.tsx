@@ -40,9 +40,12 @@ import { useMediaQuery } from '../../hooks/useIsDesktop';
 import { isMacPlatform } from '../ui/notifications/undoShortcut';
 import { FULL_PAGE_FRAME, PAGE_FRAME } from './frame';
 
-/** The full screen's key, in the button's `title` and its `aria-keyshortcuts`: ⌘Space on a Mac, Ctrl+Space elsewhere. */
-const FULL_SCREEN_SHORTCUT = isMacPlatform() ? '⌘Spazio' : 'Ctrl+Spazio';
-const FULL_SCREEN_KEYS = isMacPlatform() ? 'Meta+Space' : 'Control+Space';
+/**
+ * The full screen's key, in the button's `title` and its `aria-keyshortcuts`: ⌘⇧F on a Mac, Ctrl+⇧F elsewhere (the
+ * owner's choice: ⌘Space, the key until then, opens Spotlight on a Mac).
+ */
+const FULL_SCREEN_SHORTCUT = isMacPlatform() ? '⌘⇧F' : 'Ctrl+⇧F';
+const FULL_SCREEN_KEYS = isMacPlatform() ? 'Meta+Shift+F' : 'Control+Shift+F';
 
 const loadCompareView = () => import('../features/compare/CompareView').then(m => ({ default: m.CompareView }));
 // A new one after a failed fetch: `lazy` keeps a failure for good.
@@ -247,7 +250,8 @@ export function Layout() {
         e.preventDefault();
         navigate('/dossier');
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === ' ') {
+      // The full screen: Cmd/Ctrl+Shift+F. Without Shift, F is the find window's, below.
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         updateSettings({ focusMode: !settings.focusMode });
       }
