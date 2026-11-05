@@ -250,10 +250,11 @@ export function Layout() {
         e.preventDefault();
         navigate('/dossier');
       }
-      // The full screen: Cmd/Ctrl+Shift+F. Without Shift, F is the find window's, below.
+      // The full screen: Cmd/Ctrl+Shift+F. Without Shift, F is the find window's, below. A key held down toggles it once,
+      // and its repeats stay ours (Chrome on a Mac binds ⇧⌘F to its own menu).
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
-        updateSettings({ focusMode: !settings.focusMode });
+        if (!e.repeat) updateSettings({ focusMode: !settings.focusMode });
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault();

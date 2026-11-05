@@ -1,6 +1,7 @@
 import { Modal } from './Modal';
 import { Command, Keyboard } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { isMacPlatform } from './notifications/undoShortcut';
 
 interface KeyboardShortcutsModalProps {
   isOpen: boolean;
@@ -17,8 +18,8 @@ interface ShortcutGroup {
   shortcuts: ShortcutItem[];
 }
 
-const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-const modKey = isMac ? 'Cmd' : 'Ctrl';
+// The system as `Layout`'s button reads it (an iPad with a keyboard takes ⌘ too).
+const modKey = isMacPlatform() ? 'Cmd' : 'Ctrl';
 
 const shortcutGroups: ShortcutGroup[] = [
   {

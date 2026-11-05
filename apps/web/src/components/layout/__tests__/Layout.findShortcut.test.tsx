@@ -21,9 +21,11 @@ vi.mock('../../../hooks/useTour', () => ({
 
 import { Layout } from '../Layout';
 import { closeFindWindow } from '../../../utils/findWindowControl';
+import { appStore } from '../../../store/useAppStore';
 
 afterEach(() => {
   act(() => closeFindWindow());
+  appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
 });
 
 // The find window, by its name: the search page also draws its own search field.
@@ -40,6 +42,24 @@ describe('Layout — Cmd/Ctrl+F', () => {
     act(() => closeFindWindow());
     press({ ctrlKey: true });
     expect(screen.getByRole('search', FIND)).toBeInTheDocument();
+  });
+
+  it('is not the full screen\'s key, which takes Shift too', () => {
+    render(<MemoryRouter><Layout /></MemoryRouter>);
+    press({ metaKey: true });
+    expect(screen.getByRole('search', FIND)).toBeInTheDocument();
+    expect(appStore.getState().settings.focusMode).toBe(false);
+  });
+
+  it('with Shift, on the search page, toggles the full screen and opens no find window', () => {
+    render(<MemoryRouter><Layout /></MemoryRouter>);
+    const event = new KeyboardEvent('keydown', { key: 'F', metaKey: true, shiftKey: true, cancelable: true, bubbles: true });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(appStore.getState().settings.focusMode).toBe(true);
+    expect(screen.queryByRole('search', FIND)).not.toBeInTheDocument();
   });
 
   it('keeps the browser\'s own find away', () => {

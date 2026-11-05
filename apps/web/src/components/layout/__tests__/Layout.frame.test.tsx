@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -96,14 +96,28 @@ describe('Layout — the full-screen button (U1)', () => {
     expect(button()).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('no longer takes ⌘Space, which opens Spotlight on a Mac, nor ⌘F without Shift, nor ⌘⌥⇧F', () => {
+  it.each([
+    ['⌘Space, which opens Spotlight on a Mac', { key: ' ', metaKey: true }],
+    ['Ctrl+Space', { key: ' ', ctrlKey: true }],
+    ['⌘F without Shift', { key: 'f', metaKey: true }],
+    ['Ctrl+F without Shift', { key: 'f', ctrlKey: true }],
+    ['⇧F without Cmd or Ctrl', { key: 'F', shiftKey: true }],
+    ['⌘⌥⇧F', { key: 'F', metaKey: true, shiftKey: true, altKey: true }],
+  ])('no longer takes %s', (_, init) => {
     at('/dossier');
-    const button = () => screen.getByRole('button', { name: 'Tutto schermo' });
-    fireEvent.keyDown(window, { key: ' ', metaKey: true });
-    fireEvent.keyDown(window, { key: ' ', ctrlKey: true });
-    fireEvent.keyDown(window, { key: 'f', metaKey: true });
-    fireEvent.keyDown(window, { key: 'F', ctrlKey: true, shiftKey: true, altKey: true });
-    expect(button()).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.keyDown(window, init);
     expect(appStore.getState().settings.focusMode).toBe(false);
+    expect(screen.getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('toggles once for a key held down, and keeps its repeats from the browser', () => {
+    at('/dossier');
+    fireEvent.keyDown(window, { key: 'F', metaKey: true, shiftKey: true });
+    const repeat = new KeyboardEvent('keydown', { key: 'F', metaKey: true, shiftKey: true, repeat: true, cancelable: true, bubbles: true });
+    act(() => {
+      window.dispatchEvent(repeat);
+    });
+    expect(appStore.getState().settings.focusMode).toBe(true);
+    expect(repeat.defaultPrevented).toBe(true);
   });
 });
