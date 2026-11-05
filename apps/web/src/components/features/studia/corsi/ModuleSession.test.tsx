@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -34,6 +34,7 @@ import { loadAssistantFeatures } from '../../../../store/assistantProposals';
 import { coursesSwitchStore, setCoursesSwitch } from './coursesSwitch';
 import { ModuleSession } from './ModuleSession';
 import { appStore } from '../../../../store/useAppStore';
+import { resetNotifications, runShortcutUndo } from '../../../ui/notifications/notifications';
 import { forgetModuleSessions, readWork, saveStepReached } from './moduleSteps';
 import { lesson } from './__fixtures__/corsi';
 import type { EsitoRisposta, ModuloLezione } from '../../../../types/corsi';
@@ -102,6 +103,8 @@ beforeEach(() => {
 afterEach(() => {
   // The highlighter is the app's (A4): a test that turns it on or changes its ink never leaks it.
   appStore.setState((st) => ({ readingTool: null, highlighterEraser: false, settings: { ...st.settings, highlightColor: 'yellow' } }));
+  // Nor a gesture held for Ctrl+Z.
+  resetNotifications();
   vi.clearAllMocks();
   coursesSwitchStore.setState({ state: 'unknown' });
 });
@@ -473,6 +476,22 @@ describe('the review of #374', () => {
     expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['d', 'ingu']);
     // One Tab stop per highlight.
     expect(document.querySelectorAll('mark[tabindex="0"]')).toHaveLength(2);
+  });
+
+  it('Ctrl+Z (⌘Z) takes the last gesture back, with no notice, while the text is on screen (A4, 5 November)', async () => {
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    const words = await screen.findByText(/distingue i prodotti/);
+    select(words.firstChild!, 1, words.firstChild!, 9);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect(document.querySelector('mark')?.textContent).toBe('distingue');
+    let undone: string | null = null;
+    act(() => { undone = runShortcutUndo(); });
+    expect(undone).toBe('Testo evidenziato in giallo');
+    expect(document.querySelector('mark')).toBeNull();
+    // Once: nothing is left for a second press.
+    expect(runShortcutUndo()).toBeNull();
   });
 
   it('takes a word the selection cuts whole, and the piece exactly with Alt, for every gesture (A4, 5 November)', async () => {

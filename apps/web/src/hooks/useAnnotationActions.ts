@@ -15,6 +15,7 @@ export interface AnnotationActionsOptions {
   highlights: readonly Highlight[];
   /** The projection the anchors count in: the parts a cut leaves are its own words. */
   plain: string;
+  /** A note's toast («Nota ancorata al testo»); a highlight says nothing (A4). */
   showToast: (message: string, type: 'success' | 'error' | 'info') => void;
   /** False on a text that takes no marks (a past text): the selection popup's actions do nothing. */
   enabled?: boolean;
@@ -26,13 +27,14 @@ export interface AnnotationActionsOptions {
 
 /**
  * What the selection popup's «Evidenzia» and «Nota» do, and the tooltip composer's state, for any
- * surface that renders the reader's marks: the same rules (the highlighter's, A4), the same store calls, the same toasts.
+ * surface that renders the reader's marks: the same rules (the highlighter's, A4), the same store calls, the same toasts
+ * for notes (none for highlights).
  * The anchor's `scopedArticleId` lets a sub-section of the article target its own scope.
  */
 export function useAnnotationActions({
   key, articleId, highlights, plain, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,
 }: AnnotationActionsOptions) {
-  const applyInk = useHighlightInk({ key, articleId, plain, highlights, enabled, showToast, onCreated: onHighlightAdded });
+  const applyInk = useHighlightInk({ key, articleId, plain, highlights, enabled, onCreated: onHighlightAdded });
   const addAnnotation = useAppStore((s) => s.addAnnotation);
   // The selected span becomes the note's anchor; the composer sits on the span itself, at the rect
   // the popup captured before the selection cleared (gotcha 16).

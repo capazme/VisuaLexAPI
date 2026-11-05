@@ -259,7 +259,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   // The words selected and the ink, through the highlighter's rules (A4): a new highlight, or the same words taken away
   // or recoloured, as in every reader. Only the user's own highlights: an application's passages are left alone.
   const handlePopupHighlight = useHighlightInk({
-    key: itemKey, articleId: uniqueArticleId, plain, highlights: articleHighlights, enabled: !readOnly, showToast,
+    key: itemKey, articleId: uniqueArticleId, plain, highlights: articleHighlights, enabled: !readOnly,
   });
 
   const handlePopupCopy = async (text: string) => {

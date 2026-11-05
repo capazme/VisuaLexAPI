@@ -44,7 +44,6 @@ import { keyPassages } from '../../../utils/decisionKeyPassages';
 import { KeyPassagePopover } from './KeyPassagePopover';
 import { KeyPassagesMenu } from './KeyPassagesMenu';
 import { scrollToMiddle } from '../../../utils/scrollParent';
-import { highlightColorName } from '../../../utils/highlightColors';
 
 // A decision's anchors are stored under its key with no article: the wire key is `<key>::art::`.
 const NO_ARTICLE = '';
@@ -401,8 +400,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
               showToast('Questa occorrenza è già evidenziata', 'info');
               return;
             }
+            // No notification, as every highlight made (A4): Ctrl+Z (⌘Z) takes it back.
             addHighlight(key, NO_ARTICLE, words, '', highlightColor, p.start);
-            showToast(`Testo evidenziato in ${highlightColorName(highlightColor)}`, 'success');
           }}
           onHideAll={hideKeyPassages}
           onClose={() => setOpenPassage(null)}

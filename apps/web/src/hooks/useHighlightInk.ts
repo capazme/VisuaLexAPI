@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { showText } from '../store/textsOnScreen';
 import type { Highlight } from '../types';
 import { resolveAnchors } from '../utils/articleAnnotations';
 import { highlightColorName, type HighlightColor } from '../utils/highlightColors';
@@ -30,21 +32,21 @@ export interface HighlightInkOptions {
   highlights: readonly Highlight[];
   /** False on a text that takes no highlight (a past text). */
   enabled?: boolean;
-  /** The reader's toast for a new highlight («Testo evidenziato in giallo»); a change says itself, with «Annulla». */
-  showToast?: (message: string, type: 'success' | 'error' | 'info') => void;
   /** A new highlight was made (the article's MERL-T event); never for a cut or a colour changed. */
   onCreated?: (text: string, color: HighlightColor, startOffset: number) => void;
 }
 
 /**
  * The highlighter over a reader's text (A4): the words selected and the ink, through the rules (`planInk`), into the
- * store — a new highlight, or one gesture over existing ones behind one «Annulla» (`editHighlights`). The same with
- * the tool on, with the button pressed over a selection, with H and «Evidenzia» in the selection bar, and with Study
- * Mode's keys.
+ * store — a new highlight (`addHighlight`), or one gesture over existing ones (`editHighlights`). The same with the tool
+ * on, with the button pressed over a selection, with H and «Evidenzia» in the selection bar, and with Study Mode's keys.
+ * No notification (the owner, 5 November 2026): a gesture is said to a screen reader, and Ctrl+Z (⌘Z) takes the last one
+ * back while its text is on screen — this reader counts its text as on screen while it is mounted.
  */
-export function useHighlightInk({ key, articleId, plain, highlights, enabled = true, showToast, onCreated }: HighlightInkOptions) {
+export function useHighlightInk({ key, articleId, plain, highlights, enabled = true, onCreated }: HighlightInkOptions) {
   const addHighlight = useAppStore((s) => s.addHighlight);
   const editHighlights = useAppStore((s) => s.editHighlights);
+  useEffect(() => showText(key), [key]);
   return (text: string, ink: Ink, startOffset: number) => {
     if (!enabled) return;
     const plan = planInk({ start: startOffset, end: startOffset + text.length, ink, marks: inkMarks(plain, highlights) });
@@ -52,7 +54,6 @@ export function useHighlightInk({ key, articleId, plain, highlights, enabled = t
     if (plan.kind === 'create') {
       addHighlight(key, articleId, text, '', plan.color, startOffset);
       onCreated?.(text, plan.color, startOffset);
-      showToast?.(`Testo evidenziato in ${highlightColorName(plan.color)}`, 'success');
       return;
     }
     const message = plan.effect === 'recoloured' && plan.color

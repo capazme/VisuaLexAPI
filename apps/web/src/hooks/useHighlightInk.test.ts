@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useHighlightInk } from './useHighlightInk';
 import { appStore } from '../store/useAppStore';
+import { isTextShown } from '../store/textsOnScreen';
 import type { Highlight } from '../types';
 
 const PLAIN = 'Il danno ingiusto obbliga colui che ha commesso il fatto a risarcire il danno.';
@@ -13,24 +14,30 @@ const hl = (id: string, words: string, color: Highlight['color'], extra: Partial
 const store = appStore.getState();
 afterEach(() => appStore.setState({ addHighlight: store.addHighlight, editHighlights: store.editHighlights }));
 
-function ink(highlights: Highlight[], extra: { showToast?: () => void; onCreated?: () => void; enabled?: boolean } = {}) {
+function ink(highlights: Highlight[], extra: { onCreated?: () => void; enabled?: boolean } = {}) {
   const addHighlight = vi.fn();
   const editHighlights = vi.fn();
   appStore.setState({ addHighlight, editHighlights });
-  const { result } = renderHook(() => useHighlightInk({ key: 'k', articleId: '2043', plain: PLAIN, highlights, ...extra }));
-  return { apply: result.current, addHighlight, editHighlights };
+  const { result, unmount } = renderHook(() => useHighlightInk({ key: 'k', articleId: '2043', plain: PLAIN, highlights, ...extra }));
+  return { apply: result.current, addHighlight, editHighlights, unmount };
 }
 
 describe('useHighlightInk — the rules, into the store (A4)', () => {
-  it('a new highlight: made, said in the reader\'s toast, and told to the article (MERL-T)', () => {
-    const showToast = vi.fn();
+  it('a new highlight: made (no toast: the store says it to a screen reader alone, A4) and told to the article (MERL-T)', () => {
     const onCreated = vi.fn();
-    const { apply, addHighlight, editHighlights } = ink([], { showToast, onCreated });
+    const { apply, addHighlight, editHighlights } = ink([], { onCreated });
     apply('danno ingiusto', 'blue', at('danno ingiusto'));
     expect(addHighlight).toHaveBeenCalledExactlyOnceWith('k', '2043', 'danno ingiusto', '', 'blue', at('danno ingiusto'));
-    expect(showToast).toHaveBeenCalledWith('Testo evidenziato in blu', 'success');
     expect(onCreated).toHaveBeenCalledWith('danno ingiusto', 'blue', at('danno ingiusto'));
     expect(editHighlights).not.toHaveBeenCalled();
+  });
+
+  it('counts its text as on screen while it is mounted: Ctrl+Z (⌘Z) undoes a gesture on it only then', () => {
+    expect(isTextShown('k')).toBe(false);
+    const { unmount } = ink([]);
+    expect(isTextShown('k')).toBe(true);
+    unmount();
+    expect(isTextShown('k')).toBe(false);
   });
 
   it('a piece cut out: one gesture, the parts the projection\'s own words trimmed at their edges', () => {

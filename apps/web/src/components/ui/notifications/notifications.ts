@@ -68,9 +68,11 @@ interface NotificationsState {
   announced: { polite: Announcement | null; assertive: Announcement | null };
   /** The stacks on screen (`NotificationHost`): with none, a notification closes without an exit to wait for. */
   hosts: number;
+  /** The id of the undo held for the shortcut alone (`offerShortcutUndo`), or null. */
+  shortcutUndo: number | null;
 }
 
-export const notificationStore = create<NotificationsState>()(() => ({ entries: [], announced: { polite: null, assertive: null }, hosts: 0 }));
+export const notificationStore = create<NotificationsState>()(() => ({ entries: [], announced: { polite: null, assertive: null }, hosts: 0, shortcutUndo: null }));
 
 const handlers = new Map<number, Handlers>();
 /**
@@ -198,7 +200,9 @@ export function resetNotifications() {
   handlers.forEach((h) => h.countdown?.stop());
   handlers.clear();
   undoneSlots.clear();
-  notificationStore.setState({ entries: [], announced: { polite: null, assertive: null } });
+  // Forgotten, not carried out: the logout carries it out first (`settleShortcutUndo`), while the token is there.
+  shortcutHeld = null;
+  notificationStore.setState({ entries: [], announced: { polite: null, assertive: null }, shortcutUndo: null });
   // Told last, the list already empty: what they held ends (an «Annulla» resolves as not standing, its undo not run).
   told.forEach((h) => h.onClose?.('dropped'));
 }
@@ -211,4 +215,60 @@ export function latestUndoable(entries = notificationStore.getState().entries): 
 /** Says `message` in the live region, as a notification arriving would (the shortcut's «Annullato: …»). */
 export function announce(message: string, politeness: 'polite' | 'assertive' = 'polite') {
   notificationStore.setState((s) => ({ announced: { ...s.announced, [politeness]: { id: nextId++, message } } }));
+}
+
+/**
+ * An undo with no notification (A4, the owner's correction of 5 November 2026: a gesture on a highlight says nothing,
+ * and Ctrl+Z — ⌘Z on a Mac — undoes it, with no time limit): one at a time, the last gesture's. The next one takes its
+ * place and settles it — what it held is carried out (a highlight's removals sent). The shortcut runs it while it is
+ * newer than the newest «Annulla» on screen and `ready` says it can be undone (its text on screen).
+ */
+export interface ShortcutUndoInput {
+  /** What the gesture did: «Annullato: <message>» is said once it is undone. */
+  message: string;
+  /** Whether it can be undone now; meanwhile the key goes by. */
+  ready?: () => boolean;
+  undo: () => void;
+  /** Its place taken by the next (`asThePageGoes` false), or the account leaving (true): what it held is carried out. */
+  settle?: (asThePageGoes: boolean) => void;
+}
+
+let shortcutHeld: (ShortcutUndoInput & { id: number }) | null = null;
+
+/** Holds `input` for the shortcut, in the place of the one held before, which is settled; returns its id. */
+export function offerShortcutUndo(input: ShortcutUndoInput): number {
+  const before = shortcutHeld;
+  // From the notifications' own count: the shortcut tells which of the two is newer by it.
+  const id = nextId++;
+  shortcutHeld = { ...input, id };
+  notificationStore.setState({ shortcutUndo: id });
+  before?.settle?.(false);
+  return id;
+}
+
+/** Takes it back without undoing or settling it (what it held was carried out another way: the page hidden). */
+export function withdrawShortcutUndo(id: number) {
+  if (shortcutHeld?.id !== id) return;
+  shortcutHeld = null;
+  notificationStore.setState({ shortcutUndo: null });
+}
+
+/** The account leaves: the undo held is carried out now, as the page goes, while the session's token is still there. */
+export function settleShortcutUndo() {
+  const held = shortcutHeld;
+  if (!held) return;
+  withdrawShortcutUndo(held.id);
+  held.settle?.(true);
+}
+
+/**
+ * Ctrl+Z (⌘Z) on the undo held for the shortcut, when it is newer than the notification `than` names (the newest
+ * «Annulla» on screen) and ready: undone, and what it undid returned; else null, and nothing changes.
+ */
+export function runShortcutUndo(than?: number): string | null {
+  const held = shortcutHeld;
+  if (!held || (than !== undefined && held.id < than) || !(held.ready?.() ?? true)) return null;
+  withdrawShortcutUndo(held.id);
+  held.undo();
+  return held.message;
 }

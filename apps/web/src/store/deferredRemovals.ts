@@ -1,4 +1,12 @@
-import { closeNotification, notify, RESTORED_MS, UNDO_MS } from '../components/ui/notifications/notifications';
+import {
+  announce,
+  closeNotification,
+  notify,
+  offerShortcutUndo,
+  RESTORED_MS,
+  UNDO_MS,
+  withdrawShortcutUndo,
+} from '../components/ui/notifications/notifications';
 import { getFreshAccessToken } from '../services/api';
 import { getAccessToken } from '../services/authService';
 
@@ -92,16 +100,22 @@ export function afterSaving(key: string, then: (saved: RemovalTarget<unknown> | 
 
 /** The removal itself: by `apiClient`, or as the page goes by a `keepalive` fetch; refused, the item is put back. */
 function deleteNow<T>(what: RemovalTarget<T>, onExit: boolean, putBack: (item: T) => void, onRefused: (error: unknown) => void) {
+  const sentIn = session;
   if (onExit) {
     const token = getAccessToken();
     void fetch(`${API_BASE_URL}${what.path}`, {
       method: 'DELETE',
       keepalive: true,
       headers: token ? { Authorization: `Bearer ${token}` } : {},
-    }).catch(() => {});
+    })
+      .then((response) => {
+        // The token ran out while the removal waited (a highlight's waits for the next gesture, A4) and the page lived
+        // on (a desktop's change of tab): it goes again by `apiClient`, which refreshes the token first.
+        if (response.status === 401 && sentIn === session) deleteNow(what, false, putBack, onRefused);
+      })
+      .catch(() => {});
     return;
   }
-  const sentIn = session;
   inFlight.add(what.key);
   what.remove()
     .then(() => { inFlight.delete(what.key); })
@@ -130,7 +144,7 @@ export function removeAtOnce<T>(target: RemovalTarget<T>, putBack: (item: T) => 
 }
 
 export interface DeferredRemoval<T> extends RemovalTarget<T> {
-  /** What the notification says: «Evidenziazione rimossa». */
+  /** What the notification says: «Nota rimossa». */
   message: string;
   /** «Annulla», or a refused removal: puts `item` back where it was. */
   putBack: (item: T) => void;
@@ -151,38 +165,43 @@ export function removeWithUndo<T>({ message, putBack, onRefused, ...first }: Def
   removeManyWithUndo({ message, putBack, onRefused, targets: [first] });
 }
 
-export interface DeferredRemovals<T> {
-  message: string;
-  /** What is removed: none for a gesture that only changes (a colour, A4), whose «Annulla» is `onUndo` alone. */
+/** What a gesture removes, and how it is taken back. */
+interface HeldRemovals<T> {
+  /** What is removed: none for a gesture that only changes or creates (a colour, a new highlight, A4), whose undo is `onUndo` alone. */
   targets: RemovalTarget<T>[];
   putBack: (item: T) => void;
   onRefused: (error: unknown) => void;
-  /** «Annulla» also takes back what came with the removals (the parts a cut created, a colour changed), after them. */
+  /** The undo also takes back what came with the removals (the parts a cut created, a colour changed), after them. */
   onUndo?: () => void;
   /**
    * What the removals wait for (A4: the parts a cut created, still being saved): sent only once it resolves true, so a
    * page that goes before sends nothing and the items stay on the server, rather than their parts be lost with it.
-   * False (a part refused) takes the gesture back at once — the items put back, `onUndo` run — with no «Ripristinato».
+   * False (a part refused) takes the gesture back at once — the items put back, `onUndo` run — with nothing said but
+   * the refusal.
    */
   ready?: Promise<boolean>;
 }
 
+export interface DeferredRemovals<T> extends HeldRemovals<T> {
+  message: string;
+}
+
 /**
- * `removeWithUndo` for one gesture that removes several items (A4: a highlight cut, «Nessun colore» over many): one
- * notification, one «Annulla» that puts them all back (and runs `onUndo`), all sent as it closes or the page goes.
+ * The removals of one gesture, held until they are sent (`send`: the undo's time is over, the page goes) or the
+ * gesture is taken back (`undo`). Held, a reading leaves them out (`pending`); `close` takes away the way the undo was
+ * offered (a notification, the shortcut) once they are sent or a part refused takes the gesture back.
  */
-export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, onUndo, ready }: DeferredRemovals<T>): void {
+function holdRemovals<T>({ targets, putBack, onRefused, onUndo, ready }: HeldRemovals<T>, close: () => void) {
   if (targets.length > 0) void getFreshAccessToken().catch(() => null);
   const madeIn = session;
   let settled = false;
-  let notification: number | null = null;
   // Each removed item, retargeted once a creation still out is answered; null when it never reached the server.
   const slots: { target: RemovalTarget<T> | null }[] = targets.map((target) => ({ target }));
   // `ready`'s answer, once given; and whether the removals, sent, wait for it.
   let readiness: boolean | null = ready ? null : true;
   let waiting = false;
 
-  /** A part refused: the gesture taken back, as «Annulla» would, with nothing said but the refusal. */
+  /** A part refused: the gesture taken back, as the undo would, with nothing said but the refusal. */
   const takeBack = () => {
     for (const slot of slots) {
       if (!slot.target) continue;
@@ -198,7 +217,7 @@ export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, on
     if (ok || madeIn !== session) return;
     if (!settled) {
       settled = true;
-      if (notification !== null) closeNotification(notification, 'external');
+      close();
       takeBack();
     } else if (waiting) {
       waiting = false;
@@ -225,7 +244,7 @@ export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, on
     if (settled) return;
     settled = true;
     for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
-    if (notification !== null) closeNotification(notification, 'external');
+    close();
     if (readiness === false) return;
     if (readiness === null) {
       // What they wait for is still on its way: sent once it is saved, by an ordinary request (the page lived on); a
@@ -254,28 +273,82 @@ export function removeManyWithUndo<T>({ message, targets, putBack, onRefused, on
     };
     if (slot.target) pending.set(slot.target.key, entry);
   }
-  notification = notify({
-    type: 'info',
-    message,
-    duration: UNDO_MS,
-    onUndo: () => {
-      if (settled) return;
+
+  return {
+    send,
+    /** Taken back: the items put back where they were, then `onUndo`; false when there was nothing to take back. */
+    undo: (): boolean => {
+      if (settled) return false;
       settled = true;
-      // Nothing left to put back (every creation failed) and nothing else to take back: no «Ripristinato».
-      if (!onUndo && slots.every((slot) => !slot.target)) return;
+      if (!onUndo && slots.every((slot) => !slot.target)) return false;
       for (const slot of slots) {
         if (!slot.target) continue;
         pending.delete(slot.target.key);
         putBack(slot.target.item);
       }
       onUndo?.();
+      return true;
+    },
+    /** Forgotten, unsent (a logout): the page going later sends nothing either. */
+    forget: () => {
+      settled = true;
+      for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
+    },
+  };
+}
+
+/**
+ * `removeWithUndo` for one gesture that removes several items: one notification, one «Annulla» that puts them all back
+ * (and runs `onUndo`), all sent as it closes or the page goes.
+ */
+export function removeManyWithUndo<T>({ message, ...held }: DeferredRemovals<T>): void {
+  let notification: number | null = null;
+  const removals = holdRemovals(held, () => {
+    if (notification !== null) closeNotification(notification, 'external');
+  });
+  notification = notify({
+    type: 'info',
+    message,
+    duration: UNDO_MS,
+    onUndo: () => {
+      // Nothing left to put back (every creation failed) and nothing else to take back: no «Ripristinato».
+      if (!removals.undo()) return;
       notify({ type: 'success', message: 'Ripristinato', duration: RESTORED_MS, after: notification ?? undefined });
     },
     // Dropped at logout: forgotten, so the page going later sends nothing either.
     onClose: (reason) => {
-      if (reason === 'dropped') {
-        for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
-      } else if (reason !== 'undo') send();
+      if (reason === 'dropped') removals.forget();
+      else if (reason !== 'undo') removals.send();
     },
   });
+}
+
+export interface HeldGesture<T> extends HeldRemovals<T> {
+  /** What the gesture did («Evidenziazione rimossa»): said to a screen reader as it is done, never shown. */
+  message: string;
+  /** Whether the gesture's text is on screen: the shortcut undoes it only then. */
+  onScreen: () => boolean;
+}
+
+/**
+ * A gesture on the user's highlights (A4, the owner's correction of 5 November 2026: «l'avviso per le evidenziazioni lo
+ * toglierei proprio … al massimo devo poter fare cmd + z»): no notification, its words said to a screen reader alone;
+ * Ctrl+Z (⌘Z on a Mac) takes it back, with no time limit, while it is the last gesture and its text is on screen
+ * (`offerShortcutUndo`). Its removals are held until the next gesture takes its place, so a highlight taken from the
+ * Forum and put back is the same row with its first author (gotcha 21), never one created again without it; they are
+ * sent as the page goes or is hidden too (as `removeWithUndo`'s, and the shortcut's undo goes with them), and at logout,
+ * before the token goes (`settleShortcutUndo`).
+ */
+export function holdGesture<T>({ message, onScreen, ...held }: HeldGesture<T>): void {
+  let offer: number | null = null;
+  const removals = holdRemovals(held, () => {
+    if (offer !== null) withdrawShortcutUndo(offer);
+  });
+  offer = offerShortcutUndo({
+    message,
+    ready: onScreen,
+    undo: () => { removals.undo(); },
+    settle: (asThePageGoes) => removals.send(asThePageGoes),
+  });
+  announce(message);
 }

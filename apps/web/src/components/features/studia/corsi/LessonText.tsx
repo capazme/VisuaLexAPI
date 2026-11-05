@@ -6,10 +6,11 @@ import { registerInkTarget } from '../../../../utils/inkTargets';
 import { inkRange, keepExact } from '../../../../utils/inkSelection';
 import type { Ink } from '../../../../utils/highlighterRules';
 import { useInkOnRelease } from '../../../../hooks/useInkOnRelease';
+import { announce, offerShortcutUndo } from '../../../ui/notifications/notifications';
 import { useHighlighterInk } from '../../../../hooks/useHighlighterInk';
 import { HighlighterButton } from '../../search/HighlighterButton';
 import { FOCUS_RING, INK_TEXT } from '../progress/tokens';
-import { numberLeaves, paintSpans, parseLesson, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
+import { numberLeaves, paintSpans, parseLesson, spanColor, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
 
 /** The lesson's reading type: the reader's serif at a reading measure (as a card, a step larger: it is read at length). */
 export const LESSON_TEXT = 'max-w-[65ch] break-words font-serif text-lg leading-[1.75] text-slate-900 dark:text-slate-100';
@@ -37,6 +38,20 @@ interface LessonTextProps {
   citations?: ReadonlyMap<string, string>;
   /** The level of the lesson's `###`: one under the heading the text sits under (2 under the step's `h1`). */
   headingLevel?: 2 | 3;
+}
+
+/** The characters highlighted: a gesture that lowers it took highlights away. */
+const covered = (spans: readonly Span[]) => spans.reduce((sum, [start, end]) => sum + end - start, 0);
+
+/** The same highlights, a colour left out by an older save read as yellow. */
+const sameSpans = (a: readonly Span[], b: readonly Span[]) =>
+  a.length === b.length && a.every((span, i) => span[0] === b[i][0] && span[1] === b[i][1] && spanColor(span) === spanColor(b[i]));
+
+/** What a gesture did, as a reader's says it (A4): to a screen reader, and «Annullato: …» once undone. */
+function gestureMessage(before: readonly Span[], after: readonly Span[], ink: Ink): string {
+  if (ink === 'none' || covered(after) < covered(before)) return 'Evidenziazione rimossa';
+  const name = highlightColorName(ink);
+  return covered(after) === covered(before) ? `Evidenziazione cambiata in ${name}` : `Testo evidenziato in ${name}`;
 }
 
 /** Shift and an arrow: what `Selection.modify` extends by (a word with Ctrl or Alt, as the reader's move bar does). */
@@ -114,13 +129,26 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
   useEffect(() => {
     latest.current = { spans, onSpans };
   });
-  /** The ink over the words selected in the text: painted, the selection cleared, the focus back on the text. */
+  /**
+   * The ink over the words selected in the text: painted, the selection cleared, the focus back on the text. As a
+   * reader's gesture (A4, 5 November): no notice, said to a screen reader, and Ctrl+Z (⌘Z) puts the highlights back as
+   * they were while it is the last gesture and the text is on screen. One that changes nothing says nothing.
+   */
   const paint = (span: readonly [number, number], chosen: Ink) => {
     const { spans: now, onSpans: set } = latest.current;
     if (!now || !set) return;
-    set(paintSpans(now, span, chosen));
+    const next = paintSpans(now, span, chosen);
     document.getSelection()?.removeAllRanges();
     root.current?.focus({ preventScroll: true });
+    if (sameSpans(next, now)) return;
+    set(next);
+    const message = gestureMessage(now, next, chosen);
+    offerShortcutUndo({
+      message,
+      ready: () => root.current?.isConnected === true,
+      undo: () => latest.current.onSpans?.([...now]),
+    });
+    announce(message);
   };
   const paintRef = useRef(paint);
   useEffect(() => {
