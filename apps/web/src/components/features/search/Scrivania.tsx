@@ -27,13 +27,12 @@ const ROW =
 
 export function Scrivania() {
   const navigate = useNavigate();
-  const { dossiers, quickNorms, selectQuickNorm, triggerSearch, openQuickNormsManager, focusMode } = useAppStore(useShallow((s) => ({
+  const { dossiers, quickNorms, selectQuickNorm, triggerSearch, openQuickNormsManager } = useAppStore(useShallow((s) => ({
     dossiers: s.dossiers,
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
     triggerSearch: s.triggerSearch,
     openQuickNormsManager: s.openQuickNormsManager,
-    focusMode: s.settings.focusMode,
   })));
 
   const now = new Date();
@@ -49,9 +48,9 @@ export function Scrivania() {
         // On a phone (M1): the page's 16 px margin (the layout's: the reader's column has none of its own below md since R3b, and
         // the Scrivania none either), and the
         // block centred in the window under the search bar when it is shorter than it (the layout's padding taken off:
-        // 1rem above and below, 3rem in Focus mode, which draws no search bar).
+        // 1rem above and below; in full screen no search bar is drawn and `--search-bar-height` is unset).
         'max-md:w-auto max-md:flex max-md:flex-col max-md:justify-center max-md:px-0 max-md:py-8',
-        focusMode ? 'max-md:min-h-[calc(100dvh-6rem)]' : 'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
+        'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
       )}
     >
       <div className="mx-auto w-full max-w-[760px]">

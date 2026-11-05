@@ -37,6 +37,12 @@ import { openSearchMenu } from '../../utils/searchFieldControl';
 import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
+import { isMacPlatform } from '../ui/notifications/undoShortcut';
+import { FULL_PAGE_FRAME, PAGE_FRAME } from './frame';
+
+/** The full screen's key, in the button's `title` and its `aria-keyshortcuts`: ⌘Space on a Mac, Ctrl+Space elsewhere. */
+const FULL_SCREEN_SHORTCUT = isMacPlatform() ? '⌘Spazio' : 'Ctrl+Spazio';
+const FULL_SCREEN_KEYS = isMacPlatform() ? 'Meta+Space' : 'Control+Space';
 
 const loadCompareView = () => import('../features/compare/CompareView').then(m => ({ default: m.CompareView }));
 // A new one after a failed fetch: `lazy` keeps a failure for good.
@@ -107,7 +113,7 @@ export function Layout() {
   const { pathname } = useLocation();
   const onSearchPage = pathname === '/';
   // The search page's field sits above its content, outside the scroller, so it is always on screen
-  // (spec 2026-10-13-fixed-search-design.md); Focus mode hides it, ⌘K still opens the palette.
+  // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
   const showSearchBar = onSearchPage && !settings.focusMode;
   // Below lg a bar sits at the top of every page (M1): the search page's is its field, with the menu button beside it;
   // every other page has `PhoneTopBar` over its content area, and starts under it. Focus mode draws neither.
@@ -340,12 +346,17 @@ export function Layout() {
           showPhoneBar && phoneBar.hidden && 'max-md:[--phone-bar-offset:0px]',
         )}
       >
-        {/* Floating Focus Toggle */}
+        {/* The full screen (U1, L-47: `focusMode` in the settings): it widens the frame, never narrows it. A toggle, so
+            its name stays «Tutto schermo» and `aria-pressed` says the state; the `title` says what a press does. */}
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          type="button"
+          whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+          whileTap={reduceMotion ? undefined : { scale: 0.95 }}
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
+          aria-label="Tutto schermo"
+          aria-pressed={settings.focusMode}
+          aria-keyshortcuts={FULL_SCREEN_KEYS}
           className={cn(
             // 44 px, the touch target (it was 42: a 20 px icon in 10 px of padding and a 1 px border).
             'hidden md:grid place-items-center h-11 w-11 fixed top-4 right-4 z-50 rounded-xl transition-colors',
@@ -356,9 +367,9 @@ export function Layout() {
               ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
               : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
-          title={settings.focusMode ? 'Esci da Focus Mode (Cmd+Space)' : 'Focus Mode (Cmd+Space)'}
+          title={settings.focusMode ? `Esci dal tutto schermo (${FULL_SCREEN_SHORTCUT})` : `Tutto schermo (${FULL_SCREEN_SHORTCUT})`}
         >
-          {settings.focusMode ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+          {settings.focusMode ? <Minimize2 size={20} aria-hidden /> : <Maximize2 size={20} aria-hidden />}
         </motion.button>
 
         {showPhoneBar && (
@@ -404,11 +415,14 @@ export function Layout() {
           )}
         >
           <div data-testid="layout-content" className={cn(
-            'max-w-7xl mx-auto p-4 md:p-8',
+            // The frame (U1): the window less its margins, at most 1600 px; 2400 in full screen, which gives the content
+            // the room of the sidebar and of the search page's field, and on a page that declares itself `full`
+            // (`frame.ts`). The padding above and below does not change: the practice row is measured against it.
+            PAGE_FRAME, 'py-4 md:py-8',
+            settings.focusMode ? 'max-w-frame-full' : cn('max-w-frame', FULL_PAGE_FRAME),
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
-            // md:p-8 wins).
+            // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
-            settings.focusMode && 'max-w-4xl py-12',
             // The feedback button floats over the page's foot from md, signed in: 24 px off the edge and 46 px tall, and
             // 16 px of air over it, so the last row («Ripassa» of the last subject) scrolls clear of it (G8c). In
             // `--page-foot`, which a page sized to the window takes off its height (the graph's). Not on the search page,

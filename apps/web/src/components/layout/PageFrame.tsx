@@ -2,18 +2,21 @@ import { useId, type ReactNode } from 'react';
 import { FOCUS_RING } from '../../constants/interactions';
 import { kickerOf, type SectionId } from '../../features/sections/sections';
 import { cn } from '../../lib/utils';
+import type { PageWidth } from './frame';
 
 /** A page's title: Newsreader, 28 px on a phone and 30 px from `md`, the same on every section page. */
 export const PAGE_TITLE = 'font-serif text-[28px] font-medium leading-tight tracking-tight text-slate-900 md:text-3xl dark:text-slate-50';
 
 /**
- * Room on the right of a header with an action, for `Layout`'s Focus button (`fixed top-4 right-4`, 44 px, from
+ * Room on the right of a header with an action, for `Layout`'s full-screen button (`fixed top-4 right-4`, 44 px, from
  * `md`; below `lg` the page starts under it). The action must end 68 px from the window's right edge (the button's 60
- * and 8 of air); the frame leaves it `(C − 1280) / 2 + 32`, where C is the content column (`100vw` less
- * `--sidebar-width`, less a scrollbar of up to 15 px): so the header pads `44 − (C − 1280) / 2` px, between 0 and 44 —
- * nothing from a window of about 1590 px with the wide sidebar, 44 px up to a 1280 px column.
+ * and 8 of air). The frame's right edge is `(100vw − --sidebar-width − F) / 2` from it, F the frame's own width — `100%`
+ * of the header's containing block, whatever the window, the full screen or the page's width (U1) —; a scrollbar only
+ * moves it further. So the header pads `68 px` less that, and nothing once it is past 68: 36 px at 1280 px with the wide
+ * sidebar (the 32 px margin), 20 px from 1536 px while the frame fills the window (the 48 px margin), nothing once the
+ * window less the sidebar is 136 px wider than the frame.
  */
-export const FOCUS_BUTTON_CLEARANCE = 'lg:pr-[clamp(0px,calc(2.75rem_-_(100vw_-_var(--sidebar-width,0px)_-_80rem)_/_2),2.75rem)]';
+export const FOCUS_BUTTON_CLEARANCE = 'lg:pr-[max(0px,calc(4.25rem_-_(100vw_-_var(--sidebar-width,0px)_-_100%)_/_2))]';
 
 /** The section's line over a title (L-37): Geist, small, quiet. */
 export const PAGE_KICKER = 'text-sm text-slate-600 dark:text-slate-400';
@@ -34,25 +37,28 @@ export interface PageFrameProps {
   section?: SectionId;
   /** The title's id, for a landmark it names. */
   titleId?: string;
+  /** The page's width, declared once (U1, `frame.ts`): `reading` keeps the body at the reading measure, `full` widens
+   *  `Layout`'s frame to the full screen's; `work`, the frame, by default. */
+  width?: PageWidth;
   className?: string;
   children: ReactNode;
 }
 
 /**
- * The frame of a section page (W2): the layout's own width (`Layout`'s `max-w-7xl` and its padding, the 1216 px
- * column of Dossier and Forum) with nothing narrower inside, the title at the column's left edge in one size, the
- * sentence under it, the action on its right, and no icon beside it. A page whose body reads as long text narrows
- * the body, never the title. A section's page names itself in the title and its section over it (`kicker`, L-37).
- * Outside it: the Scrivania, the lesson, the reader and the practice, the login.
+ * The frame of a section page (W2, U1): the layout's own frame (`frame.ts`: the window less its margins, at most 1600
+ * px, 2400 in full screen) with nothing narrower inside, the title at the column's left edge in one size, the sentence
+ * under it, the action on its right, and no icon beside it. A page whose body reads as long text says `reading`: the
+ * body narrows to the reading measure, never the title. A section's page names itself in the title and its section
+ * over it (`kicker`, L-37). Outside it: the Scrivania, the lesson, the reader and the practice, the login.
  */
-export function PageFrame({ title, kicker, line, action, actionBeside = false, section, titleId, className, children }: PageFrameProps) {
+export function PageFrame({ title, kicker, line, action, actionBeside = false, section, titleId, width = 'work', className, children }: PageFrameProps) {
   // The title says only the page's name («Oggi» in Opus and in Gymnasium): the line over it describes it, so the focus
   // the section switcher puts on the title also says which section it is in.
   const kickerId = useId();
   // A section with no phrase yet draws no line, and the title describes nothing.
   const kickerText = kicker ? kickerOf(kicker) : null;
   return (
-    <div className={cn('flex w-full min-w-0 flex-col gap-6', className)}>
+    <div data-page-width={width} className={cn('flex w-full min-w-0 flex-col gap-6', className)}>
       <header className={cn(
         'flex gap-4 md:flex-row md:items-center md:justify-between',
         actionBeside ? 'flex-row items-start justify-between' : 'flex-col',
@@ -71,7 +77,7 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
         </div>
         {action && <div className="flex shrink-0 gap-2">{action}</div>}
       </header>
-      {children}
+      {width === 'reading' ? <div className="flex min-w-0 max-w-measure flex-col gap-6">{children}</div> : children}
     </div>
   );
 }

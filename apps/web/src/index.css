@@ -169,6 +169,14 @@
   --radius-xl: 10px;
   --radius-2xl: 14px;
   --radius-3xl: 14px;
+
+  /* The frame and the reading measure (U1, L-46), one value each. `max-w-frame`: the column a page in `Layout` draws
+     in, 1600 px; `max-w-frame-full`: the same in full screen and on a `full` page, 2400 px (`components/layout/frame.ts`).
+     `max-w-measure`: a long text's column, 70 characters of its own font; `.vlx-art` reads it too, and the signs'
+     container query writes its number (`theme.test.ts` keeps the two equal). */
+  --container-frame: 100rem;
+  --container-frame-full: 150rem;
+  --container-measure: 70ch;
 }
 
 /* ═══════════════════════════════════════════════════════════

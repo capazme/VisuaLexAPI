@@ -8,6 +8,7 @@ import { subjectHue } from './components/features/studia/progress/tokens';
 import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
 import type { Materia } from './types/studia';
 import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
+import { FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -45,11 +46,28 @@ describe('the primary colour scale', () => {
   }, 30000);
 });
 
-describe('the page frame (W2)', () => {
-  it('compiles the room a header leaves for the Focus button, from `lg`', async () => {
+describe('the page frame (W2, U1)', () => {
+  it('compiles the room a header leaves for the full-screen button, from `lg`, against the frame\'s own width', async () => {
     const css = await compile([FOCUS_BUTTON_CLEARANCE]);
-    expect(css).toMatch(/padding-right:\s*clamp\(0px,\s*calc\(2\.75rem - \(100vw - var\(--sidebar-width,\s*0px\) - 80rem\) \/ 2\),\s*2\.75rem\)/);
+    expect(css).toMatch(/padding-right:\s*max\(0px,\s*calc\(4\.25rem - \(100vw - var\(--sidebar-width,\s*0px\) - 100%\) \/ 2\)\)/);
     expect(css).toContain('@media (width >= 64rem)');
+  }, 30000);
+
+  it('declares the frame once, 1600 px and 2400 in full screen, its margins outside it (U1)', async () => {
+    const css = await compile([...PAGE_FRAME.split(' '), 'max-w-frame', 'max-w-frame-full']);
+    expect(css).toMatch(/--container-frame:\s*100rem/);
+    expect(css).toMatch(/--container-frame-full:\s*150rem/);
+    expect(css).toMatch(/\.max-w-frame\s*\{\s*max-width:\s*var\(--container-frame\)/);
+    expect(css).toMatch(/\.max-w-frame-full\s*\{\s*max-width:\s*var\(--container-frame-full\)/);
+    // The margins are padding outside the frame: 16 px, 32 from `md`, 48 from 1536 px.
+    expect(css).toMatch(/\.box-content\s*\{\s*box-sizing:\s*content-box/);
+    expect(css).toContain('@media (width >= 96rem)');
+    expect(css).toMatch(/\.\\32 xl\\:px-12/);
+  }, 30000);
+
+  it('widens to the full screen\'s frame while a page that declares itself `full` is in it (U1)', async () => {
+    const css = await compile([FULL_PAGE_FRAME]);
+    expect(css).toMatch(/:has\(\*:is\(\[data-page-width=full\]\)\)\s*\{\s*max-width:\s*var\(--container-frame-full\)/);
   }, 30000);
 });
 
