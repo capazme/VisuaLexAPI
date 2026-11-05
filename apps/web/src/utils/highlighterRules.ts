@@ -75,37 +75,80 @@ function innermost(holders: readonly InkMark[], order: ReadonlyMap<InkMark, numb
   }, undefined);
 }
 
-/** The colours seen over `[start, end)`, a space aside: each character's innermost highlight's, null where none. */
+/** Spaces and punctuation: what a selection passes over without passing over a colour («danno,» over «danno» alone). */
+const ASIDE = /[\s\p{P}]/u;
+
+/** Whether `plain.slice(from, to)` has a character that is neither a space nor punctuation. */
+const hasWords = (plain: string, from: number, to: number) => {
+  for (let i = from; i < to; i += 1) if (!ASIDE.test(plain[i] ?? '')) return true;
+  return false;
+};
+
+/**
+ * The colours seen over `[start, end)`, spaces and punctuation aside: on each stretch between two highlights' edges, the
+ * innermost highlight's colour, null where none.
+ */
 function coloursSeen(plain: string, marks: readonly InkMark[], start: number, end: number): Set<HighlightColor | null> {
   const order = new Map(marks.map((m, i) => [m, i]));
+  const edges = [...new Set([start, end, ...marks.flatMap((m) => [m.start, m.end]).filter((e) => e > start && e < end)])].sort((a, b) => a - b);
   const seen = new Set<HighlightColor | null>();
-  for (let i = start; i < end; i += 1) {
-    if (/\s/.test(plain[i] ?? '')) continue;
-    seen.add(innermost(marks.filter((m) => m.start <= i && i < m.end), order)?.color ?? null);
+  for (let k = 0; k + 1 < edges.length; k += 1) {
+    const [from, to] = [edges[k], edges[k + 1]];
+    if (!hasWords(plain, from, to)) continue;
+    seen.add(innermost(marks.filter((m) => m.start <= from && to <= m.end), order)?.color ?? null);
   }
   return seen;
 }
 
-/** Whether `[a, b)` and `[c, d)` overlap, touch, or are apart by spaces alone in `plain`. */
-function meet(plain: string, a: number, b: number, c: number, d: number): boolean {
-  if (a <= d && c <= b) return true;
-  const gap = b < c ? plain.slice(b, c) : plain.slice(d, a);
-  return /^\s+$/.test(gap);
+/**
+ * Whether `[a, b)` and `[c, d)` are to be one in a colour: they overlap, or touch or are apart by spaces alone in
+ * `plain` with no block's start between them (`breaks`: a comma, a paragraph — two highlights there stay two, each under
+ * its own block's sign).
+ */
+export function meet(plain: string, breaks: readonly number[], a: number, b: number, c: number, d: number): boolean {
+  if (a < d && c < b) return true;
+  const [from, to] = b <= c ? [b, c] : [d, a];
+  if (to < from || breaks.some((k) => k >= from && k <= to)) return false;
+  return from === to || /^\s+$/.test(plain.slice(from, to));
+}
+
+/** `part` with the stretches `holes` cover taken out: what is left of it, in order. */
+function without(part: InkPart, holes: readonly { start: number; end: number }[]): InkPart[] {
+  let left = [part];
+  for (const hole of holes) {
+    left = left.flatMap((p) => (hole.end <= p.start || hole.start >= p.end
+      ? [p]
+      : [
+          ...(p.start < hole.start ? [{ ...p, end: hole.start }] : []),
+          ...(hole.end < p.end ? [{ ...p, start: hole.end }] : []),
+        ]));
+  }
+  return left;
 }
 
 /**
  * The plan's new highlights made one with what they meet in their colour: the parts that meet are joined, and each
- * highlight of the user's that a part meets, of its colour, not taken away already and not `whole`, is taken away and
- * joined to it. Until nothing more meets (a part grown may reach another).
+ * highlight of the user's that a part meets, of its colour, not taken away already and not `whole`, is taken away (into
+ * `removed`) and joined to it, until nothing more meets. A `whole` highlight of the colour (one from the Forum, never
+ * cut nor joined) keeps its words: the parts leave them to it, so one colour never lies twice on a word.
  */
-function joinSameColour(plain: string, marks: readonly InkMark[], remove: string[], add: InkPart[]): InkPart[] {
+function joinSameColour(
+  plain: string,
+  breaks: readonly number[],
+  marks: readonly InkMark[],
+  removed: Set<string>,
+  recolored: ReadonlyMap<string, HighlightColor>,
+  add: readonly InkPart[],
+): InkPart[] {
+  const byStart = [...marks].sort((x, y) => x.start - y.start);
   let parts = add.map((part) => ({ ...part }));
   for (let changed = true; changed;) {
     changed = false;
     for (const part of parts) {
-      for (const m of marks) {
-        if (m.whole || m.color !== part.color || remove.includes(m.id) || !meet(plain, part.start, part.end, m.start, m.end)) continue;
-        remove.push(m.id);
+      // Both ways along the text, so a row of highlights that meet is taken in one pass.
+      for (const m of [...byStart, ...[...byStart].reverse()]) {
+        if (m.whole || m.color !== part.color || removed.has(m.id) || !meet(plain, breaks, part.start, part.end, m.start, m.end)) continue;
+        removed.add(m.id);
         part.start = Math.min(part.start, m.start);
         part.end = Math.max(part.end, m.end);
         // What the server holds of it beyond the words (its `note`) goes with the joined part.
@@ -115,7 +158,7 @@ function joinSameColour(plain: string, marks: readonly InkMark[], remove: string
     }
     const joined: InkPart[] = [];
     for (const part of [...parts].sort((x, y) => x.start - y.start)) {
-      const into = joined.find((p) => p.color === part.color && meet(plain, p.start, p.end, part.start, part.end));
+      const into = joined.find((p) => p.color === part.color && meet(plain, breaks, p.start, p.end, part.start, part.end));
       if (into) {
         into.start = Math.min(into.start, part.start);
         into.end = Math.max(into.end, part.end);
@@ -126,43 +169,46 @@ function joinSameColour(plain: string, marks: readonly InkMark[], remove: string
     }
     parts = joined;
   }
-  return parts;
+  return parts.flatMap((part) => without(part, marks.filter((m) => m.whole && !removed.has(m.id) && (recolored.get(m.id) ?? m.color) === part.color)));
 }
 
-/** Whether every character of `[start, end)` but a space lies under one of `marks`. */
+/** Whether every character of `[start, end)` but spaces and punctuation lies under one of `marks`. */
 function coveredBy(plain: string, marks: readonly InkMark[], start: number, end: number): boolean {
   for (let i = start; i < end; i += 1) {
-    if (/\s/.test(plain[i] ?? '')) continue;
+    if (ASIDE.test(plain[i] ?? '')) continue;
     if (!marks.some((m) => m.start <= i && i < m.end)) return false;
   }
   return true;
 }
 
-export function planInk({ start, end, ink, marks, plain }: {
+export function planInk({ start, end, ink, marks, plain, breaks = [] }: {
   start: number;
   end: number;
   ink: Ink;
   marks: readonly InkMark[];
-  /** The projection the offsets count in: spaces decide what a selection passes over, and what meets. */
+  /** The projection the offsets count in: spaces and punctuation decide what a selection passes over, and what meets. */
   plain: string;
+  /** Where each block after the first starts in `plain` (a comma, a paragraph): one colour is never joined across one. */
+  breaks?: readonly number[];
 }): InkPlan {
   if (end <= start) return NOTHING;
   const touching = marks.filter((m) => m.start < end && m.end > start);
   if (touching.length === 0 && ink === 'none') return NOTHING;
 
-  const remove: string[] = [];
+  const removed = new Set<string>();
   const recolor: { id: string; color: HighlightColor }[] = [];
   const add: InkPart[] = [];
   // The selection taken out of a highlight: the parts outside it stay, in its colour; one that cannot be cut goes whole.
   const cut = (m: InkMark) => {
-    if (remove.includes(m.id)) return;
-    remove.push(m.id);
+    if (removed.has(m.id)) return;
+    removed.add(m.id);
     if (m.whole) return;
     if (start > m.start) add.push({ start: m.start, end: start, color: m.color, from: m.id });
     if (end < m.end) add.push({ start: end, end: m.end, color: m.color, from: m.id });
   };
   const plan = (effect: 'removed' | 'recoloured' | 'created'): InkPlan => {
-    const parts = joinSameColour(plain, marks, remove, add);
+    const parts = joinSameColour(plain, breaks, marks, removed, new Map(recolor.map((r) => [r.id, r.color])), add);
+    const remove = [...removed];
     // A new highlight alone, joined to nothing: the plain creation (the article's MERL-T event goes with it).
     if (effect === 'created' && remove.length === 0 && recolor.length === 0 && parts.length === 1 && parts[0].start === start && parts[0].end === end) {
       return { kind: 'create', color: parts[0].color };
@@ -187,20 +233,21 @@ export function planInk({ start, end, ink, marks, plain }: {
   // one that is never cut and holds the selection (one from the Forum keeps its first author, gotcha 21).
   if (same.length === 0 && others.length === 1) {
     const [only] = others;
-    const meetsInk = marks.some((m) => !m.whole && m.color === ink && meet(plain, only.start, only.end, m.start, m.end));
+    const meetsInk = marks.some((m) => !m.whole && m.color === ink && meet(plain, breaks, only.start, only.end, m.start, m.end));
     if ((only.whole && only.start <= start && end <= only.end) || (!only.whole && only.start === start && only.end === end && !meetsInk)) {
       recolor.push({ id: only.id, color: ink });
       return plan('recoloured');
     }
   }
   // The ink over the whole selection: other colours give way where it passes (one that is never cut is recoloured
-  // whole), and its own colour is one with it — or, lying under them all along, shows once they give way.
+  // whole), and its own colour is one with it — or, lying under them all along, shows once they give way. Over plain
+  // words too, it is words highlighted.
   for (const m of others) {
     if (m.whole) recolor.push({ id: m.id, color: ink });
     else cut(m);
   }
   if (!coveredBy(plain, same, start, end)) add.push({ start, end, color: ink });
-  return plan(others.length > 0 ? 'recoloured' : 'created');
+  return plan(others.length > 0 && !seen.has(null) ? 'recoloured' : 'created');
 }
 
 /**

@@ -28,6 +28,9 @@ export interface HighlightInkOptions {
   articleId: string;
   /** The projection the anchors count in (an article's text without `\n`, a decision's `decisionProjection`). */
   plain: string;
+  /** Where each block after the first starts in `plain` (`blockStarts`), read as a gesture comes: one colour is never
+   * joined across one. */
+  breaks?: () => readonly number[];
   /** False on a text that takes no highlight (a past text). */
   enabled?: boolean;
   /** Words were highlighted, alone or joined to the highlights they meet (the article's MERL-T event); never for a cut
@@ -42,7 +45,7 @@ export interface HighlightInkOptions {
  * No notification (the owner, 5 November 2026): a gesture is said to a screen reader, and Ctrl+Z (⌘Z) takes the last one
  * back while its text is on screen — this reader counts its text as on screen while it is mounted.
  */
-export function useHighlightInk({ key, articleId, plain, enabled = true, onCreated }: HighlightInkOptions) {
+export function useHighlightInk({ key, articleId, plain, breaks, enabled = true, onCreated }: HighlightInkOptions) {
   const addHighlight = useAppStore((s) => s.addHighlight);
   const editHighlights = useAppStore((s) => s.editHighlights);
   // A text that takes no highlight (a past text, whose key is the text in force's) draws none to undo.
@@ -53,7 +56,7 @@ export function useHighlightInk({ key, articleId, plain, enabled = true, onCreat
     // gesture before the screen caught up (a key held down) must see the first, or it would make the same highlight
     // again (the owner's duplicates, 5 November). An application's passages are never in it (D7b, D8).
     const highlights = appStore.getState().highlights.filter((h) => h.normaKey === key && h.articleId === articleId);
-    const plan = planInk({ start: startOffset, end: startOffset + text.length, ink, marks: inkMarks(plain, highlights), plain });
+    const plan = planInk({ start: startOffset, end: startOffset + text.length, ink, marks: inkMarks(plain, highlights), plain, breaks: breaks?.() });
     if (plan.kind === 'nothing') return;
     if (plan.kind === 'create') {
       addHighlight(key, articleId, text, '', plan.color, startOffset);

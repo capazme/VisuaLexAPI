@@ -12,6 +12,8 @@ export interface AnnotationActionsOptions {
   articleId: string;
   /** The projection the anchors count in: the parts a cut leaves are its own words. */
   plain: string;
+  /** Where its blocks start in it (`blockStarts`), read as a highlighter's gesture comes. */
+  breaks?: () => readonly number[];
   /** A note's toast («Nota ancorata al testo»); a highlight says nothing (A4). */
   showToast: (message: string, type: 'success' | 'error' | 'info') => void;
   /** False on a text that takes no marks (a past text): the selection popup's actions do nothing. */
@@ -29,9 +31,9 @@ export interface AnnotationActionsOptions {
  * The anchor's `scopedArticleId` lets a sub-section of the article target its own scope.
  */
 export function useAnnotationActions({
-  key, articleId, plain, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,
+  key, articleId, plain, breaks, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,
 }: AnnotationActionsOptions) {
-  const applyInk = useHighlightInk({ key, articleId, plain, enabled, onCreated: onHighlightAdded });
+  const applyInk = useHighlightInk({ key, articleId, plain, breaks, enabled, onCreated: onHighlightAdded });
   const addAnnotation = useAppStore((s) => s.addAnnotation);
   // The selected span becomes the note's anchor; the composer sits on the span itself, at the rect
   // the popup captured before the selection cleared (gotcha 16).

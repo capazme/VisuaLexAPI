@@ -10,7 +10,7 @@ import { announce, offerShortcutUndo } from '../../../ui/notifications/notificat
 import { useHighlighterInk } from '../../../../hooks/useHighlighterInk';
 import { HighlighterButton } from '../../search/HighlighterButton';
 import { FOCUS_RING, INK_TEXT } from '../progress/tokens';
-import { numberLeaves, paintSpans, parseLesson, plainText, spanColor, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
+import { lineStarts, numberLeaves, paintSpans, parseLesson, plainText, spanColor, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
 
 /** The lesson's reading type: the reader's serif at a reading measure (as a card, a step larger: it is read at length). */
 export const LESSON_TEXT = 'max-w-[65ch] break-words font-serif text-lg leading-[1.75] text-slate-900 dark:text-slate-100';
@@ -117,8 +117,9 @@ function selectedSpan(root: HTMLElement, selection: Selection): readonly [number
  */
 export function LessonText({ text, spans, onSpans, onCite, citations, headingLevel = 3 }: LessonTextProps) {
   const nodes = useMemo(() => numberLeaves(parseLesson(text)), [text]);
-  // What the offsets count in: highlights of one colour apart by spaces alone are one (A4).
-  const plain = useMemo(() => plainText(nodes), [nodes]);
+  // What the offsets count in, and where its lines start: highlights of one colour apart by spaces alone, on one line,
+  // are one (A4).
+  const words = useMemo(() => ({ plain: plainText(nodes), breaks: lineStarts(nodes) }), [nodes]);
   const root = useRef<HTMLDivElement>(null);
   const hintId = useId();
   const keysId = useId();
@@ -127,9 +128,9 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
   const inking = useAppStore((s) => s.readingTool === 'highlight') && highlighting;
 
   // The highlights and their handler as they are now, for the listeners below.
-  const latest = useRef({ spans, onSpans, plain });
+  const latest = useRef({ spans, onSpans, words });
   useEffect(() => {
-    latest.current = { spans, onSpans, plain };
+    latest.current = { spans, onSpans, words };
   });
   /**
    * The ink over the words selected in the text: painted, the selection cleared, the focus back on the text. As a
@@ -137,9 +138,9 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
    * they were while it is the last gesture and the text is on screen. One that changes nothing says nothing.
    */
   const paint = (span: readonly [number, number], chosen: Ink) => {
-    const { spans: now, onSpans: set, plain: words } = latest.current;
+    const { spans: now, onSpans: set, words: text } = latest.current;
     if (!now || !set) return;
-    const next = paintSpans(now, span, chosen, words);
+    const next = paintSpans(now, span, chosen, text);
     document.getSelection()?.removeAllRanges();
     root.current?.focus({ preventScroll: true });
     if (sameSpans(next, now)) return;

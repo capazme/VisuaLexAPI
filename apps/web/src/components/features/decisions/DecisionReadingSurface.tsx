@@ -30,7 +30,7 @@ import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
@@ -327,7 +327,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
   const {
     noteAnchor, composerRect, clearAnchor, handlePopupHighlight, handlePopupAddNote, handleAddNote, closeComposer, commitComposer,
-  } = useAnnotationActions({ key, articleId: NO_ARTICLE, plain, showToast });
+  } = useAnnotationActions({
+    key, articleId: NO_ARTICLE, plain, breaks: () => blockStarts(plain, structure), showToast,
+  });
   const { inlineNote, closeInlineNote } = useInlineNoteAnchors(contentRef, decisionNotes);
 
   const exportSlug = slugify(key) || 'decisione';

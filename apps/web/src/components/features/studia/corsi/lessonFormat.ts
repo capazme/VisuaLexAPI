@@ -11,6 +11,7 @@
  */
 
 import type { HighlightColor } from '../../../../utils/highlightColors';
+import { meet } from '../../../../utils/highlighterRules';
 
 export type Inline =
   /** `at`: the leaf's offset in the block's plain text, once `numberLeaves` has counted it. */
@@ -187,6 +188,22 @@ export function numberLeaves(nodes: LessonNode[]): LessonNode[] {
 /** The block's plain text, which highlights count in: the leaves joined with nothing between them. */
 export const plainText = (nodes: LessonNode[]) => leaves(nodes).join('');
 
+/**
+ * Where each line after the first starts in the plain text — a paragraph, a heading, an item, a quoted paragraph: two
+ * highlights of one colour are never joined across one (A4).
+ */
+export function lineStarts(nodes: LessonNode[]): number[] {
+  const length = (inline: Inline[]): number => inline.reduce((sum, node) => sum + (node.kind === 'text' ? node.text.length : length(node.children)), 0);
+  const lines = nodes.flatMap((node) => (node.kind === 'p' || node.kind === 'h3' ? [node.inline] : node.kind === 'quote' ? node.paragraphs : node.items));
+  const starts: number[] = [];
+  let at = 0;
+  for (const line of lines) {
+    if (at > 0) starts.push(at);
+    at += length(line);
+  }
+  return starts;
+}
+
 /** The citation markers the text uses, in order of first use. */
 export function citedMarkers(nodes: LessonNode[]): string[] {
   const out: string[] = [];
@@ -214,18 +231,23 @@ export const spanColor = (span: Span): HighlightColor => span[2] ?? 'yellow';
 
 /**
  * The highlighter over a block (A4, spec `2026-11-03-a4-highlighter-and-notes-design` §4 and §7): the reader's rules
- * (`planInk`) in the lesson's own form, where highlights never overlap. Words over the ink's colour alone (spaces aside)
- * are taken out of it, as under «Nessun colore» they are taken out of everything; any other selection takes the ink all
- * over, the other colours giving way where it passes (the parts outside stay). Highlights of one colour that meet, or
- * are apart by spaces alone in `plain` (the block's plain text, `plainText`), are one.
+ * (`planInk`) in the lesson's own form, where highlights never overlap. Words over the ink's colour alone (spaces and
+ * punctuation aside) are taken out of it, as under «Nessun colore» they are taken out of everything; any other selection
+ * takes the ink all over, the other colours giving way where it passes (the parts outside stay). Highlights of one colour
+ * that meet, or are apart by spaces alone in `text.plain` (the block's plain text, `plainText`) with no line's start
+ * between (`text.breaks`, `lineStarts`), are one.
  */
-export function paintSpans(spans: readonly Span[], [start, end]: readonly [number, number], ink: HighlightColor | 'none', plain?: string): Span[] {
+export function paintSpans(
+  spans: readonly Span[],
+  [start, end]: readonly [number, number],
+  ink: HighlightColor | 'none',
+  text: { plain: string; breaks: readonly number[] } = { plain: '', breaks: [] },
+): Span[] {
   if (end <= start) return [...spans];
   const touching = spans.filter(([s, e]) => s < end && e > start);
-  const blank = (i: number) => plain !== undefined && /\s/.test(plain[i] ?? '');
   let alone = touching.length > 0;
   for (let i = start; i < end && alone; i += 1) {
-    if (!blank(i)) alone = touching.some((span) => span[0] <= i && i < span[1] && spanColor(span) === ink);
+    if (!/[\s\p{P}]/u.test(text.plain[i] ?? 'x')) alone = touching.some((span) => span[0] <= i && i < span[1] && spanColor(span) === ink);
   }
   const erase = ink === 'none' || alone;
   const kept: [number, number, HighlightColor][] = [];
@@ -243,8 +265,7 @@ export function paintSpans(spans: readonly Span[], [start, end]: readonly [numbe
   const out: [number, number, HighlightColor][] = [];
   for (const span of kept) {
     const last = out.at(-1);
-    const meets = last && (last[1] >= span[0] || (plain !== undefined && /^\s+$/.test(plain.slice(last[1], span[0]))));
-    if (last && meets && last[2] === span[2]) last[1] = Math.max(last[1], span[1]);
+    if (last && last[2] === span[2] && (last[1] > span[0] || meet(text.plain, text.breaks, last[0], last[1], span[0], span[1]))) last[1] = Math.max(last[1], span[1]);
     else out.push(span);
   }
   return out;

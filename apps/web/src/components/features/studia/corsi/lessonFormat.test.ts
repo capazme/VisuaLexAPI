@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockMinutes, citedMarkers, paintSpans, parseInline, parseLesson, plainText, splitLeaf } from './lessonFormat';
+import { blockMinutes, citedMarkers, lineStarts, paintSpans, parseInline, parseLesson, plainText, splitLeaf } from './lessonFormat';
 
 describe('the lesson format (courses spec §10.3)', () => {
   it('reads paragraphs, `###` headings, lists and quotes, a paragraph\'s lines joined by a space', () => {
@@ -73,17 +73,28 @@ describe('highlights for the session (§5, step 3), with the highlighter\'s rule
 
   it('as the owner set them (5 November): over its colour alone, spaces aside, it goes; mixed, the ink all over, joined across spaces', () => {
     const plain = 'Il danno ingiusto, obbliga colui';
+    const text = { plain, breaks: [] };
     const at = (w: string) => plain.indexOf(w);
     const danno: [number, number, 'yellow'] = [at('danno'), at('danno') + 5, 'yellow'];
     const ingiusto: [number, number, 'yellow'] = [at('ingiusto'), at('ingiusto') + 8, 'yellow'];
     // Two highlights of the ink with a space between: both go.
-    expect(paintSpans([danno, ingiusto], [at('danno'), at('ingiusto') + 8], 'yellow', plain)).toEqual([]);
+    expect(paintSpans([danno, ingiusto], [at('danno'), at('ingiusto') + 8], 'yellow', text)).toEqual([]);
     // The words beside, across a space: one highlight; across a comma, two.
-    expect(paintSpans([danno], [ingiusto[0], ingiusto[1]], 'yellow', plain)).toEqual([[at('danno'), at('ingiusto') + 8, 'yellow']]);
-    expect(paintSpans([ingiusto], [at('obbliga'), at('obbliga') + 7], 'yellow', plain)).toEqual([ingiusto, [at('obbliga'), at('obbliga') + 7, 'yellow']]);
+    expect(paintSpans([danno], [ingiusto[0], ingiusto[1]], 'yellow', text)).toEqual([[at('danno'), at('ingiusto') + 8, 'yellow']]);
+    expect(paintSpans([ingiusto], [at('obbliga'), at('obbliga') + 7], 'yellow', text)).toEqual([ingiusto, [at('obbliga'), at('obbliga') + 7, 'yellow']]);
     // Mixed: its colour, another, plain words: the ink all over, nothing taken away.
-    expect(paintSpans([danno, [at('ingiusto'), at('ingiusto') + 8, 'green']], [at('Il'), at('ingiusto') + 8], 'yellow', plain))
+    expect(paintSpans([danno, [at('ingiusto'), at('ingiusto') + 8, 'green']], [at('Il'), at('ingiusto') + 8], 'yellow', text))
       .toEqual([[0, at('ingiusto') + 8, 'yellow']]);
+  });
+
+  it('punctuation passed over is set aside, and one colour is never joined across a line\'s start', () => {
+    // «danno,» over «danno» alone: it goes.
+    const text = { plain: 'Il danno, ingiusto', breaks: [] };
+    expect(paintSpans([[3, 8, 'yellow']], [3, 9], 'yellow', text)).toEqual([]);
+    // Two paragraphs, «fine.» and «Inizio», meet in the plain text: two highlights all the same.
+    const lines = { plain: 'fine.Inizio', breaks: [5] };
+    expect(paintSpans([[0, 5, 'yellow']], [5, 11], 'yellow', lines)).toEqual([[0, 5, 'yellow'], [5, 11, 'yellow']]);
+    expect(lineStarts(parseLesson('Uno due.\n\n- tre\n- quattro'))).toEqual([8, 11]);
   });
 
   it('«Nessun colore» takes the words out of every highlight they touch', () => {

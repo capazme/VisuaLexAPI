@@ -115,7 +115,8 @@ as before, whatever the ink.
   the floating «Evidenzia» and «Togli» go. A lesson's highlights are the session's work, kept in this tab
   (`sessionStorage`, `visualex.studia.percorsi.lavoro`) and never sent (spec 2026-10-23 §8): so a highlight now keeps
   its colour, `[start, end, colour]` (a saved one without colour reads as yellow). The lesson's highlights do not
-  overlap: a colour paints over what it covers (`paintSpans`, pure), which draws the table above exactly. From the
+  overlap: a colour paints over what it covers (`paintSpans`, pure), the table above in the lesson's form (since §7,
+  §7's rules). From the
   keyboard: Shift and the arrows select from the text (as before), H applies the ink; Enter on a highlight selects its
   words. No note tool in a lesson (lessons take no notes).
 
@@ -175,8 +176,11 @@ The test passed on the article, a decision, a dossier entry and Study Mode; thre
   highlight, overlapping»: the old rule stacked highlights of one colour, which a later cut cut each on its own, making
   identical parts — the duplicates in the owner's local database (four «te» at the same offsets). Two highlights of
   one colour never overlap now: what a gesture lays down in a colour is joined to the highlights of that colour it
-  overlaps or meets across spaces alone (so the words beside a highlight lengthen it). A highlight that is never cut
-  (from the Forum) is not joined either. The lessons follow the same rules in their form (`paintSpans`).
+  overlaps or meets across spaces alone (so the words beside a highlight lengthen it) — never across the start of a block
+  (a comma, a decision's paragraph, a lesson's line: `blockStarts`, `lineStarts`), where two highlights stay two, each
+  under its block's sign. Punctuation, as spaces, is set aside in what a selection passes over («danno,» over «danno»
+  alone takes it away). A highlight that is never cut (from the Forum) is not joined either, and the ink laid beside or
+  over it leaves its words to it. The lessons follow the same rules in their form (`paintSpans`).
 - **No duplicates** (the owner's fifth point: «te» saved four times at the same offsets). Where they came from: the old
   rule's stacked highlights of one colour, each cut on its own into identical parts (gone with the rule above); and a
   second gesture before the screen caught up — a key held down, whose repeats found the reader's highlights as the last

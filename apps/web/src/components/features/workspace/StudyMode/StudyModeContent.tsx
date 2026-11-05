@@ -11,6 +11,7 @@ import type { StudyModeTheme } from './StudyMode';
 import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
 import { useArticleTextInteractions } from '../../../../hooks/useArticleTextInteractions';
 import { getRubricText, getUpdateNoteParagraphs, parseArticleStructure } from '../../../../utils/articleStructure';
+import { blockStarts } from '../../../../utils/articleAnnotations';
 import { UpdateNotePopover } from '../../search/UpdateNotePopover';
 import { useAppStore } from '../../../../store/useAppStore';
 import { useHighlightInk } from '../../../../hooks/useHighlightInk';
@@ -101,9 +102,11 @@ export function StudyModeContent({
   const uniqueArticleId = uniqueArticleIdFromNorma(norma_data);
   const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
   const plain = useMemo(() => (article_text || '').replace(/\n/g, ''), [article_text]);
-  // The highlighter's rules (A4), as in every reader: the same words in the same colour are taken away, another colour
-  // recolours them. No toast: Study Mode says a new highlight by drawing it; a change says itself, with «Annulla».
-  const handleHighlight = useHighlightInk({ key: normaKey, articleId: uniqueArticleId, plain });
+  // The highlighter's rules (A4), as in every reader: over its own colour alone the ink is taken away, anything else
+  // takes it. No notification, as everywhere: Ctrl+Z (⌘Z) takes the last gesture back.
+  const handleHighlight = useHighlightInk({
+    key: normaKey, articleId: uniqueArticleId, plain, breaks: () => blockStarts(article_text || '', structure),
+  });
 
   // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
   const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, uniqueArticleId, {

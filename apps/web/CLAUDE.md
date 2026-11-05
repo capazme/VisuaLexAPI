@@ -1366,13 +1366,15 @@ user's own highlights only (an application's passages and glosses, a decision's 
 the owner set them (5 November 2026: «sovrascrive altri colori se presenti e non cancella il resto, se ripassa sopra lo
 stesso colore soltanto, cancella»), the colour a selection passes over being the one seen, the innermost highlight's in
 the renderer's own nesting (`byNesting`: the later start, then the earlier end, then the later highlight): over the
-ink's colour alone (spaces aside) → the ink taken away where it passes, from every highlight of it there; over anything
+ink's colour alone (spaces and punctuation aside) → the ink taken away where it passes, from every highlight of it there; over anything
 else — plain words, another colour, a mix — → the ink over the whole selection, the other colours giving way where it
 passes (the parts outside kept), the ink under them showing where it lay already (the one highlight of another colour
-selected whole is recoloured in place, `PUT`); «Nessun colore» → the piece out of everything it touches, nothing over
+selected whole is recoloured in place, `PUT`, unless it meets one of the ink, to which it is then joined, a new row);
+«Nessun colore» → the piece out of everything it touches, nothing over
 plain words. **Never two highlights of one colour overlapping**: what a gesture lays down in a colour — a new
 highlight, a piece recoloured, the parts a cut leaves — is joined to the highlights of that colour it overlaps or meets
-across spaces alone (`joinSameColour`, the note of the first joined kept), so highlighting the words beside a highlight
+across spaces alone and never across a block's start (`joinSameColour`, the note of the first joined kept; the readers
+give the starts, `blockStarts`, a lesson its lines', `lineStarts`), so highlighting the words beside a highlight
 lengthens it, and the parts that highlights of one colour stacked one on another leave are one each side (the owner's
 duplicates, 5 November). The same highlight is never made twice: the rules read the store's highlights as they apply
 (`useHighlightInk`, never the last render's, which a second gesture before the screen caught up would find without the
@@ -1387,7 +1389,7 @@ keyboard, Shift and the arrows, is taken as made, as a word processor takes it).
 the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`
 (offsets cannot be changed by `PUT`), the server's `note` copied to them. A highlight from the Forum (`sourceSuggestionId`,
 `originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut nor joined: removed or
-recoloured whole. `useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
+recoloured whole; the ink laid beside or over it leaves its words to it. `useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
 event kept) or a change (`editHighlights`). **No notification** (the owner, 5 November 2026: «l'avviso per le
 evidenziazioni lo toglierei proprio»): every gesture — a new highlight, «Fai tua», a cut, a colour, «Nessun colore», a
 removal from a sign's popover — is said to a screen reader alone («Testo evidenziato in giallo», «Evidenziazione

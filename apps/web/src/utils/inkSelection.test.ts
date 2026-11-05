@@ -121,10 +121,14 @@ describe('with Alt held, the piece exactly as selected', () => {
     expect(getInkAnchor(el, document.getSelection())?.text).toBe('ann');
     // The key's moment is over.
     vi.advanceTimersByTime(1000);
+    // A pointer's selection is widened again.
+    press(false, () => select(text, 4, text, 8));
+    expect(getInkAnchor(el, document.getSelection())?.text).toBe('danno');
+    // Shift and an arrow in a field move the field's own selection: the text's next one is not the keyboard's.
     const field = document.createElement('input');
     document.body.append(field);
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
-    press(false, () => select(text, 4, text, 8));
+    select(text, 4, text, 7);
     document.dispatchEvent(new Event('selectionchange'));
     expect(getInkAnchor(el, document.getSelection())?.text).toBe('danno');
   });

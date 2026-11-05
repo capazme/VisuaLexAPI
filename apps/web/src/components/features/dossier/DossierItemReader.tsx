@@ -23,7 +23,7 @@ import { VersionBanner } from '../search/VersionBanner';
 import { HighlighterButton } from '../search/HighlighterButton';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
 import { useGlossPassage } from '../../../hooks/useGlossPassage';
@@ -259,7 +259,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   // The words selected and the ink, through the highlighter's rules (A4): a new highlight, or the same words taken away
   // or recoloured, as in every reader. Only the user's own highlights: an application's passages are left alone.
   const handlePopupHighlight = useHighlightInk({
-    key: itemKey, articleId: uniqueArticleId, plain, enabled: !readOnly,
+    key: itemKey, articleId: uniqueArticleId, plain, breaks: () => blockStarts(rawText, structure), enabled: !readOnly,
   });
 
   const handlePopupCopy = async (text: string) => {

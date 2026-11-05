@@ -58,11 +58,12 @@ describe('planInk — the highlighter\'s rules (A4 §3, as the owner set them on
   });
 
   it('another colour reaching out: it gives way where the selection passes, the rest of it stays (no overlap any more)', () => {
+    // Over plain words too: words highlighted (said so, and told to the article).
     expect(ink(5, 40, 'red', [mark('a', 10, 30, 'yellow')])).toEqual({
-      kind: 'edit', effect: 'recoloured', color: 'red', remove: ['a'], recolor: [], add: [{ start: 5, end: 40, color: 'red' }],
+      kind: 'edit', effect: 'created', color: 'red', remove: ['a'], recolor: [], add: [{ start: 5, end: 40, color: 'red' }],
     });
     expect(ink(5, 15, 'red', [mark('a', 10, 30, 'yellow')])).toEqual({
-      kind: 'edit', effect: 'recoloured', color: 'red', remove: ['a'], recolor: [],
+      kind: 'edit', effect: 'created', color: 'red', remove: ['a'], recolor: [],
       add: [{ start: 5, end: 15, color: 'red' }, { start: 15, end: 30, color: 'yellow', from: 'a' }],
     });
   });
@@ -70,7 +71,7 @@ describe('planInk — the highlighter\'s rules (A4 §3, as the owner set them on
   it('mixed — its colour, another, plain words: the ink over all of it, its own pieces one highlight, nothing taken away', () => {
     const marks = [mark('a', 10, 20, 'yellow'), mark('b', 25, 35, 'green')];
     expect(ink(5, 40, 'yellow', marks)).toEqual({
-      kind: 'edit', effect: 'recoloured', color: 'yellow', remove: ['b', 'a'], recolor: [], add: [{ start: 5, end: 40, color: 'yellow', from: 'a' }],
+      kind: 'edit', effect: 'created', color: 'yellow', remove: ['b', 'a'], recolor: [], add: [{ start: 5, end: 40, color: 'yellow', from: 'a' }],
     });
   });
 
@@ -86,6 +87,45 @@ describe('planInk — the highlighter\'s rules (A4 §3, as the owner set them on
     const ingiusto = [mark('i', at('ingiusto'), at('ingiusto') + 8, 'yellow')];
     expect(ink(at('obbliga'), at('obbliga') + 7, 'yellow', ingiusto, text)).toEqual({ kind: 'create', color: 'yellow' });
     expect(ink(at('ingiusto'), at('ingiusto') + 8, 'green', danno, text)).toEqual({ kind: 'create', color: 'green' });
+  });
+
+  it('never joins one colour across a block\'s start (a comma, a paragraph): two highlights there stay two', () => {
+    // An article's commi are apart by spaces in the projection; a decision's paragraphs by nothing.
+    const article = 'del danno.  La risoluzione';
+    const at = (w: string) => article.indexOf(w);
+    const first = [mark('d', 0, at('.') + 1, 'yellow')];
+    // Told nothing of the blocks, the spaces between would join them.
+    expect(ink(at('La'), article.length, 'yellow', first, article)).toMatchObject({ remove: ['d'], add: [{ start: 0, end: article.length }] });
+    expect(planInk({ start: at('La'), end: article.length, ink: 'yellow', marks: first, plain: article, breaks: [at('.') + 3] })).toEqual({ kind: 'create', color: 'yellow' });
+    const decision = 'fondato.La Corte';
+    expect(planInk({ start: 8, end: 16, ink: 'yellow', marks: [mark('f', 0, 8, 'yellow')], plain: decision, breaks: [8] })).toEqual({ kind: 'create', color: 'yellow' });
+  });
+
+  it('punctuation passed over is set aside: yellow over «danno,» where «danno» alone is yellow takes it away', () => {
+    const text = 'Il danno, ingiusto';
+    expect(ink(3, 9, 'yellow', [mark('d', 3, 8, 'yellow')], text)).toEqual({ kind: 'edit', effect: 'removed', remove: ['d'], recolor: [], add: [] });
+  });
+
+  it('a highlight from the Forum keeps its words: the ink laid beside or over it never lies on them twice', () => {
+    // Yellow from the Forum, yellow reaching out of it: the new one starts where it ends.
+    expect(ink(5, 14, 'yellow', [mark('w', 0, 9, 'yellow', true)])).toEqual({
+      kind: 'edit', effect: 'created', color: 'yellow', remove: [], recolor: [], add: [{ start: 9, end: 14, color: 'yellow' }],
+    });
+    // Green from the Forum, recoloured whole by yellow reaching out of it towards a yellow one: joined, its words left to it.
+    expect(ink(5, 19, 'yellow', [mark('w', 0, 9, 'green', true), mark('y', 19, 24, 'yellow')])).toEqual({
+      kind: 'edit', effect: 'created', color: 'yellow', remove: ['y'], recolor: [{ id: 'w', color: 'yellow' }], add: [{ start: 9, end: 24, color: 'yellow', from: 'y' }],
+    });
+  });
+
+  it('a long row of highlights of one colour, one word left out, is joined into one when that word takes the colour', () => {
+    const words = Array.from({ length: 2000 }, () => 'parola').join(' ');
+    const marks = Array.from({ length: 2000 }, (_, i) => mark(`m${i}`, i * 7, i * 7 + 6, 'yellow')).filter((_, i) => i !== 1000);
+    const started = performance.now();
+    const plan = ink(7000, 7006, 'yellow', marks, words);
+    expect(plan).toMatchObject({ kind: 'edit', effect: 'created', add: [{ start: 0, end: words.length, color: 'yellow' }] });
+    expect(plan.kind === 'edit' && plan.remove).toHaveLength(1999);
+    // Each highlight met once along the row both ways, not once a pass.
+    expect(performance.now() - started).toBeLessThan(3000);
   });
 
   it('highlights of one colour stacked (the owner\'s test): the piece out of all of them, one part each side, no duplicate', () => {

@@ -47,7 +47,7 @@ import { buildArticleXrefNerPayload } from './articleXrefNer';
 import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
 import type { Annotation, Highlight } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { citeNorm, shortNorm } from '../../../utils/sources';
@@ -313,6 +313,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         key: itemKey,
         articleId: uniqueArticleId,
         plain: plainArticle,
+        // Read as a gesture comes (the structure is parsed further down, for the text).
+        breaks: () => blockStarts(article_text || '', parseArticleStructure(article_text || '')),
         showToast,
         enabled: !readOnly,
         onHighlightAdded: (text, color, startOffset) => publishMerltEvent({

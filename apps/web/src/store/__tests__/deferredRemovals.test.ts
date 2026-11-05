@@ -429,6 +429,16 @@ describe('holdGesture: a gesture held for the key alone (A4)', () => {
     expect(getFreshAccessToken).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the token fresh for a removal moved meanwhile to the id the server gave its highlight', () => {
+    vi.useFakeTimers();
+    savingStarted('y:temp');
+    holdGesture({ message: 'Evidenziazione rimossa', onScreen: () => true, targets: [target('temp')], putBack: vi.fn(), onRefused: vi.fn() });
+    savingDone('y:temp', target('server'));
+    vi.mocked(getFreshAccessToken).mockClear();
+    vi.advanceTimersByTime(3 * 60_000);
+    expect(getFreshAccessToken).toHaveBeenCalledTimes(3);
+  });
+
   it('a part refused takes the gesture back at once, and the key with it', async () => {
     let answer: (ok: boolean) => void = () => {};
     const ready = new Promise<boolean>((resolve) => { answer = resolve; });

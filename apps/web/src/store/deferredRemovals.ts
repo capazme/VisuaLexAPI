@@ -293,6 +293,11 @@ function holdRemovals<T>({ targets, putBack, onRefused, onUndo, ready }: HeldRem
       const more = onUndo ? onUndo() !== false : false;
       return any || more;
     },
+    /**
+     * Whether a removal still waits to be sent or answered — under the server's id its item took meanwhile (a slot is
+     * retargeted as a creation answers), or while what it waits for is saved.
+     */
+    waiting: (): boolean => waiting || slots.some(({ target }) => target !== null && (pending.has(target.key) || inFlight.has(target.key))),
     /** Forgotten, unsent (a logout): the page going later sends nothing either. */
     forget: () => {
       settled = true;
@@ -359,7 +364,7 @@ export function holdGesture<T>({ message, onScreen, ...held }: HeldGesture<T>): 
   });
   if (held.targets.length > 0) {
     keeper = window.setInterval(() => {
-      if (!held.targets.some((target) => pending.has(target.key) || inFlight.has(target.key))) done();
+      if (!removals.waiting()) done();
       else void getFreshAccessToken(TOKEN_MARGIN_S).catch(() => null);
     }, TOKEN_CHECK_MS);
   }
