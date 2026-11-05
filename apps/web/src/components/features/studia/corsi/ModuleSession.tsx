@@ -575,7 +575,7 @@ function ModuleStart({ modulo, headingRef }: { modulo: ModuloLezione; headingRef
           <h2 id="modulo-domande-prima" className={BLOCK_HEADING}>
             Prima di leggere
           </h2>
-          <p className="max-w-[65ch] text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+          <p className="max-w-measure text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             Tieni a mente queste domande: le ritrovi leggendo. Non c’è da rispondere qui, e le rivedi sopra ogni blocco.
           </p>
           <PreQuestions domande={modulo.domandePrima} />
@@ -583,7 +583,7 @@ function ModuleStart({ modulo, headingRef }: { modulo: ModuloLezione; headingRef
       )}
       {modulo.ritirato && <p className={cn('text-sm', MUTED_TEXT)}>Hai ritirato questo modulo: le sue risposte non contano più, conta la correzione.</p>}
       {modulo.stato === 'da-iniziare' && (
-        <p className="max-w-[65ch] text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+        <p className="max-w-measure text-sm leading-relaxed text-slate-700 dark:text-slate-300">
           Una volta iniziato, il modulo resta nel percorso: non potrai più eliminarlo. Se vuoi solo vedere com’è, leggilo senza iniziarlo.
         </p>
       )}

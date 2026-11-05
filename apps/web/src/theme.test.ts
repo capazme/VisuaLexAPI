@@ -8,6 +8,7 @@ import { subjectHue } from './components/features/studia/progress/tokens';
 import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
 import type { Materia } from './types/studia';
 import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
+import { FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -45,19 +46,55 @@ describe('the primary colour scale', () => {
   }, 30000);
 });
 
-describe('the page frame (W2)', () => {
-  it('compiles the room a header leaves for the Focus button, from `lg`', async () => {
-    const css = await compile([FOCUS_BUTTON_CLEARANCE]);
-    expect(css).toMatch(/padding-right:\s*clamp\(0px,\s*calc\(2\.75rem - \(100vw - var\(--sidebar-width,\s*0px\) - 80rem\) \/ 2\),\s*2\.75rem\)/);
-    expect(css).toContain('@media (width >= 64rem)');
+describe('the page frame (W2, U1)', () => {
+  it('compiles the room a top row leaves for the full-screen button, against the frame\'s own width, where `Layout` says it floats', async () => {
+    const css = await compile([FOCUS_BUTTON_CLEARANCE, 'lg:[--focus-button-room:4.25rem]', 'md:[--focus-button-room:4.25rem]']);
+    expect(css).toMatch(/padding-right:\s*max\(0px,\s*calc\(var\(--focus-button-room,\s*0px\) - \(100vw - var\(--sidebar-width,\s*0px\) - 100%\) \/ 2\)\)/);
+    expect(css).toMatch(/@media \(width >= 64rem\)\s*\{\s*--focus-button-room:\s*4\.25rem/);
+    expect(css).toMatch(/@media \(width >= 48rem\)\s*\{\s*--focus-button-room:\s*4\.25rem/);
   }, 30000);
+
+  it('declares the frame once, 1600 px and 2400 in full screen, its margins outside it (U1)', async () => {
+    const css = await compile([...PAGE_FRAME.split(' '), 'max-w-frame', 'max-w-frame-full']);
+    expect(css).toMatch(/--container-frame:\s*100rem/);
+    expect(css).toMatch(/--container-frame-full:\s*150rem/);
+    expect(css).toMatch(/\.max-w-frame\s*\{\s*max-width:\s*var\(--container-frame\)/);
+    expect(css).toMatch(/\.max-w-frame-full\s*\{\s*max-width:\s*var\(--container-frame-full\)/);
+    // The margins are padding outside the frame: 16 px, 32 from `md`, 48 from 1536 px.
+    expect(css).toMatch(/\.box-content\s*\{\s*box-sizing:\s*content-box/);
+    expect(css).toContain('@media (width >= 96rem)');
+    expect(css).toMatch(/\.\\32 xl\\:px-12/);
+  }, 30000);
+
+  it('widens to the full screen\'s frame while a page that declares itself `full` is in it (U1)', async () => {
+    const css = await compile([FULL_PAGE_FRAME]);
+    expect(css).toMatch(/:has\(\*:is\(\[data-page-width=full\]\)\)\s*\{\s*max-width:\s*var\(--container-frame-full\)/);
+  }, 30000);
+});
+
+describe('the reading measure (U1)', () => {
+  it('is one value in the theme, 70 characters, read as `max-w-measure` and by the reading surface', async () => {
+    const css = await compile(['max-w-measure']);
+    expect(css).toMatch(/--container-measure:\s*70ch/);
+    expect(css).toMatch(/\.max-w-measure\s*\{\s*max-width:\s*var\(--container-measure\)/);
+    expect(css).toMatch(/\.vlx-art\s*\{[^}]*max-width:\s*var\(--container-measure\)/);
+  }, 30000);
+
+  it('writes the token\'s number in the signs\' container query, which cannot read a variable', () => {
+    const source = readFileSync(CSS_PATH, 'utf8');
+    const measure = source.match(/--container-measure:\s*(\d+)ch/)?.[1];
+    expect(measure).toBe('70');
+    expect(source).toContain(`@container vlx-frame (min-width: calc(${measure}ch + 14rem))`);
+    // No other measure in characters is left in the stylesheet.
+    expect([...source.matchAll(/\b(\d+)ch\b/g)].map((m) => m[1]).filter((n) => n !== measure)).toEqual([]);
+  });
 });
 
 describe('the reading surface', () => {
   it('compiles the sign rules and the container query that moves them to the margin', async () => {
     const css = await compile(['block']);
-    // Room for a sign with notes, four dots and discussions (~7rem) on each side of the 68ch column.
-    expect(css).toMatch(/@container\s+vlx-frame\s*\(min-width:\s*calc\(68ch \+ 14rem\)\)/);
+    // Room for a sign with notes, four dots and discussions (~7rem) on each side of the column at the reading measure.
+    expect(css).toMatch(/@container\s+vlx-frame\s*\(min-width:\s*calc\(70ch \+ 14rem\)\)/);
     expect(css).toContain('.vlx-sign-dot[data-color="yellow"]');
     expect(css).toContain('.vlx-sign-threads');
     expect(css).toContain('.vlx-thread-focus');

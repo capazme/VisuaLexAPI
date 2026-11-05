@@ -440,27 +440,52 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, `EuCaseLawBlock`, the Union's courts' decisions that cite an article of a regulation or a directive, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
-- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`, `PageFrame`. **The page frame** (W2, 21 Oct 2026):
-  `PageFrame` is the frame of every section page — the layout's own width (`Layout`'s `max-w-7xl` and its padding: a
-  1216 px column at 1920 px) with nothing narrower inside, the `h1` at the column's left edge in one size
+- `components/layout/` — `Layout`, `Sidebar`, `PageFrame`, `frame.ts`. **The frame** (U1, L-46 and L-47, 5 Nov 2026:
+  one frame, one reading measure, the room left over to columns): `Layout`'s content area is the window less its
+  margins (`PAGE_FRAME`: 16 px, 32 from `md`, 48 from 1536 px, padding outside the frame, `box-content`), at most
+  1600 px (`max-w-frame`) and 2400 px in full screen (`max-w-frame-full`), the theme's `--container-frame*` tokens; the
+  padding above and below stays 16/32 px (`h-app-row` is measured against it). **The full screen** (`settings.focusMode`,
+  the button at the top right and ⌘Space) widens, never narrows: it takes the sidebar and the search page's field away
+  (⌘K stays) and gives their room to the frame; the narrow column for reading lives in Study Mode alone. The button is
+  a toggle named «Tutto schermo» in both states, `aria-pressed`, `aria-keyshortcuts`, its `title` «Tutto schermo
+  (⌘Spazio)» / «Esci dal tutto schermo (⌘Spazio)» («Ctrl+Spazio» outside a Mac); its hover scale is still under
+  reduced motion. **A page declares its width once** (`PageWidth`): `reading` (`PageFrame`'s `width="reading"`: the
+  body at the reading measure, the title at the frame's edge — «Rassegne», «Collega un'app AI»), `work` (the frame,
+  the default) or `full` (the full screen's frame in the normal view too: the search page, and after U4 the agenda).
+  The page writes it as `data-page-width` on its root (`PageFrame` from `width`, `SearchPage` by hand) and `Layout`'s
+  frame widens through `:has()` (`FULL_PAGE_FRAME`): no route list. No page writes a cap of its own inside the frame
+  (`PageFrame.test.tsx` refuses `max-w-3xl` and up on the section pages; `frame.test.ts` the search page's
+  `ReaderLayout`, deleted, and the practice's `max-w-4xl`). **The reading measure** is one value, `--container-measure`
+  (70ch: `max-w-measure`, and `.vlx-art`'s `max-width`), on every long text — articles and decisions, a review's
+  passage, a card, a lesson, a course's paragraphs, the document analysed; `max-w-prose` stays only on a short line
+  (the sentence under a title, a notice, an empty state); `frame.test.ts` refuses a measure in characters written by
+  hand (the sign-in page's display line aside). The columns that fill the room past two measures (about 1500 px) come
+  page by page (spec `2026-11-05-u1-frame-and-full-screen-design.md` §7).
+  **The page frame** (W2, 21 Oct 2026):
+  `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
+  column's left edge in one size
   (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
   small (`kicker`: «Gymnasium · la tua palestra giuridica», `PAGE_KICKER`, Geist `text-sm` slate 600; L-37, the owner,
-  22 October 2026) —, the sentence under it (`line`, at a reading
-  measure), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
-  a header with an action pads its right side from `lg` just enough to stay clear of `Layout`'s fixed Focus button
-  (`FOCUS_BUTTON_CLEARANCE`, from `--sidebar-width` and `100vw`: up to 44 px, the button's width, nothing once the
-  window is about 1590 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
+  22 October 2026) —, the sentence under it (`line`, a short line:
+  `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
+  a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button
+  (`FOCUS_BUTTON_CLEARANCE`, from `100vw`, `--sidebar-width` and the frame's own width, `100%` of the header's
+  containing block, so it holds at any frame width: 68 px less the frame's distance from the window's edge — 36 px
+  with a 32 px margin, 20 with 48, nothing once the frame is 68 px in —, wherever `Layout` says the button floats over
+  the page, `--focus-button-room`: from `lg`, from `md` in full screen, never over the search page's field; between
+  1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»; the practice's table, alone in its row, keeps
+  the same room, its header and the act's pinned heading under the button in full screen otherwise);
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
-  `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
-  title does not move), the Cronologia, the MERL-T hub and, since S7b, the graph («Grafo», the window's height: its
+  `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (`reading`: its body at the reading measure, the
+  title does not move), «Rassegne» (`reading` too), the Cronologia, the MERL-T hub and, since S7b, the graph («Grafo», the window's height: its
   canvas under the frame's header); «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page is in the frame since S7c
   (`DossierDetailView`: its name the title, under «Torna ai Dossier»; see «Dossier»). Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
   login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding;
-  since U1d its whole width, an index beside the sources). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
+  since U1d its whole width, an index beside the sources; since U1 `PAGE_FRAME` at 1600 px). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
-  and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
+  and fails on a title of their own, an icon in an `h1` or a cap of their own (`max-w-3xl` and up). `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
   the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. From `md`, for someone signed in
   and on every page but the search page, it ends 16 px over the floating feedback button (G8c: it covered the last row
@@ -550,8 +575,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   icon a 44 px box, so widening moves no icon: `Layout` animates the column's width (instantly under reduced
   motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
   and the button's name carries the username it shows («Menu utente di …», label in name).
-  `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in Focus
-  mode), for what would float beside it from `lg`: nothing does since the services pill went into the user menu (S1).
+  `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in full
+  screen), for what is placed against the window from `lg`: the room a top row keeps for the full-screen button
+  (`FOCUS_BUTTON_CLEARANCE`) and the practices' bar (`PracticeBar`).
   The bar's 11 px texts (headings, shortcut) are `SIDEBAR_SMALL_TEXT`, slate 600 / dark slate 400: AA for small
   text on the glass over the page and over the phone's backdrop; `theme.test.ts` composites and checks it.
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
@@ -586,12 +612,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Below `md` it slides away scrolling down and comes back scrolling up or near the top (`useHideOnScroll`, which listens
   to the content scroller below `md` only, holds the scroll top to the last real one so iOS's bounce at the end is no
   move up, and never hides while the focus is inside the bar; a new address and a focus landing in it bring it back;
-  under reduced motion at once); from `md` it stays, and the Focus button sits inside its right end. A sticky row of a page pins under it
+  under reduced motion at once); from `md` it stays, and the full-screen button sits inside its right end. A sticky row of a page pins under it
   with `top-[var(--phone-bar-offset,0px)]`: `<main>` sets the bar's height below `lg` and 0 once it has slid away
   («Le mie schede»'s filters and its card's column, the Cronologia's dates, «Da validare»'s article; a new sticky row
   does the same, or it slides under the bar). No ancestor of such a row may be `overflow: hidden` (say `overflow-clip`
   for rounded corners): it would become the row's scroll container, and the row would pin the bar's height below that
-  box's top instead (the Cronologia's card did, M1, 25 October 2026). Focus mode and Gymnasium's lesson draw no bar. During a section change
+  box's top instead (the Cronologia's card did, M1, 25 October 2026). The full screen (`focusMode`) and Gymnasium's lesson draw no bar. During a section change
   the bar is named (`vlx-phone-bar`, `index.css`), so the page's picture passes under it. The drawer's section switcher
   sits where the bar is; the closed drawer is `inert`, and whatever closes it from inside (an entry, a link, the
   backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back; Esc closes it
@@ -604,7 +630,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.
   **The search page's field** (`features/search/SearchField`, spec
-  `docs/superpowers/specs/2026-10-13-fixed-search-design.md`): `Layout` draws it on `/` (not in Focus mode) in a
+  `docs/superpowers/specs/2026-10-13-fixed-search-design.md`): `Layout` draws it on `/` (not in full screen) in a
   bar above the content scroller (56 px and the iPhone's top edge below `lg`, 72 from it; the phone's bar there), so it
   is always on screen, and sets `--search-bar-height` on `<main>`, which `h-app-row` subtracts and the bar takes as its
   height. It is the door to the search menu (R2, brief of 21 Oct 2026: one field, no «Opzioni»): a button
@@ -624,7 +650,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   drops from the field's form (`SEARCH_FIELD_FORM_ID` in `utils/searchFieldControl.ts`; floating-ui puts its top on
   the field's, as wide as the field, so it covers it, as tall as what it holds up to 640 px — Bill: one row is not a
   640 px panel —, the lists scrolling inside it past that: a flex column all the way down to the columns, since a
-  percentage height finds nothing definite in a panel sized by its content), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
+  percentage height finds nothing definite in a panel sized by its content), hung at the top, centred, where no field is on screen (another page, the full screen); on a
   phone the same panel, the page's width less 16 px each side, dropping from the bar at the top (R2: no bottom sheet
   any more; its «Chiudi» is the field row's ✕, drawn at every width). From the top: the box, the one strong thing, with the help
   line (12 px), or «Cerco l’atto…» while the server names it: a decision, a norm or a topic read in the box is its
@@ -684,7 +710,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `returnWordsToSearchField` does) and says whether the field took
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
-  palette with the same words when no field is on screen (Focus mode).
+  palette with the same words when no field is on screen (the full screen).
   **The palette is global**: `GlobalSearch` (the palette, `QuickNormsManager`, `AliasManager`) is mounted by
   `Layout`, so ⌘K opens it on every page at once; what it opens lands in the practices through
   `hooks/useSearchActions` (`search`, `browse`, `openDecision`, `openTopic`), which bring the reader to `/` from
@@ -1106,8 +1132,9 @@ AGGIORNAMENTO notes, as raw ranges that partition `article_text`;
 `renderArticleHtml` (`utils/articleRender.ts`, behind `useArticleMarkers`)
 emits one `div.vlx-b.vlx-{kind}` per block, cutting the text at every block and
 mark edge and nesting marks with a stack, so the HTML is always well-formed and
-escaped. Styles are the `.vlx-*` rules in `index.css` (READING SURFACE): a 68ch
-measure, commi divided by space, hanging numbers and items. The contract is
+escaped. Styles are the `.vlx-*` rules in `index.css` (READING SURFACE): the
+reading measure (`--container-measure`, 70ch, U1), centred in a wider row, commi
+divided by space, hanging numbers and items. The contract is
 gotcha 23: the rendered text nodes spell `article_text` minus `\n` — any new
 label goes in CSS (`content: attr(...)`), never in a text node.
 `articleRender.test.ts` enforces it on 27 real texts
@@ -1236,7 +1263,8 @@ reader, not Study Mode — the renderer ends each annotated block with an empty
 `span.vlx-sign`: the note icon, the count and one dot per colour are CSS, so
 the text nodes are untouched. The sign sits inline after the block's text, or
 in the right margin when the `vlx-frame` size container (a wrapper around the
-text in `ArticleBody`) has room for the 68ch column plus a sign. It opens
+text in `ArticleBody`) has room for the 70ch column plus a sign (the query
+writes the measure's number: it cannot read a variable). It opens
 `BlockAnnotationsPopover` through `useArticleTextInteractions` (one popover at
 a time with the update notes): the block's notes, edited and deleted in place
 with the Notes panel's own `NoteCard`, and its highlights, removed; *Vai al
@@ -1569,8 +1597,8 @@ feedback button and the plain toasts — the services' state is the user menu's 
 confirmation and the toast — at the top, off the bar — cover it), with Tab fenced off from the shell (`#root`)
 and the body: a dialog over it, or a popover the article portals to the body (a note being typed), keeps its own.
 The shell is not `inert` — the command palette is drawn inside it — so a screen reader's browse mode can still reach
-it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. The shell's Focus mode
-is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
+it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. The shell's full screen
+(`focusMode`) is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
 header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
 where done are the cards out of the queue — a «Di nuovo» holds it still —; at each grade that moves it the head runs
 ahead in the section's hue (`vlx-lesson-head`, 150 ms), the ink — the hue too, at a step that reads as a colour on its
@@ -1591,7 +1619,7 @@ with the session's own filters and nothing taken while a grade travels; a move w
 new read) clears the note; keep its filters in step with the hook's.
 The card (`ReviewCard`) is the area's tile — a sheet on the paper, no shadow or gradient — and comes in with each card
 (the session keys it by step: opacity and a few pixels, 180 ms, `motion-safe:` only): the anchor's citation small in
-slate sans above, question and answer in the reader's serif at a 60ch measure, the question a step larger; the reveal
+slate sans above, question and answer in the reader's serif at the reading measure (`max-w-measure`), the question a step larger; the reveal
 is the card's own motion (a hairline, then the answer, `motion-safe:` only; the celebration never touches the card);
 the articles under the answer are 44 px buttons. Nothing else moves between a grade and the next card. The end (G8): one
 card, centred (`lesson-end`), with no bar under it — the sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime:
@@ -1610,7 +1638,7 @@ palestra giuridica» — L-37; the section switcher keeps «Gymnasium»; spec
 under the subjects only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the subjects, and once more
 for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the day block. The page is in
 the sections' frame (`layout/PageFrame`, G6: the layout's full width, the heading at its left edge; the 768 px column
-of G1 is gone). One column up to `xl`, and in Focus mode (its 896 px frame would leave the band too narrow); from `xl` (1280 px) two, a grid of `7fr` and `5fr`: on the left the day block, today's missions
+of G1 is gone). One column up to `xl`; from `xl` (1280 px) two, in full screen too (U1: the frame widens there, it no longer narrows to 896 px), a grid of `7fr` and `5fr`: on the left the day block, today's missions
 and the full list, on the right the statistics and «Le tue materie» in one box over all the rows (`row-span-full`,
 `self-start`; a fourth row of `1fr` takes what the right column has beyond the left, so it never stretches the left's
 rows), `sticky` at `top-8` while it fits in the content scroller with 32 px above and below (`useFitsInScroller`, a
@@ -3020,7 +3048,7 @@ meant to stay split; add new features as new files, not inside the shells:
   tap lists the practices with «Nuova pratica»; R3 took the carousel's chevrons and dots away —, the count after it,
   which gives way first, «Salva come dossier» as a 44 px icon and its «⋯» (`usePracticeSaveActions`); with all of R3
   the text of «art. 1453 c.c.», one article of an act whose title takes one line, starts 251 px under the bar at the
-  top at 390 and 360 px (each more line of title or meta, about 25 px more); R3b: below `md` neither `ReaderLayout`, the
+  top at 390 and 360 px (each more line of title or meta, about 25 px more); R3b: below `md` neither the page, the
   column, a row nor the text root steps in — the layout's 16 px are the edge, the text runs from 16 to 16 —, the icons
   on the column's right edge reach 12 px into that margin (`-mr-3`: the row's ✕, the act's and the head's «⋯», the
   reading bar's tools, so the status keeps one line at 320 px), and a row shows a bolt when its article is among the
@@ -3047,8 +3075,9 @@ meant to stay split; add new features as new files, not inside the shells:
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
   from the pure `besideLayout`: half and half, thirds from 420 px a column, else a 48 px rail that opens
   the table as an overlay closed by Esc or a click outside; `SearchPanel` mounts it on the desktop in
-  place of the bare table, and with a window beside it reaches past the search page's `ReaderLayout` cap (`max-w-5xl`, about 960 px) to the scroller's
-  width, measured, for that row only) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
+  place of the bare table, at the frame's width with or without a window beside: the search page is a `full` page
+  with no cap of its own, so the row never reaches past its parent (U1; it escaped `ReaderLayout`'s `max-w-5xl`, now
+  gone)) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
   the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
   `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`
   (notes and highlights in words, and behind «⋯» discussions, the find window and copy), and no Studio,

@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { SearchPanel } from '../components/features/search/SearchPanel';
-import { ReaderLayout } from '../components/layout/ReaderLayout';
 import { useTour } from '../hooks/useTour';
 
 export function SearchPage() {
@@ -11,10 +10,12 @@ export function SearchPage() {
     if (hasSeenTour('welcome')) tryStartTour('search');
   }, [tryStartTour, hasSeenTour]);
 
+  // A `full` page (U1, `components/layout/frame.ts`): the frame at its full-screen width in the normal view too, and no
+  // cap of its own inside it (the old `ReaderLayout`'s `max-w-5xl` is gone); an open text keeps the reading measure.
   return (
-    <ReaderLayout maxWidth="normal">
+    <div data-page-width="full">
       <SearchPanel />
-    </ReaderLayout>
+    </div>
   );
 }
 
