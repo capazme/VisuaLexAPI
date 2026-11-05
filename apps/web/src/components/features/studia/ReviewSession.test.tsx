@@ -183,7 +183,7 @@ describe('the review session', () => {
     renderSession([card('a', { spiegazione: 'Perché sì.' })]);
     const question = await screen.findByRole('heading', { name: 'Domanda a?' });
     expect(question).toHaveClass('font-serif');
-    expect(question).toHaveClass('max-w-[60ch]');
+    expect(question).toHaveClass('max-w-measure');
     expect(screen.getByText('art. 1453 c.c.')).toBeInTheDocument();
     expect(screen.queryByText('Risposta a.')).not.toBeInTheDocument();
 

@@ -36,7 +36,7 @@ export function CoursesEmpty() {
       <h2 id="corsi-vuoto" className={BLOCK_HEADING}>
         Non hai ancora percorsi
       </h2>
-      <div className="grid max-w-[65ch] grid-cols-1 gap-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+      <div className="grid max-w-measure grid-cols-1 gap-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         <p>
           Un percorso è un corso costruito dal tuo materiale: appunti, dispense, ricerche. Lezioni in ordine, un modulo al
           giorno, domande di verifica, schede da ripassare e un esame finale, con le competenze che promette e il momento in

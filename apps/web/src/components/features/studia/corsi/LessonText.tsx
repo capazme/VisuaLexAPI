@@ -13,7 +13,7 @@ import { FOCUS_RING, INK_TEXT } from '../progress/tokens';
 import { lineStarts, numberLeaves, paintSpans, parseLesson, plainText, spanColor, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
 
 /** The lesson's reading type: the reader's serif at a reading measure (as a card, a step larger: it is read at length). */
-export const LESSON_TEXT = 'max-w-[65ch] break-words font-serif text-lg leading-[1.75] text-slate-900 dark:text-slate-100';
+export const LESSON_TEXT = 'max-w-measure break-words font-serif text-lg leading-[1.75] text-slate-900 dark:text-slate-100';
 
 /** A highlight's look: the reader's own tint and ink for its colour (A4), legible in both themes. */
 const MARK_STYLE: Record<HighlightColor, React.CSSProperties> = {

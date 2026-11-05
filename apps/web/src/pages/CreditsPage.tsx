@@ -205,7 +205,7 @@ export function CreditsPage() {
         <main className="mt-8">
           <PageFrame title="Crediti">
             {/* The opening across the frame; the long paragraph at a reading measure. */}
-            <p className="max-w-[70ch] font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+            <p className="max-w-measure font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
               VisuaLex usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
               per ciascuna, cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri tipografici
               dell’interfaccia.

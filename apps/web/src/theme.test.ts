@@ -71,11 +71,29 @@ describe('the page frame (W2, U1)', () => {
   }, 30000);
 });
 
+describe('the reading measure (U1)', () => {
+  it('is one value in the theme, 70 characters, read as `max-w-measure` and by the reading surface', async () => {
+    const css = await compile(['max-w-measure']);
+    expect(css).toMatch(/--container-measure:\s*70ch/);
+    expect(css).toMatch(/\.max-w-measure\s*\{\s*max-width:\s*var\(--container-measure\)/);
+    expect(css).toMatch(/\.vlx-art\s*\{[^}]*max-width:\s*var\(--container-measure\)/);
+  }, 30000);
+
+  it('writes the token\'s number in the signs\' container query, which cannot read a variable', () => {
+    const source = readFileSync(CSS_PATH, 'utf8');
+    const measure = source.match(/--container-measure:\s*(\d+)ch/)?.[1];
+    expect(measure).toBe('70');
+    expect(source).toContain(`@container vlx-frame (min-width: calc(${measure}ch + 14rem))`);
+    // No other measure in characters is left in the stylesheet.
+    expect([...source.matchAll(/\b(\d+)ch\b/g)].map((m) => m[1]).filter((n) => n !== measure)).toEqual([]);
+  });
+});
+
 describe('the reading surface', () => {
   it('compiles the sign rules and the container query that moves them to the margin', async () => {
     const css = await compile(['block']);
-    // Room for a sign with notes, four dots and discussions (~7rem) on each side of the 68ch column.
-    expect(css).toMatch(/@container\s+vlx-frame\s*\(min-width:\s*calc\(68ch \+ 14rem\)\)/);
+    // Room for a sign with notes, four dots and discussions (~7rem) on each side of the column at the reading measure.
+    expect(css).toMatch(/@container\s+vlx-frame\s*\(min-width:\s*calc\(70ch \+ 14rem\)\)/);
     expect(css).toContain('.vlx-sign-dot[data-color="yellow"]');
     expect(css).toContain('.vlx-sign-threads');
     expect(css).toContain('.vlx-thread-focus');

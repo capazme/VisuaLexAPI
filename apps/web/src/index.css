@@ -486,7 +486,8 @@
   --vlx-hang: 2em;         /* hanging width of a printed comma number */
   --vlx-hang-item: 2.25em; /* hanging width of an item enumerator */
   --vlx-indent: 1.75em;    /* item indent per level */
-  max-width: 68ch;
+  /* The reading measure (U1): 70 characters of the text's own font, articles and decisions alike. */
+  max-width: var(--container-measure);
   margin-inline: auto;
   font-size: 1.1875rem;
   line-height: 1.65;
@@ -499,7 +500,7 @@
   @apply font-serif text-slate-800 dark:text-slate-200;
 }
 
-/* Study Mode sets size, leading and theme colours itself. */
+/* Study Mode sets size, leading and theme colours itself, and keeps its own narrow column (U1, L-47). */
 .vlx-art--study {
   max-width: none;
   font-size: inherit;
@@ -799,7 +800,7 @@
    shrink-to-fit ancestor: keep it inside block-level parents. */
 .vlx-frame {
   container: vlx-frame / inline-size;
-  /* The query measures in the column's own font: 68ch is the column. */
+  /* The query measures in the column's own font: 70ch is the column (the reading measure). */
   font-size: 1.125rem;
   @apply font-serif;
 }
@@ -1050,10 +1051,11 @@
   }
 }
 
-/* Room for the 68ch column plus a sign on each side (with notes, four
+/* Room for the column at the reading measure plus a sign on each side (with notes, four
    dots and discussions a sign is ~7rem): every sign moves to the right margin, level with
-   its block's first line, all at the same x. */
-@container vlx-frame (min-width: calc(68ch + 14rem)) {
+   its block's first line, all at the same x. A query cannot read a variable: 70ch is
+   `--container-measure`, and theme.test.ts keeps the two equal. */
+@container vlx-frame (min-width: calc(70ch + 14rem)) {
   .vlx-art .vlx-b,
   .vlx-decision .vlx-dec-para {
     position: relative;
@@ -1078,7 +1080,7 @@
    passage (GlossMargin places them with a transform, measured from the words' DOM range: no element in the text,
    root rule 23). Only where the reader has room for a text still readable (about 32rem) beside the 17.5rem column;
    below that the column is not drawn and the block's sign opens the cards in its popover, as on a phone. The query
-   is in rem, the root's size: the frame's own 68ch would need the text's font on the container. */
+   is in rem, the root's size: the frame's own 70ch would need the text's font on the container. */
 .vlx-glossed {
   container: vlx-glossed / inline-size;
 }

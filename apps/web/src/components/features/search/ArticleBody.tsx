@@ -64,8 +64,8 @@ export function ArticleBody({
                 onCreateCard={onPopupCreateCard}
                 copyOnly={copyOnly}
             />}
-            {/* A size container: with room beside the 68ch column, each
-                block's annotation sign moves to the right margin (index.css). */}
+            {/* A size container: with room beside the column at the reading
+                measure, each block's annotation sign moves to the right margin (index.css). */}
             <div className="vlx-frame">
                 <div ref={textRef} className={cn(className, 'md:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
                     {processedContent && <SafeHTML html={processedContent} />}

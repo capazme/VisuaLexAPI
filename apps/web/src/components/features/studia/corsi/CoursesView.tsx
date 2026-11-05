@@ -97,7 +97,7 @@ function DeclarationNotice({ firstCourse, onOpen }: { firstCourse: boolean; onOp
       <h2 id="corsi-dichiarazione" className={BLOCK_HEADING}>
         Il tuo materiale di studio
       </h2>
-      <p className="max-w-[65ch] text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+      <p className="max-w-measure text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         {firstCourse
           ? 'Prima che il tuo assistente possa creare un percorso, dichiara di avere il diritto di usare il materiale da cui lo crei.'
           : 'La dichiarazione sul materiale di studio è cambiata: accettala di nuovo perché il tuo assistente possa creare altri percorsi.'}
