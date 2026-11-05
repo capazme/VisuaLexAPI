@@ -19,3 +19,10 @@ export type PageWidth = 'reading' | 'work' | 'full';
 
 /** `Layout`'s frame while a `full` page is in it. */
 export const FULL_PAGE_FRAME = 'has-[[data-page-width=full]]:max-w-frame-full';
+
+/**
+ * The columns of a grid of cards (U1 §7: the room left over goes to columns, a list of cards is a grid, never a
+ * carousel or a row 2000 px long): as many as cards of 20rem fit (320 px at the default text size; the whole width
+ * when even one does not), each an equal share of what is left. Written once, here, for every list of cards.
+ */
+export const CARD_GRID_COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))]';

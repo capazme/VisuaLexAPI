@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { appStore } from '../../../store/useAppStore';
 import { loadStudyPacks, packContent, type StudyPack } from '../../../utils/studyPacks';
 import { StudyPacksBand } from './StudyPacksBand';
+import { CARD_GRID_COLUMNS } from '../../layout/frame';
 
 const service = vi.hoisted(() => ({ importStudy: vi.fn() }));
 // The packs' data still on its way (`release` brings it) or that cannot be loaded (a chunk a deploy removed), when a
@@ -49,6 +50,49 @@ describe('StudyPacksBand', () => {
     expect(screen.queryByRole('button', { name: /^Mostra tutti/ })).toBeNull();
   });
 
+  it('is a grid of cards of at least 20rem from three of them, by its own width, the row below (U1)', async () => {
+    render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
+    const list = await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+    // The band's own width decides (the sidebar and the full screen count), not the window's.
+    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toHaveClass('@container');
+    expect(list).toHaveClass('@min-[61.5rem]:grid', CARD_GRID_COLUMNS, '@min-[61.5rem]:overflow-x-visible');
+    expect(within(list).getAllByRole('listitem')[0]).toHaveClass('@min-[61.5rem]:w-auto');
+  });
+
+  it('as a grid, which scrolls nothing, is no Tab stop of its own, still focusable for /forum#pronti (U1)', async () => {
+    // The browser's layout, which jsdom has not: the list laid out as the grid, and the observer reporting its size.
+    const realStyle = window.getComputedStyle;
+    const style = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const real = realStyle(element, pseudo);
+      if ((element as HTMLElement).id !== 'pronti') return real;
+      return new Proxy(real, {
+        get: (target, key) => {
+          if (key === 'display') return 'grid';
+          const value: unknown = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    const RealObserver = window.ResizeObserver;
+    window.ResizeObserver = class {
+      report: ResizeObserverCallback;
+      constructor(report: ResizeObserverCallback) { this.report = report; }
+      observe() { this.report([], this as unknown as ResizeObserver); }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    try {
+      render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
+      const list = await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+      await waitFor(() => expect(list).toHaveAttribute('tabindex', '-1'));
+      list.focus();
+      expect(list).toHaveFocus();
+    } finally {
+      window.ResizeObserver = RealObserver;
+      style.mockRestore();
+    }
+  });
+
   it('follows the category filter', async () => {
     render(<StudyPacksBand category="penal" onAdded={vi.fn()} onError={vi.fn()} />);
     await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
@@ -79,9 +123,15 @@ describe('StudyPacksBand', () => {
     load.held = true;
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
     expect(screen.getByRole('heading', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toHaveAttribute('aria-busy', 'true');
+    const region = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    expect(region).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByRole('list')).toBeNull();
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    // As many cards as the packs of «Tutte le categorie», laid out as they will be: the grid holds their height (U1).
+    const held = region.querySelector('[aria-hidden="true"]')!;
+    expect(held.children).toHaveLength(STUDY_PACKS.length);
+    expect(held).toHaveClass('flex', '@min-[61.5rem]:grid', CARD_GRID_COLUMNS);
+    expect(held.firstElementChild).toHaveClass('w-56', '@min-[61.5rem]:w-auto');
     load.release();
     expect(await screen.findByRole('list', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).not.toHaveAttribute('aria-busy');

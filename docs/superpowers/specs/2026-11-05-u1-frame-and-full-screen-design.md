@@ -106,6 +106,15 @@ the first; card lists become grids of cards of at least 320 px, not carousels an
 da VisuaLex» (a grid on wide screens, the scrolling row on a phone), the dossier list and «Le mie schede» (grids),
 Gymnasium's «Oggi» and «Progressi», Academia after a pass with an account that opens it.
 
+The grid's columns are written once, `CARD_GRID_COLUMNS` in `layout/frame.ts`: as many as cards of 20rem fit (320 px
+at the default text size, so they grow with the text size the user chose), each an equal share of the rest.
+
+- **The Forum's packs** (the first of these pull requests): the band chooses by its own width (a container query, so
+  the sidebar and the full screen count): the row below three cards of 20rem and their gaps (61.5rem), the grid from
+  there — at 1366 px with the sidebar 3 columns, at 1920 px 4, at 2560 px in full screen 7, so the 20 packs take 7, 5
+  and 3 lines. Below three columns the grid would be 10 lines of two, a long page of packs at the Forum's foot: there
+  the row stays, as on a phone. The grid is no Tab stop of its own (it scrolls nothing); the row still is.
+
 ## Out of scope
 
 The Scrivania, Gymnasium's lesson and the sign-in page keep their own frame. The width chosen by the user (option C of
