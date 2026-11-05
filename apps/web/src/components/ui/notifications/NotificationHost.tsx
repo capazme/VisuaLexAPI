@@ -16,6 +16,7 @@ import {
   registerNotificationHost,
   removeNotification,
   runShortcutUndo,
+  shortcutUndoReady,
   undoNotification,
   type NotificationEntry,
 } from './notifications';
@@ -70,8 +71,9 @@ export function NotificationHost() {
   const keyboard = typeof window.matchMedia !== 'function' || !window.matchMedia('(pointer: coarse)').matches;
   const held = notificationStore((s) => s.shortcutUndo);
   const latest = latestUndoable(entries)?.id;
-  // A gesture newer than it, undone by the key alone, takes the key: the notification does not promise it then.
-  const newest = keyboard && latest !== undefined && (held === null || held < latest) ? latest : undefined;
+  // A gesture newer than it, undone by the key alone, takes the key while its text is on screen: the notification does
+  // not promise it then.
+  const newest = keyboard && latest !== undefined && (held === null || held < latest || !shortcutUndoReady()) ? latest : undefined;
   // Under a dialog or an overlay the key does nothing: the notification does not promise it.
   const covered = useWorkspaceCovered(newest !== undefined, isUndoCovered);
   const shortcutFor = covered ? undefined : newest;

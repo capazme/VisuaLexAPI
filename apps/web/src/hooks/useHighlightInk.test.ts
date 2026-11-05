@@ -38,6 +38,10 @@ describe('useHighlightInk — the rules, into the store (A4)', () => {
     expect(isTextShown('k')).toBe(true);
     unmount();
     expect(isTextShown('k')).toBe(false);
+    // A past text, which takes no highlight, is not the text in force on screen.
+    const past = ink([], { enabled: false });
+    expect(isTextShown('k')).toBe(false);
+    past.unmount();
   });
 
   it('a piece cut out: one gesture, the parts the projection\'s own words trimmed at their edges', () => {

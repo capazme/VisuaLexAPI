@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getInkAnchor, keepExact, wholeWordsRange } from './inkSelection';
 
 /** A text root drawn from `html`, in the document (the selection must live there). */
@@ -32,6 +32,7 @@ function press(alt: boolean, make: () => void) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   document.getSelection()?.removeAllRanges();
   document.body.innerHTML = '';
 });
@@ -107,6 +108,24 @@ describe('with Alt held, the piece exactly as selected', () => {
     expect(getInkAnchor(el, document.getSelection())?.text).toBe('ann');
     // Moved from the keyboard: whole words again.
     select(text, 4, text, 8);
+    expect(getInkAnchor(el, document.getSelection())?.text).toBe('danno');
+  });
+
+  it('a selection made from the keyboard, Shift and the arrows, is taken as made; a key in a field is not one', () => {
+    vi.useFakeTimers();
+    const el = root('<div class="vlx-b">Il danno ingiusto</div>');
+    const [text] = texts(el);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+    select(text, 4, text, 7);
+    document.dispatchEvent(new Event('selectionchange'));
+    expect(getInkAnchor(el, document.getSelection())?.text).toBe('ann');
+    // The key's moment is over.
+    vi.advanceTimersByTime(1000);
+    const field = document.createElement('input');
+    document.body.append(field);
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }));
+    press(false, () => select(text, 4, text, 8));
+    document.dispatchEvent(new Event('selectionchange'));
     expect(getInkAnchor(el, document.getSelection())?.text).toBe('danno');
   });
 

@@ -154,7 +154,9 @@ The test passed on the article, a decision, a dossier entry and Study Mode; thre
   — in the readers, Study Mode's keys and a lesson. A note keeps the words as selected. Widened in the DOM
   (`utils/inkSelection.ts`), never in the projection, where a block's last word and the next block's first touch once
   the `\n` is gone: a word stops at a block or a line break. Alt is read from the press that made the selection while
-  the selection stands as made; Enter on a lesson's highlight selects its words exactly.
+  the selection stands as made; Enter on a lesson's highlight selects its words exactly. A selection made from the
+  keyboard (Shift and the arrows) is taken as made, as a word processor takes it: a word at a time is Ctrl (Alt on a
+  Mac) with Shift and the arrows, and a keyboard user keeps the exact piece.
 - **No notification for highlights; Ctrl+Z (⌘Z) undoes.** Creating, taking away, cutting and recolouring say nothing
   on screen (the words are said to a screen reader). Ctrl+Z (⌘Z on a Mac), outside a field, takes back the last gesture
   with no time limit, while its text is on screen; one step, as the owner asked («al massimo devo poter fare cmd + z»).

@@ -1,13 +1,19 @@
 import { collectSearchableText, isBlockLike, type TextSegment } from './findInText';
 import { getRangeAnchor } from './selectionOffset';
+import { isEditableTarget } from '../components/ui/notifications/undoShortcut';
 
 /**
  * What the highlighter takes of a selection (A4, the owner's correction of 5 November 2026): as a word processor does,
  * a selection that cuts a word takes it whole, its start and end widened to the word's edges; with Alt held while the
  * words were selected, the piece exactly as selected. Every gesture alike: creating, taking away, recolouring, «Nessun
  * colore». Read from the DOM, never from the stored projection, where a block's last word and the next block's first
- * touch once the `\n` between them is gone: a word never runs past its block (`isBlockLike`) or a `<br>`.
+ * touch once the `\n` between them is gone: a word never runs past its block (`isBlockLike`) or a `<br>`. A selection
+ * made from the keyboard (Shift and the arrows) is taken as made, as a word processor takes it: there a word at a time
+ * is Ctrl (Alt on a Mac) with Shift and the arrows, and a character at a time stays possible.
  */
+
+/** How long after a selecting key a change of the selection counts as the keyboard's. */
+const KEYED_MS = 150;
 
 /** A letter, a digit, or a mark written on one: what a word is made of (no apostrophe: «l'» is a word of its own). */
 const WORD = /[\p{L}\p{N}\p{M}]/u;
@@ -83,12 +89,18 @@ const sameEnds = (a: Ends | null, b: Ends | null) =>
 let exactEnds: Ends | null = null;
 /** The press going on: whether Alt was held at any moment of it, and the selection as it began. */
 let press: { alt: boolean; before: Ends | null } | null = null;
+/** A key that extends a selection was just pressed: the selection it makes is taken as made. */
+let keyed = false;
+let keyedTimer = 0;
+/** The keys that extend a selection with Shift (the browser's caret, `Selection.modify` in a lesson). */
+const SELECTING_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
 
 if (typeof document !== 'undefined') {
   // In the capture phase, before any handler reads the selection. A press that leaves the selection as it found it (a
   // button pressed over it: the highlighter's, the selection bar's) changes nothing.
   document.addEventListener('pointerdown', (event) => {
     press = { alt: event.altKey, before: endsOf(document.getSelection()) };
+    keyed = false;
   }, true);
   document.addEventListener('pointermove', (event) => {
     if (press && event.altKey) press.alt = true;
@@ -99,6 +111,17 @@ if (typeof document !== 'undefined') {
     if (!sameEnds(after, press.before)) exactEnds = press.alt || event.altKey ? after : null;
     press = null;
   }, true);
+  // Shift and an arrow outside a field: the selection that changes in the next moments is the keyboard's. A window, not
+  // a flag waiting for the change, so a key that moved nothing leaves nothing behind.
+  document.addEventListener('keydown', (event) => {
+    if (!event.shiftKey || !SELECTING_KEYS.has(event.key) || isEditableTarget(event.target)) return;
+    keyed = true;
+    window.clearTimeout(keyedTimer);
+    keyedTimer = window.setTimeout(() => { keyed = false; }, KEYED_MS);
+  }, true);
+  document.addEventListener('selectionchange', () => {
+    if (keyed) exactEnds = endsOf(document.getSelection());
+  });
 }
 
 /** Whether `selection` was made with Alt held, and stands as it was made (a selection moved since is widened). */

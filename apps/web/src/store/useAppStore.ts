@@ -724,9 +724,11 @@ const appStore = createStore<AppState>()(
 
             /**
              * The undo of the highlights a gesture created (A4): each off the screen at once, deleted once its creation
-             * has answered, under its server id; one whose creation failed (`saved` false) needs nothing.
+             * has answered, under its server id; one whose creation failed (`saved` false) needs nothing. False when it
+             * took none back.
              */
-            const takeBackCreated = (created: readonly Highlight[], saved: ReadonlyMap<string, boolean>) => {
+            const takeBackCreated = (created: readonly Highlight[], saved: ReadonlyMap<string, boolean>): boolean => {
+                let any = false;
                 for (const part of created) {
                     if (saved.get(part.id) === false) continue;
                     const id = serverIdOf(part.id);
@@ -739,7 +741,9 @@ const appStore = createStore<AppState>()(
                         (item) => set((state) => { if (!state.highlights.some(h => h.id === item.id)) state.highlights.push(item); }),
                         highlightDeleteRefused,
                     );
+                    any = true;
                 }
+                return any;
             };
 
             return {
@@ -2420,7 +2424,7 @@ const appStore = createStore<AppState>()(
                     ready,
                     // The parts go (once created, when they are still on their way) and the colours come back.
                     onUndo: () => {
-                        takeBackCreated(created, saved);
+                        const parts = takeBackCreated(created, saved);
                         for (const { id, from, to } of recolored) {
                             // Recorded under a temporary id, it may have its server id by now.
                             const current = serverIdOf(id);
@@ -2430,6 +2434,7 @@ const appStore = createStore<AppState>()(
                             });
                             sendHighlightColor(current, from, to);
                         }
+                        return parts || recolored.length > 0;
                     },
                 });
             },

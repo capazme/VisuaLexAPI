@@ -17,6 +17,7 @@ vi.mock('../../services/authService', async (importOriginal) => ({
 }));
 
 import { appStore } from '../useAppStore';
+import { getFreshAccessToken } from '../../services/api';
 import { forgetRemovals, holdGesture, isRemovalPending, removeAtOnce, removeManyWithUndo, savingDone, savingStarted } from '../deferredRemovals';
 import { showText } from '../textsOnScreen';
 import { highlightService } from '../../services/highlightService';
@@ -260,7 +261,8 @@ describe('removing a highlight: the edges', () => {
       appStore.getState().removeHighlight(ids()[0]);
       refuse(refused(500));
       await vi.waitFor(() => expect(appStore.getState().lastSyncError).not.toBeNull());
-      runShortcutUndo();
+      // Nothing to take back: the key says nothing and goes on (to an «Annulla» on screen, if any).
+      expect(runShortcutUndo()).toBeNull();
       expect(ids()).toEqual([]);
       nextGesture();
       expect(highlightService.delete).not.toHaveBeenCalled();
@@ -282,6 +284,16 @@ describe('a new highlight is a gesture too (A4, 5 November)', () => {
     answer({ id: 'srv-9', normaKey: 'k::art::1453', text: 'contraenti', color: 'green', startOffset: 30, endOffset: 40 } as never);
     await vi.waitFor(() => expect(highlightService.delete).toHaveBeenCalledExactlyOnceWith('srv-9'));
     expect(ids()).toEqual([]);
+  });
+
+  it('one whose creation failed leaves the key nothing to undo: it says nothing and goes on', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(highlightService.create).mockRejectedValueOnce(refused(500));
+    appStore.setState({ highlights: [] });
+    appStore.getState().addHighlight('k', '1453', 'contraenti', '', 'green', 30);
+    await vi.waitFor(() => expect(appStore.getState().lastSyncError).not.toBeNull());
+    expect(runShortcutUndo()).toBeNull();
+    expect(highlightService.delete).not.toHaveBeenCalled();
   });
 });
 
@@ -403,6 +415,18 @@ describe('holdGesture: a gesture held for the key alone (A4)', () => {
     expect(runShortcutUndo()).toBe('Evidenziazione rimossa');
     expect(putBack.mock.calls).toEqual([['b']]);
     expect(b.remove).not.toHaveBeenCalled();
+  });
+
+  it('keeps the token fresh while its removals wait, and stops once they are sent or taken back', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getFreshAccessToken).mockClear();
+    holdGesture({ message: 'Evidenziazione rimossa', onScreen: () => true, targets: [target('a')], putBack: vi.fn(), onRefused: vi.fn() });
+    vi.mocked(getFreshAccessToken).mockClear();
+    vi.advanceTimersByTime(60_000);
+    expect(getFreshAccessToken).toHaveBeenCalledExactlyOnceWith(120);
+    runShortcutUndo();
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(getFreshAccessToken).toHaveBeenCalledTimes(1);
   });
 
   it('a part refused takes the gesture back at once, and the key with it', async () => {

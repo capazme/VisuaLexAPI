@@ -481,6 +481,28 @@ describe('Ctrl+Z (⌘Z) on a gesture that says nothing: a highlight\'s (A4, 5 No
     expect(gesture).toHaveBeenCalledOnce();
   });
 
+  it('a gesture that finds nothing to take back leaves the key to the «Annulla» on screen, and says nothing', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const note = vi.fn();
+    await act(async () => { void showUndoToast({ action: () => 'n', undo: note, message: 'Nota rimossa' }); });
+    act(() => { offerShortcutUndo({ message: 'Testo evidenziato in giallo', undo: () => false }); });
+    await press();
+    expect(note).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).not.toHaveTextContent('Annullato');
+  });
+
+  it('writes «· Ctrl+Z» beside the «Annulla» when the newer gesture\'s text is off screen, where the key undoes the «Annulla»', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const note = vi.fn();
+    await act(async () => { void showUndoToast({ action: () => 'n', undo: note, message: 'Nota rimossa' }); });
+    act(() => { offerShortcutUndo({ message: 'Evidenziazione rimossa', ready: () => false, undo: vi.fn() }); });
+    expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).toHaveTextContent('Ctrl+Z');
+    await press();
+    expect(note).toHaveBeenCalledOnce();
+  });
+
   it('the next gesture settles the one before: what it held is carried out, and the key undoes the newer alone', () => {
     const settle = vi.fn();
     const first = vi.fn();

@@ -171,8 +171,11 @@ interface HeldRemovals<T> {
   targets: RemovalTarget<T>[];
   putBack: (item: T) => void;
   onRefused: (error: unknown) => void;
-  /** The undo also takes back what came with the removals (the parts a cut created, a colour changed), after them. */
-  onUndo?: () => void;
+  /**
+   * The undo also takes back what came with the removals (the parts a cut created, a colour changed), after them; false
+   * when it found nothing to take back (a creation that failed).
+   */
+  onUndo?: () => boolean | void;
   /**
    * What the removals wait for (A4: the parts a cut created, still being saved): sent only once it resolves true, so a
    * page that goes before sends nothing and the items stay on the server, rather than their parts be lost with it.
@@ -280,14 +283,15 @@ function holdRemovals<T>({ targets, putBack, onRefused, onUndo, ready }: HeldRem
     undo: (): boolean => {
       if (settled) return false;
       settled = true;
-      if (!onUndo && slots.every((slot) => !slot.target)) return false;
+      let any = false;
       for (const slot of slots) {
         if (!slot.target) continue;
         pending.delete(slot.target.key);
         putBack(slot.target.item);
+        any = true;
       }
-      onUndo?.();
-      return true;
+      const more = onUndo ? onUndo() !== false : false;
+      return any || more;
     },
     /** Forgotten, unsent (a logout): the page going later sends nothing either. */
     forget: () => {
@@ -323,6 +327,10 @@ export function removeManyWithUndo<T>({ message, ...held }: DeferredRemovals<T>)
   });
 }
 
+/** How often a gesture's held removals check the token, and how long before its expiry it is refreshed. */
+const TOKEN_CHECK_MS = 60_000;
+const TOKEN_MARGIN_S = 120;
+
 export interface HeldGesture<T> extends HeldRemovals<T> {
   /** What the gesture did («Evidenziazione rimossa»): said to a screen reader as it is done, never shown. */
   message: string;
@@ -341,13 +349,27 @@ export interface HeldGesture<T> extends HeldRemovals<T> {
  */
 export function holdGesture<T>({ message, onScreen, ...held }: HeldGesture<T>): void {
   let offer: number | null = null;
+  // While its removals wait, the token is kept fresh: the page going sends them by a `keepalive` fetch, which cannot
+  // refresh it, and a gesture may wait longer than a token lives.
+  let keeper = 0;
+  const done = () => window.clearInterval(keeper);
   const removals = holdRemovals(held, () => {
+    done();
     if (offer !== null) withdrawShortcutUndo(offer);
   });
+  if (held.targets.length > 0) {
+    keeper = window.setInterval(() => {
+      if (!held.targets.some((target) => pending.has(target.key) || inFlight.has(target.key))) done();
+      else void getFreshAccessToken(TOKEN_MARGIN_S).catch(() => null);
+    }, TOKEN_CHECK_MS);
+  }
   offer = offerShortcutUndo({
     message,
     ready: onScreen,
-    undo: () => { removals.undo(); },
+    undo: () => {
+      done();
+      return removals.undo();
+    },
     settle: (asThePageGoes) => removals.send(asThePageGoes),
   });
   announce(message);

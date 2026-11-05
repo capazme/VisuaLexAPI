@@ -228,7 +228,8 @@ export interface ShortcutUndoInput {
   message: string;
   /** Whether it can be undone now; meanwhile the key goes by. */
   ready?: () => boolean;
-  undo: () => void;
+  /** False when there was nothing left to take back (a creation that failed): the key goes on, to an «Annulla». */
+  undo: () => boolean | void;
   /** Its place taken by the next (`asThePageGoes` false), or the account leaving (true): what it held is carried out. */
   settle?: (asThePageGoes: boolean) => void;
 }
@@ -261,14 +262,19 @@ export function settleShortcutUndo() {
   held.settle?.(true);
 }
 
+/** Whether the undo held for the shortcut can be undone now (its text on screen). */
+export function shortcutUndoReady(): boolean {
+  return shortcutHeld !== null && (shortcutHeld.ready?.() ?? true);
+}
+
 /**
  * Ctrl+Z (⌘Z) on the undo held for the shortcut, when it is newer than the notification `than` names (the newest
- * «Annulla» on screen) and ready: undone, and what it undid returned; else null, and nothing changes.
+ * «Annulla» on screen) and ready: undone, and what it undid returned; else null — also when it found nothing to take
+ * back, which leaves it gone and the key to the «Annulla».
  */
 export function runShortcutUndo(than?: number): string | null {
   const held = shortcutHeld;
-  if (!held || (than !== undefined && held.id < than) || !(held.ready?.() ?? true)) return null;
+  if (!held || (than !== undefined && held.id < than) || !shortcutUndoReady()) return null;
   withdrawShortcutUndo(held.id);
-  held.undo();
-  return held.message;
+  return held.undo() === false ? null : held.message;
 }

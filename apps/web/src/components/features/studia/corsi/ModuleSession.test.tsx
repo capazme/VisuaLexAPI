@@ -35,6 +35,7 @@ import { coursesSwitchStore, setCoursesSwitch } from './coursesSwitch';
 import { ModuleSession } from './ModuleSession';
 import { appStore } from '../../../../store/useAppStore';
 import { resetNotifications, runShortcutUndo } from '../../../ui/notifications/notifications';
+import { NotificationHost } from '../../../ui/notifications/NotificationHost';
 import { forgetModuleSessions, readWork, saveStepReached } from './moduleSteps';
 import { lesson } from './__fixtures__/corsi';
 import type { EsitoRisposta, ModuloLezione } from '../../../../types/corsi';
@@ -480,17 +481,24 @@ describe('the review of #374', () => {
 
   it('Ctrl+Z (⌘Z) takes the last gesture back, with no notice, while the text is on screen (A4, 5 November)', async () => {
     const user = userEvent.setup();
-    renderSession(lesson({ stato: 'in-corso' }));
+    render(<NotificationHost />);
+    const session = renderSession(lesson({ stato: 'in-corso' }));
     await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
     const words = await screen.findByText(/distingue i prodotti/);
+    const ctrlZ = () => act(async () => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+    });
     select(words.firstChild!, 1, words.firstChild!, 9);
     await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     expect(document.querySelector('mark')?.textContent).toBe('distingue');
-    let undone: string | null = null;
-    act(() => { undone = runShortcutUndo(); });
-    expect(undone).toBe('Testo evidenziato in giallo');
+    expect(screen.queryByRole('list', { name: 'Notifiche' })).toBeNull();
+    await ctrlZ();
     expect(document.querySelector('mark')).toBeNull();
-    // Once: nothing is left for a second press.
+    expect(screen.getByRole('status')).toHaveTextContent('Annullato: Testo evidenziato in giallo');
+    // Off screen, the key undoes nothing: the lesson left, its gesture waits.
+    select(words.firstChild!, 1, words.firstChild!, 9);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    session.unmount();
     expect(runShortcutUndo()).toBeNull();
   });
 

@@ -46,7 +46,8 @@ export interface HighlightInkOptions {
 export function useHighlightInk({ key, articleId, plain, highlights, enabled = true, onCreated }: HighlightInkOptions) {
   const addHighlight = useAppStore((s) => s.addHighlight);
   const editHighlights = useAppStore((s) => s.editHighlights);
-  useEffect(() => showText(key), [key]);
+  // A text that takes no highlight (a past text, whose key is the text in force's) draws none to undo.
+  useEffect(() => (enabled ? showText(key) : undefined), [key, enabled]);
   return (text: string, ink: Ink, startOffset: number) => {
     if (!enabled) return;
     const plan = planInk({ start: startOffset, end: startOffset + text.length, ink, marks: inkMarks(plain, highlights) });

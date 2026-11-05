@@ -1119,7 +1119,8 @@ Brocardi sections went (D-078); the mode stays under its tests.
 
 **Offsets are measured from the text alone.** `SelectionPopup` takes a
 `textRootRef` (the element holding only the article text) and stores the anchor
-from `getSelectionAnchor` (`utils/selectionOffset.ts`), which reads
+from `getSelectionAnchor` (`utils/selectionOffset.ts`; the highlighter's through `getInkAnchor`, the same over the
+range widened to whole words, `utils/inkSelection.ts`), which reads
 `Range.toString()`: `Selection.toString()` is rendered text and writes a newline
 per line or comma boundary, which made every cross-comma highlight unmatched.
 The renderer also accepts, at the same offset, a stored text that differs only
@@ -1285,7 +1286,7 @@ after the release, then puts back the words selected as it began — never words
 `preventDefault` on the press. The title and the help are the bar's `aria-describedby`.
 While open the bar says its room at the foot of the window (`ui/notifications/footBar.ts`, 0 as it closes), over which the
 notifications' bottom stack rises (`NotificationHost`, as `--foot-bar` on the stack alone: rewriting the root's style
-while a notification animated crashed headless Chromium's page, one row in four). The focus goes back to the block's sign after a move or «Annulla». They are read as a highlight of the user's is (`getSelectionAnchor` over the
+while a notification animated crashed headless Chromium's page, one row in four). The focus goes back to the block's sign after a move or «Annulla». They are read as a note's anchor is, as selected (`getSelectionAnchor` over the
 reader's text root, its projection; root rule 23), 1–2000 characters, and «Sposta qui» or Enter sends them
 (`PUT …/proposals/:id/range`, `moveProposal` in the store, the note's state unchanged); Esc leaves. A passage removed
 meanwhile in another tab (404 «Proposta non trovata») goes, and the move says so («Evidenziazione non spostata: …»),
@@ -1370,7 +1371,8 @@ they touch → a new highlight, overlapping, as before; «Nessun colore» → th
 words** (the owner, 5 November 2026): a selection that cuts a word takes it whole, for every gesture; with Alt held
 while selecting, the piece exactly (`utils/inkSelection.ts`: widened in the DOM, never past a block or a `<br>`, where
 the projection would join two words; `getInkAnchor` for the readers, `inkRange` for a lesson; a note keeps the words
-as selected; Alt is read from the press that made the selection, while it stands as made). The cut is
+as selected; Alt is read from the press that made the selection, while it stands as made; a selection made from the
+keyboard, Shift and the arrows, is taken as made, as a word processor takes it). The cut is
 the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`
 (offsets cannot be changed by `PUT`), the server's `note` copied to them. A highlight from the Forum (`sourceSuggestionId`,
 `originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut: removed or recoloured
@@ -2665,8 +2667,8 @@ Duplicating any of these is a defect, not a shortcut.
   they land); `utils/inkTargets.ts` — the texts the highlighter's button applies its ink to; `hooks/useInkOnRelease.ts`
   — when the tool takes a selection; `utils/inkSelection.ts` — what it takes of one (whole words, Alt the piece). A new surface that takes highlights goes through these, never `addHighlight` alone.
 - `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
-  plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
-  Every surface that creates a highlight or an anchored note goes through it.
+  plain-text offset of a selection, from the DOM text; `getRangeAnchor` for a range) and `plainOffsetAt`.
+  Every surface that creates an anchored note goes through it, and a highlight through `getInkAnchor` over it.
 - `hooks/useArticleTextInteractions.ts` — the update-note chips, the
   foldable AGGIORNAMENTO tail and the annotation signs (`openBlock`), for any
   surface that renders structured text.

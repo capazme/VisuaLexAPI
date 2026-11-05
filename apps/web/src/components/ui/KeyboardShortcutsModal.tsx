@@ -36,8 +36,9 @@ const shortcutGroups: ShortcutGroup[] = [
     shortcuts: [
       { keys: [modKey, 'Space'], description: 'Toggle Focus Mode' },
       { keys: ['Esc'], description: 'Chiudi modal/pannello' },
-      // The newest «Annulla» of the notifications (L-36); outside fields and editors, where it is the browser's undo.
-      { keys: [modKey, 'Z'], description: 'Annulla l’ultima azione con «Annulla» (fuori dai campi di testo)' },
+      // The newest «Annulla» of the notifications (L-36), or the last gesture on a highlight, which shows none (A4);
+      // outside fields and editors, where it is the browser's undo.
+      { keys: [modKey, 'Z'], description: 'Annulla l’ultima azione con «Annulla» o l’ultimo gesto sulle evidenziazioni (fuori dai campi di testo)' },
     ],
   },
   {
