@@ -85,7 +85,8 @@ highlight the gesture acts on the whole: it is removed, or recoloured in place (
 saved before offsets existed (it has no offset to cut at). When the server lets an author pass through a cut (a `PUT`
 of the offsets, or a `POST` that copies the author), these are cut too.
 
-**One gesture, one «Annulla».** (Since §7: no notification, Ctrl+Z alone, the removals held until the next gesture.)
+**One gesture, one «Annulla».** (Since §7: no notification, Ctrl+Z alone, the removals held until the next gesture;
+and the rules above are §7's for the same colour and the others.)
 `editHighlights` (store) takes a plan's removals, recolourings and new parts at once:
 
 - removals go behind one notification with «Annulla» (`removeManyWithUndo`, the D7b bin's pattern that
@@ -166,6 +167,16 @@ The test passed on the article, a decision, a dossier entry and Study Mode; thre
   author kept: no server change. The cost: another device sees the highlight until it is sent.
 - **Notes keep their notification**, «Annulla» for five seconds, and Ctrl+Z (⌘Z) as its shortcut (L-36, already
   there); with a highlight's gesture also waiting, the key takes the newer first.
+- **The same colour takes itself away; another is overwritten** (the owner, later the same day: «sovrascrive altri
+  colori se presenti e non cancella il resto, se ripassa sopra lo stesso colore soltanto, cancella»). With the ink X,
+  over X alone (spaces aside, the colour seen being the innermost's) → X taken away where the selection passes, from
+  every highlight of it there; over anything else — plain words, another colour, a mix — → X over the whole selection,
+  the other colours giving way where it passes, the rest of them kept. This replaces §3's «reaching out → a new
+  highlight, overlapping»: the old rule stacked highlights of one colour, which a later cut cut each on its own, making
+  identical parts — the duplicates in the owner's local database (four «te» at the same offsets). Two highlights of
+  one colour never overlap now: what a gesture lays down in a colour is joined to the highlights of that colour it
+  overlaps or meets across spaces alone (so the words beside a highlight lengthen it). A highlight that is never cut
+  (from the Forum) is not joined either. The lessons follow the same rules in their form (`paintSpans`).
 - As before: «Nessun colore» over words with no highlight does nothing and says nothing.
 
 ## Not in A4

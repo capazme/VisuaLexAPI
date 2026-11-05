@@ -131,8 +131,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   around a citation held by a placeholder), made with the reader's highlighter (A4, spec
   `2026-11-03-a4-highlighter-and-notes-design` §4; no floating «Evidenzia» or «Togli» any more): `HighlighterButton`
   over the text (44 px at every width, no gear), its rules in the lesson's form (`paintSpans`: highlights never overlap,
-  the same colour over words inside one highlight takes the piece out, another colour paints over, «Nessun colore»
-  clears, one colour's highlights that meet are one), its tool (every selection takes the ink as it is released) and
+  the ink over its own colour alone takes the piece out, any other selection takes the ink all over, «Nessun colore»
+  clears, one colour's highlights that meet or are apart by spaces alone are one), its tool (every selection takes the ink as it is released) and
   its cursor, the readers' whole words (Alt for the piece exactly; Enter on a highlight selects its words exactly,
   `keepExact`) and their Ctrl+Z (⌘Z) for the last gesture while the text is on screen, with no notice; the text is a Tab stop where Shift and the arrows select from its start (`Selection.modify`, a word with
   Ctrl or Alt: a text not editable has no caret) and H applies the ink; a highlight is one Tab stop (never inside a
@@ -1362,12 +1362,19 @@ handles move it unseen and the long press's release would take one word), a clic
 `vlx-inking`/`data-ink`, the highlighter's or the eraser's cursor (`index.css`, nothing in the text); it goes off at
 logout and when the last bar holding a highlighter unmounts. **The rules** (`utils/highlighterRules.ts`, `planInk`,
 pure), the same with the tool, the button, the menu, the popup's «Evidenzia» and H, and Study Mode's keys 1–4, over the
-user's own highlights only (an application's passages and glosses, a decision's key passages are never touched), the
-colour seen being the innermost highlight's in the renderer's own nesting (`byNesting`: the later start, then the earlier
-end, then the later highlight): words touching no highlight → a new one (nothing for «Nessun colore»);
-inside highlights whose innermost is the ink → the piece out of every highlight of that colour holding it; inside one of
-another colour → the piece recoloured (the whole highlight selected recoloured in place, `PUT`); reaching out of what
-they touch → a new highlight, overlapping, as before; «Nessun colore» → the piece out of everything it touches. **Whole
+user's own highlights only (an application's passages and glosses, a decision's key passages are never touched), as
+the owner set them (5 November 2026: «sovrascrive altri colori se presenti e non cancella il resto, se ripassa sopra lo
+stesso colore soltanto, cancella»), the colour a selection passes over being the one seen, the innermost highlight's in
+the renderer's own nesting (`byNesting`: the later start, then the earlier end, then the later highlight): over the
+ink's colour alone (spaces aside) → the ink taken away where it passes, from every highlight of it there; over anything
+else — plain words, another colour, a mix — → the ink over the whole selection, the other colours giving way where it
+passes (the parts outside kept), the ink under them showing where it lay already (the one highlight of another colour
+selected whole is recoloured in place, `PUT`); «Nessun colore» → the piece out of everything it touches, nothing over
+plain words. **Never two highlights of one colour overlapping**: what a gesture lays down in a colour — a new
+highlight, a piece recoloured, the parts a cut leaves — is joined to the highlights of that colour it overlaps or meets
+across spaces alone (`joinSameColour`, the note of the first joined kept), so highlighting the words beside a highlight
+lengthens it, and the parts that highlights of one colour stacked one on another leave are one each side (the owner's
+duplicates, 5 November). **Whole
 words** (the owner, 5 November 2026): a selection that cuts a word takes it whole, for every gesture; with Alt held
 while selecting, the piece exactly (`utils/inkSelection.ts`: widened in the DOM, never past a block or a `<br>`, where
 the projection would join two words; `getInkAnchor` for the readers, `inkRange` for a lesson; a note keeps the words
@@ -1375,8 +1382,8 @@ as selected; Alt is read from the press that made the selection, while it stands
 keyboard, Shift and the arrows, is taken as made, as a word processor takes it). The cut is
 the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`
 (offsets cannot be changed by `PUT`), the server's `note` copied to them. A highlight from the Forum (`sourceSuggestionId`,
-`originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut: removed or recoloured
-whole. `useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
+`originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut nor joined: removed or
+recoloured whole. `useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
 event kept) or a change (`editHighlights`). **No notification** (the owner, 5 November 2026: «l'avviso per le
 evidenziazioni lo toglierei proprio»): every gesture — a new highlight, «Fai tua», a cut, a colour, «Nessun colore», a
 removal from a sign's popover — is said to a screen reader alone («Testo evidenziato in giallo», «Evidenziazione

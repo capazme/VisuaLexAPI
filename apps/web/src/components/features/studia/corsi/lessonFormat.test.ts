@@ -71,6 +71,21 @@ describe('highlights for the session (§5, step 3), with the highlighter\'s rule
     expect(paintSpans([[10, 20, 'yellow'], [20, 30, 'green']], [15, 25], 'red')).toEqual([[10, 15, 'yellow'], [15, 25, 'red'], [25, 30, 'green']]);
   });
 
+  it('as the owner set them (5 November): over its colour alone, spaces aside, it goes; mixed, the ink all over, joined across spaces', () => {
+    const plain = 'Il danno ingiusto, obbliga colui';
+    const at = (w: string) => plain.indexOf(w);
+    const danno: [number, number, 'yellow'] = [at('danno'), at('danno') + 5, 'yellow'];
+    const ingiusto: [number, number, 'yellow'] = [at('ingiusto'), at('ingiusto') + 8, 'yellow'];
+    // Two highlights of the ink with a space between: both go.
+    expect(paintSpans([danno, ingiusto], [at('danno'), at('ingiusto') + 8], 'yellow', plain)).toEqual([]);
+    // The words beside, across a space: one highlight; across a comma, two.
+    expect(paintSpans([danno], [ingiusto[0], ingiusto[1]], 'yellow', plain)).toEqual([[at('danno'), at('ingiusto') + 8, 'yellow']]);
+    expect(paintSpans([ingiusto], [at('obbliga'), at('obbliga') + 7], 'yellow', plain)).toEqual([ingiusto, [at('obbliga'), at('obbliga') + 7, 'yellow']]);
+    // Mixed: its colour, another, plain words: the ink all over, nothing taken away.
+    expect(paintSpans([danno, [at('ingiusto'), at('ingiusto') + 8, 'green']], [at('Il'), at('ingiusto') + 8], 'yellow', plain))
+      .toEqual([[0, at('ingiusto') + 8, 'yellow']]);
+  });
+
   it('«Nessun colore» takes the words out of every highlight they touch', () => {
     expect(paintSpans([[10, 20, 'yellow'], [25, 40, 'green']], [15, 30], 'none')).toEqual([[10, 15, 'yellow'], [30, 40, 'green']]);
     expect(paintSpans([[10, 20, 'yellow']], [30, 40], 'none')).toEqual([[10, 20, 'yellow']]);

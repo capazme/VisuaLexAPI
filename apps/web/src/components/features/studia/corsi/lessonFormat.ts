@@ -213,15 +213,21 @@ export type Span = readonly [number, number, HighlightColor?];
 export const spanColor = (span: Span): HighlightColor => span[2] ?? 'yellow';
 
 /**
- * The highlighter over a block (A4, spec `2026-11-03-a4-highlighter-and-notes-design` §4): the reader's rules
- * (`planInk`) in the lesson's own form, where highlights never overlap and a colour paints over what it covers. Words
- * inside one highlight of the ink, or under «Nessun colore», are taken out of what they touch (the parts outside stay);
- * any other colour paints them. Highlights of one colour that meet are one.
+ * The highlighter over a block (A4, spec `2026-11-03-a4-highlighter-and-notes-design` §4 and §7): the reader's rules
+ * (`planInk`) in the lesson's own form, where highlights never overlap. Words over the ink's colour alone (spaces aside)
+ * are taken out of it, as under «Nessun colore» they are taken out of everything; any other selection takes the ink all
+ * over, the other colours giving way where it passes (the parts outside stay). Highlights of one colour that meet, or
+ * are apart by spaces alone in `plain` (the block's plain text, `plainText`), are one.
  */
-export function paintSpans(spans: readonly Span[], [start, end]: readonly [number, number], ink: HighlightColor | 'none'): Span[] {
+export function paintSpans(spans: readonly Span[], [start, end]: readonly [number, number], ink: HighlightColor | 'none', plain?: string): Span[] {
   if (end <= start) return [...spans];
-  const holder = spans.find(([s, e]) => s <= start && end <= e);
-  const erase = ink === 'none' || (holder !== undefined && spanColor(holder) === ink);
+  const touching = spans.filter(([s, e]) => s < end && e > start);
+  const blank = (i: number) => plain !== undefined && /\s/.test(plain[i] ?? '');
+  let alone = touching.length > 0;
+  for (let i = start; i < end && alone; i += 1) {
+    if (!blank(i)) alone = touching.some((span) => span[0] <= i && i < span[1] && spanColor(span) === ink);
+  }
+  const erase = ink === 'none' || alone;
   const kept: [number, number, HighlightColor][] = [];
   for (const span of spans) {
     const [s, e] = span;
@@ -237,7 +243,8 @@ export function paintSpans(spans: readonly Span[], [start, end]: readonly [numbe
   const out: [number, number, HighlightColor][] = [];
   for (const span of kept) {
     const last = out.at(-1);
-    if (last && last[2] === span[2] && last[1] >= span[0]) last[1] = Math.max(last[1], span[1]);
+    const meets = last && (last[1] >= span[0] || (plain !== undefined && /^\s+$/.test(plain.slice(last[1], span[0]))));
+    if (last && meets && last[2] === span[2]) last[1] = Math.max(last[1], span[1]);
     else out.push(span);
   }
   return out;

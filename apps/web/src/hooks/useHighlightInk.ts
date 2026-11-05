@@ -32,7 +32,8 @@ export interface HighlightInkOptions {
   highlights: readonly Highlight[];
   /** False on a text that takes no highlight (a past text). */
   enabled?: boolean;
-  /** A new highlight was made (the article's MERL-T event); never for a cut or a colour changed. */
+  /** Words were highlighted, alone or joined to the highlights they meet (the article's MERL-T event); never for a cut
+   * or a colour changed. */
   onCreated?: (text: string, color: HighlightColor, startOffset: number) => void;
 }
 
@@ -50,16 +51,20 @@ export function useHighlightInk({ key, articleId, plain, highlights, enabled = t
   useEffect(() => (enabled ? showText(key) : undefined), [key, enabled]);
   return (text: string, ink: Ink, startOffset: number) => {
     if (!enabled) return;
-    const plan = planInk({ start: startOffset, end: startOffset + text.length, ink, marks: inkMarks(plain, highlights) });
+    const plan = planInk({ start: startOffset, end: startOffset + text.length, ink, marks: inkMarks(plain, highlights), plain });
     if (plan.kind === 'nothing') return;
     if (plan.kind === 'create') {
       addHighlight(key, articleId, text, '', plan.color, startOffset);
       onCreated?.(text, plan.color, startOffset);
       return;
     }
-    const message = plan.effect === 'recoloured' && plan.color
-      ? `Evidenziazione cambiata in ${highlightColorName(plan.color)}`
-      : plan.remove.length > 1 ? 'Evidenziazioni rimosse' : 'Evidenziazione rimossa';
+    const message = plan.effect === 'created' && plan.color
+      ? `Testo evidenziato in ${highlightColorName(plan.color)}`
+      : plan.effect === 'recoloured' && plan.color
+        ? `Evidenziazione cambiata in ${highlightColorName(plan.color)}`
+        : plan.remove.length > 1 ? 'Evidenziazioni rimosse' : 'Evidenziazione rimossa';
     editHighlights({ normaKey: key, articleId, remove: plan.remove, recolor: plan.recolor, add: partsOf(plain, plan.add), message });
+    // A highlight made by joining the ones it meets is a new highlight too, for the article's MERL-T event.
+    if (plan.effect === 'created' && plan.color) onCreated?.(text, plan.color, startOffset);
   };
 }
