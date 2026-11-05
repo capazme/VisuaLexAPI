@@ -29,20 +29,23 @@ const ACTION = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 te
 const LAYOUT = `-mx-1 flex gap-3 px-1 pb-3 pt-1 @min-[61.5rem]:grid @min-[61.5rem]:pb-1 ${CARD_GRID_COLUMNS}`;
 const CARD = 'flex w-56 shrink-0 snap-start flex-col justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 @min-[61.5rem]:w-auto dark:border-slate-700 dark:bg-slate-900';
 const BAR = 'rounded bg-slate-100 dark:bg-slate-800';
-/** While the packs load: cards of the same size — a name on two lines, the count, the button's 44 px — as many as the
- *  packs of «Tutte le categorie», where the Forum opens, so the Forum below does not move when they arrive, in the grid
- *  too (every category holds packs, so the band never turns out empty; the test holds the number to the data). */
+/** While the packs load: cards of their size — a name on two lines in the row (the cards stretch to the tallest), on one
+ *  in the grid (at 20rem the names fit one, the longest 41 characters), the count, the button's 44 px — as many as the
+ *  packs of «Tutte le categorie», where the Forum opens, so the Forum below hardly moves when they arrive (a name that
+ *  wraps in the grid makes its line one taller; every category holds packs, so the band never turns out empty; the
+ *  test holds the number to the data). */
 const WAITING_CARDS = 20;
 
 /**
  * Whether the list is laid out as the row, as the CSS chose by the band's width: only the row is a Tab stop of its own,
  * so the arrows scroll it past the packs already added, which hold no button; the grid shows every pack and is no stop,
- * still focusable by script for `/forum#pronti`. Read whenever the list is resized; the row until then.
+ * still focusable by script for `/forum#pronti`. Read whenever the list is resized (a change of layout resizes it); the
+ * row until then, and where the browser has no `ResizeObserver`.
  */
 function useIsRow(list: HTMLElement | null): boolean {
   const [row, setRow] = useState(true);
   useEffect(() => {
-    if (!list) return;
+    if (!list || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => setRow(getComputedStyle(list).display !== 'grid'));
     observer.observe(list);
     return () => observer.disconnect();
@@ -114,7 +117,7 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
               <span className="min-w-0">
                 <span className="block text-base leading-snug">
                   <span className="flex h-[1lh] items-center"><span className={cn(BAR, 'h-4 w-4/5')} /></span>
-                  <span className="flex h-[1lh] items-center"><span className={cn(BAR, 'h-4 w-1/2')} /></span>
+                  <span className="flex h-[1lh] items-center @min-[61.5rem]:hidden"><span className={cn(BAR, 'h-4 w-1/2')} /></span>
                 </span>
                 <span className="mt-0.5 flex h-5 items-center text-sm"><span className={cn(BAR, 'h-3 w-16')} /></span>
               </span>

@@ -461,9 +461,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   passage, a card, a lesson, a course's paragraphs, the document analysed; `max-w-prose` stays only on a short line
   (the sentence under a title, a notice, an empty state); `frame.test.ts` refuses a measure in characters written by
   hand (the sign-in page's display line aside). The columns that fill the room past two measures (about 1500 px) come
-  page by page (spec `2026-11-05-u1-frame-and-full-screen-design.md` §7); a list of cards on a wide frame is a grid of
-  cards of at least 20rem, `CARD_GRID_COLUMNS` (`frame.ts`, written once; the Forum's «Pronti da VisuaLex» first),
-  never a carousel or a row 2000 px long (a phone may keep a row that scrolls).
+  page by page (spec `2026-11-05-u1-frame-and-full-screen-design.md` §7): a list of cards on a wide frame becomes a grid
+  of cards of at least 20rem, `CARD_GRID_COLUMNS` (`frame.ts`, written once), never a carousel or a row 2000 px long (a
+  phone may keep a row that scrolls). So far only the Forum's «Pronti da VisuaLex» does; the community's cards
+  (`CARD_GRID`), the dossier list and «Le mie schede» still set their columns by breakpoint until their pull requests.
   **The page frame** (W2, 21 Oct 2026):
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
@@ -2995,9 +2996,10 @@ meant to stay split; add new features as new files, not inside the shells:
   più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
   `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
   chiave»; `loadStudyPacks` imports the data, ~60 KB, when the band first asks, so it is not in the chunk every page
-  loads — meanwhile the heading and twenty cards drawn like the packs' (a name on two lines, the count, the 44 px
-  button; as many as the packs of «Tutte le categorie», where the Forum opens, laid out as the packs will be) hold
-  their place, `aria-busy`, every category holding packs; once loaded, a band drawn again shows them at
+  loads — meanwhile the heading and twenty cards drawn like the packs' (a name on two lines in the row, on one in the
+  grid, where the names fit at 20rem; the count, the 44 px button; as many as the packs of «Tutte le categorie», where
+  the Forum opens, laid out as the packs will be) hold their place, `aria-busy`, every category holding packs (a name
+  that wraps in the grid makes its line one taller); once loaded, a band drawn again shows them at
   once (`peekStudyPacks`); a load that fails leaves the band out): compact cards, every pack in the band, laid out by
   the band's own width (`@container`, so the sidebar and the full screen count, not the window; U1 §7) — one row that
   scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past packs already added) on a phone and wherever

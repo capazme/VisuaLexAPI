@@ -77,6 +77,7 @@ describe('the page frame (W2, U1)', () => {
       ['@min-[61.5rem]:pb-1', 'padding-bottom:'],
       ['@min-[61.5rem]:w-auto', 'width: auto'],
       ['@min-[61.5rem]:overflow-x-visible', 'overflow-x: visible'],
+      ['@min-[61.5rem]:hidden', 'display: none'],
     ];
     const css = await compile([CARD_GRID_COLUMNS, '@container', ...band.map(([name]) => name)]);
     expect(css).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(20rem,\s*100%\),\s*1fr\)\)/);

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { appStore } from '../../../store/useAppStore';
 import { loadStudyPacks, packContent, type StudyPack } from '../../../utils/studyPacks';
 import { StudyPacksBand } from './StudyPacksBand';
@@ -60,24 +60,26 @@ describe('StudyPacksBand', () => {
   });
 
   it('as a grid, which scrolls nothing, is no Tab stop of its own, still focusable for /forum#pronti (U1)', async () => {
-    // The browser's layout, which jsdom has not: the list laid out as the grid, and the observer reporting its size.
+    // The browser's layout, which jsdom has not: the list laid out as `display` says, and the observer reporting a
+    // resize whenever the test calls `resized`.
+    let display = 'grid';
     const realStyle = window.getComputedStyle;
     const style = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
       const real = realStyle(element, pseudo);
       if ((element as HTMLElement).id !== 'pronti') return real;
       return new Proxy(real, {
         get: (target, key) => {
-          if (key === 'display') return 'grid';
+          if (key === 'display') return display;
           const value: unknown = Reflect.get(target, key);
           return typeof value === 'function' ? value.bind(target) : value;
         },
       });
     });
+    let resized = () => {};
     const RealObserver = window.ResizeObserver;
     window.ResizeObserver = class {
-      report: ResizeObserverCallback;
-      constructor(report: ResizeObserverCallback) { this.report = report; }
-      observe() { this.report([], this as unknown as ResizeObserver); }
+      constructor(report: ResizeObserverCallback) { resized = () => report([], this as unknown as ResizeObserver); }
+      observe() { resized(); }
       unobserve() {}
       disconnect() {}
     } as unknown as typeof ResizeObserver;
@@ -87,6 +89,13 @@ describe('StudyPacksBand', () => {
       await waitFor(() => expect(list).toHaveAttribute('tabindex', '-1'));
       list.focus();
       expect(list).toHaveFocus();
+      // Narrowed (the window, the sidebar widened, the full screen left): the row again, a Tab stop again.
+      display = 'flex';
+      act(() => resized());
+      expect(list).toHaveAttribute('tabindex', '0');
+      display = 'grid';
+      act(() => resized());
+      expect(list).toHaveAttribute('tabindex', '-1');
     } finally {
       window.ResizeObserver = RealObserver;
       style.mockRestore();
@@ -132,6 +141,11 @@ describe('StudyPacksBand', () => {
     expect(held.children).toHaveLength(STUDY_PACKS.length);
     expect(held).toHaveClass('flex', '@min-[61.5rem]:grid', CARD_GRID_COLUMNS);
     expect(held.firstElementChild).toHaveClass('w-56', '@min-[61.5rem]:w-auto');
+    // A name on two lines in the row, where the cards stretch to the tallest; on one in the grid, where the names fit.
+    const nameLines = held.firstElementChild!.firstElementChild!.firstElementChild!.children;
+    expect(nameLines).toHaveLength(2);
+    expect(nameLines[0]).not.toHaveClass('@min-[61.5rem]:hidden');
+    expect(nameLines[1]).toHaveClass('@min-[61.5rem]:hidden');
     load.release();
     expect(await screen.findByRole('list', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).not.toHaveAttribute('aria-busy');
