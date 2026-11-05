@@ -223,6 +223,32 @@ describe('editHighlights — what a gesture waits for, and what it never loses (
   });
 });
 
+describe('never the same highlight twice (A4, the owner\'s duplicates of 5 November)', () => {
+  it('a highlight the store holds already — same words, place, colour and text — is not made again', async () => {
+    appStore.getState().addHighlight('k', '1453', 'contratto', '', 'yellow', 0);
+    expect(marks()).toEqual(['h1:contratto:yellow', 'h2:il danno ingiusto:yellow']);
+    expect(highlightService.create).not.toHaveBeenCalled();
+    // Another colour, or another place, is another highlight.
+    appStore.getState().addHighlight('k', '1453', 'contratto', '', 'green', 0);
+    expect(highlightService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('a part that would repeat a highlight that stays, or another part, is not made', async () => {
+    appStore.getState().editHighlights({
+      normaKey: 'k', articleId: '1453', remove: ['h2'], recolor: [],
+      add: [
+        { text: 'contratto', startOffset: 0, color: 'yellow', from: 'h2' },
+        { text: 'il', startOffset: 20, color: 'yellow', from: 'h2' },
+        { text: 'il', startOffset: 20, color: 'yellow', from: 'h2' },
+      ],
+      message: 'Evidenziazione rimossa',
+    });
+    await flush();
+    expect(vi.mocked(highlightService.create).mock.calls.map(([data]) => data.text)).toEqual(['il']);
+    expect(marks()).toEqual(['h1:contratto:yellow', 's1:il:yellow']);
+  });
+});
+
 describe('the highlighter\'s state (A4)', () => {
   afterEach(() => appStore.setState((s) => ({ readingTool: null, highlighterEraser: false, settings: { ...s.settings, highlightColor: 'yellow' } })));
 

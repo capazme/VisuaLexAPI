@@ -184,6 +184,11 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
     if (!highlighting || !el) return;
     const selection = document.getSelection();
     if (event.key.toLowerCase() === 'h' && !event.metaKey && !event.ctrlKey && !event.altKey && selection) {
+      // A key held down highlights once.
+      if (event.repeat) {
+        event.preventDefault();
+        return;
+      }
       const span = selectedSpan(el, selection);
       if (!span) return;
       event.preventDefault();

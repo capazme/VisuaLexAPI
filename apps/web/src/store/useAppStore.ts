@@ -716,6 +716,14 @@ const appStore = createStore<AppState>()(
                 });
             };
 
+            /**
+             * Whether the store holds that very highlight already — the same words at the same place, in the same colour,
+             * on the same text: it is never made twice (the owner's duplicates, 5 November 2026).
+             */
+            const holdsHighlight = (normaKey: string, articleId: string, text: string, startOffset: number | undefined, color: Highlight['color'], besides: readonly string[] = []) =>
+                typeof startOffset === 'number' && get().highlights.some(h => !besides.includes(h.id) && h.normaKey === normaKey
+                    && h.articleId === articleId && h.startOffset === startOffset && h.text === text && h.color === color);
+
             /** A highlight's removal the server refused: it is back on screen, and the reader is told. */
             const highlightDeleteRefused = (err: unknown) => {
                 console.error('Failed to sync highlight delete:', err);
@@ -2340,6 +2348,7 @@ const appStore = createStore<AppState>()(
 
             // ── Highlight actions: optimistic update + server sync ─────────
             addHighlight: (normaKey, articleId, text, range, color, startOffset) => {
+                if (holdsHighlight(normaKey, articleId, text, startOffset, color)) return;
                 const optimistic: Highlight = {
                     id: uuidv4(),
                     normaKey,
@@ -2378,7 +2387,10 @@ const appStore = createStore<AppState>()(
                 });
                 // A part keeps what the server holds of its highlight beyond the words (its `note`, unused here).
                 const notes = new Map(removed.map(({ item }) => [item.id, item.note]));
-                const created: Highlight[] = add.map((part) => {
+                // One that would repeat a highlight that stays, or another part, is not made.
+                const fresh = add.filter((part, i) => !holdsHighlight(normaKey, articleId, part.text, part.startOffset, part.color, remove)
+                    && add.findIndex(p => p.text === part.text && p.startOffset === part.startOffset && p.color === part.color) === i);
+                const created: Highlight[] = fresh.map((part) => {
                     const note = part.from ? notes.get(part.from) : undefined;
                     return {
                         id: uuidv4(), normaKey, articleId, text: part.text, rangeSerialized: '', color: part.color, startOffset: part.startOffset,

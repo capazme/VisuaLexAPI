@@ -322,6 +322,16 @@ describe('SelectionPopup: whole words for the highlighter (A4, 5 November 2026)'
     expect(onAddNote).toHaveBeenCalledWith('anni ingiu', TEXT.indexOf('anni'), RECT);
   });
 
+  it('H held down highlights once: its repeats, before the bar is gone, do nothing (the owner\'s duplicates)', async () => {
+    const onHighlight = vi.fn();
+    render(<Harness onHighlight={onHighlight} />);
+    await selectText('art. 2043 c.c.');
+    fireEvent.keyDown(window, { key: 'h', repeat: true });
+    expect(onHighlight).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(onHighlight).toHaveBeenCalledOnce();
+  });
+
   it('with Alt held while selecting, the piece exactly', async () => {
     const onHighlight = vi.fn();
     render(<Harness onHighlight={onHighlight} />);

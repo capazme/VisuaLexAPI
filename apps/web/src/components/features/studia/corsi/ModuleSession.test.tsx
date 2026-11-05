@@ -303,6 +303,13 @@ describe('highlights and citations, further (§5 step 3, §6.5)', () => {
     expect(document.getSelection()!.toString()).toBe('distingue');
     fireEvent.keyDown(mark, { key: 'h' });
     expect(document.querySelector('mark')).toBeNull();
+    // H held down highlights once: a repeat does nothing, the first press does.
+    const again = screen.getByText(/distingue i prodotti/);
+    select(again.firstChild!, 1, again.firstChild!, 9);
+    fireEvent.keyDown(text, { key: 'h', repeat: true });
+    expect(document.querySelector('mark')).toBeNull();
+    fireEvent.keyDown(text, { key: 'h' });
+    expect(document.querySelector('mark')?.textContent).toBe('distingue');
   });
 
   it('with the tool on, every selection takes the ink as the mouse lets go (A4)', async () => {

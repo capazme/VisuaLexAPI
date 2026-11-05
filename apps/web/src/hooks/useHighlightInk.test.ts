@@ -12,13 +12,14 @@ const hl = (id: string, words: string, color: Highlight['color'], extra: Partial
 });
 
 const store = appStore.getState();
-afterEach(() => appStore.setState({ addHighlight: store.addHighlight, editHighlights: store.editHighlights }));
+afterEach(() => appStore.setState({ addHighlight: store.addHighlight, editHighlights: store.editHighlights, highlights: [] }));
 
+/** The hook over the text, the store holding `highlights` (another text's one among them, which it never reads). */
 function ink(highlights: Highlight[], extra: { onCreated?: () => void; enabled?: boolean } = {}) {
   const addHighlight = vi.fn();
   const editHighlights = vi.fn();
-  appStore.setState({ addHighlight, editHighlights });
-  const { result, unmount } = renderHook(() => useHighlightInk({ key: 'k', articleId: '2043', plain: PLAIN, highlights, ...extra }));
+  appStore.setState({ addHighlight, editHighlights, highlights: [...highlights, hl('elsewhere', 'danno', 'yellow', { articleId: '2044' })] });
+  const { result, unmount } = renderHook(() => useHighlightInk({ key: 'k', articleId: '2043', plain: PLAIN, ...extra }));
   return { apply: result.current, addHighlight, editHighlights, unmount };
 }
 
@@ -73,6 +74,30 @@ describe('useHighlightInk — the rules, into the store (A4)', () => {
     expect(editHighlights).not.toHaveBeenCalled();
     apply('ingiusto obbliga', 'none', at('ingiusto obbliga'));
     expect(editHighlights).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ remove: ['a', 'b'], message: 'Evidenziazioni rimosse' }));
+  });
+
+  it('the words beside a highlight of the ink lengthen it: one highlight, said as words highlighted, told to the article (A4, 5 November)', () => {
+    const onCreated = vi.fn();
+    const { apply, addHighlight, editHighlights } = ink([hl('h1', 'danno', 'yellow', { note: 'del server' })], { onCreated });
+    apply('ingiusto', 'yellow', at('ingiusto'));
+    expect(addHighlight).not.toHaveBeenCalled();
+    expect(editHighlights).toHaveBeenCalledExactlyOnceWith({
+      normaKey: 'k', articleId: '2043', remove: ['h1'], recolor: [],
+      add: [{ text: 'danno ingiusto', startOffset: at('danno'), color: 'yellow', from: 'h1' }],
+      message: 'Testo evidenziato in giallo',
+    });
+    expect(onCreated).toHaveBeenCalledExactlyOnceWith('ingiusto', 'yellow', at('ingiusto'));
+  });
+
+  it('reads the highlights as the store holds them when it applies, not as the last render drew them (the owner\'s duplicates)', () => {
+    const { apply, addHighlight, editHighlights } = ink([]);
+    apply('danno', 'yellow', at('danno'));
+    expect(addHighlight).toHaveBeenCalledOnce();
+    // The first one in the store, the screen not drawn again yet: the same words again are its words, not a second one.
+    appStore.setState({ highlights: [hl('h1', 'danno', 'yellow')] });
+    apply('danno', 'yellow', at('danno'));
+    expect(addHighlight).toHaveBeenCalledOnce();
+    expect(editHighlights).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ remove: ['h1'], add: [] }));
   });
 
   it('a text that takes no highlight is left alone', () => {

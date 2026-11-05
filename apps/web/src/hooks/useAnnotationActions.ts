@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import type { Highlight } from '../types';
 import type { Ink } from '../utils/highlighterRules';
 import { useHighlightInk } from './useHighlightInk';
 
@@ -11,8 +10,6 @@ export interface AnnotationActionsOptions {
   /** The text's key and article id: the pair every highlight and note of this text is stored under. */
   key: string;
   articleId: string;
-  /** The user's own highlights on this text, which the highlighter's rules read (A4). */
-  highlights: readonly Highlight[];
   /** The projection the anchors count in: the parts a cut leaves are its own words. */
   plain: string;
   /** A note's toast («Nota ancorata al testo»); a highlight says nothing (A4). */
@@ -32,9 +29,9 @@ export interface AnnotationActionsOptions {
  * The anchor's `scopedArticleId` lets a sub-section of the article target its own scope.
  */
 export function useAnnotationActions({
-  key, articleId, highlights, plain, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,
+  key, articleId, plain, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,
 }: AnnotationActionsOptions) {
-  const applyInk = useHighlightInk({ key, articleId, plain, highlights, enabled, onCreated: onHighlightAdded });
+  const applyInk = useHighlightInk({ key, articleId, plain, enabled, onCreated: onHighlightAdded });
   const addAnnotation = useAppStore((s) => s.addAnnotation);
   // The selected span becomes the note's anchor; the composer sits on the span itself, at the rect
   // the popup captured before the selection cleared (gotcha 16).

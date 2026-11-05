@@ -177,6 +177,13 @@ The test passed on the article, a decision, a dossier entry and Study Mode; thre
   one colour never overlap now: what a gesture lays down in a colour is joined to the highlights of that colour it
   overlaps or meets across spaces alone (so the words beside a highlight lengthen it). A highlight that is never cut
   (from the Forum) is not joined either. The lessons follow the same rules in their form (`paintSpans`).
+- **No duplicates** (the owner's fifth point: «te» saved four times at the same offsets). Where they came from: the old
+  rule's stacked highlights of one colour, each cut on its own into identical parts (gone with the rule above); and a
+  second gesture before the screen caught up — a key held down, whose repeats found the reader's highlights as the last
+  render drew them, without the first. Now the rules read the store's highlights as they apply, a key held down
+  highlights once, and the store makes no highlight identical to one it holds. The duplicates already saved go with
+  the same colour passed over them (over X alone, X goes from every highlight of it there). A unique key on the
+  server would be the last guard: a migration, the owners' to decide.
 - As before: «Nessun colore» over words with no highlight does nothing and says nothing.
 
 ## Not in A4

@@ -103,7 +103,7 @@ export function StudyModeContent({
   const plain = useMemo(() => (article_text || '').replace(/\n/g, ''), [article_text]);
   // The highlighter's rules (A4), as in every reader: the same words in the same colour are taken away, another colour
   // recolours them. No toast: Study Mode says a new highlight by drawing it; a change says itself, with «Annulla».
-  const handleHighlight = useHighlightInk({ key: normaKey, articleId: uniqueArticleId, plain, highlights });
+  const handleHighlight = useHighlightInk({ key: normaKey, articleId: uniqueArticleId, plain });
 
   // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
   const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, uniqueArticleId, {
@@ -131,6 +131,12 @@ export function StudyModeContent({
       // While a dialog is open over Study Mode (Impostazioni) the keys are its own: a selection left in the text behind
       // it is not highlighted.
       if (document.querySelector('[aria-modal="true"]')) return;
+      // A key held down highlights once (A4): its repeats are taken, so neither a second highlight nor the theme's key.
+      if (e.repeat) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
 
       const selection = window.getSelection();
       if (!selection?.toString().trim()) return;

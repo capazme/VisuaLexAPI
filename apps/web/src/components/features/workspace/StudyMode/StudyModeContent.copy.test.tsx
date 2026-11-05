@@ -70,7 +70,7 @@ describe('StudyModeContent — copying the words of the text in force', () => {
 describe('StudyModeContent — the keys 1 to 4 (H1), by the highlighter\'s rules (A4)', () => {
   const store = appStore.getState();
   afterEach(() => {
-    appStore.setState((s) => ({ addHighlight: store.addHighlight, editHighlights: store.editHighlights, settings: { ...s.settings, highlightColor: 'yellow' } }));
+    appStore.setState((s) => ({ addHighlight: store.addHighlight, editHighlights: store.editHighlights, highlights: [], settings: { ...s.settings, highlightColor: 'yellow' } }));
     window.getSelection()?.removeAllRanges();
   });
 
@@ -98,11 +98,24 @@ describe('StudyModeContent — the keys 1 to 4 (H1), by the highlighter\'s rules
     expect(addHighlight).toHaveBeenCalledExactlyOnceWith('k', 'all2:1284', WORDS, '', 'yellow', expect.any(Number));
   });
 
+  it('held down, highlight once: the repeats are taken, so neither a second highlight nor the theme\'s key (A4)', () => {
+    const addHighlight = vi.fn();
+    appStore.setState({ addHighlight });
+    const { container } = render1284();
+    select(container, WORDS);
+    const repeat = new KeyboardEvent('keydown', { key: '1', repeat: true, bubbles: true, cancelable: true });
+    window.dispatchEvent(repeat);
+    expect(repeat.defaultPrevented).toBe(true);
+    expect(addHighlight).not.toHaveBeenCalled();
+  });
+
   it('over words highlighted in that colour, take the highlight away', () => {
     const editHighlights = vi.fn();
     appStore.setState({ editHighlights });
     const plain = (ARTICLE.article_text ?? '').replace(/\n/g, '');
     const highlight: Highlight = { id: 'h1', normaKey: 'k', articleId: 'all2:1284', rangeSerialized: '', text: WORDS, color: 'red', startOffset: plain.indexOf(WORDS) };
+    // The rules read the store's highlights (A4).
+    appStore.setState({ highlights: [highlight] });
     const { container } = render1284([highlight]);
     select(container, WORDS);
     fireEvent.keyDown(window, { key: '3' });

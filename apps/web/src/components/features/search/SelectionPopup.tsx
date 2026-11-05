@@ -254,8 +254,9 @@ export function SelectionPopup({
       if (e.key === 'Escape') {
         hidePopup();
         window.getSelection()?.removeAllRanges();
-      } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey) {
-        // Quick highlight, with the ink chosen in the reading bar (H1), by the highlighter's rules (A4)
+      } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey && !e.repeat) {
+        // Quick highlight, with the ink chosen in the reading bar (H1), by the highlighter's rules (A4); once for a key
+        // held down, whose repeats would come before the bar is gone (the owner's duplicates, 5 November)
         onHighlight(popup.ink.text, ink, popup.ink.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();

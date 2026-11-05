@@ -327,7 +327,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
   const {
     noteAnchor, composerRect, clearAnchor, handlePopupHighlight, handlePopupAddNote, handleAddNote, closeComposer, commitComposer,
-  } = useAnnotationActions({ key, articleId: NO_ARTICLE, highlights: decisionHighlights, plain, showToast });
+  } = useAnnotationActions({ key, articleId: NO_ARTICLE, plain, showToast });
   const { inlineNote, closeInlineNote } = useInlineNoteAnchors(contentRef, decisionNotes);
 
   const exportSlug = slugify(key) || 'decisione';

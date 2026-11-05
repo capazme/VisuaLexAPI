@@ -1374,7 +1374,11 @@ plain words. **Never two highlights of one colour overlapping**: what a gesture 
 highlight, a piece recoloured, the parts a cut leaves — is joined to the highlights of that colour it overlaps or meets
 across spaces alone (`joinSameColour`, the note of the first joined kept), so highlighting the words beside a highlight
 lengthens it, and the parts that highlights of one colour stacked one on another leave are one each side (the owner's
-duplicates, 5 November). **Whole
+duplicates, 5 November). The same highlight is never made twice: the rules read the store's highlights as they apply
+(`useHighlightInk`, never the last render's, which a second gesture before the screen caught up would find without the
+first), a key held down (the bar's H, Study Mode's 1–4, the lesson's H) highlights once, and the store makes no
+highlight identical to one it holds — words, place, colour and text (`holdsHighlight`, in `addHighlight` and in the
+parts of `editHighlights`). **Whole
 words** (the owner, 5 November 2026): a selection that cuts a word takes it whole, for every gesture; with Alt held
 while selecting, the piece exactly (`utils/inkSelection.ts`: widened in the DOM, never past a block or a `<br>`, where
 the projection would join two words; `getInkAnchor` for the readers, `inkRange` for a lesson; a note keeps the words
