@@ -85,7 +85,8 @@ describe('the page frame (W2, U1)', () => {
     // Each class's rule holds its declaration inside the query on the band's own width.
     const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     for (const [name, declaration] of band) {
-      const selector = `.${name.replace(/[@[\].:]/g, '\\$&')}`;
+      // The class as CSS writes it in a selector: every character it escapes, the backslash first among them.
+      const selector = `.${name.replace(/[\\@[\].:]/g, '\\$&')}`;
       expect(css).toMatch(new RegExp(`${literal(selector)}\\s*\\{\\s*@container \\(width >= 61\\.5rem\\)\\s*\\{\\s*${literal(declaration)}`));
     }
   }, 30000);
