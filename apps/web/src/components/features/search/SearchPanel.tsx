@@ -628,7 +628,7 @@ export function SearchPanel() {
 
       {/* Loading Skeleton - Shows while search is in progress */}
       {isLoading && !hasTabs && (
-        <div className="w-full max-w-4xl mx-auto p-12 space-y-8 animate-pulse">
+        <div className="w-full p-12 space-y-8 animate-pulse">
           <div className="space-y-4">
             <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded-2xl w-1/3" />
             <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/2" />

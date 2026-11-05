@@ -140,8 +140,8 @@ describe('PageFrame (W2)', () => {
 });
 
 /**
- * The section pages (W2): each draws its title through the frame, or — under a way back — with `PAGE_TITLE`; none writes
- * a title of its own, puts an icon beside it, or narrows the page under the layout's frame.
+ * The section pages (W2, U1): each draws its title through the frame, or — under a way back — with `PAGE_TITLE`; none
+ * writes a title of its own, puts an icon beside it, or narrows the page under the layout's frame.
  */
 const SECTION_PAGES = [
   'components/features/dossier/DossierListView.tsx',
@@ -153,6 +153,8 @@ const SECTION_PAGES = [
   'components/features/studia/StudiaPage.tsx',
   'components/features/planner/OpusPage.tsx',
   'components/features/documents/DocumentReviewPage.tsx',
+  // A `reading` page (U1): the frame narrows its body, the page writes no cap.
+  'components/features/rassegne/RassegneSearchPage.tsx',
   'features/connections/ConnectAiAppPage.tsx',
   'components/features/history/HistoryView.tsx',
   'pages/MerltHubPage.tsx',
@@ -171,8 +173,9 @@ describe('the section pages (W2)', () => {
     // Any `<h1` left is the frame's token alone, with its words and nothing else inside.
     for (const [, inside] of source.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)) expect(inside).not.toMatch(/</);
     expect(source).not.toMatch(/<h1\b(?![^>]*className=\{PAGE_TITLE\})/);
-    // The root of the page is the frame's width.
-    expect(source).not.toMatch(/mx-auto[^"'`]*max-w-(?:3xl|4xl|6xl)|max-w-(?:3xl|4xl|6xl)[^"'`]*mx-auto/);
+    // The root of the page is the frame's width, and the page writes no cap of its own (U1): a page that reads as text
+    // says `width="reading"` to the frame.
+    expect(source).not.toMatch(/\bmax-w-(?:3xl|4xl|5xl|6xl|7xl)\b/);
   });
 });
 

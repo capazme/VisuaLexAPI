@@ -249,8 +249,8 @@ describe('ReadingRow — widths (besideLayout)', () => {
   });
 });
 
-describe('ReadingRow — past the page\'s width cap while a window is beside', () => {
-  /** The page's shape: Layout's scroller and padded container, the search page's `max-w-5xl` results area (about 960 px of content), the row. */
+describe('ReadingRow — the frame is its one cap, with or without a window beside (U1)', () => {
+  /** The page's shape: Layout's scroller and its frame, the search page's results area (no cap of its own), the row. */
   function inPage() {
     const scroller = document.createElement('div');
     scroller.style.overflowY = 'auto';
@@ -266,12 +266,15 @@ describe('ReadingRow — past the page\'s width cap while a window is beside', (
   }
   const root = () => screen.getByTestId('reading-row');
 
-  it('takes the scroller\'s width less the gutter, centred: 1500 - 64 against the area\'s 960', () => {
+  it('never reaches past its parent while windows are beside: the scroller\'s room beyond it is the frame\'s margin', () => {
     areaWidth = 1436;
     practiceWithWindows(2);
     render(row(), { container: inPage() });
-    expect(root().style.marginInline).toBe('-238px');
-    expect(root().style.width).toBe('calc(100% + 476px)');
+    expect(root().style.marginInline).toBe('');
+    expect(root().style.width).toBe('');
+    // The columns share the row's own width.
+    const px = (testId: string, index = 0) => parseFloat(widthOf(testId, index));
+    expect(px('reading-row-table') + px('reading-row-window', 0) + px('reading-row-window', 1)).toBe(1436);
   });
 
   it('with no window the row keeps the page\'s measure', () => {
@@ -282,13 +285,14 @@ describe('ReadingRow — past the page\'s width cap while a window is beside', (
     expect(root().style.width).toBe('');
   });
 
-  it('goes back to the page\'s measure when the last window closes', () => {
+  it('stays in its parent as a window opens and closes', () => {
     areaWidth = 1436;
     const { practiceId, refs } = practiceWithWindows(1);
     render(row(), { container: inPage() });
-    expect(root().style.marginInline).toBe('-238px');
+    expect(root().style.marginInline).toBe('');
     act(() => s().closeBeside(practiceId, refs[0].id));
     expect(root().style.marginInline).toBe('');
+    expect(root().style.width).toBe('');
   });
 });
 

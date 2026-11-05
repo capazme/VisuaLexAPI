@@ -13,6 +13,7 @@ import { CREDITS, CREDIT_GROUPS, type Credit } from '../data/credits';
 import { FOCUS_RING } from '../constants/interactions';
 import { cn } from '../lib/utils';
 import { PageFrame } from '../components/layout/PageFrame';
+import { PAGE_FRAME } from '../components/layout/frame';
 import { groupAt, groupOf } from './creditsIndex';
 
 const LINK = cn(
@@ -190,10 +191,10 @@ export function CreditsPage() {
   }, [hash, key, hold]);
 
   return (
-    // The sections' frame (W2), outside the layout: its column (`max-w-7xl`, the layout's padding), the title at its left
-    // edge in `PageFrame`'s size, the whole width used (U1d).
+    // The sections' frame (W2, U1), outside the layout: its column (`PAGE_FRAME` at 1600 px, the layout's margins), the
+    // title at its left edge in `PageFrame`'s size, the whole width used (U1d).
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto w-full max-w-7xl p-4 pb-16 md:p-8 md:pb-16">
+      <div className={cn(PAGE_FRAME, 'max-w-frame pt-4 pb-16 md:pt-8')}>
         <header>
           <Link to="/" className={cn('-ml-2 inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-slate-700 dark:text-slate-300', FOCUS_RING)}>
             <BookOpen aria-hidden size={20} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
