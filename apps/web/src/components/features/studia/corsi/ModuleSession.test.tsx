@@ -70,6 +70,13 @@ function select(startNode: Node, startOffset: number, endNode: Node, endOffset: 
   fireEvent(document, new Event('selectionchange'));
 }
 
+/** `select` as a press of the mouse with Alt held makes it: the piece exactly, never widened to whole words (A4). */
+function selectExact(startNode: Node, startOffset: number, endNode: Node, endOffset: number) {
+  document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, altKey: true }));
+  select(startNode, startOffset, endNode, endOffset);
+  document.body.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, altKey: true }));
+}
+
 const graded: EsitoRisposta = {
   registrata: true,
   domandaId: 'd-1',
@@ -237,10 +244,10 @@ describe('reading a block (§5, step 2; §10.3)', () => {
   it('takes the four colours: another colour over a piece recolours it, «Nessun colore» takes it away (A4)', async () => {
     const user = await atReading();
     const word = screen.getByText(/distingue i prodotti/);
-    select(word.firstChild!, 1, word.firstChild!, 9);
+    selectExact(word.firstChild!, 1, word.firstChild!, 9);
     await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     const mark = document.querySelector('mark')!;
-    select(mark.firstChild!, 2, mark.firstChild!, 5);
+    selectExact(mark.firstChild!, 2, mark.firstChild!, 5);
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
     await user.click(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
     await user.click(screen.getByRole('menuitemradio', { name: /^Blu/ }));
@@ -248,7 +255,7 @@ describe('reading a block (§5, step 2; §10.3)', () => {
       ['di', 'yellow'], ['sti', 'blue'], ['ngu', 'yellow'],
     ]);
     const blue = document.querySelector('mark[data-color="blue"]')!;
-    select(blue.firstChild!, 0, blue.firstChild!, 3);
+    selectExact(blue.firstChild!, 0, blue.firstChild!, 3);
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
     await user.click(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
     await user.click(screen.getByRole('menuitemradio', { name: /^Nessun colore/ }));
@@ -283,12 +290,13 @@ describe('highlights and citations, further (§5 step 3, §6.5)', () => {
     text.focus();
     fireEvent.keyDown(text, { key: 'h' });
     const mark = document.querySelector<HTMLElement>('mark[tabindex="0"]')!;
-    expect(mark).toHaveTextContent('distingu');
+    // «istingu» cut the word: it is taken whole.
+    expect(mark.textContent).toBe('distingue');
     expect(mark).toHaveAccessibleDescription(/^Evidenziato in giallo\. Invio seleziona queste parole/);
     expect(document.getSelection()!.isCollapsed).toBe(true);
     mark.focus();
     fireEvent.keyDown(mark, { key: 'Enter' });
-    expect(document.getSelection()!.toString()).toBe('distingu');
+    expect(document.getSelection()!.toString()).toBe('distingue');
     fireEvent.keyDown(mark, { key: 'h' });
     expect(document.querySelector('mark')).toBeNull();
   });
@@ -456,15 +464,36 @@ describe('the review of #374', () => {
     renderSession(lesson({ stato: 'in-corso' }));
     await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
     const words = await screen.findByText(/distingue i prodotti/);
-    select(words.firstChild!, 1, words.firstChild!, 9);
+    selectExact(words.firstChild!, 1, words.firstChild!, 9);
     await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     const mark = document.querySelector('mark')!;
-    expect(mark).toHaveTextContent('distingu');
-    select(mark.firstChild!, 1, mark.firstChild!, 4);
+    expect(mark.textContent).toBe('distingu');
+    selectExact(mark.firstChild!, 1, mark.firstChild!, 4);
     await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['d', 'ingu']);
     // One Tab stop per highlight.
     expect(document.querySelectorAll('mark[tabindex="0"]')).toHaveLength(2);
+  });
+
+  it('takes a word the selection cuts whole, and the piece exactly with Alt, for every gesture (A4, 5 November)', async () => {
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    const words = await screen.findByText(/distingue i prodotti/);
+    // «stingue i prod»: both edges cut a word.
+    select(words.firstChild!, 3, words.firstChild!, 17);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent).join('')).toBe('distingue i prodotti');
+    // The same colour over a piece of a word takes the whole word out.
+    const mark = document.querySelector('mark')!;
+    select(mark.firstChild!, 13, mark.firstChild!, 15);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['distingue i ']);
+    // With Alt, the piece as selected.
+    const left = document.querySelector('mark')!;
+    selectExact(left.firstChild!, 0, left.firstChild!, 3);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['tingue i ']);
   });
 });
 

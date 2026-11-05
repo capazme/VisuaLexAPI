@@ -5,6 +5,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_ICON_ON_DARK, highlightColorName } from '../../../utils/highlightColors';
 import { useAppStore } from '../../../store/useAppStore';
 import { getSelectionAnchor } from '../../../utils/selectionOffset';
+import { getInkAnchor } from '../../../utils/inkSelection';
 import type { Ink } from '../../../utils/highlighterRules';
 import { registerInkTarget } from '../../../utils/inkTargets';
 import { useInkOnRelease } from '../../../hooks/useInkOnRelease';
@@ -52,6 +53,8 @@ interface PopupState {
   text: string;
   /** Plain-text offset of `text` in the text root. */
   startOffset: number;
+  /** What the highlighter takes of it: whole words, or the piece exactly with Alt (`getInkAnchor`). */
+  ink: { text: string; startOffset: number };
   /** What the reader sees (line breaks included) — for copy and search only. */
   displayText: string;
 }
@@ -68,7 +71,7 @@ export function SelectionPopup({
   onCreateCard,
   copyOnly = false,
 }: SelectionPopupProps) {
-  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, displayText: '' });
+  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, ink: { text: '', startOffset: -1 }, displayText: '' });
   // The highlighter's ink, chosen in the reading bar (H1, A4): a colour, or «Nessun colore», which takes highlights away.
   const ink = useHighlighterInk();
   // The highlighter on (A4): every selection takes the ink as it is released, and this bar does not appear. Not on a
@@ -93,7 +96,7 @@ export function SelectionPopup({
     return registerInkTarget({
       holds: (range) => !!containerRef.current?.contains(range.commonAncestorContainer),
       read: (selection) => {
-        const anchor = getSelectionAnchor(textRootRef?.current ?? containerRef.current, selection);
+        const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);
         if (!anchor) return null;
         return {
           apply: (chosen) => {
@@ -108,7 +111,7 @@ export function SelectionPopup({
 
   // The tool on: the selection takes the ink as it is released, with no bar.
   useInkOnRelease(containerRef, inking, (selection) => {
-    const anchor = getSelectionAnchor(textRootRef?.current ?? containerRef.current, selection);
+    const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);
     if (!anchor) return;
     highlightRef.current(anchor.text, ink, anchor.startOffset);
     selection.removeAllRanges();
@@ -180,6 +183,8 @@ export function SelectionPopup({
         hideTimeoutRef.current = setTimeout(hidePopup, 200);
         return;
       }
+      // A note anchors the words as selected; the highlighter takes them whole (A4).
+      const inkAnchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection) ?? anchor;
 
       setPopup({
         visible: true,
@@ -187,6 +192,7 @@ export function SelectionPopup({
         y: Math.max(50, y), // Ensure not too high
         text: anchor.text,
         startOffset: anchor.startOffset,
+        ink: inkAnchor,
         displayText: rawSelected.trim(),
       });
     }, 10);
@@ -250,7 +256,7 @@ export function SelectionPopup({
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey) {
         // Quick highlight, with the ink chosen in the reading bar (H1), by the highlighter's rules (A4)
-        onHighlight(popup.text, ink, popup.startOffset);
+        onHighlight(popup.ink.text, ink, popup.ink.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !copyOnly && !e.metaKey && !e.ctrlKey) {
@@ -267,7 +273,7 @@ export function SelectionPopup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, copyOnly, hidePopup, ink]);
+  }, [popup.visible, popup.text, popup.startOffset, popup.ink, popup.x, popup.y, onHighlight, onAddNote, copyOnly, hidePopup, ink]);
 
   // The live selection rect (viewport coords), read BEFORE the popup hides
   // and the selection is cleared (gotcha 16); falls back to the popup anchor.
@@ -281,7 +287,7 @@ export function SelectionPopup({
     switch (action) {
       // The ink chosen in the reading bar (H1, A4): never asked here.
       case 'highlight':
-        onHighlight(popup.text, ink, popup.startOffset);
+        onHighlight(popup.ink.text, ink, popup.ink.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;

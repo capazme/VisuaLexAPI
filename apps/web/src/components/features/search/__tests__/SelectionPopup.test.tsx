@@ -302,3 +302,33 @@ describe('SelectionPopup: the highlighter as a tool (A4)', () => {
     expect(readInkSelection()).toBeNull();
   });
 });
+
+describe('SelectionPopup: whole words for the highlighter (A4, 5 November 2026)', () => {
+  it('a selection that cuts words is highlighted whole, by «Evidenzia», H and the button; a note keeps the words selected', async () => {
+    const onHighlight = vi.fn();
+    const onAddNote = vi.fn();
+    render(<Harness onHighlight={onHighlight} onAddNote={onAddNote} />);
+    await selectText('anni ingiu');
+    fireEvent.click(screen.getByRole('button', { name: /^Evidenzia/ }));
+    expect(onHighlight).toHaveBeenLastCalledWith('danni ingiusti', 'yellow', TEXT.indexOf('danni'));
+    await selectText('anni ingiu');
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(onHighlight).toHaveBeenLastCalledWith('danni ingiusti', 'yellow', TEXT.indexOf('danni'));
+    await selectText('anni ingiu');
+    act(() => readInkSelection()!.apply('red'));
+    expect(onHighlight).toHaveBeenLastCalledWith('danni ingiusti', 'red', TEXT.indexOf('danni'));
+    await selectText('anni ingiu');
+    fireEvent.click(screen.getByTitle(/aggiungi nota/i));
+    expect(onAddNote).toHaveBeenCalledWith('anni ingiu', TEXT.indexOf('anni'), RECT);
+  });
+
+  it('with Alt held while selecting, the piece exactly', async () => {
+    const onHighlight = vi.fn();
+    render(<Harness onHighlight={onHighlight} />);
+    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, altKey: true }));
+    await selectText('anni ingiu');
+    document.body.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, altKey: true }));
+    act(() => readInkSelection()!.apply('green'));
+    expect(onHighlight).toHaveBeenCalledExactlyOnceWith('anni ingiu', 'green', TEXT.indexOf('anni'));
+  });
+});

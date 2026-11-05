@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SelectionPopup } from '../../search/SelectionPopup';
 import { SafeHTML } from '../../../../utils/sanitize';
 import { cn } from '../../../../lib/utils';
-import { getSelectionAnchor } from '../../../../utils/selectionOffset';
+import { getInkAnchor } from '../../../../utils/inkSelection';
 import { unversionedCitation, withCitation } from '../../../../utils/citation';
 import { todayInRome } from '../../../../utils/dateUtils';
 import type { ArticleData, Highlight, Annotation } from '../../../../types';
@@ -136,7 +136,8 @@ export function StudyModeContent({
       if (!selection?.toString().trim()) return;
       // Text and offset from the DOM text itself (see getSelectionAnchor):
       // a rendered selection string would carry newlines the text has not.
-      const anchor = getSelectionAnchor(container, selection);
+      // Whole words, as the highlighter takes them (A4).
+      const anchor = getInkAnchor(container, selection);
       if (!anchor) return;
 
       e.preventDefault();

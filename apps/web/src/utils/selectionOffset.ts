@@ -33,7 +33,11 @@ export function getSelectionAnchor(
   selection: Selection | null,
 ): { text: string; startOffset: number } | null {
   if (!root || !selection || selection.rangeCount === 0) return null;
-  const range = selection.getRangeAt(0);
+  return getRangeAnchor(root, selection.getRangeAt(0));
+}
+
+/** `getSelectionAnchor` for a range: the highlighter's, once widened to whole words (`inkSelection.ts`). */
+export function getRangeAnchor(root: HTMLElement, range: Range): { text: string; startOffset: number } | null {
   if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
   const rawOffset = plainOffsetAt(root, range.startContainer, range.startOffset);
   if (rawOffset < 0) return null;

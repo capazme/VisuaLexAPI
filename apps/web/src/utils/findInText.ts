@@ -205,8 +205,8 @@ const BLOCK_TAGS = new Set([
   'DIV', 'P', 'LI', 'UL', 'OL', 'PRE', 'TABLE', 'TR', 'TD', 'TH', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
 ]);
 
-/** Block-like: the tags above, the article's blocks (`vlx-b`) and the decision's lines. */
-function isBlockLike(el: Element): boolean {
+/** Block-like: the tags above, the article's blocks (`vlx-b`) and the decision's lines; the highlighter's words stop at one too. */
+export function isBlockLike(el: Element): boolean {
   return BLOCK_TAGS.has(el.tagName) || el.classList.contains('vlx-b') || el.classList.contains('vlx-dec-line');
 }
 

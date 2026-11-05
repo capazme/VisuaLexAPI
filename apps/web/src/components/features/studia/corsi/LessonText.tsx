@@ -3,6 +3,7 @@ import { cn } from '../../../../lib/utils';
 import { useAppStore } from '../../../../store/useAppStore';
 import { HIGHLIGHT_COLORS, highlightColorName, HIGHLIGHT_STYLES, parseInlineStyle, type HighlightColor } from '../../../../utils/highlightColors';
 import { registerInkTarget } from '../../../../utils/inkTargets';
+import { inkRange, keepExact } from '../../../../utils/inkSelection';
 import type { Ink } from '../../../../utils/highlighterRules';
 import { useInkOnRelease } from '../../../../hooks/useInkOnRelease';
 import { useHighlighterInk } from '../../../../hooks/useHighlighterInk';
@@ -77,10 +78,11 @@ function offsetAt(root: HTMLElement, node: Node, offset: number): number | null 
   return last;
 }
 
-/** The selection's `[start, end)` in the block's plain text, when it lies in the text. */
+/** The selection's `[start, end)` in the block's plain text, when it lies in the text: whole words, or the piece exactly
+ * with Alt, as the highlighter takes them (A4). */
 function selectedSpan(root: HTMLElement, selection: Selection): readonly [number, number] | null {
-  if (selection.rangeCount === 0 || selection.isCollapsed) return null;
-  const range = selection.getRangeAt(0);
+  const range = inkRange(root, selection);
+  if (!range) return null;
   const start = offsetAt(root, range.startContainer, range.startOffset);
   const end = offsetAt(root, range.endContainer, range.endOffset);
   return start !== null && end !== null && end > start ? [start, end] : null;
@@ -175,8 +177,11 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
     const pieces = root.current?.querySelectorAll<HTMLElement>(`mark[data-highlight="${start}"]`);
     const first = pieces?.[0]?.firstChild;
     const last = pieces?.[pieces.length - 1]?.lastChild;
-    if (!first || !last) return;
-    document.getSelection()?.setBaseAndExtent(first, 0, last, (last.textContent ?? '').length);
+    const selection = document.getSelection();
+    if (!first || !last || !selection) return;
+    selection.setBaseAndExtent(first, 0, last, (last.textContent ?? '').length);
+    // Its words as they are, never widened: a piece taken with Alt is acted on as it is.
+    keepExact(selection);
   };
 
   // Each leaf carries its offset in the plain text (`numberLeaves`); a highlight's first piece is its one Tab stop.

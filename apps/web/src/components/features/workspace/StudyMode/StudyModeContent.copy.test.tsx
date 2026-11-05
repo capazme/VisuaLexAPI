@@ -88,6 +88,16 @@ describe('StudyModeContent — the keys 1 to 4 (H1), by the highlighter\'s rules
     expect(appStore.getState().settings.highlightColor).toBe('green');
   });
 
+  it('take the words a selection cuts whole, as every gesture of the highlighter does (A4, 5 November)', () => {
+    const addHighlight = vi.fn();
+    appStore.setState({ addHighlight });
+    const { container } = render1284();
+    // «li interessi superiori alla misura leg»: both edges cut a word.
+    select(container, WORDS.slice(1, -3));
+    fireEvent.keyDown(window, { key: '1' });
+    expect(addHighlight).toHaveBeenCalledExactlyOnceWith('k', 'all2:1284', WORDS, '', 'yellow', expect.any(Number));
+  });
+
   it('over words highlighted in that colour, take the highlight away', () => {
     const editHighlights = vi.fn();
     appStore.setState({ editHighlights });
