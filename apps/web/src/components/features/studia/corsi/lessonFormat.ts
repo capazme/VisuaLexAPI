@@ -10,6 +10,9 @@
  * (`plainText`). The renderer gives each leaf its offset, so a selection maps back to offsets and a highlight to leaves.
  */
 
+import type { HighlightColor } from '../../../../utils/highlightColors';
+import { meet } from '../../../../utils/highlighterRules';
+
 export type Inline =
   /** `at`: the leaf's offset in the block's plain text, once `numberLeaves` has counted it. */
   | { kind: 'text'; text: string; at?: number }
@@ -185,6 +188,22 @@ export function numberLeaves(nodes: LessonNode[]): LessonNode[] {
 /** The block's plain text, which highlights count in: the leaves joined with nothing between them. */
 export const plainText = (nodes: LessonNode[]) => leaves(nodes).join('');
 
+/**
+ * Where each line after the first starts in the plain text — a paragraph, a heading, an item, a quoted paragraph: two
+ * highlights of one colour are never joined across one (A4).
+ */
+export function lineStarts(nodes: LessonNode[]): number[] {
+  const length = (inline: Inline[]): number => inline.reduce((sum, node) => sum + (node.kind === 'text' ? node.text.length : length(node.children)), 0);
+  const lines = nodes.flatMap((node) => (node.kind === 'p' || node.kind === 'h3' ? [node.inline] : node.kind === 'quote' ? node.paragraphs : node.items));
+  const starts: number[] = [];
+  let at = 0;
+  for (const line of lines) {
+    if (at > 0) starts.push(at);
+    at += length(line);
+  }
+  return starts;
+}
+
 /** The citation markers the text uses, in order of first use. */
 export function citedMarkers(nodes: LessonNode[]): string[] {
   const out: string[] = [];
@@ -202,29 +221,65 @@ export function citedMarkers(nodes: LessonNode[]): string[] {
   return out;
 }
 
-/** A highlight: `[start, end)` in the block's plain text. */
-export type Span = readonly [number, number];
+/**
+ * A highlight: `[start, end)` in the block's plain text, and its colour (A4). One saved before the lessons took colours
+ * has none, and is yellow.
+ */
+export type Span = readonly [number, number, HighlightColor?];
 
-/** Adds a highlight, merged with any it touches or overlaps: one colour, so two that meet are one. */
-export function addSpan(spans: readonly Span[], added: Span): Span[] {
-  let [start, end] = added;
+export const spanColor = (span: Span): HighlightColor => span[2] ?? 'yellow';
+
+/**
+ * The highlighter over a block (A4, spec `2026-11-03-a4-highlighter-and-notes-design` §4 and §7): the reader's rules
+ * (`planInk`) in the lesson's own form, where highlights never overlap. Words over the ink's colour alone (spaces and
+ * punctuation aside) are taken out of it, as under «Nessun colore» they are taken out of everything; any other selection
+ * takes the ink all over, the other colours giving way where it passes (the parts outside stay). Highlights of one colour
+ * that meet, or are apart by spaces alone in `text.plain` (the block's plain text, `plainText`) with no line's start
+ * between (`text.breaks`, `lineStarts`), are one.
+ */
+export function paintSpans(
+  spans: readonly Span[],
+  [start, end]: readonly [number, number],
+  ink: HighlightColor | 'none',
+  text: { plain: string; breaks: readonly number[] } = { plain: '', breaks: [] },
+): Span[] {
   if (end <= start) return [...spans];
-  const kept: Span[] = [];
-  for (const [s, e] of spans) {
-    if (e < start || s > end) kept.push([s, e]);
+  const touching = spans.filter(([s, e]) => s < end && e > start);
+  let alone = touching.length > 0;
+  for (let i = start; i < end && alone; i += 1) {
+    if (!/[\s\p{P}]/u.test(text.plain[i] ?? 'x')) alone = touching.some((span) => span[0] <= i && i < span[1] && spanColor(span) === ink);
+  }
+  const erase = ink === 'none' || alone;
+  const kept: [number, number, HighlightColor][] = [];
+  for (const span of spans) {
+    const [s, e] = span;
+    const color = spanColor(span);
+    if (e <= start || s >= end) kept.push([s, e, color]);
     else {
-      start = Math.min(start, s);
-      end = Math.max(end, e);
+      if (s < start) kept.push([s, start, color]);
+      if (e > end) kept.push([end, e, color]);
     }
   }
-  return [...kept, [start, end] as Span].sort((a, b) => a[0] - b[0]);
+  if (!erase) kept.push([start, end, ink as HighlightColor]);
+  kept.sort((a, b) => a[0] - b[0]);
+  const out: [number, number, HighlightColor][] = [];
+  for (const span of kept) {
+    const last = out.at(-1);
+    if (last && last[2] === span[2] && (last[1] > span[0] || meet(text.plain, text.breaks, last[0], last[1], span[0], span[1]))) last[1] = Math.max(last[1], span[1]);
+    else out.push(span);
+  }
+  return out;
 }
 
-/** Removes the highlight that starts at `start` («Togli»). */
-export const removeSpan = (spans: readonly Span[], start: number): Span[] => spans.filter(([s]) => s !== start);
-
-/** Pieces of the leaf `[from, from + text.length)`, each inside or outside a highlight; the highlight named by its start. */
-export function splitLeaf(text: string, from: number, spans: readonly Span[]): { text: string; at: number; highlight: number | null }[] {
+/**
+ * Pieces of the leaf `[from, from + text.length)`, each inside or outside a highlight; the highlight named by its start,
+ * with its colour.
+ */
+export function splitLeaf(
+  text: string,
+  from: number,
+  spans: readonly Span[],
+): { text: string; at: number; highlight: number | null; color: HighlightColor | null }[] {
   const to = from + text.length;
   const cuts = new Set([from, to]);
   for (const [s, e] of spans) {
@@ -232,11 +287,11 @@ export function splitLeaf(text: string, from: number, spans: readonly Span[]): {
     if (e > from && e < to) cuts.add(e);
   }
   const points = [...cuts].sort((a, b) => a - b);
-  const out: { text: string; at: number; highlight: number | null }[] = [];
+  const out: { text: string; at: number; highlight: number | null; color: HighlightColor | null }[] = [];
   for (let k = 0; k < points.length - 1; k += 1) {
     const [a, b] = [points[k], points[k + 1]];
     const span = spans.find(([s, e]) => s <= a && b <= e);
-    out.push({ text: text.slice(a - from, b - from), at: a, highlight: span ? span[0] : null });
+    out.push({ text: text.slice(a - from, b - from), at: a, highlight: span ? span[0] : null, color: span ? spanColor(span) : null });
   }
   return out;
 }

@@ -8,10 +8,11 @@ import type { VersionChip } from '../../../utils/versionDisplay';
 import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 import { VersionStatusChip } from './VersionStatusChip';
 import { NotesHighlightsButtons } from './NotesHighlightsButtons';
-import { HighlightColorMenu } from './HighlightColorMenu';
+import { HighlighterButton } from './HighlighterButton';
 import { highlightColorItems } from './highlightColorItems';
 import { useAppStore } from '../../../store/useAppStore';
 import { useHighlightColorMeanings } from '../../../hooks/useHighlightColorMeanings';
+import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
 import { namedAnnex } from '../../../utils/sources';
 import { EUROPEAN_LINK_NOTE, normLinkActionLabel } from '../../../utils/normattivaLink';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
@@ -133,10 +134,10 @@ export function ReadingToolbar({
     const exportLockedReason = copyLockedReason ?? lockedReason;
 
     /** The tools behind «⋯» (R3: the reading's own in words, the rest here), the phone's adding what its row does not show. */
-    // The colour of new highlights (H1): a menu of its own beside «Evidenziazioni» on a computer; on a phone, where the
-    // row has no room, its four choices close the «⋯», and the gear's way to their meanings after them.
-    const highlightColor = useAppStore((s) => s.settings.highlightColor);
-    const updateSettings = useAppStore((s) => s.updateSettings);
+    // The highlighter's ink (H1, A4): its own menu beside «Evidenziazioni» on a computer; on a phone, where the row has
+    // room for the tool's toggle alone, the inks close the «⋯», and the gear's way to their meanings after them.
+    const ink = useHighlighterInk();
+    const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
     const openSettings = useAppStore((s) => s.openSettings);
     const meanings = useHighlightColorMeanings();
     const moreItems = (phone: boolean): MenuItem[] => [
@@ -179,9 +180,9 @@ export function ReadingToolbar({
             { label: 'Testo alla data…', icon: Clock, onSelect: onOpenVersionInput },
             { label: 'Confronta con…', icon: GitCompare, onSelect: onCompare },
         ]),
-        // The colour of new highlights (H1), last: a setting, under its own title. Not on a text that takes none.
+        // The highlighter's ink (H1, A4), last: a setting, under its own title. Not on a text that takes none.
         ...(phone && !lockedReason
-            ? highlightColorItems(highlightColor, meanings, (color) => updateSettings({ highlightColor: color }), {
+            ? highlightColorItems(ink, meanings, setHighlighterInk, {
                 section: true,
                 onChangeMeanings: () => openSettings('highlightColors'),
             })
@@ -237,6 +238,8 @@ export function ReadingToolbar({
                 at 320 px («In vigore dal 1° gennaio 2005», R3b). Not in the compact bar (the phone's full-screen reader, a
                 window): there the card's padding is the edge, and its overflow would cut the focus ring. */}
             <div className={cn('ml-auto flex flex-shrink-0 items-center md:hidden', !compact && '-mr-3')}>
+                {/* The highlighter's toggle (A4); its inks are at the end of «⋯». */}
+                {!lockedReason && <HighlighterButton toggleOnly triggerClassName={ACTION} />}
                 {!compact && dossierButton(undefined, true)}
                 <div ref={phoneMoreRef} className="contents">
                     {/* Its list is long (the colours close it): capped under the bar, it scrolls on its own. */}
@@ -265,7 +268,7 @@ export function ReadingToolbar({
                     onToggleHighlights={onToggleHighlightsPeek}
                     lockedReason={lockedReason}
                 />
-                {!lockedReason && <HighlightColorMenu labelled triggerClassName={ACTION} />}
+                {!lockedReason && <HighlighterButton triggerClassName={ACTION} />}
                 {!compact && dossierButton(dossierButtonRef)}
                 <div ref={desktopMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>

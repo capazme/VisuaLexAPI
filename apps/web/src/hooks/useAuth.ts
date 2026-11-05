@@ -16,6 +16,7 @@ import { clearRassegneCache } from '../components/features/rassegne/useRassegne'
 import { clearConsentRead } from '../features/merlt/consent/consentRead';
 import { forgetSeenProgress } from '../components/features/studia/progress/seenProgress';
 import { forgetModuleSessions } from '../components/features/studia/corsi/moduleSteps';
+import { settleShortcutUndo } from '../components/ui/notifications/notifications';
 
 interface AuthState {
   user: UserResponse | null;
@@ -156,6 +157,9 @@ export function useAuth() {
    * Logout user
    */
   const logout = useCallback(() => {
+    // The last gesture on a highlight is carried out (its removals sent) while the token is still there: it said
+    // nothing, so for the reader it is done (A4).
+    settleShortcutUndo();
     authService.logout();
     // Clear user data from store
     appStore.getState().clearUserData();

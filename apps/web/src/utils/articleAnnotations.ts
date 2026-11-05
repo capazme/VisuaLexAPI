@@ -146,6 +146,22 @@ export function groupAnnotationsByBlock(
   return groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors, ...resolveGlosses(plain, glosses)]);
 }
 
+/**
+ * Where each block after the first starts in the projection (`raw` without `\n`; a decision's projection is its own raw):
+ * the highlighter never joins one colour across one, so two highlights in two commi stay two, each under its block's
+ * sign (A4).
+ */
+export function blockStarts(raw: string, structure: ArticleStructure): number[] {
+  const starts = new Set<number>();
+  let rawAt = 0;
+  let plainAt = 0;
+  for (const block of [...structure.blocks].sort((a, b) => a.start - b.start)) {
+    for (; rawAt < block.start && rawAt < raw.length; rawAt += 1) if (raw.charCodeAt(rawAt) !== 10) plainAt += 1;
+    if (plainAt > 0) starts.add(plainAt);
+  }
+  return [...starts];
+}
+
 /** `groupAnnotationsByBlock` over anchors already resolved (the renderer has them). */
 export function groupAnchorsByBlock(
   raw: string,

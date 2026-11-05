@@ -1,5 +1,6 @@
 import type { EsitoRisposta, ModuloLezione } from '../../../../types/corsi';
 import type { Span } from './lessonFormat';
+import { isHighlightColor } from '../../../../utils/highlightColors';
 import type { FaseRichiamo } from './RecallStep';
 
 /**
@@ -109,7 +110,10 @@ export interface BlockWork {
 export const EMPTY_WORK: BlockWork = { spans: [], scritto: '', fase: 'scrivi' };
 
 const PHASES: readonly FaseRichiamo[] = ['scrivi', 'confronta', 'domande'];
-const isSpan = (v: unknown): v is Span => Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0) && v[1] > v[0];
+/** `[start, end]`, or with its colour since the lessons took the reader's highlighter (A4): one saved before reads as yellow. */
+const isSpan = (v: unknown): v is Span => Array.isArray(v)
+  && (v.length === 2 || (v.length === 3 && isHighlightColor(v[2])))
+  && Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && v[1] > v[0];
 const isWork = (v: unknown): v is BlockWork => {
   const w = v as Partial<BlockWork> | null;
   return !!w && typeof w === 'object' && typeof w.scritto === 'string' && PHASES.includes(w.fase as FaseRichiamo) && Array.isArray(w.spans) && w.spans.every(isSpan);

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StudyModeContent } from './StudyModeContent';
 import { fixtureText } from '../../../../utils/__fixtures__/articleTexts';
-import type { ArticleData } from '../../../../types';
+import type { ArticleData, Highlight } from '../../../../types';
 import { appStore } from '../../../../store/useAppStore';
 
 const ARTICLE: ArticleData = {
@@ -56,7 +56,6 @@ describe('StudyModeContent — copying the words of the text in force', () => {
         highlights={[]}
         annotations={[]}
         normaKey="k"
-        onAddHighlight={() => {}}
       />,
     );
     select(container, WORDS);
@@ -68,29 +67,58 @@ describe('StudyModeContent — copying the words of the text in force', () => {
   });
 });
 
-describe('StudyModeContent — the keys 1 to 4 (H1)', () => {
+describe('StudyModeContent — the keys 1 to 4 (H1), by the highlighter\'s rules (A4)', () => {
+  const store = appStore.getState();
   afterEach(() => {
-    appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
+    appStore.setState((s) => ({ addHighlight: store.addHighlight, editHighlights: store.editHighlights, highlights: [], settings: { ...s.settings, highlightColor: 'yellow' } }));
     window.getSelection()?.removeAllRanges();
   });
 
+  const render1284 = (highlights: Highlight[] = []) => render(
+    <StudyModeContent article={ARTICLE} fontSize={18} lineHeight={1.6} theme="light" highlights={highlights} annotations={[]} normaKey="k" />,
+  );
+
   it('highlight the selection in their colour, and make it the one new highlights take', () => {
-    const onAddHighlight = vi.fn();
-    const { container } = render(
-      <StudyModeContent
-        article={ARTICLE}
-        fontSize={18}
-        lineHeight={1.6}
-        theme="light"
-        highlights={[]}
-        annotations={[]}
-        normaKey="k"
-        onAddHighlight={onAddHighlight}
-      />,
-    );
+    const addHighlight = vi.fn();
+    appStore.setState({ addHighlight });
+    const { container } = render1284();
     select(container, WORDS);
     fireEvent.keyDown(window, { key: '2' });
-    expect(onAddHighlight).toHaveBeenCalledExactlyOnceWith('k', 'all2:1284', WORDS, '', 'green', expect.any(Number));
+    expect(addHighlight).toHaveBeenCalledExactlyOnceWith('k', 'all2:1284', WORDS, '', 'green', expect.any(Number));
     expect(appStore.getState().settings.highlightColor).toBe('green');
+  });
+
+  it('take the words a selection cuts whole, as every gesture of the highlighter does (A4, 5 November)', () => {
+    const addHighlight = vi.fn();
+    appStore.setState({ addHighlight });
+    const { container } = render1284();
+    // «li interessi superiori alla misura leg»: both edges cut a word.
+    select(container, WORDS.slice(1, -3));
+    fireEvent.keyDown(window, { key: '1' });
+    expect(addHighlight).toHaveBeenCalledExactlyOnceWith('k', 'all2:1284', WORDS, '', 'yellow', expect.any(Number));
+  });
+
+  it('held down, highlight once: the repeats are taken, so neither a second highlight nor the theme\'s key (A4)', () => {
+    const addHighlight = vi.fn();
+    appStore.setState({ addHighlight });
+    const { container } = render1284();
+    select(container, WORDS);
+    const repeat = new KeyboardEvent('keydown', { key: '1', repeat: true, bubbles: true, cancelable: true });
+    window.dispatchEvent(repeat);
+    expect(repeat.defaultPrevented).toBe(true);
+    expect(addHighlight).not.toHaveBeenCalled();
+  });
+
+  it('over words highlighted in that colour, take the highlight away', () => {
+    const editHighlights = vi.fn();
+    appStore.setState({ editHighlights });
+    const plain = (ARTICLE.article_text ?? '').replace(/\n/g, '');
+    const highlight: Highlight = { id: 'h1', normaKey: 'k', articleId: 'all2:1284', rangeSerialized: '', text: WORDS, color: 'red', startOffset: plain.indexOf(WORDS) };
+    // The rules read the store's highlights (A4).
+    appStore.setState({ highlights: [highlight] });
+    const { container } = render1284([highlight]);
+    select(container, WORDS);
+    fireEvent.keyDown(window, { key: '3' });
+    expect(editHighlights).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ remove: ['h1'], add: [], message: 'Evidenziazione rimossa' }));
   });
 });

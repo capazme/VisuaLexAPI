@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  blockStarts,
   describeBlock,
   groupAnnotationsByBlock,
   hasAnnotations,
@@ -197,5 +198,15 @@ describe('highlightsWithoutSign', () => {
     const brocardi: Highlight = { ...hl('b', 'ratio', 0), articleId: '1/brocardi/ratio' };
     const groups = groupAnnotationsByBlock(RAW, STRUCTURE, [shown, orphan], []);
     expect(ids(highlightsWithoutSign([shown, orphan, brocardi], groups))).toEqual(['orphan', 'b']);
+  });
+});
+
+describe('blockStarts — where the highlighter never joins one colour (A4)', () => {
+  it('gives each block\'s start after the first in the projection, the newlines left out', () => {
+    const raw = 'Art. 1\nUno due.\nTre quattro.';
+    const structure = { blocks: [{ start: 0, end: 6, kind: 'heading' as const }, { start: 7, end: 15, kind: 'comma' as const }, { start: 16, end: 28, kind: 'comma' as const }], decorations: [], notes: {}, updates: null };
+    expect(blockStarts(raw, structure)).toEqual([6, 14]);
+    // A decision's structure counts in its projection already.
+    expect(blockStarts('fondato.La Corte', { ...structure, blocks: [{ start: 0, end: 8, kind: 'comma' as const }, { start: 8, end: 16, kind: 'comma' as const }] })).toEqual([8]);
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -33,6 +33,9 @@ import { apiClient } from '../../../../services/api';
 import { loadAssistantFeatures } from '../../../../store/assistantProposals';
 import { coursesSwitchStore, setCoursesSwitch } from './coursesSwitch';
 import { ModuleSession } from './ModuleSession';
+import { appStore } from '../../../../store/useAppStore';
+import { resetNotifications, runShortcutUndo } from '../../../ui/notifications/notifications';
+import { NotificationHost } from '../../../ui/notifications/NotificationHost';
 import { forgetModuleSessions, readWork, saveStepReached } from './moduleSteps';
 import { lesson } from './__fixtures__/corsi';
 import type { EsitoRisposta, ModuloLezione } from '../../../../types/corsi';
@@ -69,6 +72,13 @@ function select(startNode: Node, startOffset: number, endNode: Node, endOffset: 
   fireEvent(document, new Event('selectionchange'));
 }
 
+/** `select` as a press of the mouse with Alt held makes it: the piece exactly, never widened to whole words (A4). */
+function selectExact(startNode: Node, startOffset: number, endNode: Node, endOffset: number) {
+  document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, altKey: true }));
+  select(startNode, startOffset, endNode, endOffset);
+  document.body.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, altKey: true }));
+}
+
 const graded: EsitoRisposta = {
   registrata: true,
   domandaId: 'd-1',
@@ -92,6 +102,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // The highlighter is the app's (A4): a test that turns it on or changes its ink never leaks it.
+  appStore.setState((st) => ({ readingTool: null, highlighterEraser: false, settings: { ...st.settings, highlightColor: 'yellow' } }));
+  // Nor a gesture held for Ctrl+Z.
+  resetNotifications();
   vi.clearAllMocks();
   coursesSwitchStore.setState({ state: 'unknown' });
 });
@@ -210,7 +224,7 @@ describe('reading a block (§5, step 2; §10.3)', () => {
     expect(screen.getByTestId('decision-reader')).toHaveTextContent('cassazione 1234/2020');
   });
 
-  it('highlights a selection for the session with «Evidenzia», and «Togli» takes it away', async () => {
+  it('highlights a selection for the session with the reader\'s highlighter, and the same colour over it takes it away (A4)', async () => {
     const user = await atReading();
     const word = screen.getByText(/distingue i prodotti/);
     const range = document.createRange();
@@ -220,12 +234,36 @@ describe('reading a block (§5, step 2; §10.3)', () => {
     document.getSelection()!.removeAllRanges();
     document.getSelection()!.addRange(range);
     fireEvent(document, new Event('selectionchange'));
-    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    // No floating button any more: the highlighter over the text.
+    expect(screen.queryByRole('button', { name: 'Evidenzia' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     const mark = document.querySelector('mark');
     expect(mark).toHaveTextContent('distingu');
-    fireEvent.click(mark!);
-    await user.click(await screen.findByRole('button', { name: 'Togli' }));
+    expect(mark).toHaveAttribute('data-color', 'yellow');
+    select(mark!.firstChild!, 0, mark!.firstChild!, 8);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     expect(document.querySelector('mark')).toBeNull();
+  });
+
+  it('takes the four colours: another colour over a piece recolours it, «Nessun colore» takes it away (A4)', async () => {
+    const user = await atReading();
+    const word = screen.getByText(/distingue i prodotti/);
+    selectExact(word.firstChild!, 1, word.firstChild!, 9);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    const mark = document.querySelector('mark')!;
+    selectExact(mark.firstChild!, 2, mark.firstChild!, 5);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
+    await user.click(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
+    await user.click(screen.getByRole('menuitemradio', { name: /^Blu/ }));
+    expect([...document.querySelectorAll('mark')].map((m) => [m.textContent, m.dataset.color])).toEqual([
+      ['di', 'yellow'], ['sti', 'blue'], ['ngu', 'yellow'],
+    ]);
+    const blue = document.querySelector('mark[data-color="blue"]')!;
+    selectExact(blue.firstChild!, 0, blue.firstChild!, 3);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
+    await user.click(screen.getByRole('button', { name: 'Colore dell’evidenziatore' }));
+    await user.click(screen.getByRole('menuitemradio', { name: /^Nessun colore/ }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['di', 'ngu']);
   });
 });
 
@@ -243,19 +281,51 @@ describe('highlights and citations, further (§5 step 3, §6.5)', () => {
     const paragraph = screen.getByText('marchio').closest('p')!;
     // From before «Il» (an element edge) to after «marchio» (the end of the <strong>).
     select(paragraph, 0, screen.getByText('marchio').closest('strong')!, 1);
-    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     expect([...document.querySelectorAll('mark')].map((m) => m.textContent).join('')).toBe('Il marchio');
     expect(document.querySelectorAll('mark[tabindex="0"]')).toHaveLength(1);
   });
 
-  it('goes from the text to «Evidenzia» with Tab while words are selected', async () => {
+  it('from the keyboard: H highlights the words selected; Enter on a highlight selects its words, and H takes it away', async () => {
     await atReading();
     const word = screen.getByText(/distingue i prodotti/);
     select(word.firstChild!, 1, word.firstChild!, 9);
     const text = document.querySelector<HTMLElement>('[data-lesson-text]')!;
     text.focus();
-    fireEvent.keyDown(text, { key: 'Tab' });
-    expect(await screen.findByRole('button', { name: 'Evidenzia' })).toHaveFocus();
+    fireEvent.keyDown(text, { key: 'h' });
+    const mark = document.querySelector<HTMLElement>('mark[tabindex="0"]')!;
+    // «istingu» cut the word: it is taken whole.
+    expect(mark.textContent).toBe('distingue');
+    expect(mark).toHaveAccessibleDescription(/^Evidenziato in giallo\. Invio seleziona queste parole/);
+    expect(document.getSelection()!.isCollapsed).toBe(true);
+    mark.focus();
+    fireEvent.keyDown(mark, { key: 'Enter' });
+    expect(document.getSelection()!.toString()).toBe('distingue');
+    fireEvent.keyDown(mark, { key: 'h' });
+    expect(document.querySelector('mark')).toBeNull();
+    // H held down highlights once: a repeat does nothing, the first press does.
+    const again = screen.getByText(/distingue i prodotti/);
+    select(again.firstChild!, 1, again.firstChild!, 9);
+    fireEvent.keyDown(text, { key: 'h', repeat: true });
+    expect(document.querySelector('mark')).toBeNull();
+    fireEvent.keyDown(text, { key: 'h' });
+    expect(document.querySelector('mark')?.textContent).toBe('distingue');
+  });
+
+  it('with the tool on, every selection takes the ink as the mouse lets go (A4)', async () => {
+    const user = await atReading();
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect(screen.getByRole('button', { name: 'Evidenziatore (giallo)' })).toHaveAttribute('aria-pressed', 'true');
+    const text = document.querySelector<HTMLElement>('[data-lesson-text]')!;
+    expect(text).toHaveClass('vlx-inking');
+    const word = screen.getByText(/distingue i prodotti/);
+    select(word.firstChild!, 1, word.firstChild!, 9);
+    fireEvent.mouseUp(text, { button: 0 });
+    await waitFor(() => expect(document.querySelector('mark')).toHaveTextContent('distingu'));
+    // Esc turns it off, and leaves the lesson where it is.
+    fireEvent.keyDown(text, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Evidenziatore (giallo)' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
   it('gives the focus back to the citation when its panel closes', async () => {
@@ -282,7 +352,7 @@ describe('highlights and citations, further (§5 step 3, §6.5)', () => {
     const user = await atReading();
     const word = screen.getByText(/distingue i prodotti/);
     select(word.firstChild!, 1, word.firstChild!, 9);
-    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     await user.click(screen.getByRole('button', { name: /l’art\. 7 c\.p\.i\./ }));
     await user.click(screen.getByRole('button', { name: 'Apri su Dashboard' }));
     const dialog = await screen.findByRole('alertdialog', { name: 'Interrompi il modulo?' });
@@ -346,12 +416,12 @@ describe('the review of #374', () => {
     const cite = await screen.findByRole('button', { name: /l’art\. 7 c\.p\.i\./ });
     const words = within(cite).getByText('l’art. 7 c.p.i.');
     select(words.firstChild!, 0, words.firstChild!, 6);
-    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     const mark = cite.querySelector('mark')!;
     expect(mark).toHaveTextContent('l’art.');
     expect(cite.querySelector('[tabindex], [role="button"]')).toBeNull();
-    select(mark.firstChild!, 1, mark.firstChild!, 4);
-    await user.click(await screen.findByRole('button', { name: 'Togli' }));
+    select(mark.firstChild!, 0, mark.firstChild!, 6);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     expect(document.querySelector('mark')).toBeNull();
   });
 
@@ -400,20 +470,64 @@ describe('the review of #374', () => {
     expect(readWork('m-3')).toEqual({});
   });
 
-  it('takes «Togli» away with the selection that brought it', async () => {
+  it('takes a piece out of a highlight in its colour, the parts outside it kept (A4)', async () => {
     const user = userEvent.setup();
     renderSession(lesson({ stato: 'in-corso' }));
     await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
     const words = await screen.findByText(/distingue i prodotti/);
-    select(words.firstChild!, 0, words.firstChild!, 8);
-    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    selectExact(words.firstChild!, 1, words.firstChild!, 9);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     const mark = document.querySelector('mark')!;
-    select(mark.firstChild!, 1, mark.firstChild!, 4);
-    expect(await screen.findByRole('button', { name: 'Togli' })).not.toHaveFocus();
-    document.getSelection()!.removeAllRanges();
-    fireEvent(document, new Event('selectionchange'));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Togli' })).toBeNull());
-    expect(document.querySelector('mark')).not.toBeNull();
+    expect(mark.textContent).toBe('distingu');
+    selectExact(mark.firstChild!, 1, mark.firstChild!, 4);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['d', 'ingu']);
+    // One Tab stop per highlight.
+    expect(document.querySelectorAll('mark[tabindex="0"]')).toHaveLength(2);
+  });
+
+  it('Ctrl+Z (⌘Z) takes the last gesture back, with no notice, while the text is on screen (A4, 5 November)', async () => {
+    const user = userEvent.setup();
+    render(<NotificationHost />);
+    const session = renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    const words = await screen.findByText(/distingue i prodotti/);
+    const ctrlZ = () => act(async () => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+    });
+    select(words.firstChild!, 1, words.firstChild!, 9);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect(document.querySelector('mark')?.textContent).toBe('distingue');
+    expect(screen.queryByRole('list', { name: 'Notifiche' })).toBeNull();
+    await ctrlZ();
+    expect(document.querySelector('mark')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Annullato: Testo evidenziato in giallo');
+    // Off screen, the key undoes nothing: the lesson left, its gesture waits.
+    select(words.firstChild!, 1, words.firstChild!, 9);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    session.unmount();
+    expect(runShortcutUndo()).toBeNull();
+  });
+
+  it('takes a word the selection cuts whole, and the piece exactly with Alt, for every gesture (A4, 5 November)', async () => {
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    const words = await screen.findByText(/distingue i prodotti/);
+    // «stingue i prod»: both edges cut a word.
+    select(words.firstChild!, 3, words.firstChild!, 17);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent).join('')).toBe('distingue i prodotti');
+    // The same colour over a piece of a word takes the whole word out.
+    const mark = document.querySelector('mark')!;
+    select(mark.firstChild!, 13, mark.firstChild!, 15);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['distingue i ']);
+    // With Alt, the piece as selected.
+    const left = document.querySelector('mark')!;
+    selectExact(left.firstChild!, 0, left.firstChild!, 3);
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['tingue i ']);
   });
 });
 
@@ -560,7 +674,8 @@ describe('leaving (§6.5) and what reaches the server (§8)', () => {
     document.getSelection()!.removeAllRanges();
     document.getSelection()!.addRange(range);
     fireEvent(document, new Event('selectionchange'));
-    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
+    expect(document.querySelector('mark')).not.toBeNull();
     await user.click(screen.getByRole('button', { name: 'Ho letto: al richiamo' }));
     await user.type(screen.getByLabelText(/gli elementi, le eccezioni, un caso/), 'RICORDO-PRIVATO');
     await user.click(screen.getByRole('button', { name: 'Confronta con il testo' }));

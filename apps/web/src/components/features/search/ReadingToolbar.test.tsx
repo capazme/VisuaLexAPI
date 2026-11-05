@@ -107,20 +107,21 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         const { container } = setup({ notesCount: 2, highlightsCount: 3 });
         const names = within(desktopRow(container)).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent);
         expect(names).toEqual([
-            'Note, 2', 'Evidenziazioni, 3', 'Colore: giallo (nuove evidenziazioni)', 'Cambia il significato dei colori', 'Al dossier', 'Altre azioni sull’articolo',
+            'Note, 2', 'Evidenziazioni, 3', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori', 'Al dossier',
+            'Altre azioni sull’articolo',
         ]);
         // The count is seen beside the word.
         expect(within(desktopRow(container)).getByRole('button', { name: 'Note, 2' })).toHaveTextContent('Note2');
     });
 
-    it('on a phone: «Al dossier» (its icon, named) and «⋯», 44 px each', () => {
+    it('on a phone: the highlighter\'s toggle, «Al dossier» (icons, named) and «⋯», 44 px each', () => {
         const { container } = setup();
         const buttons = within(phoneRow(container)).getAllByRole('button');
         expect(buttons[0]).toHaveTextContent('');
         // Close together, the last one's target reaching into the page's margin: the status keeps one line at 320 (R3b).
         expect(phoneRow(container)).toHaveClass('-mr-3');
         expect(phoneRow(container)).not.toHaveClass('gap-1');
-        expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Al dossier', 'Altre azioni sull’articolo']);
+        expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Evidenziatore (giallo)', 'Al dossier', 'Altre azioni sull’articolo']);
         buttons.forEach((b) => expect(b).toHaveClass('min-h-[44px]', 'min-w-[44px]'));
     });
 
@@ -218,9 +219,10 @@ describe('ReadingToolbar — a past text is a reading', () => {
         expect(within(phoneMenu).getByRole('menuitem', { name: /Modalità studio/ })).toBeDisabled();
     });
 
-    it('offers no colour for new highlights, on a text that takes none (H1)', () => {
+    it('offers no highlighter, on a text that takes none (H1, A4)', () => {
         const { container } = setup({ lockedReason: READ_ONLY_REASON });
-        expect(within(desktopRow(container)).queryByRole('button', { name: /^Colore: / })).toBeNull();
+        expect(within(desktopRow(container)).queryByRole('button', { name: /^Evidenziatore|^Colore dell/ })).toBeNull();
+        expect(within(phoneRow(container)).queryByRole('button', { name: /^Evidenziatore/ })).toBeNull();
         expect(within(openMore(phoneRow(container))).queryAllByRole('menuitemradio')).toEqual([]);
     });
 
@@ -332,20 +334,22 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
 describe('ReadingToolbar — the compact form of a light window (spec §4.1)', () => {
     const find = { isOpen: false, onToggle: vi.fn() };
 
-    it('the computer\'s row holds notes, highlights, their colour and «⋯»: discussions, the magnifier and copy', () => {
+    it('the computer\'s row holds notes, highlights, the highlighter and «⋯»: discussions, the magnifier and copy', () => {
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = desktopRow(container);
-        expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent))
-            .toEqual(['Note', 'Evidenziazioni', 'Colore: giallo (nuove evidenziazioni)', 'Cambia il significato dei colori', 'Altre azioni sull’articolo']);
+        expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual([
+            'Note', 'Evidenziazioni', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
+            'Altre azioni sull’articolo',
+        ]);
         expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
     });
 
-    it('the phone\'s row holds «⋯» alone: no quick norm, dossier, Study Mode or source link', () => {
+    it('the phone\'s row holds the highlighter\'s toggle and «⋯»: no quick norm, dossier, Study Mode or source link', () => {
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = phoneRow(container);
         // The card's padding is its edge (the full-screen reader): no reach into it, which cut the focus ring (R3b).
         expect(row).not.toHaveClass('-mr-3');
-        expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Altre azioni sull’articolo']);
+        expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Evidenziatore (giallo)', 'Altre azioni sull’articolo']);
         expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia', 'Cambia il significato dei colori']);
     });
 
@@ -356,55 +360,57 @@ describe('ReadingToolbar — the compact form of a light window (spec §4.1)', (
     });
 });
 
-describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', () => {
+describe('ReadingToolbar — the highlighter and its inks (H1, A4)', () => {
     const color = () => appStore.getState().settings.highlightColor;
-    afterEach(() => appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'yellow' } })));
+    afterEach(() => appStore.setState((st) => ({ readingTool: null, highlighterEraser: false, settings: { ...st.settings, highlightColor: 'yellow' } })));
 
-    it('on a computer: a menu of its own beside «Evidenziazioni», each colour with what it is suggested for', () => {
+    it('on a computer: a split button beside «Evidenziazioni», its menu each colour with what it is suggested for', () => {
         const { container } = setup();
         const row = desktopRow(container);
-        const trigger = within(row).getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
-        // The colour in words, not in a pale dot alone; the name starts with those words (WCAG 2.5.3).
-        expect(trigger).toHaveTextContent('Colore: giallo');
-        expect(trigger.getAttribute('aria-label')).toMatch(new RegExp(`^${trigger.textContent}`));
-        expect(trigger).not.toHaveAttribute('title');
-        fireEvent.click(trigger);
+        const toggle = within(row).getByRole('button', { name: 'Evidenziatore (giallo)' });
+        expect(toggle).toHaveAttribute('aria-pressed', 'false');
+        fireEvent.click(within(row).getByRole('button', { name: 'Colore dell’evidenziatore' }));
         const menu = within(row).getByRole('menu');
         // The meanings are a suggestion, and the menu says so.
-        expect(menu).toHaveAccessibleDescription('Colore delle nuove evidenziazioni — uso suggerito');
+        expect(menu).toHaveAccessibleDescription('Colore dell’evidenziatore — uso suggerito');
         const choices = within(menu).getAllByRole('menuitemradio');
         expect(choices.map((c) => [c.textContent, c.getAttribute('aria-checked')])).toEqual([
             ['GialloPunto centrale', 'true'],
             ['VerdeCondizione o presupposto', 'false'],
             ['RossoDa rivedere', 'false'],
             ['BluDefinizione o eccezione', 'false'],
+            ['Nessun coloreToglie le evidenziazioni', 'false'],
         ]);
         expect(choices[0]).toHaveAccessibleName('Giallo, uso suggerito: punto centrale');
         fireEvent.click(choices[1]);
         expect(color()).toBe('green');
-        expect(within(row).getByRole('button', { name: 'Colore: verde (nuove evidenziazioni)' })).toBeInTheDocument();
+        // Chosen with nothing selected, the colour turns the tool on with it.
+        expect(within(row).getByRole('button', { name: 'Evidenziatore (verde)' })).toHaveAttribute('aria-pressed', 'true');
     });
 
-    it('on a phone, where the row has no room: its four choices close the «⋯», under a title, as a setting', () => {
+    it('on a phone, where the row has room for the toggle alone: the inks close the «⋯», under a title, as a setting', () => {
         const { container } = setup();
         const menu = openMore(phoneRow(container));
         // Long now: capped under the bar, it scrolls on its own, so the last colour is never off the screen.
         expect(menu).toHaveClass('overflow-y-auto', 'max-h-[calc(100dvh-12rem)]');
-        expect(within(menu).getByText('Colore delle nuove evidenziazioni — uso suggerito')).toBeInTheDocument();
+        expect(within(menu).getByText('Colore dell’evidenziatore — uso suggerito')).toBeInTheDocument();
         const choices = within(menu).getAllByRole('menuitemradio');
         // Named for what they set, never «Evidenzia in…», which reads as «highlight now».
         expect(choices.map((c) => c.getAttribute('aria-label'))).toEqual([
-            'Nuove evidenziazioni in giallo, uso suggerito: punto centrale',
-            'Nuove evidenziazioni in verde, uso suggerito: condizione o presupposto',
-            'Nuove evidenziazioni in rosso, uso suggerito: da rivedere',
-            'Nuove evidenziazioni in blu, uso suggerito: definizione o eccezione',
-        ]);
-        expect(choices.map((c) => c.textContent)).toEqual([
-            'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',
+            'Evidenziatore in giallo, uso suggerito: punto centrale',
+            'Evidenziatore in verde, uso suggerito: condizione o presupposto',
+            'Evidenziatore in rosso, uso suggerito: da rivedere',
+            'Evidenziatore in blu, uso suggerito: definizione o eccezione',
+            'Evidenziatore senza colore: toglie le evidenziazioni',
         ]);
         expect(choices[0]).toHaveAttribute('aria-checked', 'true');
         fireEvent.click(choices[3]);
         expect(color()).toBe('blue');
+        // A setting there: the tool stays as it was.
+        expect(appStore.getState().readingTool).toBeNull();
+        fireEvent.click(within(openMore(phoneRow(container))).getByRole('menuitemradio', { name: /senza colore/ }));
+        expect(appStore.getState()).toMatchObject({ highlighterEraser: true, settings: { highlightColor: 'blue' } });
+        expect(within(phoneRow(container)).getByRole('button', { name: 'Evidenziatore (nessun colore)' })).toBeInTheDocument();
     });
 });
 
@@ -417,10 +423,10 @@ describe('ReadingToolbar — the colours mean what the user says', () => {
     it('the menu words each colour with the user\'s own meaning, the default where none was given', () => {
         appStore.setState((st) => ({ settings: { ...st.settings, highlightColorMeanings: { green: 'Termini e scadenze', blue: 'GDPR' } } }));
         const { container } = setup();
-        fireEvent.click(within(desktopRow(container)).getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' }));
+        fireEvent.click(within(desktopRow(container)).getByRole('button', { name: 'Colore dell’evidenziatore' }));
         const choices = within(desktopRow(container)).getAllByRole('menuitemradio');
         expect(choices.map((c) => c.textContent)).toEqual([
-            'GialloPunto centrale', 'VerdeTermini e scadenze', 'RossoDa rivedere', 'BluGDPR',
+            'GialloPunto centrale', 'VerdeTermini e scadenze', 'RossoDa rivedere', 'BluGDPR', 'Nessun coloreToglie le evidenziazioni',
         ]);
         // Inside the name its first letter is lowered, an acronym kept as written.
         expect(choices[1]).toHaveAccessibleName('Verde, uso suggerito: termini e scadenze');
@@ -437,12 +443,12 @@ describe('ReadingToolbar — the colours mean what the user says', () => {
         expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
     });
 
-    it('on a phone the gear is the entry after the four colours in the «⋯»', () => {
+    it('on a phone the gear is the entry after the inks in the «⋯»', () => {
         const { container } = setup();
         const menu = openMore(phoneRow(container));
         const items = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]'));
         expect(items.at(-1)).toHaveAccessibleName('Cambia il significato dei colori');
-        expect(items.at(-2)).toHaveAccessibleName(/^Nuove evidenziazioni in blu/);
+        expect(items.at(-2)).toHaveAccessibleName(/^Evidenziatore senza colore/);
         fireEvent.click(items.at(-1)!);
         expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
     });

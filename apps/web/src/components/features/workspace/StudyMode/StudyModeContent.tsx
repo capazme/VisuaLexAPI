@@ -1,9 +1,9 @@
-import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SelectionPopup } from '../../search/SelectionPopup';
 import { SafeHTML } from '../../../../utils/sanitize';
 import { cn } from '../../../../lib/utils';
-import { getSelectionAnchor } from '../../../../utils/selectionOffset';
+import { getInkAnchor } from '../../../../utils/inkSelection';
 import { unversionedCitation, withCitation } from '../../../../utils/citation';
 import { todayInRome } from '../../../../utils/dateUtils';
 import type { ArticleData, Highlight, Annotation } from '../../../../types';
@@ -11,8 +11,11 @@ import type { StudyModeTheme } from './StudyMode';
 import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
 import { useArticleTextInteractions } from '../../../../hooks/useArticleTextInteractions';
 import { getRubricText, getUpdateNoteParagraphs, parseArticleStructure } from '../../../../utils/articleStructure';
+import { blockStarts } from '../../../../utils/articleAnnotations';
 import { UpdateNotePopover } from '../../search/UpdateNotePopover';
 import { useAppStore } from '../../../../store/useAppStore';
+import { useHighlightInk } from '../../../../hooks/useHighlightInk';
+import { uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 
 const COLOR_SHORTCUTS: Record<string, 'yellow' | 'green' | 'red' | 'blue'> = {
   '1': 'yellow',
@@ -29,14 +32,6 @@ interface StudyModeContentProps {
   highlights: Highlight[];
   annotations: Annotation[];
   normaKey: string;
-  onAddHighlight: (
-    normaKey: string,
-    articleId: string,
-    text: string,
-    range: string,
-    color: 'yellow' | 'green' | 'red' | 'blue',
-    startOffset: number,
-  ) => void;
   /**
    * Fired when the user picks "Aggiungi nota" from the selection popup.
    * The anchor carries the selected text and its document-relative plain
@@ -54,7 +49,6 @@ export function StudyModeContent({
   highlights,
   annotations,
   normaKey,
-  onAddHighlight,
   onRequestAddNote,
 }: StudyModeContentProps) {
   // `scrollRef` tracks the outer scrollable container (used for the
@@ -105,32 +99,24 @@ export function StudyModeContent({
   // `uniqueArticleId` mirrors ArticleTabContent's builder: highlights
   // live under `all{N}:{numero}` for annex articles so the main view's
   // articleId filter finds entries created here.
-  const uniqueArticleId = useMemo(
-    () => norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo,
-    [norma_data.allegato, norma_data.numero_articolo],
-  );
-  const updateSettings = useAppStore((s) => s.updateSettings);
-  const handleHighlight = useCallback(
-    (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
-      const alreadyHighlighted = highlights.some(h =>
-        h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
-      );
-      if (!alreadyHighlighted) {
-        onAddHighlight(normaKey, uniqueArticleId, text, '', color, startOffset);
-      }
-    },
-    [highlights, onAddHighlight, normaKey, uniqueArticleId],
-  );
+  const uniqueArticleId = uniqueArticleIdFromNorma(norma_data);
+  const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
+  const plain = useMemo(() => (article_text || '').replace(/\n/g, ''), [article_text]);
+  // The highlighter's rules (A4), as in every reader: over its own colour alone the ink is taken away, anything else
+  // takes it. No notification, as everywhere: Ctrl+Z (⌘Z) takes the last gesture back.
+  const handleHighlight = useHighlightInk({
+    key: normaKey, articleId: uniqueArticleId, plain, breaks: () => blockStarts(article_text || '', structure),
+  });
 
   // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
   const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, uniqueArticleId, {
     contentKey: markedHtml,
   });
 
-  // Colour shortcut: 1/2/3/4 highlight the current selection when it
-  // sits inside the article body, and make that colour the one chosen for
-  // new highlights, as the bar's menu does (H1): the next highlight, by
-  // the popup or H, takes it too. Runs in the capture phase with
+  // Colour shortcut: 1/2/3/4 apply their colour to the current selection
+  // when it sits inside the article body, by the highlighter's rules (A4),
+  // and make it the highlighter's ink, as the bar's menu does (H1): the next
+  // highlight, by the popup or H, takes it too. Runs in the capture phase with
   // stopImmediatePropagation so the theme shortcut in
   // useStudyModeShortcuts (also bound to 1/2/3 on window) doesn't also
   // fire and flip the theme while the user wanted a yellow highlight.
@@ -148,24 +134,31 @@ export function StudyModeContent({
       // While a dialog is open over Study Mode (Impostazioni) the keys are its own: a selection left in the text behind
       // it is not highlighted.
       if (document.querySelector('[aria-modal="true"]')) return;
+      // A key held down highlights once (A4): its repeats are taken, so neither a second highlight nor the theme's key.
+      if (e.repeat) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
 
       const selection = window.getSelection();
       if (!selection?.toString().trim()) return;
       // Text and offset from the DOM text itself (see getSelectionAnchor):
       // a rendered selection string would carry newlines the text has not.
-      const anchor = getSelectionAnchor(container, selection);
+      // Whole words, as the highlighter takes them (A4).
+      const anchor = getInkAnchor(container, selection);
       if (!anchor) return;
 
       e.preventDefault();
       e.stopImmediatePropagation();
-      updateSettings({ highlightColor: color });
+      setHighlighterInk(color);
       handleHighlight(anchor.text, color, anchor.startOffset);
       selection.removeAllRanges();
     };
 
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [handleHighlight, updateSettings]);
+  }, [handleHighlight, setHighlighterInk]);
 
   // Handle note from selection popup; the offset is document-relative
   // already, so the anchor resolves on the dashboard and in the dossier too.
@@ -199,7 +192,7 @@ export function StudyModeContent({
         {/* Article Title */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo}
+            key={uniqueArticleId}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
