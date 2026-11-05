@@ -85,7 +85,8 @@ highlight the gesture acts on the whole: it is removed, or recoloured in place (
 saved before offsets existed (it has no offset to cut at). When the server lets an author pass through a cut (a `PUT`
 of the offsets, or a `POST` that copies the author), these are cut too.
 
-**One gesture, one «Annulla».** `editHighlights` (store) takes a plan's removals, recolourings and new parts at once:
+**One gesture, one «Annulla».** (Since §7: no notification, Ctrl+Z alone, the removals held until the next gesture.)
+`editHighlights` (store) takes a plan's removals, recolourings and new parts at once:
 
 - removals go behind one notification with «Annulla» (`removeManyWithUndo`, the D7b bin's pattern that
   `removeHighlight` already follows: off the screen at once, `DELETE` sent when the notification closes, or as the page
@@ -142,6 +143,28 @@ Designed now, built in the second pull request.
   highlight that the popover gave (its bin) has to stay: the sheet lists the block's highlights on a phone, and the
   second round decides where a keyboard user on a computer removes one (the highlights' panel in the bar is the
   candidate).
+
+## 7. Corrections after the test of #410 (the owner, 5 November 2026)
+
+The test passed on the article, a decision, a dossier entry and Study Mode; three corrections before the merge.
+
+- **Whole words, as a word processor.** A selection that cuts a word takes it whole: its start and end are widened to
+  the word's edges (letters, digits and their marks; an elided «l'» is a word of its own). With Alt held while
+  selecting, the piece exactly as selected. Every gesture alike — creating, taking away, recolouring, «Nessun colore»
+  — in the readers, Study Mode's keys and a lesson. A note keeps the words as selected. Widened in the DOM
+  (`utils/inkSelection.ts`), never in the projection, where a block's last word and the next block's first touch once
+  the `\n` is gone: a word stops at a block or a line break. Alt is read from the press that made the selection while
+  the selection stands as made; Enter on a lesson's highlight selects its words exactly.
+- **No notification for highlights; Ctrl+Z (⌘Z) undoes.** Creating, taking away, cutting and recolouring say nothing
+  on screen (the words are said to a screen reader). Ctrl+Z (⌘Z on a Mac), outside a field, takes back the last gesture
+  with no time limit, while its text is on screen; one step, as the owner asked («al massimo devo poter fare cmd + z»).
+  Without a notification closing, a gesture's removals are sent when the next gesture comes (its place taken), when
+  the page is hidden or goes (`pagehide`, `visibilitychange`, as before; the key's undo goes with them) and at logout,
+  before the token goes. Held until then, a highlight taken from the Forum and put back is the same row, its first
+  author kept: no server change. The cost: another device sees the highlight until it is sent.
+- **Notes keep their notification**, «Annulla» for five seconds, and Ctrl+Z (⌘Z) as its shortcut (L-36, already
+  there); with a highlight's gesture also waiting, the key takes the newer first.
+- As before: «Nessun colore» over words with no highlight does nothing and says nothing.
 
 ## Not in A4
 

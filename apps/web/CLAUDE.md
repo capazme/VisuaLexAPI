@@ -133,7 +133,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   over the text (44 px at every width, no gear), its rules in the lesson's form (`paintSpans`: highlights never overlap,
   the same colour over words inside one highlight takes the piece out, another colour paints over, «Nessun colore»
   clears, one colour's highlights that meet are one), its tool (every selection takes the ink as it is released) and
-  its cursor; the text is a Tab stop where Shift and the arrows select from its start (`Selection.modify`, a word with
+  its cursor, the readers' whole words (Alt for the piece exactly; Enter on a highlight selects its words exactly,
+  `keepExact`) and their Ctrl+Z (⌘Z) for the last gesture while the text is on screen, with no notice; the text is a Tab stop where Shift and the arrows select from its start (`Selection.modify`, a word with
   Ctrl or Alt: a text not editable has no caret) and H applies the ink; a highlight is one Tab stop (never inside a
   citation's button, where its pieces are only drawn: nothing interactive sits in a button), named «Evidenziato in
   giallo: …», where Enter selects its words. The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
@@ -831,7 +832,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   seen, not in the name; `aria-keyshortcuts`) where the pointer is not coarse and nothing covers the workspace
   (`useWorkspaceCovered(…, isUndoCovered)`, watched only while an «Annulla» is on screen: under a dialog the key does
   nothing); the
-  shortcuts' list has it.
+  shortcuts' list has it. A gesture on a highlight, which shows no notification (A4, the owner, 5 November 2026), is
+  held for the key alone (`offerShortcutUndo`: one at a time, the last gesture's, and the next settles it — what it
+  held is carried out): the key runs it when it is newer than the newest «Annulla» on screen and `ready` (its text on
+  screen), and the live region says «Annullato: <what it did>»; a notification older than it does not write the key
+  beside its «Annulla»; `settleShortcutUndo` carries it out at logout, while the token is there.
   `registerUndoToastListener` hands the newest «Annulla» on screen to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
@@ -1361,16 +1366,24 @@ colour seen being the innermost highlight's in the renderer's own nesting (`byNe
 end, then the later highlight): words touching no highlight → a new one (nothing for «Nessun colore»);
 inside highlights whose innermost is the ink → the piece out of every highlight of that colour holding it; inside one of
 another colour → the piece recoloured (the whole highlight selected recoloured in place, `PUT`); reaching out of what
-they touch → a new highlight, overlapping, as before; «Nessun colore» → the piece out of everything it touches. The cut is
+they touch → a new highlight, overlapping, as before; «Nessun colore» → the piece out of everything it touches. **Whole
+words** (the owner, 5 November 2026): a selection that cuts a word takes it whole, for every gesture; with Alt held
+while selecting, the piece exactly (`utils/inkSelection.ts`: widened in the DOM, never past a block or a `<br>`, where
+the projection would join two words; `getInkAnchor` for the readers, `inkRange` for a lesson; a note keeps the words
+as selected; Alt is read from the press that made the selection, while it stands as made). The cut is
 the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`
 (offsets cannot be changed by `PUT`), the server's `note` copied to them. A highlight from the Forum (`sourceSuggestionId`,
 `originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut: removed or recoloured
-whole. `useHighlightInk` turns a plan into the store's calls: a new highlight keeps the reader's toast and the article's
-MERL-T event; a change is `editHighlights`, one gesture behind one «Annulla» («Evidenziazione rimossa»,
-«Evidenziazioni rimosse», «Evidenziazione cambiata in verde»; see «Destructive confirmations»). «Questa occorrenza è già
+whole. `useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
+event kept) or a change (`editHighlights`). **No notification** (the owner, 5 November 2026: «l'avviso per le
+evidenziazioni lo toglierei proprio»): every gesture — a new highlight, «Fai tua», a cut, a colour, «Nessun colore», a
+removal from a sign's popover — is said to a screen reader alone («Testo evidenziato in giallo», «Evidenziazione
+rimossa», «Evidenziazioni rimosse», «Evidenziazione cambiata in verde»), and Ctrl+Z (⌘Z) takes the last one back, one
+step, with no time limit, while its text is on screen (`useHighlightInk` counts its reader's text, `store/textsOnScreen.ts`;
+see «Destructive confirmations»). «Questa occorrenza è già
 evidenziata» is gone from the highlighter: the same words in the same colour take the highlight away. «Fai tua» on a key
-passage is no gesture of the highlighter: it creates in the saved colour, whatever the ink (and still says «Questa
-occorrenza è già evidenziata» for a passage already made its own). A cut's removals wait for its parts to be saved: a
+passage is no gesture of the highlighter: it creates in the saved colour, whatever the ink, with no notification and
+Ctrl+Z as any highlight made (and still says «Questa occorrenza è già evidenziata» for a passage already made its own). A cut's removals wait for its parts to be saved: a
 page that goes before keeps the highlight whole on the server, and a part refused takes the gesture back. **What a colour means is each user's** (the owner, 29 October 2026: «solo etichette» — the four colours stay, no colour
 is added, only the words for them change, so no highlight, colour key or anchor moves, root rule 23): the default is
 `HIGHLIGHT_COLOR_MEANINGS` (yellow «Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red
@@ -2650,7 +2663,7 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/highlighterRules.ts` — `planInk` and `partsOf`: what the highlighter does with a selection (A4), pure;
   `hooks/useHighlightInk.ts` turns a plan into the store's calls for a reader (`inkMarks`: the user's highlights where
   they land); `utils/inkTargets.ts` — the texts the highlighter's button applies its ink to; `hooks/useInkOnRelease.ts`
-  — when the tool takes a selection. A new surface that takes highlights goes through these, never `addHighlight` alone.
+  — when the tool takes a selection; `utils/inkSelection.ts` — what it takes of one (whole words, Alt the piece). A new surface that takes highlights goes through these, never `addHighlight` alone.
 - `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
   plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
   Every surface that creates a highlight or an anchored note goes through it.
@@ -2735,16 +2748,20 @@ coherent.
 people (K1a, the owner's L-35): an action whose «Annulla» puts everything back on the
 server (the 30-day trash, or a write held until the notification is gone, as an import
 of more than 100 articles from an act's index) asks nothing and offers «Annulla»
-(`showUndoToast`); browser-only state (the practices) likewise. Removing a highlight or a note of the reader's
-(`removeHighlight`, `removeAnnotation`) is held behind «Annulla» too, with its own rules (`store/deferredRemovals.ts`,
-the D7b bin's pattern, no `beforeunload`): off the screen at once, «Evidenziazione rimossa» / «Nota rimossa», the
-`DELETE` sent as the notification closes, or at once as the page goes or is hidden (`pagehide`, `visibilitychange`: a
-phone may discard a tab in the background unannounced; a `keepalive` fetch, the token refreshed as it was removed), so
-«Annulla» is gone once the tab is hidden. «Annulla» puts it back where it was; a refused `DELETE` puts it back with the
-sync error, a 404 is a removal done. One gesture of the highlighter that removes several (a cut, «Nessun colore» over
-many) is one notification and one «Annulla» (`removeManyWithUndo`, `editHighlights`), which also deletes the parts the
-cut created (`removeAtOnce`, after their creation answers) and puts a colour changed back (`PUT`, after a creation still
-out, `afterSaving`; one highlight's colours sent one after the other). One made and removed before the server answered is removed under the id the server
+(`showUndoToast`); browser-only state (the practices) likewise. Removing a note of the reader's (`removeAnnotation`) is
+held behind «Annulla» too, with its own rules (`store/deferredRemovals.ts`, the D7b bin's pattern, no `beforeunload`):
+off the screen at once, «Nota rimossa», the `DELETE` sent as the notification closes, or at once as the page goes or is
+hidden (`pagehide`, `visibilitychange`: a phone may discard a tab in the background unannounced; a `keepalive` fetch, the
+token refreshed as it was removed), so «Annulla» is gone once the tab is hidden. «Annulla» puts it back where it was; a
+refused `DELETE` puts it back with the sync error, a 404 is a removal done. A gesture on the reader's highlights
+(`removeHighlight`, `editHighlights`, `addHighlight`; A4, the owner, 5 November 2026) shows no notification
+(`holdGesture`, over the same hold): its removals wait until the next gesture takes its place, the page goes or is
+hidden, or the logout (`settleShortcutUndo`, before the token goes), and meanwhile Ctrl+Z (⌘Z) takes it back — a
+highlight from the Forum put back is the same row with its first author, never one made again without it; a
+`keepalive` answered 401 on a page that lived on goes again through the client. One gesture that removes several (a
+cut, «Nessun colore» over many) is taken back whole, which also deletes the parts the cut created (`removeAtOnce`, after
+their creation answers) and puts a colour changed back (`PUT`, after a creation still out, `afterSaving`; one
+highlight's colours sent one after the other). One made and removed before the server answered is removed under the id the server
 gives it, or not at all if its creation failed; sent by the tab being hidden it still waits for that id (the page lives
 on: a desktop's change of tab). A reading meanwhile — the reader's, the PDF's, a Forum publication's
 (`loadPdfMarks`) — leaves out what waits or is out (`isRemovalPending`); a logout drops it unsent, and an answer still out for one sent
