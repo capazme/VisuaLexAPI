@@ -4,6 +4,7 @@ import { RefreshCw, Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { proposedPassageAt, useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { useHighlightInk } from '../../../hooks/useHighlightInk';
 import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
@@ -19,12 +20,11 @@ import { todayInRome } from '../../../utils/dateUtils';
 import { copyNormLink, EUROPEAN_LINK_NOTE, linkPinDay, normLink, normLinkActionLabel, normLinkToast } from '../../../utils/normattivaLink';
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
-import { HighlightColorMenu } from '../search/HighlightColorMenu';
+import { HighlighterButton } from '../search/HighlighterButton';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
-import { highlightColorName } from '../../../utils/highlightColors';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
 import { useGlossPassage } from '../../../hooks/useGlossPassage';
 import { isGloss } from '../../../utils/aiReview';
@@ -82,14 +82,13 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   const {
     annotations, highlights,
     addAnnotation, updateAnnotation, removeAnnotation,
-    addHighlight, removeHighlight,
+    removeHighlight,
     loadAnnotationsForArticle, loadHighlightsForArticle,
   } = useAppStore(useShallow((s) => ({
     annotations: s.annotations, highlights: s.highlights,
     addAnnotation: s.addAnnotation,
     updateAnnotation: s.updateAnnotation,
     removeAnnotation: s.removeAnnotation,
-    addHighlight: s.addHighlight,
     removeHighlight: s.removeHighlight,
     loadAnnotationsForArticle: s.loadAnnotationsForArticle,
     loadHighlightsForArticle: s.loadHighlightsForArticle,
@@ -257,21 +256,11 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     return () => container.removeEventListener('click', handler);
   }, [itemAnnotations, isReady]);
 
-  // Same duplicate-anchor guard as ArticleTabContent.handlePopupHighlight:
-  // re-highlighting the exact same span at the same offset is a no-op with
-  // an explanatory toast, not a second overlapping <mark>.
-  const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
-    if (readOnly) return;
-    const alreadyHighlighted = articleHighlights.some(h =>
-      h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
-    );
-    if (alreadyHighlighted) {
-      showToast('Questa occorrenza è già evidenziata', 'info');
-      return;
-    }
-    addHighlight(itemKey, uniqueArticleId, text, '', color, startOffset);
-    showToast(`Testo evidenziato in ${highlightColorName(color)}`, 'success');
-  };
+  // The words selected and the ink, through the highlighter's rules (A4): a new highlight, or the same words taken away
+  // or recoloured, as in every reader. Only the user's own highlights: an application's passages are left alone.
+  const handlePopupHighlight = useHighlightInk({
+    key: itemKey, articleId: uniqueArticleId, plain, breaks: () => blockStarts(rawText, structure), enabled: !readOnly,
+  });
 
   const handlePopupCopy = async (text: string) => {
     // The table decides what may leave the page: a text it refuses is not copied under any label.
@@ -477,11 +466,10 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         >
           <ExternalLink size={13} /> Apri su Dashboard
         </button>
-        {/* The colour of new highlights (H1): the dossier's reader has no bar of its own, so it sits with its actions;
-            not on a text read only, which takes none. */}
+        {/* The highlighter (H1, A4): the dossier's reader has no bar of its own, so it sits with its actions; not on a text
+            read only, which takes none. */}
         {!readOnly && (
-          <HighlightColorMenu
-            labelled
+          <HighlighterButton
             meaningsGear={meaningsGear}
             placement="auto"
             className="ml-auto"

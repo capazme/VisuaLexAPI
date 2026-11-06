@@ -1,4 +1,12 @@
-import { closeNotification, notify, RESTORED_MS, UNDO_MS } from '../components/ui/notifications/notifications';
+import {
+  announce,
+  closeNotification,
+  notify,
+  offerShortcutUndo,
+  RESTORED_MS,
+  UNDO_MS,
+  withdrawShortcutUndo,
+} from '../components/ui/notifications/notifications';
 import { getFreshAccessToken } from '../services/api';
 import { getAccessToken } from '../services/authService';
 
@@ -79,8 +87,64 @@ export function savingDone<T>(key: string, saved: RemovalTarget<T> | null) {
   for (const waiter of waiters) waiter(saved as RemovalTarget<unknown> | null);
 }
 
+/**
+ * Runs `then` once the creation of `key` has answered — at once when none is out: with the saved item's target, null
+ * when the creation failed, undefined when nothing was out (the item has its server id already). A write on an item
+ * still being created (a colour changed, A4) waits for its id this way.
+ */
+export function afterSaving(key: string, then: (saved: RemovalTarget<unknown> | null | undefined) => void) {
+  const waiters = saving.get(key);
+  if (waiters) waiters.push(then);
+  else then(undefined);
+}
+
+/** The removal itself: by `apiClient`, or as the page goes by a `keepalive` fetch; refused, the item is put back. */
+function deleteNow<T>(what: RemovalTarget<T>, onExit: boolean, putBack: (item: T) => void, onRefused: (error: unknown) => void) {
+  const sentIn = session;
+  if (onExit) {
+    const token = getAccessToken();
+    void fetch(`${API_BASE_URL}${what.path}`, {
+      method: 'DELETE',
+      keepalive: true,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((response) => {
+        // The token ran out while the removal waited (a highlight's waits for the next gesture, A4) and the page lived
+        // on (a desktop's change of tab): it goes again by `apiClient`, which refreshes the token first.
+        if (response.status === 401 && sentIn === session) deleteNow(what, false, putBack, onRefused);
+      })
+      .catch(() => {});
+    return;
+  }
+  inFlight.add(what.key);
+  what.remove()
+    .then(() => { inFlight.delete(what.key); })
+    .catch((error: unknown) => {
+      // Answered after a logout: the store is the next account's, nothing goes back into it.
+      if (sentIn !== session) return;
+      inFlight.delete(what.key);
+      // Already gone from the server: what was wanted.
+      if ((error as { status?: number } | null)?.status === 404) return;
+      putBack(what.item);
+      onRefused(error);
+    });
+}
+
+/**
+ * A removal with no «Annulla» of its own — what an «Annulla» takes back (the parts a cut created, A4): sent now, or once
+ * the creation still out answers (none if it fails). Refused, the item is put back and the caller says so.
+ */
+export function removeAtOnce<T>(target: RemovalTarget<T>, putBack: (item: T) => void, onRefused: (error: unknown) => void) {
+  const waiters = saving.get(target.key);
+  if (waiters) {
+    waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false, putBack, onRefused); });
+    return;
+  }
+  deleteNow(target, false, putBack, onRefused);
+}
+
 export interface DeferredRemoval<T> extends RemovalTarget<T> {
-  /** What the notification says: «Evidenziazione rimossa». */
+  /** What the notification says: «Nota rimossa». */
   message: string;
   /** «Annulla», or a refused removal: puts `item` back where it was. */
   putBack: (item: T) => void;
@@ -98,80 +162,220 @@ export interface DeferredRemoval<T> extends RemovalTarget<T> {
  * notification (`dropped`), which forgets what it held.
  */
 export function removeWithUndo<T>({ message, putBack, onRefused, ...first }: DeferredRemoval<T>): void {
-  void getFreshAccessToken().catch(() => null);
-  // What is removed: retargeted once a creation still out is answered; null when it never reached the server.
-  let target: RemovalTarget<T> | null = first;
-  let settled = false;
-  let notification: number | null = null;
+  removeManyWithUndo({ message, putBack, onRefused, targets: [first] });
+}
 
-  const deleteNow = (what: RemovalTarget<T>, onExit: boolean) => {
-    if (onExit) {
-      const token = getAccessToken();
-      void fetch(`${API_BASE_URL}${what.path}`, {
-        method: 'DELETE',
-        keepalive: true,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }).catch(() => {});
-      return;
+/** What a gesture removes, and how it is taken back. */
+interface HeldRemovals<T> {
+  /** What is removed: none for a gesture that only changes or creates (a colour, a new highlight, A4), whose undo is `onUndo` alone. */
+  targets: RemovalTarget<T>[];
+  putBack: (item: T) => void;
+  onRefused: (error: unknown) => void;
+  /**
+   * The undo also takes back what came with the removals (the parts a cut created, a colour changed), after them; false
+   * when it found nothing to take back (a creation that failed).
+   */
+  onUndo?: () => boolean | void;
+  /**
+   * What the removals wait for (A4: the parts a cut created, still being saved): sent only once it resolves true, so a
+   * page that goes before sends nothing and the items stay on the server, rather than their parts be lost with it.
+   * False (a part refused) takes the gesture back at once — the items put back, `onUndo` run — with nothing said but
+   * the refusal.
+   */
+  ready?: Promise<boolean>;
+}
+
+export interface DeferredRemovals<T> extends HeldRemovals<T> {
+  message: string;
+}
+
+/**
+ * The removals of one gesture, held until they are sent (`send`: the undo's time is over, the page goes) or the
+ * gesture is taken back (`undo`). Held, a reading leaves them out (`pending`); `close` takes away the way the undo was
+ * offered (a notification, the shortcut) once they are sent or a part refused takes the gesture back.
+ */
+function holdRemovals<T>({ targets, putBack, onRefused, onUndo, ready }: HeldRemovals<T>, close: () => void) {
+  if (targets.length > 0) void getFreshAccessToken().catch(() => null);
+  const madeIn = session;
+  let settled = false;
+  // Each removed item, retargeted once a creation still out is answered; null when it never reached the server.
+  const slots: { target: RemovalTarget<T> | null }[] = targets.map((target) => ({ target }));
+  // `ready`'s answer, once given; and whether the removals, sent, wait for it.
+  let readiness: boolean | null = ready ? null : true;
+  let waiting = false;
+
+  /** A part refused: the gesture taken back, as the undo would, with nothing said but the refusal. */
+  const takeBack = () => {
+    for (const slot of slots) {
+      if (!slot.target) continue;
+      pending.delete(slot.target.key);
+      inFlight.delete(slot.target.key);
+      putBack(slot.target.item);
     }
-    const sentIn = session;
-    inFlight.add(what.key);
-    what.remove()
-      .then(() => { inFlight.delete(what.key); })
-      .catch((error: unknown) => {
-        // Answered after a logout: the store is the next account's, nothing goes back into it.
-        if (sentIn !== session) return;
-        inFlight.delete(what.key);
-        // Already gone from the server: what was wanted.
-        if ((error as { status?: number } | null)?.status === 404) return;
-        putBack(what.item);
-        onRefused(error);
-      });
+    onUndo?.();
+  };
+  ready?.then((ok) => {
+    readiness = ok;
+    // Answered after a logout: the store is the next account's.
+    if (ok || madeIn !== session) return;
+    if (!settled) {
+      settled = true;
+      close();
+      takeBack();
+    } else if (waiting) {
+      waiting = false;
+      takeBack();
+    }
+  });
+
+  const removeAll = (onExit: boolean) => {
+    for (const { target } of slots) {
+      if (!target) continue;
+      const waiters = saving.get(target.key);
+      if (waiters) {
+        // Still being created: removed under the server's id once it answers (none if it fails). Even when sent by the
+        // tab being hidden (a desktop's change of tab), the page lives on and the answer comes: dropping it would leave
+        // the mark on the server, back at the next reading. A page that really goes never hears the id.
+        waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false, putBack, onRefused); });
+        continue;
+      }
+      deleteNow(target, onExit, putBack, onRefused);
+    }
   };
 
   const send = (onExit = false) => {
     if (settled) return;
     settled = true;
-    if (target) pending.delete(target.key);
-    if (notification !== null) closeNotification(notification, 'external');
-    if (!target) return;
-    const waiters = saving.get(target.key);
-    if (waiters) {
-      // Still being created: removed under the server's id once it answers (none if it fails). Even when sent by the
-      // tab being hidden (a desktop's change of tab), the page lives on and the answer comes: dropping it would leave
-      // the mark on the server, back at the next reading. A page that really goes never hears the id.
-      waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false); });
+    for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
+    close();
+    if (readiness === false) return;
+    if (readiness === null) {
+      // What they wait for is still on its way: sent once it is saved, by an ordinary request (the page lived on); a
+      // reading meanwhile still leaves them out.
+      waiting = true;
+      for (const slot of slots) if (slot.target) inFlight.add(slot.target.key);
+      void ready?.then((ok) => {
+        if (!ok || !waiting || madeIn !== session) return;
+        waiting = false;
+        for (const slot of slots) if (slot.target) inFlight.delete(slot.target.key);
+        removeAll(false);
+      });
       return;
     }
-    deleteNow(target, onExit);
+    removeAll(onExit);
   };
 
-  const entry: Pending = {
+  for (const slot of slots) {
+    const entry: Pending = {
+      send,
+      retarget: (saved) => {
+        if (slot.target) pending.delete(slot.target.key);
+        slot.target = saved as RemovalTarget<T> | null;
+        if (slot.target) pending.set(slot.target.key, entry);
+      },
+    };
+    if (slot.target) pending.set(slot.target.key, entry);
+  }
+
+  return {
     send,
-    retarget: (saved) => {
-      if (target) pending.delete(target.key);
-      target = saved as RemovalTarget<T> | null;
-      if (target) pending.set(target.key, entry);
+    /** Taken back: the items put back where they were, then `onUndo`; false when there was nothing to take back. */
+    undo: (): boolean => {
+      if (settled) return false;
+      settled = true;
+      let any = false;
+      for (const slot of slots) {
+        if (!slot.target) continue;
+        pending.delete(slot.target.key);
+        putBack(slot.target.item);
+        any = true;
+      }
+      const more = onUndo ? onUndo() !== false : false;
+      return any || more;
+    },
+    /**
+     * Whether a removal still waits to be sent or answered — under the server's id its item took meanwhile (a slot is
+     * retargeted as a creation answers), or while what it waits for is saved.
+     */
+    waiting: (): boolean => waiting || slots.some(({ target }) => target !== null && (pending.has(target.key) || inFlight.has(target.key))),
+    /** Forgotten, unsent (a logout): the page going later sends nothing either. */
+    forget: () => {
+      settled = true;
+      for (const slot of slots) if (slot.target) pending.delete(slot.target.key);
     },
   };
-  pending.set(first.key, entry);
+}
+
+/**
+ * `removeWithUndo` for one gesture that removes several items: one notification, one «Annulla» that puts them all back
+ * (and runs `onUndo`), all sent as it closes or the page goes.
+ */
+export function removeManyWithUndo<T>({ message, ...held }: DeferredRemovals<T>): void {
+  let notification: number | null = null;
+  const removals = holdRemovals(held, () => {
+    if (notification !== null) closeNotification(notification, 'external');
+  });
   notification = notify({
     type: 'info',
     message,
     duration: UNDO_MS,
     onUndo: () => {
-      if (settled) return;
-      settled = true;
-      if (!target) return;
-      pending.delete(target.key);
-      putBack(target.item);
+      // Nothing left to put back (every creation failed) and nothing else to take back: no «Ripristinato».
+      if (!removals.undo()) return;
       notify({ type: 'success', message: 'Ripristinato', duration: RESTORED_MS, after: notification ?? undefined });
     },
     // Dropped at logout: forgotten, so the page going later sends nothing either.
     onClose: (reason) => {
-      if (reason === 'dropped') {
-        if (target) pending.delete(target.key);
-      } else if (reason !== 'undo') send();
+      if (reason === 'dropped') removals.forget();
+      else if (reason !== 'undo') removals.send();
     },
   });
+}
+
+/** How often a gesture's held removals check the token, and how long before its expiry it is refreshed. */
+const TOKEN_CHECK_MS = 60_000;
+const TOKEN_MARGIN_S = 120;
+
+export interface HeldGesture<T> extends HeldRemovals<T> {
+  /** What the gesture did («Evidenziazione rimossa»): said to a screen reader as it is done, never shown. */
+  message: string;
+  /** Whether the gesture's text is on screen: the shortcut undoes it only then. */
+  onScreen: () => boolean;
+}
+
+/**
+ * A gesture on the user's highlights (A4, the owner's correction of 5 November 2026: «l'avviso per le evidenziazioni lo
+ * toglierei proprio … al massimo devo poter fare cmd + z»): no notification, its words said to a screen reader alone;
+ * Ctrl+Z (⌘Z on a Mac) takes it back, with no time limit, while it is the last gesture and its text is on screen
+ * (`offerShortcutUndo`). Its removals are held until the next gesture takes its place, so a highlight taken from the
+ * Forum and put back is the same row with its first author (gotcha 21), never one created again without it; they are
+ * sent as the page goes or is hidden too (as `removeWithUndo`'s, and the shortcut's undo goes with them), and at logout,
+ * before the token goes (`settleShortcutUndo`).
+ */
+export function holdGesture<T>({ message, onScreen, ...held }: HeldGesture<T>): void {
+  let offer: number | null = null;
+  // While its removals wait, the token is kept fresh: the page going sends them by a `keepalive` fetch, which cannot
+  // refresh it, and a gesture may wait longer than a token lives.
+  let keeper = 0;
+  const done = () => window.clearInterval(keeper);
+  const removals = holdRemovals(held, () => {
+    done();
+    if (offer !== null) withdrawShortcutUndo(offer);
+  });
+  if (held.targets.length > 0) {
+    keeper = window.setInterval(() => {
+      if (!removals.waiting()) done();
+      else void getFreshAccessToken(TOKEN_MARGIN_S).catch(() => null);
+    }, TOKEN_CHECK_MS);
+  }
+  offer = offerShortcutUndo({
+    message,
+    ready: onScreen,
+    undo: () => {
+      done();
+      return removals.undo();
+    },
+    settle: (asThePageGoes) => removals.send(asThePageGoes),
+  });
+  announce(message);
 }

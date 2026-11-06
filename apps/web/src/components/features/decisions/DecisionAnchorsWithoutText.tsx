@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
+import { showText } from '../../../store/textsOnScreen';
 import type { DecisionIdentity } from '../../../types/decisions';
 import { decisionKey } from '../../../utils/decisionLinks';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
@@ -25,6 +26,8 @@ export function DecisionAnchorsWithoutText({ identity }: { identity: DecisionIde
     loadHighlightsForArticle(key, '');
     loadAnnotationsForArticle(key, '');
   }, [key, loadHighlightsForArticle, loadAnnotationsForArticle]);
+  // Its highlights are on screen here: one removed is taken back by Ctrl+Z (⌘Z), as in a reader (A4).
+  useEffect(() => showText(key), [key]);
   const notes = useMemo(() => annotations.filter((a) => a.normaKey === key && a.articleId === ''), [annotations, key]);
   const marks = useMemo(() => highlights.filter((h) => h.normaKey === key && h.articleId === ''), [highlights, key]);
   return (

@@ -28,7 +28,7 @@ export function PreparationPanel({ titolo, missing }: { titolo: string; missing:
           ))}
         </ul>
       )}
-      <p className="max-w-[65ch] text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+      <p className="max-w-measure text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         Puoi già studiare i moduli che ci sono. Per completare il percorso chiedi al tuo assistente:
       </p>
       <div className="max-w-2xl">
@@ -53,7 +53,7 @@ export function EndProgrammeOffer({ deleted, missing, onEnd, busy }: {
   const rest = count === 1 ? 'con l’unico modulo che c’è' : `con i ${count} moduli che ci sono`;
   return (
     <div className="grid grid-cols-1 gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-      <p className="max-w-[65ch] break-words">
+      <p className="max-w-measure break-words">
         Hai eliminato il modulo {deleted.ordine}, «{deleted.titolo}». Se non vuoi altri moduli, il programma può finire {rest}
         {closingOpensExam(missing) ? ', così l’esame potrà aprirsi.' : '.'}
       </p>
@@ -190,7 +190,7 @@ export function ExamSection({ titolo, esame, inPreparazione }: { titolo: string;
 }
 
 function ExamState({ titolo, esame, inPreparazione }: { titolo: string; esame: EsamePagina; inPreparazione: boolean }) {
-  const text = 'max-w-[65ch] text-sm leading-relaxed text-slate-700 dark:text-slate-300';
+  const text = 'max-w-measure text-sm leading-relaxed text-slate-700 dark:text-slate-300';
   const attempt = esame.tentativo;
   switch (esame.stato) {
     case 'assente':

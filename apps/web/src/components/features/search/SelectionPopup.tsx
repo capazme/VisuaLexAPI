@@ -1,10 +1,15 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap } from 'lucide-react';
+import { Eraser, Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { HIGHLIGHT_ICON_ON_DARK, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
+import { HIGHLIGHT_ICON_ON_DARK, highlightColorName } from '../../../utils/highlightColors';
 import { useAppStore } from '../../../store/useAppStore';
 import { getSelectionAnchor } from '../../../utils/selectionOffset';
+import { getInkAnchor } from '../../../utils/inkSelection';
+import type { Ink } from '../../../utils/highlighterRules';
+import { registerInkTarget } from '../../../utils/inkTargets';
+import { useInkOnRelease } from '../../../hooks/useInkOnRelease';
+import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
 
 interface SelectionPopupProps {
   /** Where selections are listened for (mouseup) and where the popup is positioned. */
@@ -16,7 +21,8 @@ interface SelectionPopupProps {
    * every offset measured while it is open.
    */
   textRootRef?: React.RefObject<HTMLElement | null>;
-  onHighlight: (text: string, color: HighlightColor, startOffset: number) => void;
+  /** The words and the highlighter's ink (a colour, or «Nessun colore»): the reader applies its rules (A4). */
+  onHighlight: (text: string, ink: Ink, startOffset: number) => void;
   // rect is the viewport-space bounding box of the selection at the moment the
   // action was fired; consumers can use it to anchor a tooltip composer on the
   // span itself (the actual selection gets cleared right after).
@@ -47,6 +53,8 @@ interface PopupState {
   text: string;
   /** Plain-text offset of `text` in the text root. */
   startOffset: number;
+  /** What the highlighter takes of it: whole words, or the piece exactly with Alt (`getInkAnchor`). */
+  ink: { text: string; startOffset: number };
   /** What the reader sees (line breaks included) — for copy and search only. */
   displayText: string;
 }
@@ -63,9 +71,12 @@ export function SelectionPopup({
   onCreateCard,
   copyOnly = false,
 }: SelectionPopupProps) {
-  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, displayText: '' });
-  // Every new highlight takes the colour chosen once in the reading bar (H1, `HighlightColorMenu`).
-  const highlightColor = useAppStore((s) => s.settings.highlightColor);
+  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, ink: { text: '', startOffset: -1 }, displayText: '' });
+  // The highlighter's ink, chosen in the reading bar (H1, A4): a colour, or «Nessun colore», which takes highlights away.
+  const ink = useHighlighterInk();
+  // The highlighter on (A4): every selection takes the ink as it is released, and this bar does not appear. Not on a
+  // text that takes no highlight.
+  const inking = useAppStore((s) => s.readingTool === 'highlight') && !copyOnly;
   const popupRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -73,7 +84,60 @@ export function SelectionPopup({
     setPopup(prev => ({ ...prev, visible: false }));
   }, []);
 
+  // The reader's handler as it is now, for the registered target and the tool's release.
+  const highlightRef = useRef(onHighlight);
+  useEffect(() => {
+    highlightRef.current = onHighlight;
+  });
+
+  // The words selected here, as this text stores them: the highlighter's button applies its ink to them (A4).
+  useEffect(() => {
+    if (copyOnly) return;
+    return registerInkTarget({
+      holds: (range) => !!containerRef.current?.contains(range.commonAncestorContainer),
+      read: (selection) => {
+        const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);
+        if (!anchor) return null;
+        return {
+          apply: (chosen) => {
+            highlightRef.current(anchor.text, chosen, anchor.startOffset);
+            hidePopup();
+            window.getSelection()?.removeAllRanges();
+          },
+        };
+      },
+    });
+  }, [copyOnly, containerRef, textRootRef, hidePopup]);
+
+  // The tool on: the selection takes the ink as it is released, with no bar.
+  useInkOnRelease(containerRef, inking, (selection) => {
+    const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);
+    if (!anchor) return;
+    highlightRef.current(anchor.text, ink, anchor.startOffset);
+    selection.removeAllRanges();
+  });
+  // Turned on with the bar open: the bar goes, adjusted during render (gotcha 11), so it never comes back stale.
+  const [wasInking, setWasInking] = useState(inking);
+  if (wasInking !== inking) {
+    setWasInking(inking);
+    if (inking && popup.visible) setPopup((prev) => ({ ...prev, visible: false }));
+  }
+  // The text's cursor says the tool is on (`index.css`), the eraser's for «Nessun colore»: a class on the container,
+  // never in the text (root rule 23).
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !inking) return;
+    container.classList.add('vlx-inking');
+    container.dataset.ink = ink;
+    return () => {
+      container.classList.remove('vlx-inking');
+      delete container.dataset.ink;
+    };
+  }, [containerRef, inking, ink]);
+
   const handleMouseUp = useCallback(() => {
+    // The tool takes the selection itself (`useInkOnRelease`).
+    if (inking) return;
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -119,6 +183,8 @@ export function SelectionPopup({
         hideTimeoutRef.current = setTimeout(hidePopup, 200);
         return;
       }
+      // A note anchors the words as selected; the highlighter takes them whole (A4).
+      const inkAnchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection) ?? anchor;
 
       setPopup({
         visible: true,
@@ -126,10 +192,11 @@ export function SelectionPopup({
         y: Math.max(50, y), // Ensure not too high
         text: anchor.text,
         startOffset: anchor.startOffset,
+        ink: inkAnchor,
         displayText: rawSelected.trim(),
       });
     }, 10);
-  }, [containerRef, textRootRef, hidePopup]);
+  }, [containerRef, textRootRef, hidePopup, inking]);
 
   // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it moves: the
   // position's clamp counts in the container, not the window, and a phone's edge once cut the popup (D7b). A style
@@ -187,9 +254,10 @@ export function SelectionPopup({
       if (e.key === 'Escape') {
         hidePopup();
         window.getSelection()?.removeAllRanges();
-      } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey) {
-        // Quick highlight, in the colour chosen in the reading bar (H1)
-        onHighlight(popup.text, highlightColor, popup.startOffset);
+      } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey && !e.repeat) {
+        // Quick highlight, with the ink chosen in the reading bar (H1), by the highlighter's rules (A4); once for a key
+        // held down, whose repeats would come before the bar is gone (the owner's duplicates, 5 November)
+        onHighlight(popup.ink.text, ink, popup.ink.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !copyOnly && !e.metaKey && !e.ctrlKey) {
@@ -206,7 +274,7 @@ export function SelectionPopup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, copyOnly, hidePopup, highlightColor]);
+  }, [popup.visible, popup.text, popup.startOffset, popup.ink, popup.x, popup.y, onHighlight, onAddNote, copyOnly, hidePopup, ink]);
 
   // The live selection rect (viewport coords), read BEFORE the popup hides
   // and the selection is cleared (gotcha 16); falls back to the popup anchor.
@@ -218,9 +286,9 @@ export function SelectionPopup({
 
   const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search' | 'report' | 'discuss' | 'card') => {
     switch (action) {
-      // The colour chosen once in the reading bar (H1): never asked here.
+      // The ink chosen in the reading bar (H1, A4): never asked here.
       case 'highlight':
-        onHighlight(popup.text, highlightColor, popup.startOffset);
+        onHighlight(popup.ink.text, ink, popup.ink.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;
@@ -289,12 +357,14 @@ export function SelectionPopup({
                 <button
                   onClick={() => handleAction('highlight')}
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
-                  title="Evidenzia (H)"
-                  aria-label={`Evidenzia in ${highlightColorName(highlightColor)}`}
+                  title={ink === 'none' ? 'Togli l’evidenziazione (H)' : 'Evidenzia (H)'}
+                  aria-label={ink === 'none' ? 'Togli l’evidenziazione' : `Evidenzia in ${highlightColorName(ink)}`}
                   aria-keyshortcuts="h"
                 >
-                  {/* In the colour it will take. */}
-                  <Highlighter size={16} aria-hidden className={HIGHLIGHT_ICON_ON_DARK[highlightColor]} />
+                  {/* In the colour it will take; «Nessun colore» is the eraser. */}
+                  {ink === 'none'
+                    ? <Eraser size={16} aria-hidden className="text-slate-200" />
+                    : <Highlighter size={16} aria-hidden className={HIGHLIGHT_ICON_ON_DARK[ink]} />}
                 </button>
                 <div className="w-px h-5 bg-slate-700" />
                 <button

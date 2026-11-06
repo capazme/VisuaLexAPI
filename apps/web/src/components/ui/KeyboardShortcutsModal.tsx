@@ -1,6 +1,7 @@
 import { Modal } from './Modal';
 import { Command, Keyboard } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { isMacPlatform } from './notifications/undoShortcut';
 
 interface KeyboardShortcutsModalProps {
   isOpen: boolean;
@@ -17,8 +18,8 @@ interface ShortcutGroup {
   shortcuts: ShortcutItem[];
 }
 
-const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-const modKey = isMac ? 'Cmd' : 'Ctrl';
+// The system as `Layout`'s button reads it (an iPad with a keyboard takes ⌘ too).
+const modKey = isMacPlatform() ? 'Cmd' : 'Ctrl';
 
 const shortcutGroups: ShortcutGroup[] = [
   {
@@ -26,18 +27,19 @@ const shortcutGroups: ShortcutGroup[] = [
     shortcuts: [
       { keys: [modKey, 'K'], description: 'Apri Command Palette' },
       { keys: [modKey, 'F'], description: 'Cerca nel testo' },
-      { keys: [modKey, 'B'], description: 'Toggle Sidebar' },
+      { keys: [modKey, 'B'], description: 'Mostra o nascondi la barra laterale' },
       { keys: [modKey, 'D'], description: 'Vai ai Dossier' },
-      { keys: [modKey, 'Shift', 'S'], description: 'Toggle Pannello Ricerca' },
+      { keys: [modKey, 'Shift', 'S'], description: 'Mostra o nascondi il pannello di ricerca' },
     ],
   },
   {
     title: 'Visualizzazione',
     shortcuts: [
-      { keys: [modKey, 'Space'], description: 'Toggle Focus Mode' },
+      { keys: [modKey, 'Shift', 'F'], description: 'Tutto schermo: entra o esci' },
       { keys: ['Esc'], description: 'Chiudi modal/pannello' },
-      // The newest «Annulla» of the notifications (L-36); outside fields and editors, where it is the browser's undo.
-      { keys: [modKey, 'Z'], description: 'Annulla l’ultima azione con «Annulla» (fuori dai campi di testo)' },
+      // The newest «Annulla» of the notifications (L-36), or the last gesture on a highlight, which shows none (A4);
+      // outside fields and editors, where it is the browser's undo.
+      { keys: [modKey, 'Z'], description: 'Annulla l’ultima azione con «Annulla» o l’ultimo gesto sulle evidenziazioni (fuori dai campi di testo)' },
     ],
   },
   {

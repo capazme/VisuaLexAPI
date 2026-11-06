@@ -229,7 +229,7 @@ function Course({ id }: { id: string }) {
       </section>
 
       {/* The honest limit (§4), on the course page. */}
-      <p className={cn('max-w-[70ch] text-sm leading-relaxed', MUTED_TEXT)}>
+      <p className={cn('max-w-measure text-sm leading-relaxed', MUTED_TEXT)}>
         Il percorso misura ciò che hai dimostrato sulle sue domande, a distanza di tempo. Le domande sono bozze scritte dall’AI:
         se ne trovi una sbagliata, segnalala. Le soglie sono stime da verificare con l’uso.
       </p>
@@ -297,7 +297,7 @@ function CourseHeader({ data, onRename, onExport, onTrash }: { data: CorsoPagina
         <CourseStateChip stato={data.stato} />
         {data.superatoIl && <span>Percorso superato {onDay(data.superatoIl)}</span>}
       </p>
-      {data.descrizione && <p className="max-w-[70ch] break-words text-sm leading-relaxed text-slate-700 dark:text-slate-300">{data.descrizione}</p>}
+      {data.descrizione && <p className="max-w-measure break-words text-sm leading-relaxed text-slate-700 dark:text-slate-300">{data.descrizione}</p>}
     </header>
   );
 }

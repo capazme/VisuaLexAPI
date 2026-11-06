@@ -74,7 +74,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   consent page words it (`SCOPE_LABELS`); session only, like every `/api/oauth` route but
   the quota. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
   at most every ten minutes: never fire-and-forget it, a background sweep
-  deadlocked the test suite's TRUNCATE.
+  deadlocked the test suite's TRUNCATE (the suite now empties tables with DELETEs, which
+  take no table lock but still wait on the rows a write in flight holds, and can deadlock
+  with it; a write that commits after its table's DELETE leaves a row for the next test).
 - **Exchanged tokens: how the MCP server acts for a user** (spec section 5).
   `grant_type=urn:ietf:params:oauth:grant-type:token-exchange` on
   `/oauth/token` (`oauth/exchange.ts`), for `mcp-omnilex` only: the client's
@@ -401,6 +403,26 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
   entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
   the controller maps Prisma P2002 to 409.
+- **A highlight's range can change in place** (G-417, the owner's decision of 3 November 2026): `PUT /highlights/:id`
+  takes `color` and `note` as before, and the range whole — `startOffset`, `endOffset` and `text`, all three or none,
+  `endOffset > startOffset` and `endOffset - startOffset` the text's length in UTF-16 units (as the web creates one),
+  else 400; not checked against the source's text, as a new highlight's is not. The row stays the same: its id, its
+  owner (the check is unchanged: the user's own rows with no connection, else 404) and its first author
+  (`originalAuthorId`, `sourceSuggestionId`, gotcha 21 of the web), so the web's highlighter can shrink a highlight taken
+  from the Forum when it cuts a piece out of it (A4) instead of recreating it without its author. Other keys (the owner,
+  the attribution, `kind`, an assistant's columns) are dropped by the schema, never written. Offsets are 0 to
+  2,147,483,647 (the column's integer), in `POST` too. `PUT`'s answer carries `originalAuthor` as `GET /highlights`
+  does. `tests/highlightsUpdate.test.ts`.
+- **A part of a highlight cut in the middle keeps its author** (G-418, the owner's decision of 3 November 2026): the
+  first part shrinks in place (`PUT`, above), the second is `POST /highlights` with `splitFrom`, the id of the highlight
+  cut, and takes its `originalAuthorId` and `sourceSuggestionId` (both halves of the attribution contract). Only the
+  user's own highlight with no connection, on the same `normaKey`: an unknown one or another user's is a 404 (the same
+  answer, as `PUT` and `DELETE`), another text or a value that is not an id a 400 — refused, never ignored, so no part
+  is made quietly without its author. The attribution is never taken from the body. When what it names goes between
+  the read and the create (the author's account deleted, the Forum copy's suggestions removed: P2003), it is read again
+  and the part created once more. A part's answer carries `originalAuthor`; a `POST` without `splitFrom` (or with it
+  null) is answered as before. The range is not required to lie inside the cut highlight's, which the web may shrink
+  first. `tests/highlightsSplit.test.ts`.
 - **No bulk delete of notes or highlights**: `DELETE /annotations` and `DELETE /highlights`
   (one request that wiped all of a user's notes, for good) went with environments' «Sostituisci»,
   their only caller (spec `2026-10-13-environments-into-forum`, D10; the owner's answer 185).
@@ -972,11 +994,26 @@ schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 
 ## Tests
 
-Only through `npm test`: its setup runs `prisma migrate reset` and refuses a
-database whose name lacks "test". The per-test `TRUNCATE … users CASCADE` also empties
-`lingo_testi_versioni` (it references `users`), so the setup reads the versions the migrations
-wrote once and puts them back after each truncation: every test starts with version 1 of each
-text to accept, as a fresh database has. The suite's environment is `.env.test` and the setup's own
+Only through `npm test`: the setup refuses a database whose name lacks "test". The database is
+reset once per run (`tests/globalSetup.ts`, vitest's `globalSetup`: `prisma migrate reset`), and
+before every test `tests/setup.ts` empties every table of `public` but `_prisma_migrations` and
+puts back the text versions the migrations insert (`lingo_testi_versioni`, read once right after
+the reset): every test starts from empty tables plus version 1 of each text to accept, as a fresh
+database has. The seeded `lingo_impostazioni` rows are not put back: a missing row reads as the
+default, as it always has in the suite. The tables come from the catalog, so a new table is
+emptied with no change to the setup; one statement deletes them, each table after those that
+reference it (`tests/testDatabase.ts` `deletionOrder`; the two cycles among the keys, a dossier
+and its Forum copy, a glossa and its accepted reply, are broken at a `SET NULL` key). A `TRUNCATE`
+cost about 200 ms a test, the DELETEs a few. No table has a sequence or an identity column and
+the migrations create no trigger, so there is no counter to restart. Two differences remain. A
+`TRUNCATE` gave each test brand-new table files, so a read without `ORDER BY` usually came back
+in insertion order (a sequential scan of rows never updated); after DELETEs Postgres may put a new row in space freed earlier, so a test that
+compares a list in order must ask for one. And a schema change a test leaves behind (a `CHECK`
+added for a moment, undone in a `finally`) would reach the next files: each file compares the
+schema with the one the run started from (`SCHEMA_FINGERPRINT`) and refuses to run when it
+differs. Under `npm run test:watch` the reset runs once, at start: restart it after adding a
+migration. The global setup builds a Prisma client in vitest's main process, whose environment the
+test processes inherit, and takes out what it loads at once, as below. The suite's environment is `.env.test` and the setup's own
 values, never a development `.env`: `dotenv` is mocked in the setup (so `src/config.ts` reads
 nothing); `@prisma/client` is wrapped there too, because Prisma loads `apps/server/.env` (when the
 client was generated in a checkout that has one) at the import and again at every construction,

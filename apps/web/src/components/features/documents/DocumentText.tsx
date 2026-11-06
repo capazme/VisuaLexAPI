@@ -58,7 +58,7 @@ export const DocumentText = memo(function DocumentText({ text, marks, selected, 
       data-testid="document-text"
       onClick={handleClick}
       // `--doc-pulse`: the colour of the ring that marks a citation chosen in the list, per theme.
-      className="mx-auto max-w-[68ch] [--doc-pulse:var(--color-toga-500)] dark:[--doc-pulse:var(--color-toga-400)] whitespace-pre-wrap font-serif text-[1.0625rem] leading-[1.7] text-slate-800 [overflow-wrap:anywhere] dark:text-slate-200"
+      className="mx-auto max-w-measure [--doc-pulse:var(--color-toga-500)] dark:[--doc-pulse:var(--color-toga-400)] whitespace-pre-wrap font-serif text-[1.0625rem] leading-[1.7] text-slate-800 [overflow-wrap:anywhere] dark:text-slate-200"
     >
       {pieces.map(piece => piece.mark === null
         ? text.slice(piece.from, piece.to)

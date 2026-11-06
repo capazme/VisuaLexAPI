@@ -239,16 +239,17 @@ services use their container ports (FalkorDB and Redis on 6379, Qdrant on 6333).
 
 ## Tests
 
-CI (`.github/workflows/ci.yml`, job `merlt`, on `develop` and on pull requests
-into it) is the reference run. On Python 3.11 it:
+CI (`.github/workflows/ci.yml`, job `merlt`, on `main`, `develop` and pull
+requests into them) is the reference run. On Python 3.11 it:
 
 1. installs CPU torch, then `pip install -e ".[dev]"`;
 2. bootstraps a Postgres service with `init_db()`, `create_tables()` and
-   `ensure_schema_additions()`;
-3. runs `python -m pytest tests/ -q`;
-4. runs `python -m pytest tests/ -q -m integration` against a FalkorDB service
-   (the image `infra/compose.yml` pins), with `FALKORDB_HOST` and
-   `FALKORDB_PORT` set for that step only.
+   `ensure_schema_additions()` — a database thrown away with the job, so it
+   runs with `fsync`, `synchronous_commit` and `full_page_writes` off;
+3. runs `python -m pytest tests/ -q -p no:cacheprovider`;
+4. runs `python -m pytest tests/ -q -p no:cacheprovider -m integration`
+   against a FalkorDB service (the image `infra/compose.yml` pins), with
+   `FALKORDB_HOST` and `FALKORDB_PORT` set for that step only.
 
 Tests marked `integration` need a live FalkorDB: `pyproject.toml` `addopts`
 excludes them from a plain run. Run them with `-m integration` against a

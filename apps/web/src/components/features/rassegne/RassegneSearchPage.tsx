@@ -170,8 +170,9 @@ export function RassegneSearchPage() {
   const allCount = [...counts.values()].reduce((sum, n) => sum + n, 0);
 
   return (
-    <PageFrame title="Rassegne" line="Cerca una o più parole in tutte le rassegne del Massimario della Cassazione.">
-      <div className="flex max-w-3xl flex-col gap-5">
+    // A `reading` page (U1): the field, the archives and the passages in one column at the reading measure.
+    <PageFrame title="Rassegne" line="Cerca una o più parole in tutte le rassegne del Massimario della Cassazione." width="reading">
+      <div className="flex flex-col gap-5">
         <form role="search" onSubmit={submit} className="flex flex-col gap-1.5">
           <div className="flex items-end gap-2">
             <div className="min-w-0 flex-1">

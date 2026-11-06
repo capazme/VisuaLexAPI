@@ -21,6 +21,7 @@ import { fetchDecisionCached } from '../utils/decisionFetchCache';
 import { appStore } from '../store/useAppStore';
 import { useAuth } from './useAuth';
 import { assistantProposalsStore } from '../store/assistantProposals';
+import { offerShortcutUndo } from '../components/ui/notifications/notifications';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 
@@ -60,6 +61,19 @@ describe('useAuth — logout', () => {
     expect(next.result.current.status).toBe('loading');
     await waitFor(() => expect(next.result.current.status).toBe('ready'));
     expect(studiaService.forArticle).toHaveBeenCalledTimes(2);
+  });
+
+  it('carries out the last gesture on a highlight before the token goes: it said nothing, so for the reader it is done (A4)', async () => {
+    vi.mocked(authService.logout).mockClear();
+    const settle = vi.fn(() => expect(authService.logout).not.toHaveBeenCalled());
+    offerShortcutUndo({ message: 'Evidenziazione rimossa', undo: vi.fn(), settle });
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    expect(settle).toHaveBeenCalledExactlyOnceWith(true);
+    expect(authService.logout).toHaveBeenCalled();
   });
 
   it('forgets what applications proposed on the last reader\'s dossiers (D7b)', async () => {

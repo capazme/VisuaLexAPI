@@ -12,6 +12,35 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-06
+
+The highlighter as a tool, as a word processor has it, in every reader; one frame for every page,
+wider on large screens and in full screen; a CI about four times shorter. No migration.
+
+### Reading
+
+- The highlighter is a tool (A4): a split button with the four colours and «Nessun colore»; switched
+  on, every selection takes the ink as it is released. Whole words, the exact piece with Alt; the same
+  colour removes where it passes, another recolours, a mixed selection applies and merges; no toasts
+  for highlights, Ctrl+Z / ⌘Z undoes the last gesture; no duplicates. In the article, the decision,
+  the dossier item, Modalità studio and Gymnasium's lessons.
+- `PUT /highlights/:id` takes the range too, and `POST /highlights` takes `splitFrom`: a highlight
+  imported from the Forum keeps its original author when it is cut or recoloured (G-417, G-418).
+
+### Layout
+
+- One frame (U1): 1600 px, 2400 px in full screen; one width per page and one 70-character reading
+  measure; Gymnasium «Oggi» keeps its two columns in full screen; the full screen widens, named in
+  Italian, and its key is ⌘⇧F (Ctrl+Shift+F), since ⌘Space opens Spotlight on the Mac.
+- The Forum's «Pronti da VisuaLex» is a grid of cards on a wide frame.
+
+### Development
+
+- CI: the server tests reset the database once per run and empty it with DELETEs; the web tests run
+  on three runners; the CI's Postgres runs without fsync. About 22 minutes → 5½ per pull request
+  (G-411).
+- `vendor/mcp-legal-it` on its rewritten history (same tree, G-416).
+
 ## [1.10.8] - 2026-11-02
 
 «Analizza documento» rebuilt around the search, with hyperlinks written into the text and into a copy

@@ -202,7 +202,7 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className={cn(COLUMN, 'grid px-4 py-8 md:py-14')}>
         <section data-testid="lesson-end" aria-label="Fine del ripasso" className={cn(TILE, 'mx-auto grid w-full max-w-xl justify-items-center gap-6 p-6 text-center md:p-8')}>
-          <p ref={sentence} tabIndex={-1} className="max-w-[60ch] font-serif text-2xl leading-snug text-slate-900 focus:outline-none md:text-3xl dark:text-slate-50">
+          <p ref={sentence} tabIndex={-1} className="max-w-prose font-serif text-2xl leading-snug text-slate-900 focus:outline-none md:text-3xl dark:text-slate-50">
             {endSentence(summary)}
           </p>
           <SessionEndProgress data={day} />

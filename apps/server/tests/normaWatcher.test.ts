@@ -91,7 +91,7 @@ describe('runNormaWatcher', () => {
   });
 
   async function seedWatch(normaKey: string, storedSnapshot: unknown) {
-    // A fresh user per call: setup.ts truncates `users` (CASCADE) before every
+    // A fresh user per call: setup.ts empties every table, `users` too, before every
     // test, so reusing a `user` created in an earlier test would point
     // `seedWatch` at a userId that no longer exists.
     user = await createTestUser(`watcher-${normaKey}`);

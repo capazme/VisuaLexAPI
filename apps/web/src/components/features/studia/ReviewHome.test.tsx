@@ -683,15 +683,15 @@ describe('ReviewHome', () => {
       expect(screen.getAllByRole('group', { name: 'Materia' })).toHaveLength(1);
     });
 
-    it('stays one column in Focus mode, whose narrower frame would squeeze the band (G6)', async () => {
+    it('keeps its two columns in full screen, which widens the frame instead of narrowing it (U1)', async () => {
       const before = appStore.getState().settings;
       appStore.setState({ settings: { ...before, focusMode: true } });
       try {
         progress.mockResolvedValue(answer(18, 8));
         renderHome();
         const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
-        expect(stats.parentElement?.className).not.toMatch(/xl:/);
-        expect(stats.parentElement?.parentElement?.className).not.toMatch(/xl:grid-cols/);
+        expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
+        expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,7fr\)_minmax\(0,5fr\)\]/);
       } finally {
         appStore.setState({ settings: before });
       }

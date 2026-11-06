@@ -73,13 +73,13 @@ describe('DossierItemReader — annotations on the text', () => {
   });
 });
 
-describe('DossierItemReader — the colour of new highlights (H1)', () => {
-  it('has no bar of its own: the colour is chosen with its actions', async () => {
+describe('DossierItemReader — the highlighter (H1, A4)', () => {
+  it('has no bar of its own: the highlighter sits with its actions', async () => {
     vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
     appStore.setState({ highlights: [], annotations: [] });
     render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
-    const trigger = await screen.findByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
-    expect(trigger).toHaveTextContent('Colore: giallo');
+    expect(await screen.findByRole('button', { name: 'Evidenziatore (giallo)' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Colore dell’evidenziatore' })).toBeInTheDocument();
   });
 
   it('offers none on a text read only, which takes no highlight', async () => {
@@ -88,7 +88,7 @@ describe('DossierItemReader — the colour of new highlights (H1)', () => {
     appStore.setState({ highlights: [], annotations: [] });
     render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
     await screen.findByRole('button', { name: /Copia citazione/ });
-    expect(screen.queryByRole('button', { name: /^Colore: / })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Evidenziatore|^Colore dell/ })).toBeNull();
   });
 });
 
