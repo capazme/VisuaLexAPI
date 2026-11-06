@@ -24,6 +24,7 @@ export const FULL_PAGE_FRAME = 'has-[[data-page-width=full]]:max-w-frame-full';
  * The columns of a grid of cards (U1 §7: the room left over goes to columns, a list of cards is a grid, never a
  * carousel or a row 2000 px long): as many as cards of 20rem fit (320 px at the default text size; the whole width
  * when even one does not), each an equal share of what is left. Written once, here, for the lists of cards U1 turns into
- * grids: so far the Forum's «Pronti da VisuaLex»; the others follow page by page (spec §7).
+ * grids: the Forum's «Pronti da VisuaLex», the dossier list and «Le mie schede»; the others follow page by page
+ * (spec §7).
  */
 export const CARD_GRID_COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))]';

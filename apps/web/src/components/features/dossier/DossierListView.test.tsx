@@ -7,6 +7,7 @@ import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUnd
 import { resetNotifications } from '../../ui/notifications/notifications';
 import { sectionStore } from '../../../features/sections/useSection';
 import type { Dossier, NormaVisitata } from '../../../types';
+import { CARD_GRID_COLUMNS } from '../../layout/frame';
 
 // The list's viewport (`useIsDesktop`): a phone, as jsdom's matchMedia shim says, unless a test says otherwise.
 const viewport = vi.hoisted(() => ({ desktop: false }));
@@ -400,6 +401,23 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     }
     // No icon of a folder, no «N elementi» badge.
     expect(within(card).queryByText(/elementi?$/)).toBeNull();
+  });
+
+  it('lays the cards out as a grid of cards of at least 20rem, as many columns as the frame holds (U1)', () => {
+    const address = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262~art1284';
+    appStore.setState({ dossiers: [
+      { ...dossier([CIVIL]), description: address },
+      { ...dossier([PENAL]), id: 'd2', title: 'Pratica Bianchi' },
+    ] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const card = screen.getByRole('button', { name: 'Apri dossier Pratica Rossi' });
+    const grid = card.parentElement!;
+    expect(grid).toBe(screen.getByRole('button', { name: 'Apri dossier Pratica Bianchi' }).parentElement);
+    expect(grid).toHaveClass('grid', CARD_GRID_COLUMNS);
+    // No column count set by breakpoint: the cards' width decides, so none is under 20rem (320 px at the default text size).
+    expect(grid.className).not.toMatch(/\bgrid-cols-\d/);
+    // A description with no space in it (an address) wraps inside a card of 20rem rather than being cut at its edge.
+    expect(within(card).getByText(address)).toHaveClass('break-words', 'line-clamp-2');
   });
 
   it('composes the empty list: line art in the section\'s hue, what a dossier is for, and two ways to begin', () => {
