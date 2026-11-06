@@ -5,8 +5,8 @@ Status: decided by the owner on 5 November 2026 (L-46, L-47). Web only: no route
 Two rounds, in this order:
 
 1. **The frame** (§1–§6 below): one pull request, small.
-2. **The columns** (§7): one pull request per page (the Forum's «Pronti da VisuaLex», the dossier list, «Le mie
-   schede», Gymnasium's «Oggi» and «Progressi», Academia), each planned when the one before is merged. The search page
+2. **The columns** (§7): one pull request per page (the Forum's «Pronti da VisuaLex»; the dossier list and «Le mie
+   schede» together; Gymnasium's «Oggi» and «Progressi»; Academia), each planned when the one before is merged. The search page
    and a dossier's columns are U2's; «Oggi», «Prossimi giorni» and the inbox become U4's agenda.
 
 ## Why
@@ -114,6 +114,16 @@ at the default text size, so they grow with the text size the user chose), each 
   there — at 1366 px with the sidebar 3 columns, at 1920 px 4, at 2560 px in full screen 7, so the 20 packs take 7, 5
   and 3 lines. Below three columns the grid would be 10 lines of two, a long page of packs at the Forum's foot: there
   the row stays, as on a phone. The grid is no Tab stop of its own (it scrolls nothing); the row still is.
+- **The dossier list and «Le mie schede»** (the second): grids at every width, so no container query — the grid
+  itself fits as many cards of 20rem as its width holds, one on a phone. The columns set by breakpoint go (the dossier
+  list's one, two, three; the cards' two from `lg`, three from `2xl`), and with them cards under 320 px (the dossier
+  list's 283 px at 1024 and 315 at 1280) and cards stretched past 500 px (both lists' 517–795 px at 1920 and in full
+  screen at 2560). The dossier list: two columns at 768 px, three at 1366 with the sidebar, four at 1920, seven at 2560
+  in full screen; two at 1024 (the rail) and at 1280 (the wide sidebar), where it had three. «Le mie schede»: two at
+  768 and 1024, three at 1366, four at 1920, seven at 2560 in full screen; at 1280 three with 8 px to spare, so two
+  where the scrollbar is wider than the app's own (Firefox with scrollbars always shown). Beside an open card its list
+  stays one column (G8). The counts are computed without the scrollbar's room: the page keeps 8 px for it, which
+  changes none of them.
 
 ## Out of scope
 

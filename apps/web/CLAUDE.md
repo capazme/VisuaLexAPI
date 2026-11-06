@@ -40,8 +40,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/studia` redirects to `ripasso` (see «Card review» below); `/studia/progressi` is «Progressi», the page of the data (see «Progressi» below); «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
-  `triggerSearch` as the dossier's rows do; with no card open the cards are tiles across the frame (G8: two
-  columns from `lg`, three from `2xl`; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
+  `triggerSearch` as the dossier's rows do; with no card open the cards are tiles across the frame (G8) in a grid of
+  cards of at least 20rem (`CARD_GRID_COLUMNS`, U1: one column on a phone, two at 768 px, three at 1366 with the
+  sidebar, four at 1920; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
   1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below, «Cerca» under 360 px (it was cut, Q1),
@@ -463,8 +464,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   hand (the sign-in page's display line aside). The columns that fill the room past two measures (about 1500 px) come
   page by page (spec `2026-11-05-u1-frame-and-full-screen-design.md` §7): a list of cards on a wide frame becomes a grid
   of cards of at least 20rem, `CARD_GRID_COLUMNS` (`frame.ts`, written once), never a carousel or a row 2000 px long (a
-  phone may keep a row that scrolls). So far only the Forum's «Pronti da VisuaLex» does; the community's cards
-  (`CARD_GRID`), the dossier list and «Le mie schede» still set their columns by breakpoint until their pull requests.
+  phone may keep a row that scrolls). The Forum's «Pronti da VisuaLex», the dossier list and «Le mie schede» do; the
+  community's cards (`CARD_GRID`) still set their columns by breakpoint.
   **The page frame** (W2, 21 Oct 2026):
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
@@ -2944,7 +2945,8 @@ Breaking one of these breaks the product. Read before editing.
 meant to stay split; add new features as new files, not inside the shells:
 
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
-  `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
+  `?dossier=<id>`; `DossierListView.tsx` (a grid of cards of at least 20rem, `CARD_GRID_COLUMNS` — U1: as many
+  columns as the frame holds, four at 1920 px, seven at 2560 in full screen —, context menu, shortcuts `n` `/`
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
