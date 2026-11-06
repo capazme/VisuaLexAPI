@@ -8,7 +8,7 @@ import { subjectHue } from './components/features/studia/progress/tokens';
 import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
 import type { Materia } from './types/studia';
 import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
-import { FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
+import { CARD_GRID_COLUMNS, FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -69,6 +69,26 @@ describe('the page frame (W2, U1)', () => {
   it('widens to the full screen\'s frame while a page that declares itself `full` is in it (U1)', async () => {
     const css = await compile([FULL_PAGE_FRAME]);
     expect(css).toMatch(/:has\(\*:is\(\[data-page-width=full\]\)\)\s*\{\s*max-width:\s*var\(--container-frame-full\)/);
+  }, 30000);
+
+  it('compiles the grid of cards of at least 20rem, and the Forum\'s packs turning into it by their own width (U1 §7)', async () => {
+    const band: [string, string][] = [
+      ['@min-[61.5rem]:grid', 'display: grid'],
+      ['@min-[61.5rem]:pb-1', 'padding-bottom:'],
+      ['@min-[61.5rem]:w-auto', 'width: auto'],
+      ['@min-[61.5rem]:overflow-x-visible', 'overflow-x: visible'],
+      ['@min-[61.5rem]:hidden', 'display: none'],
+    ];
+    const css = await compile([CARD_GRID_COLUMNS, '@container', ...band.map(([name]) => name)]);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(20rem,\s*100%\),\s*1fr\)\)/);
+    expect(css).toMatch(/\.\\@container\s*\{\s*container-type:\s*inline-size/);
+    // Each class's rule holds its declaration inside the query on the band's own width.
+    const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const [name, declaration] of band) {
+      // The class as CSS writes it in a selector: every character it escapes, the backslash first among them.
+      const selector = `.${name.replace(/[\\@[\].:]/g, '\\$&')}`;
+      expect(css).toMatch(new RegExp(`${literal(selector)}\\s*\\{\\s*@container \\(width >= 61\\.5rem\\)\\s*\\{\\s*${literal(declaration)}`));
+    }
   }, 30000);
 });
 
