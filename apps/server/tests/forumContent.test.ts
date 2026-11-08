@@ -127,6 +127,10 @@ describe('the Forum\'s allow-list', () => {
     ['a negative offset', { highlights: [{ normaKey: 'k', articleId: '1', text: 't', color: 'yellow', startOffset: -1 }] }, /^Evidenziazione 1: posizione non valida/],
     ['an unknown colour', { highlights: [{ normaKey: 'k', articleId: '1', text: 't', color: 'nero' }] }, /^Evidenziazione 1: colore non valido/],
     ['a quick norm with no act', { quickNorms: [{ label: 'x', searchParams: {} }] }, /^Norma rapida 1: tipo di atto mancante/],
+    // A date asks for the text in force that day (G-353): with «originale» the API answers 400.
+    ['a quick norm asking for the original at a date',
+      { quickNorms: [{ label: 'x', searchParams: { act_type: 'legge', article: '2', version: 'originale', version_date: '2020-01-01' } }] },
+      /^Norma rapida 1: versione originale con una data della versione/],
     ['an alias with spaces', { customAliases: [{ trigger: 'c c', type: 'shortcut', expandTo: 'x' }] }, /^Alias 1: abbreviazione non valida/],
     ['a dossier with no title', { dossiers: [{ items: [] }] }, /^Dossier 1: titolo mancante/],
   ])('refuses %s on publish, in Italian', async (_label, part, message) => {

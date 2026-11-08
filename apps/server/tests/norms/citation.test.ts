@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citeAct, citeArticle, citeStoredAct, citeStoredNorm } from '../../src/norms/citation';
+import { citeAct, citeArticle, citeStoredAct, citeStoredNorm, shortNorm } from '../../src/norms/citation';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -74,7 +74,9 @@ describe('citeAct', () => {
       const norma = c.input;
       const article = citeArticle(norma).replace(/ \(Allegato [^)]*\)$/, '');
       const act = citeAct(norma);
-      expect([`art. ${norma.numero_articolo} ${act}`, `art. ${norma.numero_articolo}, ${act}`]).toContain(article);
+      // A part of a split article names its commas after the article (G-389, Q2).
+      const head = `art. ${norma.numero_articolo}${norma.parte ? `, commi ${norma.parte}` : ''}`;
+      expect([`${head} ${act}`, `${head}, ${act}`]).toContain(article);
     }
   });
 
@@ -125,13 +127,31 @@ describe('a code’s default annex', () => {
   it('is never named', () => {
     expect(citeArticle({ tipo_atto: 'codice del turismo', allegato: '1', numero_articolo: '5' }))
       .toBe('art. 5, d.lgs. 23 maggio 2011, n. 79');
-    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '2', numero_articolo: '29' }))
-      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104');
+  });
+
+  it('nor for the four codes cited by their sigla (G-360, G-366)', () => {
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '2', numero_articolo: '29' })).toBe('art. 29 c.p.a.');
+    expect(citeArticle({ tipo_atto: 'codice della navigazione', allegato: '1', numero_articolo: '69' })).toBe('art. 69 cod. nav.');
+    expect(citeArticle({ tipo_atto: 'codice postale e delle telecomunicazioni', allegato: '1', numero_articolo: '20' }))
+      .toBe('art. 20 cod. post.');
+    expect(citeArticle({ tipo_atto: 'codice di giustizia contabile', allegato: '1', numero_articolo: '52' })).toBe('art. 52 c.g.c.');
   });
 
   it('another annex, or an act that is not a code, is named', () => {
-    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '29' }))
-      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)');
+    expect(citeArticle({ tipo_atto: 'codice del turismo', allegato: '2', numero_articolo: '5' }))
+      .toBe('art. 5, d.lgs. 23 maggio 2011, n. 79 (Allegato 2)');
+    // Another annex of a code's decree is not the code (the c.p.a.'s annex 3): its own sigla (G-369),
+    // also for a norm stored by its decree and annex; an annex without one, the decree with its annex.
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '3', numero_articolo: '1' }))
+      .toBe('art. 1 disp. att. c.p.a.');
+    expect(citeArticle({ tipo_atto: 'decreto legislativo', numero_atto: '104', data: '2010-07-02', allegato: '3', numero_articolo: '1' }))
+      .toBe('art. 1 disp. att. c.p.a.');
+    expect(citeArticle({ tipo_atto: 'codice civile', allegato: '1', numero_articolo: '12' })).toBe('art. 12 preleggi');
+    expect(citeArticle({ tipo_atto: 'codici penali militari di pace e di guerra', allegato: '2', numero_articolo: '1' })).toBe('art. 1 c.p.m.g.');
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '1' }))
+      .toBe('art. 1, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)');
+    expect(shortNorm({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '1' }))
+      .toBe('art. 1 d.lgs. 104/2010 (All. 1)');
     expect(citeArticle({ tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008-04-09', allegato: 'A', numero_articolo: '1' }))
       .toBe('art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)');
   });
@@ -143,5 +163,20 @@ describe('an act whose text is its annex', () => {
   it('names no annex, and names another', () => {
     expect(citeArticle(tulps)).toBe('art. 86, r.d. 18 giugno 1931, n. 773');
     expect(citeArticle({ ...tulps, allegato: '2' })).toBe('art. 86, r.d. 18 giugno 1931, n. 773 (Allegato 2)');
+  });
+});
+
+
+describe('a part of a split article (G-389, Q2)', () => {
+  const ART_1 = { tipo_atto: 'legge', data: '2006-12-27', numero_atto: '296', numero_articolo: '1' };
+
+  it('names its commas after the article', () => {
+    expect(citeArticle({ ...ART_1, parte: '701-800' })).toBe('art. 1, commi 701-800, l. 27 dicembre 2006, n. 296');
+    expect(shortNorm({ ...ART_1, parte: '701-800' })).toBe('art. 1 (commi 701-800) l. 296/2006');
+    expect(citeStoredNorm('norm', { ...ART_1, parte: '701-800' })).toBe('art. 1, commi 701-800, l. 27 dicembre 2006, n. 296');
+  });
+
+  it('the first part is the article', () => {
+    expect(citeArticle(ART_1)).toBe('art. 1, l. 27 dicembre 2006, n. 296');
   });
 });

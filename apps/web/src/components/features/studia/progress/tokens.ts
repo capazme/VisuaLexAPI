@@ -10,7 +10,8 @@ export const INK_BG = 'bg-primary-900 dark:bg-primary-300';
 export const INK_BORDER = 'border-primary-900 dark:border-primary-300';
 /** Text on an ink fill. */
 export const ON_INK = 'text-white dark:text-slate-950';
-export const SUCCESS_TEXT = 'text-green-600 dark:text-green-400';
+// green-700 in light: 600 was 3,2:1 on white for the goal's count (M1).
+export const SUCCESS_TEXT = 'text-green-700 dark:text-green-400';
 export const MUTED_TEXT = 'text-slate-500 dark:text-slate-400';
 
 /** A tile of the dashboard: the missions, the statistics, a stop of the road. */

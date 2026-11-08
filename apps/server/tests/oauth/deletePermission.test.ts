@@ -116,7 +116,9 @@ describe('the permission to delete', () => {
   it('a request for deletion alone asks for read and write too, since deleting needs them (M6)', async () => {
     const flow = await startAuthorization({ scope: 'content:delete' });
     const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
-    expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write']);
+    expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual([
+      'dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write', 'lingo:courses:read', 'lingo:courses:write',
+    ]);
   });
 
   it("PATCH on another user's grant or a revoked one is a 404, and the body is strict", async () => {

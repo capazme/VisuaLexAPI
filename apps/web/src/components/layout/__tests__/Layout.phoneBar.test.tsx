@@ -192,6 +192,7 @@ describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => 
             <Route path="/forum" element={<h1>Dossier pubblici</h1>} />
             <Route path="/history" element={<h1>Cronologia</h1>} />
             <Route path="/documents" element={<p>Nessun titolo</p>} />
+            <Route path="/rassegne" element={<h1>Rassegne</h1>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -227,6 +228,12 @@ describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => 
     expect(name(bar)).toHaveTextContent(/^$/);
     FakeIntersectionObserver.last!.say(false);
     expect(name(bar)).toHaveTextContent(/^Cronologia$/);
+  });
+
+  it('names the page «Rassegne» as its title does, once scrolled', () => {
+    const bar = at('/rassegne');
+    FakeIntersectionObserver.last!.say(false);
+    expect(name(bar)).toHaveTextContent(/^Rassegne$/);
   });
 
   it('names at once a page with no title of its own', () => {

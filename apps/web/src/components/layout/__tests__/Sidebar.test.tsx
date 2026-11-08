@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -36,6 +36,7 @@ vi.mock('../../../pageCode', async (importOriginal) => ({
 }));
 
 import { Sidebar } from '../Sidebar';
+import { coursesSwitchStore } from '../../features/studia/corsi/coursesSwitch';
 
 function renderSidebar(path = '/merlt') {
   return render(
@@ -87,14 +88,14 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     account.devMode = true;
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/documents', '/merlt', '/grafo']);
+    expect(hrefs).toEqual(['/', '/documents', '/rassegne', '/merlt', '/grafo']);
     // exactly one hub entry
     expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
   });
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar('/');
-    expect(navHrefs()).toEqual(['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier']);
+    expect(navHrefs()).toEqual(['/', '/documents', '/rassegne', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -102,7 +103,29 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     isMerltEnabledMock.mockReturnValue(false);
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/documents']);
+    expect(hrefs).toEqual(['/', '/documents', '/rassegne']);
     expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
+  });
+});
+
+// «Percorsi», second in «Studia», behind the switch `lingo_courses` (courses spec §6.1, §10.10).
+describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
+  afterEach(() => coursesSwitchStore.setState({ state: 'unknown' }));
+  const studia = () => navHrefs().filter((h) => h.startsWith('/studia') || h === '/dossier');
+
+  it('is absent while the switch is off or not yet read', () => {
+    for (const state of ['unknown', 'off'] as const) {
+      coursesSwitchStore.setState({ state });
+      const { unmount } = renderSidebar('/studia/ripasso');
+      expect(studia()).toEqual(['/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
+      unmount();
+    }
+  });
+
+  it('comes second, Oggi · Percorsi · Progressi · Dossier, once the switch is on', () => {
+    coursesSwitchStore.setState({ state: 'on' });
+    renderSidebar('/studia/ripasso');
+    expect(studia()).toEqual(['/studia/ripasso', '/studia/percorsi', '/studia/progressi', '/dossier', '/studia/schede']);
+    expect(screen.getByRole('link', { name: 'Percorsi' })).toBeInTheDocument();
   });
 });

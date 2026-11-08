@@ -2,7 +2,7 @@
  * The sign-up form, the «Registrati» tab of `AuthPage`, and what follows it: the account waits for an
  * administrator's approval (spec 2026-10-18-redesign-inchiostro §5.3.4, as the sign-in form).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { BookOpen, Check, CheckCircle2, X } from 'lucide-react';
 import { register } from '../../services/authService';
 import { cn } from '../../lib/utils';
@@ -48,16 +48,19 @@ export function RegisterForm({ onBusy, onRegistered, onSwitch }: RegisterFormPro
   const pendingFocus = useRef<HTMLInputElement | null>(null);
   const doneHeading = useRef<HTMLHeadingElement>(null);
 
-  // A field the error points at while the request still disabled it takes the focus once enabled.
-  useEffect(() => {
+  // A field the error points at while the request still disabled it takes the focus once enabled. In the layout
+  // phase, as below: an update that comes after the request (outside any event) would otherwise leave the focus
+  // on the body until the passive effects run, a frame later or more under load.
+  useLayoutEffect(() => {
     if (pendingFocus.current && !pendingFocus.current.disabled) {
       pendingFocus.current.focus();
       pendingFocus.current = null;
     }
   });
 
-  // The submit button that had the focus is gone: the confirmation takes it.
-  useEffect(() => {
+  // The submit button that had the focus is gone: the confirmation takes it, in the same commit that shows it,
+  // never after (a passive effect ran once the page already showed the confirmation with the focus on the body).
+  useLayoutEffect(() => {
     if (registrationComplete) doneHeading.current?.focus();
   }, [registrationComplete]);
 

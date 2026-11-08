@@ -5,6 +5,7 @@ import { decisionKey, identityOf } from '../../../utils/decisionLinks';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { annotationApiToStore, articleRootOf, buildWireNormaKeyPrefix, highlightApiToStore } from '../../../utils/storeApiMappers';
 import type { PdfMarks } from './dossierPdf';
+import { isRemovalPending } from '../../../store/deferredRemovals';
 
 // A decision's highlights and notes are stored under its key with no article, as the reading surface does.
 const NO_ARTICLE = '';
@@ -51,8 +52,12 @@ export async function loadPdfMarks(
           annotationService.getByNormaKeyPrefix(prefix),
         ]);
         marks.set(itemId, {
-          highlights: highlights.map(highlightApiToStore).filter((h) => h.normaKey === normaKey && h.articleId === articleId),
-          notes: notes.map(annotationApiToStore).filter((a) => a.normaKey === normaKey && a.articleId === articleId),
+          // A mark removed and still waiting behind «Annulla» is the server's for a few seconds more: never in a PDF or
+          // a Forum publication (`deferredRemovals`).
+          highlights: highlights.map(highlightApiToStore)
+            .filter((h) => h.normaKey === normaKey && h.articleId === articleId && !isRemovalPending(`highlight:${h.id}`)),
+          notes: notes.map(annotationApiToStore)
+            .filter((a) => a.normaKey === normaKey && a.articleId === articleId && !isRemovalPending(`annotation:${a.id}`)),
         });
       } catch (err) {
         console.error('PDF: highlights and notes unavailable for', normaKey, err);

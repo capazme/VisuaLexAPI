@@ -17,7 +17,7 @@ import type { StudiaOutletContext } from './StudiaPage';
 import { FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './progress/tokens';
 
 const STORAGE_KEY = 'visualex.studia.valida.materia';
-const MEASURE = 'max-w-[60ch]';
+const MEASURE = 'max-w-measure';
 const PART_HEADING = 'mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200';
 /** A state of the queue with nothing to judge: a tile, its sentence in the reader's serif. */
 const STATE_TILE = cn(TILE, 'space-y-1 p-5 md:p-6');

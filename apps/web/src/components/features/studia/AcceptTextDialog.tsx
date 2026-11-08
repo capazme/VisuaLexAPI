@@ -48,10 +48,10 @@ export function AcceptTextDialog({ text, onAccept, onCancel, busy = false }: Acc
       initialFocusRef={checkboxRef}
       footer={
         <>
-          <Button variant="ghost" size="sm" className="min-h-[44px] md:min-h-0" onClick={onCancel}>
+          <Button variant="ghost" size="sm" className="min-h-[44px] md:min-h-[44px]" onClick={onCancel}>
             Annulla
           </Button>
-          <Button size="sm" className="min-h-[44px] md:min-h-0" disabled={!ticked || busy} onClick={() => onAccept(text.id)}>
+          <Button size="sm" className="min-h-[44px] md:min-h-[44px]" disabled={!ticked || busy} onClick={() => onAccept(text.id)}>
             {text.azione}
           </Button>
         </>

@@ -51,11 +51,5 @@ export function titleOf(subject: Subject | null): string {
   return `${citeNorm(norma_data)}${versionTabSuffix({ version: norma_data.versione, versionDate: norma_data.data_versione })}`;
 }
 
-/** The nearest ancestor that scrolls: the page's content scroller, which the results area sits in. */
-export function scrollParentOf(el: HTMLElement): HTMLElement | null {
-  for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node);
-    if (overflowY === 'auto' || overflowY === 'scroll') return node;
-  }
-  return null;
-}
+/** The nearest ancestor that scrolls (`utils/scrollParent.ts`): the page's content scroller, which the results area sits in. */
+export { scrollParentOf } from '../../../utils/scrollParent';

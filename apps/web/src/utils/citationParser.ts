@@ -9,7 +9,8 @@ import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarke
 import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 import { labelFromParams } from './sources';
-import { ACT_TYPES_REQUIRING_DETAILS } from '../constants/actTypes';
+import { identifiesAct, isNumberedActType } from './sources/numberedActTypes';
+import { ANNEX_SIGLE, CODES_TABLE } from './sources/actTypes';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -123,6 +124,9 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'cce': 'codice delle comunicazioni elettroniche',
   'cod. com. elet.': 'codice delle comunicazioni elettroniche',
   'codice delle comunicazioni elettroniche': 'codice delle comunicazioni elettroniche',
+  // «c.p.a.» was missing, and «c.p.» read the head of it: «art. 29 c.p.a.» was the codice penale.
+  'c.p.a.': 'codice del processo amministrativo',
+  'c.p.a': 'codice del processo amministrativo',
   'cpa': 'codice del processo amministrativo',
   'cod. proc. amm.': 'codice del processo amministrativo',
   'codice del processo amministrativo': 'codice del processo amministrativo',
@@ -145,6 +149,8 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'ctu': 'codice del turismo',
   'cod. turismo': 'codice del turismo',
   'codice del turismo': 'codice del turismo',
+  'c.g.c.': 'codice di giustizia contabile',
+  'c.g.c': 'codice di giustizia contabile',
   'cgco': 'codice di giustizia contabile',
   'cod. giust. cont.': 'codice di giustizia contabile',
   'codice di giustizia contabile': 'codice di giustizia contabile',
@@ -161,6 +167,7 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'cod. naut. diport.': 'codice della nautica da diporto',
   'codice della nautica da diporto': 'codice della nautica da diporto',
   'cpet': 'codice postale e delle telecomunicazioni',
+  'cod. post.': 'codice postale e delle telecomunicazioni',
   'cod. post. telecom.': 'codice postale e delle telecomunicazioni',
   'codice postale e delle telecomunicazioni': 'codice postale e delle telecomunicazioni',
 
@@ -185,23 +192,36 @@ const ABBREVIATION_MAP: Record<string, string> = {
 // Ordinati per lunghezza decrescente per matching greedy
 const SORTED_ABBREVIATIONS = Object.keys(ABBREVIATION_MAP).sort((a, b) => b.length - a.length);
 
+// Le sigle degli allegati (ANNEX_SIGLE, G-369) con il codice della tabella dei codici a cui
+// l'allegato appartiene: la riga di quell'allegato, o quella dello stesso decreto (il c.p.a.
+// per il suo allegato 3). La più lunga per prima; ogni punto può mancare o avere uno spazio dopo
+// di sé («disp att cpa» non è il c.p.a.), e la sigla non si legge mai dentro una parola.
+const ANNEX_ABBREVIATIONS = Object.entries(ANNEX_SIGLE)
+  .filter(([, sigla]) => sigla.includes('.'))
+  .sort((a, b) => b[1].length - a[1].length)
+  .flatMap(([identity, sigla]) => {
+    const cut = identity.lastIndexOf(':');
+    const decree = identity.slice(0, cut);
+    const annex = identity.slice(cut + 1);
+    const rows = Object.entries(CODES_TABLE);
+    const row = rows.find(([, urn]) => urn === identity)
+      ?? rows.find(([, urn]) => /;\d+:\w+$/.test(urn) && urn.slice(0, urn.lastIndexOf(':')) === decree);
+    if (!row) return [];
+    const source = sigla.replace(/\.$/, '').split('.').map((part) => part.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')).join('\\.?\\s*');
+    return [{ pattern: new RegExp(`(?<![\\w.])${source}\\.?(?![\\w])`, 'i'), actType: row[0], annex }];
+  });
+
 // Atti che senza numero e anno non si aprono: nominati per esteso senza
 // numero ("della legge") non sono un bersaglio, e li leggono i pattern
-// numerati.
-const NUMBERED_ACT_TYPES = new Set([
-  'legge', 'decreto legge', 'decreto legislativo',
-  'decreto del presidente della repubblica', 'regio decreto',
-  'legge costituzionale', 'regio decreto legge', 'decreto legislativo luogotenenziale',
-  'Regolamento UE', 'Direttiva UE',
-]);
-
+// numerati. La lista è una sola, quella della convenzione
+// (sources/numberedActTypes.ts).
 /**
  * The spellings of numbered act types the palette accepts ("legge cost.", "l. costituzionale",
  * "decreto-legge"), each with the type it resolves to: the find window's citation search
  * (citationSearch.ts) adds them to the forms of the act-type table (sources/actTypes.ts).
  */
 export const NUMBERED_ACT_SPELLINGS: ReadonlyArray<readonly [string, string]> = Object.entries(ABBREVIATION_MAP)
-  .filter(([, actType]) => NUMBERED_ACT_TYPES.has(actType));
+  .filter(([, actType]) => isNumberedActType(actType));
 
 /**
  * Atti che un testo può nominare per esteso ("del codice civile", "della
@@ -216,8 +236,17 @@ export const NUMBERED_ACT_SPELLINGS: ReadonlyArray<readonly [string, string]> = 
  */
 export const FULL_ACT_NAMES: ReadonlyArray<readonly [string, string]> = Object.entries(ABBREVIATION_MAP)
   .filter(([name, actType]) =>
-    !name.includes('.') && (name.includes(' ') || name.length >= 8) && !NUMBERED_ACT_TYPES.has(actType))
+    !name.includes('.') && (name.includes(' ') || name.length >= 8) && !isNumberedActType(actType))
   .sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * The names of the acts the client parser reads with no number («c.c.», «codice del consumo», «cost.»): the
+ * vocabulary «Analizza documento» falls back on when the server's catalog does not answer (design
+ * 2026-10-29-document-analysis §4.7). The numbered types are left out: «legge» names an act only with its number.
+ */
+export const CLIENT_ACT_NAMES: readonly string[] = Object.entries(ABBREVIATION_MAP)
+  .filter(([name, actType]) => name.length >= 2 && !isNumberedActType(actType))
+  .map(([name]) => name);
 
 /**
  * Un articolo: numero, eventuale suffisso (bis, ter, ... terdecies) o
@@ -346,6 +375,8 @@ function normalizeInput(input: string): string {
  */
 interface ActTypeExtraction {
   actType: string | undefined;
+  /** The annex an annex's sigla names («disp. att. c.p.a.» is the c.p.a.'s decree at annex 3). */
+  annex?: string;
   actNumber?: string;
   date?: string;
   remaining: string;
@@ -389,6 +420,14 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
   // Poi gli atti UE, che portano con sé numero e anno nel loro ordine
   const eu = extractEuCitation(normalized);
   if (eu) return eu;
+
+  // Poi le sigle di un allegato del decreto di un codice (G-369): il codice e l'allegato insieme,
+  // prima delle abbreviazioni di sistema, che leggerebbero «c.p.a.» dentro «disp. att. c.p.a.»
+  for (const { pattern, actType, annex } of ANNEX_ABBREVIATIONS) {
+    if (pattern.test(normalized)) {
+      return { actType, annex, remaining: normalized.replace(pattern, ' ').replace(/\s+/g, ' ').trim() };
+    }
+  }
 
   // Poi controlla le abbreviazioni di sistema
   for (const abbr of SORTED_ABBREVIATIONS) {
@@ -579,6 +618,7 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
   // Step 1: Estrai tipo atto (controlla prima alias utente, poi sistema)
   const actTypeResult = extractActType(normalized, customAliases);
   const { actType, remaining: afterActType, fromAlias, aliasId } = actTypeResult;
+  const shownAnnex = annex ?? actTypeResult.annex;
 
   // Step 2: Estrai articolo
   let { article, remaining: afterArticle } = extractArticle(afterActType);
@@ -620,7 +660,7 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
     act_number: actNumber,
     date: date,
     article: article,
-    ...(annex ? { annex } : {}),
+    ...(shownAnnex ? { annex: shownAnnex } : {}),
     confidence: 0,
     fromAlias,
     aliasId,
@@ -632,19 +672,11 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
 }
 
 /**
- * Verifica se il parsing è completo per eseguire una ricerca
+ * The reading can be searched: it names an act (`identifiesAct`, the convention's numbered types: a code needs
+ * nothing more, a numbered type its number and date) and an article.
  */
 export function isSearchReady(parsed: ParsedCitation | null): boolean {
-  if (!parsed) return false;
-
-  // Deve avere act_type e article
-  if (!parsed.act_type || !parsed.article) return false;
-
-  // Se è un codice (non richiede numero/data) → pronto
-  if (!ACT_TYPES_REQUIRING_DETAILS.includes(parsed.act_type)) return true;
-
-  // Se richiede dettagli, deve avere numero e data
-  return !!(parsed.act_number && parsed.date);
+  return Boolean(parsed?.article) && identifiesAct(parsed);
 }
 
 /** The palette's preview of what it read: the short label of the source convention. */

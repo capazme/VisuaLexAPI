@@ -12,7 +12,8 @@
  * of the web app's `utils/sources/normLabels.ts`; both are pinned to
  * `conventions/sources/golden.json`.
  */
-import { ACT_TYPES, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
+import { ACT_TYPES, ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
+import { partOf } from './parts';
 
 export interface CitableNorm {
   tipo_atto: string;
@@ -21,6 +22,8 @@ export interface CitableNorm {
   numero_atto?: string | null;
   data?: string | null;
   allegato?: string | null;
+  /** One part of a split article ("701-800", G-387 (a)). */
+  parte?: string | null;
 }
 
 export type CitableAct = Omit<CitableNorm, 'numero_articolo'>;
@@ -70,11 +73,46 @@ function isAnnexedActText(norm: CitableAct, annex: string): boolean {
   return ANNEXED_ACTS[`${type.replace(/ /g, '.')}:${date};${number}`] === annex;
 }
 
+// The sigla of an annex by its identity («<decree>:<annex>»): the codes NAMED_ACTS names, at the
+// annex the codes table keys them by, and ANNEX_SIGLE (G-369). The API's `sources._SIGLA_BY_ANNEX`.
+const ANNEXED_CODES: ReadonlyArray<readonly [string, string]> = Object.entries(CODES_TABLE)
+  .filter(([, urn]) => /;\d+:\w+$/.test(urn))
+  .map(([name, urn]) => [urn, key(name)] as const);
+const SIGLA_BY_ANNEX: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(ANNEXED_CODES.filter(([, kind]) => NAMED_ACTS[kind]).map(([urn, kind]) => [urn, NAMED_ACTS[kind]])),
+  ...ANNEX_SIGLE,
+};
+
+// «<decree>:<annex>» of the annex the norm sits in: a code's (its stored annex, or the one the codes
+// table keys it by), or an act's cited by type, date and number with an annex.
+function annexIdentity(norm: CitableAct): string | null {
+  const value = text(norm.allegato);
+  const row = CODES_BY_NAME.get(key(norm.tipo_atto)) ?? '';
+  if (/;\d+:\w+$/.test(row)) {
+    const cut = row.lastIndexOf(':');
+    return `${row.slice(0, cut)}:${value || row.slice(cut + 1)}`;
+  }
+  const kind = key(norm.tipo_atto_reale || norm.tipo_atto).replace(/ /g, '.');
+  const date = text(norm.data);
+  const number = text(norm.numero_atto);
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(date) && number ? `${kind}:${date};${number}:${value}` : null;
+}
+
+// The act's own name («c.c.», «c.p.a.», «disp. att. c.p.a.»): by the annex it sits in, so another
+// annex of a code's decree is not the code; else by its name, for an act the codes table keys by no
+// annex. Undefined for anything else, cited by the decree with its annex. The API's `sources._named`.
+function namedAct(norm: CitableAct): string | undefined {
+  const identity = annexIdentity(norm);
+  if (identity && SIGLA_BY_ANNEX[identity]) return SIGLA_BY_ANNEX[identity];
+  if (/;\d+:\w+$/.test(CODES_BY_NAME.get(key(norm.tipo_atto)) ?? '')) return undefined;
+  return NAMED_ACTS[key(norm.tipo_atto)];
+}
+
 // The act, and how an article joins it: a code, the Constitution and a treaty follow the
 // article with a space ("art. 1284 c.c."), every other act with a comma (short: a space).
 function actOf(norm: CitableAct, short: boolean): { act: string; joiner: string } {
   const kind = key(norm.tipo_atto);
-  const named = NAMED_ACTS[kind];
+  const named = namedAct(norm);
   if (named) return { act: named, joiner: ' ' };
   const joiner = short ? ' ' : ', ';
   const eu = EU_ACTS[kind];
@@ -103,7 +141,7 @@ function annexOf(norm: CitableAct, short: boolean): string {
   const kind = key(norm.tipo_atto);
   // A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named,
   // also for a code cited by its decree (the codice del turismo is «d.lgs. 23 maggio 2011, n. 79»).
-  if (!value || NAMED_ACTS[kind] || EU_ACTS[kind]) return '';
+  if (!value || namedAct(norm) || EU_ACTS[kind]) return '';
   if ((CODES_BY_NAME.get(kind) ?? '').endsWith(`:${value}`)) return '';
   if (isAnnexedActText(norm, value)) return '';
   return short ? ` (All. ${value})` : ` (Allegato ${value})`;
@@ -118,16 +156,21 @@ export function citeAct(norm: CitableAct): string {
   return actOf(norm, false).act;
 }
 
-/** "art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679". */
+/**
+ * "art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679". A part of a split article
+ * names its commas after the article (G-389, Q2): "art. 1, commi 701-800, l. 27 dicembre 2006, n. 296".
+ */
 export function citeArticle(norm: CitableNorm): string {
   const { act, joiner } = actOf(norm, false);
-  return `art. ${text(norm.numero_articolo)}${joiner}${act}${annexOf(norm, false)}`;
+  const part = text(norm.parte) ? `, commi ${text(norm.parte)}` : '';
+  return `art. ${text(norm.numero_articolo)}${part}${joiner}${act}${annexOf(norm, false)}`;
 }
 
-/** The article in little room: "art. 2 l. 241/1990", "art. 2043 c.c.". */
+/** The article in little room: "art. 2 l. 241/1990", "art. 2043 c.c.", a part "art. 1 (commi 701-800) l. 296/2006". */
 export function shortNorm(norm: CitableNorm): string {
   const { act, joiner } = actOf(norm, true);
-  return `art. ${text(norm.numero_articolo)}${joiner}${act}${annexOf(norm, true)}`;
+  const part = text(norm.parte) ? ` (commi ${text(norm.parte)})` : '';
+  return `art. ${text(norm.numero_articolo)}${part}${joiner}${act}${annexOf(norm, true)}`;
 }
 
 // A stored item's content is whatever the client sent (the items route takes
@@ -146,6 +189,7 @@ function storedAct(itemType: string, content: unknown): (CitableAct & { numero_a
     data: text('data'),
     allegato: text('allegato'),
     numero_articolo: text('numero_articolo') ?? undefined,
+    parte: partOf(raw.parte) ?? null,
   };
 }
 

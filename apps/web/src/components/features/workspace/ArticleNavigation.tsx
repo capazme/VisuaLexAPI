@@ -190,7 +190,8 @@ export function ArticleNavigation({
           title="Doppio click per inserire articolo"
         >
           {currentIndex + 1}
-          <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
+          {/* The separator of «2133 / 3249», readable (M1: it was 1,4:1). */}
+          <span className="text-slate-500 dark:text-slate-400 mx-1">/</span>
           {navigationIds.length}
         </span>
       )}

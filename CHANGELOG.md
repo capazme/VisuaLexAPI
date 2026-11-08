@@ -12,6 +12,254 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-06
+
+The highlighter as a tool, as a word processor has it, in every reader; one frame for every page,
+wider on large screens and in full screen; a CI about four times shorter. No migration.
+
+### Reading
+
+- The highlighter is a tool (A4): a split button with the four colours and «Nessun colore»; switched
+  on, every selection takes the ink as it is released. Whole words, the exact piece with Alt; the same
+  colour removes where it passes, another recolours, a mixed selection applies and merges; no toasts
+  for highlights, Ctrl+Z / ⌘Z undoes the last gesture; no duplicates. In the article, the decision,
+  the dossier item, Modalità studio and Gymnasium's lessons.
+- `PUT /highlights/:id` takes the range too, and `POST /highlights` takes `splitFrom`: a highlight
+  imported from the Forum keeps its original author when it is cut or recoloured (G-417, G-418).
+
+### Layout
+
+- One frame (U1): 1600 px, 2400 px in full screen; one width per page and one 70-character reading
+  measure; Gymnasium «Oggi» keeps its two columns in full screen; the full screen widens, named in
+  Italian, and its key is ⌘⇧F (Ctrl+Shift+F), since ⌘Space opens Spotlight on the Mac.
+- The Forum's «Pronti da VisuaLex» is a grid of cards on a wide frame.
+
+### Development
+
+- CI: the server tests reset the database once per run and empty it with DELETEs; the web tests run
+  on three runners; the CI's Postgres runs without fsync. About 22 minutes → 5½ per pull request
+  (G-411).
+- `vendor/mcp-legal-it` on its rewritten history (same tree, G-416).
+
+## [1.10.8] - 2026-11-02
+
+«Analizza documento» rebuilt around the search, with hyperlinks written into the text and into a copy
+of the Word file; «Copia link Normattiva» with the date; the Massimario's reviews served by VisuaLex's
+core; the Forum Community's server; article parts and Gymnasium courses still switched off. Two
+migrations. The reviews panel stays hidden until the archive is installed.
+
+### Reading
+
+- «Copia link Normattiva» (and «Copia link EUR-Lex») in the reader and the dossier: the address
+  VisuaLex holds, dated today for the text in force and at the date asked for a past text, and the
+  citation as a link for Word.
+- The Massimario's reviews come from VisuaLex's core (MERL-T may read them): a panel inside
+  «Giurisprudenza», every volume, a filter by word, the reviews of another article, and a «Rassegne»
+  page to search the whole Massimario by word; with no archive installed the panel says nothing,
+  never an error on every article.
+
+### Analizza documento
+
+- One recognizer with the search (`/parse_query_batch`), the act inherited from the context only when
+  the text names its type, completion by hand of what is missing.
+- Hyperlinks: `/fetch_norm_links` resolves the found citations (the Constitution included); a safe
+  DOCX reader in the browser; «Prepara i link» and a copy of the Word file with the links written in,
+  with a report.
+
+### Forum
+
+- The Community's server (data and routes; licence text as draft v1): the glosses' discussions
+  gathered, ready for the web.
+
+### Sources
+
+- Normattiva articles split into parts: part and paragraph in the article routes, one article with
+  its parts in the index (switch `article_parts`, off until the web shows them).
+
+### Gymnasium
+
+- Courses (switch `lingo_courses`, off): check cards for every competence, module and exam shapes in
+  the MCP's schema tool, the reading web's fixes.
+
+## [1.10.7] - 2026-10-29
+
+The D8 request: the highlight colours' meanings set by each user, a dossier created in one call
+through the MCP, and the assistant's glosses in place of its coloured highlights; the readers' update
+notes and partial texts; the Gymnasium courses (A1) server, MCP and first web screens. Glosses and
+courses ship switched off. Three migrations. MCP clients reconnect.
+
+### Reading
+
+- Each user sets what the four highlight colours mean (Impostazioni › «Significato dei colori»,
+  reached from the gear beside «Colore»); labels only, kept on the device.
+
+### Dossier and MCP
+
+- `omnilex_crea_dossier` creates a dossier and adds up to 50 norms, 10 decisions and 10 notes in one
+  call, verified at the source, with one compact outcome per row not entered (`non_entrate[].riga`
+  as written); `in_sospeso` names a step left without an answer. On the fixed AgID case: 10 calls
+  to 1. `omnilex_aggiungi_nota_dossier` takes `note[1..10]`; the single form is gone.
+- Glosses (switch `assistant_glosses`, with `assistant_passages`): an assistant's note anchored to a
+  passage by position, validated by the user, shown beside the text as a word processor's comments
+  and in a sheet on the phone. `omnilex_glossa_voce` replaces `omnilex_evidenzia_passaggi_dossier`;
+  applications proposing coloured passages get 410; saved proposals stay. `omnilex_leggi_testo_voce`
+  no longer depends on a switch.
+- The text of the user's dossier notes leaves through the MCP under «Leggere i testi», whose words
+  now name the notes.
+
+### Sources
+
+- Normattiva: an article's update notes («AGGIORNAMENTO») in their own field beside the text
+  (`note_aggiornamento`), and an article Normattiva splits into parts says it is partial
+  (`testo_parziale`, `parti`). The article's text is unchanged.
+
+### Gymnasium
+
+- Courses created by the assistant (A1, switch `lingo_courses`): the model, the declaration, the
+  creating routes, studying, mastery and the final exam on the server; the MCP's course tools on the
+  one consent; in the web the list, the course page, «Oggi»'s row, the declaration, and a module's
+  reading and recall.
+
+## [1.10.6] - 2026-10-29
+
+The Union's acts read again despite EUR-Lex's firewall, and a lighter MCP. Server and MCP only: no
+migration, no change to the web.
+
+### MCP
+
+- Fewer tokens for the same results: compact JSON in every tool result; `lingolex_le_mie_card`
+  returns a light list (`ancore` as words, no URN) and the new read-only `lingolex_leggi_card`
+  gives 1–10 cards whole; server instructions at `initialize`; a dossier named wrongly is refused
+  with the list of the user's dossiers. Clients reconnect to see the new tool.
+
+### Sources
+
+- The Union's acts are read from CELLAR, the Publications Office's repository, first, and from
+  EUR-Lex's site through the browser only when CELLAR does not serve the act: since 25-26
+  October 2026 eur-lex.europa.eu answers a server with a firewall challenge. Same page, same
+  texts (23 acts compared, 1534 articles identical). `/health/detailed` probes both hosts and
+  reports the source down only when both are.
+- An EU act's article heading glued to the end of the paragraph before it is now found also when
+  its body sits in the next container or is bare text after the paragraph. A paragraph that
+  opens on an article it cites («Articolo 5 della direttiva … è sostituito», «Article 5 of
+  Directive …») is no longer read as that article's heading, and, on every page, no longer ends
+  the article it sits in. No real page known today has these shapes; the texts of the 23 acts
+  compared are unchanged.
+
+## [1.10.5] - 2026-10-27
+
+The web only: the boundaries of an assistant's passage moved by hand, and the
+signs of a dossier row on one line. No migration, no server change.
+
+### Dossier
+
+- D7b: «Sposta l'evidenziazione» on a proposal's card, in the block's popover
+  and among the proposals no longer in the text: new words chosen by mouse,
+  touch or Shift+arrows, 1–2000 characters inside the entry's text; the note
+  keeps its state and the application's original words stay viewable.
+- The AI light and the notes' count on a dossier row sit on the line of the
+  star and the bin, for articles and decisions.
+
+## [1.10.4] - 2026-10-26
+
+The web only: undo for removed highlights and notes, the highlight colour
+chosen once, and the touch-ups from a real phone. No migration, no server
+change.
+
+### Reading
+
+- «Annulla» (and Ctrl/Cmd+Z, also over Study Mode) when removing a highlight
+  or a note: the removal reaches the server only when the notification closes.
+- H1: the highlight colour is chosen once in the reading bar and every new
+  highlight uses it; a short legend suggests a meaning for each colour.
+- In Study Mode «H» with text selected no longer moves to the previous article.
+
+### Phone
+
+- 44 px targets in the reader, in Settings and on the group marks in the text
+  (touch area only), contrast fixes, Cronologia at 392 px, the sign-in margin,
+  the 404 bar; the favourites dash in the sidebar removed.
+
+## [1.10.3] - 2026-10-25
+
+Passages and notes an assistant proposes in a dossier, validated by hand (D7b,
+first cut), and the readers' corrections from the inventory of mcp-legal-it.
+One migration.
+
+### Dossier and MCP
+
+- An assistant connected through MCP reads the text of a dossier's norm or
+  decision (`omnilex_leggi_testo_voce`, scope `dossier:text`) and proposes
+  passages with a note (`omnilex_evidenzia_passaggi_dossier`): the server finds
+  the quoted words in the real text and stores its own slice (rule 23).
+- In the dossier each assistant note is «da validare», «Validato» (or
+  «modificato da te», the assistant's original kept), or «Da rivedere» with a
+  comment; a mark per row sums them. No tool confirms, edits or removes.
+- Behind a switch (`app_switches`), off by default; the consent's words name
+  the text that goes to the connected application's provider.
+- Migration `20261027100000_assistant_proposed_marks`.
+
+### Readers
+
+- The c.p.a., the cod. nav., the cod. post. and the c.g.c. by their sigla.
+- EUR-Lex: an article quoted by an amending act is never served as the act's
+  own; older acts' titles read without commas round the date; dir. 85/374's
+  art. 11 is listed and served.
+- Three acts whose text is their decree's annex 1 are read from the annex; a
+  request for the original at a date is refused, also in imports and quick
+  norms.
+- The exported PDF's cache name and the review of #279 and #281.
+
+## [1.10.2] - 2026-10-24
+
+The phone first: a lighter first load and no layout shift on «Oggi» and the
+Forum; decisions that open in place in the dossier, the goal's mark written in
+ink, accessibility, and a security update. No migration.
+
+### Performance
+
+- jsPDF loaded on the first export, out of the initial chunk (−126 KB gzip).
+- Tours, study packs and the comparison loaded when used (−19 KB gzip).
+- Pages loaded with their route; an address opened directly preloads its page
+  through a small map written at build time (−112 KB gzip on the first chunk).
+- Places held as tall as what takes them on «Oggi» and the Forum: CLS on a
+  phone from 0.63 and 0.12 to 0.
+- A page whose code cannot be fetched, or that fails while in use, keeps the
+  layout with «Si è verificato un errore.» and «Riprova»; the comparison closes.
+
+### Dossier
+
+- Decisions open in place like acts, in two columns from lg (D7a); each column
+  scrolls on its own, and a norm cited in a decision opens on the left when it
+  is in the dossier (D7d).
+- The header's labels never wrap inside their buttons; the row wraps as a row
+  (D3b). Touches: the task field's hint whole, a decision's name as a line.
+
+### Gymnasium
+
+- «Obiettivo raggiunto» as a mark written in ink, drawn once; no mark and no
+  «0 di 0» when the day counts with nothing to review (G9).
+- «Oggi» without missions keeps its columns, and the page's foot clears the
+  feedback button (G8c).
+- Three touches for a first use: the cards' search hint, «Torna alla ricerca»
+  on a missing card, a line on what a card is (Q1).
+
+### Readers
+
+- The citation matcher knows cod. nav., cod. post. and c.g.c.
+
+### Accessibility
+
+- «Confronta articoli» is a dialog: role, name, focus kept and returned; the
+  command palette opened above it keeps Tab. The open decision in a dossier is
+  a named region.
+
+### Security
+
+- zod 4.6.7 in the server and the MCP (removed from the web, unused);
+  body-parser 1.20.9 and 2.4.0; multer 2.5.0; fast-uri 3.1.9. Italian messages,
+  status codes and lengths as before.
+
 ## [1.10.1] - 2026-10-23
 
 The afternoon's design across the app, a fix for Gymnasium on the phone that

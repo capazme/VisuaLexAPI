@@ -27,6 +27,8 @@ export interface DecisionResolution {
   key?: string;
   /** The court the words name when VisuaLex has no reader for it (`court_not_supported`). */
   court?: string;
+  /** The candidates' citations (`ambiguous`, when the source listed them): a client names them without reading `detail`. */
+  candidates?: string[];
   /** Why it was not stored, in Italian, for the person reading the answer; for a decision
    *  stored, what the reader should know (a TAR's seat deduced from its region). */
   detail?: string;
@@ -186,9 +188,11 @@ async function lookUp(reference: Json, signal: AbortSignal): Promise<DecisionRes
     const candidates = data.candidati
       .map((c) => (isObject(c) ? itemFrom(c.identita, c.attributi) : null))
       .filter((c): c is DecisionItemContent => c !== null);
+    const cited = candidates.map((c) => citeDecision(c));
     return {
       outcome: 'ambiguous',
-      detail: `Più decisioni con questo numero e anno: ${candidates.map((c) => citeDecision(c)).join('; ')}. ${tellApart(reference.corte, candidates)}`,
+      detail: `Più decisioni con questo numero e anno: ${cited.join('; ')}. ${tellApart(reference.corte, candidates)}`,
+      ...(cited.length ? { candidates: cited } : {}),
     };
   }
   if (status === 404 && data.esito === 'non_trovata') return notFound(data);

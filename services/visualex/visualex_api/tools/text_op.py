@@ -101,11 +101,14 @@ async def parse_article_input(article_string, normurn):
         try:
             all_articles, count = await get_tree(normurn)
         except Exception as e:
-            logging.error(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
+            # The type only above debug: the address names the act (/fetch_norm_links passes here).
+            logging.error("Failed to retrieve the act's articles: %s", type(e).__name__)
+            logging.debug(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
             return {"error": INDEX_UNREADABLE.format(what="l'atto intero"), "kind": "source"}
         # get_tree answers a failure (a blocked page, a timeout) with a message and 0, not an exception.
         if not isinstance(all_articles, list) or count == 0:
-            logging.error(f"Act index unreadable for {normurn}: {all_articles!r}")
+            logging.error("Act index unreadable")
+            logging.debug(f"Act index unreadable for {normurn}: {all_articles!r}")
             return {"error": INDEX_UNREADABLE.format(what="l'atto intero"), "kind": "source"}
         logging.info("Returning complete list of articles from norm")
         logging.debug(f"All articles retrieved: {all_articles}")
@@ -145,7 +148,8 @@ async def parse_article_input(article_string, normurn):
                 # exception: read as a list of characters it gave no article and no error, and the
                 # reader saw an empty search. Said as it is instead.
                 if not isinstance(all_articles, list) or count == 0:
-                    logging.error(f"Act index unreadable for {normurn}: {all_articles!r}")
+                    logging.error("Act index unreadable")
+                    logging.debug(f"Act index unreadable for {normurn}: {all_articles!r}")
                     return {"error": INDEX_UNREADABLE.format(what=f"gli artt. {start}-{end}"), "kind": "source"}
                 logging.info("Successfully retrieved article list from norm")
                 logging.debug(f"All articles retrieved: {all_articles}")
@@ -174,7 +178,9 @@ async def parse_article_input(article_string, normurn):
                     empty_ranges.append(f"{start} e {end}")
 
             except Exception as e:
-                logging.error(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
+                # The type only above debug: the address names the act (/fetch_norm_links passes here).
+                logging.error("Failed to retrieve the act's articles: %s", type(e).__name__)
+                logging.debug(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
                 return {"error": INDEX_UNREADABLE.format(what=f"gli artt. {start}-{end}"), "kind": "source"}
 
         else:
@@ -188,7 +194,8 @@ async def parse_article_input(article_string, normurn):
                 articles.append(part)  # Aggiungiamo l'articolo, supponendo che la validità venga gestita successivamente
             else:
                 error_message = f"Formato dell'articolo non valido: «{part}»"
-                logging.error(error_message)
+                logging.error("Invalid article format")
+                logging.debug(error_message)
                 return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
 
     # Deduplica mantenendo l'ordine
@@ -199,7 +206,7 @@ async def parse_article_input(article_string, normurn):
             seen.add(article)
             unique_articles.append(article)
         else:
-            logging.warning(f"Duplicate article found and removed: {article}")
+            logging.debug(f"Duplicate article found and removed: {article}")
     
     if not unique_articles and empty_ranges:
         return {"error": f"Nessun articolo tra {', tra '.join(empty_ranges)} nell'indice di quest'atto.", "kind": "not_found"}

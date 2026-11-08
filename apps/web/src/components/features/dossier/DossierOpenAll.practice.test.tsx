@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 
 const fetchDecision = vi.hoisted(() => vi.fn());
+// D7b's flag: off here, with no request leaving the test.
+vi.mock('../../../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('./useActDetails', () => ({ useActDetails: () => ({ title: null, rubricaOf: () => null }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: { getSnapshots: vi.fn(async () => []) } }));

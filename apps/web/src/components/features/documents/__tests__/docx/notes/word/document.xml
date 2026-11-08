@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Invented text for the tests: footnotes and endnotes, referred to out of id order. -->
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Primo richiamo</w:t></w:r>
+      <w:r><w:rPr><w:rStyle w:val="Rimandonotaapidipagina"/></w:rPr><w:footnoteReference w:id="3"/></w:r>
+      <w:r><w:t xml:space="preserve"> e secondo</w:t></w:r>
+      <w:r><w:rPr><w:rStyle w:val="Rimandonotaapidipagina"/></w:rPr><w:footnoteReference w:id="2"/></w:r>
+      <w:del w:id="9" w:author="Autore di prova" w:date="2026-10-31T00:00:00Z"><w:r><w:footnoteReference w:id="4"/></w:r></w:del>
+      <w:r><w:t>.</w:t></w:r>
+      <w:r><w:endnoteReference w:id="2"/></w:r>
+      <w:r><w:footnoteReference w:customMarkFollows="1" w:id="6"/><w:t>*</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>

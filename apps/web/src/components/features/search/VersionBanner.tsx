@@ -17,6 +17,8 @@ function labelOf(action: BannerAction, banner: BannerData): string {
     switch (action) {
         case 'go_current': return 'Vai al testo attuale';
         case 'copy_citation': return 'Copia citazione';
+        // A past text is a text of Normattiva: an act of the Union has no versions here.
+        case 'copy_link': return 'Copia link Normattiva';
         case 'pick_date': return 'Scegli un’altra data';
         case 'open_next_day':
             return banner.nextDay ? `Vai al testo ${withPreposition('del', formatDateForCitation(banner.nextDay))}` : 'Vai al testo successivo';

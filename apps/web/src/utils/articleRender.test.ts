@@ -3,11 +3,12 @@ import { renderArticleHtml, type RenderArticleInput } from './articleRender';
 import { parseArticleStructure } from './articleStructure';
 import { sanitizeHTML } from './sanitizeHtml';
 import { getSelectionAnchor, plainOffsetAt } from './selectionOffset';
-import { groupAnnotationsByBlock, type LocatedThread } from './articleAnnotations';
+import { groupAnnotationsByBlock, type GlossAnchor, type LocatedThread } from './articleAnnotations';
 import { ARTICLE_FIXTURES, fixtureText } from './__fixtures__/articleTexts';
 import { buildPassage } from './threadPassages';
 import type { Annotation, Highlight } from '../types';
 import { openFindOn, wordOf } from './__fixtures__/openFind';
+import { aiNote } from './__fixtures__/assistantNote';
 
 const hl = (id: string, text: string, startOffset: number, color: Highlight['color'] = 'yellow'): Highlight => ({
   id, normaKey: 'k', articleId: '1', rangeSerialized: '', text, color, startOffset,
@@ -30,7 +31,7 @@ function rng(seed: number) {
 
 describe('the projection invariant — every real text', () => {
   it.each(ARTICLE_FIXTURES.map((f) => [f.id, f.text] as const))(
-    '%s: text nodes spell article_text minus \\n; every mark sits at its offset',
+    '%s: text nodes spell article_text minus \\n; every mark sits at its offset, proposals and glosses on',
     (_id, raw) => {
       const plain = raw.replace(/\n/g, '');
       const next = rng(raw.length);
@@ -39,6 +40,12 @@ describe('the projection invariant — every real text', () => {
         const a = Math.floor(next() * (plain.length - 1));
         const len = 1 + Math.floor(next() * Math.min(80, plain.length - a - 1));
         highlights.push(hl(`h${i}`, plain.slice(a, a + len), a));
+      }
+      // Passages an application proposed (D7b), waiting or validated: highlights of their own kind, never a character.
+      for (const [i, h] of highlights.entries()) {
+        const state = (['proposed', 'review', 'validated'] as const)[i % 4 - 1];
+        // h5 has no note: a plain mark of known origin, with no state (the note has it).
+        if (state) h.proposal = { clientName: 'Claude Code', note: i === 5 ? null : aiNote(`nota ${i}`, state) };
       }
       const annotations: Annotation[] = [];
       for (let i = 0; i < 6; i++) {
@@ -66,8 +73,15 @@ describe('the projection invariant — every real text', () => {
           end: a + len,
         });
       }
+      // An application's glosses (D8): counted on the signs, never an element in the text.
+      const glosses: GlossAnchor[] = [];
+      for (let i = 0; i < 4; i++) {
+        const a = Math.floor(next() * (plain.length - 1));
+        const len = 1 + Math.floor(next() * Math.min(60, plain.length - a - 1));
+        glosses.push({ id: `g${i}`, startOffset: a, text: plain.slice(a, a + len), state: (['proposed', 'review', 'validated', 'proposed'] as const)[i] });
+      }
       const focusedThreadId = threads[0]?.thread.id ?? null;
-      const html = render(raw, { highlights, annotations, threads, focusedThreadId, signs: true });
+      const html = render(raw, { highlights, annotations, threads, focusedThreadId, signs: true, glosses });
       // Well-formed before the sanitizer gets a chance to repair it.
       const xml = new DOMParser().parseFromString(`<root>${html}</root>`, 'application/xml');
       expect(xml.getElementsByTagName('parsererror')).toHaveLength(0);
@@ -85,6 +99,8 @@ describe('the projection invariant — every real text', () => {
         expect(found.map((e) => e.textContent).join('')).toBe(h.text);
         const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
         expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(h.startOffset);
+        const waiting = h.proposal?.note && h.proposal.note.state !== 'validated' ? h.proposal.note.state : null;
+        for (const e of found) expect(e.getAttribute('data-proposed'), h.id).toBe(waiting);
       }
       // Focused thread pieces join to thread words, no extra elements for unfocused threads
       if (focusedThreadId) {
@@ -97,7 +113,7 @@ describe('the projection invariant — every real text', () => {
       }
       // Each block's sign counts exactly what the block shows.
       const structure = parseArticleStructure(raw);
-      const groups = groupAnnotationsByBlock(raw, structure, highlights, annotations, threads);
+      const groups = groupAnnotationsByBlock(raw, structure, highlights, annotations, threads, glosses);
       const blocks = pieces(div, '.vlx-b');
       expect(blocks).toHaveLength(structure.blocks.length);
       blocks.forEach((block, i) => {
@@ -106,12 +122,15 @@ describe('the projection invariant — every real text', () => {
         expect(shown('data-note-id'), `block ${i}: notes`).toEqual(new Set(groups[i].notes.map((n) => n.id)));
         expect(shown('data-highlight'), `block ${i}: highlights`).toEqual(new Set(groups[i].highlights.map((h) => h.id)));
         const sign = [...block.children].find((c) => c.classList.contains('vlx-sign'));
-        if (groups[i].notes.length + groups[i].highlights.length + groups[i].threads.length === 0) {
+        if (groups[i].notes.length + groups[i].highlights.length + groups[i].threads.length + groups[i].glosses.length === 0) {
           expect(sign, `block ${i}: sign`).toBeUndefined();
         } else {
+          expect(sign?.getAttribute('data-glosses'), `block ${i}: sign glosses`).toBe(String(groups[i].glosses.length));
           expect(sign?.getAttribute('data-notes'), `block ${i}: sign notes`).toBe(String(groups[i].notes.length));
           expect(sign?.getAttribute('data-highlights'), `block ${i}: sign highlights`).toBe(String(groups[i].highlights.length));
           expect(sign?.getAttribute('data-threads'), `block ${i}: sign threads`).toBe(String(groups[i].threads.length));
+          const waiting = groups[i].highlights.filter((h) => h.proposal?.note && h.proposal.note.state !== 'validated').length;
+          expect(sign?.getAttribute('data-proposed') ?? '0', `block ${i}: sign proposals`).toBe(String(waiting));
         }
       });
     },
@@ -333,6 +352,98 @@ describe('annotation signs', () => {
     expect(sign.querySelector('.vlx-sign-notes')?.getAttribute('data-count')).toBe('2');
     expect(pieces(sign, '.vlx-sign-dot').map((d) => d.getAttribute('data-color'))).toEqual(['green', 'yellow']);
     expect(div.querySelectorAll('.vlx-sign')).toHaveLength(1);
+  });
+
+  it('names the passages with an application\'s note apart on the sign, each state by its own shape, with a title (D7b)', () => {
+    const as = (state: 'proposed' | 'review' | 'validated') => (h: Highlight): Highlight => ({ ...h, proposal: { clientName: 'Claude Code', note: aiNote('Rileva.', state) } });
+    const div = mount(render(raw, {
+      signs: true,
+      annotations: [note('n1', 'prestazioni corrispettive', at('prestazioni corrispettive'))],
+      highlights: [
+        as('proposed')(hl('p1', 'contraenti', at('contraenti'), 'green')),
+        as('review')(hl('p2', 'obbligazioni', at('obbligazioni'))),
+        as('validated')(hl('p3', 'risarcimento', at('risarcimento'), 'blue')),
+      ],
+    }));
+    const sign = signOf(div, 2)!;
+    const label = "1 nota in questo passo; 3 passaggi proposti dall'IA: 1 da validare · 1 da rivedere · 1 validato";
+    expect(sign.getAttribute('aria-label')).toBe(label);
+    expect(sign.getAttribute('title')).toBe(label);
+    expect(sign.getAttribute('data-highlights')).toBe('3');
+    expect(sign.getAttribute('data-proposed')).toBe('2');
+    // A shape per state, as on the row's light, in the light's order; no colour dot for them.
+    expect(pieces(sign, '.vlx-sign-ai').map((e) => `${e.getAttribute('data-state')}:${e.getAttribute('data-count')}`))
+      .toEqual(['proposed:1', 'review:1', 'validated:1']);
+    expect(sign.querySelectorAll('.vlx-sign-dot')).toHaveLength(0);
+    expect(sign.textContent).toBe('');
+    // In the text: the open ones dashed and named by their state, the validated one as the user's own.
+    for (const [id, state, title] of [['p1', 'proposed', 'da validare'], ['p2', 'review', 'da rivedere']]) {
+      const mark = div.querySelector(`[data-highlight="${id}"]`)!;
+      expect(mark.classList.contains('vlx-proposed')).toBe(true);
+      expect(mark.getAttribute('data-proposed')).toBe(state);
+      expect(mark.getAttribute('title')).toBe(`Proposto dall'IA, ${title}`);
+    }
+    const own = div.querySelector('[data-highlight="p3"]')!;
+    expect(own.classList.contains('vlx-proposed')).toBe(false);
+    expect(own.hasAttribute('data-proposed')).toBe(false);
+    expect(div.textContent).toBe(plain);
+  });
+
+  it('a passage the application marked with no note is a plain mark of known origin, outside the count', () => {
+    const bare: Highlight = { ...hl('b', 'contraenti', at('contraenti')), proposal: { clientName: 'Claude Code', note: null } };
+    const div = mount(render(raw, { signs: true, highlights: [bare] }));
+    const mark = div.querySelector('[data-highlight="b"]')!;
+    expect(mark.hasAttribute('data-proposed')).toBe(false);
+    expect(mark.classList.contains('vlx-proposed')).toBe(false);
+    expect(mark.getAttribute('title')).toBe("Evidenziato dall'IA");
+    const sign = signOf(div, 2)!;
+    expect(sign.getAttribute('aria-label')).toBe('1 evidenziazione in questo passo');
+    expect(sign.hasAttribute('data-proposed')).toBe(false);
+    // A dot of its colour, as the reader's own.
+    expect(pieces(sign, '.vlx-sign-dot').map((d) => d.getAttribute('data-color'))).toEqual(['yellow']);
+    expect(sign.querySelector('.vlx-sign-ai')).toBeNull();
+  });
+
+  it('a block with proposals only is named by them alone; a sign without any keeps no title', () => {
+    const p: Highlight = { ...hl('p', 'contraenti', at('contraenti')), proposal: { clientName: null, note: aiNote('Rileva.') } };
+    expect(signOf(mount(render(raw, { signs: true, highlights: [p] })), 2)!.getAttribute('aria-label'))
+      .toBe("1 passaggio proposto dall'IA: 1 da validare");
+    const plainSign = signOf(mount(render(raw, { signs: true, highlights: [hl('h', 'contraenti', at('contraenti'))] })), 2)!;
+    expect(plainSign.hasAttribute('title')).toBe(false);
+    expect(plainSign.hasAttribute('data-proposed')).toBe(false);
+    expect(plainSign.querySelector('.vlx-sign-ai')).toBeNull();
+  });
+
+  it('counts an application\'s glosses on the sign by state, apart, and draws nothing of them in the text (D8)', () => {
+    const gloss = (id: string, words: string, state: GlossAnchor['state']): GlossAnchor => ({ id, startOffset: at(words), text: words, state });
+    const div = mount(render(raw, {
+      signs: true,
+      highlights: [hl('h1', 'contraenti', at('contraenti'))],
+      glosses: [gloss('g1', 'obbligazioni', 'proposed'), gloss('g2', 'risarcimento del danno', 'validated'), gloss('g3', 'a sua scelta', 'proposed')],
+    }));
+    const sign = signOf(div, 2)!;
+    const label = "1 evidenziazione in questo passo; 3 glosse dell'IA: 2 da validare · 1 validata";
+    expect(sign.getAttribute('aria-label')).toBe(label);
+    expect(sign.getAttribute('title')).toBe(label);
+    expect(sign.getAttribute('data-glosses')).toBe('3');
+    expect(sign.getAttribute('data-highlights')).toBe('1');
+    expect(pieces(sign, '.vlx-sign-gloss').map((e) => `${e.getAttribute('data-state')}:${e.getAttribute('data-count')}`))
+      .toEqual(['proposed:2', 'validated:1']);
+    expect(sign.querySelector('.vlx-sign-ai')).toBeNull();
+    expect(sign.textContent).toBe('');
+    // No mark, no element: the words of a gloss are the text's alone.
+    expect(div.querySelectorAll('mark')).toHaveLength(1);
+    expect(div.textContent).toBe(plain);
+  });
+
+  it('a block with glosses only has a sign of its own, named by them; one whose words are not there makes none', () => {
+    const only = mount(render(raw, { signs: true, glosses: [{ id: 'g', startOffset: at('contraenti'), text: 'contraenti', state: 'review' }] }));
+    const sign = signOf(only, 2)!;
+    expect(sign.getAttribute('aria-label')).toBe("1 glossa dell'IA: 1 da rivedere");
+    expect(sign.getAttribute('data-highlights')).toBe('0');
+    expect(sign.getAttribute('data-glosses')).toBe('1');
+    const lost = mount(render(raw, { signs: true, glosses: [{ id: 'g', startOffset: at('contraenti'), text: 'parole che non ci sono', state: 'proposed' }] }));
+    expect(lost.querySelector('.vlx-sign')).toBeNull();
   });
 
   it('adds no text: the sign is empty and sits after the block\'s text, outside every mark', () => {

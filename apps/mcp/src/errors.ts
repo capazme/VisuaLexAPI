@@ -4,6 +4,12 @@
  */
 export class ToolError extends Error {}
 
+/**
+ * The API gave no answer (the request failed, timed out, or a gateway said so): it may have done what it was asked,
+ * in part or whole. A caller that wrote before must not report the rows as refused (D8 S1).
+ */
+export class NoAnswer extends ToolError {}
+
 /** The renewal time, in Italian, from an ISO date. */
 export function formatRenewal(iso: string | null | undefined): string {
   if (!iso) return 'tra 24 ore';

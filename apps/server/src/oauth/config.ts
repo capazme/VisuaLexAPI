@@ -4,8 +4,26 @@
  * build a router with other values.
  */
 
-export const SCOPES = ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write', 'content:delete'] as const;
+// `dossier:text` (D7b, G2 and G7 decided by the owners on 25 October 2026): the text of a dossier's norms and
+// decisions leaves through MCP, for one tool only; a grant made before has it only once the user connects again.
+// Since G-381 (b), 29 October 2026, the text of the user's dossier notes leaves under it too, but only for a grant
+// approved with the words that name the notes (`TEXT_CONSENT_VERSION`).
+// `lingo:courses:*` (Percorsi, A1; G-371, G-372, G-379): worded in the one consent, never a consent of their own.
+export const SCOPES = [
+  'dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write', 'lingo:courses:read', 'lingo:courses:write',
+  'content:delete',
+] as const;
 export type Scope = (typeof SCOPES)[number];
+
+/**
+ * The version of the words of `dossier:text` on the consent page (`SCOPE_LABELS`), stored on a grant when the user
+ * approves a request for that scope (`oauth_grants.text_consent_version`). 1: «… e le tue note» (G-381 (b)); the
+ * migration gave 1 to the grants that already held the scope (G-385: no active users yet). A grant with an older
+ * version, or none, does not receive the text of the user's notes until the user connects again.
+ * Change the words in a way that widens what leaves, and this number goes up with them.
+ */
+export const TEXT_SCOPE = 'dossier:text';
+export const TEXT_CONSENT_VERSION = 1;
 
 /**
  * The permission to delete through a connected application (MCP second round,

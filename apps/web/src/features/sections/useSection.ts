@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -82,6 +82,20 @@ export function useSection() {
     if (fromPath) setSection(fromPath);
   }, [fromPath, setSection]);
 
+  // The change this instance started stops when it goes: its wait for the new title (two timers and an observer)
+  // would otherwise outlive it, and in a test outlive the page itself. The phone's drawer stays mounted when it
+  // closes, so a change chosen there keeps its focus on the new title (T1).
+  const startedHere = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      if (startedHere.current && finishRunning === startedHere.current) {
+        finishRunning();
+        finishRunning = null;
+      }
+    },
+    [],
+  );
+
   const sections = availableSections(devMode);
   const wanted = fromPath ?? stored;
   const section = sections.some((s) => s.id === wanted) ? wanted : 'opus';
@@ -105,6 +119,7 @@ export function useSection() {
     // By hand: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router. The
     // router renders the new page in a transition: the old page's picture holds until its title is there.
     finishRunning = playSectionTransition({ section: id, swap: go, still, byPointer });
+    startedHere.current = finishRunning;
   };
 
   return { section, active: SECTIONS.find((s) => s.id === section)!, sections, chooseSection };

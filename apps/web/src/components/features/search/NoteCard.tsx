@@ -3,6 +3,7 @@ import type { Annotation } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { retiredSectionLabel } from '../../../utils/articleAnnotations';
+import { NoteEditBox } from './NoteEditBox';
 
 export interface NoteCardProps {
     note: Annotation;
@@ -38,18 +39,7 @@ export function NoteCard({ note, isEditing, editingText, onStartEdit, onChangeEd
             )}
 
             {isEditing ? (
-                <textarea
-                    autoFocus
-                    value={editingText}
-                    onChange={(e) => onChangeEdit(e.target.value)}
-                    onBlur={onCommitEdit}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') { e.preventDefault(); onCancelEdit(); }
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onCommitEdit(); }
-                    }}
-                    rows={Math.max(2, editingText.split('\n').length)}
-                    className="w-full resize-none rounded-md border border-amber-500/50 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-                />
+                <NoteEditBox value={editingText} onChange={onChangeEdit} onCommit={onCommitEdit} onCancel={onCancelEdit} />
             ) : (
                 <>
                     <button

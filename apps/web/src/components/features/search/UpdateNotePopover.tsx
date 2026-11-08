@@ -10,6 +10,7 @@ import {
     useInteractions,
     useRole,
 } from '@floating-ui/react';
+import type { RefObject } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -21,6 +22,8 @@ export interface UpdateNotePopoverProps {
     /** The "(119)" chip in the article text. */
     anchorEl: HTMLElement;
     onClose: () => void;
+    /** Where it is portalled, when not the body: inside a modal dialog (the comparison), so it stays in it. */
+    portalRoot?: RefObject<HTMLElement | null> | null;
 }
 
 /**
@@ -29,7 +32,7 @@ export interface UpdateNotePopoverProps {
  * commi below do not move while the reader consults it; Esc or a click
  * outside closes it and focus returns to the reference.
  */
-export function UpdateNotePopover({ noteId, paragraphs, anchorEl, onClose }: UpdateNotePopoverProps) {
+export function UpdateNotePopover({ noteId, paragraphs, anchorEl, onClose, portalRoot }: UpdateNotePopoverProps) {
     // The anchor goes straight to useFloating so the first frame is already
     // positioned (CLAUDE.md gotcha 13).
     const { refs, floatingStyles, context, placement } = useFloating({
@@ -54,7 +57,7 @@ export function UpdateNotePopover({ noteId, paragraphs, anchorEl, onClose }: Upd
     const titleId = `update-note-title-${noteId}`;
 
     return (
-        <FloatingPortal>
+        <FloatingPortal root={portalRoot ?? undefined}>
             <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
                 {/* Outer element: floating-ui positioning only. */}
                 <div

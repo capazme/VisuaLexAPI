@@ -107,7 +107,7 @@ export interface VersionChip {
   title: string;
 }
 
-export type BannerAction = 'go_current' | 'copy_citation' | 'open_next_day' | 'pick_date';
+export type BannerAction = 'go_current' | 'copy_citation' | 'copy_link' | 'open_next_day' | 'pick_date';
 export type BannerKind = 'historical' | 'not_yet' | 'unreliable' | 'current_in_window' | 'upcoming';
 
 export interface VersionBanner {
@@ -216,7 +216,7 @@ function bannerFor(
         + 'Il testo in vigore a una data non dice quale disciplina si applichi al fatto: possono contare '
         + 'disposizioni transitorie, efficacia retroattiva o norme più favorevoli.',
       note: 'Note ed evidenziazioni non sono mostrate su un testo storico.',
-      actions: canCite ? ['go_current', 'copy_citation'] : ['go_current'],
+      actions: canCite ? ['go_current', 'copy_citation', 'copy_link'] : ['go_current'],
     };
   }
   if (validity.state === 'current' && requestedDay) {

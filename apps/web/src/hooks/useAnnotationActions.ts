@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import type { Highlight } from '../types';
-import { highlightColorName } from '../utils/highlightColors';
+import type { Ink } from '../utils/highlighterRules';
+import { useHighlightInk } from './useHighlightInk';
 
 export type SelectionRect = { x: number; y: number; width: number; height: number };
 export type NoteAnchor = { anchorText: string; startOffset: number; scopedArticleId: string };
@@ -10,8 +10,11 @@ export interface AnnotationActionsOptions {
   /** The text's key and article id: the pair every highlight and note of this text is stored under. */
   key: string;
   articleId: string;
-  /** The highlights already on this text, for the «già evidenziata» guard. */
-  highlights: readonly Highlight[];
+  /** The projection the anchors count in: the parts a cut leaves are its own words. */
+  plain: string;
+  /** Where its blocks start in it (`blockStarts`), read as a highlighter's gesture comes. */
+  breaks?: () => readonly number[];
+  /** A note's toast («Nota ancorata al testo»); a highlight says nothing (A4). */
   showToast: (message: string, type: 'success' | 'error' | 'info') => void;
   /** False on a text that takes no marks (a past text): the selection popup's actions do nothing. */
   enabled?: boolean;
@@ -23,30 +26,22 @@ export interface AnnotationActionsOptions {
 
 /**
  * What the selection popup's «Evidenzia» and «Nota» do, and the tooltip composer's state, for any
- * surface that renders the reader's marks: the same guard, the same store calls, the same toasts.
+ * surface that renders the reader's marks: the same rules (the highlighter's, A4), the same store calls, the same toasts
+ * for notes (none for highlights).
  * The anchor's `scopedArticleId` lets a sub-section of the article target its own scope.
  */
 export function useAnnotationActions({
-  key, articleId, highlights, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,
+  key, articleId, plain, breaks, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,
 }: AnnotationActionsOptions) {
-  const addHighlight = useAppStore((s) => s.addHighlight);
+  const applyInk = useHighlightInk({ key, articleId, plain, breaks, enabled, onCreated: onHighlightAdded });
   const addAnnotation = useAppStore((s) => s.addAnnotation);
   // The selected span becomes the note's anchor; the composer sits on the span itself, at the rect
   // the popup captured before the selection cleared (gotcha 16).
   const [noteAnchor, setNoteAnchor] = useState<NoteAnchor | null>(null);
   const [composerRect, setComposerRect] = useState<SelectionRect | null>(null);
 
-  const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
-    if (!enabled) return;
-    const already = highlights.some((h) => h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset);
-    if (already) {
-      showToast('Questa occorrenza è già evidenziata', 'info');
-      return;
-    }
-    addHighlight(key, articleId, text, '', color, startOffset);
-    onHighlightAdded?.(text, color, startOffset);
-    showToast(`Testo evidenziato in ${highlightColorName(color)}`, 'success');
-  };
+  // The words selected and the ink: a new highlight, or the same words taken away or recoloured (A4).
+  const handlePopupHighlight = (text: string, ink: Ink, startOffset: number) => applyInk(text, ink, startOffset);
 
   const openComposer = (anchor: NoteAnchor, rect: SelectionRect) => {
     setNoteAnchor(anchor);

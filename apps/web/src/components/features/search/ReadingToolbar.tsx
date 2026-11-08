@@ -1,6 +1,6 @@
 import { useRef, type Ref } from 'react';
 import type { ArticleData } from '../../../types';
-import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, Link2, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FOCUS_RING } from '../../../constants/interactions';
@@ -8,7 +8,14 @@ import type { VersionChip } from '../../../utils/versionDisplay';
 import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 import { VersionStatusChip } from './VersionStatusChip';
 import { NotesHighlightsButtons } from './NotesHighlightsButtons';
+import { HighlighterButton } from './HighlighterButton';
+import { highlightColorItems } from './highlightColorItems';
+import { useAppStore } from '../../../store/useAppStore';
+import { useHighlightColorMeanings } from '../../../hooks/useHighlightColorMeanings';
+import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
 import { namedAnnex } from '../../../utils/sources';
+import { EUROPEAN_LINK_NOTE, normLinkActionLabel } from '../../../utils/normattivaLink';
+import { isEuropeanAct } from '../../../utils/versionDisplay';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
@@ -45,6 +52,8 @@ export interface ReadingToolbarProps {
     onOpenCopyModal: () => void;
     onOpenDossier: () => void;
     onShareLink: () => void;
+    /** «Copia link Normattiva» (the source's address, for a filing's hyperlinks); absent when the norm holds none. */
+    onCopyLink?: () => void;
     onOpenAdvancedExport: () => void;
     onOpenVersionInput: () => void;
     onCompare: () => void;
@@ -101,6 +110,7 @@ export function ReadingToolbar({
     onOpenCopyModal,
     onOpenDossier,
     onShareLink,
+    onCopyLink,
     onOpenAdvancedExport,
     onOpenVersionInput,
     onCompare,
@@ -123,7 +133,13 @@ export function ReadingToolbar({
     // carries no version: anything that may not be copied, or is a reading, stays in.
     const exportLockedReason = copyLockedReason ?? lockedReason;
 
-    /** The tools behind «⋯» (R3: three in words, the rest here), the phone's adding what its row does not show. */
+    /** The tools behind «⋯» (R3: the reading's own in words, the rest here), the phone's adding what its row does not show. */
+    // The highlighter's ink (H1, A4): its own menu beside «Evidenziazioni» on a computer; on a phone, where the row has
+    // room for the tool's toggle alone, the inks close the «⋯», and the gear's way to their meanings after them.
+    const ink = useHighlighterInk();
+    const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
+    const openSettings = useAppStore((s) => s.openSettings);
+    const meanings = useHighlightColorMeanings();
     const moreItems = (phone: boolean): MenuItem[] => [
         ...(compact ? [] : [{
             label: isPinnedQuick ? 'Togli dalle norme rapide' : 'Aggiungi alle norme rapide',
@@ -147,6 +163,13 @@ export function ReadingToolbar({
             disabled: Boolean(copyLockedReason),
             description: copyLockedReason,
         },
+        ...(onCopyLink ? [{
+            label: normLinkActionLabel(normaData),
+            icon: Link2,
+            onSelect: onCopyLink,
+            disabled: Boolean(copyLockedReason),
+            description: copyLockedReason ?? (isEuropeanAct(normaData.tipo_atto) ? EUROPEAN_LINK_NOTE : undefined),
+        }] : []),
         ...(compact ? [] : [
             ...(phone ? [
                 { label: 'Modalità studio', icon: BookOpen, onSelect: () => onOpenStudyMode?.(), disabled: Boolean(lockedReason) || !onOpenStudyMode, description: lockedReason },
@@ -157,6 +180,13 @@ export function ReadingToolbar({
             { label: 'Testo alla data…', icon: Clock, onSelect: onOpenVersionInput },
             { label: 'Confronta con…', icon: GitCompare, onSelect: onCompare },
         ]),
+        // The highlighter's ink (H1, A4), last: a setting, under its own title. Not on a text that takes none.
+        ...(phone && !lockedReason
+            ? highlightColorItems(ink, meanings, setHighlighterInk, {
+                section: true,
+                onChangeMeanings: () => openSettings('highlightColors'),
+            })
+            : []),
     ];
 
     // The annex as the source convention names it: never a code's own (the codice civile is Allegato 2 of its decree).
@@ -208,15 +238,23 @@ export function ReadingToolbar({
                 at 320 px («In vigore dal 1° gennaio 2005», R3b). Not in the compact bar (the phone's full-screen reader, a
                 window): there the card's padding is the edge, and its overflow would cut the focus ring. */}
             <div className={cn('ml-auto flex flex-shrink-0 items-center md:hidden', !compact && '-mr-3')}>
+                {/* The highlighter's toggle (A4); its inks are at the end of «⋯». */}
+                {!lockedReason && <HighlighterButton toggleOnly triggerClassName={ACTION} />}
                 {!compact && dossierButton(undefined, true)}
                 <div ref={phoneMoreRef} className="contents">
-                    <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(true)}>
+                    {/* Its list is long (the colours close it): capped under the bar, it scrolls on its own. */}
+                    <MenuButton
+                        label="Altre azioni sull’articolo"
+                        triggerClassName={ACTION}
+                        items={moreItems(true)}
+                        menuClassName="max-h-[calc(100dvh-12rem)] overflow-y-auto overscroll-contain"
+                    >
                         <MoreHorizontal size={18} aria-hidden />
                     </MenuButton>
                 </div>
             </div>
 
-            {/* A computer: three tools in words, then «⋯». */}
+            {/* A computer: the tools in words («Note», «Evidenziazioni», «Colore», «Al dossier»), then «⋯». */}
             <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
                 <NotesHighlightsButtons
                     labelled
@@ -230,6 +268,7 @@ export function ReadingToolbar({
                     onToggleHighlights={onToggleHighlightsPeek}
                     lockedReason={lockedReason}
                 />
+                {!lockedReason && <HighlighterButton triggerClassName={ACTION} />}
                 {!compact && dossierButton(dossierButtonRef)}
                 <div ref={desktopMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>

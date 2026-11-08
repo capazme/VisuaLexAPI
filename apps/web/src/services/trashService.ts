@@ -5,18 +5,23 @@ import { apiClient } from './api';
  * kept 30 days. The web app lists, restores and empties it. Its own deletions go
  * there too: a whole dossier (`dossierService.delete`, question 160), entries removed
  * from a dossier (`dossierService.trashItems`, question 181: one trash entry per
- * action) and study cards (`studiaService.trash`).
+ * action), study cards (`studiaService.trash`) and the courses of «Percorsi» and their
+ * modules (`corsiService.trash`, `trashModule`).
  */
 
-export type TrashKind = 'DOSSIER' | 'DOSSIER_ITEMS' | 'LINGO_CARDS';
+/** `LINGO_CORSO` and `LINGO_CORSO_MODULO`: a course of «Percorsi», or a module of one never opened (courses spec §10.9). */
+export type TrashKind = 'DOSSIER' | 'DOSSIER_ITEMS' | 'LINGO_CARDS' | 'LINGO_CORSO' | 'LINGO_CORSO_MODULO';
 
 export interface TrashEntry {
   id: string;
   kind: TrashKind;
   dossierId: string | null;
-  /** The dossier's name, for a dossier or its entries. */
+  /** The dossier's name, for a dossier or its entries; a course's title; «module · course» for a module. */
   label: string;
+  /** For a course, its modules. */
   itemCount: number;
+  /** The study cards that went with a course or a module. */
+  cardCount?: number;
   items?: { itemType: string; citation: string | null; actCitation: string | null }[];
   cards?: { istituto: string; domanda: string }[];
   clientName: string | null;

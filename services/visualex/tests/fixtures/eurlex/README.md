@@ -30,3 +30,37 @@ Added 2026-10-22:
   (`<meta property="eli:title" lang="…">`). Trimmed to `<title>`, those metas and `#TexteOnly`.
 - `synthetic_oj_article_15_bis.html` — **synthetic**, written for the test: an OJ-style act
   whose only article 15 is «Articolo 15 bis». No real page with that shape is known.
+- `amending_dir_2009_136_trimmed.html` — the OJ page of dir. 2009/136 (`/eli/dir/2009/136/oj/ita`,
+  captured 2026-10-22), an amending act: its six articles, and inside art. 1 and 2, in table
+  cells, the articles it replaces or inserts in dir. 2002/22 and 2002/58 («Articolo 21», «Articolo
+  23 bis», «Articolo 15 bis» …). Trimmed to `#tit_1` and `#art_1` … `#art_6`.
+- `synthetic_classless_glued_15_bis.html` — **synthetic**: a class-less page whose heading and text
+  share an element, so the element reads «Articolo 15 bisTesto…»; its only article 15 is 15 bis.
+- `aiact_consolidated_20260727_title_trimmed.html` — the consolidated AI Act
+  (`CELEX:02024R1689-20260727`, captured 2026-10-25), trimmed to its title paragraphs: the
+  Official Journal's Italian title prints «(CE) n, 300/2008» with a comma, kept as published.
+- `dir_85_374_eli_title_trimmed.html`, `dir_64_221_eli_title_trimmed.html` — the Italian
+  `eli:title` meta of `/eli/dir/1985/374/oj/ita` and `/eli/dir/1964/221/oj/ita` (captured
+  2026-10-25), alone: an older title with no commas round its date.
+- `gdpr_consolidated_20160504_title_trimmed.html` — the consolidated GDPR
+  (`CELEX:02016R0679-20160504`, captured 2026-10-22), trimmed to its `title-doc-first` and
+  `title-doc-last` paragraphs: the last holds only the EEA note, the subject is in the first.
+- `dir_85_374_eli_legacy_text_trimmed.html` — the legacy OJ page of dir. 85/374
+  (`/eli/dir/1985/374/oj/ita`, captured 2026-10-25), trimmed to its text (`div#TexteOnly`):
+  art. 11's heading is glued to the end of art. 10's last paragraph.
+
+Added 2026-10-27 — CELLAR (`publications.europa.eu/resource/celex/<CELEX>`, `Accept:
+application/xhtml+xml,text/html`, `Accept-Language: it`, after its 303), the host the acts are
+read from first since EUR-Lex answers a server with a WAF challenge (`services/eurlex_fetch.py`):
+
+- `cellar_eprivacy_oj_legacy.html` — CELLAR's page of dir. 2002/58 (CELEX 32002L0058), whole:
+  the legacy class-less markup, as `eprivacy_oj_legacy.html` from EUR-Lex.
+- `cellar_eprivacy_consolidated_20091219.html` — CELLAR's page of `02002L0058-20091219`,
+  whole: the consolidated markup, as `eprivacy_consolidated_20091219.html` from EUR-Lex.
+- `cellar_gdpr_oj_head_trimmed.html` — CELLAR's XHTML of the GDPR (CELEX 32016R0679), trimmed
+  to its own prolog and `<head>` (an XML declaration, the OJ file's name as `<title>`), the
+  title block `#tit_1` and `#art_1`. Trimmed as `gdpr_oj_trimmed.html` (the same ids from the
+  same page), CELLAR's GDPR is byte for byte that file, so it is not kept twice.
+
+`tests/test_eurlex_cellar.py` reads each pair and asks the same of both: tree, rubriche,
+title, recitals and every article's text.

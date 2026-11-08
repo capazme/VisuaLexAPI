@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  blockStarts,
   describeBlock,
   groupAnnotationsByBlock,
   hasAnnotations,
@@ -103,7 +104,7 @@ describe('groupAnnotationsByBlock', () => {
     expect(ids(groups[2].highlights)).toEqual(['h1', 'h2']);
     expect(ids(groups[2].notes)).toEqual(['n0']);
     expect(ids(groups[3].notes)).toEqual(['n1']);
-    expect(groups[4]).toEqual({ notes: [], highlights: [], threads: [] });
+    expect(groups[4]).toEqual({ notes: [], highlights: [], threads: [], glosses: [] });
   });
 
   it('lists a highlight dragged across two commi under both', () => {
@@ -154,6 +155,11 @@ describe('signColors and signAriaLabel', () => {
     expect(signAriaLabel(0, 3)).toBe('3 evidenziazioni in questo passo');
     expect(signAriaLabel(0, 0, 1)).toBe('1 glossa in questo passo');
     expect(signAriaLabel(2, 1, 3)).toBe('2 note, 1 evidenziazione e 3 glosse in questo passo');
+    expect(signAriaLabel(0, 0, 0, { proposed: 1, validated: 0, review: 0 })).toBe("1 passaggio proposto dall'IA: 1 da validare");
+    expect(signAriaLabel(1, 0, 0, { proposed: 1, validated: 0, review: 1 })).toBe("1 nota in questo passo; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere");
+    expect(signAriaLabel(2, 1, 3, { proposed: 0, validated: 0, review: 1 })).toBe("2 note, 1 evidenziazione e 3 glosse in questo passo; 1 passaggio proposto dall'IA: 1 da rivedere");
+    // The validated ones too: the sign still shows them, by their tick.
+    expect(signAriaLabel(0, 0, 0, { proposed: 0, validated: 2, review: 0 })).toBe("2 passaggi proposti dall'IA: 2 validati");
   });
 });
 
@@ -192,5 +198,15 @@ describe('highlightsWithoutSign', () => {
     const brocardi: Highlight = { ...hl('b', 'ratio', 0), articleId: '1/brocardi/ratio' };
     const groups = groupAnnotationsByBlock(RAW, STRUCTURE, [shown, orphan], []);
     expect(ids(highlightsWithoutSign([shown, orphan, brocardi], groups))).toEqual(['orphan', 'b']);
+  });
+});
+
+describe('blockStarts — where the highlighter never joins one colour (A4)', () => {
+  it('gives each block\'s start after the first in the projection, the newlines left out', () => {
+    const raw = 'Art. 1\nUno due.\nTre quattro.';
+    const structure = { blocks: [{ start: 0, end: 6, kind: 'heading' as const }, { start: 7, end: 15, kind: 'comma' as const }, { start: 16, end: 28, kind: 'comma' as const }], decorations: [], notes: {}, updates: null };
+    expect(blockStarts(raw, structure)).toEqual([6, 14]);
+    // A decision's structure counts in its projection already.
+    expect(blockStarts('fondato.La Corte', { ...structure, blocks: [{ start: 0, end: 8, kind: 'comma' as const }, { start: 8, end: 16, kind: 'comma' as const }] })).toEqual([8]);
   });
 });

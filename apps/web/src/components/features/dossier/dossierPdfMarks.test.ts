@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../services/highlightService', () => ({ highlightService: { getByNormaKeyPrefix: vi.fn() } }));
 vi.mock('../../../services/annotationService', () => ({ annotationService: { getByNormaKeyPrefix: vi.fn() } }));
+// A removal still waiting behind «Annulla»: the server has it a few seconds more.
+const waiting = new Set<string>();
+vi.mock('../../../store/deferredRemovals', () => ({ isRemovalPending: (key: string) => waiting.has(key) }));
 
 import { annotationService } from '../../../services/annotationService';
 import { highlightService } from '../../../services/highlightService';
@@ -41,6 +44,18 @@ beforeEach(() => {
 });
 
 describe('loadPdfMarks', () => {
+  it('leaves out a highlight or a note removed and still waiting behind «Annulla»', async () => {
+    waiting.add('highlight:hs');
+    waiting.add('annotation:ns');
+    try {
+      const marks = await loadPdfMarks([sentenza], { articles: false, decisionIds: new Set(['s1']) });
+      expect(marks.get('s1')?.highlights).toEqual([]);
+      expect(marks.get('s1')?.notes).toEqual([]);
+    } finally {
+      waiting.clear();
+    }
+  });
+
   it("reads the chosen decisions' marks under the decision's key with no article, as its reader does, and waits for them", async () => {
     const marks = await loadPdfMarks([norma, sentenza, other], { articles: false, decisionIds: new Set(['s1']) });
     expect(highlights).toHaveBeenCalledTimes(1);

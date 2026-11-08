@@ -14,6 +14,17 @@ export interface DossierItemApi {
   // The article a note is about, and the connected application that wrote it.
   about_item_id?: string | null;
   created_by?: { clientName: string | null } | null;
+  // D7b (the server's contract §5): the light of a norm or a decision, the state of a note an application wrote.
+  assistant_notes?: { proposed: number; validated: number; review: number } | null;
+  assistant_note?: {
+    state: 'proposed' | 'validated' | 'review';
+    state_changed_at: string | null;
+    review_comment: string | null;
+    original_text: string;
+    edited: boolean;
+    edited_at: string | null;
+    edited_by: { username: string } | null;
+  } | null;
   content: unknown;
   position: number;
   status: DossierItemStatus;

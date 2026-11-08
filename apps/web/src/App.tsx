@@ -25,6 +25,7 @@ const BulletinBoardPage = lazy(() => PAGE_CODE.forum().then(m => ({ default: m.B
 const HistoryView = lazy(() => PAGE_CODE.history().then(m => ({ default: m.HistoryView })));
 const ForumCommunityPage = lazy(() => PAGE_CODE.community().then(m => ({ default: m.ForumCommunityPage })));
 const DocumentReviewPage = lazy(() => PAGE_CODE.documents().then(m => ({ default: m.DocumentReviewPage })));
+const RassegneSearchPage = lazy(() => PAGE_CODE.rassegne().then(m => ({ default: m.RassegneSearchPage })));
 const CreditsPage = lazy(() => PAGE_CODE.credits().then(m => ({ default: m.CreditsPage })));
 const ConnectAiAppPage = lazy(() => PAGE_CODE.connectAiApp().then(m => ({ default: m.ConnectAiAppPage })));
 const OpusPage = lazy(() => PAGE_CODE.opus().then(([m]) => ({ default: m.OpusPage })));
@@ -59,6 +60,15 @@ const ValidationQueueView = lazy(() =>
 const ReviewHome = lazy(() =>
   import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
 );
+const CoursesView = lazy(() =>
+  import('./components/features/studia/corsi/CoursesView').then(m => ({ default: m.CoursesView })),
+);
+const CoursePage = lazy(() =>
+  import('./components/features/studia/corsi/CoursePage').then(m => ({ default: m.CoursePage })),
+);
+const ModuleSession = lazy(() =>
+  import('./components/features/studia/corsi/ModuleSession').then(m => ({ default: m.ModuleSession })),
+);
 const ProgressPage = lazy(() =>
   import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
 );
@@ -79,7 +89,8 @@ function EnvironmentsRedirect() {
 function NotFoundPage() {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-3 p-6 text-center">
-      <p className="text-2xl font-semibold text-slate-900 dark:text-white">Pagina non trovata</p>
+      {/* The page's title: the phone's bar names no section over it (M1: it said the one the user came from). */}
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Pagina non trovata</h1>
       <p className="text-sm text-slate-500 dark:text-slate-400">
         L'indirizzo che hai aperto non esiste o non è più disponibile.
       </p>
@@ -144,6 +155,7 @@ function App() {
           <Route path="forum" element={<BulletinBoardPage />} />
           <Route path="forum/community" element={<ForumCommunityPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
+          <Route path="rassegne" element={<RassegneSearchPage />} />
           {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
           <Route path="collega-app" element={<ConnectAiAppPage />} />
           {/* The MERL-T pages are development addresses (spec D6): without the development mode they
@@ -193,7 +205,7 @@ function App() {
               </DevRoute>
             }
           />
-          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; progressi the data; valida is the validators' queue. */}
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; percorsi the courses; progressi the data; valida is the validators' queue. */}
           {isStudiaEnabled() && (
             <Route
               path="studia"
@@ -206,6 +218,11 @@ function App() {
               <Route index element={<Navigate to="ripasso" replace />} />
               <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
               <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
+              {/* «Percorsi» (courses spec §6): drawn only while the switch `lingo_courses` is on, else back to Oggi. */}
+              <Route path="percorsi" element={<Suspense fallback={null}><CoursesView /></Suspense>} />
+              <Route path="percorsi/:id" element={<Suspense fallback={null}><CoursePage /></Suspense>} />
+              {/* A module's session (courses spec §6.5), the lesson's frame as the review's. */}
+              <Route path="percorsi/:id/moduli/:moduloId" element={<Suspense fallback={<LessonLoading />}><ModuleSession /></Suspense>} />
               <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />

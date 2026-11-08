@@ -142,7 +142,7 @@ def instrument() -> None:
     from yarl import URL
 
     import app as root_app
-    from visualex_api.services import akn_fetch, eurlex_scraper, normattiva_scraper, pdfextractor
+    from visualex_api.services import akn_fetch, eurlex_fetch, eurlex_scraper, normattiva_scraper, pdfextractor
     from visualex_api.services import http_client as http_module
     from visualex_api.services.decisions import curia, italgiure
     from visualex_api.tools import cache as cache_module
@@ -174,8 +174,10 @@ def instrument() -> None:
     _wrap_sync(bs4.BeautifulSoup, "__init__", "parse:bs4")
     _wrap_async(normattiva_scraper.NormattivaScraper, "estrai_da_html", "extract:normattiva")
     _wrap_async(eurlex_scraper.EurlexScraper, "extract_article_text", "extract:eurlex")
-    _wrap_async(eurlex_scraper.EurlexScraper, "_fetch_with_playwright", "playwright:eurlex")
-    _wrap_async(treextractor, "_fetch_with_playwright", "playwright:tree")
+    # An EU act's page, the scraper's and the tree's alike: CELLAR first (its network time is
+    # under net:publications.europa.eu), the browser on EUR-Lex second.
+    _wrap_async(eurlex_fetch, "fetch_from_cellar", "cellar:eurlex")
+    _wrap_async(eurlex_fetch, "fetch_with_playwright", "playwright:eurlex")
     _wrap_async(treextractor, "_parse_normattiva_tree", "extract:tree")
     _wrap_async(akn_fetch, "_fetch_and_parse", "akn:fetch+parse")
     _wrap_sync(akn_fetch, "parse_akn", "akn:parse")

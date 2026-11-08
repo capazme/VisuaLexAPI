@@ -43,7 +43,8 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming }: Practi
   });
   if (!practice) return null;
   return (
-    <div data-testid="practice-table" className="mx-auto w-full max-w-4xl space-y-3">
+    // The frame's width (U1): its rows widen, the text they open stays at the reading measure (`.vlx-art`).
+    <div data-testid="practice-table" className="w-full space-y-3">
       <PracticeHeader practice={practice} />
       <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
       {isEmptyPractice(practice) ? (

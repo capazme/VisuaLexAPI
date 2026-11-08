@@ -11,7 +11,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import { ACT_TYPES_REQUIRING_DETAILS } from '../../../constants/actTypes';
+import { isNumberedActType } from '../../../utils/sources/numberedActTypes';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
@@ -20,6 +20,7 @@ import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/s
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
+import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 interface CommandPaletteProps {
@@ -51,8 +52,7 @@ const PANEL_MAX_HEIGHT = 640;
  *  picked from the list ("Regolamento UE"), or the palette skips the step that
  *  collects its number and date. */
 function requiresDetails(actValue: string): boolean {
-  const wanted = (actValue || '').toLowerCase();
-  return ACT_TYPES_REQUIRING_DETAILS.some(v => v.toLowerCase() === wanted);
+  return isNumberedActType(actValue);
 }
 
 // One row of the lists: 44 px, a colour change when chosen, never a lift (UI conventions).
@@ -480,12 +480,18 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     }
   }, [isOpen]);
 
+  // On the dialogs' stack while open: opened over one (⌘K over the comparison), it keeps Tab and Esc, which that dialog's
+  // trap would otherwise take back, its box being portalled to the body, outside the dialog. Its own focus is floating-ui's.
+  const [stackToken] = useState(() => Symbol('palette'));
+  useEffect(() => (isOpen ? openDialog(stackToken) : undefined), [isOpen, stackToken]);
+
   // Handle Escape key. Only while open: a closed palette that took every Escape and called
-  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay).
+  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay). Only while it is the
+  // top-most dialog: one opened over it takes its own Esc.
   useEffect(() => {
     if (!isOpen) return undefined;
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && isTopmostDialog(stackToken)) {
         e.preventDefault();
         onClose();
       }
@@ -493,7 +499,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, stackToken]);
 
   /** A choice made: the menu closes and the field is left empty. */
   const done = useCallback(() => {

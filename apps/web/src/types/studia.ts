@@ -60,8 +60,11 @@ export interface SchedaDellArticolo extends Scheda {
  */
 export interface TestoDaAccettare {
   id: string;
-  /** The card proposal's notice, or the MERL-T notice (answered through the consent screen). */
-  chiave: 'PROPOSTA_SCHEDA' | 'INFORMATIVA_MERLT';
+  /**
+   * The card proposal's notice, the MERL-T notice (answered through the consent screen), or the declaration on one's
+   * study material, accepted in «Percorsi» before the first course.
+   */
+  chiave: 'PROPOSTA_SCHEDA' | 'INFORMATIVA_MERLT' | 'MATERIALE_STUDIO';
   versione: number;
   titolo: string;
   corpo: string;
@@ -142,10 +145,13 @@ export interface SchedaDiRipasso extends Scheda {
   nuova: boolean;
   comunita: boolean;
   anteprima: Record<`${Voto}`, number>;
+  /** A course's session (`?corso=`, «Percorsi» S2): a check card, already reviewed and not due, after the due and new ones. */
+  verifica?: boolean;
 }
 
 export interface SessioneRipasso {
-  conteggi: { dovute: number; nuove: number };
+  /** `verifica`: a course's check cards, in a session narrowed to it (`?corso=`). */
+  conteggi: { dovute: number; nuove: number; verifica?: number };
   /** Due cards first, then new ones. */
   cards: SchedaDiRipasso[];
 }
@@ -227,9 +233,12 @@ export interface XpLivello {
 /** The missions' ids, the server's catalogue in its order (Gymnasium XP spec §3.1). */
 export type MissioneId = 'dovute' | 'nuove' | 'obiettivo' | 'materia-ferma' | 'scrivi' | 'convalida' | 'caso' | 'settimana' | 'consolida';
 
-/** A credit just written: a mission done, and what it was worth. */
+/**
+ * A credit just written: a mission done, and what it was worth. The courses' missions («Completa un modulo», «Supera un
+ * percorso», «Percorsi» S2) are credited too, never listed among the day's missions.
+ */
 export interface XpCredito {
-  missione: MissioneId;
+  missione: MissioneId | 'modulo' | 'percorso';
   punti: number;
 }
 

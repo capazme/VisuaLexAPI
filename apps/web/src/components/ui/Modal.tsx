@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
-import { isTopmostDialog, openDialog } from './dialogStack';
+import { useDialogFocus } from './useDialogFocus';
 import { dur, ease } from '../../lib/motion';
 
 export type ModalVariant = 'default' | 'danger' | 'info' | 'success';
@@ -71,18 +71,14 @@ export function Modal({
   const reactId = useId();
   const titleId = title ? `modal-title-${reactId}` : undefined;
   const descriptionId = description ? `modal-desc-${reactId}` : undefined;
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const tokenRef = useRef<symbol>(Symbol('modal'));
   // Spec §6.2: 240 ms on the drawer curve, growing from 0.97 where it stands; under reduced motion a fade.
   const still = useReducedMotion();
   const hidden = still ? { opacity: 0 } : { opacity: 0, scale: 0.97 };
   const panel = { duration: dur.panel, ease: ease.drawer };
 
-  useEffect(() => (isOpen ? openDialog(tokenRef.current) : undefined), [isOpen]);
-
-  const isTopmost = () => isTopmostDialog(tokenRef.current);
+  const isTopmost = useDialogFocus(isOpen, dialogRef, () => initialFocusRef?.current ?? closeButtonRef.current);
 
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
@@ -92,38 +88,7 @@ export function Modal({
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose, closeOnEscape]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleTab = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !isTopmost()) return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey) {
-        // From an element outside the list (the dialog itself, a wrapper focused with tabIndex -1) the browser would
-        // step out of the dialog backwards: the last element takes it.
-        if (active === first || !focusable.includes(active as HTMLElement)) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !dialog.contains(active)) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handleTab);
-    return () => document.removeEventListener('keydown', handleTab);
-  }, [isOpen]);
+  }, [isOpen, onClose, closeOnEscape, isTopmost]);
 
   useEffect(() => {
     if (isOpen) {
@@ -135,19 +100,6 @@ export function Modal({
       document.body.style.overflow = '';
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-    const timer = window.setTimeout(() => {
-      const target = initialFocusRef?.current ?? closeButtonRef.current;
-      target?.focus();
-    }, 50);
-    return () => {
-      window.clearTimeout(timer);
-      previouslyFocusedRef.current?.focus?.();
-    };
-  }, [isOpen, initialFocusRef]);
 
   const hasHeader = Boolean(title || icon || showCloseButton);
 

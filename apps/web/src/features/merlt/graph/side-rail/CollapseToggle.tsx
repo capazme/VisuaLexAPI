@@ -20,9 +20,11 @@ export function CollapseToggle({ isOpen, onToggle }: CollapseToggleProps): React
       className={cn(
         'flex items-center justify-center transition-colors duration-150',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+        // 44 px to tap on a phone (M1). Closed, the tab stays 40 px wide over the reader's text, and an invisible
+        // `::after` reaches 4 px further left, as the signs in the text do.
         isOpen
-          ? 'h-7 w-7 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-          : 'h-auto w-10 flex-col gap-1 rounded-l-lg bg-slate-800 px-2 py-3 text-slate-100 hover:bg-slate-700'
+          ? 'h-11 w-11 rounded text-slate-400 hover:text-slate-700 md:h-7 md:w-7 dark:hover:text-slate-200'
+          : "relative h-auto w-10 flex-col gap-1 rounded-l-lg bg-slate-800 px-2 py-3 text-slate-100 hover:bg-slate-700 after:absolute after:inset-y-0 after:-left-1 after:right-0 after:content-[''] md:after:hidden"
       )}
     >
       {isOpen ? (

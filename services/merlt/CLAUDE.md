@@ -79,7 +79,7 @@ services/merlt/
 | `tools/` | the tools the experts call (`search.py`, `mcp_legal_adapter.py` for mcp-legal-it, `registry.py`, …) |
 | `rlcf/` | `training_scheduler.py` (buffer, `add_experience`, persistence), `replay_buffer.py`, `buffer_rehydration.py`, `policy_gradient.py` (REINFORCE, `GRAPH_TO_POLICY_RELATION`), `policy_manager.py` (loads `*_latest.pt`), `authority.py`, `domain_authority.py`, `authority_sync.py`, `aggregation.py`, `devils_advocate.py`, `quarantine_service.py`, `ai_service.py` (`OpenRouterService`), and more |
 | `weights/` | `store.py` (`WeightStore`, `weight_versions`), `learner.py`, `experiment.py`, `config/` |
-| `pipeline/` | `document_parser.py` (notes → staging, relation endpoint resolution), `provisional_writer.py`, `promotion.py`, `hygiene.py`, `mechanical_ingestion/` (parser, conflict report, promote), `massimario/` (the Massimario's annual reviews: portal links to URNs, paragraphs, citation grammar, volume assembly, promotion, vectors, the reader), `ingestion.py`, `enrichment/`, `semantic_chunking/`, `live_enrichment.py`, `multivigenza.py` |
+| `pipeline/` | `document_parser.py` (notes → staging, relation endpoint resolution), `provisional_writer.py`, `promotion.py`, `hygiene.py`, `mechanical_ingestion/` (parser, conflict report, promote), `massimario/` (the Massimario's annual reviews: portal links to URNs, paragraphs, citation grammar, volume assembly, promotion, vectors, the reader; the parsing modules have a twin in the Python API, `visualex_api/services/massimario/`, which serves the reader since the web reads `/fetch_rassegne` (PR 2): until this adapter reads the API's records, a grammar fix lands in both — design 2026-10-30-rassegne-without-merlt), `ingestion.py`, `enrichment/`, `semantic_chunking/`, `live_enrichment.py`, `multivigenza.py` |
 | `storage/` | `graph/` (FalkorDB client and config, `entity_writer.py`, `relation_endpoints.py`), `vectors/` (embeddings, `collection.py`), `retriever/`, `bridge/`, `trace/`, `temporal/`, `enrichment/` (SQLAlchemy models, `database.py`, `consensus_triggers.py`, `schema_additions.py`, `deduplication.py`), `migrations/` (plain SQL for the `create_tables()` stack) |
 | `worker/` | RQ tasks: `tasks.py` (article ingest), `extraction_tasks.py` (`extract_to_staging`), `mechanical_ingest_tasks.py`, `massimario_tasks.py` (a promoted Massimario batch's vectors and bridge rows, 100 paragraphs a job, chained on `merlt_bulk`), `ner_training_tasks.py` |
 | `ner/` | spaCy model, feedback buffer, training data conversion |
@@ -122,7 +122,7 @@ router is mounted with `prefix="/api/v1"` plus its own prefix:
 | `api_keys_router` | `/api-keys` |
 | `ner_router` | `/ner` |
 | `ingestion_mechanical_router` | `/ingestion/mechanical` |
-| `rassegne_router` | `/rassegne` (`GET /by-norma`: the review paragraphs citing a norm, by year) |
+| `rassegne_router` | `/rassegne` (`GET /by-norma`: the review paragraphs citing a norm, by year; no caller since the web reads the Python API's store, removed in PR 3 of design 2026-10-30-rassegne-without-merlt) |
 | `user_data_router` | `/user-data` (`GET` and `DELETE /{user_id}`: a person's data, for the BFF only; see Personal data) |
 
 **Auth.** `app.py` sets `app.dependency_overrides[verify_api_key] = optional_api_key`,
@@ -206,7 +206,7 @@ salted hash, which is still personal data for whoever holds the salt.
 | `storage/graph/entity_writer.py`, `relation_endpoints.py` | what consensus writes into FalkorDB; the `user_document` placeholder must never become a node |
 | `pipeline/provisional_writer.py`, `promotion.py`, `hygiene.py` | the graph co-evolution; match nodes by `URN OR node_id OR source_url` |
 | `utils/urn_labels.py` | URN → label, the article-suffix regex (longest-first) |
-| `utils/sources.py` | the source convention as MERL-T holds it: the URN normaliser, a node's `estremi` (`short_norm`, `short_from_urn`), an act's `titolo` (`act_heading`) and `autorita_emanante`, a decision's `estremi` (`decision_short`). A copy of the API's `visualex_api/tools/sources.py` (MERL-T does not import it), pinned by `tests/unit/test_sources_golden.py` to `conventions/sources/golden.json`, as are the copies of `NORMATTIVA_URN_CODICI` and `ANNEXED_ACTS` (`utils/map.py`; an act whose text is its annex, the TULPS, is keyed by it and never named, G-351) and of the ordinal table (`utils/article_suffixes.py`). `scripts/backfill_source_labels.py` rewrites the graph's labels (dry run by default) |
+| `utils/sources.py` | the source convention as MERL-T holds it: the URN normaliser, a node's `estremi` (`short_norm`, `short_from_urn`), an act's `titolo` (`act_heading`) and `autorita_emanante`, a decision's `estremi` (`decision_short`). A copy of the API's `visualex_api/tools/sources.py` (MERL-T does not import it), pinned by `tests/unit/test_sources_golden.py` to `conventions/sources/golden.json`, as are the copies of `NORMATTIVA_URN_CODICI`, `ANNEXED_ACTS`, `ANNEX_SIGLE` and `ANNEX_HEADINGS` (`utils/map.py`; an annex of a code's decree cited by its own sigla, G-369; an act whose text is its annex, the TULPS, is keyed by it and never named, G-351) and of the ordinal table (`utils/article_suffixes.py`). `scripts/backfill_source_labels.py` rewrites the graph's labels (dry run by default) |
 | `api/experts_router.py`, `api/enrichment_router.py`, `api/graph_router.py` | the BFF-facing contract; see `docs/merlt/contract-matrix.md` |
 
 ## Running
@@ -239,16 +239,17 @@ services use their container ports (FalkorDB and Redis on 6379, Qdrant on 6333).
 
 ## Tests
 
-CI (`.github/workflows/ci.yml`, job `merlt`, on `develop` and on pull requests
-into it) is the reference run. On Python 3.11 it:
+CI (`.github/workflows/ci.yml`, job `merlt`, on `main`, `develop` and pull
+requests into them) is the reference run. On Python 3.11 it:
 
 1. installs CPU torch, then `pip install -e ".[dev]"`;
 2. bootstraps a Postgres service with `init_db()`, `create_tables()` and
-   `ensure_schema_additions()`;
-3. runs `python -m pytest tests/ -q`;
-4. runs `python -m pytest tests/ -q -m integration` against a FalkorDB service
-   (the image `infra/compose.yml` pins), with `FALKORDB_HOST` and
-   `FALKORDB_PORT` set for that step only.
+   `ensure_schema_additions()` — a database thrown away with the job, so it
+   runs with `fsync`, `synchronous_commit` and `full_page_writes` off;
+3. runs `python -m pytest tests/ -q -p no:cacheprovider`;
+4. runs `python -m pytest tests/ -q -p no:cacheprovider -m integration`
+   against a FalkorDB service (the image `infra/compose.yml` pins), with
+   `FALKORDB_HOST` and `FALKORDB_PORT` set for that step only.
 
 Tests marked `integration` need a live FalkorDB: `pyproject.toml` `addopts`
 excludes them from a plain run. Run them with `-m integration` against a
@@ -335,6 +336,22 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   contract test fails on `labels(x)[0]` in Cypher.
 - Do not change the authority algorithm or the synthesizer's contract without
   the owner's approval.
+- Normattiva's update notes («AGGIORNAMENTO (N)», G-386) are never part of an
+  article's text. VisuaLex answers them beside it (`note_aggiornamento`,
+  `note_non_lette`, `note_nel_testo`); `clients/visualex_client.py` carries them in
+  `ArticleResult` (`get_article`) and `update_notes_block` labels them for a model;
+  likewise `parti` / `testo_parziale` for an article Normattiva splits into parts
+  (G-387), whose notice `partial_text_notice` writes («testo parziale: commi 1-100
+  di 1364 (diviso in 14 parti)»; for a part asked as such, the part served, «commi
+  701-800 di 1364»). `fetch_article_text` takes `parte` («701-800») or `comma`
+  («773»), G-387 (a); the graph keeps one node per article and ingestion reads
+  the first part, as before (G-389 Q4).
+  `get_document` still gives the text alone, which is what ingestion stores. Only
+  `tools/search.ArticleFetchTool` puts the notice and the block after the text it
+  hands an expert (its `oltre_il_testo`, read by
+  `react_mixin._extract_sources_from_result`), and that tool is **not wired**
+  (`api/engine_bootstrap.py`): the experts read articles through mcp-legal-it's
+  `fetch_law_article`, whose notes come with the submodule at 3.0.x.
 - Brocardi is no longer a source (D-078). MERL-T does not fetch from it: the
   VisuaLex client's `fetch_brocardi_info` returns nothing without a call,
   `include_brocardi` defaults to False, no expert is granted `cerca_brocardi`

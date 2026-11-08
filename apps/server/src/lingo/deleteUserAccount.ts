@@ -18,6 +18,10 @@ export const PERSONAL_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'ARCHIVIATA
  * and the administrator's); deleting the user row by hand would leave their
  * drafts behind, anonymous and of no use to anyone.
  *
+ * The Community's glosse, replies and comments stay too, without an author («utente cancellato»,
+ * G-307), and so do the replies others wrote under them: the foreign keys set `user_id` to NULL.
+ * The person's votes and notifications go with the row; their reports stay without a reporter.
+ *
  * MERL-T keeps its own copy of what a consenting person did there: when the person ever gave
  * MERL-T a consent, the same transaction records an erasure request, which outlives the user
  * row and is sent to MERL-T until it confirms (`services/merlt/userData.ts`). One attempt is
@@ -36,6 +40,9 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     // The person's cards are locked first: a validator's vote in flight finishes before the
     // states are read, so a card it has just archived goes with the account instead of
     // staying archived with no author, where nobody could see or delete it.
+    // Their courses first (Percorsi): the course trash locks a course, then its modules, then its cards, so
+    // taking the cards first here would deadlock with it.
+    await tx.$queryRaw`SELECT id FROM lingo_corsi WHERE autore_id = ${userId} ORDER BY id FOR UPDATE`;
     await tx.$queryRaw`SELECT id FROM lingo_cards WHERE autore_id = ${userId} ORDER BY id FOR UPDATE`;
     await tx.lingoCard.deleteMany({ where: { autoreId: userId, stato: { in: PERSONAL_STATES } } });
     await tx.user.delete({ where: { id: userId } });

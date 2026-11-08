@@ -35,6 +35,25 @@
       }
     },
     {
+      "id": "in-force-at-a-date",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_atto": "241",
+        "data": "1990-08-07",
+        "numero_articolo": "2",
+        "versione": "vigente",
+        "data_versione": "2020-01-01"
+      },
+      "entry": {
+        "tipo_atto": "legge",
+        "numero_articolo": "2",
+        "numero_atto": "241",
+        "data": "1990-08-07",
+        "versione": "vigente",
+        "data_versione": "2020-01-01"
+      }
+    },
+    {
       "id": "eu-year-only",
       "input": {
         "tipo_atto": "Regolamento UE",
@@ -270,6 +289,18 @@
         "versione": "domani"
       },
       "reason": "Versione non valida («domani»)"
+    },
+    {
+      "id": "original-with-a-date",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_atto": "241",
+        "data": "1990-08-07",
+        "numero_articolo": "2",
+        "versione": "originale",
+        "data_versione": "2020-01-01"
+      },
+      "reason": "Versione originale con una data della versione («2020-01-01»)"
     },
     {
       "id": "bad-version-date",
