@@ -39,6 +39,7 @@ import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { DOSSIER_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
+import { CARD_GRID_COLUMNS } from '../../layout/frame';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -374,7 +375,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      {/* A grid of cards of at least 20rem (U1 §7), as many as the frame holds: one on a phone, two at 768 px, three at
+          1366 px with the sidebar, four at 1920, seven at 2560 in full screen. */}
+      <div className={cn('grid gap-4 md:gap-6', CARD_GRID_COLUMNS)}>
         {filteredDossiers.length === 0 ? (
           searchQuery || selectedCategory ? (
             <div className="col-span-full">
@@ -485,7 +488,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 )}
                 {/* No placeholder for a missing description: an empty line says nothing (spec §5.3.3). */}
                 {dossier.description && (
-                  <p className="mt-2 line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{dossier.description}</p>
+                  <p className="mt-2 line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-400">{dossier.description}</p>
                 )}
                 {dossier.tags && dossier.tags.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
