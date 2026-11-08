@@ -11,7 +11,7 @@ const createAnnotationSchema = z.object({
   annotationType: z.enum(['note', 'question', 'important', 'follow_up', 'summary']).default('note'),
   textContext: z.string().optional(),
   position: z.number().int().min(0).optional().nullable(),
-  bookmarkId: z.string().uuid().optional().nullable(),
+  bookmarkId: z.string().guid().optional().nullable(),
 });
 
 const updateAnnotationSchema = z.object({

@@ -37,6 +37,20 @@ describe('QuickAddField — «Dettagli»', () => {
     expect(title).not.toHaveClass('text-base');
   });
 
+  it('keeps its hint whole on a narrow row, the buttons going under it (cut to «Aggiun» at 320 px in the dossier)', () => {
+    render(<QuickAddField view="dossier" today="2026-10-22" defaults={{ dossierId: 'd1' }} dossierLocked />);
+    const title = screen.getByLabelText('Nuovo compito');
+    // 12 em of its own text, whatever the page's rem (the «piccolo» size cut it again), never wider than its line.
+    expect(title).toHaveClass('min-w-[min(12em,100%)]', 'flex-1');
+    // The ＋ with the field, in one item of the row that wraps.
+    expect(title.parentElement).toHaveClass('min-w-0');
+    expect(title.parentElement!.parentElement).toHaveClass('flex-wrap');
+    // The two buttons wrap together, at the right.
+    const buttons = screen.getByRole('button', { name: /Aggiungi/ }).parentElement!;
+    expect(buttons).toHaveClass('ml-auto');
+    expect(buttons).toContainElement(screen.getByRole('button', { name: /Dettagli/ }));
+  });
+
   it('leaves the details alone when Esc empties the title', async () => {
     render(<QuickAddField view="today" today="2026-10-22" defaults={{}} />);
     const user = userEvent.setup();

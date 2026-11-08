@@ -40,8 +40,9 @@ describe('Layout — the document never scrolls', () => {
     const scroller = main.querySelector('.overflow-y-auto') as HTMLElement;
     expect(scroller).not.toBeNull();
     // The content area pads 2 rem above and below it at `md`: the practice row's `h-app-row` (100dvh - 4rem)
-    // is that, so the scroller's content is exactly its height with windows beside.
-    expect(scroller.firstElementChild).toHaveClass('md:p-8');
+    // is that, so the scroller's content is exactly its height with windows beside. The frame (U1) changes the margins
+    // on the sides only.
+    expect(scroller.firstElementChild).toHaveClass('md:py-8');
   });
 });
 

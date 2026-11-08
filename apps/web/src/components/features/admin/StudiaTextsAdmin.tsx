@@ -16,6 +16,8 @@ const KEY_LABEL: Record<string, string> = {
   PROPOSTA_SCHEDA: 'Avviso per proporre una scheda',
   // Answered with a consent level on the consent screen; a new version asks every user again.
   INFORMATIVA_MERLT: 'Informativa MERL-T (consenso alla raccolta dei dati)',
+  // Accepted in «Percorsi» before the first course; a new version asks again before the next one.
+  MATERIALE_STUDIO: 'Dichiarazione sul materiale di studio (Percorsi)',
 };
 
 // The server's limits (`POST /api/admin/studia/testi/:chiave`).

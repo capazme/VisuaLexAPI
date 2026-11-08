@@ -74,6 +74,7 @@ export function highlightStoreToCreate(h: StoreHighlight): HighlightCreate | nul
     color: h.color,
     startOffset: h.startOffset,
     endOffset: h.startOffset + h.text.length,
+    ...(h.note ? { note: h.note } : {}),
   };
 }
 
@@ -90,6 +91,8 @@ export function highlightApiToStore(r: HighlightResponse): StoreHighlight {
     color,
     rangeSerialized: '',
     startOffset: r.startOffset,
+    // Never shown; kept so that a highlight cut keeps it on its parts (A4).
+    ...(r.note ? { note: r.note } : {}),
     // Preserve forum attribution so the AttributionChip survives reloads (gotcha #21).
     ...(r.sourceSuggestionId !== undefined ? { sourceSuggestionId: r.sourceSuggestionId } : {}),
     ...(r.originalAuthor !== undefined ? { originalAuthor: r.originalAuthor } : {}),

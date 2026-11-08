@@ -1,4 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { loadAssistantFeatures } from '../../../store/assistantProposals';
+import { CurrentDossierContext } from './currentDossier';
 import {
   Trash2,
   ArrowLeft,
@@ -74,8 +76,10 @@ import { cn } from '../../../lib/utils';
 import { PageFrame } from '../../layout/PageFrame';
 import { sectionOfDossierKind } from '../../../features/sections/useSection';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { COLUMN_HEADING, HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
+import { COLUMN_HEADING, COLUMN_SCROLLS, HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
 import { FIELD, ICON_BUTTON } from '../planner/plannerStyles';
+import { CitedNormsContext, useCitedNorms } from './useCitedNorms';
+import { CitedNormChoice } from './CitedNormChoice';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -121,6 +125,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+
+  // D7b: the flag again as the page mounts (it may have been switched since the app started); no polling.
+  useEffect(() => { void loadAssistantFeatures(); }, []);
 
   // Hydrate the snapshot list, or the "• N snapshot" counter reads 0 after a
   // reload even when rows exist. Logged on failure, never hidden (gotcha 18).
@@ -191,6 +198,18 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d). Stable callbacks, so the
+  // context's value, and every decision's reader with it, changes only with the dossier, its acts and its search
+  // (`reveal` reads which items are on screen), not on every render.
+  const unfoldAct = useCallback((key: string) => setFoldedActs((prev) => {
+    if (!prev.has(key)) return prev;
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  }), []);
+  const expand = useCallback((id: string) => setExpandedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id))), []);
+  const clearSearch = useCallback(() => setItemSearchQuery(''), []);
+  const cited = useCitedNorms({ items: dossier.items, visibleItems, acts: fullLayout.acts, unfoldAct, expand, clearSearch });
   const toggleFolded = (key: string) => setFoldedActs((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -427,7 +446,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       }));
       const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
-      const doc = writeDossierPdf(
+      const doc = await writeDossierPdf(
         { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine: pdfCountsLine(dossier.items, chosen), exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );
@@ -489,6 +508,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               block={block}
               // Under «Norme» when the decisions stand beside the acts.
               headingLevel={twoColumns ? 3 : 2}
+              flashedId={cited.flashedId}
               act={fullBlocks.get(block.key) ?? block}
               dragDisabled={hasFilter}
               isFolded={foldedActs.has(block.key)}
@@ -532,6 +552,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       onToggleSelect={toggleItemSelection}
       onRemove={handleRemoveSingle}
       onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
+      // The right column scrolls on its own beside the norms (D7d): the section «Giurisprudenza» is the scroller.
+      className={twoColumns ? COLUMN_SCROLLS : undefined}
+      tabIndex={twoColumns ? 0 : undefined}
     />
   );
 
@@ -598,6 +621,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   );
 
   return (
+    // The dossier its entries' readers ask the server about (D7b's proposals).
+    <CurrentDossierContext.Provider value={dossier.id}>
     <div className="animate-in slide-in-from-right-10 duration-200">
       {/* The way back, one control at every width (S7c), over the frame. */}
       <button
@@ -763,15 +788,23 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               {/* Acts and decisions both (D7a): two columns from lg, «Norme» | «Giurisprudenza», a rule between them;
                   below lg the norms, then the decisions. One kind alone takes the width, untitled as before. The same
                   elements either way, only their classes changing, so a search that leaves one kind remounts nothing
-                  (an open article keeps its text). */}
-              <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
-                {/* Hidden, still mounted, while no act is on screen: no empty block and no gap over the decisions. */}
-                <section aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined} className={cn('min-w-0', twoColumns && 'lg:pr-5', layout.acts.length === 0 && 'hidden')}>
-                  {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
-                  {actsList}
-                </section>
-                <div className={cn('min-w-0 empty:hidden', twoColumns && 'border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800')}>{decisionsList}</div>
-              </div>
+                  (an open article keeps its text). From lg each column scrolls on its own, as tall as the window
+                  (D7d): a decision stays where it is read while a norm it cites opens beside it, and the other way. */}
+              <CitedNormsContext.Provider value={cited.citedNorms}>
+                <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
+                  {/* Hidden, still mounted, while no act is on screen: no empty block and no gap over the decisions. */}
+                  <section
+                    ref={cited.columnRef}
+                    aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined}
+                    tabIndex={twoColumns ? 0 : undefined}
+                    className={cn('min-w-0', twoColumns && cn('lg:pr-5', COLUMN_SCROLLS), layout.acts.length === 0 && 'hidden')}
+                  >
+                    {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
+                    {actsList}
+                  </section>
+                  <div className={cn('min-w-0 empty:hidden', twoColumns && 'border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800')}>{decisionsList}</div>
+                </div>
+              </CitedNormsContext.Provider>
             </>
           )}
         </div>
@@ -811,6 +844,17 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           />
         )}
 
+        {cited.choice && (
+          <CitedNormChoice
+            key={cited.choice.link.dataset.cacheKey ?? cited.choice.citation.article}
+            citation={cited.choice.citation}
+            link={cited.choice.link}
+            onClose={cited.closeChoice}
+            onOpenOnDashboard={cited.openOnDashboard}
+            showToast={showToast}
+          />
+        )}
+
         {noteTarget && (
           <AddNoteModal
             heading={noteTarget.heading}
@@ -845,5 +889,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         </div>
       </PageFrame>
     </div>
+    </CurrentDossierContext.Provider>
   );
 }

@@ -12,7 +12,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "costo-dossier": "tsx scripts/costo-dossier.mjs"
   },
   "license": "MPL-2.0",
   "dependencies": {
@@ -20,7 +21,7 @@
     "dotenv": "^16.3.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.1",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",

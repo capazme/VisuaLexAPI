@@ -6,10 +6,10 @@ import { useAppStore } from '../../../store/useAppStore';
 import { FIND_WINDOW_ESTIMATED_HEIGHT, FIND_WINDOW_MARGIN, FIND_WINDOW_WIDTH, setFindWindowDefaultPlace } from '../../../utils/findWindowControl';
 import { MAX_BESIDE, practiceCounts, type BesideRef, type Practice } from '../../../utils/practice';
 import { workspaceOrigin } from '../../../utils/workspaceOrigin';
+import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 import { RAIL_WIDTH, besideLayout } from './besideLayout';
 import { PracticeTable, type PracticeTableProps } from './PracticeTable';
 import { ReadingWindow } from './ReadingWindow';
-import { scrollParentOf } from './practiceView';
 
 const NO_WINDOWS: BesideRef[] = [];
 
@@ -26,30 +26,18 @@ const OVERLAY_ID = 'reading-row-overlay';
 const COLUMN_FRAME = 'sticky top-4 h-app-row flex-none';
 
 /**
- * The row's width, kept current by a `ResizeObserver`, and — when `wide` — how far past its parent
- * it may reach on each side. The search page holds the results area to `ReaderLayout`'s `max-w-5xl`
- * (about 960 px of content), under the 1260 px that three columns need; with a window beside, the row takes the scroller's full width (less the
- * gutter the page keeps), measured here rather than assumed, and only for this row: Layout and the
- * other routes are untouched. Before it is measured, the results area's width.
+ * The row's width, kept current by a `ResizeObserver`. The search page is a `full` page (U1): the row takes the frame's
+ * width with or without a window beside, and never reaches past it — it did while the page held the results area to
+ * `ReaderLayout`'s `max-w-5xl`, now gone. Before it is measured, the results area's width.
  */
-function useRowWidth(ref: RefObject<HTMLElement | null>, wide: boolean): { width: number; overshoot: number } {
+function useRowWidth(ref: RefObject<HTMLElement | null>): number {
   const [width, setWidth] = useState(() => workspaceOrigin().width);
-  const [overshoot, setOvershoot] = useState(0);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const parent = el.parentElement;
-    const scroller = wide ? scrollParentOf(el) : null;
     const measure = () => {
       const measured = el.getBoundingClientRect().width;
       if (measured > 0) setWidth(measured);
-      if (!wide || !parent || !scroller) {
-        setOvershoot(0);
-        return;
-      }
-      const gutter = parseFloat(getComputedStyle(scroller.firstElementChild ?? scroller).paddingLeft) || 0;
-      const usable = scroller.clientWidth - 2 * gutter;
-      setOvershoot(Math.max(0, Math.round(usable - parent.getBoundingClientRect().width)));
     };
     measure();
     if (typeof ResizeObserver === 'undefined') {
@@ -58,11 +46,9 @@ function useRowWidth(ref: RefObject<HTMLElement | null>, wide: boolean): { width
     }
     const observer = new ResizeObserver(measure);
     observer.observe(el);
-    if (parent) observer.observe(parent);
-    if (scroller) observer.observe(scroller);
     return () => observer.disconnect();
-  }, [ref, wide]);
-  return { width, overshoot };
+  }, [ref]);
+  return width;
 }
 
 /**
@@ -82,7 +68,7 @@ export function ReadingRow(props: PracticeTableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   const railButtonRef = useRef<HTMLButtonElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const { width, overshoot } = useRowWidth(rootRef, count > 0);
+  const width = useRowWidth(rootRef);
   const layout = besideLayout(width, count);
   const isRail = layout.table === 'rail';
 
@@ -186,8 +172,6 @@ export function ReadingRow(props: PracticeTableProps) {
       ref={rootRef}
       data-testid="reading-row"
       className="relative flex w-full items-start"
-      // Past the page's cap on both sides, centred, while a window is beside.
-      style={overshoot > 0 ? { marginInline: -overshoot / 2, width: `calc(100% + ${overshoot}px)` } : undefined}
     >
       {isRail ? (
         practice && (
@@ -218,7 +202,9 @@ export function ReadingRow(props: PracticeTableProps) {
         <div
           ref={tableRef}
           data-testid="reading-row-table"
-          className={cn('min-w-0', count === 0 ? 'w-full' : 'flex-none pr-4')}
+          // Alone in the row it ends at the frame's right edge: its header and the act's pinned heading keep clear of
+          // the full-screen button, which floats there in full screen (the last window keeps its own, `clearTopRight`).
+          className={cn('min-w-0', count === 0 ? cn('w-full', FOCUS_BUTTON_CLEARANCE) : 'flex-none pr-4')}
           style={count === 0 ? undefined : { width: tableWidth }}
         >
           <PracticeTable {...props} />

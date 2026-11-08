@@ -133,13 +133,18 @@ export function DayBlock({
         </div>
       )}
       <DayLine day={day} subject={subject} />
+      {/* The date's place while the day's read travels — also when a subject's read answers first: on a phone two lines
+          with a subject («mercoledì 21 ottobre · Diritto processuale penale»), one without (P1). */}
+      {!day && !dayFailed && <div aria-hidden className={cn('h-5 w-40 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800', subject && 'max-md:h-10')} />}
 
       {state === 'loading' && (
-        // The final size, so nothing jumps when the read answers.
+        // The final size, so nothing jumps when the read answers (P1: on a phone the block grew 91 px, CLS 0.63): the large
+        // line on two lines under 390 px, where «23 da ripassare, 15 nuove» wraps, one from there; the cost and the
+        // subjects on two below `md`.
         <>
           <p className="sr-only">Carico i tuoi progressi…</p>
-          <div aria-hidden className="h-9 w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800" />
-          <div aria-hidden className="h-5 w-56 max-w-full rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          <div aria-hidden className="h-[75px] w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse min-[390px]:h-[38px] md:h-11 dark:bg-slate-800" />
+          <div aria-hidden className="h-10 w-56 max-w-full rounded bg-slate-100 motion-safe:animate-pulse md:h-5 dark:bg-slate-800" />
           <div aria-hidden className="mt-1 h-12 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-64 dark:bg-slate-800" />
         </>
       )}
@@ -181,7 +186,8 @@ export function DayBlock({
           <p className={LARGE} aria-live="polite">
             {state === 'todo' ? todaySentence(action) : filtered ? 'Niente da ripassare in questa materia, per oggi.' : 'Hai finito per oggi.'}
           </p>
-          {state === 'todo' && detail && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{detail}</p>}
+          {/* While the subjects' read travels, on a phone the line keeps the two lines it takes once they come (P1). */}
+          {state === 'todo' && detail && <p className={cn('max-w-prose text-sm', MUTED_TEXT, stops === null && !materia && 'max-md:min-h-10')}>{detail}</p>}
           {state === 'done' && !filtered && <p className={cn('max-w-prose text-base', MUTED_TEXT)}>{nextDayLine(action)}</p>}
 
           {/* A read after the first failed: what is on screen is the last answer. */}

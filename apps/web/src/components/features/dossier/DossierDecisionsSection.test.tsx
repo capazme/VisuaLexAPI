@@ -7,11 +7,18 @@ import type { FetchDecisionAnswer } from '../../../types/decisions';
 const fetchDecision = vi.fn();
 vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
 vi.mock('./AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
+vi.mock('../../../services/assistantService', () => ({
+  assistantService: { features: vi.fn(), listProposals: vi.fn(async () => []), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(), refreshForExit: vi.fn(async () => {}) },
+}));
 
 import { appStore } from '../../../store/useAppStore';
 import { forgetDecision } from '../../../utils/decisionFetchCache';
 import type { DossierItem } from '../../../types';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
+import { DossierDecisionRow } from './DossierDecisionRow';
+import { CurrentDossierContext } from './currentDossier';
+import { assistantProposalsStore } from '../../../store/assistantProposals';
+import { assistantService } from '../../../services/assistantService';
 import type { SentenzaItem } from './dossierLayout';
 
 // Stored with labels of an older style: the rows show the citation recomputed (source convention, Q9).
@@ -97,8 +104,16 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(screen.getByRole('button', { name: `Comprimi ${CASS}` })).toHaveAttribute('aria-expanded', 'true');
     const motivazione = await screen.findByRole('region', { name: 'Motivazione' });
     expect(motivazione.textContent).toContain('Il ricorrente lamenta la violazione');
-    // Its heading a level under «Giurisprudenza» (h2).
-    expect(screen.getByRole('heading', { level: 3, name: /^Corte di cassazione/ })).toBeInTheDocument();
+    // The row names it: inside, its full name is a quiet line of details, no second and heavier title.
+    const details = screen.getByText(/^Corte di cassazione · Sez\. VII penale · Sentenza n\. 99999\/2024/);
+    expect(details.tagName).toBe('P');
+    expect(details).toHaveClass('text-sm', 'text-slate-600');
+    expect(screen.queryByRole('heading', { name: /^Corte di cassazione/ })).toBeNull();
+    // A screen reader still finds the decision by its name: the opened decision is a region named by the row's own
+    // citation (no new words on screen), the one the toggle controls.
+    const decision = screen.getByRole('region', { name: CASS });
+    expect(decision).toContainElement(motivazione);
+    expect(screen.getByRole('button', { name: `Comprimi ${CASS}` })).toHaveAttribute('aria-controls', decision.id);
     expect(fetchDecision).toHaveBeenCalledTimes(1);
     // The decision's own reading surface: its toolbar, without the find window it has no tab for.
     expect(screen.getByRole('button', { name: /Glosse sulla decisione/ })).toBeInTheDocument();
@@ -185,13 +200,42 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(onToggleImportant).toHaveBeenCalledWith(cass);
   });
 
-  it('marks a decision Claude filed, as an article\'s notes are, and says it in the row\'s name', () => {
+  it('draws no mark of the application that filed a decision, on screen or in the row\'s name (D7b)', () => {
     renderSection([{ ...cass, createdBy: { clientName: 'Claude Code (visualex)' } }, cost]);
-    const filed = screen.getByRole('button', { name: `Espandi ${CASS}, aggiunta da Claude Code (visualex) (applicazione collegata)` });
-    expect(within(filed).getByText('Claude Code (visualex)')).toBeInTheDocument();
-    expect(within(filed).getByText('aggiunta da Claude Code (visualex) (applicazione collegata)')).toHaveClass('sr-only');
-    // The user's own carries none.
+    expect(screen.getByRole('button', { name: `Espandi ${CASS}` })).toBeInTheDocument();
+    expect(screen.queryByText(/Claude Code/)).toBeNull();
     expect(screen.getByRole('button', { name: `Espandi ${COST}` })).toBeInTheDocument();
+  });
+
+  it('shows the traffic light of what an application wrote on a decision, and says it in the row\'s name (D7b)', () => {
+    render(
+      <DossierDecisionRow
+        item={{ ...cass, assistantNotes: { proposed: 1, validated: 2, review: 0 } }} isSelected={false} showCheckbox={false}
+        onToggleSelect={() => {}} isExpanded={false} onToggleExpand={() => {}} onRemove={() => {}} onToggleImportant={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: `Espandi ${CASS}, 1 da validare · 2 validati` })).toBeInTheDocument();
+    expect(screen.getByTitle('1 da validare · 2 validati')).toHaveAttribute('data-ai-review', 'proposed');
+    // On the line of the star and the bin, as on an article's row: a box as tall as they are, across the toggle's padding.
+    const box = screen.getByTitle('1 da validare · 2 validati').parentElement!;
+    expect(box).toHaveClass('flex', 'h-11', '-my-2.5', 'items-center');
+    expect(screen.getByRole('button', { name: 'Segna come importante' })).toHaveClass('h-11');
+    expect(box.parentElement).toHaveAttribute('role', 'button');
+    expect(box.parentElement).toHaveClass('py-2.5', 'items-start');
+  });
+
+  it('opened in a dossier, its reader asks what an application proposed on that entry (D7b)', async () => {
+    fetchDecision.mockResolvedValue(found({ motivazione: MOTIVAZIONE }));
+    assistantProposalsStore.setState({ enabled: true, byItem: {} });
+    render(
+      <MemoryRouter initialEntries={['/dossier']}>
+        <CurrentDossierContext.Provider value="d1"><Section decisions={[cass]} /></CurrentDossierContext.Provider>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CASS}` }));
+    await screen.findByRole('region', { name: 'Motivazione' });
+    await waitFor(() => expect(assistantService.listProposals).toHaveBeenCalledWith('d1', 's1'));
+    assistantProposalsStore.setState({ enabled: false, byItem: {} });
   });
 
   it('removes a decision as the other rows do', () => {

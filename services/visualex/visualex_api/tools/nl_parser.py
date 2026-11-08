@@ -10,9 +10,11 @@ from dataclasses import dataclass
 from datetime import date as _date
 from typing import Optional
 
-from .act_resolver import resolve_atto
+from .act_resolver import ambiguous_act, resolve_atto
+from .article_clause import ARTICLE_CLAUSE_SOURCE
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
-from .map import NORMATTIVA_SEARCH
+from .map import ANNEX_SIGLE, NORMATTIVA_SEARCH, NORMATTIVA_URN_CODICI, code_row_of_annex
+from .sources import SIGLA_BY_ANNEX
 
 # Italian month names → month number
 _MESI = {
@@ -42,12 +44,24 @@ _ART_NUM_RE = re.compile(
     r"(" + _ART_ITEM + r")(?:" + _ART_SEPARATOR_RE.pattern + r"(" + _ART_ITEM + r"))*",
     re.IGNORECASE,
 )
-# "comma 1", "co. 3", "comma 1, lett. b)": qualifies the article, is not the
-# act number, and hides the act name from the resolver if left in place.
-_COMMA_CLAUSE_RE = re.compile(
-    r"\s*,?\s*(?:comma|co\.|c\.)\s*\d+(?:\s*,?\s*(?:lett\.?|lettera)\s*[a-z]\b\)?)?",
+# "comma 1", "secondo comma", "par. 1", "n. 3", "lett. b)": qualifies the article, is
+# not the act number, and hides the act name from the resolver if left in place. The
+# linker's clause too (article_clause.py): «art. 4, n. 7, GDPR» read «n. 7» as the
+# GDPR's number, «art. 82, par. 1, GDPR» and «art. 360, primo comma, n. 3, c.p.c.» as
+# nothing.
+_COMMA_CLAUSE_RE = re.compile(ARTICLE_CLAUSE_SOURCE, re.IGNORECASE)
+# A single comma inside that clause is kept: the API answers the part of a split
+# article that holds it (G-387 (a)). «comma 773», «co. 4-bis»; never a list («commi 1
+# e 2») nor an ordinal («secondo comma»).
+_SINGLE_COMMA_RE = re.compile(
+    r"\s*+(?:,\s*+)?(?:comma|co\.?|c\.)\s*+(\d{1,5})(?:\s*+-?\s*+(" + ARTICLE_SUFFIX_ALTERNATION + r")\b)?"
+    r"(?!\s*+(?:,|\be\b)\s*+\d)",
     re.IGNORECASE,
 )
+# A part of a split article as the convention labels it (G-389): «art. 1, commi
+# 701-800, l. …» and «art. 1 (commi 701-800) l. …», read before the clause above,
+# which would stop at «commi 701». _normalize has dropped the brackets by then.
+_PART_CLAUSE_RE = re.compile(r"\s*,?\s*\(?\s*commi\s+(\d{1,5})\s*-\s*(\d{1,5})\s*\)?\s*,?", re.IGNORECASE)
 
 # Act number patterns: "241/90", "241/1990", "n. 241", "241 del 1990"
 _ACT_NUM_DATE_PATTERNS = [
@@ -151,6 +165,9 @@ class ParsedQuery:
     act_number: Optional[str] = None
     article: Optional[str] = None
     annex: Optional[str] = None
+    # One article only: the comma it names, or the part («701-800») its label names.
+    comma: Optional[str] = None
+    part: Optional[str] = None
 
     def to_api_params(self) -> dict:
         """Convert to API request parameters, omitting None values."""
@@ -165,6 +182,10 @@ class ParsedQuery:
             params["article"] = self.article
         if self.annex:
             params["annex"] = self.annex
+        if self.part:
+            params["parte"] = self.part
+        elif self.comma:
+            params["comma"] = self.comma
         return params
 
     @property
@@ -199,9 +220,11 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
     result = ParsedQuery()
 
     # 1. Extract article numbers (remove from text for cleaner act matching)
-    text, articles = _extract_articles(text)
+    text, articles, comma, part = _extract_articles(text)
     if articles:
         result.article = articles
+        if re.fullmatch(r"[^,]+", articles) and not re.search(r"\d\s*-\s*\d", articles):
+            result.comma, result.part = comma, part
 
     # 1b. EU acts read their pair in their own order. Resolve them before the
     #     Italian number/year rule can read "2024/2847" as act 2024 of 2847.
@@ -231,9 +254,18 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
         if year_date:
             result.date = year_date
 
-    # 5. Identify act type from remaining text
-    known = _identify_known_act(text)
-    if known:
+    # A spelling that names two acts («T.U.E.») is refused, never read as one of them.
+    if ambiguous_act(text):
+        return None
+
+    # 5. Identify act type from remaining text: an annex's own sigla first («disp. att. c.p.a.»
+    #    is the c.p.a.'s decree at annex 3, never the «c.p.a.» inside it)
+    text, annex_code, sigla_annex = _extract_annex_sigla(text)
+    known = None if annex_code else _identify_known_act(text)
+    if annex_code:
+        result.act_type = annex_code
+        annex = annex or sigla_annex
+    elif known:
         result.act_type = known["tipo_atto"]
         if known.get("numero_atto") and not result.act_number:
             result.act_number = known["numero_atto"]
@@ -267,6 +299,47 @@ def _extract_annex(text: str) -> tuple[str, Optional[str]]:
     return text[:m.start()] + " " + text[m.end():], annex
 
 
+# The sigla of an annex of a code's decree (G-369: «disp. att. c.p.a.», «c.p.m.g.») and every code
+# sigla of more than one word («disp. att. c.c.», «cod. nav.»): the code and its annex together, so
+# a label reads back to the annex it was written from. Longest first; each dot may be left out or
+# followed by a space («disp att cpa» is not the c.p.a., «disp att cc» not the c.c.), and a sigla
+# is never read inside a word.
+def _sigla_pattern(sigla: str) -> "re.Pattern[str]":
+    return re.compile(r"(?<![\w.])" + r"\.?\s*".join(re.escape(part.strip()) for part in sigla.rstrip(".").split("."))
+                      + r"\.?(?![\w])")
+
+
+_SIGLE = {identity: sigla for identity, sigla in SIGLA_BY_ANNEX.items()
+          if "." in sigla and (identity in ANNEX_SIGLE or " " in sigla)}
+# A longer spelling of the same act that opens with one of these sigle («cod. post. telecom.»
+# for «cod. post.») is read whole, or its tail («telecom.») was left in the text.
+_LONGER_SPELLINGS = {
+    alias: identity
+    for identity, sigla in _SIGLE.items()
+    for alias, act in NORMATTIVA_SEARCH.items()
+    if alias.lower().startswith(sigla) and alias.lower() != sigla
+    and (code_row_of_annex(identity) or ("",))[0].lower() == act.lower()
+}
+_ANNEX_SIGLA_PATTERNS = [
+    (_sigla_pattern(sigla), identity)
+    for sigla, identity in sorted([(s, i) for i, s in _SIGLE.items()] + list(_LONGER_SPELLINGS.items()),
+                                  key=lambda item: -len(item[0]))
+]
+
+
+def _extract_annex_sigla(text: str) -> tuple[str, Optional[str], Optional[str]]:
+    """Take an annex's sigla out of the text: (remaining, code's name, annex), or the text alone."""
+    for pattern, identity in _ANNEX_SIGLA_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            row = code_row_of_annex(identity)
+            if row:
+                # A code's own row (the disp. att. c.c., the c.p.m.p.) needs no annex: its default.
+                exact = NORMATTIVA_URN_CODICI.get(row[0]) == identity
+                return (text[:match.start()] + " " + text[match.end():]).strip(), row[0], None if exact else row[1]
+    return text, None, None
+
+
 def _normalize(text: str) -> str:
     """Normalize whitespace, lowercase, clean up punctuation."""
     text = _FIRST_DAY_RE.sub(r"\1 ", text.strip().lower())
@@ -280,16 +353,17 @@ def _normalize(text: str) -> str:
     return text
 
 
-def _extract_articles(text: str) -> tuple[str, Optional[str]]:
-    """Extract article numbers from text. Returns (remaining_text, article_string)."""
+def _extract_articles(text: str) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+    """Extract article numbers from text. Returns (remaining_text, article_string, comma, part):
+    the comma or the part's range («701-800») that follows the article, if any."""
     match = _ART_RE.search(text)
     if not match:
-        return text, None
+        return text, None, None, None
 
     after_prefix = text[match.end():]
     num_match = _ART_NUM_RE.match(after_prefix)
     if not num_match:
-        return text, None
+        return text, None, None, None
 
     # Hand the API its own shapes: "2 bis" → "2-bis", "1 - 10" → "1-10",
     # "5 e 6" → "5,6".
@@ -301,15 +375,24 @@ def _extract_articles(text: str) -> tuple[str, Optional[str]]:
         items.append(item)
     full_match_str = ",".join(items)
 
-    # Remove the article portion from text, and the comma clause behind it
+    # Remove the article portion from text, and the comma or part clause behind it
     consumed_end = match.start() + len(match.group(0)) + len(num_match.group(0))
-    clause = _COMMA_CLAUSE_RE.match(text, consumed_end)
+    comma = part = None
+    clause = _PART_CLAUSE_RE.match(text, consumed_end)
     if clause:
         consumed_end = clause.end()
+        part = f"{clause.group(1)}-{clause.group(2)}"
+    else:
+        clause = _COMMA_CLAUSE_RE.match(text, consumed_end)
+        if clause:
+            consumed_end = clause.end()
+            single = _SINGLE_COMMA_RE.match(clause.group(0))
+            if single:
+                comma = single.group(1) + (f"-{single.group(2).lower()}" if single.group(2) else "")
     remaining = text[:match.start()] + " " + text[consumed_end:]
     remaining = re.sub(r"\s+", " ", remaining).strip()
 
-    return remaining, full_match_str
+    return remaining, full_match_str, comma, part
 
 
 def _is_eu_year_like(half: str, ceiling: int) -> bool:

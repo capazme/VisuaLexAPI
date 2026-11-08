@@ -33,7 +33,11 @@ export function getSelectionAnchor(
   selection: Selection | null,
 ): { text: string; startOffset: number } | null {
   if (!root || !selection || selection.rangeCount === 0) return null;
-  const range = selection.getRangeAt(0);
+  return getRangeAnchor(root, selection.getRangeAt(0));
+}
+
+/** `getSelectionAnchor` for a range: the highlighter's, once widened to whole words (`inkSelection.ts`). */
+export function getRangeAnchor(root: HTMLElement, range: Range): { text: string; startOffset: number } | null {
   if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
   const rawOffset = plainOffsetAt(root, range.startContainer, range.startOffset);
   if (rawOffset < 0) return null;
@@ -62,4 +66,28 @@ export function alignOffsetToTrimmedText(
   const leadingRun = raw.slice(0, raw.length - raw.trimStart().length);
   const visibleLeading = leadingRun.replace(/[\n\r]/g, '').length;
   return { text: raw.trim(), startOffset: rawOffset + visibleLeading };
+}
+
+/**
+ * The DOM range of a span of plain-text offsets inside `root`: the inverse of `plainOffsetAt`, over the same text nodes
+ * (a `<br />` or a block boundary counts zero). Null when the span does not fit the text. It selects a stored anchor in
+ * the text, so that the user can move its boundaries from there (D7b).
+ */
+export function rangeFromPlainOffsets(root: Node, start: number, end: number): Range | null {
+  if (start < 0 || end <= start) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let seen = 0;
+  let from: { node: Node; offset: number } | null = null;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const length = node.textContent?.length ?? 0;
+    if (!from && start < seen + length) from = { node, offset: start - seen };
+    if (from && end <= seen + length) {
+      const range = document.createRange();
+      range.setStart(from.node, from.offset);
+      range.setEnd(node, end - seen);
+      return range;
+    }
+    seen += length;
+  }
+  return null;
 }

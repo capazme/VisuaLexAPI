@@ -64,13 +64,39 @@ test('every scraping path is a prefix match, like a Vite proxy key', () => {
 
 test('nothing else of the Python API is routed to it', () => {
   // The Python API keeps a global search history and a dossier file of its own,
-  // and a circuit-breaker status page. None of them is for the outside.
-  for (const forbidden of ['/history', '/dossiers', '/api/circuit-breakers']) {
+  // and a circuit-breaker status page. None of them is for the outside. Nor are the
+  // Massimario's internal routes: the portal's paced client and a volume's records,
+  // which MERL-T reads from inside.
+  for (const forbidden of ['/history', '/dossiers', '/api/circuit-breakers', '/fetch_massimario', '/massimario']) {
     assert.ok(
       !caddyLegalTokens().some((token) => token.startsWith(forbidden)),
       `${forbidden} must not be routed to the scrapers`,
     );
   }
+});
+
+test('the Massimario\'s reviews are read behind the login (ADR-001)', () => {
+  // The reviews' prose reaches signed-in users only: the reader's route is in @legal,
+  // which asks the server before it proxies, and never among the open paths.
+  assert.ok(caddyLegalTokens().includes('/fetch_rassegne*'));
+  assert.ok(!caddyOpenPaths().some((token) => token.startsWith('/fetch_rassegne')));
+});
+
+test('the page «Rassegne» searches every volume behind the login, by its own path', () => {
+  // /search_rassegne matches no other prefix (not /search_decisions*): its own entry on both sides
+  // (design 2026-11-01-rassegne-search-page §2), and never among the open paths.
+  assert.ok(caddyLegalTokens().includes('/search_rassegne*'));
+  assert.ok(vitePythonPaths().includes('/search_rassegne'));
+  assert.ok(!caddyOpenPaths().some((token) => token.startsWith('/search_rassegne')));
+  assert.ok(!caddyLegalTokens().some((t) => t !== '/search_rassegne*' && '/search_rassegne'.startsWith(t.replace(/\*$/, ''))));
+});
+
+test('the links of «Analizza documento» go to the scrapers behind the login, by their own path', () => {
+  // /fetch_norm_links matches no other prefix (not /fetch_norma_data*): it needs its own entry
+  // on both sides (design 2026-10-31-document-hyperlinks §3.1).
+  assert.ok(caddyLegalTokens().includes('/fetch_norm_links*'));
+  assert.ok(vitePythonPaths().includes('/fetch_norm_links'));
+  assert.ok(!caddyLegalTokens().some((t) => t !== '/fetch_norm_links*' && '/fetch_norm_links'.startsWith(t.replace(/\*$/, ''))));
 });
 
 test('only /version and /health stay open, and each exactly', () => {

@@ -67,11 +67,67 @@ def get_visualex_client() -> "VisuaLexClient":
 
 @dataclass
 class ArticleResult:
-    """Result of fetching an article."""
+    """Result of fetching an article.
+
+    The update notes («AGGIORNAMENTO (N)») of a Normattiva article come beside the
+    text, never in it (G-386): `note_aggiornamento` is a list of
+    `{numero, testo, ordine, corte_costituzionale}`, None when VisuaLex did not read
+    them; `note_non_lette` says some could not be read; `note_nel_testo` that the
+    text already holds them (the codes). `update_notes_block` renders them for a
+    model; the text itself, which ingestion stores, never carries them.
+    """
     text: str
     url: str
     norma_data: Dict[str, Any]
     error: Optional[str] = None
+    note_aggiornamento: Optional[List[Dict[str, Any]]] = None
+    note_non_lette: bool = False
+    note_nel_testo: bool = False
+    # G-387: the parts of an article Normattiva splits (`{progressivo, commi_dal,
+    # commi_al, url}`), and whether the text is one of them: the one `norma_data.parte`
+    # names ("701-800", G-387 (a)), else the first.
+    parti: Optional[List[Dict[str, Any]]] = None
+    testo_parziale: bool = False
+
+
+UPDATE_NOTES_LABEL = "NOTE DI AGGIORNAMENTO (Normattiva, non fanno parte del testo dell'articolo)"
+UPDATE_NOTES_UNREAD = "note di aggiornamento non lette: verificare su Normattiva"
+
+
+def partial_text_notice(result: ArticleResult) -> str:
+    """«testo parziale: commi 1-100 di 1364 (diviso in 14 parti)» for one part of a split
+    article (G-387), "" otherwise: the model must not take the part for the whole. The
+    part served is the one `norma_data.parte` names («commi 701-800 di 1364»), else the first."""
+    if not result.testo_parziale:
+        return ""
+    asked = (result.norma_data or {}).get("parte")
+    parte = asked if isinstance(asked, str) and asked else None
+    parts = [p for p in result.parti or [] if isinstance(p, dict) and p.get("commi_dal") and p.get("commi_al")]
+    if not parts:
+        if parte:
+            return f"testo parziale: commi {parte} dell'articolo, diviso in parti"
+        return "testo parziale: l'articolo è diviso in parti, verificare su Normattiva"
+    served = parte or f"{parts[0]['commi_dal']}-{parts[0]['commi_al']}"
+    return f"testo parziale: commi {served} di {parts[-1]['commi_al']} (diviso in {len(parts)} parti)"
+
+
+def update_notes_block(result: ArticleResult) -> str:
+    """The update notes as a labelled block to put after the text, or "" when there is nothing to add.
+
+    The list is left out when the text already holds it (`note_nel_testo`), so the notes
+    are read once; the notice that some could not be read is kept.
+    """
+    lines = []
+    for note in [] if result.note_nel_testo else result.note_aggiornamento or []:
+        if not isinstance(note, dict) or not isinstance(note.get("testo"), str):
+            continue
+        court = " [Corte costituzionale]" if note.get("corte_costituzionale") is True else ""
+        lines.append(f"({note.get('numero', '?')}){court} {note['testo']}")
+    if result.note_non_lette:
+        lines.append(UPDATE_NOTES_UNREAD)
+    if not lines:
+        return ""
+    return "\n".join([UPDATE_NOTES_LABEL, *lines])
 
 
 @dataclass
@@ -273,6 +329,8 @@ class VisuaLexClient:
         version: Optional[str] = None,
         version_date: Optional[str] = None,
         annex: Optional[str] = None,
+        parte: Optional[str] = None,
+        comma: Optional[str] = None,
     ) -> List[ArticleResult]:
         """
         Fetch article text from Normattiva.
@@ -287,6 +345,9 @@ class VisuaLexClient:
             version: Version type
             version_date: Specific version date
             annex: Annex number
+            parte: One part of an article Normattiva splits, by its commas ("701-800")
+            comma: A comma: the part of a split article that holds it (G-387 (a));
+                the article itself when it is not split. Never both.
 
         Returns:
             List of ArticleResult with text and metadata
@@ -307,6 +368,10 @@ class VisuaLexClient:
             payload["version_date"] = version_date
         if annex is not None:
             payload["annex"] = annex
+        if parte:
+            payload["parte"] = parte
+        if comma:
+            payload["comma"] = comma
 
         try:
             response = await client.post("/fetch_article_text", json=payload)
@@ -323,10 +388,16 @@ class VisuaLexClient:
                         error=item["error"]
                     ))
                 else:
+                    notes = item.get("note_aggiornamento")
                     results.append(ArticleResult(
                         text=item.get("article_text", ""),
                         url=item.get("url", ""),
                         norma_data=item.get("norma_data", {}),
+                        note_aggiornamento=notes if isinstance(notes, list) else None,
+                        note_non_lette=item.get("note_non_lette") is True,
+                        note_nel_testo=item.get("note_nel_testo") is True,
+                        parti=item.get("parti") if isinstance(item.get("parti"), list) else None,
+                        testo_parziale=item.get("testo_parziale") is True,
                     ))
             return results
 
@@ -499,6 +570,12 @@ class VisuaLexClient:
         Returns:
             Tuple of (article_text, url)
         """
+        result = await self.get_article(norma_visitata)
+        return result.text, result.url
+
+    async def get_article(self, norma_visitata: NormaVisitata) -> ArticleResult:
+        """The first article's whole result, update notes included: `get_document` for a
+        caller that shows the text to a model. Raises as `get_document` does."""
         results = await self.fetch_article_text(
             act_type=norma_visitata.norma.tipo_atto,
             article=norma_visitata.numero_articolo or "",
@@ -510,7 +587,7 @@ class VisuaLexClient:
         )
 
         if results and not results[0].error:
-            return results[0].text, results[0].url
+            return results[0]
         elif results and results[0].error:
             raise Exception(results[0].error)
         else:
@@ -586,6 +663,10 @@ class NormattivaScraper:
             Tuple of (article_text, url)
         """
         return await self._client.get_document(norma_visitata)
+
+    async def get_article(self, norma_visitata: NormaVisitata) -> ArticleResult:
+        """The article's whole result, its update notes included (G-386)."""
+        return await self._client.get_article(norma_visitata)
 
     async def get_amendment_history(
         self,

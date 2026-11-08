@@ -57,13 +57,8 @@ export const ACT_TYPES: ActType[] = [
   { label: 'Direttiva UE', value: 'Direttiva UE', group: 'Unione Europea', icon: Globe },
 ];
 
-// Act types that require additional details (number and date)
-export const ACT_TYPES_REQUIRING_DETAILS = [
-  'legge', 'decreto legge', 'decreto legislativo',
-  'decreto del presidente della repubblica', 'regio decreto',
-  'legge costituzionale', 'regio decreto legge', 'decreto legislativo luogotenenziale',
-  'Regolamento UE', 'Direttiva UE'
-];
+// The act types that need a number and a date are one list, the convention's:
+// utils/sources/numberedActTypes.ts.
 
 // Helper to get act types grouped by category
 export const getActTypesByGroup = (): Record<string, ActType[]> => {

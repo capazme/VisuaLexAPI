@@ -39,11 +39,12 @@ describe('the Scrivania on a phone', () => {
     expect(container.firstElementChild).not.toHaveClass('max-md:-mx-4');
   });
 
-  it('takes Focus mode\'s padding off instead, where no search bar is drawn', () => {
+  it('takes the same padding off in full screen, which draws no search bar and pads the page as ever (U1)', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
     try {
       const { container } = renderPage();
-      expect(container.firstElementChild).toHaveClass('max-md:min-h-[calc(100dvh-6rem)]');
+      expect(container.firstElementChild).toHaveClass('max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]');
+      expect(container.firstElementChild).not.toHaveClass('max-md:min-h-[calc(100dvh-6rem)]');
     } finally {
       appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
     }

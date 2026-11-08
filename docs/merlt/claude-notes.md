@@ -314,8 +314,7 @@ declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
   the `article_sidebar` graph rail, `AskMerltEntry`, and the citation reports
   that feed MERL-T («Segnala come citazione», `MissedCitationReporter`). Not
   behind it: the `article_content_after` tracker, the `global` slot (the
-  trackers and `ConsentScreen`), `article_case_law` (the Massimario's panel,
-  content for every reader) and the implicit citation feedback on a click, so
+  trackers and `ConsentScreen`) and the implicit citation feedback on a click, so
   collection runs for whoever consented, with or without the mode. The mode
   never replaces a permission: the consent ladder and the server's guards stay
   the real barrier.
@@ -426,7 +425,6 @@ turns the article URN into the arguments of `ingest_norm`:
   - `searchEntities(q, limit)`, a fuzzy name autocomplete. The semantic
     `POST /api/v1/graph/search` is not proxied.
   - `listProvisionalReview` and `adjudicateProvisional`.
-  - `rassegneByNorma(query)`, for the reader's panel (below).
 - `services/merlt/lazyIngest.ts`: `ensureIngestionJob(prisma, graphClient, urn,
   userId)`. The explicit `POST /graph/ingest` and the `article:viewed` trigger
   both use it; do not duplicate it.
@@ -942,11 +940,13 @@ though that doc's header still says DRAFT.
   (`conflict_report.massimario`) and its paragraphs in `extras`; promotion
   writes the graph, then a chained job (`merlt_bulk`) writes vectors and bridge
   rows 100 paragraphs at a time, with progress in `stats.vectors`.
-- Reader: `GET /api/merlt/rassegne?urn&anno&archivio&cursor` (authenticated,
-  no sub-flag, no consent) → MERL-T `GET /api/v1/rassegne/by-norma`. The BFF
-  strips the URN's version marker; any MERL-T failure, an upstream 401
-  included, is `503 merlt_unavailable`. The web panel
-  (`features/merlt/rassegne`) sits in the `article_content_after` slot.
+- Reader: no longer MERL-T's (design
+  `2026-10-30-rassegne-without-merlt`, G-394). The web's panel
+  (`components/features/rassegne`, a block of «Giurisprudenza», no plugin)
+  reads the Python API's own store through `/fetch_rassegne`; the BFF's
+  `/api/merlt/rassegne` and `graphClient.rassegneByNorma` are gone. MERL-T's
+  `rassegne_router.py` and `reader.py` stay until PR 3 deletes them; nothing
+  calls them.
 
 **Graph co-evolution.** The design is
 `docs/superpowers/specs/2026-07-16-merlt-graph-coevolution-design.md`; see
@@ -1070,10 +1070,9 @@ the worker share.
 ### MERL-T testing
 
 - **Backend.** vitest + supertest on a real Postgres test DB, with nock
-  through `apps/server/tests/nockShim.ts`. `apps/server/tests/setup.ts` truncates
-  `merlt_qa_jobs`, `merlt_ingestion_jobs`, `merlt_extraction_jobs`,
-  `merlt_consent_audits`, `merlt_user_preferences` and
-  `merlt_user_authority_cache` between tests.
+  through `apps/server/tests/nockShim.ts`. `apps/server/tests/setup.ts` empties
+  every table before each test, the `merlt_*` ones included (`apps/server/CLAUDE.md`,
+  Tests).
 - **Frontend.** vitest + jsdom.
 - **CI.** `.github/workflows/ci.yml` runs on `main` and `develop`. Its
   `merlt` job, on `develop` and on pull requests into it, runs the MERL-T suite on Python 3.11

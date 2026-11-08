@@ -223,3 +223,39 @@ describe('useAppStore dossier sync', () => {
         });
     });
 });
+
+describe('trashing a note an application wrote (D7b)', () => {
+    const review = { state: 'review' as const, stateChangedAt: null, reviewComment: null, originalText: 'Rivedi.', edited: false, editedAt: null, editedBy: null };
+    const seed = () => appStore.setState({
+        pendingDossierItemIds: {},
+        lastSyncError: null,
+        dossiers: [{
+            id: 'd1', title: 'Pratica', createdAt: '', items: [
+                { id: 'a1', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_articolo: '1453' }, assistantNotes: { proposed: 1, validated: 0, review: 1 } },
+                { id: 'n1', type: 'note', addedAt: '', data: 'Rivedi.', aboutItemId: 'a1', createdBy: { clientName: 'Claude Code' }, assistantNote: review },
+            ],
+        }] as never,
+    });
+    const light = () => appStore.getState().dossiers[0].items[0].assistantNotes;
+
+    it('takes its count off the light of the article it is about', async () => {
+        seed();
+        vi.mocked(dossierService.trashItems).mockResolvedValue({ trashId: 't1' } as never);
+        await appStore.getState().trashDossierItems('d1', ['n1']);
+        expect(light()).toEqual({ proposed: 1, validated: 0, review: 0 });
+    });
+
+    it('trashed with its article and refused, the article comes back with its count as it was', async () => {
+        seed();
+        vi.mocked(dossierService.trashItems).mockRejectedValue(new Error('boom'));
+        await appStore.getState().trashDossierItems('d1', ['a1', 'n1']);
+        expect(light()).toEqual({ proposed: 1, validated: 0, review: 1 });
+    });
+
+    it('gives it back when the server refuses', async () => {
+        seed();
+        vi.mocked(dossierService.trashItems).mockRejectedValue(new Error('boom'));
+        await appStore.getState().trashDossierItems('d1', ['n1']);
+        expect(light()).toEqual({ proposed: 1, validated: 0, review: 1 });
+    });
+});

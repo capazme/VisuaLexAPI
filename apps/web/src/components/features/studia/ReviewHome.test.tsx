@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import type { Progressi, TappaIstituto } from '../../../types/studia';
@@ -8,7 +8,14 @@ vi.mock('../../../services/studiaService', () => ({
   studiaService: { progress: vi.fn(), percorso: vi.fn(), preferences: vi.fn(), savePreferences: vi.fn() },
 }));
 
+vi.mock('../../../services/corsiService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../services/corsiService')>()),
+  corsiService: { today: vi.fn(async () => []) },
+}));
+
 import { studiaService } from '../../../services/studiaService';
+import { corsiService } from '../../../services/corsiService';
+import { coursesSwitchStore } from './corsi/coursesSwitch';
 import { appStore } from '../../../store/useAppStore';
 import { ReviewHome } from './ReviewHome';
 import { serverMissions, xpFields } from './__fixtures__/xp';
@@ -77,6 +84,7 @@ beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
 });
 afterEach(() => {
+  coursesSwitchStore.setState({ state: 'unknown' });
   localStorage.removeItem(STORAGE_KEY);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -103,6 +111,18 @@ function windowOf(width: number) {
 }
 
 describe('ReviewHome', () => {
+  it('shows the day\'s module of a course under the day block once «Percorsi» is on, and reads no course before (§6.2)', async () => {
+    progress.mockResolvedValue(answer(18, 20));
+    coursesSwitchStore.setState({ state: 'off' });
+    renderHome();
+    expect(await screen.findByText('18 da ripassare, 20 nuove')).toBeInTheDocument();
+    expect(corsiService.today).not.toHaveBeenCalled();
+    vi.mocked(corsiService.today).mockResolvedValue([{ corso: { id: 'c1', titolo: 'Segni distintivi', materia: 'DIRITTO_CIVILE' }, modulo: { id: 'm', ordine: 2, titolo: 'Il marchio' }, schede: { dovute: 0, verifica: 0 } }]);
+    act(() => coursesSwitchStore.setState({ state: 'on' }));
+    const row = await screen.findByRole('link', { name: /Modulo del giorno: Il marchio/ });
+    expect(follows(screen.getByRole('button', { name: START }), row)).toBe(true);
+  });
+
   it('says what is on today, how far the goal is, and offers to start', async () => {
     progress.mockResolvedValue(answer(18, 20));
     renderHome();
@@ -257,6 +277,70 @@ describe('ReviewHome', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere i tuoi progressi.');
     expect(container.querySelectorAll('.motion-safe\\:animate-pulse')).toHaveLength(0);
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  // P1: on a phone the page moved when the read came (CLS 0.63): the places held were shorter than what took them.
+  describe('the places held as tall as what takes them (P1)', () => {
+    it('holds the day\'s line, the large line as a phone wraps it, the cost on two lines, and the mission rows as tall as theirs', () => {
+      progress.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
+      const held = [...day.querySelectorAll('[aria-hidden="true"]')].map((el) => el.className);
+      // One line for the date without a subject.
+      expect(held[0]).toMatch(/\bh-5\b.*\bw-40\b/);
+      expect(held[0]).not.toMatch(/max-md:h-10/);
+      // Two lines under 390 px, one from there and from `md`.
+      expect(held[1]).toMatch(/h-\[75px\].*min-\[390px\]:h-\[38px\].*md:h-11/);
+      expect(held[2]).toMatch(/\bh-10\b.*md:h-5/);
+      const rows = screen.getByRole('region', { name: 'Le missioni di oggi' }).querySelectorAll('.grid-cols-\\[24px_minmax\\(0\\,1fr\\)\\] > div:last-child');
+      expect([...rows].map((row) => ['h-[58px]', 'h-[84px]'].find((c) => row.classList.contains(c)))).toEqual(['h-[58px]', 'h-[58px]', 'h-[84px]']);
+      for (const row of rows) expect(row).toHaveClass('md:h-9');
+    });
+
+    it('holds two lines for the date on a phone with a subject remembered, and keeps it held while that subject\'s read answers first', async () => {
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PROCESSUALE_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? Promise.resolve(answer(4, 2)) : new Promise(() => {})));
+      renderHome();
+      // The subject's read has answered, the day's has not: the block draws the subject's day, the date's place held.
+      expect(await screen.findByText('4 da ripassare, 2 nuove')).toBeInTheDocument();
+      const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
+      expect(day.querySelector('.w-40')).toHaveClass('h-5', 'max-md:h-10');
+    });
+
+    it('draws the date once with a subject chosen: no place held for it under the day\'s line while the subject\'s read travels', async () => {
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? new Promise(() => {}) : Promise.resolve(answer(18, 20))));
+      renderHome();
+      const day = await screen.findByRole('region', { name: 'Il ripasso di oggi' });
+      expect(await within(day).findByText(/^lunedì 19 ottobre/)).toBeInTheDocument();
+      expect(day.querySelector('.w-40')).toBeNull();
+    });
+
+    it('keeps two lines for the cost on a phone while the subjects\' read travels, and leaves the large line its own height', async () => {
+      percorso.mockReturnValue(new Promise(() => {}));
+      progress.mockResolvedValue(answer(18, 20));
+      renderHome();
+      const large = await screen.findByText('18 da ripassare, 20 nuove');
+      // No room kept once read: a short sentence leaves no empty line under it.
+      expect(large.className).not.toMatch(/min-h/);
+      expect(screen.getByText(/^circa \d+ minuti/)).toHaveClass('max-md:min-h-10');
+    });
+
+    it('lets the cost\'s line be its own height once the subjects have come', async () => {
+      progress.mockResolvedValue(answer(18, 20));
+      renderHome();
+      expect(await screen.findByText(/^circa \d+ minuti/)).not.toHaveClass('max-md:min-h-10');
+    });
+
+    it('wraps the subjects\' strip held in a plain box, so React never keeps the strip, a scroller, when they come', () => {
+      progress.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      const mine = screen.getByRole('region', { name: 'Le tue materie' });
+      const box = mine.querySelector('h2 + div')!;
+      expect(box).toHaveAttribute('aria-hidden', 'true');
+      expect(box.className).toBe('');
+      expect(box.firstElementChild!.className).toMatch(/overflow-x-auto/);
+    });
   });
 
   it('says what the subjects are missing when the progress cannot be read, and draws them once read again', async () => {
@@ -599,15 +683,15 @@ describe('ReviewHome', () => {
       expect(screen.getAllByRole('group', { name: 'Materia' })).toHaveLength(1);
     });
 
-    it('stays one column in Focus mode, whose narrower frame would squeeze the band (G6)', async () => {
+    it('keeps its two columns in full screen, which widens the frame instead of narrowing it (U1)', async () => {
       const before = appStore.getState().settings;
       appStore.setState({ settings: { ...before, focusMode: true } });
       try {
         progress.mockResolvedValue(answer(18, 8));
         renderHome();
         const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
-        expect(stats.parentElement?.className).not.toMatch(/xl:/);
-        expect(stats.parentElement?.parentElement?.className).not.toMatch(/xl:grid-cols/);
+        expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
+        expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,7fr\)_minmax\(0,5fr\)\]/);
       } finally {
         appStore.setState({ settings: before });
       }

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import { cn } from '../../../lib/utils';
-import { useAppStore } from '../../../store/useAppStore';
 import type { Materia } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
 import { DayBlock } from './missions/DayBlock';
@@ -16,6 +15,7 @@ import { rememberedMateria, rememberMateria } from './progress/rememberedSubject
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { usePercorso } from './progress/usePercorso';
 import { useProgress } from './progress/useProgress';
+import { TodayCourses } from './corsi/TodayCourses';
 
 /**
  * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the sections' full-width frame, in the order the owner fixed — the
@@ -28,10 +28,10 @@ import { useProgress } from './progress/useProgress';
  */
 /**
  * From `xl` two columns (G6), seven twelfths and five: the grid, the left column's place, the right column's (the band
- * and the subjects, sticky over every row) and the confetti's box. Applied only out of Focus mode, which narrows the
- * frame to 896 px: there the band would be too narrow for the week. The left holds three rows (the day, the missions,
- * the list); the fourth, `1fr`, takes what the right column has beyond them. With no mission (G8c) the left holds two,
- * the day and the subjects (`LONELY_ROWS`): a third, empty, would leave two gaps under them.
+ * and the subjects, sticky over every row) and the confetti's box. In full screen too (U1): the frame widens there, it
+ * no longer narrows to 896 px, so the split depends on the width alone. The left holds three rows (the day, the
+ * missions, the list); the fourth, `1fr`, takes what the right column has beyond them. With no mission (G8c) the left
+ * holds two, the day and the subjects (`LONELY_ROWS`): a third, empty, would leave two gaps under them.
  */
 const SPLIT = 'xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] xl:grid-rows-[auto_auto_auto_1fr] xl:pb-0';
 const LONELY_ROWS = 'xl:grid-rows-[auto_auto_1fr]';
@@ -83,7 +83,6 @@ function useFitsInScroller(ref: RefObject<HTMLElement | null>, enabled: boolean)
 
 export function ReviewHome() {
   const navigate = useNavigate();
-  const split = !useAppStore((s) => s.settings.focusMode);
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const day = useProgress(undefined);
   const narrowed = useProgress(materia, materia !== undefined);
@@ -125,9 +124,9 @@ export function ReviewHome() {
   // from `xl` the left column held the day block alone, the right one ran past the window (G8c). «Le tue materie» goes
   // left then, under the day block, and before the statistics in the document, so the keyboard follows the eye; the
   // statistics keep the right column. Below `xl` nothing moves: one column, the order the owner fixed.
-  const lonely = split && wide && answered && !data?.missioni?.length;
+  const lonely = wide && answered && !data?.missioni?.length;
   const aside = useRef<HTMLDivElement>(null);
-  const fits = useFitsInScroller(aside, split && !settingsOpen);
+  const fits = useFitsInScroller(aside, !settingsOpen);
 
   const choose = (next: Materia | undefined) => {
     setMateria(next);
@@ -158,8 +157,9 @@ export function ReviewHome() {
     // the right, kept in sight under the heading while the page scrolls. The document's order is the reading order the
     // owner fixed — missions, statistics, list — on every width; the grid places the right column.
     // One column of `minmax(0, 1fr)` below `xl` (two from it, `SPLIT`): an implicit track grows to its widest content.
-    <section className={cn('relative grid grid-cols-1 gap-6 pb-8', split && SPLIT, lonely && LONELY_ROWS)}>
-      <div className={cn('min-w-0', split && LEFT)}>
+    <section className={cn('relative grid grid-cols-1 gap-6 pb-8', SPLIT, lonely && LONELY_ROWS)}>
+      {/* The day block and, under it, the courses' row (courses spec §6.2): one cell, so the grid keeps its rows. */}
+      <div className={cn('grid min-w-0 grid-cols-1 gap-4', LEFT)}>
         <DayBlock
           day={data}
           dayFailed={day.status === 'error'}
@@ -176,8 +176,9 @@ export function ReviewHome() {
           drawGoal={celebrate}
           goalRef={goalRef}
         />
+        <TodayCourses />
       </div>
-      <div className={cn('min-w-0 empty:hidden', split && LEFT)}>
+      <div className={cn('min-w-0 empty:hidden', LEFT)}>
         <TodayMissions
           day={data}
           dayFailed={day.status === 'error'}
@@ -190,9 +191,9 @@ export function ReviewHome() {
       {/* Under the missions on a phone; beside everything from `xl`, sticky while it fits. */}
       {/* One column of `minmax(0, 1fr)`: an implicit track takes its width from its widest content, «Le tue materie»'s
           strip of 240 px cards on a phone (G8b: 1370 px, the card out of the screen). */}
-      <div ref={aside} className={cn('grid min-w-0 grid-cols-1 gap-6', split && ASIDE, split && !settingsOpen && fits && STICK)}>
+      <div ref={aside} className={cn('grid min-w-0 grid-cols-1 gap-6', ASIDE, !settingsOpen && fits && STICK)}>
         <StatsBand
-          aside={split}
+          aside
           data={data}
           loading={loading && data === null}
           settingsOpen={settingsOpen}
@@ -208,12 +209,12 @@ export function ReviewHome() {
           (with no mission, the subjects under the day), never further: an absolute box placed on their rows (the grid's area is its containing block), out of the
           flow, so mounting it moves nothing. */}
       {celebrate && data && (
-        <div aria-hidden className={cn('pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-4', split && BURST)}>
+        <div aria-hidden className={cn('pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-4', BURST)}>
           <ConfettiBurst originRef={goalRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         </div>
       )}
 
-      <div className={cn('min-w-0 empty:hidden', split && LEFT)}>
+      <div className={cn('min-w-0 empty:hidden', LEFT)}>
         <MissionList data={data} loading={loading && data === null} />
       </div>
     </section>

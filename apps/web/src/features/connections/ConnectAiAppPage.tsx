@@ -201,10 +201,10 @@ export function ConnectAiAppPage() {
   const mcpUrl = state.status === 'ready' ? state.info.mcpUrl : null;
 
   return (
-    // The title at the frame's edge, as on every section page (W2); the page reads as text, so its body keeps a column
-    // of 768 px.
-    <PageFrame title="Collega un’app AI">
-      <div className="max-w-3xl space-y-8 pb-12">
+    // The title at the frame's edge, as on every section page (W2); the page reads as text, so its body keeps the
+    // reading measure (U1, `reading`).
+    <PageFrame title="Collega un’app AI" width="reading">
+      <div className="space-y-8 pb-12">
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Un’app di intelligenza artificiale collegata a VisuaLex può leggere i tuoi dossier, crearne di nuovi e aggiungervi
           norme, sentenze, note e schede di studio, con il tuo account. Il collegamento usa il protocollo MCP: copi
@@ -248,7 +248,7 @@ export function ConnectAiAppPage() {
                 Dati personali e app AI
               </h2>
               <p>
-                Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci e le tue schede di studio, e li
+                Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci, le tue note, le tue schede e i tuoi percorsi di studio, e li
                 passa al servizio di intelligenza artificiale che usa. Non scrivere lì dati personali dei clienti, oppure collega
                 solo app AI di cui ti fidi.
               </p>

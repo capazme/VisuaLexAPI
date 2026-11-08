@@ -44,8 +44,8 @@ export const subgraphNodeSchema = z
     urn: z.string().nullable().optional(),
     type: z.string(),
     label: z.string(),
-    properties: z.record(z.unknown()).optional(),
-    metadata: z.record(z.unknown()).optional(),
+    properties: z.record(z.string(), z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 export type SubgraphNode = z.infer<typeof subgraphNodeSchema>;
@@ -56,7 +56,7 @@ export const subgraphEdgeSchema = z
     source: z.string(),
     target: z.string(),
     type: z.string(),
-    properties: z.record(z.unknown()).optional(),
+    properties: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 export type SubgraphEdge = z.infer<typeof subgraphEdgeSchema>;
@@ -65,7 +65,7 @@ export const subgraphResponseSchema = z
   .object({
     nodes: z.array(subgraphNodeSchema),
     edges: z.array(subgraphEdgeSchema),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 export type SubgraphResponse = z.infer<typeof subgraphResponseSchema>;

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { NotificationHost, Toast } from '../Toast';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
-import { closeNotification, notificationStore, notify, resetNotifications } from '../notifications/notifications';
+import { closeNotification, notificationStore, notify, offerShortcutUndo, resetNotifications } from '../notifications/notifications';
+import { setFootBarRoom } from '../notifications/footBar';
 
 // jsdom runs no animation to its end on its own: an exit is ended by hand, as the card would at its end.
 const endExits = () => act(() => notificationStore.getState().entries.filter((e) => e.closing).forEach((e) => notificationStore.setState((s) => ({ entries: s.entries.filter((x) => x.id !== e.id) }))));
@@ -20,8 +21,20 @@ describe('NotificationHost (K1a)', () => {
     render(<NotificationHost />);
     await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
     const stack = list().parentElement as HTMLElement;
-    expect(stack.className).toContain('md:bottom-[5.5rem]');
+    expect(stack.className).toContain('md:bottom-[max(5.5rem,calc(1rem+var(--foot-bar,0px)))]');
     expect(stack.className).not.toContain('md:bottom-8');
+  });
+
+  it('rises over a bar held at the foot of the window (`--foot-bar`, «Sposta l\'evidenziazione»), at every width', async () => {
+    render(<NotificationHost />);
+    await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
+    const stack = list().parentElement as HTMLElement;
+    expect(stack.className).toContain('bottom-[calc(1rem+var(--foot-bar,0px))]');
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('');
+    act(() => setFootBarRoom(150));
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('150px');
+    act(() => setFootBarRoom(0));
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('');
   });
 
   it('answers «Annulla» while the time runs, then says «Ripristinato» in the same place', async () => {
@@ -288,6 +301,39 @@ describe('NotificationHost (K1a)', () => {
       expect(undoNew).not.toHaveBeenCalled();
     });
 
+    it('undoes over Study Mode, under the notifications (`data-undo-through`), and writes it there; not under a dialog over it', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      const study = document.createElement('div');
+      study.setAttribute('data-find-overlay', '');
+      study.setAttribute('data-undo-through', '');
+      const dialog = document.createElement('div');
+      dialog.setAttribute('aria-modal', 'true');
+      try {
+        await act(async () => { document.body.append(study); await new Promise((r) => setTimeout(r, 20)); });
+        expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).toHaveTextContent('Ctrl+Z');
+        await act(async () => { study.append(dialog); });
+        await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+        expect(undoNew).not.toHaveBeenCalled();
+        dialog.remove();
+        await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+        expect(undoNew).toHaveBeenCalledOnce();
+      } finally {
+        await act(async () => { study.remove(); });
+      }
+    });
+
+    it('does nothing under another overlay over the workspace (the find overlay of a page, a sheet)', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      const overlay = document.createElement('div');
+      overlay.setAttribute('data-find-overlay', '');
+      document.body.append(overlay);
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      overlay.remove();
+      expect(undoNew).not.toHaveBeenCalled();
+    });
+
     it('hands the focus in the notification it undoes to the next one', async () => {
       platform('Win32');
       await two();
@@ -368,5 +414,116 @@ describe('NotificationHost (K1a)', () => {
       document.body.dispatchEvent(event);
       expect(event.defaultPrevented).toBe(false);
     });
+  });
+});
+
+describe('Ctrl+Z (⌘Z) on a gesture that says nothing: a highlight\'s (A4, 5 November 2026)', () => {
+  const platform = (value: string) => Object.defineProperty(navigator, 'platform', { configurable: true, get: () => value });
+  afterEach(() => Reflect.deleteProperty(navigator, 'platform'));
+  const press = async () => {
+    const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+    await act(async () => { document.body.dispatchEvent(event); });
+    return event;
+  };
+
+  it('undoes it, with nothing on screen, says «Annullato: …» in the live region, and only once', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const undo = vi.fn();
+    act(() => { offerShortcutUndo({ message: 'Evidenziazione rimossa', undo }); });
+    expect(screen.queryByRole('list')).toBeNull();
+    expect((await press()).defaultPrevented).toBe(true);
+    expect(undo).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent(/^Annullato: Evidenziazione rimossa$/);
+    expect((await press()).defaultPrevented).toBe(false);
+    expect(undo).toHaveBeenCalledOnce();
+  });
+
+  it('the newer of a gesture and a notification\'s «Annulla» goes first, the other at the next press', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const gesture = vi.fn();
+    const note = vi.fn();
+    act(() => { offerShortcutUndo({ message: 'Evidenziazione rimossa', undo: gesture }); });
+    await act(async () => { void showUndoToast({ action: () => 'n', undo: note, message: 'Nota rimossa' }); });
+    // The note is newer: its notification says the key, and takes it.
+    expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).toHaveTextContent('Ctrl+Z');
+    await press();
+    expect(note).toHaveBeenCalledOnce();
+    expect(gesture).not.toHaveBeenCalled();
+    await press();
+    expect(gesture).toHaveBeenCalledOnce();
+  });
+
+  it('a gesture newer than the «Annulla» on screen takes the key, and the notification no longer promises it', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const gesture = vi.fn();
+    const note = vi.fn();
+    await act(async () => { void showUndoToast({ action: () => 'n', undo: note, message: 'Nota rimossa' }); });
+    act(() => { offerShortcutUndo({ message: 'Testo evidenziato in giallo', undo: gesture }); });
+    expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).not.toHaveTextContent('Ctrl+Z');
+    await press();
+    expect(gesture).toHaveBeenCalledOnce();
+    expect(note).not.toHaveBeenCalled();
+  });
+
+  it('while its text is off screen the key goes to the «Annulla» on screen, or by', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const gesture = vi.fn();
+    let onScreen = false;
+    act(() => { offerShortcutUndo({ message: 'Evidenziazione rimossa', ready: () => onScreen, undo: gesture }); });
+    expect((await press()).defaultPrevented).toBe(false);
+    expect(gesture).not.toHaveBeenCalled();
+    onScreen = true;
+    await press();
+    expect(gesture).toHaveBeenCalledOnce();
+  });
+
+  it('a gesture that finds nothing to take back leaves the key to the «Annulla» on screen, and says nothing', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const note = vi.fn();
+    await act(async () => { void showUndoToast({ action: () => 'n', undo: note, message: 'Nota rimossa' }); });
+    act(() => { offerShortcutUndo({ message: 'Testo evidenziato in giallo', undo: () => false }); });
+    await press();
+    expect(note).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).not.toHaveTextContent('Annullato');
+  });
+
+  it('writes «· Ctrl+Z» beside the «Annulla» when the newer gesture\'s text is off screen, where the key undoes the «Annulla»', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const note = vi.fn();
+    await act(async () => { void showUndoToast({ action: () => 'n', undo: note, message: 'Nota rimossa' }); });
+    act(() => { offerShortcutUndo({ message: 'Evidenziazione rimossa', ready: () => false, undo: vi.fn() }); });
+    expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).toHaveTextContent('Ctrl+Z');
+    await press();
+    expect(note).toHaveBeenCalledOnce();
+  });
+
+  it('the next gesture settles the one before: what it held is carried out, and the key undoes the newer alone', () => {
+    const settle = vi.fn();
+    const first = vi.fn();
+    offerShortcutUndo({ message: 'Evidenziazione rimossa', undo: first, settle });
+    offerShortcutUndo({ message: 'Testo evidenziato in giallo', undo: vi.fn() });
+    expect(settle).toHaveBeenCalledExactlyOnceWith(false);
+    expect(first).not.toHaveBeenCalled();
+  });
+
+  it('never in a field, where the key is the browser\'s own', async () => {
+    platform('Win32');
+    render(<NotificationHost />);
+    const gesture = vi.fn();
+    act(() => { offerShortcutUndo({ message: 'Evidenziazione rimossa', undo: gesture }); });
+    const field = document.createElement('textarea');
+    document.body.append(field);
+    try {
+      await act(async () => { field.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      expect(gesture).not.toHaveBeenCalled();
+    } finally {
+      field.remove();
+    }
   });
 });

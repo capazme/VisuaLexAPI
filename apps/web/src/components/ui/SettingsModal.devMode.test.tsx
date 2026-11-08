@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const auth = vi.fn();
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => auth() }));
-vi.mock('../../features/connections', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
 vi.mock('../../services/accountService', () => ({ accountService: {} }));
 
 import { SettingsModal } from './SettingsModal';
@@ -51,6 +51,21 @@ describe('SettingsModal — «Modalità sviluppo»', () => {
     auth.mockReturnValue({ isAdmin: false, canUseDevMode: true, devMode: false, setDevMode });
     open();
     expect(screen.getByRole('switch', { name: 'Modalità sviluppo' })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0');
+  });
+
+  it('gives every control of the page 44 px on a phone (M1): the theme, the four sizes, the tour, the admin panel', () => {
+    auth.mockReturnValue({ isAdmin: true, canUseDevMode: false, devMode: false, setDevMode });
+    render(
+      <MemoryRouter>
+        <SettingsModal isOpen onClose={vi.fn()} onRestartTour={vi.fn()} />
+      </MemoryRouter>,
+    );
+    for (const name of [/Chiaro/, /Scuro/, /Ricomincia il tour guidato/, /Pannello Admin/]) {
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    }
+    const sizes = screen.getByRole('group', { name: 'Dimensione testo' }).querySelectorAll('button');
+    expect(sizes).toHaveLength(4);
+    for (const size of sizes) expect(size).toHaveClass('h-11', 'w-11', 'md:h-8', 'md:w-8');
   });
 
   it('shows the switch on when the mode is on', () => {

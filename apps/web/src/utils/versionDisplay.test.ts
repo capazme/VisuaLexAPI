@@ -130,7 +130,7 @@ describe('describeVersion — a past text', () => {
         + 'Non è il testo attuale. Il testo in vigore a una data non dice quale disciplina si applichi al fatto: possono '
         + 'contare disposizioni transitorie, efficacia retroattiva o norme più favorevoli.',
       note: 'Note ed evidenziazioni non sono mostrate su un testo storico.',
-      actions: ['go_current', 'copy_citation'],
+      actions: ['go_current', 'copy_citation', 'copy_link'],
     });
   });
 

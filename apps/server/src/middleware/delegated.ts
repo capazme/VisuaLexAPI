@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import jwt from 'jsonwebtoken';
 import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible';
 import { prisma } from '../lib/prisma';
-import { DELETE_SCOPE, oauthConfig } from '../oauth/config';
+import { DELETE_SCOPE, TEXT_CONSENT_VERSION, TEXT_SCOPE, oauthConfig } from '../oauth/config';
 import { ACTOR, delegationSecret } from '../oauth/delegationSecret';
 import { findDelegatedRoute, type DelegatedCounter } from '../oauth/delegatedRoutes';
 import type { DelegatedClaims } from '../oauth/exchange';
@@ -18,6 +18,12 @@ export const DELEGATED_COUNTERS: Record<DelegatedCounter, number> = {
   note: 100,
   trash: 20,
   card: 100,
+  // D7b and D8: glosses proposed on the passages of dossier entries, and pages of an entry's text read.
+  passage: 100,
+  text: 200,
+  // Percorsi (A1, spec 2026-10-23 §10.6): courses created, and modules and exams added.
+  corso: 3,
+  modulo: 40,
 };
 
 const COUNTER_WORDS: Record<DelegatedCounter, string> = {
@@ -25,6 +31,10 @@ const COUNTER_WORDS: Record<DelegatedCounter, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
+  passage: 'glosse proposte',
+  text: 'pagine di testo',
+  corso: 'percorsi creati',
+  modulo: 'moduli ed esami aggiunti',
 };
 
 // Created on first use: the Redis client, when enabled, is read then.
@@ -154,13 +164,16 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
 
   const route = findDelegatedRoute(req.method, req.path);
   if (!route) return refuse(res, 403, 'Operazione non consentita alle applicazioni collegate.', 'forbidden');
-  if (!claims.scope.split(' ').includes(route.scope)) {
+  const tokenScopes = claims.scope.split(' ');
+  if (!tokenScopes.includes(route.scope) || (route.alsoScope && !tokenScopes.includes(route.alsoScope))) {
     return refuse(res, 403, 'Il collegamento non autorizza questa operazione.', 'insufficient_scope');
   }
 
   let user;
   // The name the application registered with (unverified): the mark on what it creates.
   let clientName: string | null = null;
+  // Whether this call may receive the text of the user's notes (G-381 (b)): the token's scope and the grant's consent.
+  let readsNotes = false;
   try {
     const grant = await prisma.oAuthGrant.findUnique({
       where: { id: claims.grant },
@@ -177,6 +190,7 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     }
     user = grant.user;
     clientName = grant.client.clientName ?? null;
+    readsNotes = tokenScopes.includes(TEXT_SCOPE) && grant.scopes.includes(TEXT_SCOPE) && (grant.textConsentVersion ?? 0) >= TEXT_CONSENT_VERSION;
   } catch (error) {
     console.error('delegatedAuth: could not read the grant:', error instanceof Error ? error.message : error);
     res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
@@ -227,14 +241,15 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     }
   }
   // A call that ends refused (4xx, 5xx) costs nothing; a route may also hand
-  // back part of the charge (the norms route, for references it could not check).
+  // back part of the charge (the norms route, for references it could not check)
+  // and of the counter (the passages route, for passages it refused).
   res.on('finish', () => {
     const back = res.statusCode >= 400 ? charged : Math.min(charged, Number(res.locals.delegatedRefund) || 0);
-    const counterBack = res.statusCode >= 400 ? counted : null;
-    if (back > 0 || counterBack) void refund(user.id, back, counterBack, counterAmount);
+    const counterBack = !counted ? 0 : res.statusCode >= 400 ? counterAmount : Math.min(counterAmount, Number(res.locals.delegatedCounterRefund) || 0);
+    if (back > 0 || counterBack > 0) void refund(user.id, back, counterBack > 0 ? counted : null, counterBack);
   });
 
   req.user = user;
-  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: claims.scope.split(' '), clientName };
+  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: tokenScopes, clientName, readsNotes };
   next();
 }

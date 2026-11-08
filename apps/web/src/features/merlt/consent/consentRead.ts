@@ -21,7 +21,7 @@ let serverWithoutMerlt = false;
 let pending: Promise<MerltConsentResponse> | null = null;
 
 /** A 404 `merlt_disabled`, in the shape `services/api.ts` rejects with, or axios' own. */
-function isMerltDisabled(err: unknown): boolean {
+export function isMerltDisabled(err: unknown): boolean {
   const e = err as
     | { status?: number; data?: { detail?: string }; response?: { status?: number; data?: { detail?: string } } }
     | null;

@@ -103,9 +103,9 @@ export function introspect(token: string, authorization: string | null = mcpBasi
   return call.send({ token });
 }
 
-/** A user's connected client with a live access and refresh token. */
-export async function connectedTokens(user: { token: string }) {
-  const flow = await approvedCode(user);
+/** A user's connected client with a live access and refresh token; `grantScope` is what the client asks for. */
+export async function connectedTokens(user: { token: string }, grantScope?: string) {
+  const flow = await approvedCode(user, grantScope ? { scope: grantScope } : {});
   const response = await exchangeCode(flow.clientId, flow.code, flow.verifier);
   if (response.status !== 200) throw new Error(`token failed: ${response.status} ${JSON.stringify(response.body)}`);
   return {
@@ -135,9 +135,10 @@ export function tokenExchange(subjectToken: string, extra: Record<string, string
   return call.send(Object.fromEntries(Object.entries(form).filter(([, v]) => v !== undefined)));
 }
 
-/** An API token for `user`, as the MCP server would hold it for one call. */
+/** An API token for `user`, as the MCP server would hold it for one call; the connection holds read and write and the scope asked. */
 export async function delegatedToken(user: { token: string }, scope = 'dossier:read dossier:write') {
-  const tokens = await connectedTokens(user);
+  const granted = [...new Set(['dossier:read', 'dossier:write', ...scope.split(' ')])].join(' ');
+  const tokens = await connectedTokens(user, granted);
   const response = await tokenExchange(tokens.access, { scope });
   if (response.status !== 200) throw new Error(`exchange failed: ${response.status} ${JSON.stringify(response.body)}`);
   return { ...tokens, apiToken: response.body.access_token as string };

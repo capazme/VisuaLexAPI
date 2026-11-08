@@ -82,36 +82,44 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
       }}
       className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
     >
-      <div className="flex items-center gap-1 p-1.5">
-        <Plus size={18} aria-hidden className="ml-2 shrink-0 text-slate-500 dark:text-slate-400" />
-        <label htmlFor={`${id}-title`} className="sr-only">Nuovo compito</label>
-        <input
-          id={`${id}-title`}
-          value={draft.title}
-          maxLength={MAX_TITLE}
-          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          placeholder="Aggiungi un compito"
-          aria-describedby={`${id}-summary`}
-          autoComplete="off"
-          className={cn('min-h-[44px] min-w-0 flex-1 rounded-lg bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-400', FIELD_TEXT)}
-        />
-        <button
-          ref={detailsButton}
-          type="button"
-          aria-expanded={open}
-          aria-controls={`${id}-details`}
-          onClick={() => setOpen((v) => !v)}
-          // In a row at every width: the planner's icon button is a grid, which stacked the icon over the arrow.
-          className={cn(ICON_BUTTON, 'inline-flex gap-1.5 px-2 sm:px-3', open && 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50')}
-        >
-          <SlidersHorizontal size={16} aria-hidden />
-          <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Dettagli</span>
-          {/* Turns as the panel opens, with its height: the button's state at every width. */}
-          <ChevronDown size={14} aria-hidden className={cn('shrink-0 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
-        </button>
-        <button type="submit" disabled={busy || !draft.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
-          {busy ? 'Aggiungo…' : <>Aggiungi<span className="sr-only"> il compito</span></>}
-        </button>
+      {/* The field keeps its hint whole — 12 em of its own text, «Aggiungi un compito» and its padding with some room,
+          whatever the reader's text size (the field stays 16 px on a phone while the page's rem shrinks) — but never
+          wider than its line; where the row has no room for it and the two buttons (a phone), the buttons go under it,
+          at the right (it was cut to «Aggiun» at 320 px). The ＋ stays with the field. */}
+      <div className="flex flex-wrap items-center gap-1 p-1.5">
+        <div className="flex min-w-0 flex-[1_1_auto] items-center gap-1">
+          <Plus size={18} aria-hidden className="ml-2 shrink-0 text-slate-500 dark:text-slate-400" />
+          <label htmlFor={`${id}-title`} className="sr-only">Nuovo compito</label>
+          <input
+            id={`${id}-title`}
+            value={draft.title}
+            maxLength={MAX_TITLE}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            placeholder="Aggiungi un compito"
+            aria-describedby={`${id}-summary`}
+            autoComplete="off"
+            className={cn('min-h-[44px] min-w-[min(12em,100%)] flex-1 rounded-lg bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-400', FIELD_TEXT)}
+          />
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            ref={detailsButton}
+            type="button"
+            aria-expanded={open}
+            aria-controls={`${id}-details`}
+            onClick={() => setOpen((v) => !v)}
+            // In a row at every width: the planner's icon button is a grid, which stacked the icon over the arrow.
+            className={cn(ICON_BUTTON, 'inline-flex gap-1.5 px-2 sm:px-3', open && 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50')}
+          >
+            <SlidersHorizontal size={16} aria-hidden />
+            <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Dettagli</span>
+            {/* Turns as the panel opens, with its height: the button's state at every width. */}
+            <ChevronDown size={14} aria-hidden className={cn('shrink-0 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
+          </button>
+          <button type="submit" disabled={busy || !draft.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
+            {busy ? 'Aggiungo…' : <>Aggiungi<span className="sr-only"> il compito</span></>}
+          </button>
+        </div>
       </div>
       <p id={`${id}-summary`} className={cn(FIELD_HINT, 'px-4 pb-2')}>{summary(draft, today, dossierTitle)}</p>
       <Collapsible

@@ -94,4 +94,18 @@ describe('LessonLoading', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(await screen.findByText('Oggi')).toBeInTheDocument();
   });
+
+  it('goes back to the course while a module\'s session loads (courses spec §6.5)', async () => {
+    render(
+      <MemoryRouter initialEntries={['/studia/percorsi/c1/moduli/m1']}>
+        <Routes>
+          <Route path="/studia/percorsi/:id" element={<p>Il percorso</p>} />
+          <Route path="/studia/percorsi/:id/moduli/:moduloId" element={<LessonLoading />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Carico il modulo…')).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(await screen.findByText('Il percorso')).toBeInTheDocument();
+  });
 });

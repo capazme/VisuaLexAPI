@@ -60,13 +60,15 @@ describe('Layout — the page\'s foot, clear of the feedback button (G8c)', () =
     expect(screen.getByTestId('layout-content')).toHaveClass(CLEARANCE, FOOT);
   });
 
-  it('keeps it in Focus mode, where the button still floats', async () => {
+  it('keeps it in full screen, where the button still floats', async () => {
     const { appStore } = await import('../../../store/useAppStore');
     const before = appStore.getState().settings;
     appStore.setState({ settings: { ...before, focusMode: true } });
     try {
       at('/dossier');
-      expect(screen.getByTestId('layout-content')).toHaveClass(CLEARANCE, 'py-12');
+      // The full screen keeps the page's padding (U1): it widens the frame, it no longer pads it 3 rem.
+      expect(screen.getByTestId('layout-content')).toHaveClass(CLEARANCE, 'md:py-8');
+      expect(screen.getByTestId('layout-content')).not.toHaveClass('py-12');
     } finally {
       appStore.setState({ settings: before });
     }

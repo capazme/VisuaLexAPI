@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
+import { RoutePage } from './RouteBoundary';
 import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -19,7 +20,7 @@ import { FindWindow } from '../features/search/FindWindow';
 import { GlobalSearch } from '../features/search/GlobalSearch';
 import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
-const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
+import { closeCompare, forgetCompareOpened, useCompare, useCompareOpened } from '../../hooks/useCompare';
 import { useTour } from '../../hooks/useTour';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
@@ -36,33 +37,87 @@ import { openSearchMenu } from '../../utils/searchFieldControl';
 import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
+import { isMacPlatform } from '../ui/notifications/undoShortcut';
+import { FULL_PAGE_FRAME, PAGE_FRAME } from './frame';
+
+/**
+ * The full screen's key, in the button's `title` and its `aria-keyshortcuts`: ⌘⇧F on a Mac, Ctrl+⇧F elsewhere (the
+ * owner's choice: ⌘Space, the key until then, opens Spotlight on a Mac).
+ */
+const FULL_SCREEN_SHORTCUT = isMacPlatform() ? '⌘⇧F' : 'Ctrl+⇧F';
+const FULL_SCREEN_KEYS = isMacPlatform() ? 'Meta+Shift+F' : 'Control+Shift+F';
+
+const loadCompareView = () => import('../features/compare/CompareView').then(m => ({ default: m.CompareView }));
+// A new one after a failed fetch: `lazy` keeps a failure for good.
+let CompareView = lazy(loadCompareView);
+
+/**
+ * The comparison's code that cannot be fetched, or an error of the comparison while in use, closes it instead of taking
+ * the page down (on `develop` the whole app went blank), the error in the console and no words on screen. The next
+ * opening fetches it again: that mends a connection that dropped, not a file a deploy removed, which stays missing until
+ * the page is reloaded (as for a lazy route).
+ */
+class CompareBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('the comparison could not be loaded', error);
+    CompareView = lazy(loadCompareView);
+    closeCompare();
+    forgetCompareOpened();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/** Where the comparison will stand while its code travels: only while it is open (closed meanwhile, nothing). */
+function CompareWaiting() {
+  const { isOpen } = useCompare();
+  if (!isOpen) return null;
+  return (
+    <div aria-hidden data-testid="compare-waiting" className={cn('pointer-events-none fixed inset-0 flex items-center justify-center', Z_INDEX.compare)}>
+      <span className="size-6 rounded-full border-2 border-primary-600 border-t-transparent animate-spin dark:border-primary-400 dark:border-t-transparent" />
+    </div>
+  );
+}
 
 export function Layout() {
-  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
+  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette, settingsDialog, openSettings, closeSettings } = useAppStore(useShallow(s => ({
     settings: s.settings,
     updateSettings: s.updateSettings,
     sidebarVisible: s.sidebarVisible,
     toggleSidebar: s.toggleSidebar,
     toggleSearchPanel: s.toggleSearchPanel,
     openCommandPalette: s.openCommandPalette,
+    // In the store, not here: a reader's gear opens it at «Significato dei colori» from wherever it is drawn.
+    settingsDialog: s.settingsDialog,
+    openSettings: s.openSettings,
+    closeSettings: s.closeSettings,
   })));
   const { isAuthenticated } = useAuth();
+  const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
   const desktopSidebar = useDesktopSidebar();
   const reduceMotion = useReducedMotion();
-  // The desktop column's width as it is drawn (0 when hidden or in Focus mode), set as `--sidebar-width` for
-  // what would float beside it from `lg`; nothing does since the services pill went into the user menu (S1).
+  // The desktop column's width as it is drawn (0 when hidden or in full screen), set as `--sidebar-width` for what is
+  // placed against the window from `lg`: the room a top row keeps for the full-screen button (`FOCUS_BUTTON_CLEARANCE`)
+  // and the practices' bar (`PracticeBar`).
   const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
   const { pathname } = useLocation();
   const onSearchPage = pathname === '/';
   // The search page's field sits above its content, outside the scroller, so it is always on screen
-  // (spec 2026-10-13-fixed-search-design.md); Focus mode hides it, ⌘K still opens the palette.
+  // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
   const showSearchBar = onSearchPage && !settings.focusMode;
   // Below lg a bar sits at the top of every page (M1): the search page's is its field, with the menu button beside it;
   // every other page has `PhoneTopBar` over its content area, and starts under it. Focus mode draws neither.
@@ -125,7 +180,7 @@ export function Layout() {
   // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
   // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
   // address is read when the welcome ends, not when this callback was made.
-  const { startTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+  const { startTour, prepareTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (type) => {
       if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
@@ -138,6 +193,7 @@ export function Layout() {
   const consentAsking = consent !== null && (consent.status === 'loading' || consent.needsAnswer);
   useEffect(() => {
     if (consentAsking) return;
+    if (!hasSeenTour('welcome')) prepareTour();
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
       if (!hasSeenTour('welcome')) {
@@ -145,7 +201,7 @@ export function Layout() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [hasSeenTour, startTour, consentAsking]);
+  }, [hasSeenTour, prepareTour, startTour, consentAsking]);
 
   // Apply Theme & Typography Effects
   useEffect(() => {
@@ -194,9 +250,11 @@ export function Layout() {
         e.preventDefault();
         navigate('/dossier');
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === ' ') {
+      // The full screen: Cmd/Ctrl+Shift+F. Without Shift, F is the find window's, below. A key held down toggles it once,
+      // and its repeats stay ours (Chrome on a Mac binds ⇧⌘F to its own menu).
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
-        updateSettings({ focusMode: !settings.focusMode });
+        if (!e.repeat) updateSettings({ focusMode: !settings.focusMode });
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
@@ -254,7 +312,7 @@ export function Layout() {
             layout={desktopSidebar.layout}
             onToggleWide={desktopSidebar.toggle}
             closeMobile={() => { }}
-            openSettings={() => setSettingsOpen(true)}
+            openSettings={() => openSettings()}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
@@ -271,7 +329,7 @@ export function Layout() {
             isOpen={sidebarOpen}
             layout="drawer"
             closeMobile={closeDrawer}
-            openSettings={() => setSettingsOpen(true)}
+            openSettings={() => openSettings()}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
@@ -294,12 +352,17 @@ export function Layout() {
           showPhoneBar && phoneBar.hidden && 'max-md:[--phone-bar-offset:0px]',
         )}
       >
-        {/* Floating Focus Toggle */}
+        {/* The full screen (U1, L-47: `focusMode` in the settings): it widens the frame, never narrows it. A toggle, so
+            its name stays «Tutto schermo» and `aria-pressed` says the state; the `title` says what a press does. */}
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          type="button"
+          whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+          whileTap={reduceMotion ? undefined : { scale: 0.95 }}
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
+          aria-label="Tutto schermo"
+          aria-pressed={settings.focusMode}
+          aria-keyshortcuts={FULL_SCREEN_KEYS}
           className={cn(
             // 44 px, the touch target (it was 42: a 20 px icon in 10 px of padding and a 1 px border).
             'hidden md:grid place-items-center h-11 w-11 fixed top-4 right-4 z-50 rounded-xl transition-colors',
@@ -310,9 +373,9 @@ export function Layout() {
               ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
               : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
-          title={settings.focusMode ? 'Esci da Focus Mode (Cmd+Space)' : 'Focus Mode (Cmd+Space)'}
+          title={settings.focusMode ? `Esci dal tutto schermo (${FULL_SCREEN_SHORTCUT})` : `Tutto schermo (${FULL_SCREEN_SHORTCUT})`}
         >
-          {settings.focusMode ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+          {settings.focusMode ? <Minimize2 size={20} aria-hidden /> : <Maximize2 size={20} aria-hidden />}
         </motion.button>
 
         {showPhoneBar && (
@@ -358,23 +421,32 @@ export function Layout() {
           )}
         >
           <div data-testid="layout-content" className={cn(
-            'max-w-7xl mx-auto p-4 md:p-8',
+            // The frame (U1): the window less its margins, at most 1600 px; 2400 in full screen, which gives the content
+            // the room of the sidebar and of the search page's field, and on a page that declares itself `full`
+            // (`frame.ts`). The padding above and below does not change: the practice row is measured against it.
+            PAGE_FRAME, 'py-4 md:py-8',
+            settings.focusMode ? 'max-w-frame-full' : cn('max-w-frame', FULL_PAGE_FRAME),
+            // Where the full-screen button floats over the page's top right, the room it takes, which a top row keeps
+            // clear (`FOCUS_BUTTON_CLEARANCE`): from md in full screen, which draws no bar for it to sit in; from lg
+            // otherwise; never over the search page's field, which ends before it.
+            settings.focusMode ? 'md:[--focus-button-room:4.25rem]' : !showSearchBar && 'lg:[--focus-button-room:4.25rem]',
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
-            // md:p-8 wins).
+            // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
-            settings.focusMode && 'max-w-4xl py-12',
             // The feedback button floats over the page's foot from md, signed in: 24 px off the edge and 46 px tall, and
             // 16 px of air over it, so the last row («Ripassa» of the last subject) scrolls clear of it (G8c). In
             // `--page-foot`, which a page sized to the window takes off its height (the graph's). Not on the search page,
-            // whose practice row is the window less `p-8` (`h-app-row`).
+            // whose practice row is the window less `md:py-8` (`h-app-row`).
             isAuthenticated && !onSearchPage && 'md:[--page-foot:5.375rem] md:pb-[var(--page-foot)]',
           )}>
-            <Outlet />
+            <RoutePage>
+              <Outlet />
+            </RoutePage>
           </div>
         </div>
       </main>
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onRestartTour={resetAndStartTour} />
+      <SettingsModal isOpen={settingsDialog.open} section={settingsDialog.section} onClose={closeSettings} onRestartTour={resetAndStartTour} />
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
@@ -407,11 +479,15 @@ export function Layout() {
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />
 
-      {/* Heavy reader overlays are loaded only when their route/state needs them. */}
-      <Suspense fallback={null}>
-        {/* Article Compare View */}
-        <CompareView />
-      </Suspense>
+      {/* Heavy reader overlays are loaded only when their route/state needs them: the comparison on its first opening,
+          a spinner where it will stand while its code arrives and it is open. */}
+      {compareOpened && (
+        <CompareBoundary>
+          <Suspense fallback={<CompareWaiting />}>
+            <CompareView />
+          </Suspense>
+        </CompareBoundary>
+      )}
     </div>
   );
 }

@@ -169,6 +169,14 @@
   --radius-xl: 10px;
   --radius-2xl: 14px;
   --radius-3xl: 14px;
+
+  /* The frame and the reading measure (U1, L-46), one value each. `max-w-frame`: the column a page in `Layout` draws
+     in, 1600 px; `max-w-frame-full`: the same in full screen and on a `full` page, 2400 px (`components/layout/frame.ts`).
+     `max-w-measure`: a long text's column, 70 characters of its own font; `.vlx-art` reads it too, and the signs'
+     container query writes its number (`theme.test.ts` keeps the two equal). */
+  --container-frame: 100rem;
+  --container-frame-full: 150rem;
+  --container-measure: 70ch;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -451,12 +459,20 @@
 }
 
 /* A column of the practice's row beside its windows: the page's height less the content area's
-   padding above and below it (`p-8`, 2 rem each, in `Layout`) and less the search page's field
+   padding above and below it (`md:py-8`, 2 rem each, in `Layout`) and less the search page's field
    (`--search-bar-height`, set by `Layout` while the field is drawn), so the scroller's content is never
    taller than the scroller and a `scrollIntoView` inside a window does not move the page. */
 @utility h-app-row {
   height: calc(100vh - 4rem - var(--search-bar-height, 0px));
   height: calc(100dvh - 4rem - var(--search-bar-height, 0px));
+}
+
+/* A dossier's column of two (D7d), at most the window's height less the content area's padding above it
+   (`md:py-8`) and its foot below (`--page-foot`, the floating feedback button's room; 2 rem without it) and the
+   search page's field: the columns fit the window once the page is scrolled to them, and each scrolls alone. */
+@utility max-h-app-column {
+  max-height: calc(100vh - 2rem - var(--page-foot, 2rem) - var(--search-bar-height, 0px));
+  max-height: calc(100dvh - 2rem - var(--page-foot, 2rem) - var(--search-bar-height, 0px));
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -470,7 +486,8 @@
   --vlx-hang: 2em;         /* hanging width of a printed comma number */
   --vlx-hang-item: 2.25em; /* hanging width of an item enumerator */
   --vlx-indent: 1.75em;    /* item indent per level */
-  max-width: 68ch;
+  /* The reading measure (U1): 70 characters of the text's own font, articles and decisions alike. */
+  max-width: var(--container-measure);
   margin-inline: auto;
   font-size: 1.1875rem;
   line-height: 1.65;
@@ -483,7 +500,7 @@
   @apply font-serif text-slate-800 dark:text-slate-200;
 }
 
-/* Study Mode sets size, leading and theme colours itself. */
+/* Study Mode sets size, leading and theme colours itself, and keeps its own narrow column (U1, L-47). */
 .vlx-art--study {
   max-width: none;
   font-size: inherit;
@@ -512,6 +529,19 @@
 ::highlight(vlx-find-current) {
   background-color: hsl(var(--vlx-find-current-bg));
   color: hsl(var(--vlx-find-current-fg));
+}
+
+/* The words of the gloss a card is on (D8: hovered or focused), painted through the CSS Custom Highlight API
+   (utils/glossPassage.ts), so the text nodes are never touched. The discussion's tint and underline
+   (`.vlx-thread-focus`), not a new colour. */
+::highlight(vlx-gloss) {
+  background-color: hsl(var(--primary) / 0.16);
+  text-decoration-line: underline;
+  text-decoration-color: hsl(var(--primary) / 0.7);
+  text-decoration-thickness: 2px;
+}
+:where(.dark) ::highlight(vlx-gloss) {
+  background-color: hsl(var(--primary) / 0.26);
 }
 
 /* Hidden, not removed: hidden text still counts in the offsets. */
@@ -770,7 +800,7 @@
    shrink-to-fit ancestor: keep it inside block-level parents. */
 .vlx-frame {
   container: vlx-frame / inline-size;
-  /* The query measures in the column's own font: 68ch is the column. */
+  /* The query measures in this font, close to the column's (1.1875rem): its 70ch is about the reading measure. */
   font-size: 1.125rem;
   @apply font-serif;
 }
@@ -798,6 +828,102 @@
 .vlx-art .vlx-sign-threads::after {
   content: attr(data-count);
   font-variant-numeric: tabular-nums;
+}
+
+/* The passages with an application's note (D7b), on the block's sign: the state's own shape and its count, as on the
+   row's light (`AiReviewSignal`): a dashed ring to validate, a filled flag to review, a tick validated. The -700 shades
+   in light (the count is text, 4.5:1 on the pill and on its hover), -300/-400 in dark. */
+.vlx-art .vlx-sign-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.vlx-art .vlx-sign-ai::before {
+  content: '';
+  width: 0.8rem;
+  height: 0.8rem;
+  background-color: currentColor;
+  -webkit-mask: var(--vlx-ai-icon) center / contain no-repeat;
+  mask: var(--vlx-ai-icon) center / contain no-repeat;
+}
+
+.vlx-art .vlx-sign-ai::after {
+  content: attr(data-count);
+  font-variant-numeric: tabular-nums;
+}
+
+.vlx-art .vlx-sign-ai[data-state="review"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528'/%3E%3C/svg%3E");
+  @apply text-red-700 dark:text-red-300;
+}
+
+.vlx-art .vlx-sign-ai[data-state="proposed"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.1 2.182a10 10 0 0 1 3.8 0'/%3E%3Cpath d='M13.9 21.818a10 10 0 0 1-3.8 0'/%3E%3Cpath d='M17.609 3.721a10 10 0 0 1 2.69 2.7'/%3E%3Cpath d='M2.182 13.9a10 10 0 0 1 0-3.8'/%3E%3Cpath d='M20.279 17.609a10 10 0 0 1-2.7 2.69'/%3E%3Cpath d='M21.818 10.1a10 10 0 0 1 0 3.8'/%3E%3Cpath d='M3.721 6.391a10 10 0 0 1 2.7-2.69'/%3E%3Cpath d='M6.391 20.279a10 10 0 0 1-2.69-2.7'/%3E%3C/svg%3E");
+  @apply text-amber-700 dark:text-amber-400;
+}
+
+.vlx-art .vlx-sign-ai[data-state="validated"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+  @apply text-emerald-700 dark:text-emerald-400;
+}
+
+.vlx-art .vlx-proposed {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* An application's glosses on the block's sign (D8): the same shapes and counts as `.vlx-sign-ai`, their own element, so
+   «Nascondi evidenziazioni» leaves them (a gloss is a note, not a highlight). */
+.vlx-art .vlx-sign-gloss {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.vlx-art .vlx-sign-gloss::before {
+  content: '';
+  width: 0.8rem;
+  height: 0.8rem;
+  background-color: currentColor;
+  -webkit-mask: var(--vlx-ai-icon) center / contain no-repeat;
+  mask: var(--vlx-ai-icon) center / contain no-repeat;
+}
+
+.vlx-art .vlx-sign-gloss::after {
+  content: attr(data-count);
+  font-variant-numeric: tabular-nums;
+}
+
+.vlx-art .vlx-sign-gloss[data-state="review"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528'/%3E%3C/svg%3E");
+  @apply text-red-700 dark:text-red-300;
+}
+
+.vlx-art .vlx-sign-gloss[data-state="proposed"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.1 2.182a10 10 0 0 1 3.8 0'/%3E%3Cpath d='M13.9 21.818a10 10 0 0 1-3.8 0'/%3E%3Cpath d='M17.609 3.721a10 10 0 0 1 2.69 2.7'/%3E%3Cpath d='M2.182 13.9a10 10 0 0 1 0-3.8'/%3E%3Cpath d='M20.279 17.609a10 10 0 0 1-2.7 2.69'/%3E%3Cpath d='M21.818 10.1a10 10 0 0 1 0 3.8'/%3E%3Cpath d='M3.721 6.391a10 10 0 0 1 2.7-2.69'/%3E%3Cpath d='M6.391 20.279a10 10 0 0 1-2.69-2.7'/%3E%3C/svg%3E");
+  @apply text-amber-700 dark:text-amber-400;
+}
+
+.vlx-art .vlx-sign-gloss[data-state="validated"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+  @apply text-emerald-700 dark:text-emerald-400;
+}
+
+/* Flagged «Da rivedere»: the dashed line turns red and thicker, not colour alone (the popover's flag says it in words). */
+.vlx-art .vlx-proposed[data-proposed="review"] {
+  text-decoration-thickness: 2.5px;
+  @apply decoration-red-600 dark:decoration-red-400;
+}
+
+.highlights-hidden .vlx-art .vlx-proposed,
+.vlx-art.highlights-hidden .vlx-proposed {
+  text-decoration-line: none;
+  cursor: auto;
 }
 
 /* The words of the discussion open in the panel. A tint and an underline,
@@ -883,9 +1009,10 @@
 }
 
 /* "Nascondi evidenziazioni" means the plain text: the dots go, and so does a
-   sign that holds only highlights. */
+   sign that holds only highlights (an application's glosses are notes: they stay). */
 .highlights-hidden .vlx-art .vlx-sign-dot,
-.highlights-hidden .vlx-art .vlx-sign[data-notes="0"][data-threads="0"] {
+.highlights-hidden .vlx-art .vlx-sign-ai,
+.highlights-hidden .vlx-art .vlx-sign[data-notes="0"][data-threads="0"][data-glosses="0"] {
   display: none;
 }
 
@@ -912,17 +1039,23 @@
     position: relative;
   }
 
+  /* 44 px each way at least, centred on the sign, which stays its 19 px in the text (M1). */
   .vlx-art .vlx-sign::after {
     content: '';
     position: absolute;
-    inset: -12px -8px;
+    left: 50%;
+    top: 50%;
+    width: max(calc(100% + 16px), 44px);
+    height: max(calc(100% + 24px), 44px);
+    transform: translate(-50%, -50%);
   }
 }
 
-/* Room for the 68ch column plus a sign on each side (with notes, four
+/* Room for the column at the reading measure plus a sign on each side (with notes, four
    dots and discussions a sign is ~7rem): every sign moves to the right margin, level with
-   its block's first line, all at the same x. */
-@container vlx-frame (min-width: calc(68ch + 14rem)) {
+   its block's first line, all at the same x. A query cannot read a variable: 70ch is
+   `--container-measure`, and theme.test.ts keeps the two equal. */
+@container vlx-frame (min-width: calc(70ch + 14rem)) {
   .vlx-art .vlx-b,
   .vlx-decision .vlx-dec-para {
     position: relative;
@@ -938,6 +1071,58 @@
 
 @media print {
   .vlx-art .vlx-sign {
+    display: none;
+  }
+}
+
+/* ── The glosses beside the text (D8) ─────────────────────────
+   As a word processor's comments: the text on the left, a column of cards on the right, each at the height of its
+   passage (GlossMargin places them with a transform, measured from the words' DOM range: no element in the text,
+   root rule 23). Only where the reader has room for a text still readable (about 32rem) beside the 17.5rem column;
+   below that the column is not drawn and the block's sign opens the cards in its popover, as on a phone. The query
+   is in rem, the root's size: the frame's own 70ch would need the text's font on the container. */
+.vlx-glossed {
+  container: vlx-glossed / inline-size;
+}
+
+.vlx-gloss-column {
+  display: none;
+}
+
+.vlx-gloss-card {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  transition: transform 160ms var(--ease-out), border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* Its first place is taken at once: from no transform it would slide down from the column's top. */
+.vlx-gloss-card.vlx-gloss-card-fresh {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vlx-gloss-card {
+    transition: none;
+  }
+}
+
+@container vlx-glossed (min-width: 52rem) {
+  .vlx-glossed-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 17.5rem;
+    column-gap: 1.5rem;
+    align-items: start;
+  }
+
+  .vlx-gloss-column {
+    display: block;
+    position: relative;
+  }
+}
+
+@media print {
+  .vlx-gloss-column {
     display: none;
   }
 }
@@ -1103,6 +1288,23 @@
 .dark .citation-hover:hover,
 .dark .decision-cite:hover {
   background-color: hsl(var(--primary) / 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   THE HIGHLIGHTER ON (A4) — the text's cursor while every selection
+   takes the ink (`vlx-inking` and `data-ink` on the selection's
+   container: `SelectionPopup`, `LessonText`). A hint only: the pressed
+   button is the state. Nothing in the text changes (gotcha 23). Ink
+   strokes over a white halo, legible on every paper; the pen's tip is
+   the hot spot. What has a click of its own keeps its own cursor.
+   ═══════════════════════════════════════════════════════════ */
+.vlx-inking,
+.vlx-inking :where(:not(a, button, [role='button'], .vlx-sign, .vlx-ref, .vlx-updates-toggle)) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='white' stroke-width='4'%3E%3Cpath d='m9 11-6 6v3h9l3-3'/%3E%3Cpath d='m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4'/%3E%3C/g%3E%3Cg stroke='%231e293b' stroke-width='2'%3E%3Cpath d='m9 11-6 6v3h9l3-3'/%3E%3Cpath d='m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4'/%3E%3C/g%3E%3C/svg%3E") 3 21, text;
+}
+.vlx-inking[data-ink='none'],
+.vlx-inking[data-ink='none'] :where(:not(a, button, [role='button'], .vlx-sign, .vlx-ref, .vlx-updates-toggle)) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='white' stroke-width='4'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3Cg stroke='%231e293b' stroke-width='2'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3C/svg%3E") 4 19, text;
 }
 
 /* ═══════════════════════════════════════════════════════════

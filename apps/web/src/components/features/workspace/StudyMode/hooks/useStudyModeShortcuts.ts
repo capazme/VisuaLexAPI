@@ -24,6 +24,10 @@ export function useStudyModeShortcuts(
   const { enabled = true } = options;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // While a dialog is open over Study Mode (Impostazioni, opened from its settings) the keys are the dialog's: its Esc,
+    // its arrows and what is typed in it never close Study Mode or turn the article under it — the focus inside the
+    // dialog or not (a click on its words, the 50 ms before its first focus, Safari's click that focuses nothing).
+    if (document.querySelector('[aria-modal="true"]')) return;
     // Ignore if typing in input or textarea
     if (
       e.target instanceof HTMLInputElement ||
@@ -35,6 +39,13 @@ export function useStudyModeShortcuts(
       }
       return;
     }
+
+    // A key an open menu took (its Esc, its arrows), or any key while one has focus (the colour of new highlights,
+    // H1): never Study Mode's too, which would close it or turn the article.
+    if (e.defaultPrevented) return;
+    if (e.target instanceof Element && e.target.closest('[role="menu"]')) return;
+    // With text selected, H and N are the selection popup's (highlight it, a note on it), not «previous» and a note.
+    if ((e.key === 'h' || e.key === 'n') && window.getSelection()?.toString().trim()) return;
 
     // Prevent default for our shortcuts
     const isModifier = e.metaKey || e.ctrlKey;
@@ -151,6 +162,6 @@ export const STUDY_MODE_SHORTCUTS = [
   { key: 'S', label: 'Settings' },
   { key: 'N', label: 'Nota' },
   { key: '1/2/3', label: 'Tema' },
-  { key: '1-4', label: 'Evidenzia (con selezione)' },
+  { key: '1-4', label: 'Sceglie il colore ed evidenzia (con selezione)' },
   { key: '⌘B', label: 'Segnalibro' },
 ] as const;

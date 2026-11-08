@@ -23,7 +23,40 @@ describe('PageFrame (W2)', () => {
     expect(screen.getByText('corpo')).toBeInTheDocument();
   });
 
-  it('keeps a header with an action clear of the Focus button, and only such a header', () => {
+  it('declares the page\'s width once, on its root: the frame by default (U1)', () => {
+    const { container, unmount } = render(
+      <PageFrame title="Dossier">
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    expect(container.firstElementChild).toHaveAttribute('data-page-width', 'work');
+    unmount();
+    const full = render(
+      <PageFrame title="Agenda" width="full">
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    // `Layout`'s frame widens to the full screen's while this page is in it (`FULL_PAGE_FRAME`, through `:has()`).
+    expect(full.container.firstElementChild).toHaveAttribute('data-page-width', 'full');
+    expect(screen.getByText('corpo').parentElement).toBe(full.container.firstElementChild);
+  });
+
+  it('keeps a `reading` page\'s body at the reading measure, never its title (U1)', () => {
+    const { container } = render(
+      <PageFrame title="Rassegne" width="reading" line="Cerca nelle rassegne" action={<button type="button">Azione</button>}>
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    const frame = container.firstElementChild as HTMLElement;
+    expect(frame).toHaveAttribute('data-page-width', 'reading');
+    expect(frame.className).not.toMatch(/\bmax-w-/);
+    expect(screen.getByRole('banner').className).not.toMatch(/\bmax-w-measure\b/);
+    const body = screen.getByText('corpo').parentElement as HTMLElement;
+    expect(body).toHaveClass('max-w-measure');
+    expect(body.parentElement).toBe(frame);
+  });
+
+  it('keeps a header with an action clear of the full-screen button, and only such a header', () => {
     const { unmount } = render(
       <PageFrame title="Cronologia" action={<button type="button">Svuota cronologia</button>}>
         <p>corpo</p>
@@ -107,8 +140,8 @@ describe('PageFrame (W2)', () => {
 });
 
 /**
- * The section pages (W2): each draws its title through the frame, or — under a way back — with `PAGE_TITLE`; none writes
- * a title of its own, puts an icon beside it, or narrows the page under the layout's frame.
+ * The section pages (W2, U1): each draws its title through the frame, or — under a way back — with `PAGE_TITLE`; none
+ * writes a title of its own, puts an icon beside it, or narrows the page under the layout's frame.
  */
 const SECTION_PAGES = [
   'components/features/dossier/DossierListView.tsx',
@@ -120,6 +153,8 @@ const SECTION_PAGES = [
   'components/features/studia/StudiaPage.tsx',
   'components/features/planner/OpusPage.tsx',
   'components/features/documents/DocumentReviewPage.tsx',
+  // A `reading` page (U1): the frame narrows its body, the page writes no cap.
+  'components/features/rassegne/RassegneSearchPage.tsx',
   'features/connections/ConnectAiAppPage.tsx',
   'components/features/history/HistoryView.tsx',
   'pages/MerltHubPage.tsx',
@@ -138,8 +173,9 @@ describe('the section pages (W2)', () => {
     // Any `<h1` left is the frame's token alone, with its words and nothing else inside.
     for (const [, inside] of source.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)) expect(inside).not.toMatch(/</);
     expect(source).not.toMatch(/<h1\b(?![^>]*className=\{PAGE_TITLE\})/);
-    // The root of the page is the frame's width.
-    expect(source).not.toMatch(/mx-auto[^"'`]*max-w-(?:3xl|4xl|6xl)|max-w-(?:3xl|4xl|6xl)[^"'`]*mx-auto/);
+    // The root of the page is the frame's width, and the page writes no cap of its own (U1): a page that reads as text
+    // says `width="reading"` to the frame.
+    expect(source).not.toMatch(/\bmax-w-(?:3xl|4xl|5xl|6xl|7xl)\b/);
   });
 });
 

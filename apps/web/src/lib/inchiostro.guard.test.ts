@@ -31,6 +31,8 @@ const KEYS: Record<string, string> = {
     'the kinds of a suggestion\'s items: notes, highlights, dossiers, quick norms, aliases (purple)',
   [join('components', 'features', 'bulletin', 'SuggestContentModal.tsx')]:
     'the same kinds counted before a suggestion is sent: the aliases\' purple',
+  [join('utils', 'highlightColors.ts')]:
+    'the four colours of a highlight, which the reader chooses and learns: blue on the selection popup\'s «Evidenzia» (H1)',
 };
 
 /** Every `file:line` of the sources (outside `allowed`) where `pattern` matches. */

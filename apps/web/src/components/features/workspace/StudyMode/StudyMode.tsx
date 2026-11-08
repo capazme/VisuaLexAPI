@@ -12,6 +12,7 @@ import { cn } from '../../../../lib/utils';
 import type { ArticleData, NormaVisitata, SearchParams } from '../../../../types';
 import { useTour } from '../../../../hooks/useTour';
 import { actHeading, shortNorm } from '../../../../utils/sources';
+import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 
 export interface StudyModeProps {
   /** When true (default), the component is visible */
@@ -131,7 +132,6 @@ export function StudyMode({
     highlights,
     addAnnotation,
     removeAnnotation,
-    addHighlight,
     removeHighlight,
     addQuickNorm,
     removeQuickNormByParams,
@@ -322,18 +322,20 @@ export function StudyMode({
     };
   }, [isOpen]);
 
-  // Generate norma key for annotations/highlights
-  const normaKey = useMemo(() => generateNormaKey(article.norma_data), [article.norma_data]);
+  // The pair the article's notes and highlights are stored under, the reader's own (`utils/normaKeys.ts`): an annex's
+  // article is `all{N}:{numero}`, so what Study Mode makes there is found here and in the reader alike.
+  const normaKey = useMemo(() => buildItemKey(article.norma_data), [article.norma_data]);
+  const articleId = uniqueArticleIdFromNorma(article.norma_data);
 
   // Filter annotations and highlights for current article
   const articleAnnotations = useMemo(() =>
-    annotations.filter(a => a.normaKey === normaKey && a.articleId === article.norma_data.numero_articolo),
-    [annotations, normaKey, article.norma_data.numero_articolo]
+    annotations.filter(a => a.normaKey === normaKey && a.articleId === articleId),
+    [annotations, normaKey, articleId]
   );
 
   const articleHighlights = useMemo(() =>
-    highlights.filter(h => h.normaKey === normaKey && h.articleId === article.norma_data.numero_articolo),
-    [highlights, normaKey, article.norma_data.numero_articolo]
+    highlights.filter(h => h.normaKey === normaKey && h.articleId === articleId),
+    [highlights, normaKey, articleId]
   );
 
   const isCurrentlyBookmarked = isQuickNorm(normaToSearchParams(article.norma_data));
@@ -374,8 +376,10 @@ export function StudyMode({
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+        // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Not the notifications, drawn
+        // over it: Ctrl+Z runs their «Annulla» here too (`isUndoCovered`), a highlight removed in it among them.
         data-find-overlay=""
+        data-undo-through=""
         style={isFullscreen ? undefined : windowStyle}
         className={cn(
           "fixed z-[130] flex flex-col shadow-lg overflow-hidden",
@@ -423,7 +427,7 @@ export function StudyMode({
             annotations={articleAnnotations}
             highlights={articleHighlights}
             normaKey={normaKey}
-            articleId={article.norma_data.allegato ? `all${article.norma_data.allegato}:${article.norma_data.numero_articolo}` : article.norma_data.numero_articolo}
+            articleId={articleId}
             onAddAnnotation={addAnnotation}
             onRemoveAnnotation={removeAnnotation}
             onRemoveHighlight={removeHighlight}
@@ -443,7 +447,6 @@ export function StudyMode({
             highlights={articleHighlights}
             annotations={articleAnnotations}
             normaKey={normaKey}
-            onAddHighlight={addHighlight}
             onRequestAddNote={(anchor) => {
               setNoteAnchor(anchor);
               setShowToolsPanel(true);
@@ -510,20 +513,6 @@ export function StudyMode({
     </AnimatePresence>,
     document.body
   );
-}
-
-// Helper to generate consistent norma keys. MUST mirror ArticleTabContent's
-// itemKey builder — highlights / annotations are filtered by `normaKey ===
-// itemKey` in the main view, so any divergence means entries saved from
-// Study Mode never show up back in the normal tab (and vice versa).
-function generateNormaKey(normaData: ArticleData['norma_data']): string {
-  const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
-  const parts = [normaData.tipo_atto];
-  if (normaData.numero_atto?.trim()) parts.push(normaData.numero_atto);
-  if (normaData.data?.trim()) parts.push(normaData.data);
-  if (normaData.allegato?.trim()) parts.push(`all${normaData.allegato}`);
-  if (normaData.numero_articolo?.trim()) parts.push(normaData.numero_articolo);
-  return parts.map(part => sanitize(part || '')).join('--');
 }
 
 export default StudyMode;

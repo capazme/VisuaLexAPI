@@ -10,6 +10,7 @@ vi.mock('../../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi
 
 import { StudyMode } from './StudyMode';
 import { isWorkspaceCovered } from '../../../../utils/findWindowControl';
+import { isUndoCovered } from '../../../ui/notifications/undoShortcut';
 import type { ArticleData } from '../../../../types';
 
 const ARTICLE: ArticleData = {
@@ -23,6 +24,11 @@ describe('StudyMode — over the workspace', () => {
     expect(isWorkspaceCovered()).toBe(true);
     rerender(<StudyMode isOpen={false} article={ARTICLE} onClose={vi.fn()} />);
     expect(isWorkspaceCovered()).toBe(false);
+  });
+
+  it('leaves Ctrl+Z to the notifications drawn over it: their «Annulla» is seen', () => {
+    render(<StudyMode article={ARTICLE} onClose={vi.fn()} />);
+    expect(isUndoCovered()).toBe(false);
   });
 
   it('is not a modal dialog: a note popover portalled outside it stays readable to a screen reader', () => {

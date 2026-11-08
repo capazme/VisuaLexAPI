@@ -38,6 +38,8 @@ export interface DossierActBlockProps {
   attachedNotes?: Map<string, Extract<DossierItem, { type: 'note' }>[]>;
   onAddNote?: (item: DossierItem) => void;
   onRemoveNote?: (note: DossierItem) => void;
+  /** The article a decision's citation has just opened, ringed for a moment (D7d). */
+  flashedId?: string | null;
   /** 3 under the page's «Norme» (D7a, the decisions beside the acts), else 2. */
   headingLevel?: 2 | 3;
 }
@@ -56,6 +58,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
     useSortable({ id: block.key, disabled: dragDisabled });
   const count = block.articles.length;
   const Heading = props.headingLevel === 3 ? 'h3' : 'h2';
+  const countLabel = count === 1 ? '1 articolo' : `${count} articoli`;
 
   return (
     <section
@@ -80,8 +83,9 @@ export function DossierActBlock(props: DossierActBlockProps) {
         <div className="min-w-0 flex-1 px-1 py-1">
           {/* The accordion pattern: the heading holds the toggle, so the act is a
               heading to a screen reader and its name is the act's own words. */}
-          {/* On one line, the name cut, while the act is 672 px wide; narrower — a phone, a tablet's narrow window, the
-              left column of two (D7a) — it wraps: a cut act name says nothing. */}
+          {/* On one line, the name cut, while the act is 42 rem wide (672 px at the default text size); narrower — a phone, a tablet's narrow window, the
+              left column of two (D7a) — it wraps: a cut act name says nothing. Its count then follows the name's last
+              words, on its line, not on a line of its own under a name of two (the left column at 1024 px). */}
           <Heading className="flex min-w-0 flex-wrap items-center gap-x-2 @2xl:flex-nowrap">
             <div
               role="button"
@@ -107,11 +111,13 @@ export function DossierActBlock(props: DossierActBlockProps) {
                 aria-hidden
                 className={cn('flex-shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', isFolded && '-rotate-90')}
               />
-              <span className="break-words @2xl:truncate">{block.heading}</span>
+              <span className="break-words @2xl:truncate">
+                {block.heading}
+                {/* Shown in the name's flow while narrow; the heading's own count, below, says it to a screen reader. */}
+                <span aria-hidden className={cn(SECTION_COUNT, 'ml-2 whitespace-nowrap @2xl:hidden')}>{countLabel}</span>
+              </span>
             </div>
-            <span className={cn('flex-shrink-0', SECTION_COUNT)}>
-              {count === 1 ? '1 articolo' : `${count} articoli`}
-            </span>
+            <span className={cn('flex-shrink-0 sr-only @2xl:not-sr-only', SECTION_COUNT)}>{countLabel}</span>
           </Heading>
           {title && (
             <p className={cn(ROW_LINE, 'ml-6 line-clamp-2 @2xl:line-clamp-none @2xl:truncate')} title={title}>{title}</p>
@@ -129,7 +135,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
             className={ACTION_BUTTON}
           >
             <ExternalLink size={15} aria-hidden />
-            {/* From lg, and while the act is 672 px wide: in the left column of two its name takes the room. */}
+            {/* From lg, and while the act is 42 rem wide: in the left column of two its name takes the room. */}
             <span className="hidden lg:@2xl:inline">Apri tutto</span>
           </button>
           <button
@@ -145,6 +151,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
           <MenuButton
             label={`Azioni su ${block.heading}`}
             triggerClassName={cn(ACTION_BUTTON, 'text-slate-500')}
+            // In the left column of two, which scrolls on its own (D7d), the last act's menu opens upwards.
+            placement="auto"
             items={[{ label: "Rimuovi l'atto dal dossier", icon: Trash2, danger: true, onSelect: props.onRemoveAct }]}
           >
             <MoreHorizontal size={18} />
@@ -170,6 +178,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
               notes={props.attachedNotes?.get(item.id)}
               onAddNote={props.onAddNote ? () => props.onAddNote?.(item) : undefined}
               onRemoveNote={props.onRemoveNote}
+              isFlashing={props.flashedId === item.id}
             />
           ))}
         </div>

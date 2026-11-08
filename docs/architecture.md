@@ -70,7 +70,7 @@ graph TD
 | **Routing** | React Router DOM v7 |
 | **HTTP** | Axios |
 | **UI** | Lucide React, React RND, Floating UI, cmdk |
-| **Utilities** | Zod, DOMPurify, jsPDF, date-fns |
+| **Utilities** | DOMPurify, jsPDF, date-fns |
 
 ### Node.js Backend (`/backend`)
 

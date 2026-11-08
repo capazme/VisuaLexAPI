@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
-vi.mock('../../features/connections', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
 vi.mock('../../features/merlt/privacy/MerltDataSection', () => ({ MerltDataSection: () => null }));
 vi.mock('../../services/accountService', () => ({ accountService: {} }));
 

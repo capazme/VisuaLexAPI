@@ -205,7 +205,6 @@ apps/web/src/
 | Package | Purpose |
 |---------|---------|
 | `axios` | HTTP client |
-| `zod` | Schema validation |
 | `date-fns` | Date formatting |
 | `dompurify` | HTML sanitization |
 | `jspdf` | PDF generation |

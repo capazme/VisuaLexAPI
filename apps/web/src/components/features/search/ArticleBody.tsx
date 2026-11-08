@@ -2,12 +2,14 @@ import { useRef, type RefObject } from 'react';
 import { SafeHTML } from '../../../utils/sanitize';
 import { cn } from '../../../lib/utils';
 import { SelectionPopup } from './SelectionPopup';
+import type { Ink } from '../../../utils/highlighterRules';
 
 export interface ArticleBodyProps {
     contentRef: RefObject<HTMLDivElement | null>;
     itemKey: string;
     processedContent: string;
-    onPopupHighlight: (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => void;
+    /** The words selected and the highlighter's ink (A4). */
+    onPopupHighlight: (text: string, ink: Ink, startOffset: number) => void;
     onPopupAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onPopupCopy: (text: string) => Promise<void> | void;
     /** Optional "Discuti" action on selected passage. */
@@ -22,8 +24,10 @@ export interface ArticleBodyProps {
     copyOnly?: boolean;
     /** The classes of the text root (typography and structure): `vlx-art` for an article. */
     className?: string;
-    /** Receives the text root (without the selection popup), for «Cerca nel testo». */
+    /** Receives the text root (without the selection popup): «Cerca nel testo», and a passage's new words (D7b). */
     textRootRef?: RefObject<HTMLDivElement | null>;
+    /** False while the reader asks for a passage's new words (D7b, `MoveProposalBar`): no popup over the selection. */
+    selectionPopup?: boolean;
 }
 
 export function ArticleBody({
@@ -40,6 +44,7 @@ export function ArticleBody({
     copyOnly = false,
     className = 'vlx-art',
     textRootRef,
+    selectionPopup = true,
 }: ArticleBodyProps) {
     // The text alone, without the selection popup: stored offsets are measured
     // from here (see SelectionPopup's textRootRef).
@@ -48,7 +53,7 @@ export function ArticleBody({
     // Article text — typography and structure from `.vlx-art` (index.css, READING SURFACE)
     return (
         <div className="relative group/content" ref={contentRef}>
-            <SelectionPopup
+            {selectionPopup && <SelectionPopup
                 containerRef={contentRef}
                 textRootRef={textRef}
                 onHighlight={onPopupHighlight}
@@ -58,9 +63,9 @@ export function ArticleBody({
                 onReportCitation={onPopupReportCitation}
                 onCreateCard={onPopupCreateCard}
                 copyOnly={copyOnly}
-            />
-            {/* A size container: with room beside the 68ch column, each
-                block's annotation sign moves to the right margin (index.css). */}
+            />}
+            {/* A size container: with room beside the column at the reading
+                measure, each block's annotation sign moves to the right margin (index.css). */}
             <div className="vlx-frame">
                 <div ref={textRef} className={cn(className, 'md:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
                     {processedContent && <SafeHTML html={processedContent} />}

@@ -1,12 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { spring } from '../../../lib/motion';
-import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { useWorkspaceCovered } from '../../../hooks/useWorkspaceCovered';
 import { NotificationCard } from './NotificationCard';
-import { isEditableTarget, isUndoShortcut, undoShortcutKeys, undoShortcutLabel } from './undoShortcut';
+import { footBarStore } from './footBar';
+import { isEditableTarget, isUndoCovered, isUndoShortcut, undoShortcutKeys, undoShortcutLabel } from './undoShortcut';
 import {
   announce,
   closeNotification,
@@ -15,6 +15,8 @@ import {
   notificationStore,
   registerNotificationHost,
   removeNotification,
+  runShortcutUndo,
+  shortcutUndoReady,
   undoNotification,
   type NotificationEntry,
 } from './notifications';
@@ -33,13 +35,20 @@ export function NotificationHost() {
   useEffect(() => registerNotificationHost(), []);
 
   // Ctrl+Z (⌘Z on a Mac) runs the newest «Annulla» still on screen (L-36), and says so; never in a field, an editor or
-  // anything editable, where it stays the browser's own undo, nor when something else took the key first.
+  // anything editable, where it stays the browser's own undo, nor when something else took the key first. A gesture on
+  // a highlight, which says nothing (A4), is undone by the key alone, when it is the newer of the two.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // Not under a dialog or an overlay (the «?» dialog, the palette): an undo behind it would go unseen. A held key
-      // undoes once, not the whole stack.
-      if (event.defaultPrevented || event.repeat || !isUndoShortcut(event) || isEditableTarget(event.target) || isWorkspaceCovered()) return;
+      // Not under a dialog or an overlay (the «?» dialog, the palette): an undo behind it would go unseen; Study Mode,
+      // under the notifications, is not one (`isUndoCovered`). A held key undoes once, not the whole stack.
+      if (event.defaultPrevented || event.repeat || !isUndoShortcut(event) || isEditableTarget(event.target) || isUndoCovered()) return;
       const entry = latestUndoable();
+      const undone = runShortcutUndo(entry?.id);
+      if (undone !== null) {
+        event.preventDefault();
+        announce(`Annullato: ${undone}`);
+        return;
+      }
       if (!entry) return;
       event.preventDefault();
       // The focus in the notification undone goes to the next one, as after Esc: it would be lost on the closing one.
@@ -60,9 +69,13 @@ export function NotificationHost() {
   }, []);
   // The notification the shortcut would undo writes it beside its «Annulla», where a keyboard is likely.
   const keyboard = typeof window.matchMedia !== 'function' || !window.matchMedia('(pointer: coarse)').matches;
-  const newest = keyboard ? latestUndoable(entries)?.id : undefined;
+  const held = notificationStore((s) => s.shortcutUndo);
+  const latest = latestUndoable(entries)?.id;
+  // A gesture newer than it, undone by the key alone, takes the key while its text is on screen: the notification does
+  // not promise it then.
+  const newest = keyboard && latest !== undefined && (held === null || held < latest || !shortcutUndoReady()) ? latest : undefined;
   // Under a dialog or an overlay the key does nothing: the notification does not promise it.
-  const covered = useWorkspaceCovered(newest !== undefined);
+  const covered = useWorkspaceCovered(newest !== undefined, isUndoCovered);
   const shortcutFor = covered ? undefined : newest;
 
   return (
@@ -82,14 +95,20 @@ export function NotificationHost() {
 }
 
 function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'bottom'; entries: NotificationEntry[]; still: boolean; shortcutFor?: number }) {
+  const footRoom = footBarStore((s) => s.room);
   if (entries.length === 0) return null;
   return (
     <div
+      // The bar's room, on this stack alone (never the root's style: see `footBar.ts`).
+      style={position === 'bottom' && footRoom > 0 ? ({ '--foot-bar': `${footRoom}px` } as CSSProperties) : undefined}
       className={cn(
         // On a phone the width less a 16 px gutter; from `md` at the right, as wide as a sentence, and at the bottom over
-        // the feedback button (`FeedbackButton`: 46 px, 24 px from the edge, from `md`), which it covered.
+        // the feedback button (`FeedbackButton`: 46 px, 24 px from the edge, from `md`), which it covered. A bar held at
+        // the foot of the window (`footBarStore`, its room there: «Sposta l'evidenziazione») keeps them over it.
         'absolute inset-x-4 md:inset-x-auto md:right-8 md:w-[26rem]',
-        position === 'bottom' ? 'bottom-4 md:bottom-[5.5rem]' : 'top-4',
+        position === 'bottom'
+          ? 'bottom-[calc(1rem+var(--foot-bar,0px))] md:bottom-[max(5.5rem,calc(1rem+var(--foot-bar,0px)))]'
+          : 'top-4',
       )}
     >
       <LayoutGroup id={`notifications-${position}`}>

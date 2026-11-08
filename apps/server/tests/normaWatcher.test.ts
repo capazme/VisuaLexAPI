@@ -91,7 +91,7 @@ describe('runNormaWatcher', () => {
   });
 
   async function seedWatch(normaKey: string, storedSnapshot: unknown) {
-    // A fresh user per call: setup.ts truncates `users` (CASCADE) before every
+    // A fresh user per call: setup.ts empties every table, `users` too, before every
     // test, so reusing a `user` created in an earlier test would point
     // `seedWatch` at a userId that no longer exists.
     user = await createTestUser(`watcher-${normaKey}`);
@@ -131,6 +131,21 @@ describe('runNormaWatcher', () => {
     expect(notifications).toHaveLength(1);
     // A snapshot that names no article is named by its key, as before.
     expect(notifications[0].message).toBe(`La norma salvata «${watch.normaKey}» è cambiata`);
+  });
+
+  it('watches a part of a split article as that part (G-387 (a))', async () => {
+    process.env.LEGAL_API_URL = 'http://legal-api.test';
+    await seedWatch('legge--296--2006-12-27--1--c701-800', {
+      norma_data: { tipo_atto: 'legge', numero_atto: '296', data: '2006-12-27', numero_articolo: '1', parte: '701-800' },
+      article_text: 'Old text',
+    });
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
+      bodies.push(JSON.parse(init.body));
+      return { ok: true, json: async () => [{ norma_data: { tipo_atto: 'legge' }, article_text: 'Old text' }] };
+    }));
+    await runNormaWatcher();
+    expect(bodies).toEqual([expect.objectContaining({ article: '1', parte: '701-800' })]);
   });
 
   it('strips a trailing slash on the base URL instead of producing a double slash', async () => {

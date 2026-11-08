@@ -22,7 +22,7 @@ export type MerltConsentLevelSchema = z.infer<typeof merltConsentLevelSchema>;
  */
 export const consentSetRequestSchema = z.object({
   level: merltConsentLevelSchema,
-  noticeId: z.string().uuid(),
+  noticeId: z.string().guid(),
   reason: z.string().max(500).optional(),
 });
 export type ConsentSetRequest = z.infer<typeof consentSetRequestSchema>;

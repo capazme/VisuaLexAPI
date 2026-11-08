@@ -20,15 +20,16 @@ import {
 const router = Router();
 router.use(authenticate, requireAdmin);
 
+// A number of the wrong type is answered in Italian; a missing one keeps zod's own message (zod 3's `invalid_type_error`).
 const sogliaSchema = z
   .object({
     approvazioni: z
-      .number({ invalid_type_error: 'Le approvazioni devono essere un numero intero.' })
+      .number({ error: (issue) => (issue.input === undefined ? undefined : 'Le approvazioni devono essere un numero intero.') })
       .int('Le approvazioni devono essere un numero intero.')
       .min(LIMITI_SOGLIE.approvazioni.min, 'Le approvazioni vanno da 1 a 5.')
       .max(LIMITI_SOGLIE.approvazioni.max, 'Le approvazioni vanno da 1 a 5.'),
     errate: z
-      .number({ invalid_type_error: 'Le errate devono essere un numero intero.' })
+      .number({ error: (issue) => (issue.input === undefined ? undefined : 'Le errate devono essere un numero intero.') })
       .int('Le errate devono essere un numero intero.')
       .min(LIMITI_SOGLIE.errate.min, 'Le errate vanno da 1 a 3.')
       .max(LIMITI_SOGLIE.errate.max, 'Le errate vanno da 1 a 3.'),

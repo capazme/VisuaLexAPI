@@ -2,26 +2,38 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react
 import { Layout } from './components/layout/Layout';
 import { SearchPage } from './pages/SearchPage';
 import { AuthPage } from './pages/AuthPage';
-import { CreditsPage } from './pages/CreditsPage';
-import { DossierPage } from './components/features/dossier/DossierPage';
-import { HistoryView } from './components/features/history/HistoryView';
-import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
-import { ForumCommunityPage } from './components/features/bulletin/ForumCommunityPage';
-import { DocumentReviewPage } from './components/features/documents/DocumentReviewPage';
 import { ConsentProvider } from './features/merlt/consent/ConsentContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { ConnectAiAppPage, ConnectPage } from './features/connections';
+import { ConnectPage } from './features/connections/ConnectPage';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
 import { isStudiaEnabled } from './features/studia/featureFlag';
 import { DevRoute } from './features/devMode/DevRoute';
-import { OpusPage } from './components/features/planner/OpusPage';
-import { InboxView, TaskTrashView, TodayView, UpcomingView } from './components/features/planner/OpusViews';
 import { buttonClassName } from './components/ui/buttonStyles';
 import { cn } from './lib/utils';
+import { PageBoundary } from './components/layout/RouteBoundary';
+import { PAGE_CODE } from './pageCode';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
 import { lazy, Suspense } from 'react';
+
+// The pages loaded with their route (P1, `pageCode.ts`); Ricerca, the sign-in page, a decision's address and «Pagina
+// non trovata» stay in the first chunk. They wait in the layout's `RoutePage`, «Crediti» at the root (below): nothing
+// in their place, a failure that keeps the app.
+const DossierPage = lazy(() => PAGE_CODE.dossier().then(m => ({ default: m.DossierPage })));
+const BulletinBoardPage = lazy(() => PAGE_CODE.forum().then(m => ({ default: m.BulletinBoardPage })));
+const HistoryView = lazy(() => PAGE_CODE.history().then(m => ({ default: m.HistoryView })));
+const ForumCommunityPage = lazy(() => PAGE_CODE.community().then(m => ({ default: m.ForumCommunityPage })));
+const DocumentReviewPage = lazy(() => PAGE_CODE.documents().then(m => ({ default: m.DocumentReviewPage })));
+const RassegneSearchPage = lazy(() => PAGE_CODE.rassegne().then(m => ({ default: m.RassegneSearchPage })));
+const CreditsPage = lazy(() => PAGE_CODE.credits().then(m => ({ default: m.CreditsPage })));
+const ConnectAiAppPage = lazy(() => PAGE_CODE.connectAiApp().then(m => ({ default: m.ConnectAiAppPage })));
+const OpusPage = lazy(() => PAGE_CODE.opus().then(([m]) => ({ default: m.OpusPage })));
+// Loaded with Opus's frame (`PAGE_CODE.opus`): by the time a view renders, its module is there.
+const TodayView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TodayView })));
+const UpcomingView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.UpcomingView })));
+const InboxView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.InboxView })));
+const TaskTrashView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TaskTrashView })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
 const MerltHubPage = lazy(() =>
   import('./pages/MerltHubPage').then(m => ({ default: m.MerltHubPage })),
@@ -48,6 +60,15 @@ const ValidationQueueView = lazy(() =>
 const ReviewHome = lazy(() =>
   import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
 );
+const CoursesView = lazy(() =>
+  import('./components/features/studia/corsi/CoursesView').then(m => ({ default: m.CoursesView })),
+);
+const CoursePage = lazy(() =>
+  import('./components/features/studia/corsi/CoursePage').then(m => ({ default: m.CoursePage })),
+);
+const ModuleSession = lazy(() =>
+  import('./components/features/studia/corsi/ModuleSession').then(m => ({ default: m.ModuleSession })),
+);
 const ProgressPage = lazy(() =>
   import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
 );
@@ -68,7 +89,8 @@ function EnvironmentsRedirect() {
 function NotFoundPage() {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-3 p-6 text-center">
-      <p className="text-2xl font-semibold text-slate-900 dark:text-white">Pagina non trovata</p>
+      {/* The page's title: the phone's bar names no section over it (M1: it said the one the user came from). */}
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Pagina non trovata</h1>
       <p className="text-sm text-slate-500 dark:text-slate-400">
         L'indirizzo che hai aperto non esiste o non è più disponibile.
       </p>
@@ -83,6 +105,9 @@ function NotFoundPage() {
 function App() {
   return (
     <BrowserRouter>
+      {/* No Suspense around the routes: a page outside the layout loaded with its route («Crediti») suspends the root,
+          so opened by its address the splash in `index.html` stays until it is there, and moved to from the app (the
+          user menu, the sign-in page) the router's transition keeps the screen it leaves. */}
       <Routes>
         {/* Public routes */}
         {/* Signing in and signing up, one page with two tabs: one parent route, so changing tab
@@ -92,7 +117,7 @@ function App() {
           <Route path="/register" element={null} />
         </Route>
         {/* The sources and their licences: public, so an attribution reads without an account. */}
-        <Route path="/crediti" element={<CreditsPage />} />
+        <Route path="/crediti" element={<PageBoundary><CreditsPage /></PageBoundary>} />
         {/* The OAuth consent page (MCP spike): signed in, outside the app layout. */}
         <Route
           path="/connect"
@@ -130,6 +155,7 @@ function App() {
           <Route path="forum" element={<BulletinBoardPage />} />
           <Route path="forum/community" element={<ForumCommunityPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
+          <Route path="rassegne" element={<RassegneSearchPage />} />
           {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
           <Route path="collega-app" element={<ConnectAiAppPage />} />
           {/* The MERL-T pages are development addresses (spec D6): without the development mode they
@@ -179,7 +205,7 @@ function App() {
               </DevRoute>
             }
           />
-          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; progressi the data; valida is the validators' queue. */}
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; percorsi the courses; progressi the data; valida is the validators' queue. */}
           {isStudiaEnabled() && (
             <Route
               path="studia"
@@ -192,6 +218,11 @@ function App() {
               <Route index element={<Navigate to="ripasso" replace />} />
               <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
               <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
+              {/* «Percorsi» (courses spec §6): drawn only while the switch `lingo_courses` is on, else back to Oggi. */}
+              <Route path="percorsi" element={<Suspense fallback={null}><CoursesView /></Suspense>} />
+              <Route path="percorsi/:id" element={<Suspense fallback={null}><CoursePage /></Suspense>} />
+              {/* A module's session (courses spec §6.5), the lesson's frame as the review's. */}
+              <Route path="percorsi/:id/moduli/:moduloId" element={<Suspense fallback={<LessonLoading />}><ModuleSession /></Suspense>} />
               <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />

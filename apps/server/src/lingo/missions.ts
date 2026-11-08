@@ -1,9 +1,11 @@
 import { Prisma, type LingoFonteXp, type LingoMateria, type LingoMissione } from '@prisma/client';
 import { CONSOLIDATED_DAYS, maturity } from './cardMaturity';
 import { levelOf } from './levels';
-import { reviewScope } from './reviewQueue';
+import { courseDayFor, reviewScope } from './reviewQueue';
 import { computeStreak } from './streak';
 import { addDays } from './studyDay';
+import { isSwitchOn } from '../assistant/switches';
+import { countingModules } from './courses';
 import { countedDays, dayToDate, romeDayStartSql } from './studyDays';
 import { readPreferences } from './studyPreferences';
 import { dueWhere, introducedToday, newCardsWhere } from './todayQueue';
@@ -18,18 +20,35 @@ import { creditedNow, insertCredit, levelNow, periodOf, type XpLivello, type XpP
  * Nothing here reads what the client sent: the events name only rows the server has just stored, and every
  * mission is evaluated from the stored day, the review log, the review states and the scopes, in Rome days of
  * the server's clock. `settleMissions` is called only from routes of the user's session (the grade, the proposal,
- * the vote, the progress and session reads), never from a route an exchanged token can reach (spec §8).
+ * the vote, the progress and session reads, and the courses' study routes and course page), never from a route an
+ * exchanged token can reach (spec §8).
+ *
+ * The courses' two missions (Percorsi, spec 2026-10-23 §10.8, §11) are not daily and not in the catalogue «Le
+ * missioni di oggi» lists: «Completa un modulo» once per module (`M:<module id>`) and «Supera un percorso» once per
+ * course (`C:<course id>`), settled by the same writer under the same lock and the same daily net.
  *
  * The vote rule (`lingo/validationRule.ts`) never reads this module or the level (G-253, G-318).
  */
 
-export type MissionId = 'dovute' | 'nuove' | 'obiettivo' | 'materia-ferma' | 'scrivi' | 'convalida' | 'caso' | 'settimana' | 'consolida';
+export type MissionId =
+  | 'dovute' | 'nuove' | 'obiettivo' | 'materia-ferma' | 'scrivi' | 'convalida' | 'caso' | 'settimana' | 'consolida'
+  | 'modulo' | 'percorso';
 
+/**
+ * What happened. A grade of a course card names the enrolment (`iscrizioneId`); `modulo` is any study write on a
+ * course's module (an answer, the end, a withdrawal), `esame` an exam handed in, `corso` the course page's read,
+ * which settles what a rolled-back savepoint or the daily net left behind (§10.8).
+ */
 export type XpEvent =
-  | { tipo: 'revisione'; logId: string; cardId: string; materia: LingoMateria; isNew: boolean; intervallo: number }
+  | { tipo: 'revisione'; logId: string; cardId: string; materia: LingoMateria; isNew: boolean; intervallo: number; iscrizioneId?: string }
   | { tipo: 'proposta'; cardId: string; materia: LingoMateria }
   | { tipo: 'voto'; votoId: string }
-  | { tipo: 'lettura' };
+  | { tipo: 'lettura' }
+  | { tipo: 'modulo'; iscrizioneId: string }
+  | { tipo: 'esame'; iscrizioneId: string }
+  | { tipo: 'corso'; iscrizioneId: string };
+
+type CatalogueEvent = Extract<XpEvent, { tipo: 'revisione' | 'proposta' | 'voto' | 'lettura' }>;
 
 interface MissionDef {
   id: MissionId;
@@ -40,7 +59,7 @@ interface MissionDef {
   principale: boolean;
   punti: number;
   /** The events that evaluate it (spec §5.1). */
-  eventi: readonly XpEvent['tipo'][];
+  eventi: readonly CatalogueEvent['tipo'][];
 }
 
 const REVIEW_EVENTS = ['revisione', 'lettura'] as const;
@@ -63,8 +82,11 @@ export const MISSIONS: readonly MissionDef[] = [
   { id: 'consolida', missione: 'CONSOLIDA', gruppo: 'lungo', principale: false, punti: 100, eventi: REVIEW_EVENTS },
 ];
 
-/** A safety net, not the rule (G-315): the catalogue's most in one day stays under it (a test pins it). */
-export const XP_DAILY_CEILING = 300;
+/**
+ * A safety net, not the rule (G-315): the catalogue's most in one day (255), two modules (60) and a course passed
+ * (100) stay under it (G-377 Q5; a test pins it).
+ */
+export const XP_DAILY_CEILING = 450;
 /** The reviews «obiettivo» needs for XP whatever the user's own goal (L-27 choice 5; the default goal). */
 export const XP_GOAL_FLOOR = 10;
 /** The new cards «nuove» asks for, lowered only when fewer are left in the review scope (spec §3.3). */
@@ -82,7 +104,11 @@ export const CONSOLIDATED_TARGET = 50;
  */
 export const LINGO_XP_LOCK_CLASS = 5870;
 
-const FONTE: Record<XpEvent['tipo'], LingoFonteXp> = { revisione: 'REVISIONE', proposta: 'PROPOSTA', voto: 'VOTO', lettura: 'LETTURA' };
+const FONTE: Record<CatalogueEvent['tipo'], LingoFonteXp> = { revisione: 'REVISIONE', proposta: 'PROPOSTA', voto: 'VOTO', lettura: 'LETTURA' };
+
+/** The courses' missions (§10.8, §11; G-377 Q5). */
+export const MODULE_MISSION = { punti: 30, percentuale: 70, alGiorno: 2 } as const;
+export const COURSE_MISSION = { punti: 100, competenze: 3, moduli: 3 } as const;
 
 export interface XpCredito {
   missione: MissionId;
@@ -134,7 +160,8 @@ function lazy<T, A extends unknown[] = []>(compute: (...args: A) => Promise<T>):
 /** The stored facts the missions read, for one user and one Rome day. */
 function factsFor(db: Prisma.TransactionClient, userId: string, today: string) {
   const prefs = lazy(() => readPreferences(db, userId));
-  const scope = lazy(async () => reviewScope(userId, (await prefs()).materieComunita));
+  const courseDay = lazy(() => courseDayFor(db, today));
+  const scope = lazy(async () => reviewScope(userId, (await prefs()).materieComunita, await courseDay()));
   const day = lazy(async () => {
     const row = await db.lingoGiornataStudio.findUnique({ where: { utenteId_giorno: { utenteId: userId, giorno: dayToDate(today) } } });
     return { ripassi: row?.ripassi ?? 0, ripassiDovuti: row?.ripassiDovuti ?? 0, nuove: row?.nuove ?? 0, valido: row?.valido ?? false, voti: row?.voti ?? 0 };
@@ -162,7 +189,7 @@ function factsFor(db: Prisma.TransactionClient, userId: string, today: string) {
     return rows;
   });
   const votable = lazy(async () => (await db.lingoCard.findFirst({ where: votableWhere(userId), select: { id: true } })) !== null);
-  return { prefs, scope, day, due, newLeft, streak, consolidated, subjects, votable };
+  return { prefs, courseDay, scope, day, due, newLeft, streak, consolidated, subjects, votable };
 }
 
 type Facts = ReturnType<typeof factsFor>;
@@ -174,7 +201,7 @@ function qualifies(stat: SubjectStat, today: string): boolean {
 
 const progress = (fatte: number, di: number) => ({ fatte: Math.min(fatte, di), di });
 
-async function evaluate(id: MissionId, facts: Facts, today: string, event: XpEvent, userId: string, db: Prisma.TransactionClient): Promise<Evaluation> {
+async function evaluate(id: MissionId, facts: Facts, today: string, event: CatalogueEvent, userId: string, db: Prisma.TransactionClient): Promise<Evaluation> {
   switch (id) {
     case 'dovute': {
       // Only grades of a card already due count (G-334): a card graded early cannot stand in for the due queue.
@@ -223,6 +250,8 @@ async function evaluate(id: MissionId, facts: Facts, today: string, event: XpEve
       return { fulfilled: n >= CONSOLIDATED_TARGET, vuota: false, progresso: progress(n, CONSOLIDATED_TARGET) };
     }
     case 'caso':
+    case 'modulo':
+    case 'percorso':
       return { fulfilled: false, vuota: false };
   }
 }
@@ -233,7 +262,7 @@ async function evaluate(id: MissionId, facts: Facts, today: string, event: XpEve
  * oldest last review among those where today's reviews, the cards due today and the new cards left today (with
  * the quota) reach 5; «vuota» when none.
  */
-async function evaluateStaleSubject(facts: Facts, today: string, event: XpEvent, userId: string, db: Prisma.TransactionClient): Promise<Evaluation> {
+async function evaluateStaleSubject(facts: Facts, today: string, event: CatalogueEvent, userId: string, db: Prisma.TransactionClient): Promise<Evaluation> {
   // One settle evaluates this mission once, so the lazy value is asked with the same argument each time.
   const stats = (await facts.subjects(event.tipo === 'revisione' ? event.materia : undefined)).filter((s) => qualifies(s, today));
   if (event.tipo === 'revisione') {
@@ -248,7 +277,7 @@ async function evaluateStaleSubject(facts: Facts, today: string, event: XpEvent,
     const newSlots = Math.max(0, nuoveAlGiorno - (await introducedToday(db, userId, today)));
     const reachable: SubjectStat[] = [];
     for (const stat of stats) {
-      const scope = reviewScope(userId, materieComunita, stat.materia);
+      const scope = reviewScope(userId, materieComunita, await facts.courseDay(), stat.materia);
       const [due, fresh] = await Promise.all([
         db.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) }),
         db.lingoCard.count({ where: newCardsWhere(userId, scope) }),
@@ -263,6 +292,7 @@ async function evaluateStaleSubject(facts: Facts, today: string, event: XpEvent,
 
 /** The missions this event evaluates, the subject- and interval-bound ones narrowed as spec §5.1 says. */
 async function evaluatedBy(event: XpEvent, db: Prisma.TransactionClient, userId: string): Promise<MissionDef[]> {
+  if (!isCatalogueEvent(event)) return [];
   const isValidator = event.tipo === 'lettura' ? await validator(db, userId) : true;
   return MISSIONS.filter((m) => {
     if (m.missione === null || !m.eventi.includes(event.tipo)) return false;
@@ -277,7 +307,9 @@ async function validator(db: Prisma.TransactionClient, userId: string): Promise<
   return user?.lingoValidatore ?? false;
 }
 
-function fonteIdOf(event: XpEvent): string | null {
+const isCatalogueEvent = (event: XpEvent): event is CatalogueEvent => event.tipo in FONTE;
+
+function fonteIdOf(event: CatalogueEvent): string | null {
   if (event.tipo === 'revisione') return event.logId;
   if (event.tipo === 'proposta') return event.cardId;
   if (event.tipo === 'voto') return event.votoId;
@@ -306,7 +338,7 @@ export async function settleMissions(tx: Prisma.TransactionClient, userId: strin
     let dayTotal = before.oggi;
     for (const mission of await evaluatedBy(event, tx, userId)) {
       if (credited.has(mission.missione!)) continue;
-      const result = await evaluate(mission.id, facts, today, event, userId, tx);
+      const result = await evaluate(mission.id, facts, today, event as CatalogueEvent, userId, tx);
       if (!result.fulfilled) continue;
       if (dayTotal + mission.punti > XP_DAILY_CEILING) {
         console.warn(`[xp] daily ceiling reached: «${mission.id}» not credited`);
@@ -315,12 +347,13 @@ export async function settleMissions(tx: Prisma.TransactionClient, userId: strin
       const materia = mission.id === 'scrivi' && event.tipo === 'proposta' ? event.materia : (result.materia ?? null);
       const written = await insertCredit(tx, {
         userId, missione: mission.missione!, periodo: periodOf(mission.gruppo, today), today,
-        punti: mission.punti, fonte: FONTE[event.tipo], fonteId: fonteIdOf(event), materia,
+        punti: mission.punti, fonte: FONTE[(event as CatalogueEvent).tipo], fonteId: fonteIdOf(event as CatalogueEvent), materia,
       });
       if (!written) continue;
       crediti.push({ missione: mission.id, punti: mission.punti });
       dayTotal += mission.punti;
     }
+    dayTotal = await settleCourseMissions(tx, userId, today, event, crediti, dayTotal);
     settled = { before, crediti, dayTotal };
   } catch (error) {
     // Also undoes the SET LOCAL. The error's text may carry the statement's values: only its name is logged.
@@ -335,6 +368,83 @@ export async function settleMissions(tx: Prisma.TransactionClient, userId: strin
   const total = before.totale + crediti.reduce((sum, c) => sum + c.punti, 0);
   const livello = { ...levelOf(total), totale: total, oggi: dayTotal };
   return { crediti, livello, nuovoLivello: livello.livello > before.livello };
+}
+
+/**
+ * «Completa un modulo» and «Supera un percorso» for the event's enrolment (§10.8), decided from stored rows only:
+ * every module of it done with the quiz at 70% or more and not yet credited, at most two a Rome day (G-377 Q5: a
+ * third waits for the next day's event or course page, never lost), and the course once it is passed, for a course of
+ * three competences and three modules at least. Returns the day's new total; pushes what it credits.
+ */
+async function settleCourseMissions(
+  tx: Prisma.TransactionClient, userId: string, today: string, event: XpEvent, crediti: XpCredito[], dayTotal: number,
+): Promise<number> {
+  const iscrizioneId = 'iscrizioneId' in event ? event.iscrizioneId : undefined;
+  // Off hides: no course mission is credited while the switch is off, whatever the path (§10.10).
+  if (!iscrizioneId || !(await isSwitchOn('lingo_courses', tx))) return dayTotal;
+  const enrolment = await tx.lingoCorsoIscrizione.findFirst({
+    where: { id: iscrizioneId, utenteId: userId },
+    select: {
+      id: true, corsoId: true, superatoIl: true,
+      corso: { select: { materia: true, _count: { select: { competenze: true } }, moduli: { select: { id: true, sostituisceId: true } } } },
+      stati: { select: { id: true, moduloId: true, fattoIl: true, fattoGiorno: true, quizPercentuale: true, ritiratoIl: true } },
+      tentativi: { select: { giorno: true, superato: true } },
+    },
+  });
+  if (!enrolment) return dayTotal;
+  const materia = enrolment.corso.materia;
+
+  if (event.tipo === 'modulo' || event.tipo === 'corso') {
+    const passed = enrolment.stati
+      .filter((s) => s.fattoIl && s.quizPercentuale !== null && s.quizPercentuale >= MODULE_MISSION.percentuale)
+      .sort((a, b) => a.fattoIl!.getTime() - b.fattoIl!.getTime() || (a.id < b.id ? -1 : 1));
+    if (passed.length > 0) {
+      const credited = new Set(
+        (await tx.lingoCreditoXp.findMany({ where: { missione: 'MODULO', fonteId: { in: passed.map((s) => s.id) } }, select: { fonteId: true } })).map((r) => r.fonteId),
+      );
+      let todays = await tx.lingoCreditoXp.count({ where: { utenteId: userId, missione: 'MODULO', giorno: dayToDate(today) } });
+      for (const state of passed) {
+        if (credited.has(state.id)) continue;
+        if (todays >= MODULE_MISSION.alGiorno) break;
+        if (dayTotal + MODULE_MISSION.punti > XP_DAILY_CEILING) {
+          console.warn('[xp] daily ceiling reached: «modulo» not credited');
+          break;
+        }
+        const written = await insertCredit(tx, {
+          userId, missione: 'MODULO', periodo: `M:${state.moduloId}`, today, punti: MODULE_MISSION.punti, fonte: 'MODULO', fonteId: state.id, materia,
+        });
+        if (!written) continue;
+        crediti.push({ missione: 'modulo', punti: MODULE_MISSION.punti });
+        dayTotal += MODULE_MISSION.punti;
+        todays += 1;
+      }
+    }
+  }
+
+  if (!enrolment.superatoIl) return dayTotal;
+  const withdrawn = new Set(enrolment.stati.filter((s) => s.ritiratoIl).map((s) => s.moduloId));
+  const big = enrolment.corso._count.competenze >= COURSE_MISSION.competenze && countingModules(enrolment.corso.moduli, withdrawn).length >= COURSE_MISSION.moduli;
+  if (!big) return dayTotal;
+  if (dayTotal + COURSE_MISSION.punti > XP_DAILY_CEILING) {
+    console.warn('[xp] daily ceiling reached: «percorso» not credited');
+    return dayTotal;
+  }
+  const passedOn = enrolment.superatoIl.getTime();
+  const fonte: LingoFonteXp =
+    event.tipo === 'esame' ? 'ESAME'
+      : event.tipo === 'revisione' ? 'REVISIONE'
+        : event.tipo === 'modulo' ? 'MODULO'
+          // The course page settles a credit left behind with the event that brought it, as far as the rows tell.
+          : enrolment.tentativi.some((t) => t.superato && t.giorno?.getTime() === passedOn) ? 'ESAME'
+            : enrolment.stati.some((s) => s.fattoGiorno?.getTime() === passedOn) ? 'MODULO' : 'REVISIONE';
+  const written = await insertCredit(tx, {
+    userId, missione: 'PERCORSO', periodo: `C:${enrolment.corsoId}`, today, punti: COURSE_MISSION.punti, fonte, fonteId: enrolment.id, materia,
+  });
+  if (written) {
+    crediti.push({ missione: 'percorso', punti: COURSE_MISSION.punti });
+    dayTotal += COURSE_MISSION.punti;
+  }
+  return dayTotal;
 }
 
 /**

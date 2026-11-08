@@ -6,31 +6,31 @@ import { AppError } from '../middleware/errorHandler';
 // Validation schemas
 const createBookmarkSchema = z.object({
   normaKey: z.string().min(1),
-  normaData: z.any(), // JSON data from VisualEx API
+  normaData: z.any().optional(), // JSON data from VisualEx API
   title: z.string().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional().default([]),
-  folderId: z.string().uuid().optional().nullable(),
+  folderId: z.string().guid().optional().nullable(),
 });
 
 const updateBookmarkSchema = z.object({
   title: z.string().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  folderId: z.string().uuid().optional().nullable(),
+  folderId: z.string().guid().optional().nullable(),
 });
 
 const moveBookmarkSchema = z.object({
-  folderId: z.string().uuid().optional().nullable(),
+  folderId: z.string().guid().optional().nullable(),
 });
 
 const bulkDeleteSchema = z.object({
-  bookmarkIds: z.array(z.string().uuid()).min(1),
+  bookmarkIds: z.array(z.string().guid()).min(1),
 });
 
 const bulkMoveSchema = z.object({
-  bookmarkIds: z.array(z.string().uuid()).min(1),
-  folderId: z.string().uuid().optional().nullable(),
+  bookmarkIds: z.array(z.string().guid()).min(1),
+  folderId: z.string().guid().optional().nullable(),
 });
 
 // Create bookmark

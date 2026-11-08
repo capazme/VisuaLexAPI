@@ -27,12 +27,12 @@ beforeEach(() => {
 afterEach(() => appStore.setState({ pushReadingBack: originalPush }));
 
 describe('useCitationLinks', () => {
-  it('a click records the origin, then opens the citation and hides the preview', () => {
+  it('a click records the origin, then opens the citation, with the link clicked, and hides the preview', () => {
     const onOpen = vi.fn();
     const hidePreview = vi.fn();
     render(<Host onOpen={onOpen} origin={ORIGIN} showPreview={vi.fn()} hidePreview={hidePreview} />);
     fireEvent.click(citation());
-    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ article: '2043' }));
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ article: '2043' }), citation());
     expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(ORIGIN);
     expect(hidePreview).toHaveBeenCalled();
   });

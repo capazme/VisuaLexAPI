@@ -82,7 +82,7 @@ export const qaCallbackSchema = z.object({
   bffJobId: z.string().min(1),
   status: z.enum(['running', 'completed', 'failed', 'timeout']),
   partialExpert: qaCallbackPartialExpertSchema.nullish(),
-  result: z.record(z.unknown()).nullish(),
+  result: z.record(z.string(), z.unknown()).nullish(),
   error: z.string().nullish(),
 });
 export type QaCallback = z.infer<typeof qaCallbackSchema>;

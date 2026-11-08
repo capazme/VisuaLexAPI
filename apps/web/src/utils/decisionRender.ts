@@ -13,7 +13,7 @@
  */
 import type { Annotation, Highlight } from '../types';
 import type { DecisionText } from '../types/decisions';
-import { groupAnchorsByBlock, resolveAnchors, type LocatedThread, type ResolvedAnchor } from './articleAnnotations';
+import { groupAnchorsByBlock, resolveAnchors, resolveGlosses, type GlossAnchor, type LocatedThread, type ResolvedAnchor } from './articleAnnotations';
 import { highlightOpen, noteOpen, renderSpan, signHtml, threadFocusOpen, type Mark } from './articleRender';
 import type { ArticleStructure } from './articleStructure';
 import { decisionParagraphs } from './decisionText';
@@ -121,6 +121,8 @@ export interface RenderDecisionInput {
   focusedThreadId?: string | null;
   /** The key passages (`keyPassages`): wrapped, never stored; hidden by a class on the container. */
   keyPassages?: readonly KeyPassage[];
+  /** An application's glosses (D8): counted on the signs, never drawn, as an article's. */
+  glosses?: readonly GlossAnchor[];
 }
 
 /** The label a key passage starts with, drawn by CSS from `data-key-label`. */
@@ -130,7 +132,7 @@ export const KEY_PASSAGE_LABELS: Record<KeyPassageKind, string> = {
   decisione: 'Decisione',
 };
 
-export function renderDecisionHtml({ testo, highlights, annotations, signs = false, threads = [], focusedThreadId = null, keyPassages = [] }: RenderDecisionInput): string {
+export function renderDecisionHtml({ testo, highlights, annotations, signs = false, threads = [], focusedThreadId = null, keyPassages = [], glosses = [] }: RenderDecisionInput): string {
   const plain = decisionProjection(testo);
   const anchors = resolveAnchors(plain, highlights, annotations);
   const marks: Mark[] = [];
@@ -156,7 +158,7 @@ export function renderDecisionHtml({ testo, highlights, annotations, signs = fal
 
   const layout = layoutDecision(testo);
   const threadAnchors: ResolvedAnchor[] = threads.map((lt) => ({ kind: 'thread', thread: lt.thread, start: lt.start, end: lt.end }));
-  const groups = signs ? groupAnchorsByBlock(plain, decisionStructure(testo), [...anchors, ...threadAnchors]) : null;
+  const groups = signs ? groupAnchorsByBlock(plain, decisionStructure(testo), [...anchors, ...threadAnchors, ...resolveGlosses(plain, glosses)]) : null;
 
   let index = 0;
   return layout

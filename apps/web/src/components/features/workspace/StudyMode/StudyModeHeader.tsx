@@ -4,6 +4,7 @@ import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { spring } from '../../../../lib/motion';
+import { HighlighterButton } from '../../search/HighlighterButton';
 
 interface StudyModeHeaderProps {
   visible: boolean;
@@ -173,6 +174,10 @@ export function StudyModeHeader({
                   <StickyNote size={14} className="sm:w-4 sm:h-4" />
                 </button>
               )}
+
+              {/* The highlighter (H1, A4), as in the reading bar; the way to the colours' meanings is in Study Mode's own
+                  settings (the gear «Impostazioni (S)»), not a second gear beside this one. */}
+              <HighlighterButton meaningsGear={false} triggerClassName={cn('min-h-[44px] min-w-[44px] justify-center rounded-md p-1.5 sm:p-2 md:min-h-0 md:min-w-0', styles.button)} />
 
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 

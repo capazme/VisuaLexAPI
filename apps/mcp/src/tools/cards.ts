@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { Caller } from '../auth.js';
 import type { McpConfig } from '../config.js';
 import { ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
 import { TRASH_DAYS, canAsk, cardDeletionMessage, confirmWithUser } from '../confirm.js';
-import { CANNOT_ASK, DELETE_SCOPE, NO_PERMISSION, NOT_CONFIRMED, restorableUntil, type RunTool } from './dossier.js';
+import { CANNOT_ASK, DELETE_SCOPE, NO_PERMISSION, NOT_CONFIRMED, data, restorableUntil, type RunTool } from './dossier.js';
 
 /**
  * The LingoLex study-card tools (second round, spec §6; the spike plan's Task
@@ -21,10 +21,11 @@ export const CARD_TOOL_SCOPES: Record<string, string[]> = {
   lingolex_schema_card: [],
   lingolex_salva_card: ['lingo:cards:write'],
   lingolex_le_mie_card: ['lingo:cards:read'],
+  lingolex_leggi_card: ['lingo:cards:read'],
   lingolex_elimina_card: ['lingo:cards:read'],
 };
 
-const MATERIE = ['DIRITTO_CIVILE', 'DIRITTO_PENALE', 'DIRITTO_AMMINISTRATIVO', 'DIRITTO_PROCESSUALE_CIVILE', 'DIRITTO_PROCESSUALE_PENALE'] as const;
+export const MATERIE = ['DIRITTO_CIVILE', 'DIRITTO_PENALE', 'DIRITTO_AMMINISTRATIVO', 'DIRITTO_PROCESSUALE_CIVILE', 'DIRITTO_PROCESSUALE_PENALE'] as const;
 const TIPI = ['ISTITUTO_DEFINIZIONE', 'DISTINZIONE_CONCETTUALE', 'CASO_APPLICATIVO', 'REQUISITO_FORMA_ATTO'] as const;
 const STATI = ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA', 'DA_RIVEDERE', 'ARCHIVIATA'] as const;
 const PERSONAL = new Set(['BOZZA_PERSONALE', 'ARCHIVIATA']);
@@ -61,6 +62,14 @@ const SCHEMA_TEXT = [
   'Le schede create da qui sono sempre bozze personali dell’utente; proporle alla community si fa da VisuaLex.',
 ].join('\n');
 
+/** What a card tied to a course's module needs besides `lingo:cards:write` (the server's card route). */
+export const COURSE_CARD_SCOPE = 'lingo:courses:write';
+
+const CARD_COURSE_TEXT = [
+  'Le schede di un percorso: in lingolex_salva_card «modulo» (l’id del modulo) e, per ogni scheda, «competenze» (i codici che serve, tra quelli del percorso). ',
+  'Al massimo 20 schede per modulo; entrano nel ripasso solo dopo che l’utente ha fatto il modulo, e non si propongono alla community.',
+].join('');
+
 const anchorInput = z.object({
   riferimento: z.string().trim().min(1).max(200).describe('L’articolo, a parole: «art. 1453 c.c.»'),
   principale: z.boolean().optional().describe('Se è l’ancora principale della scheda'),
@@ -80,12 +89,16 @@ interface ApiCard {
   materia: string;
   stato: string;
   istituto: string;
+  tipo?: string;
   domanda: string;
   createdAt: string;
   ancore?: { normaKey: string; articleId: string; isPrimary: boolean }[];
 }
 
-const data = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
+export const CARDS_PER_PAGE = 50;
+/** How much of a card's question the list shows: enough to tell two cards on one article apart. */
+export const QUESTION_PREVIEW = 160;
+const NOT_FOUND = `Scheda non trovata: ${'\u2063'}`;
 
 /** «art_2_bis» → «art. 2-bis»; «all_1_art_3» → «all. 1, art. 3». Derived by the server from a verified reference. */
 const articleWords = (articleId: string): string =>
@@ -100,6 +113,49 @@ const actWords = (normaKey: string): string => {
   return normaKey.replace(/_/g, ' ');
 };
 
+/** An anchor as a lawyer reads it, from the server's verified keys: «art. 1453, codice civile». */
+const anchorWords = (a: { normaKey: string; articleId: string }): string => `${articleWords(a.articleId)}, ${actWords(a.normaKey)}`;
+
+/**
+ * A card in the list: what a lawyer needs to pick one (subject, institute, kind, state, the start of
+ * the question, the articles, the date), never the answer or the explanation, which
+ * lingolex_leggi_card gives. Fifty whole cards can run to tens of thousands of tokens.
+ */
+const cardSummary = (card: ApiCard) => {
+  const anchors = [...(card.ancore ?? [])].sort((x, y) => Number(y.isPrimary) - Number(x.isPrimary));
+  // Never half of a surrogate pair at the cut.
+  const cut = /[\uD800-\uDBFF]/.test(card.domanda[QUESTION_PREVIEW - 1] ?? '') ? QUESTION_PREVIEW - 1 : QUESTION_PREVIEW;
+  const question = card.domanda.length > QUESTION_PREVIEW ? `${card.domanda.slice(0, cut).trimEnd()}…` : card.domanda;
+  return {
+    id: card.id,
+    materia: card.materia,
+    istituto: card.istituto,
+    tipo: card.tipo ?? null,
+    stato: card.stato,
+    domanda: question,
+    // The primary anchor first.
+    ancore: anchors.map(anchorWords),
+    // The day in Rome, as VisuaLex counts days: the server's timestamp is UTC.
+    creata: new Date(card.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }),
+  };
+};
+
+/** The user's cards by id, one read each; ids that are not the user's are returned apart, any other refusal stops. */
+async function readCards(config: McpConfig, caller: Caller, ids: string[]) {
+  const found: ApiCard[] = [];
+  const missing: string[] = [];
+  for (const id of ids) {
+    try {
+      found.push(await callApi<ApiCard>(config, caller, 'lingo:cards:read', `/lingo/cards/${encodeURIComponent(id)}`, { notFound: NOT_FOUND }));
+    } catch (error) {
+      // Only a 404 means "not the user's"; any other refusal (revoked, quota) stops the call as it is.
+      if (error instanceof ToolError && error.message === NOT_FOUND) missing.push(id);
+      else throw error;
+    }
+  }
+  return { found, missing };
+}
+
 /**
  * How a card reads in the deletion dialog: its subject, the article of its primary anchor, its state,
  * its date and the start of its id — all set by the server, none written by the model, and enough to
@@ -108,47 +164,76 @@ const actWords = (normaKey: string): string => {
 const cardLine = (card: ApiCard): string => {
   const primary = card.ancore?.find((a) => a.isPrimary) ?? card.ancore?.[0];
   const anchor = primary ? ` su ${articleWords(primary.articleId)}, ${actWords(primary.normaKey)}` : '';
-  const date = new Date(card.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  const date = new Date(card.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
   return `Scheda di ${MATERIA_WORDS[card.materia] ?? 'materia non indicata'}${anchor}, ${STATO_WORDS[card.stato] ?? 'stato non indicato'}, creata il ${date} (${card.id.slice(0, 8)})`;
 };
 
-export function registerCardTools(server: McpServer, config: McpConfig, run: RunTool): void {
+/**
+ * `courseRules`: the rules of a course (`COURSE_SCHEMA_TEXT`), while `apps/server` has the courses on. Then the schema
+ * tells them too and a card may name its module and competences (Percorsi, M1); otherwise neither is listed.
+ */
+export function registerCardTools(server: McpServer, config: McpConfig, run: RunTool, courseRules?: string): void {
+  const schemaText = courseRules ? `${SCHEMA_TEXT}\n\n${CARD_COURSE_TEXT}\n\n${courseRules}` : SCHEMA_TEXT;
   server.registerTool(
     'lingolex_schema_card',
     {
       title: 'Come si scrive una scheda di VisuaLex Gymnasium',
-      description: 'La forma di una scheda di studio di VisuaLex Gymnasium e le regole delle ancore, da leggere prima di lingolex_salva_card.',
+      description: courseRules
+        ? 'La forma di una scheda di studio di VisuaLex Gymnasium e di un percorso, e le loro regole: da leggere prima di lingolex_salva_card e degli strumenti dei percorsi.'
+        : 'La forma di una scheda di studio di VisuaLex Gymnasium e le regole delle ancore, da leggere prima di lingolex_salva_card.',
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    (_args, extra) => run('lingolex_schema_card', extra, async () => ({ content: [{ type: 'text', text: SCHEMA_TEXT }] })),
+    (_args, extra) => run('lingolex_schema_card', extra, async () => ({ content: [{ type: 'text', text: schemaText }] })),
   );
 
-  server.registerTool(
-    'lingolex_salva_card',
-    {
-      title: 'Salva schede di VisuaLex Gymnasium',
-      description:
-        'Salva da 1 a 10 schede di studio come bozze personali dell’utente, con le ancore scritte a parole (vedi lingolex_schema_card). ' +
-        'Ogni scheda ha il suo esito: creata, o rifiutata con il motivo e l’ancora che non si è potuta verificare.',
-      inputSchema: { schede: z.array(cardInput).min(1).max(10).describe('Le schede, da 1 a 10') },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    },
-    ({ schede }, extra) =>
-      run('lingolex_salva_card', extra, async (caller) => {
-        const answer = await callApi<{ results: Record<string, unknown>[] }>(config, caller, 'lingo:cards:write', '/lingo/cards', {
-          method: 'POST',
-          body: { cards: schede },
-        });
-        return data({ esiti: answer.results });
-      }),
-  );
+  const description =
+    'Salva da 1 a 10 schede di studio come bozze personali dell’utente, con le ancore scritte a parole (vedi lingolex_schema_card). ' +
+    'Ogni scheda ha il suo esito: creata, o rifiutata con il motivo e l’ancora che non si è potuta verificare.';
+  const annotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true };
+  const save = (caller: Caller, schede: unknown[], modulo?: string) =>
+    callApi<{ results: Record<string, unknown>[] }>(
+      config,
+      caller,
+      // A card tied to a module writes into the course too: the server's card route asks for both.
+      modulo === undefined ? 'lingo:cards:write' : `lingo:cards:write ${COURSE_CARD_SCOPE}`,
+      '/lingo/cards',
+      // With a module, a 409 is the module's card limit: a rule, not a change under the call.
+      { method: 'POST', body: { cards: schede, moduloId: modulo }, notFound: 'Modulo non trovato, oppure i percorsi non sono attivi.', conflictIsState: modulo !== undefined },
+    );
+  if (!courseRules) {
+    server.registerTool(
+      'lingolex_salva_card',
+      { title: 'Salva schede di VisuaLex Gymnasium', description, inputSchema: { schede: z.array(cardInput).min(1).max(10).describe('Le schede, da 1 a 10') }, annotations },
+      ({ schede }, extra) => run('lingolex_salva_card', extra, async (caller) => data({ esiti: (await save(caller, schede)).results })),
+    );
+  } else {
+    server.registerTool(
+      'lingolex_salva_card',
+      {
+        title: 'Salva schede di VisuaLex Gymnasium',
+        description,
+        inputSchema: {
+          schede: z
+            .array(cardInput.extend({ competenze: z.array(z.string()).min(1).optional().describe('Con modulo: i codici serviti') }))
+            .min(1)
+            .max(10)
+            .describe('Le schede, da 1 a 10'),
+          modulo: z.string().min(1).max(64).optional().describe('Id del modulo di un percorso'),
+        },
+        annotations,
+      },
+      ({ schede, modulo }, extra) => run('lingolex_salva_card', extra, async (caller) => data({ esiti: (await save(caller, schede, modulo)).results })),
+    );
+  }
 
   server.registerTool(
     'lingolex_le_mie_card',
     {
       title: 'Le mie schede di VisuaLex Gymnasium',
-      description: 'Le schede di studio dell’utente, le più recenti prima, filtrabili per materia e stato (50 per pagina).',
+      description:
+        `Le schede di studio dell’utente in breve, le più recenti prima, filtrabili per materia e stato (${CARDS_PER_PAGE} per pagina). ` +
+        'Risposta e spiegazione con lingolex_leggi_card.',
       inputSchema: {
         materia: z.enum(MATERIE).optional(),
         stato: z.enum(STATI).optional(),
@@ -158,11 +243,27 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
     },
     ({ materia, stato, pagina }, extra) =>
       run('lingolex_le_mie_card', extra, async (caller) => {
-        const query = new URLSearchParams({ limit: '50', offset: String(((pagina ?? 1) - 1) * 50) });
+        const query = new URLSearchParams({ limit: String(CARDS_PER_PAGE), offset: String(((pagina ?? 1) - 1) * CARDS_PER_PAGE) });
         if (materia) query.set('materia', materia);
         if (stato) query.set('stato', stato);
-        const answer = await callApi<{ cards: unknown[]; nextOffset: number | null }>(config, caller, 'lingo:cards:read', `/lingo/cards?${query}`);
-        return data({ schede: answer.cards, altre: answer.nextOffset !== null });
+        const answer = await callApi<{ cards: ApiCard[]; nextOffset: number | null }>(config, caller, 'lingo:cards:read', `/lingo/cards?${query}`);
+        return data({ schede: answer.cards.map(cardSummary), altre: answer.nextOffset !== null });
+      }),
+  );
+
+  server.registerTool(
+    'lingolex_leggi_card',
+    {
+      title: 'Leggi schede di VisuaLex Gymnasium',
+      description: 'Da 1 a 10 schede dell’utente per intero, con domanda, risposta, spiegazione e ancore (gli id da lingolex_le_mie_card).',
+      inputSchema: { schede: z.array(z.string().min(1).max(64)).min(1).max(10).describe('Gli id delle schede') },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    ({ schede }, extra) =>
+      run('lingolex_leggi_card', extra, async (caller) => {
+        const { found, missing } = await readCards(config, caller, [...new Set(schede)]);
+        if (found.length === 0) throw new ToolError(`Schede non trovate: ${missing.join(', ')}.`);
+        return data({ schede: found, non_trovate: missing });
       }),
   );
 
@@ -180,19 +281,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
       run('lingolex_elimina_card', extra, async (caller) => {
         if (!caller.scopes.includes(DELETE_SCOPE)) throw new ToolError(NO_PERMISSION);
         if (!canAsk(server)) throw new ToolError(CANNOT_ASK);
-        const wanted = [...new Set(schede)];
-        const found: ApiCard[] = [];
-        const missing: string[] = [];
-        const NOT_FOUND = `Scheda non trovata: ${'\u2063'}`;
-        for (const id of wanted) {
-          try {
-            found.push(await callApi<ApiCard>(config, caller, 'lingo:cards:read', `/lingo/cards/${encodeURIComponent(id)}`, { notFound: NOT_FOUND }));
-          } catch (error) {
-            // Only a 404 means "not the user's"; any other refusal (revoked, quota) stops the call as it is.
-            if (error instanceof ToolError && error.message === NOT_FOUND) missing.push(id);
-            else throw error;
-          }
-        }
+        const { found, missing } = await readCards(config, caller, [...new Set(schede)]);
         if (missing.length > 0) throw new ToolError(`Schede non trovate: ${missing.join(', ')}. Nulla è stato eliminato.`);
         const community = found.filter((card) => !PERSONAL.has(card.stato));
         if (community.length > 0) {

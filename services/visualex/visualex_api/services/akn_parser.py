@@ -23,6 +23,7 @@ be ignored.
 Both shapes are frozen as offline fixtures under ``tests/fixtures/akn/``.
 """
 
+import functools
 import re
 from dataclasses import dataclass, field
 
@@ -341,6 +342,7 @@ def normalize_article_key(numero_articolo: str) -> str:
     return key
 
 
+@functools.lru_cache(maxsize=65536)
 def comparable_article_key(numero_articolo: str) -> str:
     """`normalize_article_key`, with an ordinal split in two words joined when the
     table holds it joined: for comparing two spellings of one article, never as a key
@@ -352,6 +354,9 @@ def comparable_article_key(numero_articolo: str) -> str:
     here. `normalize_article_key` keeps them apart because its keys are what
     /fetch_rubriche and the fingerprints answer. A pair the table does not hold
     joined ("135 vicies semel") stays two words.
+
+    Cached: the existence check compares every entry of an act's index (some 3,700 for the
+    codice civile) for each norm asked, and /fetch_norm_links asks up to 200 of one act.
     """
     key = normalize_article_key(numero_articolo)
     split = _SPLIT_ORDINAL.match(key)

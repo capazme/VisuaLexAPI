@@ -6,7 +6,8 @@
  * land are listed at the end, never dropped. The Corte costituzionale's PDF carries its licence in the footer and in a closing line (owner, 8 Oct
  * 2026); the Cassazione's PDF and the page do not.
  */
-import { jsPDF } from 'jspdf';
+import type { jsPDF } from 'jspdf';
+import { loadJsPdf } from '../../../utils/loadJsPdf';
 import type { Annotation, Highlight } from '../../../types';
 import type { DecisionAttributes, DecisionIdentity, DecisionText, FoundDecision } from '../../../types/decisions';
 import { resolveAnchors } from '../../../utils/articleAnnotations';
@@ -279,8 +280,10 @@ export function drawDecision(w: PdfWriter, model: DecisionPdfModel): void {
   drawDecisionTail(w, model);
 }
 
-export function writeDecisionPdf(model: DecisionPdfModel): jsPDF {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+/** The decision's own PDF. jsPDF is loaded here, on the download. */
+export async function writeDecisionPdf(model: DecisionPdfModel): Promise<jsPDF> {
+  const JsPdf = await loadJsPdf();
+  const doc = new JsPdf({ unit: 'pt', format: 'a4' });
   const w = createPdfWriter(doc, { footerLeft: model.footer, font: 'times' });
   drawDecision(w, model);
   w.footer();

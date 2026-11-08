@@ -1,4 +1,5 @@
 import { Briefcase, GraduationCap, Landmark, Users, type LucideIcon } from 'lucide-react';
+import { PAGE_CODE } from '../../pageCode';
 
 /** The four sections over the common core, Corpus (D-076; spec 2026-10-18-sections-switcher). */
 export type SectionId = 'opus' | 'gymnasium' | 'academia' | 'forum';
@@ -59,6 +60,8 @@ export function kickerOf(id: SectionId): string | null {
  * routes', so the same files.
  */
 export const SECTION_HOME_CODE: Partial<Record<SectionId, () => Promise<unknown>>> = {
+  opus: PAGE_CODE.opus,
+  forum: PAGE_CODE.forum,
   gymnasium: () => Promise.all([import('../../components/features/studia/StudiaPage'), import('../../components/features/studia/ReviewHome')]),
   academia: () => import('../../pages/MerltHubPage'),
 };

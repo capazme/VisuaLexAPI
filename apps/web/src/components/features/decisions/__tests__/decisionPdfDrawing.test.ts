@@ -36,7 +36,7 @@ const ANSWER = {
 } as const;
 
 describe('writeDecisionPdf — what is drawn', () => {
-  it('draws the heading, the notices, the marked paragraphs, the notes, the lost anchors and the licence, as it always has', () => {
+  it('draws the heading, the notices, the marked paragraphs, the notes, the lost anchors and the licence, as it always has', async () => {
     const start = 'LA CORTE COSTITUZIONALE'.length;
     const model = decisionPdfModel(ANSWER as never, {
       consultedOn: '2026-10-05',
@@ -52,7 +52,7 @@ describe('writeDecisionPdf — what is drawn', () => {
       },
     });
     calls.length = 0;
-    const doc = writeDecisionPdf(model);
+    const doc = await writeDecisionPdf(model);
     expect(doc.getNumberOfPages()).toBe(1);
     const drawn = calls.map(([name, ...a]) => (name === 'text' ? `text ${a[1]},${a[2]} ${String(a[0])}` : [name, ...a].join(' ')));
     expect(drawn.join('\n')).toMatchInlineSnapshot(`

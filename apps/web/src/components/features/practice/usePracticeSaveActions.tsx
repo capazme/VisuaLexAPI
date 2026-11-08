@@ -23,7 +23,7 @@ export interface PracticeSaveActions {
  * items, the header's button, and the dialog and toast they need. One save at a time per practice,
  * wherever it starts (`usePracticeSaving`). The toast is portalled to the document in the toast
  * band: inside the bar (`fixed`, transformed, blurred) a `fixed` child is placed against the bar and
- * stacked in it (gotchas 22, 26), and at the header's top right it would cover Focus Mode's button.
+ * stacked in it (gotchas 22, 26), and at the header's top right it would cover the full-screen button.
  */
 export function usePracticeSaveActions(practiceId: string): PracticeSaveActions {
   const { notice, dismissNotice, saveAsNew, addToExisting } = useSavePracticeAsDossier();

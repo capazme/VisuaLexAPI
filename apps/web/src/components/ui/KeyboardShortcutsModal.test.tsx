@@ -10,4 +10,10 @@ describe('KeyboardShortcutsModal', () => {
     expect(within(group).getByText('Di nuovo / Difficile / Bene / Facile').nextElementSibling).toHaveTextContent('1–4');
     expect(within(group).getByText('Interrompi il ripasso').nextElementSibling).toHaveTextContent('Esc');
   });
+
+  it('lists the full screen under ⌘⇧F (Ctrl+Shift+F), not ⌘Space', () => {
+    render(<KeyboardShortcutsModal isOpen onClose={() => {}} />);
+    const keys = screen.getByText('Tutto schermo: entra o esci').nextElementSibling as HTMLElement;
+    expect([...keys.querySelectorAll('kbd')].map((k) => k.textContent)).toEqual([expect.stringMatching(/^(?:Cmd|Ctrl)$/), 'Shift', 'F']);
+  });
 });

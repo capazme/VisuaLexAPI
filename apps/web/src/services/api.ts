@@ -68,11 +68,13 @@ export async function refreshAccessToken(): Promise<string> {
  * The access token to send now, for a request that does not go through axios (the
  * scraping calls use fetch: see legalFetch.ts). A token past its expiry is refreshed
  * first, through the same single in-flight promise as every other refresh; when the
- * refresh fails the stale token is returned, and the 401 that follows decides.
+ * refresh fails the stale token is returned, and the 401 that follows decides. With
+ * `skewSeconds`, one that expires within them is refreshed too (a removal held for a
+ * `keepalive` fetch, `deferredRemovals.ts`).
  */
-export async function getFreshAccessToken(): Promise<string | null> {
+export async function getFreshAccessToken(skewSeconds?: number): Promise<string | null> {
   const token = localStorage.getItem('access_token');
-  if (token && isAccessTokenExpired() && localStorage.getItem('refresh_token')) {
+  if (token && isAccessTokenExpired(skewSeconds) && localStorage.getItem('refresh_token')) {
     try {
       return await refreshAccessToken();
     } catch {

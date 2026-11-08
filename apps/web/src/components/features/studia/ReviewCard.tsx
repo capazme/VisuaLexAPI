@@ -14,14 +14,14 @@ export interface ReviewCardProps {
   onOpenAnchor: (anchor: AncoraScheda) => void;
 }
 
-const MEASURE = 'max-w-[60ch]';
+const MEASURE = 'max-w-measure';
 const TEXT = 'whitespace-pre-line break-words text-left font-serif leading-[1.7]';
 
 /**
  * A card in the lesson (Gymnasium spec §5.4, over the Studia screens spec §6 as rewritten for G2): a sheet of
  * paper on the page — the area's tile, no shadow or gradient — that comes in with each card (opacity and a few
  * pixels, 180 ms, `motion-safe:` only; the session keys it by step). The article as a small source line in the
- * interface's sans above, the question in the reader's serif one step above the answer, at a 60ch measure.
+ * interface's sans above, the question in the reader's serif one step above the answer, at the reading measure (U1).
  * Showing the answer is the card's own motion: a hairline draws across, then the answer unfolds beneath it
  * (`motion-safe:` only). Under it the explanation and the articles, each a 44 px button that opens the article
  * beside the card (in a sheet on a phone). Question, answer and explanation are plain text, left to React as
