@@ -579,7 +579,8 @@ describe('the practice in two views (U2)', () => {
     expect(css).toMatch(/>\s*\[data-row-open\][^{]*\{\s*grid-column:\s*1\s*\/\s*-1/);
     expect(css).toMatch(/\.min-h-9\s*\{\s*min-height:/);
     for (const name of strip) {
-      const selector = `.${name.replace(/[/:]/g, '\\$&')}`;
+      // The class as CSS writes it in a selector: every character it escapes, the backslash first among them.
+      const selector = `.${name.replace(/[\\/:.]/g, '\\$&')}`;
       expect(css, name).toContain(selector);
     }
   }, 30000);
