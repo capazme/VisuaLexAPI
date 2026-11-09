@@ -447,7 +447,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           processedContent={html}
           className="vlx-art vlx-decision"
           onPopupHighlight={handlePopupHighlight}
-          onPopupAddNote={handlePopupAddNote}
+          // A note being written keeps its words: a new selection refocuses it (the note tool takes every one).
+          onPopupAddNote={(text, startOffset, rect) => { if (!marginRef.current?.keepDraft()) handlePopupAddNote(text, startOffset, rect); }}
           onPopupCopy={copySelection}
           onPopupDiscuss={discussion.popupDiscuss}
           selectionPopup={!moving}

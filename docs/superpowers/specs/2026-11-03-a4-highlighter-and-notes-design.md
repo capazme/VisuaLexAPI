@@ -234,8 +234,13 @@ highlight from the Forum is cut and recoloured as the others, and its author is 
 - **The sign** goes to the block's first card where the column is shown; else, or with Shift, to the block's sheet
   (`BlockAnnotationsSheet`): what the popover listed, in a sheet from the bottom (a capped width centred on a
   computer). Shift is the keyboard's way to a block's highlights (and an application's proposed passages) beside its
-  cards, which the column does not show; said in the guide, not on screen. A click on a proposed passage opens the
-  sheet, as it opened the popover.
+  cards, which the column does not show; the sign says it (`aria-keyshortcuts`) and the «?» dialog lists it, nothing
+  on screen. A click on a proposed passage opens the sheet, as it opened the popover.
+- **A new note's text is the column's**: it moves with the editor between the column and the sheet as the reader
+  crosses the room's threshold, and a new selection while something is written does not take it onto other words — its
+  field takes the focus again. Saved, the focus goes to the note's card.
+- **The note tool's button on a phone**: the article's phone row shows it only while the tool is on (turned on in the
+  decision's bar or the dossier's actions), so it can be turned off; Study Mode's header has it from 640 px.
 - **A note's wavy words** go to its card, else to its block's sheet; Study Mode, which draws no sign, to its card only.
 - `InlineNoteComposer`, `InlineNotePopover`, `BlockAnnotationsPopover` and `blockAnchorRect` are gone.
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AnnotationMargin, type AnnotationMarginHandle, type NoteDraft } from './AnnotationMargin';
 import type { Annotation } from '../../../types';
@@ -23,14 +23,28 @@ const thread: LocatedThread = {
 };
 
 /** The reader has room for the column (jsdom lays nothing out): the wrapper measures `width`. */
+let wrapperWidth = 0;
 function room(width: number) {
+  wrapperWidth = width;
   const original = HTMLElement.prototype.getBoundingClientRect;
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     return this.hasAttribute('data-annotation-margin')
-      ? ({ x: 0, y: 0, top: 0, left: 0, right: width, bottom: 0, width, height: 0, toJSON: () => ({}) } as DOMRect)
+      ? ({ x: 0, y: 0, top: 0, left: 0, right: wrapperWidth, bottom: 0, width: wrapperWidth, height: 0, toJSON: () => ({}) } as DOMRect)
       : original.call(this);
   });
 }
+
+/** jsdom has no ResizeObserver: one whose callbacks the test calls, as the reader is resized. */
+const resized: (() => void)[] = [];
+function observeResizes() {
+  vi.stubGlobal('ResizeObserver', class {
+    private readonly callback: () => void;
+    constructor(callback: () => void) { this.callback = callback; resized.push(callback); }
+    observe() {}
+    disconnect() { resized.splice(resized.indexOf(this.callback), 1); }
+  });
+}
+const resizeTo = (width: number) => act(() => { wrapperWidth = width; [...resized].forEach((run) => run()); });
 
 interface HarnessProps {
   notes?: Annotation[];
@@ -44,20 +58,30 @@ interface HarnessProps {
 }
 
 let handle: AnnotationMarginHandle | null = null;
+let openDraft: (draft: NoteDraft) => void = () => {};
 function Harness({ notes = [], threads = [], initialDraft = null, onSave = vi.fn(), onUpdate = vi.fn(), onRemove = vi.fn(), onOpenThread, onWide }: HarnessProps) {
   const textRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<NoteDraft | null>(initialDraft);
+  const [list, setList] = useState(notes);
+  // A reader's selection bar: a new note, unless one being written keeps its words.
+  useEffect(() => {
+    openDraft = (next) => { if (!handle?.keepDraft()) setDraft(next); };
+  });
   return (
     <AnnotationMargin
       ref={(h) => { handle = h; }}
       plain={PLAIN}
       textRootRef={textRef}
       contentKey="v1"
-      notes={notes}
+      notes={list}
       onUpdateNote={onUpdate}
       onRemoveNote={onRemove}
       draft={draft}
-      onSaveDraft={(text) => { onSave(text); setDraft(null); }}
+      onSaveDraft={(text) => {
+        onSave(text);
+        if (draft) setList((l) => [...l, note('nuova', draft.text, text)]);
+        setDraft(null);
+      }}
       onCancelDraft={() => setDraft(null)}
       threads={threads}
       onOpenThread={onOpenThread}
@@ -78,6 +102,8 @@ const placed = (card: HTMLElement) => waitFor(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  resized.length = 0;
   handle = null;
 });
 
@@ -197,5 +223,52 @@ describe('AnnotationMargin — the notes beside the text, as a word processor\'s
     render(<Harness notes={[{ ...note('n1', 'prestazioni corrispettive', 'Persa'), anchorText: 'parole che non ci sono' }, note('n2', 'obbligazioni', 'Quali?')]} />);
     const aside = await column();
     expect(within(aside).getAllByRole('article').map((c) => c.getAttribute('data-note'))).toEqual(['n2']);
+  });
+
+  it('a new note saved: the focus goes to its card, never to the page', async () => {
+    room(1200);
+    render(<Harness initialDraft={{ text: 'contraenti', startOffset: at('contraenti') }} />);
+    const card = await placed(within(await column()).getByRole('article', { name: 'Nuova nota' }));
+    const box = within(card).getByRole('textbox');
+    await waitFor(() => expect(box).toHaveFocus());
+    fireEvent.change(box, { target: { value: 'Il debitore.' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    await waitFor(() => expect(document.activeElement?.getAttribute('data-note')).toBe('nuova'));
+  });
+
+  it('a new selection while a note is written keeps it on its words and gives its field the focus again; empty, it moves', async () => {
+    room(1200);
+    render(<Harness initialDraft={{ text: 'contraenti', startOffset: at('contraenti') }} />);
+    const card = await placed(within(await column()).getByRole('article', { name: 'Nuova nota' }));
+    // Nothing written: the editor goes to the new words.
+    act(() => openDraft({ text: 'obbligazioni', startOffset: at('obbligazioni') }));
+    await waitFor(() => expect(within(screen.getByRole('article', { name: 'Nuova nota' })).getByText('“obbligazioni”')).toBeInTheDocument());
+    const box = within(screen.getByRole('article', { name: 'Nuova nota' })).getByRole('textbox');
+    fireEvent.change(box, { target: { value: 'Quali?' } });
+    (document.activeElement as HTMLElement | null)?.blur();
+    // Written: the new words are not taken, the text stays on its own, and its field has the focus.
+    act(() => openDraft({ text: 'contraenti', startOffset: at('contraenti') }));
+    const now = screen.getByRole('article', { name: 'Nuova nota' });
+    expect(within(now).getByText('“obbligazioni”')).toBeInTheDocument();
+    expect(within(now).getByRole('textbox')).toHaveValue('Quali?');
+    expect(within(now).getByRole('textbox')).toHaveFocus();
+    expect(card).toBeDefined();
+  });
+
+  it('a note being written keeps its text when the reader loses the room for the column: the sheet takes it, and back', async () => {
+    observeResizes();
+    room(1200);
+    render(<Harness initialDraft={{ text: 'contraenti', startOffset: at('contraenti') }} />);
+    const card = await placed(within(await column()).getByRole('article', { name: 'Nuova nota' }));
+    fireEvent.change(within(card).getByRole('textbox'), { target: { value: 'Il debitore.' } });
+    resizeTo(600);
+    const sheet = await screen.findByRole('dialog', { name: 'Nuova nota' });
+    expect(within(sheet).getByRole('textbox')).toHaveValue('Il debitore.');
+    // A scrollbar's width less does not take the column away again (a rem of slack); well under the room, it goes.
+    resizeTo(1200);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Nuova nota' })).toBeNull());
+    expect(within(await column()).getByRole('textbox')).toHaveValue('Il debitore.');
+    resizeTo(52 * 16 - 10);
+    expect(screen.queryByRole('dialog', { name: 'Nuova nota' })).toBeNull();
   });
 });

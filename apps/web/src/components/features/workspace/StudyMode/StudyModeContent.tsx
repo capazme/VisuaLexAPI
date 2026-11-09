@@ -175,6 +175,8 @@ export function StudyModeContent({
   // A note's wavy words: its card beside the text (Study Mode draws no sign: with no column, the tools panel lists it).
   useInlineNoteAnchors(contentRef, annotations, (note) => { marginRef.current?.focus([`note:${note.id}`]); });
   const handleAddNote = (text: string, startOffset: number) => {
+    // A note being written keeps its words: a new selection refocuses it.
+    if (marginRef.current?.keepDraft()) return;
     if (roomy) {
       setDraft({ text, startOffset });
       return;
@@ -211,7 +213,8 @@ export function StudyModeContent({
         notes={annotations}
         onUpdateNote={updateAnnotation}
         onRemoveNote={removeAnnotation}
-        draft={roomy ? draft : null}
+        // Narrowed while it is written, it moves to a sheet with its text.
+        draft={draft}
         onSaveDraft={(text) => {
           if (!draft) return;
           addAnnotation(normaKey, uniqueArticleId, text, { anchorText: draft.text, startOffset: draft.startOffset });

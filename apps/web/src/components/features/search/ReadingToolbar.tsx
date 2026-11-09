@@ -140,6 +140,7 @@ export function ReadingToolbar({
     const ink = useHighlighterInk();
     const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
     const openSettings = useAppStore((s) => s.openSettings);
+    const noteToolOn = useAppStore((s) => s.readingTool === 'note');
     const meanings = useHighlightColorMeanings();
     const moreItems = (phone: boolean): MenuItem[] => [
         ...(compact ? [] : [{
@@ -241,6 +242,9 @@ export function ReadingToolbar({
             <div className={cn('ml-auto flex flex-shrink-0 items-center md:hidden', !compact && '-mr-3')}>
                 {/* The highlighter's toggle (A4); its inks are at the end of «⋯». */}
                 {!lockedReason && <HighlighterButton toggleOnly triggerClassName={ACTION} />}
+                {/* The note tool has no room here; turned on elsewhere (a decision's bar, Study Mode), its toggle shows,
+                    so it can be turned off where there is no Esc (A4 §6). */}
+                {!lockedReason && noteToolOn && <NoteToolButton triggerClassName={ACTION} />}
                 {!compact && dossierButton(undefined, true)}
                 <div ref={phoneMoreRef} className="contents">
                     {/* Its list is long (the colours close it): capped under the bar, it scrolls on its own. */}

@@ -347,11 +347,14 @@ describe('SelectionPopup: the note tool (A4 §6)', () => {
     await waitFor(() => expect(onAddNote).toHaveBeenCalledOnce());
   });
 
-  it('gives the note tool\'s button the words selected: its press opens the editor on them', async () => {
+  it('gives the note tool\'s button the words selected, read as its press starts: its click opens the editor on them', async () => {
     const onAddNote = vi.fn();
     render(<Harness onAddNote={onAddNote} />);
     await selectText('art. 2043 c.c.');
-    act(() => readInkSelection()!.note!('note'));
+    const selected = readInkSelection()!;
+    // A tap may take the selection away before its click: the words were read with the press.
+    window.getSelection()!.removeAllRanges();
+    act(() => selected.note!('note'));
     expect(onAddNote).toHaveBeenCalledExactlyOnceWith('art. 2043 c.c.', TEXT.indexOf('art. 2043'), expect.any(Object));
     expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
     expect(window.getSelection()!.isCollapsed).toBe(true);

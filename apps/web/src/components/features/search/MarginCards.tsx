@@ -4,6 +4,7 @@ import type { Annotation, ArticleDiscussionPassageSummary } from '../../../types
 import { cn } from '../../../lib/utils';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { NoteEditBox } from './NoteEditBox';
+import { scrollToMiddle } from '../../../utils/scrollParent';
 
 /** The card's frame, as an application's gloss's (`GlossCard`): a comment of a word processor. */
 const CARD = cn(
@@ -143,6 +144,9 @@ export function NoteMarginCard({
 export interface NoteDraftCardProps {
     /** The words the new note is on. */
     text: string;
+    /** What is written in it: kept by the column, so it survives the move to a sheet and back. */
+    value: string;
+    onChange: (text: string) => void;
     onSave: (text: string) => void;
     onCancel: () => void;
     /** It has its place in the column: its field takes the focus then, never before (the page would scroll). */
@@ -157,14 +161,18 @@ export interface NoteDraftCardProps {
  * `NoteComposerSheet`): the words, the field (its focus at once), «Salva» or Enter, «Annulla» or Esc — a text written
  * is never dropped without asking («Scartare la modifica?»). An empty note is not saved.
  */
-export function NoteDraftCard({ text, onSave, onCancel, placed, ref, className, style }: NoteDraftCardProps) {
+export function NoteDraftCard({ text, value, onChange, onSave, onCancel, placed, ref, className, style }: NoteDraftCardProps) {
     const titleId = useId();
     const quoteId = useId();
-    const [value, setValue] = useState('');
     const fieldRef = useRef<HTMLDivElement>(null);
-    // Its place known, the field takes the focus, scrolling nothing: the card is where the words are.
+    // Its place known, the field takes the focus; the card is brought into view only if the column opening moved it
+    // out of sight (the text reflowed as the column took its room).
     useEffect(() => {
-        if (placed) fieldRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
+        if (!placed) return;
+        fieldRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
+        const card = fieldRef.current?.closest('article');
+        const box = card?.getBoundingClientRect();
+        if (card && box && (box.top < 0 || box.bottom > window.innerHeight)) scrollToMiddle(card);
     }, [placed]);
     return (
         <article
@@ -179,7 +187,7 @@ export function NoteDraftCard({ text, onSave, onCancel, placed, ref, className, 
             <h4 id={titleId} className="text-xs font-semibold text-slate-700 dark:text-slate-300">Nuova nota</h4>
             <Quote id={quoteId} text={text} />
             <div ref={fieldRef} className="mt-1.5">
-                <NoteDraftField value={value} onChange={setValue} onSave={onSave} onCancel={onCancel} autoFocus={false} />
+                <NoteDraftField value={value} onChange={onChange} onSave={onSave} onCancel={onCancel} autoFocus={false} />
             </div>
         </article>
     );

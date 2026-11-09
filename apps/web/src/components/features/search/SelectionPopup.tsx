@@ -96,19 +96,20 @@ export function SelectionPopup({
   });
 
   /**
-   * The editor of a note on the words selected, as selected (a note keeps them exactly, A4): a gloss opens the
-   * discussion's composer where the reader has one, else it is a personal note. The selection's box is read before the
-   * selection is cleared (gotcha 16).
+   * A note on the words selected, as selected (a note keeps them exactly, A4), read now — the words and their box,
+   * before a press or the clearing takes the selection away (gotcha 16) —, and the editor it opens once asked: a gloss
+   * opens the discussion's composer where the reader has one, else it is a personal note. Null with no words to anchor.
    */
-  const noteOn = useCallback((selection: Selection, kind: NoteKind): boolean => {
+  const noteOn = useCallback((selection: Selection): ((kind: NoteKind) => void) | null => {
     const anchor = getSelectionAnchor(textRootRef?.current ?? containerRef.current, selection);
-    if (!anchor) return false;
+    if (!anchor) return null;
     const box = selection.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
     const rect = { x: box?.x ?? 0, y: box?.y ?? 0, width: box?.width ?? 0, height: box?.height ?? 0 };
-    const { onAddNote: addNote, onDiscuss: discuss } = noteRef.current;
-    if (kind === 'gloss' && discuss) discuss(anchor.text, anchor.startOffset);
-    else addNote(anchor.text, anchor.startOffset, rect);
-    return true;
+    return (kind) => {
+      const { onAddNote: addNote, onDiscuss: discuss } = noteRef.current;
+      if (kind === 'gloss' && discuss) discuss(anchor.text, anchor.startOffset);
+      else addNote(anchor.text, anchor.startOffset, rect);
+    };
   }, [containerRef, textRootRef]);
 
   // The words selected here, as this text stores them: the highlighter's button applies its ink to them (A4).
@@ -119,17 +120,21 @@ export function SelectionPopup({
       read: (selection) => {
         const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);
         if (!anchor) return null;
+        // Read as the press starts, as the ink's words are: by the click the selection may be gone (a touch).
+        const write = noteOn(selection);
         return {
           apply: (chosen) => {
             highlightRef.current(anchor.text, chosen, anchor.startOffset);
             hidePopup();
             window.getSelection()?.removeAllRanges();
           },
-          note: (kind) => {
-            if (!noteOn(selection, kind)) return;
-            hidePopup();
-            window.getSelection()?.removeAllRanges();
-          },
+          ...(write ? {
+            note: (kind: NoteKind) => {
+              write(kind);
+              hidePopup();
+              window.getSelection()?.removeAllRanges();
+            },
+          } : {}),
         };
       },
     });
@@ -138,7 +143,10 @@ export function SelectionPopup({
   // A tool on: the selection takes the ink, or opens a note's editor, as it is released, with no bar.
   useInkOnRelease(containerRef, tooling, (selection) => {
     if (noting) {
-      if (noteOn(selection, noteKind)) selection.removeAllRanges();
+      const write = noteOn(selection);
+      if (!write) return;
+      write(noteKind);
+      selection.removeAllRanges();
       return;
     }
     const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);

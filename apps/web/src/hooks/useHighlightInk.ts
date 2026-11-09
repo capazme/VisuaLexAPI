@@ -74,7 +74,8 @@ export function useHighlightInk({ key, articleId, plain, breaks, enabled = true,
       ? `Testo evidenziato in ${highlightColorName(plan.color)}`
       : plan.effect === 'recoloured' && plan.color
         ? `Evidenziazione cambiata in ${highlightColorName(plan.color)}`
-        : plan.remove.length > 1 ? 'Evidenziazioni rimosse' : 'Evidenziazione rimossa';
+        // Each highlight it took words from: removed whole, or kept on its row with what is left (one from the Forum).
+        : plan.remove.length + (plan.reshape?.length ?? 0) > 1 ? 'Evidenziazioni rimosse' : 'Evidenziazione rimossa';
     // A highlight with an author keeps its row with its first part's words (`PUT` of the range): with none left but
     // spaces, it goes.
     const reshape = (plan.reshape ?? []).flatMap((r) => partsOf(plain, [r]).map(({ text: words, startOffset: at, color }) => ({ id: r.id, text: words, startOffset: at, color })));

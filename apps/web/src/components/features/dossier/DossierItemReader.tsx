@@ -332,7 +332,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
             processedContent={markedHtml}
             onPopupHighlight={handlePopupHighlight}
             onPopupAddNote={(text, startOffset) => {
-              if (readOnly) return;
+              // A note being written keeps its words: a new selection refocuses it (the note tool takes every one).
+              if (readOnly || marginRef.current?.keepDraft()) return;
               setDraft({ text, startOffset });
             }}
             onPopupCopy={handlePopupCopy}

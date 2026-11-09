@@ -227,7 +227,7 @@ describe('planInk — a highlight from the Forum is cut like the others, its aut
     expect(planInk({ start: at('obbliga'), end: at('colui') + 5, ink: 'yellow', marks: [f], plain: text })).toMatchObject({
       kind: 'edit', effect: 'created', remove: [], add: [{ start: f.end, end: at('colui') + 5, color: 'yellow' }],
     });
-    // A user's own yellow highlight beside it is never joined to it, its words given another colour are not either.
+    // A user's own green highlight beside it is never joined to the piece given green: they stay two.
     const own = mark('o', at('colui'), at('colui') + 5, 'green');
     expect(planInk({ start: at('obbliga'), end: f.end, ink: 'green', marks: [f, own], plain: text })).toEqual({
       kind: 'edit', effect: 'recoloured', color: 'green', remove: [], recolor: [],
@@ -243,6 +243,19 @@ describe('planInk — a highlight from the Forum is cut like the others, its aut
     expect(planInk({ start: at('danno'), end: at('danno') + 5, ink: 'yellow', marks: [f, h], plain: text })).toEqual({
       kind: 'edit', effect: 'removed', remove: [], recolor: [], reshape: [{ id: 'f', start: at('danno') + 5, end: f.end, color: 'yellow' }], add: [],
     });
+  });
+
+  it('the user\'s own ink joined to a highlight of its colour leaves the words a piece with an author took (never two of one colour on a word)', () => {
+    // Green from the Forum over [10,30), the user's own yellow over [25,40); yellow over [20,35).
+    const plan = ink(20, 35, 'yellow', [forum('a', 10, 30, 'green'), mark('u', 25, 40, 'yellow')]);
+    expect(plan).toEqual({
+      kind: 'edit', effect: 'recoloured', color: 'yellow', remove: ['u'], recolor: [],
+      reshape: [{ id: 'a', start: 10, end: 20, color: 'green' }],
+      add: [{ start: 20, end: 30, color: 'yellow', from: 'a' }, { start: 30, end: 40, color: 'yellow', from: 'u' }],
+    });
+    // No two parts of one colour share a character.
+    const parts = plan.kind === 'edit' ? plan.add : [];
+    expect(parts.every((p, i) => parts.every((q, j) => i === j || p.color !== q.color || p.end <= q.start || q.end <= p.start))).toBe(true);
   });
 });
 

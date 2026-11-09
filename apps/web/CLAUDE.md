@@ -1274,7 +1274,7 @@ writes the measure's number: it cannot read a variable). **No popover** (A4 §6,
 «The notes beside the text»), where the column is shown and the block has one there — the block is closed again, so
 the next press does the same —; else (a phone, a narrow reader, a block of highlights or an application's proposed
 passages alone), or with Shift (a click or Enter: `blockAll`, the keyboard's way to a block's highlights beside its
-cards), it opens the block's sheet, `BlockAnnotationsSheet` (`ui/Sheet`, a capped width centred on a computer): the
+cards; the sign says it, `aria-keyshortcuts`, and so does the «?» dialog), it opens the block's sheet, `BlockAnnotationsSheet` (`ui/Sheet`, a capped width centred on a computer): the
 proposals first (D7b), an application's glosses, the reader's notes (`NoteMarginCard`, edited and removed in place),
 the highlights (removed), each with *Vai al passo*, which scrolls to the passage and makes it glow
 (`utils/revealAnnotation.ts`), and the discussions (`ThreadCard`, opened in their panel). Decided as the block opens: a
@@ -1376,8 +1376,12 @@ card (the lists under the text keep the rest). The column is drawn where the rea
 beside it — the wrapper measured in script against `MARGIN_MIN_REM` (52rem; `vlx-glossed` on the wrapper, `index.css`),
 so a new note knows where to go before any card is there — and something to put in it; `onWideChange` says it is shown
 once its cards are placed, `onRoomChange` whether there is room at all (Study Mode writes a note in its tools panel
-without). With less room a new note's editor is a sheet from the bottom (`NoteComposerSheet`, its X asking before a text
-written is dropped), and the cards are the block's sheet's. A card hovered or focused shows its words in the text (the
+without); a rem of slack once there, so a scrollbar the cards bring does not take the column away. With less room a new
+note's editor is a sheet from the bottom (`NoteComposerSheet`, its X asking before a text written is dropped), and the
+cards are the block's sheet's. What is written in a new note is the margin's, so it moves with the editor between the
+column and the sheet; a new selection while something is written there does not take it onto other words (the note tool
+takes every selection): the readers ask `keepDraft()`, which gives the field the focus again. Saved, the focus goes to
+the note's card; given up, to the block's sign. A card hovered or focused shows its words in the text (the
 CSS Custom Highlight API, `utils/glossPassage.ts`; a gloss's card through `useGlossPassage`). «Rimuovi» hands the focus
 to the next card, else the one before, else the block's sign found again after the text redrew (`signAt`), else the
 nearest sign; Esc on a card (not a field's own) goes back to its block's sign. A note's wavy words clicked go to its card,
@@ -1385,8 +1389,10 @@ else its block's sheet (`useInlineNoteAnchors`, `useNoteOpener`; no popover). `I
 `InlineNotePopover` are gone.
 
 **The note tool** (A4 §6): `NoteToolButton`, a word processor's split button beside the highlighter in the four reading
-bars (the article's computer row and its compact form — not the phone's row, which keeps the selection bar's «Nota» —,
-the decision's, Study Mode's header, the dossier reader's actions). Its left half is the tool: with words selected it
+bars (the article's computer row and its compact form; the phone's row only while the tool is on, so it can be turned off
+where there is no Esc — it keeps the selection bar's «Nota» otherwise —; the decision's; Study Mode's header from 640 px,
+mounted only there, since a button hidden by a class keeps the tool alive; the dossier reader's actions). Its words are
+read as the press starts, as the highlighter's (`InkSelection.note`). Its left half is the tool: with words selected it
 opens the editor of a note on them at once; with nothing selected it turns the tool on (`aria-pressed`), and every
 selection then opens the editor as it is released (`SelectionPopup`, `useInkOnRelease`), the words exactly as selected,
 with no selection bar, until it is pressed again or Esc. One tool at a time: `readingTool` is `'highlight'`, `'note'`
@@ -1505,7 +1511,7 @@ reader: an article's `DossierItemReader` and a decision's `DecisionReadingSurfac
 `DossierDecisionRow`), each given its entry's id, the dossier from `CurrentDossierContext` (`DossierDetailView`). It asks
 nothing outside a dossier entry, with the feature off or on a text shown read-only, and draws the proposals with the
 reader's own highlights (a decision's downloads keep only the reader's); one whose words no longer land is listed under
-the text at every width, as the application's, with its note and the popover's actions (`LostProposalsList`), never
+the text at every width, as the application's, with its note and the sheet's actions (`LostProposalsList`), never
 in the reader's own boxes (`LooseHighlightsList`, desktop only, and `UnmatchedAnchors`). Each
 write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
 once and offers «Annulla»; the `DELETE` leaves when the notification closes, when the entry's reader goes (its row
@@ -1517,7 +1523,7 @@ is out the checkbox and the flag wait (`busy`, `aria-disabled`, still focusable)
 waits behind «Annulla» is what «Annulla» puts back, the server's state. A 404 «Proposta non trovata», on a write or a
 `DELETE`, is a removal done: no error, nothing put back. Errors are read as `apiClient` rejects them (`{ status,
 message, data }`): the server's `detail` is what the notification says. A state that changes is said in a `status`
-region; the focus comes back to the pencil after editing, and to the popover after a bin; «Cosa non va?» also saves on
+region; the focus comes back to the pencil after editing, and to the sheet's list after a bin; «Cosa non va?» also saves on
 Esc. On a narrow card the three buttons go under the label (`flex-wrap`). The flag is read once as the app starts
 (with the user's data) and as the dossier page mounts; on again after an off, the dossiers are read again for their
 lights. A 404 «Non disponibile» also clears the items' `assistantNotes` and

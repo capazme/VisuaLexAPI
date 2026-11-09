@@ -60,16 +60,17 @@ export function NoteToolButton({ triggerClassName, className, placement, gloss =
   };
 
   const { name } = KINDS[kind];
+  const label = `Strumento nota (${name.toLowerCase()})`;
   const hint = on
-    ? `${name}: acceso. Premi per spegnerlo, o Esc`
-    : `${name}: con del testo selezionato la scrive su quelle parole; senza, si accende`;
+    ? `${label}: acceso. Premi per spegnerlo, o Esc`
+    : `${label}: con del testo selezionato apre la nota su quelle parole; senza, accende lo strumento`;
   const Icon = kind === 'gloss' ? MessageCircle : MessageSquarePlus;
   return (
     <div role="group" aria-label="Strumento nota" className={cn('flex items-center', className)}>
       <button
         type="button"
         aria-pressed={on}
-        aria-label={`Strumento nota (${name.toLowerCase()})`}
+        aria-label={label}
         title={hint}
         onPointerDown={readAtPress}
         // The selection stays where it is: the button never takes it (nor the focus) from the text.

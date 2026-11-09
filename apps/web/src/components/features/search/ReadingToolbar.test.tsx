@@ -125,6 +125,21 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         buttons.forEach((b) => expect(b).toHaveClass('min-h-[44px]', 'min-w-[44px]'));
     });
 
+    it('on a phone, the note tool\'s toggle shows while the tool is on, so it can be turned off where there is no Esc', () => {
+        appStore.setState({ readingTool: 'note' });
+        try {
+            const { container } = setup();
+            const buttons = within(phoneRow(container)).getAllByRole('button');
+            expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual([
+                'Evidenziatore (giallo)', 'Strumento nota (nota personale)', 'Al dossier', 'Altre azioni sull’articolo',
+            ]);
+            fireEvent.click(within(phoneRow(container)).getByRole('button', { name: 'Strumento nota (nota personale)' }));
+            expect(appStore.getState().readingTool).toBeNull();
+        } finally {
+            appStore.setState({ readingTool: null });
+        }
+    });
+
     it('the visible tools are 36 px on a computer, neutral (no colour of their own)', () => {
         const { container } = setup();
         within(desktopRow(container)).getAllByRole('button').forEach((b) => {

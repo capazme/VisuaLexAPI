@@ -12,7 +12,7 @@ function sign(over: Partial<SignTargetOptions>) {
   const focus = vi.fn(() => true);
   const options: SignTargetOptions = {
     openBlock: 2, blockAll: false, group: block({ notes: [note], highlights: [highlight] }), marginShown: true,
-    marginRef: { current: { focus } }, closeBlock: vi.fn(), openBlockAt: vi.fn(), ...over,
+    marginRef: { current: { focus, keepDraft: () => false } }, closeBlock: vi.fn(), openBlockAt: vi.fn(), ...over,
   };
   const { result } = renderHook(() => useSignTarget(options));
   return { sheet: result.current, focus, options };
@@ -41,7 +41,7 @@ describe('useSignTarget — where a block\'s sign takes the reader (A4 §6, no p
 
   it('a card that could not take the focus (the reader narrowed meanwhile): everything of the block in its sheet', () => {
     const focus = vi.fn(() => false);
-    const { options } = sign({ marginRef: { current: { focus } } });
+    const { options } = sign({ marginRef: { current: { focus, keepDraft: () => false } } });
     expect(options.openBlockAt).toHaveBeenCalledExactlyOnceWith(2, true);
     expect(options.closeBlock).not.toHaveBeenCalled();
   });
@@ -71,14 +71,14 @@ describe('useNoteOpener — a note\'s wavy words clicked', () => {
   it('its card beside the text, where the column is shown', () => {
     const focus = vi.fn(() => true);
     const openBlockAt = vi.fn();
-    renderHook(() => useNoteOpener({ current: { focus } }, openBlockAt)).result.current(note, words());
+    renderHook(() => useNoteOpener({ current: { focus, keepDraft: () => false } }, openBlockAt)).result.current(note, words());
     expect(focus).toHaveBeenCalledExactlyOnceWith(['note:n1']);
     expect(openBlockAt).not.toHaveBeenCalled();
   });
 
   it('else everything of its block, in the block\'s sheet', () => {
     const openBlockAt = vi.fn();
-    renderHook(() => useNoteOpener({ current: { focus: () => false } }, openBlockAt)).result.current(note, words());
+    renderHook(() => useNoteOpener({ current: { focus: () => false, keepDraft: () => false } }, openBlockAt)).result.current(note, words());
     expect(openBlockAt).toHaveBeenCalledExactlyOnceWith(3, true);
   });
 });

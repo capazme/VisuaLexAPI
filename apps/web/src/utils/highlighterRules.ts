@@ -195,8 +195,17 @@ function joinSameColour(
     }
     parts = joined;
   }
-  return parts.flatMap((part) => without(part, marks.filter((m) => !removed.has(m.id) && (recolored.get(m.id) ?? m.color) === part.color
-    && (m.whole || m.author !== authorOf(part)))));
+  // What another author holds in the colour keeps its words: the highlights of it that stay, and the parts of it made
+  // here — a part with an author before the ink's own, and among two authors the first.
+  const kept: InkPart[] = [];
+  for (const part of [...parts].sort((x, y) => Number(!authorOf(x)) - Number(!authorOf(y)))) {
+    const theirs = [
+      ...marks.filter((m) => !removed.has(m.id) && (recolored.get(m.id) ?? m.color) === part.color && (m.whole || m.author !== authorOf(part))),
+      ...kept.filter((p) => p.color === part.color && authorOf(p) !== authorOf(part)),
+    ];
+    kept.push(...without(part, theirs));
+  }
+  return kept.sort((x, y) => x.start - y.start);
 }
 
 /** A part's author: the one of the highlight it comes from (a cut's, a piece recoloured), none for the ink's own. */

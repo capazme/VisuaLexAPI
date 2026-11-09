@@ -920,7 +920,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                         itemKey={itemKey}
                         processedContent={processedContent}
                         onPopupHighlight={handlePopupHighlight}
-                        onPopupAddNote={handlePopupAddNote}
+                        // A note being written keeps its words: a new selection refocuses it (the note tool takes every one).
+                        onPopupAddNote={(text, startOffset, rect) => { if (!marginRef.current?.keepDraft()) handlePopupAddNote(text, startOffset, rect); }}
                         onPopupCopy={handlePopupCopy}
                         onPopupDiscuss={readOnly ? undefined : discussion.popupDiscuss}
                         onPopupReportCitation={devMode && canContribute && !readOnly ? handlePopupReportCitation : undefined}

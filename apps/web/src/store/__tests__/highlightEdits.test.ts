@@ -279,6 +279,29 @@ describe('a highlight from the Forum cut or recoloured in pieces keeps its autho
     expect(runShortcutUndo()).toBeNull();
   });
 
+  it('a range refused after a later gesture changed the same row: the later one stands, on screen and on the server', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.setState({ highlights: [forum()] });
+    let refuse: (reason: unknown) => void = () => {};
+    vi.mocked(highlightService.update).mockImplementationOnce(() => new Promise((_resolve, reject) => { refuse = reject; }));
+    recolourPiece();
+    await flush();
+    // A second gesture shortens the same row again, while the first's range is still out.
+    appStore.getState().editHighlights({
+      normaKey: 'k', articleId: '1453', remove: [], recolor: [], reshape: [{ id: 'f1', text: 'i', startOffset: 20, color: 'red' }], add: [], message: 'Evidenziazione cambiata in rosso',
+    });
+    refuse({ status: 500, message: 'no' });
+    await flush();
+    await flush();
+    const row = appStore.getState().highlights.find((h) => h.id === 'f1');
+    expect(row).toMatchObject({ text: 'i', color: 'red' });
+    // Nothing put the first gesture's shape back over it.
+    expect(vi.mocked(highlightService.update).mock.calls.map(([, body]) => body)).toEqual([
+      { color: 'yellow', text: 'il', startOffset: 20, endOffset: 22 },
+      { color: 'red', text: 'i', startOffset: 20, endOffset: 21 },
+    ]);
+  });
+
   it('a piece of one still being created waits for its server id: `splitFrom` never names a temporary id', async () => {
     const answers = heldCreate();
     appStore.setState({ highlights: [forum()] });

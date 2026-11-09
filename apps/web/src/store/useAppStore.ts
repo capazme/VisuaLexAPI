@@ -2516,9 +2516,13 @@ const appStore = createStore<AppState>()(
                         const back = (id: string, to: HighlightShape, from: HighlightShape, written?: Promise<boolean>) => {
                             // Recorded under a temporary id, it may have its server id by now.
                             const current = serverIdOf(id);
+                            // Only while it still shows what this gesture gave it: a later gesture's colour or range
+                            // (taken back after it, a part refused late) stands, on screen and on the server.
+                            const h = get().highlights.find(x => x.id === current || x.id === id);
+                            if (!h || !isShaped(h, from)) return;
                             set((state) => {
-                                const h = state.highlights.find(x => x.id === current || x.id === id);
-                                if (h) Object.assign(h, to);
+                                const now = state.highlights.find(x => x.id === current || x.id === id);
+                                if (now) Object.assign(now, to);
                             });
                             // One refused is back already, on the server and on screen.
                             void (written ?? Promise.resolve(true)).then((ok) => { if (ok) void sendHighlightUpdate(current, to, from); });

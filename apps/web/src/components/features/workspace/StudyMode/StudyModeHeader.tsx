@@ -6,6 +6,7 @@ import type { StudyModeTheme } from './StudyMode';
 import { spring } from '../../../../lib/motion';
 import { HighlighterButton } from '../../search/HighlighterButton';
 import { NoteToolButton } from '../../search/NoteToolButton';
+import { useMediaQuery } from '../../../../hooks/useIsDesktop';
 
 interface StudyModeHeaderProps {
   visible: boolean;
@@ -68,6 +69,7 @@ export function StudyModeHeader({
   onToggleTools,
   onExport
 }: StudyModeHeaderProps) {
+  const roomForNoteTool = useMediaQuery('(min-width: 640px)');
   const styles = THEME_HEADER_STYLES[theme];
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < totalArticles - 1;
@@ -179,7 +181,12 @@ export function StudyModeHeader({
               {/* The highlighter (H1, A4), as in the reading bar; the way to the colours' meanings is in Study Mode's own
                   settings (the gear «Impostazioni (S)»), not a second gear beside this one. */}
               <HighlighterButton meaningsGear={false} triggerClassName={cn('min-h-[44px] min-w-[44px] justify-center rounded-md p-1.5 sm:p-2 md:min-h-0 md:min-w-0', styles.button)} />
-              <NoteToolButton triggerClassName={cn('min-h-[44px] min-w-[44px] justify-center rounded-md p-1.5 sm:p-2 md:min-h-0 md:min-w-0', styles.button)} />
+              {/* From 640 px: under it the header has no room left (the selection bar's «Nota» writes one). Mounted
+                  only there, not hidden by a class: a button hidden but mounted would keep the tool on with no way to
+                  see it (A4 §6). */}
+              {roomForNoteTool && (
+                <NoteToolButton triggerClassName={cn('min-h-[44px] min-w-[44px] justify-center rounded-md p-1.5 sm:p-2 md:min-h-0 md:min-w-0', styles.button)} />
+              )}
 
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 

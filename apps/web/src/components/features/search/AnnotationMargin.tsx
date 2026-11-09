@@ -21,6 +21,12 @@ export interface AnnotationMarginHandle {
      * the column is shown: false otherwise (the caller opens the block's sheet instead).
      */
     focus: (keys: readonly string[]) => boolean;
+    /**
+     * A new note asked for while one is being written (the note tool takes every selection): true when something is
+     * written in the editor already — its field takes the focus again, and the new words are not taken, so the text is
+     * never moved onto other words without asking —; false when the caller may open the new one.
+     */
+    keepDraft: () => boolean;
 }
 
 /** A new note being written: its words, where they start. */
@@ -112,12 +118,17 @@ export function AnnotationMargin({
     const columnRef = useRef<HTMLElement>(null);
     const cards = useRef(new Map<string, HTMLElement>());
 
-    // Whether the reader has room for the column, known before any card is there (a new note's editor goes by it).
+    // Whether the reader has room for the column, known before any card is there (a new note's editor goes by it). A
+    // rem of slack once it is there: the column's cards may bring a scrollbar, which narrows the wrapper by its width,
+    // and the column must not take itself away.
     const [roomy, setRoomy] = useState(false);
     useLayoutEffect(() => {
         const wrapper = wrapperRef.current;
         if (!wrapper) return;
-        const check = () => setRoomy(wrapper.getBoundingClientRect().width >= MARGIN_MIN_REM * remPx());
+        const check = () => {
+            const width = wrapper.getBoundingClientRect().width;
+            setRoomy((was) => width >= (was ? MARGIN_MIN_REM - 1 : MARGIN_MIN_REM) * remPx());
+        };
         check();
         if (typeof ResizeObserver === 'undefined') return;
         const observer = new ResizeObserver(check);
@@ -125,15 +136,30 @@ export function AnnotationMargin({
         return () => observer.disconnect();
     }, []);
 
+    // What is written in a new note's editor: here, so it survives the move between the column and the sheet (the
+    // reader crossing the room's threshold), and starts empty for other words.
+    const draftKey = draft ? `${draft.startOffset}:${draft.text}` : null;
+    const [written, setWritten] = useState<{ key: string | null; text: string }>({ key: null, text: '' });
+    if (written.key !== draftKey) setWritten({ key: draftKey, text: '' });
+    const draftText = written.key === draftKey ? written.text : '';
+    const writeDraft = (text: string) => setWritten({ key: draftKey, text });
+
+    // What the column holds depends on what the reader gives, not on the identity of its callbacks (new ones at every
+    // render of a reader): the anchors are resolved and the cards measured again only when that changes.
+    const hasNotes = !!(onUpdateNote && onRemoveNote);
+    const hasThreads = !!onOpenThread;
+    const hasDraft = !!(draft && onSaveDraft && onCancelDraft);
+    const draftStart = draft?.startOffset;
+    const draftWords = draft?.text;
     const entries = useMemo<Entry[]>(() => {
         const out: Entry[] = [];
-        if (onUpdateNote && onRemoveNote) {
+        if (hasNotes) {
             const anchored = notes.filter((n) => n.anchorText && typeof n.startOffset === 'number');
             for (const anchor of resolveAnchors(plain, [], anchored)) {
                 if (anchor.kind === 'note') out.push({ key: `note:${anchor.note.id}`, start: anchor.start, end: anchor.end, kind: 'note', note: anchor.note });
             }
         }
-        if (onOpenThread) {
+        if (hasThreads) {
             for (const { thread, start, end } of threads) out.push({ key: `thread:${thread.id}`, start, end, kind: 'thread', thread });
         }
         if (glossActions) {
@@ -143,11 +169,11 @@ export function AnnotationMargin({
                 if (gloss) out.push({ key: `gloss:${gloss.id}`, start: anchor.start, end: anchor.end, kind: 'gloss', gloss });
             }
         }
-        if (draft && onSaveDraft && onCancelDraft) {
-            out.push({ key: 'draft', start: draft.startOffset, end: draft.startOffset + draft.text.length, kind: 'draft', draft });
+        if (hasDraft && draftStart !== undefined && draftWords !== undefined) {
+            out.push({ key: 'draft', start: draftStart, end: draftStart + draftWords.length, kind: 'draft', draft: { text: draftWords, startOffset: draftStart } });
         }
         return out.sort((x, y) => x.start - y.start || x.end - y.end);
-    }, [plain, notes, onUpdateNote, onRemoveNote, threads, onOpenThread, glosses, glossActions, draft, onSaveDraft, onCancelDraft]);
+    }, [plain, notes, hasNotes, threads, hasThreads, glosses, glossActions, hasDraft, draftStart, draftWords]);
 
     const active = roomy && entries.length > 0;
     const [layout, setLayout] = useState<{ tops: Record<string, number>; height: number } | null>(null);
@@ -225,7 +251,17 @@ export function AnnotationMargin({
             const first = entries.find((e) => keys.includes(e.key));
             return !!first && focusCard(first.key);
         },
-    }), [shown, entries, focusCard]);
+        keepDraft: () => {
+            if (!hasDraft || !draftText.trim()) return false;
+            const card = cards.current.get('draft');
+            const field = card?.querySelector('textarea');
+            if (field) {
+                field.focus({ preventScroll: true });
+                if (card) scrollToMiddle(card);
+            }
+            return true;
+        },
+    }), [shown, entries, focusCard, hasDraft, draftText]);
 
     // The words of the card hovered or focused (a note's, a discussion's), painted in the text; a gloss shows its own.
     const [passageOf, setPassageOf] = useState<string | null>(null);
@@ -265,6 +301,34 @@ export function AnnotationMargin({
     const keepCard = (key: string, el: HTMLElement | null) => {
         if (el) cards.current.set(key, el);
         else cards.current.delete(key);
+    };
+    /**
+     * A new note saved: the focus goes to its card once the store has it there (the first card at the same words),
+     * else to the block's sign; given up, to the sign. Never left on the page as the editor goes.
+     */
+    const latestEntries = useRef(entries);
+    useEffect(() => { latestEntries.current = entries; });
+    const afterDraft = (words: NoteDraft, saved: boolean) => {
+        const end = words.startOffset + words.text.length;
+        requestAnimationFrame(() => {
+            const card = saved
+                ? latestEntries.current.find((e) => e.kind === 'note' && e.start === words.startOffset && e.end === end)
+                : undefined;
+            if (card && focusCard(card.key)) return;
+            signAt(textRootRef.current, words.startOffset, end)?.focus({ preventScroll: true });
+        });
+    };
+    const saveDraft = (text: string) => {
+        if (!draft || !onSaveDraft) return;
+        const words = draft;
+        onSaveDraft(text);
+        afterDraft(words, true);
+    };
+    const cancelDraft = () => {
+        if (!draft || !onCancelDraft) return;
+        const words = draft;
+        onCancelDraft();
+        afterDraft(words, false);
     };
     /** Esc on a card: back to its block's sign, the way it came (the sign focuses the card). */
     const escapeFrom = (entry: Entry) => signAt(textRootRef.current, entry.start, entry.end)?.focus({ preventScroll: true });
@@ -322,12 +386,16 @@ export function AnnotationMargin({
                                             onEscape={() => escapeFrom(entry)}
                                         />
                                     )}
-                                    {entry.kind === 'draft' && onSaveDraft && onCancelDraft && (
+                                    {entry.kind === 'draft' && (
                                         <NoteDraftCard
+                                            // Other words, another editor (its field focused again once placed).
+                                            key={draftKey}
                                             ref={(el: HTMLElement | null) => keepCard(entry.key, el)}
                                             text={entry.draft.text}
-                                            onSave={onSaveDraft}
-                                            onCancel={onCancelDraft}
+                                            value={draftText}
+                                            onChange={writeDraft}
+                                            onSave={saveDraft}
+                                            onCancel={cancelDraft}
                                             placed={top !== undefined}
                                         />
                                     )}
@@ -337,8 +405,8 @@ export function AnnotationMargin({
                     </aside>
                 )}
             </div>
-            {draft && onSaveDraft && onCancelDraft && !roomy && (
-                <NoteComposerSheet text={draft.text} onSave={onSaveDraft} onCancel={onCancelDraft} />
+            {hasDraft && draft && !roomy && (
+                <NoteComposerSheet text={draft.text} value={draftText} onChange={writeDraft} onSave={saveDraft} onCancel={cancelDraft} />
             )}
         </div>
     );

@@ -16,4 +16,10 @@ describe('KeyboardShortcutsModal', () => {
     const keys = screen.getByText('Tutto schermo: entra o esci').nextElementSibling as HTMLElement;
     expect([...keys.querySelectorAll('kbd')].map((k) => k.textContent)).toEqual([expect.stringMatching(/^(?:Cmd|Ctrl)$/), 'Shift', 'F']);
   });
+
+  it('lists Shift+Enter on a block\'s sign: everything of the block, its highlights too (A4 §6)', () => {
+    render(<KeyboardShortcutsModal isOpen onClose={() => {}} />);
+    const keys = screen.getByText('Sul segno di un comma: tutte le sue annotazioni, evidenziazioni comprese').nextElementSibling as HTMLElement;
+    expect([...keys.querySelectorAll('kbd')].map((k) => k.textContent)).toEqual(['Shift', 'Enter']);
+  });
 });
