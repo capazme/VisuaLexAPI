@@ -17,27 +17,32 @@ export interface PracticeTableProps {
   onViewPdf: (urn: string) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => void;
   streaming: PracticeStreaming | null;
+  /** The overview (the acts a grid of panels) or the reading view's index, beside the windows (U2, `ReadingRow`). */
+  layout: 'overview' | 'index';
+  /** Mounted but hidden (the rail's overlay, closed): it asks for no tour, whose steps would point at nothing drawn. */
+  concealed?: boolean;
 }
 
 /**
  * The active practice's table on the desktop (spec §3): its header (name, count line, «Salva come
- * dossier», «⋯»), the streaming bar of a search landing in it, then its column. An empty practice
- * says so. Topic searches are windows beside it (`ReadingRow`, T8); the phone's table keeps its band. (The migration's notice is `SearchPanel`'s, over both layouts.)
+ * dossier», «⋯»), the streaming bar of a search landing in it, then its column — the overview's grid, or the index of
+ * the reading view, where the header is compact. An empty practice says so. Topic searches are windows beside it
+ * (`ReadingRow`, T8); the phone's table keeps its band. (The migration's notice is `SearchPanel`'s, over both layouts.)
  */
-export function PracticeTable({ onViewPdf, onCrossReference, streaming }: PracticeTableProps) {
+export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, concealed = false }: PracticeTableProps) {
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
   const theme = useAppStore((s) => s.settings.theme);
   // The tour of the table, once; when it is done the act's follows (`PracticeActBlock`).
   const { tryStartTour } = useTour({ theme: theme as 'light' | 'dark', onComplete: (type) => {
-    // the act's tour follows, when the practice has an act to show
+    // the act's tour follows, when the practice has an act to show in the overview (its steps are the panel's)
     const held = appStore.getState().practices.find((p) => p.id === appStore.getState().activePracticeId);
-    if (type === 'practice' && held && held.acts.length > 0) tryStartTour('practiceAct');
+    if (type === 'practice' && held && held.acts.length > 0 && held.beside.length === 0) tryStartTour('practiceAct');
   } });
   // Asked once: `tryStartTour` is a new function on every render, so the effect cannot key on it.
   const tourAsked = useRef(false);
   const drawn = practice !== undefined;
   useEffect(() => {
-    if (!drawn || tourAsked.current) return;
+    if (!drawn || concealed || tourAsked.current) return;
     tourAsked.current = true;
     tryStartTour('practice');
   });
@@ -45,18 +50,22 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming }: Practi
   return (
     // The frame's width (U1): its rows widen, the text they open stays at the reading measure (`.vlx-art`).
     <div data-testid="practice-table" className="w-full space-y-3">
-      <PracticeHeader practice={practice} />
+      <PracticeHeader practice={practice} compact={layout === 'index'} />
       <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
       {isEmptyPractice(practice) ? (
         <PracticeEmpty />
       ) : (
-        <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
+        <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} layout={layout} />
       )}
     </div>
   );
 }
 
-function PracticeHeader({ practice }: { practice: Practice }) {
+/** The index's title (U2): the act headings' serif, a step larger than theirs, so the name fits a 320 px column. */
+const INDEX_TITLE = 'font-serif text-[22px] font-medium leading-tight text-slate-900 dark:text-white';
+
+/** In the index (`compact`) the name is smaller and «Salva come dossier» is a 44 px icon beside «⋯». */
+function PracticeHeader({ practice, compact }: { practice: Practice; compact: boolean }) {
   const renamePractice = useAppStore((s) => s.renamePractice);
   const [editing, setEditing] = useState(false);
   const countLine = practiceCountLine(practiceCounts(practice));
@@ -68,7 +77,7 @@ function PracticeHeader({ practice }: { practice: Practice }) {
         {editing ? (
           <PracticeNameInput
             initial={practice.label}
-            className={cn('w-full', PAGE_TITLE)}
+            className={cn('w-full', compact ? INDEX_TITLE : PAGE_TITLE)}
             onDone={(name) => {
               setEditing(false);
               if (name !== null) renamePractice(practice.id, name);
@@ -78,8 +87,8 @@ function PracticeHeader({ practice }: { practice: Practice }) {
           // The page's title, as every section page writes it (`PageFrame`'s `PAGE_TITLE`, R3).
           <h2
             onDoubleClick={() => setEditing(true)}
-            title="Doppio clic per rinominare"
-            className={cn('truncate', PAGE_TITLE)}
+            title={compact ? `${practice.label} · doppio clic per rinominare` : 'Doppio clic per rinominare'}
+            className={cn('truncate', compact ? INDEX_TITLE : PAGE_TITLE)}
           >
             {practice.label}
           </h2>
@@ -91,10 +100,15 @@ function PracticeHeader({ practice }: { practice: Practice }) {
         onClick={save.saveAsNew}
         disabled={save.busy}
         id="tour-practice-save"
-        className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-0 md:py-1.5 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        aria-label={compact ? 'Salva come dossier' : undefined}
+        title={compact ? 'Salva come dossier' : undefined}
+        className={cn(
+          'inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+          compact ? 'min-w-[44px] justify-center' : 'px-3 md:min-h-0 md:py-1.5',
+        )}
       >
         <FolderPlus size={16} aria-hidden />
-        Salva come dossier
+        {!compact && 'Salva come dossier'}
       </button>
       <MenuButton
         label={`Altre azioni per la pratica ${practice.label}`}

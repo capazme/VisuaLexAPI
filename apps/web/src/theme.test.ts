@@ -9,6 +9,7 @@ import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
 import type { Materia } from './types/studia';
 import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
 import { CARD_GRID_COLUMNS, FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
+import { OVERVIEW_GRID } from './components/features/practice/besideLayout';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -563,6 +564,24 @@ describe('Gymnasium\'s small motions (S2)', () => {
     for (const name of ['vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
     for (const rule of ['.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
+  }, 30000);
+});
+
+describe('the practice in two views (U2)', () => {
+  it('the overview\'s grid, the decisions\' strip and its open row, and the index\'s entries all generate CSS', async () => {
+    const strip = ['border-emerald-200/70', 'bg-emerald-50/40', 'dark:border-emerald-900/50', 'dark:bg-emerald-950/20'];
+    const css = await compile([
+      ...OVERVIEW_GRID.split(' '), ...strip, 'grid-cols-[repeat(auto-fill,minmax(min(26rem,100%),1fr))]',
+      '[&>[data-row-open]]:col-span-full', 'min-h-9', 'md:flex-initial',
+    ]);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(38\.75rem,\s*100%\),\s*1fr\)\)/);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(26rem,\s*100%\),\s*1fr\)\)/);
+    expect(css).toMatch(/>\s*\[data-row-open\][^{]*\{\s*grid-column:\s*1\s*\/\s*-1/);
+    expect(css).toMatch(/\.min-h-9\s*\{\s*min-height:/);
+    for (const name of strip) {
+      const selector = `.${name.replace(/[/:]/g, '\\$&')}`;
+      expect(css, name).toContain(selector);
+    }
   }, 30000);
 });
 

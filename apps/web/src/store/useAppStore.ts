@@ -377,9 +377,10 @@ interface AppState {
      * «Apri accanto» (§4.2): a window on `ref` beside the practice's table, which is made active.
      * Nothing moves when a window already shows that subject; with two, the oldest that is not the
      * asker goes and its subject stays in the table (D10, T16). A ref to something the practice does
-     * not hold, or a practice that is not open, opens nothing and is warned.
+     * not hold, or a practice that is not open, opens nothing and is warned. With `focus` (a row's or
+     * the index's «Apri accanto», U2) the window takes the keyboard focus, opened or already there.
      */
-    openBeside: (practiceId: string, ref: BesideRef, askerId?: string) => void;
+    openBeside: (practiceId: string, ref: BesideRef, askerId?: string, options?: { focus?: boolean }) => void;
     /** Closes the window; its subject stays in the table (D7). */
     closeBeside: (practiceId: string, refId: string) => void;
     /**
@@ -1229,7 +1230,7 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            openBeside: (practiceId, ref, askerId) => {
+            openBeside: (practiceId, ref, askerId, options) => {
                 const practice = get().practices.find((p) => p.id === practiceId);
                 const subject = subjectOfRef(ref);
                 if (!practice || (subject && !holdsSubject(practice, subject))) {
@@ -1237,8 +1238,10 @@ const appStore = createStore<AppState>()(
                     return;
                 }
                 const beside = besideWith(practice.beside, ref, askerId);
-                // Already shown: asked again, that window takes focus (carry-over 11).
-                const shownId = beside === practice.beside && isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
+                // Already shown: asked again, that window takes focus (carry-over 11); asked with `focus`, a new one too.
+                const shownId = !isDesktopViewport() ? undefined
+                    : beside === practice.beside ? shownWindowId(practice.beside, ref)
+                    : options?.focus ? ref.id : undefined;
                 if (beside === practice.beside && get().activePracticeId === practiceId && (!shownId || get().windowFocusRequest === shownId)) return;
                 set((state) => {
                     activate(state, practiceId);

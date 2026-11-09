@@ -9,8 +9,8 @@ vi.mock('../../../hooks/useTour', () => ({
   useTour: () => ({ tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true }),
 }));
 vi.mock('./PracticeTable', () => ({
-  PracticeTable: () => (
-    <div data-testid="practice-table">
+  PracticeTable: ({ layout }: { layout: string }) => (
+    <div data-testid="practice-table" data-layout={layout}>
       <header data-pinned-head data-testid="stub-practice-head">La pratica</header>
       <div data-pinned-head data-testid="stub-act-head">Atto</div>
       <div data-pinned-head data-testid="stub-toolbar">Barra della riga aperta</div>
@@ -135,6 +135,11 @@ function practiceWithWindows(count: 0 | 1 | 2 = 2) {
 }
 
 const row = () => <ReadingRow onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} />;
+/** The rail's overlay is open: drawn, not hidden (closed, it stays mounted and hidden, with the table in it). */
+const overlayShown = () => {
+  const overlay = screen.queryByTestId('reading-row-overlay');
+  return overlay !== null && !overlay.hidden;
+};
 const windows = () => screen.queryAllByTestId('reading-window');
 const widthOf = (testId: string, index = 0) => (screen.getAllByTestId(testId)[index] as HTMLElement).style.width;
 
@@ -168,6 +173,58 @@ describe('ReadingRow — the table and its windows (spec §4.2-§4.3)', () => {
     expect(screen.getByTestId('practice-table')).toBeInTheDocument();
     expect(windows()).toHaveLength(0);
     expect(screen.getByTestId('reading-row-table').style.width).toBe('');
+  });
+
+  it('the view follows the windows (U2): the overview with none, the index beside one, the overview again once it closes', () => {
+    const { practiceId, refs } = practiceWithWindows(0);
+    render(row());
+    expect(screen.getByTestId('practice-table')).toHaveAttribute('data-layout', 'overview');
+    expect(screen.getByTestId('reading-row-table')).toHaveAttribute('data-view', 'overview');
+    act(() => s().openBeside(practiceId, refs[0]));
+    expect(screen.getByTestId('practice-table')).toHaveAttribute('data-layout', 'index');
+    expect(screen.getByTestId('reading-row-table')).toHaveAttribute('data-view', 'index');
+    act(() => s().closeBeside(practiceId, refs[0].id));
+    expect(screen.getByTestId('practice-table')).toHaveAttribute('data-layout', 'overview');
+  });
+
+  it('a view changed under the focus hands it on: to the newest window, then to the table\'s first control', () => {
+    const { practiceId, refs } = practiceWithWindows(0);
+    render(row());
+    (document.activeElement as HTMLElement | null)?.blur();
+    act(() => s().openBeside(practiceId, refs[0]));
+    expect(windows()[0]).toHaveFocus();
+    // The window goes with the focus in it (an entry's ✕, the store): the overview's first control takes it.
+    act(() => s().closeBeside(practiceId, refs[0].id));
+    expect(screen.getByRole('button', { name: 'Dentro il tavolo' })).toHaveFocus();
+    // A focus somewhere that stays (the search field) is left where it is.
+    const field = document.createElement('input');
+    document.body.appendChild(field);
+    field.focus();
+    act(() => s().openBeside(practiceId, refs[0]));
+    expect(field).toHaveFocus();
+    field.remove();
+  });
+
+  it('a row revealed in the reading view opens beside, in place of the oldest window; with none open the column takes it', () => {
+    const { practiceId, actId, refs } = practiceWithWindows(2);
+    render(row());
+    act(() => { s().revealPracticeArticle(practiceId, actId, '7'); });
+    const seven = besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(article(L24, '7')) });
+    expect(s().practices[0].beside.map((b) => b.id)).toEqual([refs[1].id, seven.id]);
+    expect(s().pendingReveal).toBeNull();
+    // Its row, which the reveal opened in the hidden overview, is closed again.
+    expect(Object.keys(s().practiceRows).filter((key) => key.endsWith(practiceArticleKey(article(L24, '7'))))).toEqual([]);
+    // A reveal does not take the focus (a search that landed keeps it in the field).
+    expect(s().windowFocusRequest).toBeNull();
+
+    act(() => {
+      s().closeBeside(practiceId, refs[1].id);
+      s().closeBeside(practiceId, seven.id);
+    });
+    act(() => { s().revealPracticeArticle(practiceId, actId, '7'); });
+    expect(s().practices[0].beside).toEqual([]);
+    // The overview's column (stubbed here) takes it: nothing opened beside, the reveal left for it.
+    expect(s().pendingReveal?.rowKey).toContain(practiceArticleKey(article(L24, '7')));
   });
 
   it('draws the practice\'s windows in order, with their views', () => {
@@ -216,30 +273,30 @@ describe('ReadingRow — the table and its windows (spec §4.2-§4.3)', () => {
 });
 
 describe('ReadingRow — widths (besideLayout)', () => {
-  it('one window: half and half', () => {
+  it('one window: the index, 320 px, and the window the rest', () => {
     areaWidth = 1280;
     practiceWithWindows(1);
     render(row());
-    expect(widthOf('reading-row-table')).toBe('640px');
-    expect(widthOf('reading-row-window')).toBe('640px');
+    expect(widthOf('reading-row-table')).toBe('320px');
+    expect(widthOf('reading-row-window')).toBe('960px');
   });
 
-  it('two windows: three columns when each gets 420 px', () => {
+  it('two windows: the index and the two windows sharing the rest, each at least 420 px', () => {
     areaWidth = 1300;
     practiceWithWindows(2);
     render(row());
-    expect(widthOf('reading-row-table')).toBe('434px');
-    expect(widthOf('reading-row-window', 0)).toBe('433px');
-    expect(widthOf('reading-row-window', 1)).toBe('433px');
+    expect(widthOf('reading-row-table')).toBe('320px');
+    expect(widthOf('reading-row-window', 0)).toBe('490px');
+    expect(widthOf('reading-row-window', 1)).toBe('490px');
     expect(screen.queryByTestId('practice-rail')).not.toBeInTheDocument();
   });
 
-  it('follows the area when it is resized: thirds fold into the rail and unfold again', () => {
+  it('follows the area when it is resized: the index folds into the rail and unfolds again', () => {
     practiceWithWindows(2);
     render(row());
     expect(screen.getByTestId('practice-table')).toBeInTheDocument();
     resizeTo(1100);
-    expect(screen.queryByTestId('practice-table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('practice-table')).not.toBeVisible();
     expect(screen.getByTestId('practice-rail')).toBeInTheDocument();
     expect(widthOf('reading-row-rail')).toBe('48px');
     expect(widthOf('reading-row-window', 0)).toBe('526px');
@@ -295,6 +352,44 @@ describe('ReadingRow — the frame is its one cap, with or without a window besi
     expect(screen.getByTestId('reading-row-table')).toHaveClass(FOCUS_BUTTON_CLEARANCE);
   });
 
+  it('the overview comes back at its scroll position when the last window closes (U2)', () => {
+    areaWidth = 1436;
+    const { practiceId, refs } = practiceWithWindows(0);
+    const area = inPage();
+    render(row(), { container: area });
+    const scroller = area.parentElement!.parentElement!;
+    scroller.scrollTop = 640;
+    fireEvent.scroll(scroller);
+    act(() => s().openBeside(practiceId, refs[0]));
+    // The reading view is the window's height: the browser clamps the scroller, the overview's place is kept.
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+    act(() => s().closeBeside(practiceId, refs[0].id));
+    expect(scroller.scrollTop).toBe(640);
+  });
+
+  it('entering the reading view starts at the top; the overview\'s place is kept per practice', () => {
+    areaWidth = 1436;
+    const { practiceId, refs } = practiceWithWindows(0);
+    const other = s().createPractice('Altra');
+    s().addArticlesToPractice(other, L241, [B2]);
+    s().setActivePractice(practiceId);
+    const area = inPage();
+    render(row(), { container: area });
+    const scroller = area.parentElement!.parentElement!;
+    scroller.scrollTop = 640;
+    fireEvent.scroll(scroller);
+    act(() => s().openBeside(practiceId, refs[0]));
+    expect(scroller.scrollTop).toBe(0);
+    // Another practice, in its overview, scrolled elsewhere: it does not take this one's place.
+    act(() => s().setActivePractice(other));
+    scroller.scrollTop = 120;
+    fireEvent.scroll(scroller);
+    act(() => s().setActivePractice(practiceId));
+    act(() => s().closeBeside(practiceId, refs[0].id));
+    expect(scroller.scrollTop).toBe(640);
+  });
+
   it('stays in its parent as a window opens and closes', () => {
     areaWidth = 1436;
     const { practiceId, refs } = practiceWithWindows(1);
@@ -341,6 +436,21 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     areaWidth = 1100;
   });
 
+  it('keeps the one table mounted as the index folds into the rail and unfolds again: what its acts hold stays open', () => {
+    areaWidth = 1400;
+    practiceWithWindows(2);
+    render(row());
+    const table = screen.getByTestId('practice-table');
+    resizeTo(1100);
+    expect(screen.getByTestId('practice-table')).toBe(table);
+    expect(table).not.toBeVisible();
+    expect(screen.getByTestId('reading-row-overlay')).toHaveAttribute('hidden');
+    fireEvent.click(screen.getByTestId('practice-rail'));
+    expect(table).toBeVisible();
+    resizeTo(1400);
+    expect(screen.getByTestId('practice-table')).toBe(table);
+  });
+
   it('shows the count of texts and the practice\'s name, with the table folded away', () => {
     practiceWithWindows(2);
     render(row());
@@ -348,21 +458,23 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     expect(rail).toHaveAccessibleName('Pratica l. 24/2017');
     expect(rail).toHaveAttribute('aria-expanded', 'false');
     expect(within(rail).getByTestId('practice-rail-count')).toHaveTextContent('3');
-    expect(screen.queryByTestId('practice-table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('practice-table')).not.toBeVisible();
   });
 
-  it('opens the table as an overlay over the windows; Esc closes it and returns focus to the rail', () => {
+  it('opens the index as an overlay over the windows; Esc closes it and returns focus to the rail', () => {
     practiceWithWindows(2);
     render(row());
     fireEvent.click(screen.getByTestId('practice-rail'));
     const overlay = screen.getByTestId('reading-row-overlay');
-    expect(within(overlay).getByTestId('practice-table')).toBeInTheDocument();
+    expect(within(overlay).getByTestId('practice-table')).toHaveAttribute('data-layout', 'index');
+    // The index's 320 px and the overlay's padding.
+    expect(overlay.style.width).toMatch(/^min\(344px/);
     expect(screen.getByTestId('practice-rail')).toHaveAttribute('aria-expanded', 'true');
     expect(overlay).toHaveClass('z-30');
     expect(windows()).toHaveLength(2);
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
     expect(screen.getByTestId('practice-rail')).toHaveFocus();
   });
 
@@ -372,24 +484,24 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     fireEvent.click(screen.getByTestId('practice-rail'));
 
     fireEvent.pointerDown(within(screen.getByTestId('reading-row-overlay')).getByRole('button', { name: 'Dentro il tavolo' }));
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
 
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
     document.body.appendChild(dialog);
     fireEvent.pointerDown(dialog);
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
     dialog.remove();
 
     fireEvent.pointerDown(within(windows()[0]).getByTestId('article-reader'));
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
 
     // The rail itself toggles it: a press on it is not «outside».
     fireEvent.click(screen.getByTestId('practice-rail'));
     fireEvent.pointerDown(screen.getByTestId('practice-rail'));
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
     fireEvent.click(screen.getByTestId('practice-rail'));
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
   });
 
   it('Esc under an open modal dialog leaves the overlay open (the dialog takes it)', () => {
@@ -400,10 +512,10 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     modal.setAttribute('aria-modal', 'true');
     document.body.appendChild(modal);
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
     modal.remove();
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
   });
 
   it('a press in a floating tool (the structure window, the find window) is not a click away', () => {
@@ -414,7 +526,7 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     tool.setAttribute('data-floating-tool', '');
     document.body.appendChild(tool);
     fireEvent.pointerDown(tool);
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
     tool.remove();
   });
 
@@ -422,19 +534,19 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     practiceWithWindows(2);
     render(<>{row()}<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} /></>);
     fireEvent.click(screen.getByTestId('practice-rail'));
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
   });
 
   it('a window asked to take focus closes the overlay over it, and is focused', () => {
     const { practiceId, refs } = practiceWithWindows(2);
     render(row());
     fireEvent.click(screen.getByTestId('practice-rail'));
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
     // The folded row's header, or an index chip of an article shown beside, asks again for its window.
     act(() => s().openBeside(practiceId, refs[0]));
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
     expect(windows()[0]).toHaveFocus();
   });
 
@@ -442,11 +554,11 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     const { practiceId, refs } = practiceWithWindows(2);
     render(row());
     fireEvent.click(screen.getByTestId('practice-rail'));
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
     const { actId } = s().addArticlesToPractice(practiceId, L24, [article(L24, '9')]);
     act(() => s().openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(article(L24, '9')) })));
     expect(s().practices[0].beside.map((b) => b.id)).not.toContain(refs[0].id);
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
   });
 
   it('a press in a link popup portalled out of the table (a citation preview) leaves the overlay open', () => {
@@ -460,10 +572,10 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     </>);
     fireEvent.click(screen.getByTestId('practice-rail'));
     fireEvent.pointerDown(screen.getByRole('tooltip'));
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(true);
   });
 
-  it('the rail names the overlay it opens, and opening it moves focus in; a reveal opening it does not', () => {
+  it('the rail names the overlay it opens, and opening it moves focus in; a reveal opens no overlay and takes no focus', () => {
     const { practiceId, actId } = practiceWithWindows(2);
     render(row());
     const rail = screen.getByTestId('practice-rail');
@@ -472,11 +584,11 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     expect(rail).toHaveAttribute('aria-controls', overlay.id);
     expect(within(overlay).getByRole('button', { name: 'Dentro il tavolo' })).toHaveFocus();
     fireEvent.click(rail);
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
 
     rail.focus();
     act(() => { s().revealPracticeArticle(practiceId, actId, '7'); });
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
     expect(rail).toHaveFocus();
   });
 
@@ -487,30 +599,33 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     render(row());
     fireEvent.click(screen.getByTestId('practice-rail'));
     resizeTo(1400);
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
     resizeTo(1100);
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
 
     fireEvent.click(screen.getByTestId('practice-rail'));
     act(() => s().setActivePractice(other));
     act(() => s().setActivePractice(practiceId));
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
   });
 
   it('a reveal of a row folded by its window opens no overlay: the window is focused instead', () => {
     const { practiceId, actId } = practiceWithWindows(2);
     render(row());
     act(() => { s().revealPracticeArticle(practiceId, actId, '5'); });
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
     expect(windows()[0]).toHaveFocus();
   });
 
-  it('opens by itself when a row is revealed in a practice whose table is folded', () => {
-    const { practiceId, actId } = practiceWithWindows(2);
+  it('a row revealed while the index is folded opens beside (U2): the overlay stays closed', () => {
+    const { practiceId, actId, refs } = practiceWithWindows(2);
     render(row());
-    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
     act(() => { s().revealPracticeArticle(practiceId, actId, '7'); });
-    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(overlayShown()).toBe(false);
+    expect(windows().map((w) => w.getAttribute('data-window-id'))).toEqual([
+      refs[1].id, besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(article(L24, '7')) }).id,
+    ]);
   });
 });
 
@@ -534,22 +649,23 @@ describe('ReadingRow — where the find window opens (spec §4.4)', () => {
     expect(placeOf()).toEqual({ x: 1400 - 420 - 16, y: 90 + 8 });
   });
 
-  it('with windows beside: the table column\'s top right, under the same stack and every window\'s header', () => {
+  it('in the reading view (U2): the first window\'s body, under its header and its pinned compact bar', () => {
     areaWidth = 1400;
     practiceWithWindows(1);
     render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    // Table column: 100..800; the window\'s header ends at 94, the table\'s stack at 212.
-    expect(placeOf()).toEqual({ x: 800 - 420 - 16, y: 220 });
+    // The index 100..420; the window 420..1500, its body from 436, from 94; its bar 94..134.
+    expect(placeOf()).toEqual({ x: 1500 - 420 - 16, y: 134 + 8 });
   });
 
-  it('never over a window\'s ×: below its header even when the table column is narrower than the window', () => {
+  it('never on the index, narrower than the find window, and never over a window\'s ×: below its header', () => {
     areaWidth = 1260;
     practiceWithWindows(2);
     render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    // The table column is 420 wide, narrower than the window: it starts at the column\'s left edge.
-    expect(placeOf()).toEqual({ x: 100, y: 220 });
+    // The index 100..420, the first window 420..890: its body ends at 890.
+    expect(placeOf()).toEqual({ x: 890 - 420 - 16, y: 134 + 8 });
+    expect(placeOf().x).toBeGreaterThan(100 + 320);
     expect(placeOf().y).toBeGreaterThan(AREA_TOP + 44);
   });
 
@@ -602,12 +718,12 @@ describe('ReadingRow — where the find window opens (spec §4.4)', () => {
     expect(placeOf()).toEqual({ x: 20, y: 30 });
   });
 
-  it('keeps the table\'s place when the last window closes, and goes back to PR 4d\'s when the row goes', () => {
+  it('takes the table\'s place when the last window closes, and goes back to PR 4d\'s when the row goes', () => {
     areaWidth = 1400;
     const { practiceId, refs } = practiceWithWindows(1);
     const { unmount } = render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    expect(placeOf().x).toBe(800 - 420 - 16);
+    expect(placeOf()).toEqual({ x: 1500 - 420 - 16, y: 134 + 8 });
     act(() => closeFindWindow());
     act(() => s().closeBeside(practiceId, refs[0].id));
     act(() => openFindWindow());

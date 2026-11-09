@@ -50,7 +50,8 @@ export function PracticeArticleRow({
   const isDesktop = useIsDesktop();
   const beside = useMemo<RowBeside>(() => isDesktop ? {
     shown: shownBeside,
-    onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey })),
+    // The overview gives way to the reading view, this row with it: the window takes the focus (U2).
+    onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey }), undefined, { focus: true }),
     onClose: () => closeBeside(practiceId, windowId),
   } : {
     shown: false,
