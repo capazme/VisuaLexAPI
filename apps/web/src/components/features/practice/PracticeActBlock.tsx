@@ -20,6 +20,7 @@ import { PracticeArticleRow } from './PracticeArticleRow';
 import { PracticeArticleEntry } from './PracticeIndexEntry';
 import type { PracticeLayout } from './PracticeColumn';
 import { fromPracticePair, practicePair } from './practiceView';
+import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useTour } from '../../../hooks/useTour';
@@ -206,12 +207,16 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         // Read by an open row's reading toolbar (`--reading-toolbar-top`) and by the rows' scroll margin;
         // 0 on a phone, where the heading scrolls with the block, and in the index, which pins nothing.
         ['--practice-head' as string]: `${isDesktop && !isIndex ? headerHeight : 0}px`,
+        // The panel and the index's entry are one piece of the passage between the views (L-62).
+        ...(layout !== 'phone' ? { ['--vlx-vt' as string]: practiceTransitionName('practice-act', act.id) } : {}),
       }}
       aria-label={heading}
       data-layout={layout}
+      // Found by the passage between the views (`practiceSwitch`) to give its heading the focus.
+      data-act-id={act.id}
       // A section of the page (R3: one level of paper, the practice's): its title and a hairline. In the overview's grid
       // a panel (U2): a hairline box on the page's own ground, no shadow.
-      className={cn('practice-act', isPanel && 'rounded-xl border border-slate-200 px-3 pb-2 dark:border-slate-800')}
+      className={cn('practice-act', isPanel && 'rounded-xl border border-slate-200 px-3 pb-2 dark:border-slate-800', layout !== 'phone' && PRACTICE_VT)}
     >
       {/* The sticky-row convention: opaque — the page's own ground —, over the rows it heads (and over an open
           row's sticky toolbar, which slides up under it as the row ends). */}

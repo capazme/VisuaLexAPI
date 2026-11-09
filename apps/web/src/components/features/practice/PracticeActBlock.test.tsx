@@ -444,6 +444,23 @@ describe('PracticeActBlock: the two views (U2)', () => {
     expect(s().practices[0].acts[0].articles.map((a) => a.norma_data.numero_articolo)).toEqual(['7']);
   });
 
+  it('the panel and the index\'s entry are one piece of the passage (L-62), by the act\'s id; the phone\'s section none', () => {
+    const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
+    const { container, unmount } = render(<Block practiceId={practiceId} actId={actId} />);
+    const name = `vlx-practice-act-${actId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+    expect(container.querySelector('section')).toHaveClass('vlx-vt');
+    expect(container.querySelector('section')?.style.getPropertyValue('--vlx-vt')).toBe(name);
+    unmount();
+    h.layout = 'index';
+    const index = render(<Block practiceId={practiceId} actId={actId} />);
+    expect(index.container.querySelector('section')?.style.getPropertyValue('--vlx-vt')).toBe(name);
+    index.unmount();
+    h.layout = 'phone';
+    const phone = render(<Block practiceId={practiceId} actId={actId} />);
+    expect(phone.container.querySelector('section')).not.toHaveClass('vlx-vt');
+    expect(phone.container.querySelector('section')?.style.getPropertyValue('--vlx-vt')).toBe('');
+  });
+
   it('an act of the index with no article offers the structure', () => {
     h.layout = 'index';
     const { practiceId, actId } = setUp(L24_URN, []);

@@ -11,6 +11,7 @@ import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 import { INDEX_WIDTH, RAIL_WIDTH, besideLayout } from './besideLayout';
 import { PracticeTable, type PracticeTableProps } from './PracticeTable';
 import { ReadingWindow } from './ReadingWindow';
+import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 
 const NO_WINDOWS: BesideRef[] = [];
 
@@ -302,8 +303,9 @@ export function ReadingRow(props: Omit<PracticeTableProps, 'layout' | 'concealed
         <div
           key={ref.id}
           data-testid="reading-row-window"
-          className={cn(COLUMN_FRAME, 'pl-4')}
-          style={{ width: layout.windows[index] }}
+          // A piece of the passage between the views (L-62): the window comes in from the right, and goes back there.
+          className={cn(COLUMN_FRAME, 'pl-4', PRACTICE_VT)}
+          style={{ width: layout.windows[index], ['--vlx-vt' as string]: practiceTransitionName('practice-window', String(index)) }}
         >
           <ReadingWindow
             practiceId={practice.id}

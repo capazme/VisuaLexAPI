@@ -9,6 +9,7 @@ import { cn } from '../../../lib/utils';
 import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { isEmptyPractice } from './practiceView';
 import { closePracticeWithUndo } from './practiceUndo';
+import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
 import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
@@ -72,7 +73,13 @@ function PracticeHeader({ practice, compact }: { practice: Practice; compact: bo
   const save = usePracticeSaveActions(practice.id);
 
   return (
-    <header id="tour-practice-header" data-pinned-head className="flex items-start gap-2 px-1 pb-2">
+    <header
+      id="tour-practice-header"
+      data-pinned-head
+      // One piece of the passage between the views (L-62): the overview's title becomes the index's.
+      style={{ ['--vlx-vt' as string]: practiceTransitionName('practice-head') }}
+      className={cn('flex items-start gap-2 px-1 pb-2', PRACTICE_VT)}
+    >
       <div className="min-w-0 flex-1">
         {editing ? (
           <PracticeNameInput

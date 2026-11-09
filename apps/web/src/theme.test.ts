@@ -585,6 +585,31 @@ describe('the practice in two views (U2)', () => {
   }, 30000);
 });
 
+describe('the passage between the practice\'s two views (U2, L-62)', () => {
+  it('names its pieces only while it plays, lasts 260 ms on the ease-out curve, and brings the windows in from the right', async () => {
+    const css = await compile([]);
+    // Named only under the root's class: at rest a piece is no stacking context (gotcha 22).
+    expect(css).toMatch(/\.vlx-practice-switching \.vlx-vt\s*\{\s*view-transition-name:\s*var\(--vlx-vt\)/);
+    expect(css).not.toMatch(/(^|\})\s*\.vlx-vt\s*\{/);
+    const duration = css.match(/\.vlx-practice-switching::view-transition-group\(\*\)\s*\{\s*animation-duration:\s*(\d+)ms;\s*animation-timing-function:\s*var\(--ease-out\)/);
+    expect(duration).not.toBeNull();
+    expect(Number(duration![1])).toBeGreaterThanOrEqual(220);
+    expect(Number(duration![1])).toBeLessThanOrEqual(300);
+    // The pictures keep their size: the text does not stretch while a box changes size.
+    expect(css).toMatch(/::view-transition-new\(\*\)\s*\{[^}]*object-fit:\s*none/);
+    // Clipped by its box, or the old panel's picture would paint at its full size over the incoming window.
+    expect(css).toMatch(/::view-transition-new\(\*\)\s*\{[^}]*overflow:\s*clip/);
+    for (const n of [0, 1]) {
+      expect(css).toContain(`::view-transition-new(vlx-practice-window-${n}):only-child`);
+      expect(css).toContain(`::view-transition-old(vlx-practice-window-${n}):only-child`);
+    }
+    expect(css).toMatch(/@keyframes vlx-practice-window-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*translate:\s*24px 0/);
+    // Its own rules set no `animation` shorthand: the root keeps the section change's `animation: none`.
+    const own = css.split('.vlx-practice-switching').slice(1).map((rule) => rule.slice(0, rule.indexOf('}')));
+    for (const rule of own) expect(rule).not.toMatch(/animation:\s/);
+  }, 30000);
+});
+
 describe('the section change (T1)', () => {
   const ms = (css: string, rule: RegExp) => {
     const match = css.match(rule);

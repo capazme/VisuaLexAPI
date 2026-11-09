@@ -11,6 +11,7 @@ import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
 import { articleRowKey, articleWindowId, besideRefFor, practiceArticleKey } from '../../../utils/practice';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { quickNormParamsOf } from '../../../utils/quickNormParams';
+import { openPracticeWindow } from './practiceSwitch';
 
 export interface PracticeArticleRowProps {
   practiceId: string;
@@ -40,7 +41,6 @@ export function PracticeArticleRow({
   const isQuick = useAppStore((s) => s.quickNorms.length > 0 && !historicalItemLabel(article.norma_data) && s.isQuickNorm(quickParams));
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
-  const openBeside = useAppStore((s) => s.openBeside);
   const closeBeside = useAppStore((s) => s.closeBeside);
   const openPhoneReader = useAppStore((s) => s.openPhoneReader);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
@@ -50,14 +50,14 @@ export function PracticeArticleRow({
   const isDesktop = useIsDesktop();
   const beside = useMemo<RowBeside>(() => isDesktop ? {
     shown: shownBeside,
-    // The overview gives way to the reading view, this row with it: the window takes the focus (U2).
-    onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey }), undefined, { focus: true }),
+    // The overview gives way to the reading view, through the passage (L-62), this row with it: the window takes the focus.
+    onOpen: () => openPracticeWindow(practiceId, besideRefFor({ kind: 'article', actId, articleKey })),
     onClose: () => closeBeside(practiceId, windowId),
   } : {
     shown: false,
     onOpen: () => openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })),
     onClose: closePhoneReader,
-  }, [isDesktop, shownBeside, openBeside, closeBeside, openPhoneReader, closePhoneReader, practiceId, actId, articleKey, windowId]);
+  }, [isDesktop, shownBeside, closeBeside, openPhoneReader, closePhoneReader, practiceId, actId, articleKey, windowId]);
 
   const { norma_data: norma } = article;
   const text = article.article_text || '';

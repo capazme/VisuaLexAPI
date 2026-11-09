@@ -1659,6 +1659,30 @@
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+/* The practice's two views (U2, L-62): a row's «Apri accanto» that opens the first window, and a window's «Chiudi» that
+   closes the last, pass between the overview and the reading view (`practice/practiceSwitch.ts`). Each act's panel
+   becomes its entry in the index, the practice's header and «Giurisprudenza» theirs, the windows come in from the right
+   and go back there: 260 ms, `--ease-out`, no overshoot. The pieces are named only while it plays (gotcha 22), each by
+   the `--vlx-vt` in its own style. A picture keeps its size, anchored at its top left, and its box clips it: the text
+   does not stretch while the box changes size. The root does not animate (above), so what is not a piece changes at
+   once; under reduced motion no transition is started. */
+.vlx-practice-switching .vlx-vt { view-transition-name: var(--vlx-vt); }
+.vlx-practice-switching::view-transition-group(*) { animation-duration: 260ms; animation-timing-function: var(--ease-out); }
+.vlx-practice-switching::view-transition-old(*),
+.vlx-practice-switching::view-transition-new(*) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--ease-out);
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+  overflow: clip;
+}
+.vlx-practice-switching::view-transition-new(vlx-practice-window-0):only-child,
+.vlx-practice-switching::view-transition-new(vlx-practice-window-1):only-child { animation-name: vlx-practice-window-in; }
+.vlx-practice-switching::view-transition-old(vlx-practice-window-0):only-child,
+.vlx-practice-switching::view-transition-old(vlx-practice-window-1):only-child { animation-name: vlx-practice-window-out; }
+@keyframes vlx-practice-window-in { from { opacity: 0; translate: 24px 0; } }
+@keyframes vlx-practice-window-out { to { opacity: 0; translate: 24px 0; } }
 /* The new section's title takes the focus after the change; chosen with a pointer it shows no ring. The browser
    counts that focus, given by the script after a focused menu entry, as visible, so `FOCUS_RING`'s `:focus-visible`
    alone would draw it. Unlayered, so it wins over the utilities; the attribute goes with the focus. */

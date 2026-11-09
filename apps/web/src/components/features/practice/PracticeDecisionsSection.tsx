@@ -7,6 +7,7 @@ import { besideRefFor, decisionOrder, decisionRowKey, decisionWindowId, type Pra
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
 import { PracticeDecisionEntry } from './PracticeIndexEntry';
+import { PRACTICE_VT, openPracticeWindow, practiceTransitionName } from './practiceSwitch';
 import type { PracticeLayout } from './PracticeColumn';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 
@@ -37,7 +38,13 @@ export function PracticeDecisionsSection({ practiceId, layout }: { practiceId: s
   return (
     // A section of the page as an act is (R3): its title in the reader's serif and a hairline, no card; on the desktop
     // in the decisions' tint.
-    <section aria-labelledby={headingId} data-testid="practice-decisions" className={cn(layout === 'overview' && DECISIONS_STRIP)}>
+    <section
+      aria-labelledby={headingId}
+      data-testid="practice-decisions"
+      // The strip and the index's entry are one piece of the passage between the views (L-62).
+      style={tinted ? { ['--vlx-vt' as string]: practiceTransitionName('practice-decisions') } : undefined}
+      className={cn(layout === 'overview' && DECISIONS_STRIP, tinted && PRACTICE_VT)}
+    >
       <h3
         id={headingId}
         className={cn(
@@ -75,7 +82,6 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeDecision = useAppStore((s) => s.removePracticeDecision);
-  const openBeside = useAppStore((s) => s.openBeside);
   const closeBeside = useAppStore((s) => s.closeBeside);
   const openPhoneReader = useAppStore((s) => s.openPhoneReader);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
@@ -84,14 +90,14 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
   const isDesktop = useIsDesktop();
   const beside = useMemo<RowBeside>(() => isDesktop ? {
     shown: shownBeside,
-    // The overview gives way to the reading view, this row with it: the window takes the focus (U2).
-    onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'decision', decisionId: entry.id }), undefined, { focus: true }),
+    // The overview gives way to the reading view, through the passage (L-62), this row with it: the window takes the focus.
+    onOpen: () => openPracticeWindow(practiceId, besideRefFor({ kind: 'decision', decisionId: entry.id })),
     onClose: () => closeBeside(practiceId, windowId),
   } : {
     shown: false,
     onOpen: () => openPhoneReader(practiceId, besideRefFor({ kind: 'decision', decisionId: entry.id })),
     onClose: closePhoneReader,
-  }, [isDesktop, shownBeside, openBeside, closeBeside, openPhoneReader, closePhoneReader, practiceId, entry.id, windowId]);
+  }, [isDesktop, shownBeside, closeBeside, openPhoneReader, closePhoneReader, practiceId, entry.id, windowId]);
   // «Sentenza depositata il …», once the decision was found: beside the label, never guessed.
   const deposit = formatDecisionDeposit({ tipo: entry.tipo, data_deposito: entry.depositDate });
 

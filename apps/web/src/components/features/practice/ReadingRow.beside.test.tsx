@@ -128,6 +128,22 @@ describe('«Apri accanto» on an article row (spec §4.2, T5; U2, the two views)
   });
 });
 
+describe('closing a window hands the focus on (L-62)', () => {
+  it('closing one of two: the window left open; closing the last: the subject\'s row in the overview', () => {
+    setup();
+    render(row());
+    fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Apri accanto: art\. 7/ }));
+    expect(windows()).toHaveLength(2);
+    fireEvent.click(within(windows()[1]).getByRole('button', { name: /^Chiudi la finestra/ }));
+    expect(windows()).toHaveLength(1);
+    expect(windows()[0]).toHaveFocus();
+    fireEvent.click(within(windows()[0]).getByRole('button', { name: /^Chiudi la finestra/ }));
+    expect(windows()).toHaveLength(0);
+    expect(within(articleRow('5')).getByRole('button', { name: /^(Espandi|Comprimi)/ })).toHaveFocus();
+  });
+});
+
 describe('«Apri accanto» on a decision row', () => {
   it('opens the decision window; «Giurisprudenza» is an entry of the index, the decision marked in it', () => {
     setup();
