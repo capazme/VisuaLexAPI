@@ -357,10 +357,16 @@ describe('the highlighter\'s state (A4)', () => {
   it('is never saved, and the next person on the browser never finds the tool on', () => {
     appStore.getState().setReadingTool('highlight');
     appStore.getState().setHighlighterInk('none');
+    appStore.getState().setNoteToolKind('gloss');
     const saved = JSON.stringify(appStore.persist.getOptions().partialize?.(appStore.getState()));
     expect(saved).not.toContain('readingTool');
     expect(saved).not.toContain('highlighterEraser');
+    expect(saved).not.toContain('noteToolKind');
     appStore.getState().clearUserData();
-    expect(appStore.getState()).toMatchObject({ readingTool: null, highlighterEraser: false });
+    expect(appStore.getState()).toMatchObject({ readingTool: null, highlighterEraser: false, noteToolKind: 'note' });
+    // The note tool too (§6): one tool at a time, the state's own.
+    appStore.getState().setReadingTool('note');
+    appStore.getState().clearUserData();
+    expect(appStore.getState().readingTool).toBeNull();
   });
 });

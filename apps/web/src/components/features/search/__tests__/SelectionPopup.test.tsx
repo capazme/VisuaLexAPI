@@ -303,6 +303,69 @@ describe('SelectionPopup: the highlighter as a tool (A4)', () => {
   });
 });
 
+describe('SelectionPopup: the note tool (A4 §6)', () => {
+  afterEach(() => appStore.setState({ readingTool: null, noteToolKind: 'note' }));
+
+  /** Words selected and the mouse let go, with no bar expected. */
+  const release = (needle: string) => {
+    const textNode = screen.getByText(TEXT).firstChild as Text;
+    const start = TEXT.indexOf(needle);
+    const range = document.createRange();
+    range.setStart(textNode, start);
+    range.setEnd(textNode, start + needle.length);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    fireEvent.mouseUp(screen.getByTestId('container'), { button: 0 });
+  };
+
+  it('on, every selection opens the editor of a note on its words exactly as selected, with no bar', async () => {
+    appStore.setState({ readingTool: 'note' });
+    const onAddNote = vi.fn();
+    const onHighlight = vi.fn();
+    render(<Harness onAddNote={onAddNote} onHighlight={onHighlight} />);
+    // No highlighter's cursor: the pressed button is the state.
+    expect(screen.getByTestId('container')).not.toHaveClass('vlx-inking');
+    release('anni ingiust');
+    await waitFor(() => expect(onAddNote).toHaveBeenCalledExactlyOnceWith('anni ingiust', TEXT.indexOf('anni ingiust'), expect.objectContaining({ width: RECT.width })));
+    expect(onHighlight).not.toHaveBeenCalled();
+    expect(window.getSelection()!.isCollapsed).toBe(true);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
+  });
+
+  it('on as «Glossa», a selection opens the discussion\'s composer where the reader has one, else a personal note', async () => {
+    appStore.setState({ readingTool: 'note', noteToolKind: 'gloss' });
+    const onDiscuss = vi.fn();
+    const onAddNote = vi.fn();
+    const { unmount } = render(<Harness onDiscuss={onDiscuss} onAddNote={onAddNote} />);
+    release('danni ingiusti');
+    await waitFor(() => expect(onDiscuss).toHaveBeenCalledExactlyOnceWith('danni ingiusti', TEXT.indexOf('danni')));
+    expect(onAddNote).not.toHaveBeenCalled();
+    unmount();
+    render(<Harness onAddNote={onAddNote} />);
+    release('danni ingiusti');
+    await waitFor(() => expect(onAddNote).toHaveBeenCalledOnce());
+  });
+
+  it('gives the note tool\'s button the words selected: its press opens the editor on them', async () => {
+    const onAddNote = vi.fn();
+    render(<Harness onAddNote={onAddNote} />);
+    await selectText('art. 2043 c.c.');
+    act(() => readInkSelection()!.note!('note'));
+    expect(onAddNote).toHaveBeenCalledExactlyOnceWith('art. 2043 c.c.', TEXT.indexOf('art. 2043'), expect.any(Object));
+    expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
+    expect(window.getSelection()!.isCollapsed).toBe(true);
+  });
+
+  it('on a text that takes no note (a past text), nothing', async () => {
+    appStore.setState({ readingTool: 'note' });
+    const onAddNote = vi.fn();
+    render(<Harness copyOnly onAddNote={onAddNote} />);
+    await selectText('art. 2043 c.c.', /^copia/i);
+    expect(onAddNote).not.toHaveBeenCalled();
+  });
+});
+
 describe('SelectionPopup: whole words for the highlighter (A4, 5 November 2026)', () => {
   it('a selection that cuts words is highlighted whole, by «Evidenzia», H and the button; a note keeps the words selected', async () => {
     const onHighlight = vi.fn();

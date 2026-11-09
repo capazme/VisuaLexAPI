@@ -9,6 +9,7 @@ import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 import { VersionStatusChip } from './VersionStatusChip';
 import { NotesHighlightsButtons } from './NotesHighlightsButtons';
 import { HighlighterButton } from './HighlighterButton';
+import { NoteToolButton } from './NoteToolButton';
 import { highlightColorItems } from './highlightColorItems';
 import { useAppStore } from '../../../store/useAppStore';
 import { useHighlightColorMeanings } from '../../../hooks/useHighlightColorMeanings';
@@ -269,6 +270,8 @@ export function ReadingToolbar({
                     lockedReason={lockedReason}
                 />
                 {!lockedReason && <HighlighterButton triggerClassName={ACTION} />}
+                {/* The note tool (A4 §6): a personal note, or a gloss with colleagues. */}
+                {!lockedReason && <NoteToolButton gloss triggerClassName={ACTION} />}
                 {!compact && dossierButton(dossierButtonRef)}
                 <div ref={desktopMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>

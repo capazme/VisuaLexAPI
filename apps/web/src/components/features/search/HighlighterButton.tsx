@@ -1,15 +1,15 @@
-import { useCallback, useEffect, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronDown, Highlighter, Settings } from 'lucide-react';
-import { appStore, useAppStore } from '../../../store/useAppStore';
+import { useAppStore } from '../../../store/useAppStore';
 import { highlightColorName } from '../../../utils/highlightColors';
 import type { Ink } from '../../../utils/highlighterRules';
-import { readInkSelection, type InkSelection } from '../../../utils/inkTargets';
 import { useHighlightColorMeanings } from '../../../hooks/useHighlightColorMeanings';
 import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
 import { cn } from '../../../lib/utils';
 import { MenuButton } from '../../ui/MenuButton';
 import { CHANGE_MEANINGS_LABEL, highlightColorItems, SECTION_HEADING } from './highlightColorItems';
-import { TOOLBAR_TOGGLE_ON } from './toolbarToggle';
+import { TOOL_PRESSED } from './toolbarToggle';
+import { keepForMenu, readAtPress, takeAtPress, takeForMenu, useReadingToolLife } from './readingToolLife';
 
 export interface HighlighterButtonProps {
   /** The look of the bar's buttons, given to each half (and the gear). */
@@ -25,75 +25,6 @@ export interface HighlighterButtonProps {
   meaningsGear?: boolean;
   /** The toggle alone: a phone's reading row, whose «⋯» holds the inks. */
   toggleOnly?: boolean;
-}
-
-/** The tool's pressed look: the bars' toggles' (`TOOLBAR_TOGGLE_ON`), over whatever look the bar gives, its hover too. */
-const PRESSED = cn(TOOLBAR_TOGGLE_ON, 'hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20 dark:hover:text-primary-400');
-
-/** Bars holding a highlighter now: when the last leaves the screen nobody is left to see the tool on. */
-let mountedButtons = 0;
-
-/**
- * The words selected as a press on a highlighter starts (a press may take the selection away before its click), and the
- * words its menu's ink goes to, read as the menu opens. One gesture at a time, whichever bar it is in.
- */
-let selectionAtPress: InkSelection | null = null;
-let selectionForMenu: InkSelection | null = null;
-const readAtPress = () => {
-  selectionAtPress = readInkSelection();
-  // Forgotten once the press is over, in the next task (after its click): a press dragged off the button, or a touch
-  // that became a scroll, brings no click, and a later press from the keyboard reads the selection as it is then.
-  const forget = () => {
-    window.removeEventListener('pointerup', forget, true);
-    window.removeEventListener('pointercancel', forget, true);
-    window.setTimeout(() => { selectionAtPress = null; }, 0);
-  };
-  window.addEventListener('pointerup', forget, true);
-  window.addEventListener('pointercancel', forget, true);
-};
-const takeAtPress = () => {
-  const selected = selectionAtPress ?? readInkSelection();
-  selectionAtPress = null;
-  return selected;
-};
-const keepForMenu = () => { selectionForMenu = takeAtPress(); };
-const takeForMenu = () => {
-  const selected = selectionForMenu;
-  selectionForMenu = null;
-  return selected;
-};
-
-/**
- * The tool's life (A4): Esc turns it off — unless the key belongs to what has the focus (a field, a menu, a dialog, a
- * popover) or a modal dialog is open — before anything else hears it (Study Mode's Esc, the lesson's); and it goes off
- * when the last bar that holds a highlighter leaves the screen.
- */
-function useHighlighterLife(on: boolean, turnOff: () => void) {
-  useEffect(() => {
-    mountedButtons += 1;
-    return () => {
-      mountedButtons -= 1;
-      // A microtask: the bar mounted again at once (StrictMode, a bar redrawn in the same commit) keeps it on.
-      queueMicrotask(() => {
-        if (mountedButtons === 0 && appStore.getState().readingTool === 'highlight') appStore.getState().setReadingTool(null);
-      });
-    };
-  }, []);
-  useEffect(() => {
-    if (!on) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (document.querySelector('[aria-modal="true"]')) return;
-      const target = event.target;
-      // What has an Esc of its own: a field, a menu, a dialog or a popover, the find window, a notification.
-      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="dialog"], [role="listbox"], [role="combobox"], [role="search"], [data-floating-tool], [data-notification-id]')) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      turnOff();
-    };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true });
-  }, [on, turnOff]);
 }
 
 /** The ink under the highlighter's icon: the colour's tint inside its ink, as the menu's dots; dashed and empty for none. */
@@ -125,7 +56,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
   const openSettings = useAppStore((s) => s.openSettings);
   const meanings = useHighlightColorMeanings();
   const turnOff = useCallback(() => setReadingTool(null), [setReadingTool]);
-  useHighlighterLife(on, turnOff);
+  useReadingToolLife('highlight', on, turnOff);
 
   const press = () => {
     const selected = takeAtPress();
@@ -161,7 +92,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
         className={cn(
           'inline-flex min-w-[44px] items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
           triggerClassName,
-          on && PRESSED,
+          on && TOOL_PRESSED,
         )}
       >
         <span className="flex flex-col items-center gap-[3px]">

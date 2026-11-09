@@ -21,6 +21,7 @@ import { copyNormLink, EUROPEAN_LINK_NOTE, linkPinDay, normLink, normLinkActionL
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
 import { HighlighterButton } from '../search/HighlighterButton';
+import { NoteToolButton } from '../search/NoteToolButton';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
@@ -475,6 +476,9 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
             className="ml-auto"
             triggerClassName="min-h-[44px] gap-1.5 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 md:min-h-0 dark:text-slate-400 dark:hover:bg-slate-700"
           />
+        )}
+        {!readOnly && (
+          <NoteToolButton triggerClassName="min-h-[44px] gap-1.5 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 md:min-h-0 dark:text-slate-400 dark:hover:bg-slate-700" />
         )}
       </div>
     </div>

@@ -3,6 +3,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { NotesHighlightsButtons } from '../search/NotesHighlightsButtons';
 import { HighlighterButton } from '../search/HighlighterButton';
+import { NoteToolButton } from '../search/NoteToolButton';
 import { DiscussionButton } from '../search/DiscussionButton';
 import { FindInTextButton } from '../search/FindInTextButton';
 
@@ -53,6 +54,7 @@ export function DecisionReadingToolbar({
       />
       {/* The highlighter (H1, A4), as in the article's bar. */}
       <HighlighterButton triggerClassName="min-h-[44px] min-w-[44px] justify-center p-2.5 hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-800" />
+      <NoteToolButton gloss triggerClassName="min-h-[44px] min-w-[44px] justify-center p-2.5 hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-800" />
       <DiscussionButton isOpen={isDiscussionOpen} onToggle={onToggleDiscussion} name="Glosse sulla decisione" />
       {onToggleFind && <FindInTextButton ref={findButtonRef} isOpen={isFindOpen} onToggle={onToggleFind} />}
     </div>

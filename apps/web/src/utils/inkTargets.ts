@@ -1,13 +1,21 @@
 import type { Ink } from './highlighterRules';
 
-/** Words selected in a text that takes the highlighter, read as that text stores them, ready for an ink. */
+/** What the note tool writes (A4 §6): a personal note, or a gloss (a discussion with colleagues). */
+export type NoteKind = 'note' | 'gloss';
+
+/** Words selected in a text that takes the highlighter, read as that text stores them, ready for an ink, or a note. */
 export interface InkSelection {
   apply: (ink: Ink) => void;
+  /**
+   * The editor of a note on these words, as selected (A4 §6): absent where the text takes no note (a lesson). A gloss
+   * where the reader has none is a personal note.
+   */
+  note?: (kind: NoteKind) => void;
 }
 
 /**
- * A text the highlighter's button can apply its ink to (A4): each reader's selection bar (`SelectionPopup`) and a
- * lesson's text (`LessonText`) register while they are mounted and take highlights.
+ * A text the reading tools' buttons apply to (A4): each reader's selection bar (`SelectionPopup`) and a lesson's text
+ * (`LessonText`) register while they are mounted and take highlights.
  */
 export interface InkTarget {
   /** Whether the selected range lies in this text. */

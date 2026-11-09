@@ -103,12 +103,12 @@ describe('ReadingToolbar — one line beside the text', () => {
 });
 
 describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)', () => {
-    it('on a computer: «Note», «Evidenziazioni», «Al dossier» and «⋯»', () => {
+    it('on a computer: «Note», «Evidenziazioni», the highlighter, the note tool, «Al dossier» and «⋯»', () => {
         const { container } = setup({ notesCount: 2, highlightsCount: 3 });
         const names = within(desktopRow(container)).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent);
         expect(names).toEqual([
-            'Note, 2', 'Evidenziazioni, 3', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori', 'Al dossier',
-            'Altre azioni sull’articolo',
+            'Note, 2', 'Evidenziazioni, 3', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
+            'Strumento nota (nota personale)', 'Tipo di nota', 'Al dossier', 'Altre azioni sull’articolo',
         ]);
         // The count is seen beside the word.
         expect(within(desktopRow(container)).getByRole('button', { name: 'Note, 2' })).toHaveTextContent('Note2');
@@ -334,12 +334,12 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
 describe('ReadingToolbar — the compact form of a light window (spec §4.1)', () => {
     const find = { isOpen: false, onToggle: vi.fn() };
 
-    it('the computer\'s row holds notes, highlights, the highlighter and «⋯»: discussions, the magnifier and copy', () => {
+    it('the computer\'s row holds notes, highlights, the highlighter, the note tool and «⋯»: discussions, the magnifier and copy', () => {
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = desktopRow(container);
         expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual([
             'Note', 'Evidenziazioni', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
-            'Altre azioni sull’articolo',
+            'Strumento nota (nota personale)', 'Tipo di nota', 'Altre azioni sull’articolo',
         ]);
         expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
     });

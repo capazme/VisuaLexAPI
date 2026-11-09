@@ -51,6 +51,7 @@ import { shiftAiReviewCount } from '../utils/aiReview';
 import { afterSaving, forgetRemovals, holdGesture, isRemovalPending, removeAtOnce, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
 import { isTextShown } from './textsOnScreen';
 import type { Ink } from '../utils/highlighterRules';
+import type { NoteKind } from '../utils/inkTargets';
 import type { HighlightCreate, HighlightUpdate } from '../types/api';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
@@ -132,6 +133,12 @@ export interface StructureWindowState {
     /** Where the user parked it. Persisted: that is the point of a movable window. */
     position: { x: number; y: number };
 }
+
+/** The reading tools (A4): the highlighter, and the note tool (§6). */
+export type ReadingTool = 'highlight' | 'note';
+
+/** What the note tool writes: a personal note, or a gloss (a discussion with colleagues). */
+export type NoteToolKind = NoteKind;
 
 /** One gesture of the highlighter over existing highlights (A4), as `useHighlightInk` turns a plan into it. */
 export interface HighlightEdit {
@@ -222,11 +229,17 @@ interface AppState {
     /** Impostazioni (`SettingsModal`, mounted by `Layout`), and the section it opens at: session-only, absent from `partialize`. */
     settingsDialog: { open: boolean; section: SettingsSection | null };
     /**
-     * The reading tool on (A4): the highlighter, which applies its ink to every selection as it is released, until its
-     * button is pressed again or Esc. One for the whole app, as in a word processor. Session-only, absent from
-     * `partialize`: a tool left on is never found on at the next visit.
+     * The reading tool on (A4): the highlighter, which applies its ink to every selection as it is released, or the note
+     * tool, which opens the editor of a note (or a gloss) on it, until its button is pressed again or Esc. One for the
+     * whole app, as in a word processor: turning one on turns the other off. Session-only, absent from `partialize`: a
+     * tool left on is never found on at the next visit.
      */
-    readingTool: 'highlight' | null;
+    readingTool: ReadingTool | null;
+    /**
+     * What the note tool writes (A4 §6): a personal note, or a gloss — a discussion with colleagues, where the reader has
+     * them. Session-only, as the tool.
+     */
+    noteToolKind: NoteToolKind;
     /**
      * «Nessun colore» chosen as the highlighter's ink (A4): it takes highlights away. Session-only, absent from
      * `partialize`: the colour saved stays `settings.highlightColor` (H1), the ink again after a reload.
@@ -553,7 +566,8 @@ interface AppState {
      * back (`holdGesture`). No notification.
      */
     editHighlights: (edit: HighlightEdit) => void;
-    setReadingTool: (tool: 'highlight' | null) => void;
+    setReadingTool: (tool: ReadingTool | null) => void;
+    setNoteToolKind: (kind: NoteToolKind) => void;
     /** The highlighter's ink (A4): a colour, saved as the colour of new highlights (H1); «Nessun colore» for the session. */
     setHighlighterInk: (ink: Ink) => void;
     getHighlights: (normaKey: string, articleId: string) => Highlight[];
@@ -836,6 +850,7 @@ const appStore = createStore<AppState>()(
             aliasManagerOpen: false,
             settingsDialog: { open: false, section: null },
             readingTool: null,
+            noteToolKind: 'note',
             highlighterEraser: false,
             searchPanelState: {
                 isCollapsed: false,
@@ -1438,8 +1453,9 @@ const appStore = createStore<AppState>()(
                     state.windowFocusRequest = null;
                     state.phoneReader = null;
                     state.commandPaletteQuery = null;
-                    // The highlighter (A4): the next person on the browser never finds it on.
+                    // The reading tools (A4): the next person on the browser never finds one on.
                     state.readingTool = null;
+                    state.noteToolKind = 'note';
                     state.highlighterEraser = false;
                 });
             },
@@ -2516,6 +2532,10 @@ const appStore = createStore<AppState>()(
 
             setReadingTool: (tool) => set((state) => {
                 state.readingTool = tool;
+            }),
+
+            setNoteToolKind: (kind) => set((state) => {
+                state.noteToolKind = kind;
             }),
 
             setHighlighterInk: (ink) => set((state) => {
