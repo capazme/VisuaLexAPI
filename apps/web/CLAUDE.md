@@ -464,8 +464,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   hand (the sign-in page's display line aside). The columns that fill the room past two measures (about 1500 px) come
   page by page (spec `2026-11-05-u1-frame-and-full-screen-design.md` §7): a list of cards on a wide frame becomes a grid
   of cards of at least 20rem, `CARD_GRID_COLUMNS` (`frame.ts`, written once), never a carousel or a row 2000 px long (a
-  phone may keep a row that scrolls). The Forum's «Pronti da VisuaLex», the dossier list and «Le mie schede» do; the
-  community's cards (`CARD_GRID`) still set their columns by breakpoint.
+  phone may keep a row that scrolls). The Forum's «Pronti da VisuaLex», the dossier list and «Le mie schede» do, and the
+  practice's overview (U2: a grid of act panels of at least 38.75rem, `OVERVIEW_GRID` in `practice/besideLayout.ts`, see
+  «The two views»); the community's cards (`CARD_GRID`) still set their columns by breakpoint.
   **The page frame** (W2, 21 Oct 2026):
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
@@ -1524,7 +1525,8 @@ root registers under its practice's id with the same keys, and so does a light w
 surface's `findHostId` prop, which also names the practice for the magnifier's pressed state and
 request; the window's own id stays the way back's and the focus's); `setFindWindowDefaultPlace` lets a
 layout give the window its opening place (`ReadingRow`, in every case: right-aligned in the table's
-column, or the first window's body with the rail, under the stack pinned at its top — the practice header,
+column in the overview, or the first window's body in the reading view — beside the index, narrower than the find
+window, or the rail —, under the stack pinned at its top — the practice header,
 the first act's heading, an open row's toolbar, each marked `data-pinned-head` — and every window's
 header, so never over a control; a dragged place wins; a tool held over the table carries
 `data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
@@ -2237,8 +2239,45 @@ travels with the reference to the route, which uses it to tell homonyms apart): 
 The entry reads on the reading surface (`DecisionEntryView` over `DecisionAnswerBody`), where highlights and notes work as on an
 article (see «A court decision takes the same tools»). «Cerca nella barra di ricerca», on a decision that was not found, opens the
 palette with its citation typed in (`openCommandPaletteWith`, taken once). A subject has one mounted reading surface:
-a row whose subject a window shows folds and says «Aperto accanto» (desktop only; a phone's reader replaces the table
-instead), and the find window, the way back and the index reach the row or the window through the store's reveal actions.
+on the desktop the rows are drawn only in the overview, where no window is open, and the reading view's index mounts no
+reading surface (a row whose subject a window shows still folds and says «Aperto accanto», a guard the two views no
+longer reach; a phone's reader replaces the table instead), and the find window, the way back and the index reach the
+row or the window through the store's reveal actions.
+
+**The two views** (U2, L-61 and L-62, the owner, 5 November 2026; spec `2026-11-09-u2-practice-two-views-design.md`).
+On the desktop a practice with no window beside is **the overview** («Panoramica»): one panel per act in a grid
+(`OVERVIEW_GRID`: one column below about 1264 px of frame, two from there, three from about 1908 px; one act alone
+takes the width), a hairline box on the page's ground with its tools beside its title (the title truncates, its
+tooltip says it whole), and «Giurisprudenza» a strip of the frame's width under the panels in the decisions' tint —
+the emerald the palette gives a decision, a wash and a hairline, the text ink —, its closed rows in columns of at least
+26rem and an open one across the strip (`data-row-open`). With a window it is **the reading view** («Lettura»): the
+table becomes an index of `INDEX_WIDTH` (320 px) on the left — the header compact, each act its 17 px heading with «⋯»
+(Studio, Struttura, PDF inside it) and its articles one entry a line, «Giurisprudenza» one more entry —, the windows
+share the rest (still at most two, D10), and below 420 px a window the index folds into the rail, whose overlay is the
+same table, hidden while closed and never unmounted: the act blocks hold the structure window and Study Mode, which a
+pick from them (it opens a window, which may fold the index) must not close. The index draws no act arrows (the
+structure is in «⋯»). An entry (`PracticeIndexEntry`) opens its subject beside with the focus, or takes the focus to
+its window; the entries shown beside are marked with the window's sign and, for a screen reader, in words («Vai alla
+finestra: …, aperto accanto»; not `aria-current`, which would say it twice), and keep a hover «Togli dal tavolo». In
+the reading view a row the practice reveals (a search that landed, a pick in the structure window, a find match, the
+way back) opens beside and its row, opened by the reveal in the hidden overview, is closed again (`ReadingRow` takes
+the reveal, `besideRefOfRow`; the column takes it only in the overview), with no focus taken. Entering the reading view
+the page's scroller goes to its top; closing the last window brings the overview back at the place it was left at, one
+kept per practice (followed on `scroll` while the overview is drawn: read after the switch, the browser would already
+have clamped it). «Apri accanto» passes the focus to the window (`openBeside(…, { focus: true })`); a view that changes
+under the focus by any other way (an entry's ✕, a link in an open row) gives it to the newest window, or to the
+overview's first control.
+The phone keeps its column (`layout="phone"`) and its full-screen reader. **The passage** (`practiceSwitch.ts`, L-62):
+a row's «Apri accanto» that opens the first window and a window's «Chiudi» that closes the last play a View Transition
+— each act's panel into its index entry (`vlx-practice-act-<id>`), the header and «Giurisprudenza» into theirs, the
+windows (`vlx-practice-window-<n>`) in from the right and out again —, 260 ms on `--ease-out`, the pictures
+unstretched and clipped by their box (`object-fit: none`, anchored at the top left, `overflow: clip`; the browser's
+group animation moves the boxes and changes their width and height); any other change of view is immediate, as is
+every change without View Transitions or under reduced motion. The pieces are named only while it plays
+(`vlx-practice-switching` on the root, each piece's `--vlx-vt` on an element of class `vlx-vt`), as the section change
+names `vlx-page`; a change asked while one plays waits for its end and then decides again what it does (the view may
+have changed meanwhile). Closing the last window gives the focus to the subject's row (the act's heading when the act
+is folded), closing one of two to the window left open. Dropping the passage's commit keeps the two views.
 
 **The host props.** Despite their names, `ArticleTabContent`'s `tabId` and `readingOrigin.tabId`, `DecisionReadingSurface`'s
 `hostTabId` and `CaseLawSection`'s `tabId` name the host a surface reads in: a practice (its row) or one of its windows
@@ -3040,19 +3079,24 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/practice/` — the practice, the norm-tab's replacement (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
   header in the page frame's type — the name in `PAGE_TITLE`, the count line under it, «Salva come dossier» and «⋯» on
-  its right —, the streaming bar, then
+  its right; in the reading view's index (`layout="index"`, U2) the name in 22 px and «Salva come dossier» a 44 px
+  icon —, the streaming bar, then
   `PracticeColumn`; the topic searches are windows beside it on the desktop and the full-screen reader's
   subject on a phone); `PracticeColumn` (the acts, dragged
-  into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act, R3: a section
+  into order, then «Giurisprudenza»; `layout`: `phone`, `overview` — the grid, `rectSortingStrategy` — or `index`, see
+  «The two views»; outside the index it takes the reveal once) of `PracticeActBlock` (an act, R3 — in the overview a
+  panel, a hairline box, and in the index a heading that pins nothing, U2 —: a section
   with no card around it — its sticky heading, the act's name in Newsreader 22 px over a hairline, with Studio,
   Struttura, PDF and «⋯» as neutral quiet buttons — on a phone one row, the title and «⋯», which holds Studio,
   Struttura and PDF, and the meta line only when it says more than the count —; the index line of its rows, drawn only
   for an act of more than one article, its chips in slate, on a phone one row that scrolls sideways beside the arrows;
   the rows; the structure window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
   only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
-  `DecisionEntryView`, under «Giurisprudenza (n)» in the act's type, no card), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
+  `DecisionEntryView`, under «Giurisprudenza (n)» in the act's type, no card; in the overview a strip in the decisions'
+  tint, in the index `PracticeDecisionEntry`s), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
   «Apri accanto» (on the desktop a row whose subject a window shows folds and says «Aperto accanto ·
-  Chiudi la finestra», so one subject has one mounted reading surface, T5; on a phone it opens the
+  Chiudi la finestra», so one subject has one mounted reading surface, T5 — a guard the two views no longer reach,
+  kept and tested in `PracticeRowShell.test.tsx`; on a phone it opens the
   full-screen reader, icon-only so the row's name keeps its width, and no row ever folds));
   `PracticeBar` + `PracticeChip` (the bar of practices, `fixed bottom-6` at the column's left, beside the sidebar
   (`--sidebar-width`), not over the middle of the text, R3; `Z_INDEX.dock`, `#tour-practice-bar`; a «⋯» per chip);
@@ -3085,8 +3129,10 @@ meant to stay split; add new features as new files, not inside the shells:
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
-  from the pure `besideLayout`: half and half, thirds from 420 px a column, else a 48 px rail that opens
-  the table as an overlay closed by Esc or a click outside; `SearchPanel` mounts it on the desktop in
+  from the pure `besideLayout`: with no window the overview, the table the whole area; with windows the reading view,
+  the index at `INDEX_WIDTH` (320 px) and the windows sharing the rest while each gets 420 px, else a 48 px rail that
+  opens the index as an overlay closed by Esc or a click outside — the same table, hidden while closed (U2, «The two
+  views») —; `SearchPanel` mounts it on the desktop in
   place of the bare table, at the frame's width with or without a window beside: the search page is a `full` page
   with no cap of its own, so the row never reaches past its parent (U1; it escaped `ReaderLayout`'s `max-w-5xl`, now
   gone)) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
@@ -3115,7 +3161,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `tourConfig.practice.test.tsx` fails when one is missing, and when a tour points at a Brocardi surface). Tours never overlap: `useTour` keeps one driver on screen
   module-wide, so a tour asked while another shows is not started (it is asked again the next time its
   surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
-  `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
+  `practiceAct` is asked only for a practice that has an act, and only in the overview (its steps are the panel's tools,
+  its index line and a row's «Apri accanto»). `tourConfig.targets.test.tsx` fails when a tour's
   target is written nowhere in the sources, and checks the search tour against the search page. The popover
   (`visualex-tour-popover` in `index.css`) draws every button 44 px with a focus ring — the label centred by its
   line height, since driver.js writes `display` on the buttons inline —, and `useTour` renames
