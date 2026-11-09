@@ -58,13 +58,20 @@ describe('useHighlightInk — the rules, into the store (A4)', () => {
     });
   });
 
-  it('another colour: «Evidenziazione cambiata in verde»; on a highlight from the Forum, the whole one, in place', () => {
-    const forum = hl('f1', 'Il danno ingiusto obbliga', 'yellow', { sourceSuggestionId: 's1' });
+  it('another colour on a piece of a highlight from the Forum: «Evidenziazione cambiata in verde», every piece keeping the author', () => {
+    const forum = hl('f1', 'Il danno ingiusto obbliga', 'yellow', { sourceSuggestionId: 's1', originalAuthor: { id: 'u2', username: 'mario' } });
     const { apply, editHighlights } = ink([forum]);
     apply('danno', 'green', at('danno'));
-    expect(editHighlights).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      remove: [], recolor: [{ id: 'f1', color: 'green' }], add: [], message: 'Evidenziazione cambiata in verde',
-    }));
+    // The first piece keeps the row (`PUT` of its range), the others are made from it (`splitFrom`), trimmed as any part.
+    expect(editHighlights).toHaveBeenCalledExactlyOnceWith({
+      normaKey: 'k', articleId: '2043', remove: [], recolor: [],
+      reshape: [{ id: 'f1', text: 'Il', startOffset: 0, color: 'yellow' }],
+      add: [
+        { text: 'danno', startOffset: at('danno'), color: 'green', from: 'f1' },
+        { text: 'ingiusto obbliga', startOffset: at('ingiusto'), color: 'yellow', from: 'f1' },
+      ],
+      message: 'Evidenziazione cambiata in verde',
+    });
   });
 
   it('«Nessun colore» over words with no highlight does nothing; over two, says so in the plural', () => {

@@ -7,19 +7,26 @@ import { highlightColorName, type HighlightColor } from '../utils/highlightColor
 import { partsOf, planInk, type Ink, type InkMark } from '../utils/highlighterRules';
 
 /**
- * The user's highlights where they land in `plain`, as the highlighter's rules read them: one from the Forum (it keeps
- * its first author, gotcha 21) or one saved before offsets existed is never cut.
+ * The user's highlights where they land in `plain`, as the highlighter's rules read them: one saved before offsets
+ * existed is never cut; one from the Forum carries its author (its suggestion and first author, gotcha 21), which its
+ * words keep through a cut or a colour.
  */
 export function inkMarks(plain: string, highlights: readonly Highlight[]): InkMark[] {
-  return resolveAnchors(plain, highlights, []).flatMap((anchor) => (anchor.kind === 'highlight'
-    ? [{
-        id: anchor.highlight.id,
-        start: anchor.start,
-        end: anchor.end,
-        color: anchor.highlight.color,
-        whole: Boolean(anchor.highlight.sourceSuggestionId || anchor.highlight.originalAuthor) || typeof anchor.highlight.startOffset !== 'number',
-      }]
-    : []));
+  return resolveAnchors(plain, highlights, []).flatMap((anchor) => {
+    if (anchor.kind !== 'highlight') return [];
+    const { highlight } = anchor;
+    const author = highlight.sourceSuggestionId || highlight.originalAuthor
+      ? `${highlight.sourceSuggestionId ?? ''}|${highlight.originalAuthor?.id ?? ''}`
+      : undefined;
+    return [{
+      id: highlight.id,
+      start: anchor.start,
+      end: anchor.end,
+      color: highlight.color,
+      whole: typeof highlight.startOffset !== 'number',
+      ...(author ? { author } : {}),
+    }];
+  });
 }
 
 export interface HighlightInkOptions {
@@ -68,7 +75,13 @@ export function useHighlightInk({ key, articleId, plain, breaks, enabled = true,
       : plan.effect === 'recoloured' && plan.color
         ? `Evidenziazione cambiata in ${highlightColorName(plan.color)}`
         : plan.remove.length > 1 ? 'Evidenziazioni rimosse' : 'Evidenziazione rimossa';
-    editHighlights({ normaKey: key, articleId, remove: plan.remove, recolor: plan.recolor, add: partsOf(plain, plan.add), message });
+    // A highlight with an author keeps its row with its first part's words (`PUT` of the range): with none left but
+    // spaces, it goes.
+    const reshape = (plan.reshape ?? []).flatMap((r) => partsOf(plain, [r]).map(({ text: words, startOffset: at, color }) => ({ id: r.id, text: words, startOffset: at, color })));
+    const remove = [...plan.remove, ...(plan.reshape ?? []).filter((r) => !reshape.some((k) => k.id === r.id)).map((r) => r.id)];
+    editHighlights({
+      normaKey: key, articleId, remove, recolor: plan.recolor, ...(reshape.length > 0 ? { reshape } : {}), add: partsOf(plain, plan.add), message,
+    });
     // A highlight made by joining the ones it meets is a new highlight too, for the article's MERL-T event.
     if (plan.effect === 'created' && plan.color) onCreated?.(text, plan.color, startOffset);
   };

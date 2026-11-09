@@ -1419,10 +1419,16 @@ while selecting, the piece exactly (`utils/inkSelection.ts`: widened in the DOM,
 the projection would join two words; `getInkAnchor` for the readers, `inkRange` for a lesson; a note keeps the words
 as selected; Alt is read from the press that made the selection, while it stands as made; a selection made from the
 keyboard, Shift and the arrows, is taken as made, as a word processor takes it). The cut is
-the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`
-(offsets cannot be changed by `PUT`), the server's `note` copied to them. A highlight from the Forum (`sourceSuggestionId`,
-`originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut nor joined: removed or
-recoloured whole; the ink laid beside or over it leaves its words to it. `useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
+the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`,
+the server's `note` copied to them. **A highlight from the Forum is cut like the others, its author kept on every piece**
+(9 November 2026, over the server's #411 and #412; gotcha 21): its words keep their author through a cut and a colour
+(`InkMark.author`, its suggestion and first author) — its first piece keeps its row (`reshape`: `PUT` of the range and
+the colour, `sendHighlightUpdate`), the others are made from it (`POST` with `splitFrom`, under its server id once it
+has one: the server copies the author), and the pieces show the author at once; only highlights of one author are
+joined, and the ink never takes words from a highlight of its colour by another author (it leaves them to it). Ctrl+Z
+puts the row's range back with a `PUT` and deletes the pieces; a range refused takes the gesture back. One with no
+offset is never cut nor joined: removed or recoloured whole; the ink laid beside or over it leaves its words to it.
+`useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
 event kept) or a change (`editHighlights`). **No notification** (the owner, 5 November 2026: «l'avviso per le
 evidenziazioni lo toglierei proprio»): every gesture — a new highlight, «Fai tua», a cut, a colour, «Nessun colore», a
 removal from a sign's popover — is said to a screen reader alone («Testo evidenziato in giallo», «Evidenziazione

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { partsOf, planInk, type InkMark } from './highlighterRules';
 
 const mark = (id: string, start: number, end: number, color: InkMark['color'], whole = false): InkMark => ({ id, start, end, color, whole });
+/** A highlight taken from the Forum: its words keep its author (`a` by default). */
+const forum = (id: string, start: number, end: number, color: InkMark['color'], author = 'a'): InkMark => ({ ...mark(id, start, end, color), author });
 /** A text with no spaces: offsets alone decide, and nothing meets across a gap. */
 const plain = 'x'.repeat(200);
 const ink = (start: number, end: number, color: Parameters<typeof planInk>[0]['ink'], marks: InkMark[], text = plain) =>
@@ -106,12 +108,12 @@ describe('planInk — the highlighter\'s rules (A4 §3, as the owner set them on
     expect(ink(3, 9, 'yellow', [mark('d', 3, 8, 'yellow')], text)).toEqual({ kind: 'edit', effect: 'removed', remove: ['d'], recolor: [], add: [] });
   });
 
-  it('a highlight from the Forum keeps its words: the ink laid beside or over it never lies on them twice', () => {
-    // Yellow from the Forum, yellow reaching out of it: the new one starts where it ends.
+  it('a highlight that cannot be cut (saved before offsets) keeps its words: the ink laid beside or over it never lies on them twice', () => {
+    // Yellow without offsets, yellow reaching out of it: the new one starts where it ends.
     expect(ink(5, 14, 'yellow', [mark('w', 0, 9, 'yellow', true)])).toEqual({
       kind: 'edit', effect: 'created', color: 'yellow', remove: [], recolor: [], add: [{ start: 9, end: 14, color: 'yellow' }],
     });
-    // Green from the Forum, recoloured whole by yellow reaching out of it towards a yellow one: joined, its words left to it.
+    // Green without offsets, recoloured whole by yellow reaching out of it towards a yellow one: joined, its words left to it.
     expect(ink(5, 19, 'yellow', [mark('w', 0, 9, 'green', true), mark('y', 19, 24, 'yellow')])).toEqual({
       kind: 'edit', effect: 'created', color: 'yellow', remove: ['y'], recolor: [{ id: 'w', color: 'yellow' }], add: [{ start: 9, end: 24, color: 'yellow', from: 'y' }],
     });
@@ -171,15 +173,76 @@ describe('planInk — the highlighter\'s rules (A4 §3, as the owner set them on
     expect(ink(2, 5, 'blue', twins)).toMatchObject({ effect: 'removed', remove: ['b'] });
   });
 
-  it('a highlight that cannot be cut (from the Forum) is acted on whole, and never joined: removed, or recoloured in place', () => {
-    const forum = [mark('f', 10, 30, 'yellow', true)];
-    expect(ink(15, 20, 'yellow', forum)).toEqual({ kind: 'edit', effect: 'removed', remove: ['f'], recolor: [], add: [] });
-    expect(ink(15, 20, 'none', forum)).toEqual({ kind: 'edit', effect: 'removed', remove: ['f'], recolor: [], add: [] });
-    expect(ink(15, 20, 'red', forum)).toEqual({
+  it('a highlight that cannot be cut (saved before offsets) is acted on whole, and never joined: removed, or recoloured in place', () => {
+    const old = [mark('f', 10, 30, 'yellow', true)];
+    expect(ink(15, 20, 'yellow', old)).toEqual({ kind: 'edit', effect: 'removed', remove: ['f'], recolor: [], add: [] });
+    expect(ink(15, 20, 'none', old)).toEqual({ kind: 'edit', effect: 'removed', remove: ['f'], recolor: [], add: [] });
+    expect(ink(15, 20, 'red', old)).toEqual({
       kind: 'edit', effect: 'recoloured', color: 'red', remove: [], recolor: [{ id: 'f', color: 'red' }], add: [],
     });
     // Beside a new highlight of its colour, it stays itself.
-    expect(ink(30, 40, 'yellow', forum)).toEqual({ kind: 'create', color: 'yellow' });
+    expect(ink(30, 40, 'yellow', old)).toEqual({ kind: 'create', color: 'yellow' });
+  });
+});
+
+describe('planInk — a highlight from the Forum is cut like the others, its author kept on every piece (9 November 2026)', () => {
+  it('cut by its own colour: the first part keeps its row (`PUT` of the range), the other is made from it', () => {
+    expect(ink(15, 20, 'yellow', [forum('f', 10, 30, 'yellow')])).toEqual({
+      kind: 'edit', effect: 'removed', remove: [], recolor: [],
+      reshape: [{ id: 'f', start: 10, end: 15, color: 'yellow' }], add: [{ start: 20, end: 30, color: 'yellow', from: 'f' }],
+    });
+    // At an edge, «Nessun colore»: only shortened, nothing made.
+    expect(ink(10, 20, 'none', [forum('f', 10, 30, 'yellow')])).toEqual({
+      kind: 'edit', effect: 'removed', remove: [], recolor: [], reshape: [{ id: 'f', start: 20, end: 30, color: 'yellow' }], add: [],
+    });
+    // Over the whole of it: removed, as any other.
+    expect(ink(10, 30, 'yellow', [forum('f', 10, 30, 'yellow')])).toEqual({ kind: 'edit', effect: 'removed', remove: ['f'], recolor: [], add: [] });
+  });
+
+  it('a piece given another colour keeps the author too: three pieces, the first on its row, the others made from it', () => {
+    expect(ink(15, 20, 'green', [forum('f', 10, 30, 'yellow')])).toEqual({
+      kind: 'edit', effect: 'recoloured', color: 'green', remove: [], recolor: [],
+      reshape: [{ id: 'f', start: 10, end: 15, color: 'yellow' }],
+      add: [{ start: 15, end: 20, color: 'green', from: 'f' }, { start: 20, end: 30, color: 'yellow', from: 'f' }],
+    });
+    // Selected whole: recoloured in place, as before.
+    expect(ink(10, 30, 'green', [forum('f', 10, 30, 'yellow')])).toEqual({
+      kind: 'edit', effect: 'recoloured', color: 'green', remove: [], recolor: [{ id: 'f', color: 'green' }], add: [],
+    });
+    // Reaching out over plain words: the words that had the author keep it, the others are the user's own.
+    expect(ink(25, 40, 'green', [forum('f', 10, 30, 'yellow')])).toEqual({
+      kind: 'edit', effect: 'created', color: 'green', remove: [], recolor: [],
+      reshape: [{ id: 'f', start: 10, end: 25, color: 'yellow' }],
+      add: [{ start: 25, end: 30, color: 'green', from: 'f' }, { start: 30, end: 40, color: 'green' }],
+    });
+  });
+
+  it('only one author\'s highlights are joined: the user\'s own ink leaves the Forum\'s words to it, and two pieces of one suggestion join', () => {
+    const text = 'Il danno ingiusto obbliga colui che ha commesso il fatto';
+    const at = (w: string) => text.indexOf(w);
+    const f = forum('f', at('danno'), at('obbliga') + 'obbliga'.length, 'yellow');
+    // Yellow beside it, across a space: a highlight of the user's own, not joined.
+    expect(planInk({ start: at('colui'), end: at('colui') + 5, ink: 'yellow', marks: [f], plain: text })).toEqual({ kind: 'create', color: 'yellow' });
+    // Yellow over its end and beyond: the user's own from where its words end.
+    expect(planInk({ start: at('obbliga'), end: at('colui') + 5, ink: 'yellow', marks: [f], plain: text })).toMatchObject({
+      kind: 'edit', effect: 'created', remove: [], add: [{ start: f.end, end: at('colui') + 5, color: 'yellow' }],
+    });
+    // A user's own yellow highlight beside it is never joined to it, its words given another colour are not either.
+    const own = mark('o', at('colui'), at('colui') + 5, 'green');
+    expect(planInk({ start: at('obbliga'), end: f.end, ink: 'green', marks: [f, own], plain: text })).toEqual({
+      kind: 'edit', effect: 'recoloured', color: 'green', remove: [], recolor: [],
+      reshape: [{ id: 'f', start: f.start, end: at('obbliga'), color: 'yellow' }], add: [{ start: at('obbliga'), end: f.end, color: 'green', from: 'f' }],
+    });
+    // Two highlights of one suggestion, a space apart: a cut of one joins its part to the other.
+    const g = forum('g', at('colui'), at('colui') + 5, 'yellow');
+    expect(planInk({ start: at('danno'), end: at('danno') + 5, ink: 'yellow', marks: [f, g], plain: text })).toEqual({
+      kind: 'edit', effect: 'removed', remove: ['g'], recolor: [], reshape: [{ id: 'f', start: at('danno') + 5, end: g.end, color: 'yellow' }], add: [],
+    });
+    // Another suggestion's are not.
+    const h = forum('h', at('colui'), at('colui') + 5, 'yellow', 'b');
+    expect(planInk({ start: at('danno'), end: at('danno') + 5, ink: 'yellow', marks: [f, h], plain: text })).toEqual({
+      kind: 'edit', effect: 'removed', remove: [], recolor: [], reshape: [{ id: 'f', start: at('danno') + 5, end: f.end, color: 'yellow' }], add: [],
+    });
   });
 });
 

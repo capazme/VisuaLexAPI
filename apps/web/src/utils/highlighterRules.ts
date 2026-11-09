@@ -21,6 +21,13 @@
  * so highlighting the words beside a highlight lengthens it, and the parts several highlights of one colour leave are
  * one each side (the duplicates the old rules made, the owner's local test, 5 November). A highlight that is never cut
  * (`whole`) is never joined either: recoloured, it keeps its place and its id.
+ *
+ * A highlight taken from the Forum carries its first author (gotcha 21), and the author follows its words (9 November
+ * 2026, the server's #411 and #412): cut, its parts keep it; given another colour, the piece recoloured keeps it too. The
+ * first part keeps the highlight's own row (`reshape`, a `PUT` of its range), the others are made from it (`from`, a
+ * `POST` with `splitFrom`, which copies the author). Only highlights of one author are joined — the user's own with the
+ * user's own, a suggestion's with the same suggestion's —, and the ink never takes words from a highlight of its colour
+ * by another author: it leaves them to it.
  */
 import type { HighlightColor } from './highlightColors';
 
@@ -28,9 +35,8 @@ import type { HighlightColor } from './highlightColors';
 export type Ink = HighlightColor | 'none';
 
 /**
- * A highlight of the user's where it lands, `[start, end)` in the projection. `whole`: it is never cut, only removed or
- * recoloured in place — one taken from the Forum keeps its first author, which a new highlight cannot carry (gotcha 21);
- * one saved before offsets existed has none to cut at.
+ * A highlight of the user's where it lands, `[start, end)` in the projection. `whole`: it is never cut nor joined, only
+ * removed or recoloured in place — one saved before offsets existed has none to cut at.
  */
 export interface InkMark {
   id: string;
@@ -38,6 +44,11 @@ export interface InkMark {
   end: number;
   color: HighlightColor;
   whole: boolean;
+  /**
+   * Whom the highlight is attributed to — one taken from the Forum: its suggestion and first author (gotcha 21) —,
+   * absent for the user's own. Its words keep it through a cut and a colour, and only highlights of one author are joined.
+   */
+  author?: string;
 }
 
 /** A highlight to create: a part left outside the selection by a cut (`from` its highlight), or a piece recoloured. */
@@ -46,6 +57,17 @@ export interface InkPart {
   end: number;
   color: HighlightColor;
   from?: string;
+}
+
+/**
+ * A highlight with an author that keeps its row with other words, or another colour too: the first part of it a gesture
+ * leaves (`PUT` of the range, #411), so the row and its first author stay.
+ */
+export interface InkReshape {
+  id: string;
+  start: number;
+  end: number;
+  color: HighlightColor;
 }
 
 export type InkPlan =
@@ -58,6 +80,8 @@ export type InkPlan =
       color?: HighlightColor;
       remove: string[];
       recolor: { id: string; color: HighlightColor }[];
+      /** Present when a highlight with an author keeps its row with other words. */
+      reshape?: InkReshape[];
       add: InkPart[];
     };
 
@@ -128,9 +152,9 @@ function without(part: InkPart, holes: readonly { start: number; end: number }[]
 
 /**
  * The plan's new highlights made one with what they meet in their colour: the parts that meet are joined, and each
- * highlight of the user's that a part meets, of its colour, not taken away already and not `whole`, is taken away (into
- * `removed`) and joined to it, until nothing more meets. A `whole` highlight of the colour (one from the Forum, never
- * cut nor joined) keeps its words: the parts leave them to it, so one colour never lies twice on a word.
+ * highlight of the user's that a part meets, of its colour and its author, not taken away already and not `whole`, is
+ * taken away (into `removed`) and joined to it, until nothing more meets. A highlight of the colour that stays — `whole`,
+ * or another author's — keeps its words: the parts leave them to it, so one colour never lies twice on a word.
  */
 function joinSameColour(
   plain: string,
@@ -141,13 +165,15 @@ function joinSameColour(
   add: readonly InkPart[],
 ): InkPart[] {
   const byStart = [...marks].sort((x, y) => x.start - y.start);
+  const authorOf = authorship(marks);
   let parts = add.map((part) => ({ ...part }));
   for (let changed = true; changed;) {
     changed = false;
     for (const part of parts) {
       // Both ways along the text, so a row of highlights that meet is taken in one pass.
       for (const m of [...byStart, ...[...byStart].reverse()]) {
-        if (m.whole || m.color !== part.color || removed.has(m.id) || !meet(plain, breaks, part.start, part.end, m.start, m.end)) continue;
+        if (m.whole || m.color !== part.color || m.author !== authorOf(part) || removed.has(m.id)
+          || !meet(plain, breaks, part.start, part.end, m.start, m.end)) continue;
         removed.add(m.id);
         part.start = Math.min(part.start, m.start);
         part.end = Math.max(part.end, m.end);
@@ -158,7 +184,7 @@ function joinSameColour(
     }
     const joined: InkPart[] = [];
     for (const part of [...parts].sort((x, y) => x.start - y.start)) {
-      const into = joined.find((p) => p.color === part.color && meet(plain, breaks, p.start, p.end, part.start, part.end));
+      const into = joined.find((p) => p.color === part.color && authorOf(p) === authorOf(part) && meet(plain, breaks, p.start, p.end, part.start, part.end));
       if (into) {
         into.start = Math.min(into.start, part.start);
         into.end = Math.max(into.end, part.end);
@@ -169,7 +195,14 @@ function joinSameColour(
     }
     parts = joined;
   }
-  return parts.flatMap((part) => without(part, marks.filter((m) => m.whole && !removed.has(m.id) && (recolored.get(m.id) ?? m.color) === part.color)));
+  return parts.flatMap((part) => without(part, marks.filter((m) => !removed.has(m.id) && (recolored.get(m.id) ?? m.color) === part.color
+    && (m.whole || m.author !== authorOf(part)))));
+}
+
+/** A part's author: the one of the highlight it comes from (a cut's, a piece recoloured), none for the ink's own. */
+function authorship(marks: readonly InkMark[]): (part: InkPart) => string | undefined {
+  const byId = new Map(marks.map((m) => [m.id, m]));
+  return (part) => (part.from ? byId.get(part.from)?.author : undefined);
 }
 
 /** Whether every character of `[start, end)` but spaces and punctuation lies under one of `marks`. */
@@ -207,13 +240,27 @@ export function planInk({ start, end, ink, marks, plain, breaks = [] }: {
     if (end < m.end) add.push({ start: end, end: m.end, color: m.color, from: m.id });
   };
   const plan = (effect: 'removed' | 'recoloured' | 'created'): InkPlan => {
-    const parts = joinSameColour(plain, breaks, marks, removed, new Map(recolor.map((r) => [r.id, r.color])), add);
+    const joined = joinSameColour(plain, breaks, marks, removed, new Map(recolor.map((r) => [r.id, r.color])), add);
+    // A highlight with an author keeps its row: its first part with words takes it, the others are made from it.
+    const byId = new Map(marks.map((m) => [m.id, m]));
+    const reshape: InkReshape[] = [];
+    const parts = joined.filter((part) => {
+      const origin = part.from ? byId.get(part.from) : undefined;
+      if (!origin?.author || !removed.has(origin.id) || !plain.slice(part.start, part.end).trim()) return true;
+      removed.delete(origin.id);
+      reshape.push({ id: origin.id, start: part.start, end: part.end, color: part.color });
+      return false;
+    });
     const remove = [...removed];
     // A new highlight alone, joined to nothing: the plain creation (the article's MERL-T event goes with it).
-    if (effect === 'created' && remove.length === 0 && recolor.length === 0 && parts.length === 1 && parts[0].start === start && parts[0].end === end) {
+    if (effect === 'created' && remove.length === 0 && recolor.length === 0 && reshape.length === 0 && parts.length === 1
+      && parts[0].start === start && parts[0].end === end && !parts[0].from) {
       return { kind: 'create', color: parts[0].color };
     }
-    return { kind: 'edit', effect, ...(effect !== 'removed' && ink !== 'none' ? { color: ink } : {}), remove, recolor, add: parts };
+    return {
+      kind: 'edit', effect, ...(effect !== 'removed' && ink !== 'none' ? { color: ink } : {}), remove, recolor,
+      ...(reshape.length > 0 ? { reshape } : {}), add: parts,
+    };
   };
 
   if (ink === 'none') {
@@ -229,11 +276,11 @@ export function planInk({ start, end, ink, marks, plain, breaks = [] }: {
     same.forEach(cut);
     return plan('removed');
   }
-  // One highlight of another colour, selected whole, meeting nothing of the ink: recoloured in place, its id kept. So is
-  // one that is never cut and holds the selection (one from the Forum keeps its first author, gotcha 21).
+  // One highlight of another colour, selected whole, meeting nothing of the ink by its author: recoloured in place, its
+  // id (and its author, one from the Forum) kept. So is one that is never cut and holds the selection.
   if (same.length === 0 && others.length === 1) {
     const [only] = others;
-    const meetsInk = marks.some((m) => !m.whole && m.color === ink && meet(plain, breaks, only.start, only.end, m.start, m.end));
+    const meetsInk = marks.some((m) => !m.whole && m.color === ink && m.author === only.author && meet(plain, breaks, only.start, only.end, m.start, m.end));
     if ((only.whole && only.start <= start && end <= only.end) || (!only.whole && only.start === start && only.end === end && !meetsInk)) {
       recolor.push({ id: only.id, color: ink });
       return plan('recoloured');
@@ -246,7 +293,17 @@ export function planInk({ start, end, ink, marks, plain, breaks = [] }: {
     if (m.whole) recolor.push({ id: m.id, color: ink });
     else cut(m);
   }
-  if (!coveredBy(plain, same, start, end)) add.push({ start, end, color: ink });
+  if (!coveredBy(plain, same, start, end)) {
+    // Over a highlight with an author, the ink is a piece of it in the new colour: the words keep their author.
+    const claimed: InkPart[] = [];
+    for (const m of others) {
+      if (m.whole || !m.author) continue;
+      const piece = { start: Math.max(start, m.start), end: Math.min(end, m.end), color: ink, from: m.id };
+      add.push(...without(piece, claimed));
+      claimed.push(piece);
+    }
+    add.push(...without({ start, end, color: ink }, claimed));
+  }
   return plan(others.length > 0 && !seen.has(null) ? 'recoloured' : 'created');
 }
 

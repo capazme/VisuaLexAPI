@@ -32,6 +32,8 @@ const marks = () => appStore.getState().highlights.map((h) => `${h.id}:${h.text}
 const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 
 let serverIds = 0;
+/** What the server copies onto a piece made from a highlight (`splitFrom`, #412): in these tests, always the Forum's. */
+const copied = (data: HighlightCreate) => (data.splitFrom ? { sourceSuggestionId: 'sugg', originalAuthor: { id: 'autore', username: 'mario' } } : {});
 // The text on screen: the shortcut undoes a gesture only then.
 let hideText: () => void = () => {};
 beforeEach(() => {
@@ -42,7 +44,7 @@ beforeEach(() => {
   vi.mocked(highlightService.update).mockImplementation(async (id, data) => ({ id, ...data }) as never);
   vi.mocked(highlightService.create).mockImplementation(async (data: HighlightCreate) => ({
     id: `s${++serverIds}`, normaKey: data.normaKey, text: data.text, color: data.color, startOffset: data.startOffset,
-    endOffset: data.endOffset, note: data.note, userId: 'u', createdAt: '',
+    endOffset: data.endOffset, note: data.note, userId: 'u', createdAt: '', ...copied(data),
   }));
 });
 
@@ -59,7 +61,7 @@ function heldCreate() {
   const answers: { ok: () => void; no: () => void }[] = [];
   vi.mocked(highlightService.create).mockImplementation((data: HighlightCreate) => new Promise((resolve, reject) => {
     answers.push({
-      ok: () => resolve({ id: `s${++serverIds}`, normaKey: data.normaKey, text: data.text, color: data.color, startOffset: data.startOffset, endOffset: data.endOffset, userId: 'u', createdAt: '' }),
+      ok: () => resolve({ id: `s${++serverIds}`, normaKey: data.normaKey, text: data.text, color: data.color, startOffset: data.startOffset, endOffset: data.endOffset, userId: 'u', createdAt: '', ...copied(data) }),
       no: () => reject({ status: 500, message: 'no' }),
     });
   }));
@@ -220,6 +222,97 @@ describe('editHighlights — what a gesture waits for, and what it never loses (
     expect(appStore.getState().highlights).toEqual([forum]);
     expect(highlightService.delete).not.toHaveBeenCalled();
     expect(highlightService.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('a highlight from the Forum cut or recoloured in pieces keeps its author on every one (#411, #412)', () => {
+  const author = { id: 'autore', username: 'mario' };
+  const forum = () => hl('f1', 'il danno ingiusto', 20, 'yellow', { sourceSuggestionId: 'sugg', originalAuthor: author, note: 'nota del server' });
+  // «danno» recoloured green: «il» keeps the row, «danno» and «ingiusto» are made from it.
+  const recolourPiece = () => appStore.getState().editHighlights({
+    normaKey: 'k', articleId: '1453', remove: [], recolor: [],
+    reshape: [{ id: 'f1', text: 'il', startOffset: 20, color: 'yellow' }],
+    add: [{ text: 'danno', startOffset: 23, color: 'green', from: 'f1' }, { text: 'ingiusto', startOffset: 29, color: 'yellow', from: 'f1' }],
+    message: 'Evidenziazione cambiata in verde',
+  });
+
+  it('the first piece keeps the row (`PUT` of its range), the others are made from it (`splitFrom`) and show the author at once', async () => {
+    appStore.setState({ highlights: [forum()] });
+    recolourPiece();
+    expect(vi.mocked(highlightService.create).mock.calls.map(([body]) => body)).toEqual([
+      expect.objectContaining({ text: 'danno', color: 'green', splitFrom: 'f1', note: 'nota del server' }),
+      expect.objectContaining({ text: 'ingiusto', color: 'yellow', splitFrom: 'f1' }),
+    ]);
+    // Every piece names the author before the server answers (the AttributionChip).
+    expect(appStore.getState().highlights.map((h) => [h.text, h.color, h.originalAuthor?.username, h.sourceSuggestionId])).toEqual([
+      ['il', 'yellow', 'mario', 'sugg'], ['danno', 'green', 'mario', 'sugg'], ['ingiusto', 'yellow', 'mario', 'sugg'],
+    ]);
+    await flush();
+    expect(vi.mocked(highlightService.update).mock.calls).toEqual([['f1', { color: 'yellow', text: 'il', startOffset: 20, endOffset: 22 }]]);
+    nextGesture();
+    // Nothing to delete: the row was kept.
+    expect(highlightService.delete).not.toHaveBeenCalled();
+  });
+
+  it('the key gives the row its words back with a `PUT` and deletes the pieces made from it: the same row, the same author', async () => {
+    appStore.setState({ highlights: [forum()] });
+    recolourPiece();
+    await flush();
+    expect(runShortcutUndo()).toBe('Evidenziazione cambiata in verde');
+    expect(appStore.getState().highlights).toEqual([forum()]);
+    await flush();
+    expect(vi.mocked(highlightService.update).mock.calls.at(-1)).toEqual(['f1', { color: 'yellow', text: 'il danno ingiusto', startOffset: 20, endOffset: 37 }]);
+    expect(vi.mocked(highlightService.delete).mock.calls).toEqual([['s1'], ['s2']]);
+  });
+
+  it('a range refused takes the gesture back: the row whole, the pieces deleted, the refusal said, nothing written twice', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.setState({ highlights: [forum()] });
+    vi.mocked(highlightService.update).mockRejectedValueOnce({ status: 500, message: 'no' });
+    recolourPiece();
+    await flush();
+    await flush();
+    expect(appStore.getState().highlights).toEqual([forum()]);
+    expect(vi.mocked(highlightService.delete).mock.calls).toEqual([['s1'], ['s2']]);
+    expect(highlightService.update).toHaveBeenCalledTimes(1);
+    expect(appStore.getState().lastSyncError?.message).toBe("Impossibile modificare l'evidenziazione. Riprova.");
+    expect(runShortcutUndo()).toBeNull();
+  });
+
+  it('a piece of one still being created waits for its server id: `splitFrom` never names a temporary id', async () => {
+    const answers = heldCreate();
+    appStore.setState({ highlights: [forum()] });
+    recolourPiece();
+    await flush();
+    answers.forEach((a) => a.ok());
+    await flush();
+    // «ingiusto» (s2) is cut again before anything else: its piece is made from s2, once s2 is saved.
+    const later = heldCreate();
+    appStore.getState().editHighlights({
+      normaKey: 'k', articleId: '1453', remove: [], recolor: [],
+      reshape: [{ id: 's2', text: 'in', startOffset: 29, color: 'yellow' }],
+      add: [{ text: 'usto', startOffset: 33, color: 'yellow', from: 's2' }],
+      message: 'Evidenziazione rimossa',
+    });
+    expect(vi.mocked(highlightService.create).mock.calls.at(-1)?.[0]).toMatchObject({ text: 'usto', splitFrom: 's2' });
+    later[0].ok();
+    await flush();
+    // And a piece cut from one whose creation is still out waits for it.
+    const third = heldCreate();
+    appStore.getState().addHighlight('k', '1453', 'fede', '', 'red', 60);
+    const temp = appStore.getState().highlights.at(-1)!;
+    appStore.setState({ highlights: appStore.getState().highlights.map((h) => (h.id === temp.id ? { ...h, sourceSuggestionId: 'sugg', originalAuthor: author } : h)) });
+    appStore.getState().editHighlights({
+      normaKey: 'k', articleId: '1453', remove: [], recolor: [],
+      reshape: [{ id: temp.id, text: 'f', startOffset: 60, color: 'red' }],
+      add: [{ text: 'de', startOffset: 62, color: 'red', from: temp.id }],
+      message: 'Evidenziazione rimossa',
+    });
+    expect(third).toHaveLength(1);
+    third[0].ok();
+    await flush();
+    expect(vi.mocked(highlightService.create).mock.calls.at(-1)?.[0]).toMatchObject({ text: 'de', splitFrom: `s${serverIds}` });
+    expect(vi.mocked(highlightService.update).mock.calls.at(-1)).toEqual([`s${serverIds}`, { color: 'red', text: 'f', startOffset: 60, endOffset: 61 }]);
   });
 });
 

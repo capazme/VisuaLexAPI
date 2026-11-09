@@ -83,7 +83,7 @@ The user's notes are objects of their own, anchored by position: none is lost.
 `originalAuthor`), which `POST` does not accept: recreating its parts would lose the attribution (gotcha 21). On such a
 highlight the gesture acts on the whole: it is removed, or recoloured in place (`PUT` keeps it). The same for a highlight
 saved before offsets existed (it has no offset to cut at). When the server lets an author pass through a cut (a `PUT`
-of the offsets, or a `POST` that copies the author), these are cut too.
+of the offsets, or a `POST` that copies the author), these are cut too. (Since §8 they are: the server has both.)
 
 **One gesture, one «Annulla».** (Since §7: no notification, Ctrl+Z alone, the removals held until the next gesture;
 and the rules above are §7's for the same colour and the others.)
@@ -189,6 +189,29 @@ The test passed on the article, a decision, a dossier entry and Study Mode; thre
   the same colour passed over them (over X alone, X goes from every highlight of it there). A unique key on the
   server would be the last guard: a migration, the owners' to decide.
 - As before: «Nessun colore» over words with no highlight does nothing and says nothing.
+
+## 8. The highlights from the Forum, cut like the others (9 November 2026)
+
+The server now lets the author through a cut: `PUT /highlights/:id` takes the range (#411, G-417) and `POST /highlights`
+takes `splitFrom`, the highlight a piece is cut from, whose author it copies (#412, G-418). The limit of §3 goes: a
+highlight from the Forum is cut and recoloured as the others, and its author is kept on every piece and on Ctrl+Z.
+
+- **The author follows the words.** `InkMark.author` names a highlight's suggestion and first author (none for the
+  user's own). The parts a cut leaves keep it; so does the piece of it a selection gives another colour, which the
+  §7 rules would otherwise make the user's own ink (recoloured whole, it is recoloured in place as before). The ink over
+  plain words beside it is the user's own.
+- **One row kept, the others made from it.** The first piece of such a highlight that a gesture leaves keeps its row:
+  `reshape`, a `PUT` of its range and its colour, so the row's id and author stay. Every other piece is a `POST` with
+  `splitFrom` naming it, under its server id once it has one (a piece of a piece still being saved waits for it, never a
+  temporary id), and shows the author at once. The row is never deleted before a piece made from it (the server reads
+  it to copy the author).
+- **Joined only by author.** Two highlights of one colour are joined only when they have one author: the user's own with
+  the user's own, a suggestion's with the same suggestion's. Where a piece meets a highlight of its colour by another
+  author, the two stay two, and the ink never takes words from it: it leaves them to it (as before for a highlight that
+  could not be cut). Two highlights of one colour still never overlap.
+- **Ctrl+Z** puts the row's range and colour back with a `PUT` and deletes the pieces made from it (once they are
+  saved): the same row, the same author. A range refused takes the whole gesture back, as a part refused does.
+- A highlight saved before offsets existed is still acted on whole.
 
 ## Not in A4
 
