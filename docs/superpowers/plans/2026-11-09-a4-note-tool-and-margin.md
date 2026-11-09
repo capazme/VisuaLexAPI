@@ -27,6 +27,7 @@ tests that read the sources, ESLint and `tsc -p tsconfig.app.json`, a commit and
    lists as before); the sign's press focuses the block's first card where the margin is shown, else opens the sheet;
    Shift with the press opens the sheet always (the keyboard's way to a block's highlights and proposals beside its
    cards). Tests converted from the popover's.
+   Tasks 3 and 4 land as one commit: every reader changes for both at once (the margin and the sign's target).
 5. **The documentation.** `apps/web/CLAUDE.md` (reading surface: notes, signs, the note tool), the spec's §9 with what
    was decided while building.
 6. **Review.** An independent review of the whole diff by a fresh subagent, its findings fixed; the PR's body; CI

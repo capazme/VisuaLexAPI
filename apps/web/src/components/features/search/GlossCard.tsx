@@ -6,7 +6,7 @@ import { GLOSS_WORDS } from '../../../constants/glossWords';
 import { assistantProposalsStore } from '../../../store/assistantProposals';
 import { NoteEditBox } from './NoteEditBox';
 import { ReviewComment } from './AiReviewControls';
-import type { ProposalActions } from './BlockAnnotationsPopover';
+import type { ProposalActions } from './BlockAnnotationsSheet';
 
 export interface GlossCardProps {
     gloss: Proposal;

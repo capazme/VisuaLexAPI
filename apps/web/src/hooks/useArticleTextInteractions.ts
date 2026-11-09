@@ -26,9 +26,11 @@ interface State {
   openNote: (OpenUpdateNote & { contentKey: string }) | null;
   /** The block whose annotations are open (its sign's `data-block`). */
   openBlock: number | null;
+  /** All of them in the block's sheet: the sign pressed with Shift, or a passage an application proposed (A4 §6). */
+  blockAll: boolean;
 }
 
-const fresh = (key: string, updatesOpen: boolean): State => ({ key, updatesOpen, openNote: null, openBlock: null });
+const fresh = (key: string, updatesOpen: boolean): State => ({ key, updatesOpen, openNote: null, openBlock: null, blockAll: false });
 
 export interface ArticleTextInteractionOptions {
   /** False until the body is mounted (the dossier reader renders it after its fetch). */
@@ -79,7 +81,15 @@ export function useArticleTextInteractions(
    * body — and closes on another article.
    */
   openBlock: number | null;
+  /**
+   * Whether everything of the block was asked for, in its sheet (A4 §6): the sign pressed with Shift (a click or
+   * Enter), or a passage an application proposed, which has no card beside the text. Otherwise the reader focuses the
+   * block's first card beside the text, where it is shown.
+   */
+  blockAll: boolean;
   closeBlock: () => void;
+  /** Opens a block's annotations (a note's words clicked where its card is not beside the text). */
+  openBlockAt: (index: number, all?: boolean) => void;
 } {
   // The default is part of the identity of the state: the same article shown
   // as a past text and then as the text in force (or the reverse) keeps its
@@ -100,7 +110,10 @@ export function useArticleTextInteractions(
   }, [scope, updatesOpenByDefault]);
 
   const closeBlock = useCallback(() => {
-    setState((s) => (s.key === scope ? { ...s, openBlock: null } : fresh(scope, updatesOpenByDefault)));
+    setState((s) => (s.key === scope ? { ...s, openBlock: null, blockAll: false } : fresh(scope, updatesOpenByDefault)));
+  }, [scope, updatesOpenByDefault]);
+  const openBlockAt = useCallback((index: number, all = false) => {
+    setState((s) => ({ ...(s.key === scope ? s : fresh(scope, updatesOpenByDefault)), openNote: null, openBlock: index, blockAll: all }));
   }, [scope, updatesOpenByDefault]);
 
   // A layout effect, not a passive one: the signs and chips are focusable
@@ -111,14 +124,15 @@ export function useArticleTextInteractions(
     if (!container || !enabled) return;
     const base = (s: State): State => (s.key === scope ? s : fresh(scope, updatesOpenByDefault));
 
-    const activate = (target: Element): boolean => {
+    const activate = (target: Element, shift = false): boolean => {
       const sign = target.closest<HTMLElement>('.vlx-sign');
       if (sign && container.contains(sign)) {
         const index = Number(sign.dataset.block);
         if (sign.dataset.block === undefined || !Number.isInteger(index) || index < 0) return false;
         setState((s) => {
           const b = base(s);
-          return { ...b, openNote: null, openBlock: b.openBlock === index ? null : index };
+          const again = b.openBlock === index && b.blockAll === shift;
+          return { ...b, openNote: null, openBlock: again ? null : index, blockAll: !again && shift };
         });
         return true;
       }
@@ -131,7 +145,7 @@ export function useArticleTextInteractions(
         if (!sign || sign.dataset.block === undefined || !Number.isInteger(index) || index < 0) return false;
         setState((s) => {
           const b = base(s);
-          return { ...b, openNote: null, openBlock: index };
+          return { ...b, openNote: null, openBlock: index, blockAll: true };
         });
         return true;
       }
@@ -146,7 +160,7 @@ export function useArticleTextInteractions(
         setState((s) => {
           const b = base(s);
           const same = b.openNote?.id === id && b.openNote.anchorEl === chip && b.openNote.contentKey === contentKey;
-          return { ...b, openBlock: null, openNote: same ? null : { id, anchorEl: chip, contentKey } };
+          return { ...b, openBlock: null, blockAll: false, openNote: same ? null : { id, anchorEl: chip, contentKey } };
         });
         return true;
       }
@@ -154,7 +168,7 @@ export function useArticleTextInteractions(
       if (toggle && container.contains(toggle)) {
         setState((s) => {
           const b = base(s);
-          return { ...b, updatesOpen: !b.updatesOpen, openNote: null, openBlock: null };
+          return { ...b, updatesOpen: !b.updatesOpen, openNote: null, openBlock: null, blockAll: false };
         });
         return true;
       }
@@ -162,13 +176,13 @@ export function useArticleTextInteractions(
     };
 
     const onClick = (e: MouseEvent) => {
-      if (e.target instanceof Element && activate(e.target)) e.preventDefault();
+      if (e.target instanceof Element && activate(e.target, e.shiftKey)) e.preventDefault();
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const target = e.target;
       if (!(target instanceof Element) || !target.matches('.vlx-ref, .vlx-updates-toggle, .vlx-sign')) return;
-      if (activate(target)) e.preventDefault(); // Space would scroll the page
+      if (activate(target, e.shiftKey)) e.preventDefault(); // Space would scroll the page
     };
     container.addEventListener('click', onClick);
     container.addEventListener('keydown', onKeyDown);
@@ -186,5 +200,7 @@ export function useArticleTextInteractions(
       ?.setAttribute('aria-expanded', current.updatesOpen ? 'true' : 'false');
   }, [current.updatesOpen, containerRef, contentKey]);
 
-  return { updatesOpen: current.updatesOpen, openNote, closeNote, openBlock: current.openBlock, closeBlock };
+  return {
+    updatesOpen: current.updatesOpen, openNote, closeNote, openBlock: current.openBlock, blockAll: current.blockAll, closeBlock, openBlockAt,
+  };
 }

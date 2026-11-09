@@ -42,7 +42,7 @@ export function HighlightsActionsPicker({
     onExportTxt,
 }: HighlightsActionsPickerProps) {
     // Pass the anchor via `elements.reference` so the first render is already
-    // positioned correctly. See matching comment in InlineNotePopover / NotesPeekPanel:
+    // positioned correctly. See matching comment in NotesPeekPanel:
     // setting the reference in a useLayoutEffect would leave the initial frame
     // at document (0,0), which on a scrolled page means "above the viewport".
     const { refs, floatingStyles, context, placement } = useFloating({

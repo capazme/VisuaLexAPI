@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { GlossCard } from './GlossCard';
-import type { ProposalActions } from './BlockAnnotationsPopover';
+import type { ProposalActions } from './BlockAnnotationsSheet';
 import type { Proposal } from '../../../types';
 import { aiNote } from '../../../utils/__fixtures__/assistantNote';
 import { assistantProposalsStore } from '../../../store/assistantProposals';

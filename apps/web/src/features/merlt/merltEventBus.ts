@@ -10,7 +10,7 @@ export const MERLT_EVENT_TYPES = {
     highlightCreated: 'highlight_create',
     // MERLT-1.7: distinct from `textSelected` because the latter fires on
     // generic selection (no note saved). `annotationCreated` fires only
-    // when the user persists a note via handleAddNote / InlineNoteComposer.
+    // when the user persists a note via handleAddNote (the notes beside the text, the Notes panel).
     annotationCreated: 'annotation_create',
     textSelected: 'text_selection',
     citationDetected: 'citation_detected',

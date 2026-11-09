@@ -7,8 +7,8 @@ Web only: creating, recolouring and deleting a highlight exist on the server alr
 Two pull requests, in this order:
 
 1. **The highlighter as a tool** (§1–§5 below): this document's first round.
-2. **The note as a tool and the notes beside the text** (§6): the second round, its plan written when the first is
-   merged.
+2. **The note as a tool and the notes beside the text** (§6, as built §9), with the Forum's highlights cut (§8): the
+   second round, plan `docs/superpowers/plans/2026-11-09-a4-note-tool-and-margin.md`.
 
 ## Why
 
@@ -212,6 +212,32 @@ highlight from the Forum is cut and recoloured as the others, and its author is 
 - **Ctrl+Z** puts the row's range and colour back with a `PUT` and deletes the pieces made from it (once they are
   saved): the same row, the same author. A range refused takes the whole gesture back, as a part refused does.
 - A highlight saved before offsets existed is still acted on whole.
+
+## 9. The second round as built (9 November 2026)
+
+§6 as built, and what was decided while building it.
+
+- **The note tool** (`NoteToolButton`): beside the highlighter in the article's computer row (and its compact form),
+  the decision's bar, Study Mode's header and the dossier reader's actions. The phone's row keeps three buttons (the
+  status keeps its line at 320 px): there the selection bar's «Nota» opens the editor. Its menu, «Nota personale» and
+  «Glossa», only where the reader has discussions (the article, the decision); elsewhere the toggle alone. Its icon is
+  the comment's (a speech bubble with a plus), not the sticky note Study Mode's tools panel already uses. **A gloss is
+  written where discussions are written**: the tool opens the discussion panel's composer on the words (title, text,
+  who sees it are the panel's); the brief's «nel margine» holds for personal notes. A note keeps the words exactly as
+  selected (no whole words, §7).
+- **The column** (`AnnotationMargin`, `GlossMargin` generalised): the reader's anchored notes, the passage discussions
+  (as cards that open the panel), an application's glosses and a new note's editor. Highlights are no cards, as in a
+  word processor: the highlighter takes them away. Whether the reader has room is measured on the wrapper in script
+  (52rem), no longer by a container query, so a new note's editor knows before any card is there whether it is a card
+  or a sheet. Study Mode's column wraps its centred 48rem text; with no room there, a new note is written in its tools
+  panel, as before.
+- **The sign** goes to the block's first card where the column is shown; else, or with Shift, to the block's sheet
+  (`BlockAnnotationsSheet`): what the popover listed, in a sheet from the bottom (a capped width centred on a
+  computer). Shift is the keyboard's way to a block's highlights (and an application's proposed passages) beside its
+  cards, which the column does not show; said in the guide, not on screen. A click on a proposed passage opens the
+  sheet, as it opened the popover.
+- **A note's wavy words** go to its card, else to its block's sheet; Study Mode, which draws no sign, to its card only.
+- `InlineNoteComposer`, `InlineNotePopover`, `BlockAnnotationsPopover` and `blockAnchorRect` are gone.
 
 ## Not in A4
 
