@@ -1,7 +1,10 @@
 # «Analizza documento» reads with the citex model — a model behind the page
 
-**Status:** proposal, 10 November 2026. Nothing here is decided: the owners answer the questions of §12. No product
-code, no `infra/` change and no model run is made until they do.
+**Status:** approved by one owner, 10 November 2026 (G-446 … G-449): all nine questions of §12 answered as
+recommended. Q2 (the promise) and Q6 (the licence of the model's runtime) wait for the other owner's answer — the
+page's words are the web owner's (I-2), and a licence is decided by both owners together. No product code, no
+`infra/` change and no model run is made before that answer; §14 records a study the owner asked for, not a
+commitment.
 **Asked by:** one owner, 10 November 2026 (G-445): deploy the citex model in «Analizza documento». It changes G-439,
 which had kept the model a separate tool, outside VisuaLex.
 **The model:** the citex model (a separate project): a token-classification model that finds references to sources
@@ -69,18 +72,33 @@ says so), I-2 (the page's words and screens are the web owner's).
     inside its own definition. None was a wrong article;
   - with the deduced references on, at its chosen threshold: 86.7% right, 4 harmful, about a third of the references
     «named elsewhere» resolved;
-  - the model card lists as limits: regional laws and decreti-legge not resolved by the act tables; trained on
+  - its limits: regional laws and authority regulations are identified, not served (above); trained on
     legislation, judgments and authority decisions, briefs and contracts seen only through the blind corpus.
-- **Size:** 287M parameters, 1.1 GB in fp32. A reduced package (vocabulary pruned, weights stored fp16, about 270 MB)
-  existed for the previous model of the same architecture; the c4 package is being produced with an equivalence check
-  and has no checksum yet. On a CPU the fp16 weights are loaded back into fp32: the package saves disk, memory and
+    **Decreti-legge resolve:** «d.l.», «D.L.», «decreto-legge» and «decreto legge» with a date and a number, since a
+    correction of its assembler of 9 November (G-440), with a unit test; the earlier model card that lists them among
+    the limits predates it.
+- **Size:** 287M parameters, 1.1 GB in fp32. **The reduced c4 package** (vocabulary pruned, weights stored fp16):
+  136.8M parameters, **274 MB**, SHA-256 of its `model.safetensors`
+  `c38f5eb908a4bcbb2fb2403e929d0c3eb2f6521d48ba5f9725fe3e21778e6641`. Equivalent to the fp32 weights on its project's
+  checks: the test set's components identical (F1 0.9736), its blocks 0.9411 against 0.9409, its older blind corpus
+  identical (97.2%, 0 harmful). On a CPU the fp16 weights are loaded back into fp32: the package saves disk, memory and
   load time, not inference time.
-- **Speed** (per window of 90 words, 25 of overlap): 81 ms on a recent laptop's CPU, measured on the previous model;
-  on the deployment host — a 2017 laptop, four cores, 16 GB, shared with the whole stack — **0.3–0.5 s, estimated**,
-  to be measured there. Hence, estimated: 10 pages (~5,000 words, ~80 windows) 25–45 s; 20 pages 45–90 s; 100 pages
-  (~770 windows) 4–7 minutes. Deduced references add 10–30%.
-- **Memory,** estimated, to be measured: 1.0–1.3 GB resident for the reduced package, a peak of about +0.3 GB while it
-  loads; 1.8–2.2 GB for the fp32 weights unreduced.
+- **Speed and memory, measured** on an 8-core desktop CPU, 4 threads, the whole pipeline, torch's CUDA build (windows
+  of 90 words, 25 of overlap):
+
+  | | Reduced package | fp32 |
+  | --- | ---: | ---: |
+  | load | 4.6 s | — |
+  | resident before loading (mostly torch's CUDA build) | 511 MB | — |
+  | resident, idle | 1,209 MB | 2,118 MB |
+  | resident, peak | 1,805 MB | 3,183 MB |
+  | a window of ~400 characters | 0.17 s | the same |
+  | ~20 pages (60,360 characters, 166 windows) | 36.5 s | the same |
+
+- **On the deployment host,** a 2017 laptop with four cores and 16 GB, shared with the whole stack — **estimated** at 2–3
+  times the desktop, to be measured there: 0.35–0.5 s a window; 10 pages 35–55 s, 20 pages 75–110 s, 100 pages
+  (~300,000 characters) 6–9 minutes; with torch's CPU-only build about 1.0–1.2 GB resident idle, about 1.6 GB at the
+  peak. Deduced references add 10–30%, estimated, not measured.
 
 These figures are the model project's. This spec plans on them and marks what the host must confirm (§9.1).
 
@@ -117,7 +135,7 @@ list: resolved · dal contesto · dedotte, da verificare · identificate, testo 
 
 ## 4. Architecture
 
-### 4.1 A separate internal container (recommended, Q1)
+### 4.1 A separate internal container (decided: G-446)
 
 - **`citex`, a compose module of its own** (`infra/compose.citex.yml`, beside `compose.scrapers.yml`), started only when
   the module is switched on (§9.3). It runs the model project's HTTP server, bound to `0.0.0.0:8765` inside the
@@ -143,8 +161,8 @@ Why not the others:
 | B. Inside the Python API | no new service | torch (~550 MB installed) and 1–1.3 GB of weights inside the process every search goes through, under the same 2 GB ceiling; the event loop must hand inference to a thread; an out-of-memory kill stops every scraping route; the model project's code would have to be in this repository (Q6) |
 | C. In the browser (ONNX, WebAssembly) | the promise stays literally true: nothing leaves | ~270 MB downloaded per user, impossible on a phone, inference on the user's CPU at the speeds of §2.2 or worse; an ONNX export of this architecture is not measured; the weights become downloadable by any signed-in user (Q7) |
 
-C is the one that would keep today's promise; it is not proposed now, and it stays the answer if the owners decide
-that no document text may ever reach the server (Q2).
+C is the one that would keep today's promise. It is not built now; the owner asked for it to be studied after the
+server path ships (§14).
 
 ### 4.2 The route on the Python API
 
@@ -155,7 +173,7 @@ that no document text may ever reach the server (Q2).
 - **`GET /extract_citations_model/status`** → `{"available": bool, "model": "c4-…", "max_chars": int}`: whether the
   page offers the model at all (§6.3). It costs nothing in the quota; it says nothing about any document.
 - **Its price:** a line of its own in `DEFAULT_SCRAPE_COSTS`, 10 points a part (proposed): a 100-page document is
-  about 12 parts, 120 points; one user cannot keep the model busy for more than about 30 parts a minute. Authentication's
+  about 10 parts, 100 points; one user cannot keep the model busy for more than about 30 parts a minute. Authentication's
   area: its owner reviews it.
 - **What it does:** checks the body (a 400 naming the limit otherwise); asks the container; re-reads each reference
   (§5.2); adds `offset` to every span; answers rows in the page's own shape. Nothing is kept once the answer is sent.
@@ -165,14 +183,14 @@ that no document text may ever reach the server (Q2).
 
 ## 5. Merging with today's results
 
-### 5.1 The rule (Q3)
+### 5.1 The rule (Q3, decided: G-449)
 
-Both paths run on a document read with the model. **Recommended: the model first, today's path fills its gaps:**
+Both paths run on a document read with the model. **The model first, today's path fills its gaps:**
 
 1. A span both paths read **with the same act and the same article** is one row, drawn as found.
 2. A span the model resolves and today's path does not (or leaves to complete) → the model's row.
-3. A span today's path resolves and the model misses or leaves unresolved → today's row (this is how a decreto-legge,
-   which the model's tables do not resolve today, stays found).
+3. A span today's path resolves and the model misses or leaves unresolved → today's row (the model misses about one
+   citation in eight on its blind corpus; today's rules, written for briefs, keep those that they read).
 4. A span **both read with a different act or article** → «Da completare», with both readings offered first in the
    picker («Il modello legge: …», «La ricerca legge: …»). Never a silent choice.
 5. A span the model types `non_fonte` («art. 5 del contratto») and today's path sends to «Da completare» → «Non sono
@@ -183,8 +201,7 @@ Both paths run on a document read with the model. **Recommended: the model first
 Rows keep their origin for the measure (§10) and for the row's menu («letta dal modello», «letta come nella ricerca»),
 not as a badge on every row — the web owner decides whether it shows at all.
 
-Alternatives: the model alone, today's path only as the fallback (simpler, loses what the model misses — the
-decreti-legge, today); or today's path first and the model only for what it leaves (keeps today's 0 wrong, gains less).
+Alternatives: the model alone, today's path only as the fallback (simpler, loses what the model misses); or today's path first and the model only for what it leaves (keeps today's 0 wrong, gains less).
 The measure of §10 is run for all three modes, so the owners choose on figures.
 
 ### 5.2 Every reference re-read by VisuaLex
@@ -214,7 +231,7 @@ The model's tables are not VisuaLex's. So the API never passes a model reference
 Decisions and authority decisions (`giurisprudenza`, `provvedimenti`) the model finds are **not** listed in this
 round: the page lists norms, and a decision's link has rules of its own (Q9).
 
-### 5.4 Deduced references (Q4)
+### 5.4 Deduced references (Q4, decided: G-449)
 
 The model's optional layer links «del medesimo decreto», «della citata legge» to an act named before. The browser's
 own inheritance (G-402) already does this when the text says so. Both are kept apart:
@@ -223,7 +240,7 @@ own inheritance (G-402) already does this when the text says so. Both are kept a
 - to a different act → «Da completare», rule 4;
 - deduced by the model only → «Dedotte — da verificare».
 
-The model project's release configuration has the layer **off**. Recommended: build the section, ship with the layer
+The model project's release configuration has the layer **off**. Decided: build the section, ship with the layer
 off, and switch it on (a per-request flag the model project offered to add, §13 PR A) only when the measure of §10
 shows it adds right rows with no more wrong ones than G-402's rule.
 
@@ -254,7 +271,7 @@ processed in memory and dropped when the part is answered. This is not «solo le
   cloud provider. A document under professional secrecy, or holding health or criminal data, is then processed — briefly —
   on the owners' machine. The privacy notice must say so before the page offers it; that text is the owners' (Q2).
 
-### 6.3 How the page asks (recommended: opt-in per document)
+### 6.3 How the page asks (one owner: per document, G-447; the other owner's answer pending)
 
 Three ways a document can be read; the page offers the third only when `/status` says the model is available:
 
@@ -264,7 +281,7 @@ Three ways a document can be read; the page offers the third only when `/status`
 | as today | the query strings of the citations | the default |
 | **«Leggi con il modello»** | the text of the document, in parts | new |
 
-Recommended (Q2): **per document, off by default.** Today's path runs first, as now, and its result shows at once; a
+One owner's answer (Q2, G-447): **per document, off by default.** Today's path runs first, as now, and its result shows at once; a
 button on the result, «Leggi con il modello», says in one line what it sends and starts the reading (§7.4). The choice
 is not remembered across documents: every confidential file is a fresh decision. Alternatives in Q2.
 
@@ -283,10 +300,10 @@ modello», «resta sul tuo computer» is nowhere on the page.
 
 ## 7. Long documents, latency, limits
 
-### 7.1 Parts, cut in the browser (recommended)
+### 7.1 Parts, cut in the browser (decided: G-449)
 
-The browser cuts the text at paragraph ends into **parts of at most 30,000 characters** (~4,500 words, ~70 windows,
-estimated 20–35 s on the host), never inside a paragraph; a paragraph longer than a part is cut at a sentence end, and
+The browser cuts the text at paragraph ends into **parts of at most 30,000 characters** (~10 pages, ~83 windows:
+~18 s measured on the desktop, 35–55 s estimated on the host), never inside a paragraph; a paragraph longer than a part is cut at a sentence end, and
 the two parts overlap by that sentence, the overlap's duplicates removed by span. Parts go one after the other.
 
 - **Progress** is the parts done: «Lettura con il modello: parte 3 di 12», a bar, and «Interrompi», which aborts the
@@ -298,13 +315,13 @@ the two parts overlap by that sentence, the overlap's duplicates removed by span
 - Alternative: a server job (`POST` the whole text, poll its progress). One request, but the whole text held on the
   server for minutes, a job store in a single process, and an expiry to write. Not recommended.
 
-### 7.2 Limits (to set with the host's figures, §9.1)
+### 7.2 Limits (Q5, decided: G-449; revised with the host's figures, §9.1)
 
 | Limit | Proposed | Why |
 | --- | --- | --- |
 | a part | 30,000 characters, body ≤ 128 KB | well under the ingress's 1 MB and the model's 200,000 |
-| a document read with the model | 300,000 characters (~120 pages); beyond it the button says the document is too long and today's path stays | about 10 minutes on the host at the estimates: past that, a user waits too long and blocks others |
-| a part's time | 90 s at the API, then 504 | a part is 20–35 s estimated; three times that is a stuck model |
+| a document read with the model | 300,000 characters (~100 pages); beyond it the button says the document is too long and today's path stays | 6–9 minutes on the host at the estimates: past that, a user waits too long and blocks others; 150,000 if the host's measure is slower |
+| a part's time | 90 s at the API, then 504 | a part is 35–55 s estimated on the host; past 90 s the model is stuck or the host overloaded |
 | the queue | one part reading and two waiting, across all users; a third → 503 `busy`, `Retry-After: 15` | memory stays flat (one inference at a time is the model's own rule); waits stay bounded |
 | per user | the quota: 10 points a part (§4.2) | |
 
@@ -312,7 +329,7 @@ the two parts overlap by that sentence, the overlap's duplicates removed by span
 
 The container reads one part at a time. Parts of different users interleave in the API's queue, first come first
 served; a user's next part is sent only when the previous one is answered, so a long document does not lock out a short
-one for more than one part (~30 s). The page retries a `busy` part after `Retry-After`, up to 2 minutes, then falls
+one for more than one part (under a minute). The page retries a `busy` part after `Retry-After`, up to 2 minutes, then falls
 back (§8) for the parts left.
 
 ### 7.4 What the user sees while it reads
@@ -334,35 +351,40 @@ over the model's reading of the same span, which then shows only in the picker.
 
 ### 9.1 Budget on the host (figures for the host's operator)
 
-| | Estimated | To confirm on the host before switching on |
-| --- | --- | --- |
-| model | the reduced c4 package, ~270 MB on disk; only the reduced package is deployed, never the 1.1 GB weights | its checksum (§9.2) |
-| memory, idle | 1.0–1.3 GB resident | measured after load |
-| memory, peak | +0.3 GB while loading; flat while reading (one inference at a time) | measured over a 100-page document |
-| ceiling | `mem_limit: 2g` (`CITEX_MEM_LIMIT`), `pids_limit: 128` | that the host has 2 GB free with the whole stack up |
-| CPU | `cpus: 2` (`CITEX_CPUS`), torch threads 2 (`--threads 2`): two of the four cores stay with the stack | that searches stay responsive while it reads |
-| load | at most one part (~30 s of two cores) at a time; with the quota, at most ~120 parts an hour in practice | — |
-| image | ~550 MB of libraries (torch CPU-only), the weights mounted, not baked in | — |
+| | Measured on a desktop (§2.2) | Estimated on the host | To confirm on the host before switching on |
+| --- | --- | --- | --- |
+| model | the reduced c4 package, 274 MB on disk; only the reduced package is deployed, never the 1.1 GB weights | — | its checksum (§9.2) |
+| load | 4.6 s | ~10 s | — |
+| memory, idle | 1.21 GB resident (torch's CUDA build) | 1.0–1.2 GB (CPU-only build) | measured after load |
+| memory, peak | 1.81 GB (CUDA build) | ~1.6 GB; flat while reading (one inference at a time) | measured over a 100-page document |
+| ceiling | — | `mem_limit: 2g` (`CITEX_MEM_LIMIT`), `pids_limit: 128`: ~0.4 GB over the estimated peak | that the peak stays under 1.7 GB, else 2.5g; that the host has the ceiling free with the whole stack up |
+| CPU | 4 threads of 8 cores: 0.17 s a window | `cpus: 2` (`CITEX_CPUS`), torch threads 2 (`--threads 2`): 0.35–0.5 s a window; two of the four cores stay with the stack | the seconds a window with two threads; that searches stay responsive while it reads |
+| a part (30,000 characters) | ~18 s | 35–55 s | under the 90 s timeout (§7.2) |
+| load over time | — | at most one part at a time; with the quota, at most ~60–100 parts an hour in practice | — |
+| image | — | ~550 MB of libraries (torch CPU-only), the weights mounted, not baked in | — |
 
-If the host cannot give 2 GB and two cores, the module stays off: the page works as today.
+If the host cannot give the ceiling and two cores, the module stays off: the page works as today.
 
-### 9.2 Where the weights live, and how the host gets them (Q7)
+### 9.2 Where the weights live, and how the host gets them (Q7, decided: G-449)
 
-The weights never enter this repository, nor its image. Recommended:
+The weights never enter this repository, nor its image:
 
 - the model project produces a **versioned package**, `citex-<version>/` (weights, tokenizer, configuration,
   `SHA256SUMS`), and keeps its master copy and a backup off the host;
 - an owner copies it to the host into a directory outside the checkout (`CITEX_MODEL_DIR` in `infra/.env`; one
   sub-directory per version, the previous one kept);
-- `infra/.env` pins `CITEX_MODEL_VERSION` and `CITEX_MODEL_SHA256` (the checksum of the package's `SHA256SUMS`);
+- `infra/.env` pins `CITEX_MODEL_VERSION` and `CITEX_MODEL_SHA256` (the checksum of the package's `SHA256SUMS`). The
+  first package is c4's: its `model.safetensors` has the SHA-256 given in §2.2; its `SHA256SUMS` is written when the
+  package is handed over (PR A);
 - the container mounts the version **read-only** and, before it loads, checks every file against `SHA256SUMS` and that
   file against the pin; on any mismatch it refuses to start, its health fails, `/status` says unavailable, the page is
   today's. `./start.sh --prod` checks the same before it starts the module and says why it does not;
 - the data backup (`scripts/backup.sh`) does not carry the weights: they are not data, they are a release artefact
   with its own master copy.
 
-Alternatives in Q7: a private container image with the weights inside (a registry and its credential on the host);
-a download from a private release at deploy time (a token on the host, and the network at deploy).
+The alternatives Q7 weighed, not chosen (G-449): a private container image with the weights inside (a registry and its
+credential on the host); a download from a private release at deploy time (a token on the host, and the network at
+deploy).
 
 ### 9.3 The off switch
 
@@ -398,8 +420,11 @@ a download from a private release at deploy time (a token on the host, and the n
 The six documents of #376 (`2026-10-29-document-analysis/corpus/`, 103 article citations, 9 acts alone, 1 outside
 the sources), not a blind corpus.
 
-- **Precondition:** the model project confirms that these six documents were never in its training, development or
-  test data. They are public in this repository; if they were seen, the figure is not a measure.
+- **Precondition, verified (10 November):** the six documents were never in the model's data — training, development,
+  test, synthetic examples, rinvio lots, gold sets or its blind corpora. Its project checked it without reading them,
+  by counting the 8-word sequences they share with its data: 1–14%, all common legal phrasing or the verbatim text of
+  art. 1218 c.c. quoted in a brief, where a document trained on would share nearly all. They are public in this
+  repository, so the check is repeated for each new model version before it is scored.
 - **The model's answers are recorded once,** on the model project's side (or on the host, with the module up), as JSON
   beside the corpus (`measure/citex/<version>/0N.json`): the documents are invented and public, so their answers can be
   kept. Nobody in this repository runs the model to score.
@@ -415,9 +440,9 @@ le norme citate in questo documento: per ciascuna l'atto e l'articolo, nell'ordi
 written as the scorer's predictions with each passage located, scored by `score.py`. Recorded beside the model's
 answers, with the date and the client used.
 
-### 10.3 The bar (Q8)
+### 10.3 The bar (Q8, decided: G-449)
 
-Recommended: the page with the model ships when, on the six documents, **the shipped merge mode finds at least as many
+The page with the model ships when, on the six documents, **the shipped merge mode finds at least as many
 as Claude through MCP with no more wrong ones, and at least as many as today's path with no wrong one more than
 today's (0)**. A citation the page put in «Da completare» counts as found only if Claude did not find it either (#376
 Q6's rule, kept). Six documents written by one hand are a small corpus: the figure is a gate, not a promise; the
@@ -433,12 +458,16 @@ One line on the page, under the button, from the measured figures (the web owner
 
 The figure is updated with each version (§9.4); a version that measures worse changes the words before it ships.
 
-## 12. Questions for the owners
+## 12. Questions for the owners — answered by one owner
+
+Answered on 10 November 2026 (G-446 … G-449), each as recommended. Q2 and Q6 also need the other owner's answer, which
+is pending; the build of what depends on them waits for it (§13). Kept as asked, with the answer.
 
 1. **Architecture.** A separate internal container (A), the model inside the Python API (B), or the model in the
    browser (C)? *Trade-offs:* §4.1's table. *Recommendation:* **A** — its own memory and CPU ceiling, a crash that takes
    down only the model, rollout and rollback on its own, no network but to the API. C is the only one that keeps
    «nothing leaves», at the cost of a 270 MB download per user, no phones and public weights.
+   *Answer (10 November, G-446):* A, a separate container on the deployment host, closed to the outside.
 2. **The privacy promise** (words: the web owner with the other owner, I-2). The text now reaches the server. Per
    document and off by default (a button on today's result), on by default for every document with new words, or a
    setting switched on once? *Trade-offs:* per document keeps every confidential file a fresh decision and today's
@@ -447,16 +476,24 @@ The figure is updated with each version (§9.4); a version that measures worse c
    having switched on. Also: the privacy notice must say that document text is processed on the owners' host (§6.2)
    before the page offers it. *Recommendation:* **per document, off by default**, the words of §6.4, the notice changed
    first.
+   *Answer (10 November, G-447):* per document, off by default, the privacy notice changed first — with a note: also
+   study a way for the model to run on the user's own machine (WebAssembly or another), §14. **The other owner's
+   answer is pending** (the page's words are the web owner's, I-2).
 3. **Merging with today's results.** The model first with today's path filling its gaps (disagreements to complete),
    the model alone, or today's path first? *Trade-offs:* §5.1. *Recommendation:* **the model first, today's filling**,
-   confirmed on §10's figures for all three modes; it keeps the decreti-legge the model's tables miss today.
+   confirmed on §10's figures for all three modes; today's rules keep what the model misses (about one citation in
+   eight on its blind corpus). *(Amended 10 November: an earlier draft gave the decreti-legge as an example; the
+   model resolves them, §2.2.)*
+   *Answer (10 November, G-449):* as recommended.
 4. **Deduced references.** Ship the «Dedotte — da verificare» section with the layer off, or on from the start?
    *Trade-offs:* on, about a third more of the references «named elsewhere» found, one more harmful on the model's
    blind corpus, 10–30% more time; off, nothing deduced but nothing guessed, and G-402's rule still inherits what the
    text says. *Recommendation:* **built, off at launch**, on when §10 shows it adds right rows with no wrong one more.
-5. **Limits.** 300,000 characters per document (~120 pages, ~10 minutes estimated), parts of 30,000, a queue of two?
+   *Answer (10 November, G-449):* as recommended.
+5. **Limits.** 300,000 characters per document (~100 pages, 6–9 minutes estimated on the host), parts of 30,000, a queue of two?
    *Trade-offs:* higher limits read longer briefs and keep others waiting; lower ones send long files back to today's
    path. *Recommendation:* **as proposed**, revised once the host's figures are in (§9.1).
+   *Answer (10 November, G-449):* as recommended.
 6. **The model's code: licence and delivery.** The model project has no licence file and no remote. Either its
    runtime (the adapter, the assembler, the HTTP server, the vendored tables — not the training code, the data or the
    weights) enters this repository under MPL-2.0, as `services/citex/`, and the host builds its image as it builds the
@@ -466,30 +503,74 @@ The figure is updated with each version (§9.4); a version that measures worse c
    registry, a credential on the host and an image this repository's CI cannot build or test. The base model is
    Apache-2.0, the vendored tables Apache-2.0: both compatible with MPL-2.0. Licensing is decided by both owners
    together. *Recommendation:* **the runtime in `services/citex/` under MPL-2.0**, weights outside (Q7).
+   *Answer (10 November, G-448):* only the code that runs the model, in this repository under MPL-2.0; training, data
+   and weights private. **The other owner's answer is pending** (a licence is decided by both owners together).
 7. **The weights.** Copied by an owner to a directory on the host with a pinned SHA-256 (§9.2), baked into a private
    image, or downloaded at deploy time from a private release? *Trade-offs:* the copy needs no credential and no
    network, and is one manual step per version; the image makes rollback a tag, with a registry and its credential;
    the download needs a token on the host and the network at deploy. *Recommendation:* **the copy with the pinned
    checksum**, checked by the container and by `start.sh`.
+   *Answer (10 November, G-449):* as recommended.
 8. **The bar of G-375.** On this spec's six documents: the shipped mode finds at least as many as Claude through MCP
    with no more wrong, and at least as many as today's path with no wrong one more? *Trade-offs:* the corpus is small
    and public; a blind corpus would be stronger but the model project uses its blind corpora for itself, and a corpus
    once used is no longer blind. *Recommendation:* **as stated**, with the precondition that the model never saw the
    six documents.
+   *Answer (10 November, G-449):* as recommended. The precondition is verified (§10.1).
 9. **Decisions and authority acts the model finds.** List them in this round (without a link), or leave them for a
    round of their own? *Trade-offs:* listing them shows the model's reach at once, but a decision's identity, its link
    and its completion by hand have rules this page does not have yet. *Recommendation:* **a round of their own**; this
    one lists norms only.
+   *Answer (10 November, G-449):* as recommended.
 
 ## 13. The pull requests, in order
 
 | # | Where | What | Waits for |
 | --- | --- | --- | --- |
-| A | the model project (not this repository) | the `identified` category in the answer; the deduced layer as a per-request flag; `--threads`; a health answer with the version and the package's checksum; error answers that never echo the text; the reduced c4 package with its equivalence check and `SHA256SUMS`; a container image definition (or, under Q6's first answer, the runtime handed over for B) | the package |
-| B | `infra/` (reserved in the owners' register first; CODEOWNERS review) | `infra/compose.citex.yml`: the internal network, the hardening, the ceilings, the read-only mount, the secret, `CITEX_ENABLED`; `start.sh --prod`'s checksum check; `infra/.env.example`'s new keys; under Q6's first answer, `services/citex/` with its Dockerfile and its licence header | Q1, Q6, Q7 |
+| A | the model project (not this repository) | the `identified` category in the answer; the deduced layer as a per-request flag; `--threads`; a health answer with the version and the package's checksum; error answers that never echo the text; the reduced c4 package's `SHA256SUMS` (the package and its equivalence check exist since 10 November, §2.2); the runtime handed over for B (G-448), or a container image definition if the other owner answers Q6 otherwise | — |
+| B | `infra/` (reserved in the owners' register first; CODEOWNERS review) | `infra/compose.citex.yml`: the internal network, the hardening, the ceilings, the read-only mount, the secret, `CITEX_ENABLED`; `start.sh --prod`'s checksum check; `infra/.env.example`'s new keys; under Q6's first answer, `services/citex/` with its Dockerfile and its licence header | the other owner's answer to Q6 (Q1, Q7 decided) |
 | C | Python API, server quota | `citex_client.py`; `/extract_citations_model` and `/status`; the re-reading (§5.2); the queue and the timeouts; the logging test (§6.2); the price in `DEFAULT_SCRAPE_COSTS` (authentication's area: review asked) | B; tested against a stub container, never the model |
 | D | `docs/…/measure/` | the model's recorded answers on the six documents; `score.py`'s three paths; the Claude-through-MCP recording; the table of §10 | A's package; Q8 |
-| E | web | the button and its words, the parts and the progress, the merge (§5.1), the two new sections, the fallback (§8), the promise's tests both ways; `apps/web/CLAUDE.md` updated; a browser pass on the six documents | C, D's figure passing the bar, Q2's words |
+| E | web | the button and its words, the parts and the progress, the merge (§5.1), the two new sections, the fallback (§8), the promise's tests both ways; `apps/web/CLAUDE.md` updated; a browser pass on the six documents | C, D's figure passing the bar, the other owner's answer to Q2 and the page's words |
 | F | release | `CHANGELOG.md` with the figures; the privacy notice changed (Q2); the module switched on on the host only after §9.1's checks | E |
 
-Nothing is deployed before the owners' answers, the PRs merged and a release.
+Nothing is deployed before both owners' answers, the PRs merged and a release.
+
+## 14. Follow-up study: running the model on the user's machine
+
+Asked by the owner with the answer to Q2 (G-447): study a way for the model to run on the user's own machine, so that a
+document need not leave it at all. **A study to do after the server path ships (PR F), not a blocker of it and not a
+commitment:** its outcome is a short report with figures and a recommendation, and a decision of its own.
+
+### 14.1 The ways to study
+
+| Way | What it is | What it would change |
+| --- | --- | --- |
+| in the browser, WebAssembly | the model exported to ONNX and run by a WebAssembly runtime (SIMD and threads) in a Web Worker, as the DOCX reader runs | the promise stays «Il documento resta sul tuo computer» with the model too |
+| in the browser, WebGPU | the same export on the graphics card, where the browser offers it | faster where it works; nothing where it does not |
+| a desktop app | a future VisuaLex app for the computer, with a native runtime (CPU, or the Mac's GPU) | no download per visit; an installer and its updates to maintain |
+| a local service | the model's own demo server, run by the user on their computer, called by the page on the loopback address | already exists for one machine; asks the user to install and run it |
+
+### 14.2 What would have to be measured
+
+- **The export:** that GLiNER2's encoder and its two heads export to ONNX at all, and that the exported model scores as
+  c4 on the model project's test set and blind corpus — the same equivalence check the reduced package passed (§2.2),
+  no harmful citation more.
+- **The download:** 274 MB in fp16 today; what compression gains; the int8 storage its project rejected (~140 MB,
+  more harmful errors) stays rejected unless re-measured. Kept in the browser's storage once per version, so a second
+  visit downloads nothing; how long the first visit takes on an ordinary office connection.
+- **Speed:** seconds a window on WebAssembly and on WebGPU, on the machines lawyers have — a five-year-old Windows
+  laptop, a recent Mac — against the server's 0.35–0.5 s (§2.2): a 20-page brief must not take ten minutes.
+- **Memory in the tab:** the fp32 weights and the activations inside one browser tab, against what browsers allow.
+- **A phone or a tablet:** whether it runs at all; the expectation is no, and the page then keeps the server path or
+  today's.
+- **The assembler:** the model's assembler and its tables are Python; in the browser they would be ported or run
+  under a Python-in-WebAssembly runtime — a cost to measure, and a second copy of rules to keep in step.
+
+### 14.3 What it would decide
+
+- **The weights become public.** A model that runs on the user's machine is a model every signed-in user can copy.
+  G-448 keeps the weights private; running in the browser or in a desktop app reverses that, and is the owners'
+  decision before anything is built.
+- **Which path is the default.** If local runs well enough, «Leggi con il modello» could run locally where the machine
+  allows and on the server only where it does not, with the words of §6.4 saying which.
