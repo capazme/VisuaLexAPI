@@ -61,8 +61,9 @@ function writtenKeys(): Written[] {
     }
     // zustand `persist(…, { name: '…', storage: … localStorage … })`
     if (/\bpersist\(/.test(text) && /from 'zustand\/middleware'/.test(text)) {
-      // the `name:` of the options that carry a `createJSONStorage`, and the storage it wraps
-      const options = /\bname:\s*([A-Za-z_$][\w$]*|'[^']+')\s*,((?:(?!\bname:)[\s\S]){0,400}?createJSONStorage[^\n]*\n?[^\n]*)/g;
+      // the `name:` of the persist options (zustand's default storage is localStorage): every `name:` that is
+      // followed, before the next `name:`, by a persist option, or that sits right after a `persist(` call
+      const options = /\bname:\s*([A-Za-z_$][\w$]*|'[^']+')\s*,((?:(?!\bname:)[\s\S]){0,2000}?\b(storage|partialize|version|migrate|merge)\s*:[^\n]*)/g;
       for (const m of text.matchAll(options)) {
         const raw = m[1];
         const key = raw.startsWith("'") ? raw.slice(1, -1) : constant(raw, text);
@@ -72,6 +73,9 @@ function writtenKeys(): Written[] {
   }
   return out;
 }
+
+/** Files allowed to call `.setItem` on something other than the bare storages (wrappers, the inventory itself). */
+const OTHER_RECEIVERS = new Set(['utils/guardedStorage.ts', 'services/sessionEnd.ts']);
 
 describe('the inventory of the browser storage', () => {
   const written = writtenKeys();
@@ -94,6 +98,20 @@ describe('the inventory of the browser storage', () => {
       .filter((w) => w.key !== null && !listed.has(`${w.area}:${w.key}`))
       .map((w) => `${w.file}: ${w.area}Storage «${w.key}» — classify it in BROWSER_STORAGE (sessionEnd.ts)`);
     expect(missing).toEqual([]);
+  });
+
+  it('writes the storage only through the bare globals, outside the known wrappers', () => {
+    const odd = files
+      .filter(({ path }) => !OTHER_RECEIVERS.has(path))
+      .flatMap(({ path, text }) =>
+        [...text.matchAll(/([\w$.\])?]+)\.setItem\(/g)]
+          .map((m) => m[1])
+          .filter((receiver) => !/^(window\.)?(localStorage|sessionStorage)$/.test(receiver))
+          .map((receiver) => `${path}: ${receiver}.setItem`),
+      );
+    const indexed = files.filter(({ text }) => /\bindexedDB\b|document\.cookie|\bcaches\.open\(/.test(text)).map((f) => f.path);
+    const bracket = files.filter(({ text }) => /(localStorage|sessionStorage)\[[^\]]+\]\s*=[^=]/.test(text)).map((f) => f.path);
+    expect([...odd, ...indexed, ...bracket]).toEqual([]);
   });
 
   it('lists each key once', () => {

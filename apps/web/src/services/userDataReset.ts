@@ -14,7 +14,7 @@ import { clearRassegneCache } from '../components/features/rassegne/useRassegne'
 import { clearConsentRead } from '../features/merlt/consent/consentRead';
 import { forgetSeenProgress } from '../components/features/studia/progress/seenProgress';
 import { forgetModuleSessions } from '../components/features/studia/corsi/moduleSteps';
-import { onSessionEnd } from './sessionEnd';
+import { onSessionEnd, onWorkRestored } from './sessionEnd';
 
 export function resetUserState(): void {
   appStore.getState().clearUserData();
@@ -30,3 +30,8 @@ export function resetUserState(): void {
 }
 
 onSessionEnd(resetUserState);
+
+// Work given back to its owner at sign-in: the store reads its saved value again (and checks it, `sanitizePractices`).
+onWorkRestored(() => {
+  void appStore.persist.rehydrate();
+});
