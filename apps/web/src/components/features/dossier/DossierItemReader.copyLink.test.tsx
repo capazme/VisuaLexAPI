@@ -63,7 +63,8 @@ describe('DossierItemReader — «Copia link Normattiva»', () => {
     const dated = `${URN}!vig=${todayInRome()}`;
     expect(await blobText(item.items['text/plain'])).toBe(dated);
     expect(await blobText(item.items['text/html'])).toBe(`<a href="${dated}">art. 1284 c.c.</a>`);
-    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Link Normattiva copiato \(apre il testo in vigore al /), 'success');
+    // Today's date: «al 5 novembre» but «all'8 novembre» and «all'11 novembre» (normLinkToast elides).
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Link Normattiva copiato \(apre il testo in vigore (al |all')/), 'success');
   });
 
   it('keeps a past text’s version in the link and reads as that version', async () => {
