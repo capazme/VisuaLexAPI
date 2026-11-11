@@ -49,6 +49,7 @@ class _FakeArticleResult:
     url: str = ""
     norma_data: dict = field(default_factory=dict)
     error: Optional[str] = None
+    text_source: str = "html"
 
 
 class _FakeVisuaLexClient:
@@ -64,6 +65,7 @@ class _FakeVisuaLexClient:
         allegato: Optional[str] = "2",
         tipo_atto_reale: Optional[str] = "regio decreto",
         act_base_url: str = _BASE_URL,
+        akn: tuple[str, ...] = (),
     ):
         self._tree_articles = tree_articles
         self._texts = texts
@@ -72,6 +74,7 @@ class _FakeVisuaLexClient:
         self._allegato = allegato
         self._tipo_atto_reale = tipo_atto_reale
         self._act_base_url = act_base_url
+        self._akn = akn
         self.fetch_article_text_calls: list[str] = []
 
     async def fetch_norma_data(self, act_type: str, article: str):
@@ -104,6 +107,7 @@ class _FakeVisuaLexClient:
                         text=self._texts.get(numero, ""),
                         url=f"{_BASE_URN_WITH_ANNEX}~art{numero}",
                         norma_data={"numero_articolo": numero},
+                        text_source="akn" if numero in self._akn else "html",
                     )
                 )
         return results
@@ -220,6 +224,20 @@ async def test_per_article_error_is_isolated_not_fatal():
 
     numeri = {n["properties"]["numero_articolo"] for n in result["nodes"]}
     assert numeri == {"1", "30-bis"}  # article 2 skipped, run not aborted
+
+
+@pytest.mark.asyncio
+async def test_an_akn_fallback_text_is_not_ingested():
+    """Scan A.7: VisuaLex serves Normattiva's AKN export when the HTML cannot be read, and
+    says so (`text_source: "akn"`). It is not the article's text (root CLAUDE.md, rule 23:
+    accents transliterated, a markdown heading): the article is skipped as unread, never
+    stored with it, and the next run reads it again."""
+    client = _make_client(akn=("2",))
+    adapter = VisualexTreeAdapter(client=client)
+    result = await adapter.parse('{"act_type": "codice civile"}')
+
+    numeri = {n["properties"]["numero_articolo"] for n in result["nodes"]}
+    assert numeri == {"1", "30-bis"}
 
 
 @pytest.mark.asyncio

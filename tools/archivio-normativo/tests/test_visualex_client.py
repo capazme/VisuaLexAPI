@@ -132,6 +132,14 @@ class TestStream:
         assert body["article"] == "2043,2044,2-bis,9999"
         assert body["annex"] == "2" and body["show_brocardi_info"] is True
 
+    async def test_an_akn_fallback_text_is_an_error_not_a_text(self, client, cc, fake_visualex):
+        """Scan A.7: the API's AKN fallback is not the article's text (root CLAUDE.md, rule 23):
+        never archived as it, so the next run reads the article again."""
+        cc["articles"]["2043"] = {"akn": "### Art. 2043\n\nQualunque fatto..."}
+        [result] = await client.stream_articles(cc_spec(), ["2043"], annex="2", brocardi=False)
+        assert result.text is None
+        assert "AKN" in result.error
+
     async def test_pacing_counts_articles_not_requests(self, fake_visualex, session, cc):
         paced = []
 
