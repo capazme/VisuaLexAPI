@@ -5,6 +5,8 @@ import axios from 'axios';
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { isAccessTokenExpired } from './authService';
 import { stashReturnTo } from '../utils/returnTo';
+import { forgetUserData } from './sessionEnd';
+import { notify } from '../components/ui/notifications/notifications';
 
 // API base URL - uses relative path to leverage Vite proxy in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -31,11 +33,60 @@ const apiClient: AxiosInstance = axios.create({
  */
 let refreshInFlight: Promise<string> | null = null;
 
+/**
+ * The session is over (the server refused the refresh): everything of the person goes, then the tokens, and the
+ * sign-in page opens, which brings the reader back here.
+ */
 export function handleUnauthenticated(): void {
+  forgetUserData();
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   stashReturnTo(`${window.location.pathname}${window.location.search}${window.location.hash}`);
   window.location.href = '/login';
+}
+
+/**
+ * Whether a failed refresh means the session is over: the server answered and refused it (401, 403), or there
+ * is no refresh token. A server error (5xx), a 429 or no answer at all (network, timeout) does not: the session
+ * stays, the next request tries again (`refreshInFlight` is cleared once a refresh settles).
+ */
+export function isRefreshRefused(error: unknown): boolean {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    return status === 401 || status === 403;
+  }
+  // `No refresh token`: nothing to refresh with.
+  return true;
+}
+
+/** The plain words a reader gets when a refresh could not reach the server. */
+export const CONNECTION_FAILED_MESSAGE = 'Connessione al server non riuscita. La sessione resta aperta: riprova tra poco.';
+
+let lastConnectionNotice = 0;
+
+/** Tells the reader once (at most every 10 s, as many requests may fail together) that the connection failed. */
+export function reportConnectionFailure(): void {
+  const now = Date.now();
+  if (now - lastConnectionNotice < 10_000) return;
+  lastConnectionNotice = now;
+  try {
+    notify({ type: 'error', message: CONNECTION_FAILED_MESSAGE, duration: 6000, ariaLive: 'assertive' });
+  } catch {
+    // no notification host (tests, the sign-in page): the request's own error still reaches its caller
+  }
+}
+
+/**
+ * A failed refresh: a refused one ends the session; any other keeps it, tells the reader, and returns false so
+ * the caller fails the request alone.
+ */
+export function settleRefreshFailure(error: unknown): boolean {
+  if (isRefreshRefused(error)) {
+    handleUnauthenticated();
+    return true;
+  }
+  reportConnectionFailure();
+  return false;
 }
 
 export async function refreshAccessToken(): Promise<string> {
@@ -127,9 +178,10 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, clear tokens and redirect to login
-        handleUnauthenticated();
-        return Promise.reject(refreshError);
+        // Refused: the session ends. A server or network error: the session stays and the reader is told.
+        if (settleRefreshFailure(refreshError)) return Promise.reject(refreshError);
+        const status = axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined;
+        return Promise.reject({ status, message: CONNECTION_FAILED_MESSAGE, data: undefined });
       }
     }
 
