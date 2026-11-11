@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
-  computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
+  computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups, MAX_ARTICLES_PER_SEARCH,
   dossierItemFromApi, dossierFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
   validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importReasonsText, importToastType,
@@ -230,24 +230,32 @@ describe('searchParamsFromGroup', () => {
   });
 
   it('asks for the text in force, with no Brocardi flag', () => {
-    expect(searchParamsFromGroup(group())).toEqual({
+    expect(searchParamsFromGroup(group())[0]).toEqual({
       act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1284,1285',
       version: 'vigente', version_date: '',
     });
   });
 
   it('asks for the past text a group holds', () => {
-    expect(searchParamsFromGroup(group({ versione: 'vigente', data_versione: '2007-12-29' }))).toMatchObject({
+    expect(searchParamsFromGroup(group({ versione: 'vigente', data_versione: '2007-12-29' }))[0]).toMatchObject({
       version: 'vigente', version_date: '2007-12-29',
     });
-    expect(searchParamsFromGroup(group({ versione: 'originale' }))).toMatchObject({
+    expect(searchParamsFromGroup(group({ versione: 'originale' }))[0]).toMatchObject({
       version: 'originale', version_date: '',
     });
   });
 
   it('asks for the annex a group holds, and sends no annex key when it holds none', () => {
-    expect(searchParamsFromGroup(group({ allegato: 'A' }))).toMatchObject({ annex: 'A' });
-    expect(searchParamsFromGroup(group())).not.toHaveProperty('annex');
+    expect(searchParamsFromGroup(group({ allegato: 'A' }))[0]).toMatchObject({ annex: 'A' });
+    expect(searchParamsFromGroup(group())[0]).not.toHaveProperty('annex');
+  });
+
+  it('pages a group above the API ceiling, every page with the same act and version', () => {
+    const articles = Array.from({ length: MAX_ARTICLES_PER_SEARCH * 2 + 5 }, (_, i) => String(i + 1));
+    const pages = searchParamsFromGroup(group({ articles, versione: 'originale' }));
+    expect(pages.map((p) => p.article.split(',').length)).toEqual([MAX_ARTICLES_PER_SEARCH, MAX_ARTICLES_PER_SEARCH, 5]);
+    expect(pages.flatMap((p) => p.article.split(','))).toEqual(articles);
+    pages.forEach((p) => expect(p).toMatchObject({ act_type: 'codice civile', version: 'originale' }));
   });
 });
 
@@ -297,6 +305,13 @@ describe('searchesForGroups', () => {
     expect(created).toEqual(['Pratica']);
     expect(searches.map((x) => x.targetPracticeId)).toEqual(['tab-1', 'tab-1']);
     expect(searches.map((x) => x.annex)).toEqual(['A', 'B']);
+  });
+
+  it('gives every page of a large group the group\'s tab', () => {
+    const articles = Array.from({ length: MAX_ARTICLES_PER_SEARCH + 1 }, (_, i) => String(i + 1));
+    const { created, searches } = run([g({ articles }), g(PAST)]);
+    expect(created).toEqual(['Pratica', 'Pratica — testo al 29/12/2007']);
+    expect(searches.map((s) => s.targetPracticeId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
   });
 
   it('creates no shared tab when every group asks for a past text', () => {

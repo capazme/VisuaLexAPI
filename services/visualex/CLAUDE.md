@@ -745,6 +745,9 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
 `RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
+`MAX_ARTICLES_PER_REQUEST` (`100` — the most articles one request may expand to, after
+deduplication; above it `parse_article_input` answers `kind: "too_many"`, a 400; the web's
+dossier «Apri tutto» pages its groups at the same number),
 `TRUSTED_PROXIES` (`0` — how many reverse proxies sit in front; `X-Forwarded-For` is
 believed only that far, and not at all at 0), `VISUALEX_LOG_FILE` (unset keeps
 `norma.log` / `visualex_api.log` in the working directory; **empty** means console

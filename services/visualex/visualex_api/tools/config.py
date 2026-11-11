@@ -9,6 +9,12 @@ HISTORY_LIMIT = 50
 HISTORY_FILE = BASE_PATH / "data" / "history.json"
 DOSSIER_FILE = BASE_PATH / "data" / "dossiers.json"
 DOSSIER_LIMIT = 100  # Max number of dossiers
+# How many articles one request may expand to (a range, a comma list, the whole act), counted
+# after deduplication. Each article is a page fetched from the source, so «1-3249» was a whole
+# code for the price of one request (scan A.4). The callers ask far less: the archive CLI sends
+# batches of 25, the web's search shows up to 50 at a time, a dossier's «Apri tutto» pages its
+# groups at this same number (dossierUtils.ts MAX_ARTICLES_PER_SEARCH).
+MAX_ARTICLES_PER_REQUEST = max(1, int(os.getenv("MAX_ARTICLES_PER_REQUEST") or 100))
 # Used by the root app.py's rate_limit_middleware (per-IP request counter).
 RATE_LIMIT = int(os.getenv("RATE_LIMIT", 1000))  # Max requests allowed per IP within RATE_LIMIT_WINDOW seconds
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 600))  # Window size in seconds

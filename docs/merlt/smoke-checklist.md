@@ -244,7 +244,7 @@ Prerequisiti: stack Docker attivo, BFF (3001), consenso **Completo**, `OPENROUTE
 
 ## Contributo (upload → estrazione → revisione → promozione)
 - [ ] `/merlt/contribuisci` con consenso sotto Completo → messaggio che serve il consenso Completo.
-- [ ] Carica un `.txt`, `.pdf` o `.docx` (≤50 MB) → `POST /api/merlt/contrib/documents` 201 `{documentId}`.
+- [ ] Carica un `.txt`, `.pdf` o `.docx` (≤10 MB) → `POST /api/merlt/contrib/documents` 201 `{documentId}`.
 - [ ] L'estrazione asincrona parte: spinner, poi polling di `/contrib/jobs/:id/status` fino a `completed`. Un fallimento (file già eliminato, estrattori tutti in errore) arriva come `failed` con un motivo, non come «0 candidati».
 - [ ] Compaiono i candidati (`/contrib/documents/:id/candidates`): entità con il tipo come badge e relazioni con i nomi grezzi (`source_text`/`target_text`) e lo stato di risoluzione degli estremi. Se `potential_duplicate_of` è valorizzato compare l'hint di duplicato.
 - [ ] Promozione: il pulsante resta disabilitato finché non ci sono **Norma di riferimento** (`NormaPicker`), **Fonte**, una **riformulazione diversa dal verbatim** e l'**attestazione**. Poi `POST /contrib/candidates/:id/promote` → 200 con `created:true` e `pendingId`. Se il gate fallisce, 422.

@@ -9,7 +9,7 @@ import {
   type TestUser,
   merltNoticeId,
 } from '../../helpers';
-import { _resetContribClientForTests } from '../../../src/routes/merlt/contrib';
+import { _resetContribClientForTests, MAX_UPLOAD_BYTES } from '../../../src/routes/merlt/contrib';
 
 const TEST_MERLT_BASE = 'http://merlt-test.local:8000';
 const INTERNAL_SECRET = 'test-internal-secret';
@@ -84,9 +84,25 @@ describe('POST /api/merlt/contrib/documents (upload)', () => {
     const res = await request(app)
       .post('/api/merlt/contrib/documents')
       .set(authHeader(user))
+      .field('documentType', 'appunti')
+      .field('legalDomain', 'civile')
+      .field('title', 'Le mie note')
       .attach('file', Buffer.from('i miei appunti'), { filename: 'note.txt', contentType: 'text/plain' });
     expect(res.status).toBe(201);
     expect(res.body.documentId).toBe(99);
+  });
+
+  it('413s on a file above the ceiling, and never reaches MERL-T', async () => {
+    await grantFull(user);
+    const merlt = nock(TEST_MERLT_BASE).post('/api/v1/documents/upload').reply(200, { document_id: 1 });
+    const res = await request(app)
+      .post('/api/merlt/contrib/documents')
+      .set(authHeader(user))
+      .attach('file', Buffer.alloc(MAX_UPLOAD_BYTES + 1, 'a'), { filename: 'note.txt', contentType: 'text/plain' });
+    expect(res.status).toBe(413);
+    expect(res.body.detail).toBe('file_too_large');
+    expect(merlt.isDone()).toBe(false);
+    nock.cleanAll();
   });
 });
 

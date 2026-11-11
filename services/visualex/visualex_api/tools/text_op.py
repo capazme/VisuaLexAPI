@@ -4,6 +4,7 @@ import asyncio
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import NORMATTIVA, NORMATTIVA_SEARCH, BROCARDI_SEARCH
 from .logging_config import log_handlers
+from .config import MAX_ARTICLES_PER_REQUEST
 from .treextractor import get_tree
 import logging
 
@@ -61,7 +62,8 @@ def _canonicalise_article_token(part):
 
 def article_input_error(error):
     """The exception for an error dict of `parse_article_input`: the index unreadable is the source
-    failing (503), an empty range is not found (404), anything else a malformed input (400)."""
+    failing (503), an empty range is not found (404), anything else (a malformed input, more
+    articles than the ceiling) a 400."""
     from .exceptions import IndexUnavailableError, ResourceNotFoundError, ValidationError
     kind = error.get('kind')
     if kind == 'source':
@@ -69,6 +71,21 @@ def article_input_error(error):
     if kind == 'not_found':
         return ResourceNotFoundError(error['error'])
     return ValidationError(error['error'])
+
+
+TOO_MANY_ARTICLES = (
+    "La richiesta apre {count} articoli: il massimo per una richiesta è {limit}. "
+    "Dividila in più ricerche di non più di {limit} articoli ciascuna."
+)
+
+
+def _too_many(articles):
+    """The error dict when `articles` exceed the ceiling, None otherwise."""
+    if len(articles) <= MAX_ARTICLES_PER_REQUEST:
+        return None
+    logging.warning(f"Article request refused: {len(articles)} articles, ceiling {MAX_ARTICLES_PER_REQUEST}")
+    return {"error": TOO_MANY_ARTICLES.format(count=len(articles), limit=MAX_ARTICLES_PER_REQUEST),
+            "kind": "too_many"}
 
 
 # What a reader is told when a range (or a whole act) needs the act's index and it cannot be read.
@@ -114,8 +131,9 @@ async def parse_article_input(article_string, normurn):
         logging.debug(f"All articles retrieved: {all_articles}")
         # The tree mixes articles (dicts with `numero`) and section labels (strings): the callers
         # want article numbers only, canonical as a range gives them.
-        return [_canonicalise_article_token(a['numero']).lower()
-                for a in all_articles if isinstance(a, dict) and a.get('numero')]
+        whole = list(dict.fromkeys(_canonicalise_article_token(a['numero']).lower()
+                                   for a in all_articles if isinstance(a, dict) and a.get('numero')))
+        return _too_many(whole) or whole
 
     articles = []
     # Ranges that found no article in the index: an error only when nothing at all is found
@@ -125,6 +143,12 @@ async def parse_article_input(article_string, normurn):
     # Rimuovi spazi extra e dividi per virgole
     parts = article_string.strip().split(',')
     logging.debug(f"Split article string into parts: {parts}")
+    # More parts than the ceiling can never be a legitimate request, and each range would scan
+    # the act's index: refused before any work (an empty or repeated range adds no article).
+    if len(parts) > MAX_ARTICLES_PER_REQUEST:
+        return _too_many(parts)
+    # The act's index, read once for every range of the request.
+    tree = None
 
     for part in parts:
         part = part.strip()
@@ -143,7 +167,9 @@ async def parse_article_input(article_string, normurn):
 
             # Chiamata a get_tree solo in caso di range
             try:
-                all_articles, count = await get_tree(normurn)
+                if tree is None:
+                    tree = await get_tree(normurn)
+                all_articles, count = tree
                 # A failure (EUR-Lex's firewall, a timeout) comes back as a message and 0, not an
                 # exception: read as a list of characters it gave no article and no error, and the
                 # reader saw an empty search. Said as it is instead.
@@ -176,6 +202,9 @@ async def parse_article_input(article_string, normurn):
                             articles.append(_canonicalise_article_token(article_str).lower())
                 if len(articles) == found_before:
                     empty_ranges.append(f"{start} e {end}")
+                # Stop as soon as the request is over the ceiling, not after every range.
+                if len(set(articles)) > MAX_ARTICLES_PER_REQUEST:
+                    return _too_many(list(dict.fromkeys(articles)))
 
             except Exception as e:
                 # The type only above debug: the address names the act (/fetch_norm_links passes here).
@@ -210,6 +239,10 @@ async def parse_article_input(article_string, normurn):
     
     if not unique_articles and empty_ranges:
         return {"error": f"Nessun articolo tra {', tra '.join(empty_ranges)} nell'indice di quest'atto.", "kind": "not_found"}
+
+    too_many = _too_many(unique_articles)
+    if too_many:
+        return too_many
 
     logging.info("Article parsing completed successfully")
     logging.debug(f"Parsed articles (before dedup): {articles}")

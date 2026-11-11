@@ -41,16 +41,40 @@ import { MerltClientError, MerltBadRequestError } from '../../services/merlt/mer
 
 const router = Router();
 
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // mirror MERL-T MAX_UPLOAD_SIZE_MB=50
+// A set of study notes (PDF, TXT, DOCX): 10 MB holds hundreds of pages of text. MERL-T itself
+// accepts up to 50 MB (MAX_UPLOAD_SIZE_MB); the BFF is the tighter gate. The file is held in
+// memory until it is forwarded, so this number is also what one request may cost the server
+// (scan A.4). The web's dropzone says the same number (UploadDropzone.tsx).
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+// The multipart framing around the file: boundaries and part headers, a few hundred bytes.
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 const ALLOWED_EXT = /\.(pdf|txt|docx)$/i;
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_UPLOAD_BYTES },
+  // One file and the three short fields the web sends (documentType, legalDomain, title):
+  // nothing else may be buffered either.
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 3, fieldSize: 4 * 1024, parts: 4 },
   fileFilter: (_req, file, cb) => {
     if (ALLOWED_EXT.test(file.originalname)) cb(null, true);
     else cb(new Error('unsupported_file_type'));
   },
 });
+
+/**
+ * Refuse a body whose declared length is above the ceiling before anything reads it: multer
+ * would otherwise buffer up to the limit before stopping. A chunked body (no length) goes on to
+ * multer, whose `fileSize` limit still stops it at the ceiling.
+ */
+export function rejectOversizedUpload(req: Request, res: Response, next: NextFunction): void {
+  const declared = Number(req.headers['content-length']);
+  if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD_BYTES) {
+    // The unread body stays on the socket: close it rather than keep it alive.
+    res.set('Connection', 'close');
+    res.status(413).json({ detail: 'file_too_large' });
+    return;
+  }
+  next();
+}
 
 /** Wrap multer so its errors become clean 400/413 instead of the generic handler. */
 function uploadSingle(req: Request, res: Response, next: NextFunction): void {
@@ -106,6 +130,7 @@ async function ownsDocument(documentId: number, userId: string): Promise<boolean
 router.post(
   '/contrib/documents',
   authenticate,
+  rejectOversizedUpload,
   contributionGuard,
   uploadSingle,
   async (req: Request, res: Response): Promise<void> => {

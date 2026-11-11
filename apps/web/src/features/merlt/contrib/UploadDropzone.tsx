@@ -3,14 +3,15 @@ import { UploadCloud } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 
 const ALLOWED_EXT = /\.(pdf|txt|docx)$/i;
-const MAX_BYTES = 50 * 1024 * 1024;
+// The server's ceiling (MAX_UPLOAD_BYTES in apps/server/src/routes/merlt/contrib.ts).
+const MAX_BYTES = 10 * 1024 * 1024;
 
 export interface UploadDropzoneProps {
   onFile: (file: File) => void;
   disabled?: boolean;
 }
 
-/** File picker for study notes (PDF/TXT/DOCX ≤50MB). Validates before handing off. */
+/** File picker for study notes (PDF/TXT/DOCX ≤10MB). Validates before handing off. */
 export function UploadDropzone({ onFile, disabled }: UploadDropzoneProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,7 @@ export function UploadDropzone({ onFile, disabled }: UploadDropzoneProps) {
       return;
     }
     if (file.size > MAX_BYTES) {
-      setError('File troppo grande (max 50MB).');
+      setError('File troppo grande (max 10MB).');
       return;
     }
     setError(null);
@@ -46,7 +47,7 @@ export function UploadDropzone({ onFile, disabled }: UploadDropzoneProps) {
         <Button variant="secondary" size="sm" disabled={disabled} onClick={() => inputRef.current?.click()}>
           Scegli un file
         </Button>
-        <p className="text-xs text-slate-400">PDF, TXT o DOCX · max 50MB</p>
+        <p className="text-xs text-slate-400">PDF, TXT o DOCX · max 10MB</p>
         <input
           ref={inputRef}
           type="file"
