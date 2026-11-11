@@ -4,14 +4,14 @@ import { BROWSER_STORAGE, OWNER_KEY, UNKNOWN_OWNER, claimBrowserFor, forgetUserD
 
 function fill(): void {
   for (const e of BROWSER_STORAGE) {
-    const key = e.key.replace('*', 'tab-1');
+    const key = e.key.replaceAll('*', 'tab-1');
     (e.area === 'local' ? localStorage : sessionStorage).setItem(key, 'x');
   }
 }
 
 function present(kind: string): string[] {
   return BROWSER_STORAGE.filter((e) => e.kind === kind)
-    .filter((e) => (e.area === 'local' ? localStorage : sessionStorage).getItem(e.key.replace('*', 'tab-1')) !== null)
+    .filter((e) => (e.area === 'local' ? localStorage : sessionStorage).getItem(e.key.replaceAll('*', 'tab-1')) !== null)
     .map((e) => e.key);
 }
 
