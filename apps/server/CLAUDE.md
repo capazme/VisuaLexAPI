@@ -170,7 +170,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   text). A gloss repeats only the same application's gloss where the model put it (never another application's: the answer
   must not tell what it glossed); a user's mark or a saved coloured proposal on the same words
   stays beside it, unread. The text is fetched once per call
-  from the Python API as the web fetches it (`assistant/entryText.ts`: ports of `buildItemKey`,
+  from the Python API as the web fetches it (a text marked `text_source: "akn"`, scan A.7, is
+  `TextUnavailable`: anchors in it would not land) (`assistant/entryText.ts`: ports of `buildItemKey`,
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,
   `decisionProjection`, pinned to the web's code by `tests/assistant/entryText.test.ts` and
   `ruleTwentyThree.test.ts`, which proposes on the web's fixtures and finds the marks in the web's
@@ -451,13 +452,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and the two ping-pong false notifications forever, because each stores
   `norma_data` in its own shape. A stored snapshot with no text
   (metadata-only, from before this contract) is a `baseline`: the snapshot
-  is replaced and nothing is notified.
+  is replaced and nothing is notified. A text the API marks `text_source:
+  "akn"` (the AKN export served when Normattiva's HTML could not be read, scan
+  A.7) is neither compared nor stored, by either writer: the endpoint takes the
+  field, and for a client that does not send it (today's web) reads the
+  export's «### » heading, which the HTML extractor never writes.
 - **`utils/normaWatcher.ts`** — started from `index.ts`. Every
   `NORMA_WATCH_INTERVAL_MS` (6 h, floor 1 min) it refetches up to 100
   watches through the Python API — `LEGAL_API_URL` is the **base** URL,
   `/fetch_article_text` is appended — and notifies on a text change.
   `NORMA_WATCH_ENABLED=false` turns it off. A malformed answer (no
-  `norma_data`, empty text) is a no-op, never a fallback to the stored data.
+  `norma_data`, empty text) or an AKN fallback text (`text_source: "akn"`) is a no-op, never a fallback to the stored data.
   A run that fails outright (database unreachable as it starts) is logged by
   the scheduler. **Nothing in the backend handles rejections globally**, so
   any fire-and-forget promise (`void f()`) that rejects crashes the whole
