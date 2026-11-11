@@ -59,7 +59,7 @@ type SortBy = 'date' | 'name' | 'items';
 const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
-  const { dossiers, updateDossier, triggerMultiSearch, importDossier } = useAppStore();
+  const { dossiers, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -162,7 +162,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     const tabLabel = tabLabelForGroup(dossier.title, group);
     const tabId = appStore.getState().createPractice(dossier.title, { custom: true, activate: true });
     navigate('/');
-    triggerMultiSearch(searchParamsFromGroup(group).map((params) => ({ ...params, tabLabel, targetPracticeId: tabId })));
+    // A group above the API's ceiling comes in pages, queued one after the other.
+    const pages = searchParamsFromGroup(group).map((params) => ({ ...params, tabLabel, targetPracticeId: tabId }));
+    if (pages.length === 1) triggerSearch(pages[0]);
+    else triggerMultiSearch(pages);
   };
 
   const openAllGroupsOnDashboard = (dossier: Dossier, groups: NormaGroup[]) => {
