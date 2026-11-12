@@ -1,5 +1,5 @@
 # The libraries that shape the text are pinned to the production image's versions
-# (requirements.lock): a different release can move one space of article_text and
+# (requirements-lock.txt): a different release can move one space of article_text and
 # drop the anchors after it (root CLAUDE.md, rule 23). tests/test_dependency_lock.py.
 beautifulsoup4==4.15.0
 # bs4's CSS selector engine: production 4.0.1, a fresh resolve 4.1 (11 Nov 2026).

@@ -5,7 +5,7 @@ CLAUDE.md, rule 23). A different release of the HTML parser, of its CSS selector
 engine or of the PDF text extractor can move one space and silently drop every
 anchor after it. So:
 
-- `requirements.lock` pins every package, direct and transitive, to one exact
+- `requirements-lock.txt` pins every package, direct and transitive, to one exact
   version; the image installs from it and so does CI (through
   `requirements-dev.txt`), so the frozen-text tests run against what production runs;
 - `requirements.txt` stays the human-edited list, and the libraries in
@@ -27,7 +27,7 @@ from packaging.utils import canonicalize_name
 
 HERE = Path(__file__).resolve().parent.parent
 REQUIREMENTS = HERE / "requirements.txt"
-LOCK = HERE / "requirements.lock"
+LOCK = HERE / "requirements-lock.txt"
 DEV = HERE / "requirements-dev.txt"
 DOCKERFILE = HERE / "Dockerfile"
 
@@ -57,15 +57,15 @@ def _lock() -> dict[str, str]:
     for name, req in _requirements(LOCK).items():
         specs = list(req.specifier)
         assert len(specs) == 1 and specs[0].operator == "==", (
-            f"requirements.lock: {req} is not one exact pin"
+            f"requirements-lock.txt: {req} is not one exact pin"
         )
         pins[name] = specs[0].version
     return pins
 
 
 def test_the_lock_pins_every_package_exactly():
-    assert LOCK.exists(), "services/visualex/requirements.lock is missing"
-    assert _lock(), "requirements.lock is empty"
+    assert LOCK.exists(), "services/visualex/requirements-lock.txt is missing"
+    assert _lock(), "requirements-lock.txt is empty"
 
 
 def test_every_direct_requirement_is_in_the_lock_and_satisfied():
@@ -99,10 +99,16 @@ def test_the_installed_text_shaping_libraries_are_the_locked_ones(name):
     )
 
 
+def test_the_lock_has_a_name_dependabot_reads():
+    """GitHub's dependency graph opens only `*.txt` requirements files: under another name
+    `-r` in requirements-dev.txt fails it, and the service's security alerts stop."""
+    assert LOCK.name.startswith("requirements") and LOCK.suffix == ".txt"
+
+
 def test_the_image_and_ci_install_from_the_lock():
     docker = DOCKERFILE.read_text(encoding="utf-8")
-    assert re.search(r"pip install[^\n]*-r requirements\.lock", docker), (
-        "the Dockerfile must install from requirements.lock"
+    assert re.search(r"pip install[^\n]*-r requirements-lock\.txt", docker), (
+        "the Dockerfile must install from requirements-lock.txt"
     )
     dev = [l.strip() for l in DEV.read_text(encoding="utf-8").splitlines()]
-    assert "-r requirements.lock" in dev, "requirements-dev.txt must pull the lock"
+    assert "-r requirements-lock.txt" in dev, "requirements-dev.txt must pull the lock"
