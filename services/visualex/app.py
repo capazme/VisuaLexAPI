@@ -25,7 +25,7 @@ from visualex_api.tools.config import (
 from visualex_api.tools.history_manager import history_manager
 from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
-from visualex_api.services.normattiva_scraper import NormattivaScraper
+from visualex_api.services.normattiva_scraper import NormattivaScraper, text_source_of
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services import eurlex_fetch
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn, sweep_exported_pdfs
@@ -501,6 +501,7 @@ class NormaController:
                         scraper, nv, upcoming_asked, until)
                     result = {
                         'article_text': article_text,
+                        'text_source': text_source_of(article_text),
                         'norma_data': nv.to_dict(),
                         'url': url
                     }
@@ -1309,13 +1310,12 @@ class NormaController:
         so no request is made and `article_text` is never touched (gotcha 23). An undated
         request's page is already back if it had left the cache (`_validity_of_page`); a
         dated one is never read again for this, so after a restart its notes can come back
-        unread, and say so. The AKN export's text, the last-resort fallback, opens with its
-        markdown heading («### Art. …», which the HTML extractor never writes) and already
-        holds its notes and the whole article.
+        unread, and say so. The AKN export's text, the last-resort fallback (an
+        `AknArticleText`, `text_source` "akn"), already holds its notes and the whole article.
         """
         if not isinstance(scraper, NormattivaScraper) or not nv.numero_articolo:
             return {}
-        if isinstance(article_text, str) and article_text.startswith('###'):
+        if text_source_of(article_text) == 'akn':
             return {**update_notes_fields(None, akn_text=True), **parts_fields(None)}
         notes = parts = None
         try:
@@ -1704,6 +1704,7 @@ class NormaController:
                     log.info("Document fetched successfully", article_text=article_text, url=url)
                     result = {
                         'article_text': article_text,
+                        'text_source': text_source_of(article_text),
                         'norma_data': nv.to_dict(),
                         'url': url
                     }
@@ -2187,6 +2188,7 @@ class NormaController:
                         scraper, nv, upcoming_asked, until)
                     result = {
                         'article_text': article_text,
+                        'text_source': text_source_of(article_text),
                         'url': url,
                         'norma_data': nv.to_dict(),
                     }

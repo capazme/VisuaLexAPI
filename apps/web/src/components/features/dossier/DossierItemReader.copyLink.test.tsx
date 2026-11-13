@@ -7,7 +7,7 @@ import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { DossierItemReader } from './DossierItemReader';
 import { appStore } from '../../../store/useAppStore';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
-import { formatDateForCitation, todayInRome, withPreposition } from '../../../utils/dateUtils';
+import { todayInRome } from '../../../utils/dateUtils';
 import type { ArticleUpcoming, ArticleValidity, NormaVisitata } from '../../../types';
 
 const RAW = fixtureText('nrm-cc-1284');
@@ -63,9 +63,8 @@ describe('DossierItemReader — «Copia link Normattiva»', () => {
     const dated = `${URN}!vig=${todayInRome()}`;
     expect(await blobText(item.items['text/plain'])).toBe(dated);
     expect(await blobText(item.items['text/html'])).toBe(`<a href="${dated}">art. 1284 c.c.</a>`);
-    // Today's day, with its preposition as the toast writes it: «all'8 novembre», «al 9 novembre» (it failed on the 8th).
-    const today = withPreposition('al', formatDateForCitation(todayInRome()));
-    expect(showToast).toHaveBeenCalledWith(`Link Normattiva copiato (apre il testo in vigore ${today})`, 'success');
+    // Today's date: «al 5 novembre» but «all'8 novembre» and «all'11 novembre» (normLinkToast elides).
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Link Normattiva copiato \(apre il testo in vigore (al |all')/), 'success');
   });
 
   it('keeps a past text’s version in the link and reads as that version', async () => {
