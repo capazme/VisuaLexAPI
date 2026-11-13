@@ -1008,7 +1008,8 @@ actions.
 **Server-backed** (hydrated by `fetchUserData`, mutated optimistically then
 synced): bookmarks, dossiers + items, environments (read-only: the Forum's archive), quickNorms, customAliases,
 annotations and highlights (these two hydrate per-article via
-`loadAnnotationsForArticle` / `loadHighlightsForArticle`). The search history is
+`loadAnnotationsForArticle` / `loadHighlightsForArticle`: each reader for its text, Study Mode for the article it
+shows — one reached with its arrows may be a row never opened). The search history is
 not a store slice: `HistoryView` keeps it in local state and reloads it on mount.
 
 **Not in the store:** the planner's tasks are server state read per view (`planner/useTaskView`; see «The

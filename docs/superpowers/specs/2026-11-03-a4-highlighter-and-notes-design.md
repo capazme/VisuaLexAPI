@@ -244,8 +244,12 @@ highlight from the Forum is cut and recoloured as the others, and its author is 
 - **The note tool's button on a phone**: the article's phone row shows it only while the tool is on (turned on in the
   decision's bar or the dossier's actions), so it can be turned off; Study Mode's header has it from 640 px.
 - **A note's wavy words** go to its card, else to its block's sheet; Study Mode, which draws no sign, to its card only.
+- **Study Mode's column holds the reader's notes**, not the passage discussions: Study Mode mounts no discussion panel
+  (it never had one), and a card that could not open its discussion would be a dead end. It reads the notes and
+  highlights of the article it shows, as the readers do: one reached with its arrows may never have been read.
 - `InlineNoteComposer`, `InlineNotePopover`, `BlockAnnotationsPopover` and `blockAnchorRect` are gone.
 
 ## Not in A4
 
 The labels for MERL-T on the highlights (part B of the proposal), and the assistant's glosses without personal data.
+The passage discussions in Study Mode (its column and a discussion panel over it): Study Mode has none today.
