@@ -1381,7 +1381,9 @@ note's editor is a sheet from the bottom (`NoteComposerSheet`, its X asking befo
 cards are the block's sheet's. What is written in a new note is the margin's, so it moves with the editor between the
 column and the sheet; a new selection while something is written there does not take it onto other words (the note tool
 takes every selection): the readers ask `keepDraft()`, which gives the field the focus again. Saved, the focus goes to
-the note's card; given up, to the block's sign. A card hovered or focused shows its words in the text (the
+the note's card, else its block's sign, and is held on those words through the redraws the save brings — the server's
+id makes a new card, the text a new sign — until the reader presses or moves it (10 s at most); given up, to the
+block's sign. A card hovered or focused shows its words in the text (the
 CSS Custom Highlight API, `utils/glossPassage.ts`; a gloss's card through `useGlossPassage`). «Rimuovi» hands the focus
 to the next card, else the one before, else the block's sign found again after the text redrew (`signAt`), else the
 nearest sign; Esc on a card (not a field's own) goes back to its block's sign. A note's wavy words clicked go to its card,

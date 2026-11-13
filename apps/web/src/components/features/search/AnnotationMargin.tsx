@@ -15,6 +15,9 @@ import { NoteComposerSheet } from './NoteComposerSheet';
 /** The room the column needs beside a text still readable (about 32rem of text, the 17.5rem column, the gap). */
 export const MARGIN_MIN_REM = 52;
 
+/** How long a new note's card keeps the focus through the redraws its save brings, the reader doing nothing. */
+const SAVED_FOCUS_MS = 10_000;
+
 export interface AnnotationMarginHandle {
     /**
      * Focuses the first card, in the order of the text, among `keys` (`note:<id>`, `gloss:<id>`, `thread:<id>`), when
@@ -303,32 +306,75 @@ export function AnnotationMargin({
         else cards.current.delete(key);
     };
     /**
-     * A new note saved: the focus goes to its card once the store has it there (the first card at the same words),
-     * else to the block's sign; given up, to the sign. Never left on the page as the editor goes.
+     * A new note saved: the focus goes to its card — with no card, or one that refuses it, to its block's sign — and
+     * stays there. The store gives the note the server's id a moment after it is drawn under a temporary one, and the
+     * text is drawn again with it: the card and the sign the focus was given go, and new ones take their place — the
+     * focus would fall to the page. So it is held on those words, taken by the card or the sign that comes, until the
+     * reader presses or moves the focus, `SAVED_FOCUS_MS` at most. Placed where the editor was, the card is not scrolled
+     * to (it would be scrolled to the column's top before its place is measured).
      */
     const latestEntries = useRef(entries);
-    useEffect(() => { latestEntries.current = entries; });
-    const afterDraft = (words: NoteDraft, saved: boolean) => {
-        const end = words.startOffset + words.text.length;
-        requestAnimationFrame(() => {
-            const card = saved
-                ? latestEntries.current.find((e) => e.kind === 'note' && e.start === words.startOffset && e.end === end)
-                : undefined;
-            if (card && focusCard(card.key)) return;
-            signAt(textRootRef.current, words.startOffset, end)?.focus({ preventScroll: true });
+    useLayoutEffect(() => { latestEntries.current = entries; });
+    const saved = useRef<{ start: number; end: number; before: ReadonlySet<string>; on: HTMLElement | null } | null>(null);
+    const stopHolding = useRef<(() => void) | null>(null);
+    const letGo = useCallback(() => {
+        saved.current = null;
+        stopHolding.current?.();
+        stopHolding.current = null;
+    }, []);
+    useEffect(() => letGo, [letGo]);
+    const landSaved = useCallback(() => {
+        const words = saved.current;
+        if (!words) return;
+        // The new note's card (not another note on the same words, there before it), else the block's sign.
+        const card = latestEntries.current.find((e) => e.kind === 'note' && e.start === words.start && e.end === words.end && !words.before.has(e.key));
+        for (const target of [card && cards.current.get(card.key), signAt(textRootRef.current, words.start, words.end)]) {
+            if (!target) continue;
+            // Before the focus: its `focusin` is not the reader moving it.
+            words.on = target;
+            target.focus({ preventScroll: true });
+            if (document.activeElement === target) return;
+        }
+    }, [textRootRef]);
+    // The card or the sign that had it gone with a redraw: the one in its place takes it.
+    useLayoutEffect(() => {
+        if (!saved.current) return;
+        const at = document.activeElement;
+        if (!at || at === document.body) landSaved();
+    });
+    const holdSaved = (words: NoteDraft) => {
+        letGo();
+        const before = new Set(latestEntries.current.filter((e) => e.kind === 'note').map((e) => e.key));
+        saved.current = { start: words.startOffset, end: words.startOffset + words.text.length, before, on: null };
+        // A frame on: the sheet has given the focus back to what opened it (a microtask as it goes), the card is drawn.
+        const frame = requestAnimationFrame(() => {
+            if (!saved.current) return;
+            landSaved();
+            // The reader moving it: a press, or the focus taken out of what holds it (Tab to the card's «Modifica» keeps it).
+            const moved = (e: FocusEvent) => { if (!saved.current?.on?.contains(e.target as Node | null)) letGo(); };
+            const timer = window.setTimeout(letGo, SAVED_FOCUS_MS);
+            document.addEventListener('focusin', moved, true);
+            document.addEventListener('pointerdown', letGo, true);
+            stopHolding.current = () => {
+                window.clearTimeout(timer);
+                document.removeEventListener('focusin', moved, true);
+                document.removeEventListener('pointerdown', letGo, true);
+            };
         });
+        stopHolding.current = () => cancelAnimationFrame(frame);
     };
     const saveDraft = (text: string) => {
         if (!draft || !onSaveDraft) return;
         const words = draft;
         onSaveDraft(text);
-        afterDraft(words, true);
+        holdSaved(words);
     };
+    // Given up: the focus back to the block's sign, once (nothing is drawn again).
     const cancelDraft = () => {
         if (!draft || !onCancelDraft) return;
         const words = draft;
         onCancelDraft();
-        afterDraft(words, false);
+        requestAnimationFrame(() => signAt(textRootRef.current, words.startOffset, words.startOffset + words.text.length)?.focus({ preventScroll: true }));
     };
     /** Esc on a card: back to its block's sign, the way it came (the sign focuses the card). */
     const escapeFrom = (entry: Entry) => signAt(textRootRef.current, entry.start, entry.end)?.focus({ preventScroll: true });

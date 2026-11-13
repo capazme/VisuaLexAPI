@@ -55,24 +55,33 @@ interface HarnessProps {
   onRemove?: (id: string) => void;
   onOpenThread?: (id: string) => void;
   onWide?: (wide: boolean) => void;
+  /** The block draws its sign once it holds a note, drawn again (a new element) with the text. */
+  signs?: boolean;
 }
 
 let handle: AnnotationMarginHandle | null = null;
 let openDraft: (draft: NoteDraft) => void = () => {};
-function Harness({ notes = [], threads = [], initialDraft = null, onSave = vi.fn(), onUpdate = vi.fn(), onRemove = vi.fn(), onOpenThread, onWide }: HarnessProps) {
+/** The server's answer to the new note: its id in place of the temporary one, and the text drawn again. */
+let savedOnServer: (id: string) => void = () => {};
+function Harness({ notes = [], threads = [], initialDraft = null, onSave = vi.fn(), onUpdate = vi.fn(), onRemove = vi.fn(), onOpenThread, onWide, signs = false }: HarnessProps) {
   const textRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<NoteDraft | null>(initialDraft);
   const [list, setList] = useState(notes);
+  const [drawn, setDrawn] = useState(1);
   // A reader's selection bar: a new note, unless one being written keeps its words.
   useEffect(() => {
     openDraft = (next) => { if (!handle?.keepDraft()) setDraft(next); };
+    savedOnServer = (id) => {
+      setList((l) => l.map((n) => (n.id === 'nuova' ? { ...n, id } : n)));
+      setDrawn((d) => d + 1);
+    };
   });
   return (
     <AnnotationMargin
       ref={(h) => { handle = h; }}
       plain={PLAIN}
       textRootRef={textRef}
-      contentKey="v1"
+      contentKey={`v${drawn}`}
       notes={list}
       onUpdateNote={onUpdate}
       onRemoveNote={onRemove}
@@ -88,7 +97,12 @@ function Harness({ notes = [], threads = [], initialDraft = null, onSave = vi.fn
       textHash="h"
       onWideChange={onWide}
     >
-      <div ref={textRef} className="vlx-art"><div className="vlx-b">{PLAIN}</div></div>
+      <div ref={textRef} className="vlx-art">
+        <div className="vlx-b">
+          {PLAIN}
+          {signs && list.length > 0 && <span key={drawn} className="vlx-sign" role="button" tabIndex={0} aria-label="Annotazioni del comma" />}
+        </div>
+      </div>
     </AnnotationMargin>
   );
 }
@@ -234,6 +248,77 @@ describe('AnnotationMargin — the notes beside the text, as a word processor\'s
     fireEvent.change(box, { target: { value: 'Il debitore.' } });
     fireEvent.keyDown(box, { key: 'Enter' });
     await waitFor(() => expect(document.activeElement?.getAttribute('data-note')).toBe('nuova'));
+  });
+
+  it('a new note saved keeps the focus when the server gives it its id: the card drawn in its place takes it', async () => {
+    room(1200);
+    render(<Harness initialDraft={{ text: 'contraenti', startOffset: at('contraenti') }} />);
+    const card = await placed(within(await column()).getByRole('article', { name: 'Nuova nota' }));
+    const box = within(card).getByRole('textbox');
+    await waitFor(() => expect(box).toHaveFocus());
+    fireEvent.change(box, { target: { value: 'Il debitore.' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    await waitFor(() => expect(document.activeElement?.getAttribute('data-note')).toBe('nuova'));
+    act(() => savedOnServer('s1'));
+    expect(document.activeElement?.getAttribute('data-note')).toBe('s1');
+  });
+
+  it('without room, a new note saved from the sheet gives the focus to its block\'s sign, and to the sign drawn again', async () => {
+    room(600);
+    render(<Harness signs initialDraft={{ text: 'contraenti', startOffset: at('contraenti') }} />);
+    const sheet = await screen.findByRole('dialog', { name: 'Nuova nota' });
+    fireEvent.change(within(sheet).getByRole('textbox'), { target: { value: 'Il debitore.' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Salva' }));
+    const sign = await screen.findByRole('button', { name: 'Annotazioni del comma' });
+    await waitFor(() => expect(sign).toHaveFocus());
+    act(() => savedOnServer('s1'));
+    const again = screen.getByRole('button', { name: 'Annotazioni del comma' });
+    expect(again).not.toBe(sign);
+    expect(again).toHaveFocus();
+  });
+
+  /** A new note written on «contraenti» and saved with Enter, its card focused. */
+  async function saveNote() {
+    room(1200);
+    render(<Harness initialDraft={{ text: 'contraenti', startOffset: at('contraenti') }} />);
+    const card = await placed(within(await column()).getByRole('article', { name: 'Nuova nota' }));
+    const box = within(card).getByRole('textbox');
+    await waitFor(() => expect(box).toHaveFocus());
+    fireEvent.change(box, { target: { value: 'Il debitore.' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    await waitFor(() => expect(document.activeElement?.getAttribute('data-note')).toBe('nuova'));
+    // The frame the hold starts listening in (after the editor's sheet, if any, gave the focus back).
+    await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
+    return document.activeElement as HTMLElement;
+  }
+
+  it('a new note saved: Tab to its card\'s «Modifica» keeps the hold; the focus taken out of the card lets it go', async () => {
+    const card = await saveNote();
+    within(card).getByRole('button', { name: 'Modifica' }).focus();
+    act(() => savedOnServer('s1'));
+    expect(document.activeElement?.getAttribute('data-note')).toBe('s1');
+    const elsewhere = document.body.appendChild(document.createElement('button'));
+    elsewhere.focus();
+    elsewhere.remove();
+    act(() => savedOnServer('s2'));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('a new note saved: the hold ends after its time, and a redraw then takes no focus back', async () => {
+    const timers = vi.spyOn(window, 'setTimeout');
+    await saveNote();
+    const expire = timers.mock.calls.find(([, ms]) => ms === 10_000)?.[0];
+    expect(expire).toBeTypeOf('function');
+    act(() => (expire as () => void)());
+    act(() => savedOnServer('s1'));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('a new note saved: once the reader presses elsewhere, a redraw takes no focus back', async () => {
+    await saveNote();
+    fireEvent.pointerDown(document.body);
+    act(() => savedOnServer('s1'));
+    expect(document.activeElement).toBe(document.body);
   });
 
   it('a new selection while a note is written keeps it on its words and gives its field the focus again; empty, it moves', async () => {

@@ -238,7 +238,9 @@ highlight from the Forum is cut and recoloured as the others, and its author is 
   on screen. A click on a proposed passage opens the sheet, as it opened the popover.
 - **A new note's text is the column's**: it moves with the editor between the column and the sheet as the reader
   crosses the room's threshold, and a new selection while something is written does not take it onto other words — its
-  field takes the focus again. Saved, the focus goes to the note's card.
+  field takes the focus again. Saved, the focus goes to the note's card (else its block's sign) and stays there
+  through the redraws the save brings (the server's id, the text drawn again), until the reader presses or moves it
+  (10 s at most).
 - **The note tool's button on a phone**: the article's phone row shows it only while the tool is on (turned on in the
   decision's bar or the dossier's actions), so it can be turned off; Study Mode's header has it from 640 px.
 - **A note's wavy words** go to its card, else to its block's sheet; Study Mode, which draws no sign, to its card only.
