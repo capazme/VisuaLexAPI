@@ -18,17 +18,18 @@ const APPROVED_SOURCES: Record<string, string> = {
   'giustizia-amministrativa': 'Fonte: Giustizia amministrativa.',
 };
 
-/** Each typeface entry and the packages it covers (Geist Mono is Geist's monospaced cut, same authors and licence). */
+/** Each typeface entry and the packages it covers (the `geist` entry is Geist Mono, its id kept for `/crediti#geist`). */
 const FONTS = {
-  newsreader: ['@fontsource-variable/newsreader'],
-  geist: ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'],
+  'eb-garamond': ['@fontsource-variable/eb-garamond'],
+  inter: ['@fontsource-variable/inter'],
+  geist: ['@fontsource-variable/geist-mono'],
 } as const;
 
 const entry = (id: CreditId) => getCredit(id);
 const textOf = (id: CreditId) => JSON.stringify(entry(id));
 
 describe('credits.ts', () => {
-  it('holds exactly the eight sources of group A and the two typefaces', () => {
+  it('holds exactly the eight sources of group A and the three typefaces', () => {
     expect(CREDITS.map((c) => c.id).sort()).toEqual([...Object.keys(APPROVED_SOURCES), ...Object.keys(FONTS)].sort());
   });
 
