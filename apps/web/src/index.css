@@ -164,11 +164,11 @@
     100% { opacity: 0; }
   }
 
-  /* Type (spec §4.2): Newsreader to read and for titles, Geist for the interface, Geist Mono for
+  /* Type (Pietra, D-156): EB Garamond to read and for titles, Inter for the interface, Geist Mono for
      identifiers. Self-hosted through @fontsource-variable (imported in main.tsx). */
-  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
-  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, monospace;
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --font-serif: 'EB Garamond Variable', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Radius */
   --radius-lg: var(--radius);
@@ -521,7 +521,7 @@
   font-size: 1.1875rem;
   line-height: 1.65;
   overflow-wrap: break-word;
-  /* Inchiostro (spec §4.2, §5.3.1): Newsreader at its text size, balanced rag, old-style figures in
+  /* Inchiostro (spec §4.2, §5.3.1): EB Garamond, balanced rag, old-style figures in
      prose. Presentation only: no character of the text changes (root rule 23). */
   font-optical-sizing: auto;
   font-variant-numeric: oldstyle-nums proportional-nums;
@@ -1578,6 +1578,8 @@
 .vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
 .vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
 .vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
+/* Dark Work is the dark action, paper: its icon is ink, not the switcher's `text-white` (unlayered, so it wins). */
+.dark .vlx-section-mark[data-section="opus"] { color: var(--color-ink-950); }
 
 /* «Analizza documento»'s box (D6): the frame's dashes stand still at rest — nothing moves for ever on an open page
    (Bill) —, turn slowly under a mouse or with the keyboard's focus on the box, and run while a file is dragged over

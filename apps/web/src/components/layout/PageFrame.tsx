@@ -4,7 +4,7 @@ import { kickerOf, type SectionId } from '../../features/sections/sections';
 import { cn } from '../../lib/utils';
 import type { PageWidth } from './frame';
 
-/** A page's title: Newsreader, 28 px on a phone and 30 px from `md`, the same on every section page. */
+/** A page's title: EB Garamond, 28 px on a phone and 30 px from `md`, the same on every section page. */
 export const PAGE_TITLE = 'font-serif text-[28px] font-medium leading-tight tracking-tight text-slate-900 md:text-3xl dark:text-slate-50';
 
 /**
@@ -20,7 +20,7 @@ export const PAGE_TITLE = 'font-serif text-[28px] font-medium leading-tight trac
  */
 export const FOCUS_BUTTON_CLEARANCE = 'pr-[max(0px,calc(var(--focus-button-room,0px)_-_(100vw_-_var(--sidebar-width,0px)_-_100%)_/_2))]';
 
-/** The section's line over a title (L-37): Geist, small, quiet. */
+/** The section's line over a title (L-37): Inter, small, quiet. */
 export const PAGE_KICKER = 'text-sm text-slate-600 dark:text-slate-400';
 
 export interface PageFrameProps {

@@ -50,7 +50,7 @@ const PRIMARY = cn(
   FOCUS_RING,
 );
 
-/** The block's large line: Newsreader, 30 px on a phone and 36 px from `md`. */
+/** The block's large line: EB Garamond, 30 px on a phone and 36 px from `md`. */
 const LARGE = cn('max-w-prose font-serif text-3xl font-medium leading-tight tracking-tight md:text-4xl', INK_TEXT);
 
 const RETRY = cn('min-h-[44px] rounded px-1 font-sans text-base font-medium underline', FOCUS_RING);
