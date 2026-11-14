@@ -113,6 +113,19 @@ export function sameBesideSubject(a: BesideRef, b: BesideRef): boolean {
   return false;
 }
 
+/** The window that shows the row `rowKey` names — an article of an act, or a decision — or null when the practice holds
+ *  no such row. In the reading view (U2) a revealed row opens beside: there is no row to open in place. */
+export function besideRefOfRow(practice: Practice, rowKey: string): BesideRef | null {
+  for (const act of practice.acts) {
+    for (const article of act.articles) {
+      const articleKey = practiceArticleKey(article);
+      if (articleRowKey(practice.id, act.id, articleKey) === rowKey) return besideRefFor({ kind: 'article', actId: act.id, articleKey });
+    }
+  }
+  const decision = practice.decisions.find((d) => decisionRowKey(practice.id, d.id) === rowKey);
+  return decision ? besideRefFor({ kind: 'decision', decisionId: decision.id }) : null;
+}
+
 /**
  * An article's identity in a practice: its annotation key plus the text it asks for (T2).
  * Keyed on `norma_data`, not `versionInfo`: the server echoes the request's `versione` and

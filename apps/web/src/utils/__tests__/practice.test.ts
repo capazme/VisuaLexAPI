@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { ArticleData, Norma, NormaVisitata } from '../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../normaKeys';
 import {
-  addArticles, articleWindowId, besideAfterOpen, besideRefFor, decisionOrder, decisionWindowId, findPracticeArticle,
+  addArticles, articleRowKey, articleWindowId, besideAfterOpen, besideRefFor, besideRefOfRow, decisionOrder, decisionRowKey, decisionWindowId, findPracticeArticle,
   holdsSubject, mergeDecisionEntries, practiceArticleKey, practiceCountLine, practiceCounts, sameBesideSubject, sameDecision, sameEntry,
   subjectOfRef,
   type BesideRef, type Practice, type PracticeDecision,
@@ -190,6 +190,13 @@ describe('the subjects of the windows and of the way back', () => {
     expect(holdsSubject(practice, { kind: 'article', actId: 'gone', articleKey: key })).toBe(false);
     expect(holdsSubject(practice, { kind: 'decision', decisionId: 'dec' })).toBe(true);
     expect(holdsSubject(practice, { kind: 'decision', decisionId: 'gone' })).toBe(false);
+  });
+
+  it('the window that shows a revealed row (U2: the reading view opens it beside); none for a row the practice lacks', () => {
+    expect(besideRefOfRow(practice, articleRowKey('p', 'act', key))).toEqual(besideRefFor({ kind: 'article', actId: 'act', articleKey: key }));
+    expect(besideRefOfRow(practice, decisionRowKey('p', 'dec'))).toEqual(besideRefFor({ kind: 'decision', decisionId: 'dec' }));
+    expect(besideRefOfRow(practice, articleRowKey('other', 'act', key))).toBeNull();
+    expect(besideRefOfRow(practice, decisionRowKey('p', 'gone'))).toBeNull();
   });
 });
 
