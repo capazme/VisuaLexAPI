@@ -195,7 +195,8 @@ describe('the Inchiostro palette', () => {
       return (hi + 0.05) / (lo + 0.05);
     };
     const white = [1, 1, 1];
-    expect(ratio(rgb('ink-900'), rgb('ink-50'))).toBeGreaterThanOrEqual(15);
+    // 15 was Inchiostro's own figure; Pietra's text #2b2a28 on ground #f1eee8 is 12.4:1 by D-156, and AAA asks for 7.
+    expect(ratio(rgb('ink-900'), rgb('ink-50'))).toBeGreaterThanOrEqual(12);
     expect(ratio(rgb('ink-600'), rgb('ink-50'))).toBeGreaterThanOrEqual(6.5);
     expect(ratio(rgb('ink-500'), rgb('ink-50'))).toBeGreaterThanOrEqual(4.5);
     expect(ratio(rgb('toga-600'), rgb('ink-50'))).toBeGreaterThanOrEqual(6);

@@ -42,33 +42,41 @@
   --color-warning: hsl(var(--warning));
   --color-warning-foreground: hsl(var(--warning-foreground));
 
-  /* «Inchiostro» (spec 2026-10-18-redesign-inchiostro §4.1): ink, from warm paper to cool ink, and
-     toga, the one accent. The app spends ~6 200 raw slate/gray/blue classes against ~800 semantic
-     ones, so the Tailwind scales it uses are aliased here: one file re-skins every surface.
-     Red, amber, emerald, purple and the highlight, category and find tokens keep their meaning
-     and are not touched. `theme.test.ts` checks the contrast of the pairs the app relies on. */
-  --color-ink-50: oklch(98.4% 0.004 85);
-  --color-ink-100: oklch(96.2% 0.006 85);
-  --color-ink-200: oklch(92.4% 0.008 80);
-  --color-ink-300: oklch(86.5% 0.010 75);
-  --color-ink-400: oklch(70.5% 0.014 250);
-  --color-ink-500: oklch(55.6% 0.018 255);
-  --color-ink-600: oklch(45.5% 0.022 258);
-  --color-ink-700: oklch(37.5% 0.026 260);
-  --color-ink-800: oklch(28.5% 0.028 262);
-  --color-ink-900: oklch(21.5% 0.030 263);
-  --color-ink-950: oklch(15.5% 0.026 264);
-  --color-toga-50: oklch(97% 0.015 262);
-  --color-toga-100: oklch(93.5% 0.032 262);
-  --color-toga-200: oklch(88% 0.058 262);
-  --color-toga-300: oklch(79.5% 0.095 262);
-  --color-toga-400: oklch(68% 0.135 262);
-  --color-toga-500: oklch(57% 0.165 262);
-  --color-toga-600: oklch(48.5% 0.165 262);
-  --color-toga-700: oklch(41.5% 0.145 262);
-  --color-toga-800: oklch(35% 0.120 262);
-  --color-toga-900: oklch(29.5% 0.095 262);
-  --color-toga-950: oklch(21% 0.070 262);
+  /* «Pietra» (D-156, the LexCraft design system; values from its token file, light and dark): ink is the
+     warm grey of paper, stone and text, and toga, once the blue accent, is warm ink: an action is the
+     ink itself (D-135, no accent colour). The app spends ~6 400 raw slate/gray and ~1 500 primary
+     classes against ~800 semantic ones, so the Tailwind scales it uses are aliased here: one file
+     re-skins every surface. Red, amber, emerald, purple and the highlight, category and find tokens
+     keep their meaning and are not touched. Both scales stay warm and near-grey
+     (`lib/pietra.guard.test.ts`); `theme.test.ts` checks the contrast of the pairs the app relies on.
+     ink: 50 paper #f1eee8, 100 sidebar and hover #ebe7df, 200 rule #ddd8ce, 300 strong hover rule
+     #cfc9bd, 400 dark secondary text #b2afa9, 500 secondary text #5f5a52, 600 #4a4844, 700 #42403c,
+     800 dark rule #373633, 900 text and dark surface #2b2a28, 950 dark paper #1f1e1c. Pietra #8a8478
+     (3.2:1) is never text, so it is no step. toga: 50 the highlighter (an active area, design system § 6 rule 1)
+     #d9d4ca, 600/700/800 the action, its hover and press #2b2a28 #1f1e1c #141312, 500 the focus;
+     in the dark `.dark` (below) redefines the action, focus and selection-tint steps. */
+  --color-ink-50: oklch(95% 0.009 84.6);
+  --color-ink-100: oklch(92.9% 0.012 84.6);
+  --color-ink-200: oklch(88.3% 0.015 84.6);
+  --color-ink-300: oklch(83.7% 0.018 84.6);
+  --color-ink-400: oklch(75.5% 0.009 84.6);
+  --color-ink-500: oklch(47% 0.014 79.7);
+  --color-ink-600: oklch(40.2% 0.007 84.6);
+  --color-ink-700: oklch(37.2% 0.007 84.6);
+  --color-ink-800: oklch(33.3% 0.005 91.5);
+  --color-ink-900: oklch(28.5% 0.004 84.6);
+  --color-ink-950: oklch(23.5% 0.004 84.6);
+  --color-toga-50: oklch(87.1% 0.015 84.6);
+  --color-toga-100: oklch(83.7% 0.018 84.6);
+  --color-toga-200: oklch(79.6% 0.015 84.6);
+  --color-toga-300: oklch(75.5% 0.009 84.6);
+  --color-toga-400: oklch(72.3% 0.011 81.8);
+  --color-toga-500: oklch(28.5% 0.004 84.6);
+  --color-toga-600: oklch(28.5% 0.004 84.6);
+  --color-toga-700: oklch(23.5% 0.004 84.6);
+  --color-toga-800: oklch(18.7% 0.003 67.7);
+  --color-toga-900: oklch(16.9% 0.004 84.6);
+  --color-toga-950: oklch(14.6% 0.003 68.6);
 
   /* `primary-<number>` once lived in tailwind.config.js, which v4 never loads (gotcha 29); it is
      declared here. `--color-primary` (above) is a different token: `bg-primary` ≠ `primary-500`. */
@@ -117,13 +125,13 @@
 
   /* Elevation is two shadows: a hairline for things on the page, a ring and a soft drop for things
      floating over it. Redefined here so the existing shadow-* classes follow. */
-  --shadow-xs: 0 1px 0 rgb(18 25 39 / 0.04);
-  --shadow-sm: 0 1px 0 rgb(18 25 39 / 0.04), 0 1px 2px rgb(18 25 39 / 0.06);
-  --shadow: 0 1px 0 rgb(18 25 39 / 0.04), 0 1px 2px rgb(18 25 39 / 0.06);
-  --shadow-md: 0 1px 0 rgb(18 25 39 / 0.04), 0 2px 6px -1px rgb(18 25 39 / 0.08);
-  --shadow-lg: 0 0 0 1px rgb(18 25 39 / 0.06), 0 12px 32px -8px rgb(18 25 39 / 0.18);
-  --shadow-xl: 0 0 0 1px rgb(18 25 39 / 0.06), 0 12px 32px -8px rgb(18 25 39 / 0.18);
-  --shadow-2xl: 0 0 0 1px rgb(18 25 39 / 0.06), 0 24px 48px -12px rgb(18 25 39 / 0.22);
+  --shadow-xs: 0 1px 0 rgb(43 42 40 / 0.04);
+  --shadow-sm: 0 1px 0 rgb(43 42 40 / 0.04), 0 1px 2px rgb(43 42 40 / 0.06);
+  --shadow: 0 1px 0 rgb(43 42 40 / 0.04), 0 1px 2px rgb(43 42 40 / 0.06);
+  --shadow-md: 0 1px 0 rgb(43 42 40 / 0.04), 0 2px 6px -1px rgb(43 42 40 / 0.08);
+  --shadow-lg: 0 0 0 1px rgb(43 42 40 / 0.06), 0 12px 32px -8px rgb(43 42 40 / 0.18);
+  --shadow-xl: 0 0 0 1px rgb(43 42 40 / 0.06), 0 12px 32px -8px rgb(43 42 40 / 0.18);
+  --shadow-2xl: 0 0 0 1px rgb(43 42 40 / 0.06), 0 24px 48px -12px rgb(43 42 40 / 0.22);
 
   /* Motion (spec §4.4). Tailwind reads these for its own utilities, so every transition-* and
      ease-out class already in the code follows; `lib/motion.ts` mirrors them for Framer Motion. */
@@ -184,35 +192,36 @@
    ═══════════════════════════════════════════════════════════ */
 @layer base {
   /* The semantic tokens keep the HSL-triplet form (code reads `hsl(var(--x))`); their values are
-     the ink and toga steps of the @theme block: paper ink-50, text ink-900, rule ink-200, accent toga-600. */
+     Pietra's: paper ink-50, surface #faf8f4 (cards and popovers), text ink-900, secondary text ink-500,
+     rule ink-200, hover ink-100, action and focus the ink (toga-600). */
   :root {
-    --background: 40 34% 97.6%;
-    --foreground: 220 37% 11.3%;
+    --background: 40 24.3% 92.7%;
+    --foreground: 40 3.6% 16.3%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 37% 11.3%;
+    --card: 40 37.5% 96.9%;
+    --card-foreground: 40 3.6% 16.3%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 37% 11.3%;
+    --popover: 40 37.5% 96.9%;
+    --popover-foreground: 40 3.6% 16.3%;
 
-    --primary: 220 66% 44%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 40 3.6% 16.3%;
+    --primary-foreground: 40 37.5% 96.9%;
 
-    --secondary: 40 22% 94.5%;
-    --secondary-foreground: 220 37% 11.3%;
+    --secondary: 40 23.1% 89.8%;
+    --secondary-foreground: 40 3.6% 16.3%;
 
-    --muted: 40 22% 94.5%;
-    --muted-foreground: 216 11% 35%;
+    --muted: 40 23.1% 89.8%;
+    --muted-foreground: 36.9 7.3% 34.7%;
 
-    --accent: 40 22% 94.5%;
-    --accent-foreground: 220 37% 11.3%;
+    --accent: 40 23.1% 89.8%;
+    --accent-foreground: 40 3.6% 16.3%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 37 16% 89.5%;
-    --input: 37 16% 89.5%;
-    --ring: 220 66% 54.3%;
+    --border: 40 18.1% 83.7%;
+    --input: 40 18.1% 83.7%;
+    --ring: 40 3.6% 16.3%;
 
     /* Feature colors — light */
     --tree: 160 84% 39%;
@@ -262,33 +271,53 @@
      DARK THEME
      ═══════════════════════════════════════════════════════════ */
   .dark {
-    --background: 221 55% 5.9%;
-    --foreground: 40 22% 94.5%;
+    --background: 40 5.1% 11.6%;
+    --foreground: 40 24.3% 92.7%;
 
-    --card: 220 37% 11.3%;
-    --card-foreground: 40 22% 94.5%;
+    --card: 40 3.6% 16.3%;
+    --card-foreground: 40 24.3% 92.7%;
 
-    --popover: 220 37% 11.3%;
-    --popover-foreground: 40 22% 94.5%;
+    --popover: 40 3.6% 16.3%;
+    --popover-foreground: 40 24.3% 92.7%;
 
-    --primary: 219 77% 66.8%;
-    --primary-foreground: 221 55% 5.9%;
+    --primary: 40 24.3% 92.7%;
+    --primary-foreground: 40 5.1% 11.6%;
 
-    --secondary: 219 24% 17.8%;
-    --secondary-foreground: 40 22% 94.5%;
+    --secondary: 45 3.8% 20.8%;
+    --secondary-foreground: 40 24.3% 92.7%;
 
-    --muted: 219 24% 17.8%;
-    --muted-foreground: 211 8% 63.2%;
+    --muted: 45 3.8% 20.8%;
+    --muted-foreground: 40 5.5% 68%;
 
-    --accent: 219 24% 17.8%;
-    --accent-foreground: 40 22% 94.5%;
+    --accent: 45 3.8% 20.8%;
+    --accent-foreground: 40 24.3% 92.7%;
 
     --destructive: 0 70% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 219 24% 17.8%;
-    --input: 219 24% 17.8%;
-    --ring: 219 77% 66.8%;
+    --border: 45 3.8% 20.8%;
+    --input: 45 3.8% 20.8%;
+    --ring: 40 24.3% 92.7%;
+
+    /* In the dark the action is light ink (Pietra): the toga steps the code writes for a dark action
+       (`dark:bg-toga-400`, hover 300, press 200) and for the focus (`ring-toga-500`, one class for both
+       themes) take the dark table's values. The ink steps need no second value.
+       600, 700, 800: an interim for the filled actions written without a `dark:` variant (`bg-primary-600
+       text-white`), which would be ink slabs on the dark paper: the lightest warm grey that keeps white at
+       4.6:1 (#79746c, 4.64:1), hover #6f6a61 (5.37:1), press #67625a (6.05:1). The design's dark action
+       (#f1eee8, dark text) needs each of those classes touched.
+       900: the design's dark pietra #a39c90, so that a selection's tint (`dark:bg-primary-900/20`, `/30`)
+       lands on the dark highlighter #4a463f: /20 gives #43413d and /30 #4f4c47 on the surface #2b2a28,
+       and its few solid uses are borders. 950: the dark rule #373633. */
+    --color-toga-200: oklch(87.1% 0.015 84.6);
+    --color-toga-300: oklch(100% 0.000 0);
+    --color-toga-400: oklch(95% 0.009 84.6);
+    --color-toga-500: oklch(95% 0.009 84.6);
+    --color-toga-600: oklch(56.1% 0.014 79.7);
+    --color-toga-700: oklch(52.6% 0.015 82.4);
+    --color-toga-800: oklch(49.8% 0.014 79.7);
+    --color-toga-900: oklch(69.5% 0.019 81.3);
+    --color-toga-950: oklch(33.3% 0.005 91.5);
 
     /* Environment category palette — dark theme (slightly brighter for visibility) */
     --category-compliance: 255 86% 69%;
@@ -655,7 +684,7 @@
 }
 
 .vlx-art .vlx-ref:hover {
-  @apply bg-primary-100 dark:bg-primary-900;
+  @apply bg-primary-100 dark:bg-primary-900/30;
 }
 
 .vlx-art .vlx-ref:focus-visible,
@@ -1446,7 +1475,7 @@
   background: #fff;
   color: var(--color-ink-900);
   font-family: var(--font-sans);
-  box-shadow: 0 0 0 1px rgb(18 25 39 / 0.06), 0 12px 32px -8px rgb(18 25 39 / 0.22);
+  box-shadow: 0 0 0 1px rgb(43 42 40 / 0.06), 0 12px 32px -8px rgb(43 42 40 / 0.22);
 }
 .dark .driver-popover.visualex-tour-popover {
   background: var(--color-ink-900);
