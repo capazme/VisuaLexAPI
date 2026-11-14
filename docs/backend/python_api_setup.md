@@ -20,7 +20,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ### 2. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.lock   # exact versions; requirements-dev.txt adds the test tools
 ```
 
 **Core packages installed:**
