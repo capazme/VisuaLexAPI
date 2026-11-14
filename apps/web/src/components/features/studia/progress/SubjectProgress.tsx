@@ -1,4 +1,5 @@
 import { cn } from '../../../../lib/utils';
+import { CARD_GRID_COLUMNS } from '../../../layout/frame';
 import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { formatCount, percent, totalCards } from './layout';
@@ -19,12 +20,13 @@ const reviews = (n: number) => (n === 0 ? 'Nessun ripasso negli ultimi 30 giorni
  * «Oggi»'s road (`orderStops`: the cards still open first, then by name), each a button that narrows the page to it
  * (pressed again, it clears). A subject shows its share consolidated, its three states as a bar and in words, and the
  * reviews of the last 30 days. No «N da ripassare» here: the progress read does not carry it by subject (the road has
- * it from the read by institute, and it is not counted twice).
+ * it from the read by institute, and it is not counted twice). The subjects are a grid of cards of at least 20rem
+ * (`CARD_GRID_COLUMNS`, U1 §7), as many a row as the block holds: one on a phone, three at 1366 px with the sidebar,
+ * four at 1920, all five at 1920 in full screen.
  */
 export function SubjectProgress({ materie, selected, onSelect }: SubjectProgressProps) {
   return (
-    // Two columns from `lg` (G6): the page is the frame's full width.
-    <ul className="grid gap-2 lg:grid-cols-2">
+    <ul className={cn('grid gap-2', CARD_GRID_COLUMNS)}>
       {orderStops(materie).map((row) => {
         const total = totalCards(row);
         const on = selected === row.materia;

@@ -82,7 +82,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
     renderDetail(TWO_PAST);
     fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
     fireEvent.click(screen.getByRole('button', { name: /^Apri tutto\s*\d+ gruppi/ }));
-    const { container } = render(<MemoryRouter><PracticeTable onViewPdf={() => {}} onCrossReference={() => {}} streaming={null} /></MemoryRouter>);
+    const { container } = render(<MemoryRouter><PracticeTable onViewPdf={() => {}} onCrossReference={() => {}} streaming={null} layout="overview" /></MemoryRouter>);
     const section = await within(container).findByRole('region', { name: /Giurisprudenza/ });
     const toggles = within(section).getAllByRole('button', { name: /^Espandi Cass\. civ\./ });
     expect(toggles).toHaveLength(2);

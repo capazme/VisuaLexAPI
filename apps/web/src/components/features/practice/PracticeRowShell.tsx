@@ -51,6 +51,8 @@ export function PracticeRowShell({
   return (
     <div
       data-practice-row={rowKey}
+      // Read by the overview's strip of decisions (U2): an open row takes the strip's width.
+      data-row-open={isOpen || undefined}
       // Clear of the act's sticky heading (`--practice-head`, set by the act block) when scrolled into view.
       className="group scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-lg py-1 md:pl-2 md:pr-1"
     >

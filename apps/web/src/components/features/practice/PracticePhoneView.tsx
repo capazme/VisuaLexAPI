@@ -129,7 +129,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
               {practice.acts.length === 0 && practice.decisions.length === 0 ? (
                 <PracticeEmpty />
               ) : (
-                <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
+                <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} layout="phone" />
               )}
             </div>
           )}

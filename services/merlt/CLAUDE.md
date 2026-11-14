@@ -346,7 +346,10 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   701-800 di 1364»). `fetch_article_text` takes `parte` («701-800») or `comma`
   («773»), G-387 (a); the graph keeps one node per article and ingestion reads
   the first part, as before (G-389 Q4).
-  `get_document` still gives the text alone, which is what ingestion stores. Only
+  `get_document` still gives the text alone, which is what ingestion stores; it
+  raises on a text VisuaLex marks `text_source: "akn"` (the AKN export served when
+  Normattiva's HTML could not be read, scan A.7: not the article's text), and the
+  mechanical ingestion's `VisualexTreeAdapter` skips such an article as unread. Only
   `tools/search.ArticleFetchTool` puts the notice and the block after the text it
   hands an expert (its `oltre_il_testo`, read by
   `react_mixin._extract_sources_from_result`), and that tool is **not wired**

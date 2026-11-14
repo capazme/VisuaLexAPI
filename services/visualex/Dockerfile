@@ -21,8 +21,10 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /repo/services/visualex
 
 # Debian, not Alpine: Playwright does not support musl.
-COPY services/visualex/requirements.txt ./
-RUN pip install -r requirements.txt \
+# The lock, not requirements.txt: every package at the exact version CI tested
+# the frozen texts against (rule 23 of the root CLAUDE.md).
+COPY services/visualex/requirements.lock ./
+RUN pip install -r requirements.lock \
     && playwright install --with-deps chromium
 
 COPY version.txt /repo/version.txt

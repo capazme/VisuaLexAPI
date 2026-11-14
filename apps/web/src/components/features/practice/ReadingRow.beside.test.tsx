@@ -43,7 +43,7 @@ const REF_A = { corte: 'cassazione' as const, archivio: 'civile' as const, numer
 const REF_B = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 22222, anno: 2021 };
 
 const row = () => <ReadingRow onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} />;
-const table = () => <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} />;
+const table = () => <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} layout="overview" />;
 const windows = () => screen.queryAllByTestId('reading-window');
 
 /** One practice: art. 5 and 7 of l. 24/2017, both rows closed. */
@@ -72,66 +72,89 @@ afterEach(() => {
 /** The row of an article, found by its accessible name. */
 const articleRow = (n: string) => screen.getByRole('button', { name: new RegExp(`(Espandi|Comprimi|Vai alla finestra su) .*art\\. ${n}`) }).closest('[data-practice-row]') as HTMLElement;
 
-describe('«Apri accanto» on an article row (spec §4.2, T5)', () => {
-  it('opens the window and folds the row, which says so; closing the window gives the row back as it was', () => {
+describe('«Apri accanto» on an article row (spec §4.2, T5; U2, the two views)', () => {
+  const variants = () => screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'));
+  const layoutOf = () => screen.getByTestId('practice-column').getAttribute('data-layout');
+
+  it('opens the window: the table becomes the index, its entry marked; closing it gives the overview back, the row as it was', () => {
     setup();
     // Open art. 5's row.
     render(row());
+    expect(layoutOf()).toBe('overview');
     fireEvent.click(within(articleRow('5')).getByRole('button', { name: /Espandi/ }));
-    expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'))).toEqual(['row']);
+    expect(variants()).toEqual(['row']);
 
     fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ }));
     expect(windows()).toHaveLength(1);
-    // One subject, one mounted reading surface: the window's, not the row's.
-    expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'))).toEqual(['beside']);
-    expect(within(articleRow('5')).getByText(/Aperto accanto/)).toBeInTheDocument();
-    // The folded header does not claim to expand: it goes to the window.
-    const header = within(articleRow('5')).getByRole('button', { name: /^Vai alla finestra su/ });
-    expect(header).not.toHaveAttribute('aria-expanded');
-    expect(within(articleRow('5')).queryByRole('button', { name: /^(Espandi|Comprimi)/ })).not.toBeInTheDocument();
-    expect(within(articleRow('5')).queryByRole('button', { name: /^Apri accanto/ })).not.toBeInTheDocument();
-    // The other row still offers it.
-    expect(within(articleRow('7')).getByRole('button', { name: /^Apri accanto/ })).toBeInTheDocument();
+    // The reading view: the index on the left, no row, one reading surface — the window's — which has the focus.
+    expect(layoutOf()).toBe('index');
+    expect(document.querySelector('[data-practice-row]')).toBeNull();
+    expect(variants()).toEqual(['beside']);
+    expect(windows()[0]).toHaveFocus();
+    // The entry shown beside is marked, in words too; the other offers to open beside.
+    const entry = screen.getByRole('button', { name: /^Vai alla finestra: art\. 5/ });
+    expect(entry).toHaveAccessibleName(/aperto accanto$/);
+    expect(screen.getByRole('button', { name: /^Apri accanto: art\. 7/ })).not.toHaveAccessibleName(/aperto accanto$/);
 
-    fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Chiudi la finestra su/ }));
+    fireEvent.click(within(windows()[0]).getByRole('button', { name: /^Chiudi la finestra/ }));
     expect(windows()).toHaveLength(0);
-    expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'))).toEqual(['row']);
+    expect(layoutOf()).toBe('overview');
+    expect(variants()).toEqual(['row']);
   });
 
-  it('the header of a folded row asks the window to take focus', () => {
+  it('an entry of the index whose window is open takes the focus to that window', () => {
     setup();
     render(row());
     fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ }));
     const window_ = windows()[0];
-    fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Vai alla finestra su/ }));
+    screen.getByRole('button', { name: /^Apri accanto: art\. 7/ }).focus();
+    fireEvent.click(screen.getByRole('button', { name: /^Vai alla finestra: art\. 5/ }));
     expect(window_).toHaveFocus();
     expect(s().windowFocusRequest).toBeNull();
   });
 
-  it('a third window replaces the oldest; its subject stays in the table, its row unfolded', () => {
+  it('a third window replaces the oldest; its subject stays in the table, its entry no longer marked', () => {
     setup();
     s().openDecision(REF_A, { open: false });
     render(row());
     fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ }));
-    fireEvent.click(within(articleRow('7')).getByRole('button', { name: /^Apri accanto/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Apri accanto: art\. 7/ }));
     expect(windows()).toHaveLength(2);
-    fireEvent.click(screen.getByRole('button', { name: /^Apri accanto Cass/ }));
+    expect(windows()[1]).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: /^Apri accanto: Cass/ }));
     expect(windows()).toHaveLength(2);
-    expect(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Apri accanto: art\. 5/ })).not.toHaveAccessibleName(/aperto accanto$/);
     expect(s().practices[0].acts[0].articles).toHaveLength(2);
   });
 });
 
+describe('closing a window hands the focus on (L-62)', () => {
+  it('closing one of two: the window left open; closing the last: the subject\'s row in the overview', () => {
+    setup();
+    render(row());
+    fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Apri accanto: art\. 7/ }));
+    expect(windows()).toHaveLength(2);
+    fireEvent.click(within(windows()[1]).getByRole('button', { name: /^Chiudi la finestra/ }));
+    expect(windows()).toHaveLength(1);
+    expect(windows()[0]).toHaveFocus();
+    fireEvent.click(within(windows()[0]).getByRole('button', { name: /^Chiudi la finestra/ }));
+    expect(windows()).toHaveLength(0);
+    expect(within(articleRow('5')).getByRole('button', { name: /^(Espandi|Comprimi)/ })).toHaveFocus();
+  });
+});
+
 describe('«Apri accanto» on a decision row', () => {
-  it('opens the decision window and folds the row', () => {
+  it('opens the decision window; «Giurisprudenza» is an entry of the index, the decision marked in it', () => {
     setup();
     s().openDecision(REF_B, { open: false });
     render(row());
     fireEvent.click(screen.getByRole('button', { name: /^Apri accanto Cass/ }));
     expect(windows()).toHaveLength(1);
     expect(screen.getByTestId('decision-reader')).toHaveAttribute('data-host', s().practices[0].beside[0].id);
-    expect(screen.getByText(/Aperto accanto/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Chiudi la finestra su Cass/ }));
+    const decisions = screen.getByRole('region', { name: /Giurisprudenza/ });
+    expect(within(decisions).getByRole('button', { name: /^Vai alla finestra: Cass/ })).toHaveAccessibleName(/aperto accanto$/);
+    fireEvent.click(within(windows()[0]).getByRole('button', { name: /^Chiudi la finestra/ }));
     expect(windows()).toHaveLength(0);
     expect(s().practices[0].decisions).toHaveLength(1);
   });

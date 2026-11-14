@@ -40,6 +40,15 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     "does this article exist" when the HTML tree is unusable
     (`fetch_act_index`), and as a last-resort article text when HTML extraction
     fails outright (`fetch_act_article`, from `NormattivaScraper.get_document`).
+    That text is an `AknArticleText` (a `str`, the export's characters untouched)
+    and every article answer says where its text comes from, `text_source`
+    "html" or "akn" (`text_source_of`, scan A.7); `get_document`'s 24-hour memory
+    skips it (`skip_cache_func`), so the next request extracts again (from the
+    page in the persistent cache while it lasts). Downstream, an "akn" text is
+    never compared or stored by the saved-norm checks (the watcher by the field,
+    the web's check by the field or the export's «### » heading), never anchored
+    to by the assistant, never ingested by MERL-T or archived by
+    `tools/archivio-normativo`. The web reader does not read the field yet.
     Only the article INDEX is cached — in memory, capped at
     `AKN_CACHE_MAX_ACTS`, and through the shared cache manager, with an
     in-flight registry so N concurrent cold requests download the act once.
