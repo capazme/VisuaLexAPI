@@ -18,7 +18,7 @@ export const MUTED_TEXT = 'text-slate-500 dark:text-slate-400';
 export const TILE = 'rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
 /**
  * A block's heading: the reader's serif, in sentence case. One type language (Gymnasium spec §5.1): headings
- * in Newsreader, labels in Geist; no small capitals and no double rule.
+ * in EB Garamond, labels in Inter; no small capitals and no double rule.
  */
 export const BLOCK_HEADING = 'font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 

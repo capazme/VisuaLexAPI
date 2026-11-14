@@ -15,7 +15,7 @@ describe('PageFrame (W2)', () => {
     const frame = container.firstElementChild as HTMLElement;
     expect(frame.className).not.toMatch(/\bmax-w-|\bmx-auto\b/);
     const title = screen.getByRole('heading', { level: 1, name: 'Dossier pubblici' });
-    // One size on every page: Newsreader, 28 px on a phone, 30 px from `md`.
+    // One size on every page: EB Garamond, 28 px on a phone, 30 px from `md`.
     expect(title).toHaveClass(...PAGE_TITLE.split(' '));
     expect(title.querySelector('svg')).toBeNull();
     expect(screen.getByText('I dossier di studio pubblicati dalla comunità')).toBeInTheDocument();
