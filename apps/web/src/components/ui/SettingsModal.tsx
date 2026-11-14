@@ -11,6 +11,7 @@ import { ConnectedAppsSection } from '../../features/connections/ConnectedAppsSe
 import { MerltDataSection } from '../../features/merlt/privacy/MerltDataSection';
 import { HighlightMeaningsSection } from '../features/search/HighlightMeaningsSection';
 import type { SettingsSection } from '../../types';
+import { forgetUserData } from '../../services/sessionEnd';
 
 interface CommitInfo {
     hash: string;
@@ -146,7 +147,9 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
             await accountService.deleteAccount(deletePassword, deleteConfirmation);
             // Tokens AND the persisted store (the practices, settings): the
             // next person on this browser must not inherit them.
+            forgetUserData();
             localStorage.clear();
+            sessionStorage.clear();
             window.location.href = '/login?deleted=1';
         } catch {
             setAccountMessage('Impossibile eliminare l’account. Verifica la password e la conferma.');

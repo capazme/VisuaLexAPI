@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getFreshAccessToken = vi.fn();
 const refreshAccessToken = vi.fn();
 const handleUnauthenticated = vi.fn();
+// The real rule (`api.ts`): refused ends the session, any other failure keeps it. Here, refused = no HTTP status.
+const settleRefreshFailure = vi.fn((error: unknown) => {
+  const refused = !(error as { transient?: boolean }).transient;
+  if (refused) handleUnauthenticated();
+  return refused;
+});
 vi.mock('../api', () => ({
+  settleRefreshFailure: (error: unknown) => settleRefreshFailure(error),
   getFreshAccessToken: () => getFreshAccessToken(),
   refreshAccessToken: () => refreshAccessToken(),
   handleUnauthenticated: () => handleUnauthenticated(),
@@ -125,6 +132,19 @@ describe('legalFetch — a 401', () => {
     expect(response.status).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(handleUnauthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands a failed refresh to settleRefreshFailure, which keeps the session on a server or network error', async () => {
+    getFreshAccessToken.mockResolvedValue('old');
+    const failure = Object.assign(new Error('Network Error'), { transient: true });
+    refreshAccessToken.mockRejectedValue(failure);
+    fetchMock.mockResolvedValue(answer(401));
+
+    const response = await legalFetch('/fetch_tree', { method: 'POST', body });
+
+    expect(response.status).toBe(401);
+    expect(settleRefreshFailure).toHaveBeenCalledWith(failure);
+    expect(handleUnauthenticated).not.toHaveBeenCalled();
   });
 
   it('does not send a body it cannot replay a second time', async () => {
