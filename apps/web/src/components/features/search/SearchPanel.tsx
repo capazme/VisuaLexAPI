@@ -311,9 +311,8 @@ export function SearchPanel() {
     // error once the stream ends (M-2). Local to this search run so a later
     // search starts clean.
     let parseFailures = 0;
-    // Lines that came through (articles and per-article errors), the articles among them, and the
-    // server's closing line when it ran out of time (`kind: 'time_budget'`, with the missing articles).
-    let received = 0;
+    // The articles that came through, and the server's closing line when it ran out of time
+    // (`kind: 'time_budget'`, with the missing articles).
     let articles = 0;
     let missing: string[] | null = null;
     const handleLine = (line: string) => {
@@ -322,7 +321,6 @@ export function SearchPanel() {
         missing = Array.isArray(result.missing) ? result.missing.map(String) : [];
         return;
       }
-      received += 1;
       if (!result.error) articles += 1;
       processResult(result, params.version_date, true, params.tabLabel, params.targetPracticeId, params.filters, params.version);
     };
@@ -376,7 +374,7 @@ export function SearchPanel() {
       }
 
       // The stream stopped early (D-323): the server says which articles are missing, and they can be
-      // asked for again; a stream cut short without that line (a proxy) says only how many arrived.
+      // asked for again.
       // Set inside `handleLine`, which the compiler's narrowing does not follow.
       const missingArticles = missing as string[] | null;
       if (missingArticles && missingArticles.length > 0) {
@@ -396,8 +394,6 @@ export function SearchPanel() {
             triggerMultiSearch([...searchQueue, retry]);
           } },
         });
-      } else if (!missingArticles && received + parseFailures < expectedTotal) {
-        notify({ type: 'warning', duration: 0, message: `Caricamento interrotto: caricati ${articles} di ${expectedTotal} articoli.` });
       }
 
       // If any NDJSON lines were malformed, let the user know something was

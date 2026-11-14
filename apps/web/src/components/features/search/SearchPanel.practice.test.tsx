@@ -536,14 +536,16 @@ describe('SearchPanel — an interrupted stream (D-323)', () => {
     await waitFor(() => expect(s().practices.find((p) => p.id === target)?.acts[0]?.articles).toHaveLength(3));
   });
 
-  it('a stream that ends short without the closing line raises the fallback warning, with no action', async () => {
+  it('a stream with fewer articles than the estimate and no closing line raises no warning: the act may not have them', async () => {
     s().createPractice('P');
     env.lines = [ccArticle('1'), ccArticle('2')];
     panel();
     act(() => { s().triggerSearch(params('1-5')); });
-    await waitFor(() => expect(notices()).toHaveLength(1));
-    expect(notices()[0]).toMatchObject({ type: 'warning', duration: 0, message: 'Caricamento interrotto: caricati 2 di 5 articoli.' });
-    expect(notices()[0].action).toBeUndefined();
+    await waitFor(() => expect(s().practices[0].acts[0]?.articles).toHaveLength(2));
+    await waitFor(() => expect(env.requests).toHaveLength(1));
+    // the search has ended (its progress line is gone) and said nothing
+    await waitFor(() => expect(screen.queryByText('Caricamento articoli…')).toBeNull());
+    expect(notices().filter((n) => n.message.startsWith('Caricamento interrotto'))).toEqual([]);
   });
 });
 
