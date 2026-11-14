@@ -32,6 +32,7 @@ import { ReadingRow } from '../practice/ReadingRow';
 import { PracticeBar } from '../practice/PracticeBar';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
 import { dur, ease } from '../../../lib/motion';
+import { notify } from '../../ui/notifications/notifications';
 
 /** The practice whose light window or, on a phone, full-screen reader `askerId` names: where a norm
  *  cited in its text is searched and opened. */
@@ -310,6 +311,21 @@ export function SearchPanel() {
     // error once the stream ends (M-2). Local to this search run so a later
     // search starts clean.
     let parseFailures = 0;
+    // Lines that came through (articles and per-article errors), the articles among them, and the
+    // server's closing line when it ran out of time (`kind: 'time_budget'`, with the missing articles).
+    let received = 0;
+    let articles = 0;
+    let missing: string[] | null = null;
+    const handleLine = (line: string) => {
+      const result = JSON.parse(line);
+      if (result.kind === 'time_budget') {
+        missing = Array.isArray(result.missing) ? result.missing.map(String) : [];
+        return;
+      }
+      received += 1;
+      if (!result.error) articles += 1;
+      processResult(result, params.version_date, true, params.tabLabel, params.targetPracticeId, params.filters, params.version);
+    };
 
     try {
       // Always the streaming endpoint
@@ -340,8 +356,7 @@ export function SearchPanel() {
         for (const line of lines) {
           if (line.trim()) {
             try {
-              const result = JSON.parse(line);
-              processResult(result, params.version_date, true, params.tabLabel, params.targetPracticeId, params.filters, params.version);
+              handleLine(line);
             } catch (e) {
               parseFailures += 1;
               console.error("Error parsing line", line, e);
@@ -353,12 +368,36 @@ export function SearchPanel() {
       // Process any remaining data in buffer
       if (buffer.trim()) {
         try {
-          const result = JSON.parse(buffer);
-          processResult(result, params.version_date, true, params.tabLabel, params.targetPracticeId, params.filters, params.version);
+          handleLine(buffer);
         } catch (e) {
           parseFailures += 1;
           console.error("Error parsing final buffer", e);
         }
+      }
+
+      // The stream stopped early (D-323): the server says which articles are missing, and they can be
+      // asked for again; a stream cut short without that line (a proxy) says only how many arrived.
+      // Set inside `handleLine`, which the compiler's narrowing does not follow.
+      const missingArticles = missing as string[] | null;
+      if (missingArticles && missingArticles.length > 0) {
+        const k = missingArticles.length;
+        const retry: SearchParams = {
+          ...params,
+          article: missingArticles.join(','),
+          targetPracticeId: params.targetPracticeId ?? streamingPracticeRef.current ?? undefined,
+        };
+        notify({
+          type: 'warning',
+          duration: 0,
+          message: `Caricamento interrotto: caricati ${articles} di ${articles + k} articoli. ${k === 1 ? 'Manca 1 articolo.' : `Mancano ${k} articoli.`}`,
+          // Queued, never started over a running search: «Apri tutto»'s queue runs one search at a time.
+          action: { label: 'Carica i mancanti', onClick: () => {
+            const { searchQueue, triggerMultiSearch } = appStore.getState();
+            triggerMultiSearch([...searchQueue, retry]);
+          } },
+        });
+      } else if (!missingArticles && received + parseFailures < expectedTotal) {
+        notify({ type: 'warning', duration: 0, message: `Caricamento interrotto: caricati ${articles} di ${expectedTotal} articoli.` });
       }
 
       // If any NDJSON lines were malformed, let the user know something was
