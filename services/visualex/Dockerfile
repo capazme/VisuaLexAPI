@@ -23,8 +23,8 @@ WORKDIR /repo/services/visualex
 # Debian, not Alpine: Playwright does not support musl.
 # The lock, not requirements.txt: every package at the exact version CI tested
 # the frozen texts against (rule 23 of the root CLAUDE.md).
-COPY services/visualex/requirements.lock ./
-RUN pip install -r requirements.lock \
+COPY services/visualex/requirements-lock.txt ./
+RUN pip install -r requirements-lock.txt \
     && playwright install --with-deps chromium
 
 COPY version.txt /repo/version.txt

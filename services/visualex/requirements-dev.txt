@@ -1,5 +1,5 @@
 # Test-only dependencies. The suite in tests/ needs these; the runtime does not.
 # The lock, so the tests run on what the image runs.
--r requirements.lock
+-r requirements-lock.txt
 pytest>=8.0
 pytest-asyncio>=0.24
