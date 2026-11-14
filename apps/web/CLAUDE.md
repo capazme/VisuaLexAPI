@@ -71,8 +71,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
-  verdict after «Annulla»; below `md` it is the user menu's «Commenti», M1; the bar's right end still keeps the 56 px it kept for the
-  feedback button that floated there until D-253, `md:pr-14`, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
+  verdict after «Annulla»; nothing floats over it since D-253, «Commenti» being at the top right from `md` and in the
+  user menu below it, M1); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -828,8 +828,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the body as the sheet closed. The notifications (K1a,
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
-  the bottom (at the top for `position="top"`; from `md` at the right, its foot over the feedback button, which it
-  covered), three at most per edge — the newest first, a fourth closes the oldest
+  the bottom (at the top for `position="top"`; from `md` at the right, 32 px from the bottom), three at most per edge — the newest first, a fourth closes the oldest
   plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
   out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
@@ -2352,7 +2351,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
   order), the norms first below `lg`; one kind alone takes the width, untitled as before. From `lg` each of the two
   scrolls on its own, at most the window's height (D7d, `COLUMN_SCROLLS`, `max-h-app-column`: the content area's padding
-  and `--page-foot` off it), so a decision read on the right stays put while a norm opens on the left; each is a named
+  and the 2 rem foot off it), so a decision read on the right stays put while a norm opens on the left; each is a named
   region («Norme», «Giurisprudenza (n)») and a tab stop with the focus ring, so the keyboard scrolls it. Whatever
   scrolls a text to a passage there moves its own scroller alone (`utils/scrollParent.ts`: `scrollToMiddle` for «Vai al
   passo» and `revealAnnotation`, gotcha 34): `scrollIntoView` would move the page and the other column too. An act's identity is a code's name

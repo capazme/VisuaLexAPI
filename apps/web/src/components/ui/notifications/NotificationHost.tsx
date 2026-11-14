@@ -102,12 +102,11 @@ function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'b
       // The bar's room, on this stack alone (never the root's style: see `footBar.ts`).
       style={position === 'bottom' && footRoom > 0 ? ({ '--foot-bar': `${footRoom}px` } as CSSProperties) : undefined}
       className={cn(
-        // On a phone the width less a 16 px gutter; from `md` at the right, as wide as a sentence, and at the bottom over
-        // the feedback button (`FeedbackButton`: 46 px, 24 px from the edge, from `md`), which it covered. A bar held at
-        // the foot of the window (`footBarStore`, its room there: «Sposta l'evidenziazione») keeps them over it.
+        // On a phone the width less a 16 px gutter; from `md` at the right, as wide as a sentence, 32 px from the bottom.
+        // A bar held at the foot of the window (`footBarStore`, its room there: «Sposta l'evidenziazione») keeps them over it.
         'absolute inset-x-4 md:inset-x-auto md:right-8 md:w-[26rem]',
         position === 'bottom'
-          ? 'bottom-[calc(1rem+var(--foot-bar,0px))] md:bottom-[max(5.5rem,calc(1rem+var(--foot-bar,0px)))]'
+          ? 'bottom-[calc(1rem+var(--foot-bar,0px))] md:bottom-[max(2rem,calc(1rem+var(--foot-bar,0px)))]'
           : 'top-4',
       )}
     >
