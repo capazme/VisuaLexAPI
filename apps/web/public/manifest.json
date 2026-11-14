@@ -2,8 +2,8 @@
   "name": "VisuaLex",
   "short_name": "VisuaLex",
   "description": "Intelligent Legal Visualization and Research",
-  "theme_color": "#2563eb",
-  "background_color": "#ffffff",
+  "theme_color": "#f1eee8",
+  "background_color": "#f1eee8",
   "display": "standalone",
   "icons": [
     {

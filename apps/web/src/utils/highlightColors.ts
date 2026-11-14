@@ -69,7 +69,8 @@ export const HIGHLIGHT_ICON_ON_DARK: Record<HighlightColor, string> = {
   yellow: 'text-yellow-300',
   green: 'text-green-300',
   red: 'text-red-300',
-  blue: 'text-blue-300',
+  // The old toga 300, written out: `blue-*` is an alias of toga, warm ink under Pietra, and a highlight's blue stays blue.
+  blue: 'text-[oklch(79.5%_0.095_262)]',
 };
 
 /**

@@ -194,7 +194,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
         "hover:bg-slate-100 dark:hover:bg-slate-800",
         // The icon keeps the same 44 px box in every layout, so widening the bar moves no icon.
         words ? "w-full h-11 overflow-hidden pr-2" : "w-11 h-11",
-        isActive && "bg-primary-50 dark:bg-primary-900/10"
+        isActive && "bg-primary-50 dark:bg-primary-900/25"
       )}
       onClick={() => {
         hide();
@@ -545,7 +545,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             "hover:bg-slate-100 dark:hover:bg-slate-800",
             // The avatar is 36 px below `md` and 32 px from it: inset as in the rail, so widening moves it not.
             words ? "w-full h-11 gap-2.5 overflow-hidden px-1 md:px-1.5 text-left" : "justify-center w-11 h-11",
-            showUserMenu && "bg-primary-50 dark:bg-primary-900/10"
+            showUserMenu && "bg-primary-50 dark:bg-primary-900/25"
           )}
         >
           <motion.div

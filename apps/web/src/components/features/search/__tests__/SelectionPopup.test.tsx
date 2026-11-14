@@ -204,7 +204,7 @@ describe('SelectionPopup: the colour chosen in the reading bar (H1)', () => {
 
   it.each([
     ['yellow', 'giallo', 'text-yellow-300'],
-    ['blue', 'blu', 'text-blue-300'],
+    ['blue', 'blu', 'text-[oklch(79.5%_0.095_262)]'],
   ] as const)('draws its icon in %s bright on the popup\'s dark surface, never in the highlight\'s tint (it may be hidden)', async (color, name, ink) => {
     appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: color } }));
     try {
