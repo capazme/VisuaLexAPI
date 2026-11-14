@@ -464,8 +464,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   hand (the sign-in page's display line aside). The columns that fill the room past two measures (about 1500 px) come
   page by page (spec `2026-11-05-u1-frame-and-full-screen-design.md` §7): a list of cards on a wide frame becomes a grid
   of cards of at least 20rem, `CARD_GRID_COLUMNS` (`frame.ts`, written once), never a carousel or a row 2000 px long (a
-  phone may keep a row that scrolls). The Forum's «Pronti da VisuaLex», the dossier list and «Le mie schede» do; the
-  community's cards (`CARD_GRID`) still set their columns by breakpoint.
+  phone may keep a row that scrolls). The Forum's «Pronti da VisuaLex», the dossier list, «Le mie schede» and «Progressi»'
+  «Per materia» do; the community's cards (`CARD_GRID`) still set their columns by breakpoint.
   **The page frame** (W2, 21 Oct 2026):
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
@@ -1856,7 +1856,8 @@ from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are 
 drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
 with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
-(`SubjectProgress`, two columns from `lg`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
+(`SubjectProgress`, a grid of cards of at least 20rem, `CARD_GRID_COLUMNS`, U1, three a row at 1366 px with the sidebar,
+four at 1920, the five in one row at 1920 in full screen): the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
 `stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). Every control on the page is 44 px tall at every width
 (`ProgressPage.test.tsx` guards its files against an `md:` height, as `contribuisci.test.ts` does Contribuisci's); the

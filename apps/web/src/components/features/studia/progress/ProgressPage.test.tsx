@@ -11,6 +11,8 @@ const desktop = vi.hoisted(() => ({ value: true }));
 vi.mock('../../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => desktop.value }));
 
 import { studiaService } from '../../../../services/studiaService';
+import { appStore } from '../../../../store/useAppStore';
+import { CARD_GRID_COLUMNS } from '../../../layout/frame';
 import { ProgressPage } from './ProgressPage';
 import { xpFields } from '../__fixtures__/xp';
 
@@ -84,16 +86,36 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Il tuo andamento', 'Le schede per stato', 'I prossimi 14 giorni', 'Per materia']);
   });
 
-  it('uses the frame\'s full width (G6): the calendar across it, the states and the coming days side by side, the subjects in two columns', async () => {
-    progress.mockResolvedValue(answer());
-    renderPage();
+  /** The page's columns: the trend across the frame, the states and the coming days side by side, the subjects a grid. */
+  async function expectColumns() {
     await screen.findByRole('region', { name: 'Riepilogo' });
     const block = (name: string) => screen.getByRole('region', { name });
     const pair = block('Le schede per stato').parentElement!;
     expect(pair).toBe(block('I prossimi 14 giorni').parentElement);
     expect(pair).toHaveClass('grid', 'lg:grid-cols-2');
     expect(block('Il tuo andamento').parentElement).not.toBe(pair);
-    expect(within(block('Per materia')).getByRole('list')).toHaveClass('lg:grid-cols-2');
+    // As many subjects a row as cards of 20rem fit (U1), never a count by breakpoint.
+    const subjects = within(block('Per materia')).getByRole('list');
+    expect(subjects).toHaveClass('grid', CARD_GRID_COLUMNS);
+    expect(subjects.className).not.toMatch(/\bgrid-cols-\d/);
+  }
+
+  it('uses the frame\'s full width (G6): the trend across it, the states and the coming days side by side, the subjects a grid of cards of at least 20rem (U1)', async () => {
+    progress.mockResolvedValue(answer());
+    renderPage();
+    await expectColumns();
+  });
+
+  it('keeps the same columns in full screen, which widens the frame instead of narrowing it (U1)', async () => {
+    const before = appStore.getState().settings;
+    appStore.setState({ settings: { ...before, focusMode: true } });
+    try {
+      progress.mockResolvedValue(answer());
+      renderPage();
+      await expectColumns();
+    } finally {
+      appStore.setState({ settings: before });
+    }
   });
 
   it('opens the trend on 30 days on a computer, on 7 on a phone (G7, Bill)', async () => {
@@ -173,6 +195,11 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(document.querySelectorAll('.motion-safe\\:animate-pulse').length).toBeGreaterThan(4);
     // The trend's place holds the header's and the drawing's heights.
     expect(screen.getByRole('region', { name: 'Il tuo andamento' }).querySelector('.h-\\[190px\\]')).not.toBeNull();
+    // The five subjects' places, in the grid the cards come in (U1): the block's body, under its heading.
+    const places = screen.getByRole('region', { name: 'Per materia' }).querySelector(':scope > div > div[aria-hidden]')!;
+    expect(places.children).toHaveLength(5);
+    expect(places).toHaveClass('grid', CARD_GRID_COLUMNS);
+    expect(places.className).not.toMatch(/\bgrid-cols-\d/);
   });
 
   it('says a failed read with «Riprova», no alert, and reads again', async () => {
