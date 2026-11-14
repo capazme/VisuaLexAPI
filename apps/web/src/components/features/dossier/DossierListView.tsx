@@ -162,7 +162,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     const tabLabel = tabLabelForGroup(dossier.title, group);
     const tabId = appStore.getState().createPractice(dossier.title, { custom: true, activate: true });
     navigate('/');
-    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetPracticeId: tabId });
+    // A group above the API's ceiling comes in pages, queued one after the other.
+    const pages = searchParamsFromGroup(group).map((params) => ({ ...params, tabLabel, targetPracticeId: tabId }));
+    if (pages.length === 1) triggerSearch(pages[0]);
+    else triggerMultiSearch(pages);
   };
 
   const openAllGroupsOnDashboard = (dossier: Dossier, groups: NormaGroup[]) => {

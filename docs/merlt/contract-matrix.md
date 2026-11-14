@@ -75,7 +75,7 @@ Fonte di verità: `apps/server/src/routes/merlt/index.ts` (montaggio e feature f
 
 | Route BFF | Metodo | Guard | Endpoint MERL-T | Auth MERL-T | Consumer FE |
 |---|---|---|---|---|---|
-| `/contrib/documents` | POST (multipart, ≤50 MB, PDF/TXT/DOCX) | `auth` + `contrib` | `POST /api/v1/documents/upload` | OPT | `UploadDropzone` (`uploadContribDocument`) |
+| `/contrib/documents` | POST (multipart, ≤10 MB, PDF/TXT/DOCX) | `auth` + `contrib` | `POST /api/v1/documents/upload` | OPT | `UploadDropzone` (`uploadContribDocument`) |
 | `/contrib/documents/:id/extract` | POST | `auth` + `contrib` + `owner` | `GET /api/v1/documents/{id}` (proprietà), poi `POST /api/v1/documents/{id}/extract-async` (RQ `merlt_extract`) | OPT | `ContribPage` |
 | `/contrib/documents/:id/candidates` | GET | `auth` + `contrib` + `owner` | `GET /api/v1/documents/{id}/candidates?user_id=` | OPT | `CandidateReviewList` |
 | `/contrib/jobs/:jobId/status` | GET | `auth` + `owner` | nessuno: Prisma `MerltExtractionJob` | — | `useExtractionJob` |

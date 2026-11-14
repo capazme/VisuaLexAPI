@@ -745,6 +745,9 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
 `RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
+`MAX_ARTICLES_PER_REQUEST` (`150`, G-473 — the most articles one request may expand to, after
+deduplication; above it `parse_article_input` answers `kind: "too_many"`, a 400; the web's
+dossier «Apri tutto» pages its groups at the same number),
 `STREAM_SECONDS_PER_ARTICLE` / `STREAM_MAX_SECONDS` (`30` / `5400` — the time budget of
 `/stream_article_text`: articles × allowance, at least 60 s, at most the cap; past it the stream
 ends with a line `{"kind": "time_budget", "missing": [...]}`. Without it Quart's

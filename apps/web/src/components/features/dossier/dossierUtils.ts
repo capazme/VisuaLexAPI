@@ -72,13 +72,27 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
   return Array.from(groups.values());
 }
 
-// The search that opens a group on the dashboard: the version the group holds.
-export function searchParamsFromGroup(group: NormaGroup): SearchParams {
+// How many articles one search may ask for: the API's ceiling refuses more, so a larger group is
+// paged. The number lives in services/visualex/visualex_api/tools/config.py
+// (MAX_ARTICLES_PER_REQUEST); dossierUtils.test.ts reads it there and fails if this one drifts.
+export const MAX_ARTICLES_PER_SEARCH = 150;
+
+// The searches that open a group on the dashboard, the version the group holds: one, or one per
+// page of MAX_ARTICLES_PER_SEARCH articles for a group above the API's ceiling.
+export function searchParamsFromGroup(group: NormaGroup): SearchParams[] {
+  const pages: string[][] = [];
+  for (let i = 0; i < group.articles.length; i += MAX_ARTICLES_PER_SEARCH) {
+    pages.push(group.articles.slice(i, i + MAX_ARTICLES_PER_SEARCH));
+  }
+  return (pages.length ? pages : [[]]).map((page) => searchParamsForPage(group, page));
+}
+
+function searchParamsForPage(group: NormaGroup, articles: string[]): SearchParams {
   return {
     act_type: group.tipo_atto,
     act_number: group.numero_atto,
     date: group.data,
-    article: group.articles.join(','),
+    article: articles.join(','),
     version: (group.versione as SearchParams['version']) || 'vigente',
     version_date: group.data_versione || '',
     ...(group.allegato ? { annex: group.allegato } : {}),
@@ -104,7 +118,7 @@ export function searchesForGroups(
   createPractice: (label: string) => string,
 ): SearchParams[] {
   let sharedPracticeId: string | undefined;
-  return groups.map((group) => {
+  return groups.flatMap((group) => {
     const tabLabel = tabLabelForGroup(dossierTitle, group);
     let targetPracticeId: string;
     if (requestIsHistorical(group)) {
@@ -113,7 +127,7 @@ export function searchesForGroups(
       sharedPracticeId ??= createPractice(tabLabel);
       targetPracticeId = sharedPracticeId;
     }
-    return { ...searchParamsFromGroup(group), tabLabel, targetPracticeId };
+    return searchParamsFromGroup(group).map((params) => ({ ...params, tabLabel, targetPracticeId }));
   });
 }
 
