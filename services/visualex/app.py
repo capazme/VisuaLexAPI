@@ -16,6 +16,9 @@ import structlog
 
 from visualex_api.tools.client_ip import client_address
 from visualex_api.tools.config import (
+    STREAM_MAX_SECONDS,
+    STREAM_MIN_SECONDS,
+    STREAM_SECONDS_PER_ARTICLE,
     RATE_LIMIT,
     RATE_LIMIT_WINDOW,
     TRUSTED_PROXIES,
@@ -488,36 +491,69 @@ class NormaController:
             return self._error_response(exc, 'stream_article_text')
         log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
 
+        # The stream's own time budget (config.py, STREAM_SECONDS_PER_ARTICLE): Quart's
+        # RESPONSE_TIMEOUT (60 s) would otherwise close the body silently after 20-40 articles.
+        # Never less than the framework's 60 s a short request had before.
+        budget = min(max(len(normavisitate) * STREAM_SECONDS_PER_ARTICLE, STREAM_MIN_SECONDS), STREAM_MAX_SECONDS)
+        deadline = asyncio.get_running_loop().time() + budget
+
+        async def read_one(scraper, nv):
+            article_text, url, validity, extra = await self._document_in_force(
+                scraper, nv, upcoming_asked, until)
+            result = {
+                'article_text': article_text,
+                'text_source': text_source_of(article_text),
+                'norma_data': nv.to_dict(),
+                'url': url
+            }
+            if validity:
+                result['validity'] = validity
+            result.update(extra)
+            result.update(await self._page_extras_for(scraper, nv, url, article_text))
+            return result
+
         async def result_generator():
-            for nv in normavisitate:
+            for index, nv in enumerate(normavisitate):
                 scraper = self.get_scraper_for_norma(nv)
                 if scraper is None:
                     result = {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
                     yield json.dumps(result) + "\n"
                     continue
 
-                try:
-                    article_text, url, validity, extra = await self._document_in_force(
-                        scraper, nv, upcoming_asked, until)
-                    result = {
-                        'article_text': article_text,
-                        'text_source': text_source_of(article_text),
-                        'norma_data': nv.to_dict(),
-                        'url': url
-                    }
-                    if validity:
-                        result['validity'] = validity
-                    result.update(extra)
-                    result.update(await self._page_extras_for(scraper, nv, url, article_text))
-
-                except Exception as exc:
-                    result = {'error': str(exc), 'norma_data': nv.to_dict()}
+                # Only the budget's own deadline ends the stream: a TimeoutError raised inside
+                # one article's read (the same class as asyncio's) stays that article's error.
+                budget_spent = deadline <= asyncio.get_running_loop().time()
+                if not budget_spent:
+                    try:
+                        async with asyncio.timeout_at(deadline) as scope:
+                            result = await read_one(scraper, nv)
+                    except TimeoutError as exc:
+                        if not scope.expired():
+                            result = {'error': str(exc) or 'Timeout', 'norma_data': nv.to_dict()}
+                        else:
+                            budget_spent = True
+                    except Exception as exc:
+                        result = {'error': str(exc), 'norma_data': nv.to_dict()}
+                if budget_spent:
+                    # Past the budget: said in a line of its own, with what was not sent, so
+                    # the client can show it and ask for the rest; never a silent cut.
+                    missing = [str(left.numero_articolo) for left in normavisitate[index:]]
+                    log.warning("Article stream over its time budget",
+                                budget=budget, sent=index, missing=len(missing))
+                    yield json.dumps({
+                        'error': (f"Caricamento interrotto: tempo esaurito dopo {index} di "
+                                  f"{len(normavisitate)} articoli. Ne mancano {len(missing)}: "
+                                  f"riprova per quelli."),
+                        'kind': 'time_budget',
+                        'missing': missing,
+                    }) + "\n"
+                    return
 
                 # Send result immediately
                 yield json.dumps(result) + "\n"
 
         # Return streaming response with proper headers
-        return Response(
+        response = Response(
             result_generator(),
             mimetype='application/x-ndjson',
             headers={
@@ -525,6 +561,9 @@ class NormaController:
                 'X-Accel-Buffering': 'no'  # Disable nginx buffering
             }
         )
+        # The framework's own cut, a backstop past the budget: time to write the error line.
+        response.timeout = budget + 15
+        return response
 
     async def record_start_time(self):
         g.start_time = time()
