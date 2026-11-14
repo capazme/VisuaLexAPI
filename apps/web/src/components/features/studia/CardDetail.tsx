@@ -59,7 +59,7 @@ const DANGER = cn(
   FOCUS_RING,
 );
 const BACK = cn(ACTION, '-ml-2 min-h-[44px] rounded-lg px-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING);
-/** A source line, a heading of the card's parts: Geist, small, the reader's grey. */
+/** A source line, a heading of the card's parts: Inter, small, the reader's grey. */
 const PART_HEADING = 'mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200';
 const LINK = cn('min-h-[44px] rounded text-left text-sm hover:text-primary-900 hover:underline dark:hover:text-primary-200', FOCUS_RING);
 const MEASURE = 'max-w-measure';

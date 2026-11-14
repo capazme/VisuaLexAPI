@@ -71,10 +71,10 @@ describe('SharedEnvironmentCard — its tags', () => {
   });
 });
 
-// The card as S7a draws it: the title in Newsreader, one plain line of who and when, two tags at most, «Mi piace» an
+// The card as S7a draws it: the title in EB Garamond, one plain line of who and when, two tags at most, «Mi piace» an
 // icon with its number, one action, outlined.
 describe('SharedEnvironmentCard — its shape (S7a)', () => {
-  it('titles it in Newsreader 18 px and says the category, the version, the author and when in one plain line', () => {
+  it('titles it in EB Garamond 18 px and says the category, the version, the author and when in one plain line', () => {
     renderCard({ ...base, createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 2 * 86400000).toISOString() });
     const card = screen.getByRole('article', { name: 'Ricorso Rossi' });
     expect(screen.getByRole('heading', { name: 'Ricorso Rossi' })).toHaveClass('font-serif', 'text-lg');
