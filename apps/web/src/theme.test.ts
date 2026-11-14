@@ -546,6 +546,35 @@ describe('Gymnasium\'s small motions (S2)', () => {
     }
   });
 
+  it('keeps Work\'s mark icon at AA on its paper ground in the dark theme (the switcher writes `text-white`)', () => {
+    const source = readFileSync(CSS_PATH, 'utf8');
+    // The icon's colour is the one the dark rule declares; with no rule it is the switcher's white.
+    const declared = source.match(/\.dark \.vlx-section-mark\[data-section="opus"\]\s*\{\s*color:\s*var\(--color-([\w-]+)\)/)?.[1];
+    const ground = source.match(/\.dark\s*\{[^}]*--vlx-section-opus:\s*var\(--color-([\w-]+)\)/)![1];
+    // The last declaration of a token is its dark value (the dark table follows the light one).
+    const rgb = (name: string): number[] => {
+      const m = [...source.matchAll(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`, 'g'))].at(-1);
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const icon = declared ? rgb(declared) : [1, 1, 1];
+    expect(ratio(icon, rgb(ground))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('compiles the lesson bar\'s spring, its delay and the head', async () => {
     const css = await compile([
       'motion-safe:ease-(--ease-catch)',

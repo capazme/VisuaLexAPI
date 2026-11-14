@@ -1578,6 +1578,8 @@
 .vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
 .vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
 .vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
+/* Dark Work is the dark action, paper: its icon is ink, not the switcher's `text-white` (unlayered, so it wins). */
+.dark .vlx-section-mark[data-section="opus"] { color: var(--color-ink-950); }
 
 /* «Analizza documento»'s box (D6): the frame's dashes stand still at rest — nothing moves for ever on an open page
    (Bill) —, turn slowly under a mouse or with the keyboard's focus on the box, and run while a file is dragged over
