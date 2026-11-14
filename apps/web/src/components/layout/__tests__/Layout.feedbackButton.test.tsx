@@ -1,11 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({
-  FeedbackButton: ({ className }: { className?: string; onOpen: () => void }) => <button type="button" data-testid="feedback" className={className}>Feedback</button>,
+  FeedbackButton: ({ className }: { className?: string; onOpen: () => void }) => <button type="button" data-testid="feedback" className={className}>Commenti</button>,
 }));
 vi.mock('../../ui/FeedbackModal', () => ({ FeedbackModal: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
@@ -27,62 +27,62 @@ import { Layout } from '../Layout';
 
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
 
-describe('Layout — what floats at the foot of the page on a phone', () => {
-  // On a phone it is the user menu's «Invia un commento» (M1): it covered the bars pinned to the bottom and the pages' rows.
-  it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione?materia=DIRITTO_CIVILE', '/studia/valida', '/studia/schede', '/dossier'])(
-    'hides the feedback button on a phone on %s',
-    (path) => {
-      at(path);
-      expect(screen.getByTestId('feedback')).toHaveClass('max-md:hidden');
-    },
-  );
-
-  // The services pill covered the foot of the page on a phone: it is the user menu's «Stato dei servizi» (S1).
-  it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione', '/studia/valida', '/dossier'])('draws no services pill on %s', (path) => {
-    at(path);
-    expect(screen.queryByText(/Servizi operativi|Controllo servizi/)).toBeNull();
-  });
-});
-
-describe('Layout — the page\'s foot, clear of the feedback button (G8c)', () => {
+describe('Layout — «Commenti» at the top right (D-253)', () => {
   afterEach(() => {
     auth.isAuthenticated = true;
   });
 
-  // From md the button, 24 px off the edge and 46 px tall, covered the last row on the right («Ripassa» of the last
-  // subject on «Oggi»): the page ends 16 px over it.
-  const CLEARANCE = 'md:pb-[var(--page-foot)]';
-  const FOOT = 'md:[--page-foot:5.375rem]';
+  // Below md it is the user menu's «Commenti» (M1).
+  it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione?materia=DIRITTO_CIVILE', '/studia/valida', '/studia/schede', '/dossier'])(
+    'shows it from md only on %s, left of «Tutto schermo», which Tab reaches after it',
+    (path) => {
+      at(path);
+      const feedback = screen.getByTestId('feedback');
+      expect(feedback).toHaveClass('hidden', 'md:inline-flex', 'fixed', 'top-4', 'right-[4.25rem]');
+      expect(feedback.compareDocumentPosition(screen.getByRole('button', { name: 'Tutto schermo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    },
+  );
 
-  it.each(['/studia/ripasso', '/studia/schede', '/dossier', '/forum', '/studia/progressi'])('ends the page over the button on %s', (path) => {
-    at(path);
-    expect(screen.getByTestId('feedback')).toBeInTheDocument();
-    expect(screen.getByTestId('layout-content')).toHaveClass(CLEARANCE, FOOT);
-  });
-
-  it('keeps it in full screen, where the button still floats', async () => {
+  it("sits in the bar's right end between md and lg, as «Tutto schermo», and at the window's top right in full screen", async () => {
+    at('/dossier');
+    expect(screen.getByTestId('feedback')).toHaveClass('max-lg:right-14');
+    cleanup();
     const { appStore } = await import('../../../store/useAppStore');
     const before = appStore.getState().settings;
     appStore.setState({ settings: { ...before, focusMode: true } });
     try {
       at('/dossier');
-      // The full screen keeps the page's padding (U1): it widens the frame, it no longer pads it 3 rem.
-      expect(screen.getByTestId('layout-content')).toHaveClass(CLEARANCE, 'md:py-8');
-      expect(screen.getByTestId('layout-content')).not.toHaveClass('py-12');
+      expect(screen.getByTestId('feedback')).not.toHaveClass('max-lg:right-14');
+      // The top rows keep clear of both buttons from md, which draws no bar in full screen.
+      expect(screen.getByTestId('layout-content')).toHaveClass('md:[--focus-button-room:11rem]');
     } finally {
       appStore.setState({ settings: before });
     }
   });
 
-  it('leaves the search page its padding, which its practice row is measured against (`h-app-row`)', () => {
+  it('keeps the top rows clear of it from lg, never over the search page, whose field ends before it', () => {
+    at('/dossier');
+    expect(screen.getByTestId('layout-content')).toHaveClass('lg:[--focus-button-room:11rem]');
+    cleanup();
     at('/');
-    expect(screen.getByTestId('layout-content')).not.toHaveClass(CLEARANCE);
+    expect(screen.getByTestId('layout-content').className).not.toMatch(/--focus-button-room/);
+    expect(screen.getByTestId('search-bar')).toHaveClass('md:pr-[9.75rem]', 'lg:pr-[11rem]');
   });
 
-  it('adds nothing for someone signed out, who has no button', () => {
+  it("leaves the page's foot its own padding: nothing floats there any more", () => {
+    at('/dossier');
+    expect(screen.getByTestId('layout-content').className).not.toMatch(/page-foot/);
+  });
+
+  it('is not drawn for someone signed out', () => {
     auth.isAuthenticated = false;
     at('/dossier');
     expect(screen.queryByTestId('feedback')).toBeNull();
-    expect(screen.getByTestId('layout-content')).not.toHaveClass(CLEARANCE);
+  });
+
+  // The services pill covered the foot of the page on a phone: it is the user menu's «Stato dei servizi» (S1).
+  it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione', '/studia/valida', '/dossier'])('draws no services pill on %s', (path) => {
+    at(path);
+    expect(screen.queryByText(/Servizi operativi|Controllo servizi/)).toBeNull();
   });
 });

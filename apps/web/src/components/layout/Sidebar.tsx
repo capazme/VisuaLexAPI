@@ -31,7 +31,7 @@ interface SidebarProps {
   closeMobile: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
-  /** Opens the feedback form: on a phone an entry of the user menu, «Invia un commento» (M1); from `md` the floating
+  /** Opens the feedback form: on a phone an entry of the user menu, «Commenti» (M1); from `md` the top right's
    *  button does it. Not given, no entry. */
   openFeedback?: () => void;
   /** Icons only (the desktop between `lg` and `xl`, or narrowed), icons and words (from `xl`), or the
@@ -635,7 +635,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 {feedbackInMenu && (
                   <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openFeedback)} className={menuItemClass}>
                     <MessageSquarePlus size={16} />
-                    Invia un commento
+                    Commenti
                   </button>
                 )}
                 <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />

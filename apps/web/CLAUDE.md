@@ -71,9 +71,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
-  verdict after «Annulla»; below `md` no feedback button floats over it, nor over any page: there it is the user
-  menu's «Invia un commento», M1; from `md` it floats at the bar's right end, which keeps 56 px clear for it,
-  `md:pr-14`, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
+  verdict after «Annulla»; nothing floats over it since D-253, «Commenti» being at the top right from `md` and in the
+  user menu below it, M1); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -475,10 +474,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   small (`kicker`: «Learn · la tua palestra giuridica», `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
   22 October 2026) —, the sentence under it (`line`, a short line:
   `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
-  a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button
-  (`FOCUS_BUTTON_CLEARANCE`, from `100vw`, `--sidebar-width` and the frame's own width, `100%` of the header's
-  containing block, so it holds at any frame width: 68 px less the frame's distance from the window's edge — 36 px
-  with a 32 px margin, 20 with 48, nothing once the frame is 68 px in —, wherever `Layout` says the button floats over
+  a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button and
+  «Commenti» beside it (`FOCUS_BUTTON_CLEARANCE`, from `100vw`, `--sidebar-width` and the frame's own width, `100%` of the header's
+  containing block, so it holds at any frame width: the room less the frame's distance from the window's edge, the
+  room 11 rem since D-253 — the toggle's 60 px, 8 of gap, about 96 for «Commenti», 8 of air; it was 4.25 —, wherever `Layout` says the buttons float over
   the page, `--focus-button-room`: from `lg`, from `md` in full screen, never over the search page's field; between
   1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»; the practice's table, alone in its row, keeps
   the same room, its header and the act's pinned heading under the button in full screen otherwise);
@@ -494,12 +493,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a cap of their own (`max-w-3xl` and up). `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
-  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. From `md`, for someone signed in
-  and on every page but the search page, it ends 16 px over the floating feedback button (G8c: it covered the last row
-  on the right, «Ripassa» of the last subject on «Oggi»): `--page-foot` (5.375 rem: the button's 24 px off the edge,
-  its 46 px and the air) as the bottom padding, which a page sized to the window takes off its height
-  (`GraphExplorerPage`, `DocumentReviewPage`'s columns: `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
-  («Da validare»'s votes). **The sections** (D-076, spec
+  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. Nothing floats at the page's foot
+  since D-253: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
+  for someone signed in, left of «Tutto schermo» with 8 px between: `right-[4.25rem]` at `top-4` from `lg` and in full
+  screen, `right-14` in the bar's right end between `md` and `lg`, whose search field and `PhoneTopBar` keep
+  `md:pr-[9.75rem]`, the search field `lg:pr-[11rem]` too); the `--page-foot` room it kept is gone, and a page sized to
+  the window takes the plain 2 rem foot off its height (`GraphExplorerPage`, `DocumentReviewPage`'s columns). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum — on screen Work, Learn, Labs and Forum, with no «VisuaLex» before them (D-137, D-157; the ids,
   the CSS and the addresses keep the old names; Labs's icon `FlaskConical`, D-236) —, in
@@ -591,8 +590,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
-  «Collega un'app AI», «Crediti» (`/crediti`), on a phone «Invia un commento» (the feedback form, which `Layout` holds and
-  the floating button opens from `md`, M1), the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
+  «Collega un'app AI», «Crediti» (`/crediti`), on a phone «Commenti» (the feedback form, which `Layout` holds and
+  the button at the top right opens from `md`, M1, D-253), the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
   «Pannello Admin» (admins) and «Esci». **The services' status** (S1, 19 Oct 2026; it was a pill fixed at the bottom left,
   over the foot of the page on a phone) is `ui/ServiceHealthMenuEntry`: the status icon and phrase («Servizi operativi»,
   «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`; a screen
@@ -829,8 +828,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the body as the sheet closed. The notifications (K1a,
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
-  the bottom (at the top for `position="top"`; from `md` at the right, its foot over the feedback button, which it
-  covered), three at most per edge — the newest first, a fourth closes the oldest
+  the bottom (at the top for `position="top"`; from `md` at the right, 32 px from the bottom), three at most per edge — the newest first, a fourth closes the oldest
   plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
   out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
@@ -2353,7 +2351,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
   order), the norms first below `lg`; one kind alone takes the width, untitled as before. From `lg` each of the two
   scrolls on its own, at most the window's height (D7d, `COLUMN_SCROLLS`, `max-h-app-column`: the content area's padding
-  and `--page-foot` off it), so a decision read on the right stays put while a norm opens on the left; each is a named
+  and the 2 rem foot off it), so a decision read on the right stays put while a norm opens on the left; each is a named
   region («Norme», «Giurisprudenza (n)») and a tab stop with the focus ring, so the keyboard scrolls it. Whatever
   scrolls a text to a passage there moves its own scroller alone (`utils/scrollParent.ts`: `scrollToMiddle` for «Vai al
   passo» and `revealAnnotation`, gotcha 34): `scrollIntoView` would move the page and the other column too. An act's identity is a code's name

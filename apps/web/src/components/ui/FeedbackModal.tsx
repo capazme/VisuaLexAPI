@@ -58,7 +58,7 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Invia Feedback" size="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Commenti" size="md">
       {success ? (
         <div className="text-center py-8">
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
