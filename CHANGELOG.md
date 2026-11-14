@@ -55,7 +55,7 @@ at every way out of a session. No migration.
   45 pins); Dockerfile and CI install from it, and Dependabot reads it (scan A.6). Developers:
   `services/visualex/.venv/bin/pip install -r services/visualex/requirements-dev.txt`.
 - `VISUALEX_API_PORT` moves the Python API off 5000 in development (AirPlay on the Mac).
-- `@hono/node-server` 2.1.8 in `apps/server` and `apps/mcp`.
+- `@hono/node-server` 2.1.8 and `hono` 4.13.18 (closes the open Dependabot alerts on hono) in `apps/server` and `apps/mcp`.
 - Spec: the MCP's next tools (N2) and notes on decisions (D7c).
 
 ## [1.11.0] - 2026-11-06
