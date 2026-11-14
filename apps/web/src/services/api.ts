@@ -128,8 +128,10 @@ export async function getFreshAccessToken(skewSeconds?: number): Promise<string 
   if (token && isAccessTokenExpired(skewSeconds) && localStorage.getItem('refresh_token')) {
     try {
       return await refreshAccessToken();
-    } catch {
-      // Fall through with the stale token.
+    } catch (error) {
+      // Fall through with the stale token. Refused: the 401 that follows ends the session. A server or network
+      // error: the request may fail without a 401, so the reader is told here that the connection failed.
+      if (!isRefreshRefused(error)) reportConnectionFailure();
     }
   }
   return token;

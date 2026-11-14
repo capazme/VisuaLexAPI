@@ -9,7 +9,7 @@ const notify = vi.fn();
 vi.mock('../../components/ui/notifications/notifications', () => ({ notify: (...a: unknown[]) => notify(...a) }));
 
 import { memoryStorage } from '../../test/memoryStorage';
-import { apiClient, isRefreshRefused } from '../api';
+import { apiClient, getFreshAccessToken, isRefreshRefused } from '../api';
 import { onSessionEnd } from '../sessionEnd';
 
 function axiosError(status: number | null): AxiosError {
@@ -91,5 +91,34 @@ describe('a request whose refresh fails', () => {
     await Promise.allSettled([apiClient.get('/a'), apiClient.get('/b'), apiClient.get('/c')]);
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls[0][0]).toMatchObject({ type: 'error' });
+  });
+});
+
+describe('a token already expired in the browser (refreshed before the request)', () => {
+  function expired(): string {
+    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 60 })).replace(/=+$/, '');
+    return `h.${payload}.s`;
+  }
+
+  let later = 600_000;
+  it.each([[500], [null]])('a refresh failing with %s tells the reader, keeps the session, returns the stale token', async (status) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // past the 10 s between two notices
+    later += 600_000;
+    vi.setSystemTime(Date.now() + later);
+    localStorage.setItem('access_token', expired());
+    vi.spyOn(axios, 'post').mockRejectedValue(axiosError(status));
+    const token = await getFreshAccessToken();
+    expect(token).toBe(localStorage.getItem('access_token'));
+    expect(localStorage.getItem('refresh_token')).toBe('r1');
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(reset).not.toHaveBeenCalled();
+  });
+
+  it('a refused refresh says nothing here: the 401 that follows ends the session', async () => {
+    localStorage.setItem('access_token', expired());
+    vi.spyOn(axios, 'post').mockRejectedValue(axiosError(401));
+    await getFreshAccessToken();
+    expect(notify).not.toHaveBeenCalled();
   });
 });
