@@ -1,24 +1,28 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { Annotation } from '../types';
 import { proposedPassageAt } from './useArticleTextInteractions';
 
 /**
- * A tap on a wavy `.note-anchor` underline in the text opens that single note's compact popover
- * (`InlineNotePopover`); the full notes panel stays for the toolbar button. One delegated click
- * listener on the text container, because the markup comes from `SafeHTML`. Shared by every
- * surface that renders the reader's notes (the article tab, a decision).
+ * A tap on a wavy `.note-anchor` underline in the text hands that note to the reader (A4 §6: its card beside the text,
+ * else its block's sheet — `useNoteOpener`; no popover); the full notes panel stays for the toolbar button. One
+ * delegated click listener on the text container, because the markup comes from `SafeHTML`. Shared by every surface
+ * that renders the reader's notes (the article tab, a decision, a dossier's entry). `enabled` waits for the body where it
+ * is drawn after a fetch.
  */
 export function useInlineNoteAnchors(
   containerRef: RefObject<HTMLElement | null>,
   notes: readonly Annotation[],
-): { inlineNote: { note: Annotation; anchorEl: HTMLElement } | null; closeInlineNote: () => void } {
-  const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
+  onOpen: (note: Annotation, anchorEl: HTMLElement) => void,
+  enabled = true,
+): void {
+  const latest = useRef(onOpen);
+  useEffect(() => { latest.current = onOpen; });
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || !enabled) return;
     const handler = (e: MouseEvent) => {
-      // A passage an application proposed answers with its block's popover instead (D7b, `useArticleTextInteractions`).
+      // A passage an application proposed answers with its block's sheet instead (D7b, `useArticleTextInteractions`).
       if (proposedPassageAt(e.target)) return;
       const target = (e.target as HTMLElement | null)?.closest<HTMLElement>('.note-anchor');
       if (!target) return;
@@ -28,11 +32,9 @@ export function useInlineNoteAnchors(
       if (!note) return;
       e.preventDefault();
       e.stopPropagation();
-      setInlineNote({ note, anchorEl: target });
+      latest.current(note, target);
     };
     container.addEventListener('click', handler);
     return () => container.removeEventListener('click', handler);
-  }, [containerRef, notes]);
-
-  return { inlineNote, closeInlineNote: () => setInlineNote(null) };
+  }, [containerRef, notes, enabled]);
 }

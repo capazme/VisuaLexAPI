@@ -29,7 +29,7 @@ export interface MissedCitationReporterProps {
 /**
  * "Segnala come citazione" (Loop β #2, feedback_type=missed): a small editor
  * anchored on the selection where the user says which norm a reference the
- * detector missed actually cites. Positioned like InlineNoteComposer: the
+ * detector missed actually cites. Positioned as a virtual reference: the
  * anchor is a virtual element built from the captured rect, registered with
  * `setPositionReference` (floating-ui rejects virtual elements passed as
  * `elements.reference`) and hidden until `isPositioned` (gotcha 13); the outer

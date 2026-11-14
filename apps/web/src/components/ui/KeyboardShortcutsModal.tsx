@@ -40,6 +40,9 @@ const shortcutGroups: ShortcutGroup[] = [
       // The newest «Annulla» of the notifications (L-36), or the last gesture on a highlight, which shows none (A4);
       // outside fields and editors, where it is the browser's undo.
       { keys: [modKey, 'Z'], description: 'Annulla l’ultima azione con «Annulla» o l’ultimo gesto sulle evidenziazioni (fuori dai campi di testo)' },
+      // A block's sign (A4 §6): Enter goes to its first card beside the text; with Shift, everything of the block —
+      // its highlights and an application's proposed passages too — in its sheet.
+      { keys: ['Shift', 'Enter'], description: 'Sul segno di un comma: tutte le sue annotazioni, evidenziazioni comprese' },
     ],
   },
   {

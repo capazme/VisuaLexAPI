@@ -51,6 +51,8 @@ import { shiftAiReviewCount } from '../utils/aiReview';
 import { afterSaving, forgetRemovals, holdGesture, isRemovalPending, removeAtOnce, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
 import { isTextShown } from './textsOnScreen';
 import type { Ink } from '../utils/highlighterRules';
+import type { NoteKind } from '../utils/inkTargets';
+import type { HighlightCreate, HighlightUpdate } from '../types/api';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -132,6 +134,12 @@ export interface StructureWindowState {
     position: { x: number; y: number };
 }
 
+/** The reading tools (A4): the highlighter, and the note tool (§6). */
+export type ReadingTool = 'highlight' | 'note';
+
+/** What the note tool writes: a personal note, or a gloss (a discussion with colleagues). */
+export type NoteToolKind = NoteKind;
+
 /** One gesture of the highlighter over existing highlights (A4), as `useHighlightInk` turns a plan into it. */
 export interface HighlightEdit {
     normaKey: string;
@@ -139,7 +147,15 @@ export interface HighlightEdit {
     /** Highlights taken away, held until the next gesture (`holdGesture`). */
     remove: string[];
     recolor: { id: string; color: Highlight['color'] }[];
-    /** New highlights: the parts a cut leaves (`from` the highlight cut), a piece recoloured. */
+    /**
+     * Highlights with an author (from the Forum) that keep their row with other words, and maybe another colour:
+     * `PUT` of the range (#411), so the row and its first author stay.
+     */
+    reshape?: { id: string; text: string; startOffset: number; color: Highlight['color'] }[];
+    /**
+     * New highlights: the parts a cut leaves (`from` the highlight cut), a piece recoloured. A part of a highlight with
+     * an author is made from it (`splitFrom`, #412) and keeps the author.
+     */
     add: { text: string; startOffset: number; color: Highlight['color']; from?: string }[];
     /** What the gesture did: said to a screen reader (no notification, A4), and «Annullato: …» once undone. */
     message: string;
@@ -213,11 +229,17 @@ interface AppState {
     /** Impostazioni (`SettingsModal`, mounted by `Layout`), and the section it opens at: session-only, absent from `partialize`. */
     settingsDialog: { open: boolean; section: SettingsSection | null };
     /**
-     * The reading tool on (A4): the highlighter, which applies its ink to every selection as it is released, until its
-     * button is pressed again or Esc. One for the whole app, as in a word processor. Session-only, absent from
-     * `partialize`: a tool left on is never found on at the next visit.
+     * The reading tool on (A4): the highlighter, which applies its ink to every selection as it is released, or the note
+     * tool, which opens the editor of a note (or a gloss) on it, until its button is pressed again or Esc. One for the
+     * whole app, as in a word processor: turning one on turns the other off. Session-only, absent from `partialize`: a
+     * tool left on is never found on at the next visit.
      */
-    readingTool: 'highlight' | null;
+    readingTool: ReadingTool | null;
+    /**
+     * What the note tool writes (A4 §6): a personal note, or a gloss — a discussion with colleagues, where the reader has
+     * them. Session-only, as the tool.
+     */
+    noteToolKind: NoteToolKind;
     /**
      * «Nessun colore» chosen as the highlighter's ink (A4): it takes highlights away. Session-only, absent from
      * `partialize`: the colour saved stays `settings.highlightColor` (H1), the ink again after a reload.
@@ -545,7 +567,8 @@ interface AppState {
      * back (`holdGesture`). No notification.
      */
     editHighlights: (edit: HighlightEdit) => void;
-    setReadingTool: (tool: 'highlight' | null) => void;
+    setReadingTool: (tool: ReadingTool | null) => void;
+    setNoteToolKind: (kind: NoteToolKind) => void;
     /** The highlighter's ink (A4): a colour, saved as the colour of new highlights (H1); «Nessun colore» for the session. */
     setHighlighterInk: (ink: Ink) => void;
     getHighlights: (normaKey: string, articleId: string) => Highlight[];
@@ -639,11 +662,22 @@ let saveFailureReported = false;
 // follows in the same hydration (`practicesOnLoad`): the notice is session-only, so it travels here.
 let migrationNotice: string | null = null;
 
+/** What a highlight's `PUT` changes (A4): its colour, and its range for one that keeps its row with other words (#411). */
+type HighlightShape = { color: Highlight['color']; text?: string; startOffset?: number };
+
+/** Whether `h` shows `shape` (its colour, and its words where the shape gives them). */
+const isShaped = (h: Highlight, shape: HighlightShape) =>
+    h.color === shape.color && (shape.text === undefined || (h.text === shape.text && h.startOffset === shape.startOffset));
+
+/** Whether a highlight is attributed to someone else (one taken from the Forum, gotcha 21). */
+const hasAuthor = (h: Highlight) => Boolean(h.sourceSuggestionId || h.originalAuthor);
+
 const appStore = createStore<AppState>()(
     persist(
         immer((set, get) => {
-            // Per highlight, its colours sent one after the other (A4): «Annulla» right after a change must not land first.
-            const colourWrites = new Map<string, Promise<void>>();
+            // Per highlight, its colours and ranges sent one after the other (A4): «Annulla» right after a change must not
+            // land first.
+            const colourWrites = new Map<string, Promise<boolean>>();
             // A highlight's server id by the temporary one it was shown with (A4): what a gesture recorded under the
             // temporary id («Annulla», a colour) reaches it once it is saved.
             const serverIds = new Map<string, string>();
@@ -651,22 +685,35 @@ const appStore = createStore<AppState>()(
 
             /**
              * Sends a highlight already on screen (optimistic): its server id replaces the temporary one, keeping a colour
-             * changed while it travelled (whose `PUT` waits for the id, `sendHighlightColor`); refused, it goes, and the
-             * reader is told. A removal meanwhile waits for the id (`deferredRemovals`). True once saved.
+             * changed while it travelled (whose `PUT` waits for the id, `sendHighlightUpdate`); refused, it goes, and the
+             * reader is told. A removal meanwhile waits for the id (`deferredRemovals`). True once saved. A piece cut from
+             * a highlight with an author is made from it (`splitFrom`, #412: the server copies the author), once that one
+             * has its server id; one whose creation failed takes the piece with it.
              */
-            const saveHighlight = (optimistic: Highlight): Promise<boolean> => {
+            const saveHighlight = (optimistic: Highlight, splitFrom?: string): Promise<boolean> => {
                 const wirePayload = highlightStoreToCreate(optimistic);
                 // No startOffset — cannot persist server-side. Keep the optimistic entry local only (legacy behaviour).
                 if (!wirePayload) return Promise.resolve(true);
                 const tempId = optimistic.id;
                 // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
                 savingStarted(`highlight:${tempId}`);
-                return highlightService
-                    .create(wirePayload)
+                if (splitFrom === undefined) return createHighlight(tempId, wirePayload);
+                return new Promise<boolean>((resolve) => {
+                    afterSaving(`highlight:${splitFrom}`, (origin) => {
+                        const from = origin === undefined ? serverIdOf(splitFrom) : origin && (origin.item as Highlight).id;
+                        resolve(createHighlight(tempId, from ? { ...wirePayload, splitFrom: from } : null));
+                    });
+                });
+            };
+
+            /** `saveHighlight`'s request, and what its answer does on screen; none (null) when it cannot be made. */
+            const createHighlight = (tempId: string, payload: HighlightCreate | null): Promise<boolean> => {
+                return (payload ? highlightService.create(payload) : Promise.reject(new Error('the highlight it is cut from was not saved')))
                     .then((serverHighlight) => {
                         const mapped = highlightApiToStore(serverHighlight);
                         const current = get().highlights.find(h => h.id === tempId);
-                        const kept = current ? { ...mapped, color: current.color } : mapped;
+                        // A colour, or words, given while it travelled stay: their `PUT` waits for this id.
+                        const kept = current ? { ...mapped, color: current.color, text: current.text, startOffset: current.startOffset } : mapped;
                         set((state) => {
                             const idx = state.highlights.findIndex(h => h.id === tempId);
                             if (idx !== -1) state.highlights[idx] = kept;
@@ -692,30 +739,38 @@ const appStore = createStore<AppState>()(
             };
 
             /**
-             * A highlight's new colour sent (A4, `PUT /highlights/:id`), once it has its server id if it is still being
-             * created; refused, the colour on screen goes back to `previous` and the reader is told. One gone meanwhile
-             * (404) needs nothing.
+             * A highlight's new colour sent (A4, `PUT /highlights/:id`) — and its new range, for one that keeps its row
+             * with other words (#411) —, once it has its server id if it is still being created; refused, what is on
+             * screen goes back to `previous` and the reader is told. One gone meanwhile (404) needs nothing. True once
+             * written (or gone), false when refused or never created.
              */
-            const sendHighlightColor = (id: string, color: Highlight['color'], previous: Highlight['color']) => {
+            const sendHighlightUpdate = (id: string, next: HighlightShape, previous: HighlightShape): Promise<boolean> => new Promise((resolve) => {
                 afterSaving(`highlight:${id}`, (saved) => {
-                    // Its creation failed: there is nothing to colour.
-                    if (saved === null) return;
+                    // Its creation failed: there is nothing to change.
+                    if (saved === null) { resolve(false); return; }
                     const serverId = saved ? (saved.item as Highlight).id : serverIdOf(id);
-                    const write = (colourWrites.get(serverId) ?? Promise.resolve())
-                        .then(() => highlightService.update(serverId, { color }))
-                        .then(() => undefined, (err: unknown) => {
-                            if ((err as { status?: number } | null)?.status === 404) return;
-                            console.error('Failed to sync highlight colour:', err);
+                    const body: HighlightUpdate = next.text === undefined || next.startOffset === undefined
+                        ? { color: next.color }
+                        : { color: next.color, text: next.text, startOffset: next.startOffset, endOffset: next.startOffset + next.text.length };
+                    const write = (colourWrites.get(serverId) ?? Promise.resolve(true))
+                        .then(() => highlightService.update(serverId, body))
+                        .then(() => true, (err: unknown) => {
+                            if ((err as { status?: number } | null)?.status === 404) return true;
+                            console.error('Failed to sync highlight change:', err);
                             set((state) => {
                                 const h = state.highlights.find(x => x.id === serverId || x.id === id);
-                                if (h && h.color === color) h.color = previous;
+                                if (h && isShaped(h, next)) Object.assign(h, previous);
                             });
-                            get().pushSyncError('Impossibile cambiare il colore dell\'evidenziazione. Riprova.');
+                            get().pushSyncError(next.text === undefined
+                                ? 'Impossibile cambiare il colore dell\'evidenziazione. Riprova.'
+                                : 'Impossibile modificare l\'evidenziazione. Riprova.');
+                            return false;
                         });
                     colourWrites.set(serverId, write);
                     void write.then(() => { if (colourWrites.get(serverId) === write) colourWrites.delete(serverId); });
+                    resolve(write);
                 });
-            };
+            });
 
             /**
              * Whether the store holds that very highlight already — the same words at the same place, in the same colour,
@@ -796,6 +851,7 @@ const appStore = createStore<AppState>()(
             aliasManagerOpen: false,
             settingsDialog: { open: false, section: null },
             readingTool: null,
+            noteToolKind: 'note',
             highlighterEraser: false,
             searchPanelState: {
                 isCollapsed: false,
@@ -1400,8 +1456,9 @@ const appStore = createStore<AppState>()(
                     state.windowFocusRequest = null;
                     state.phoneReader = null;
                     state.commandPaletteQuery = null;
-                    // The highlighter (A4): the next person on the browser never finds it on.
+                    // The reading tools (A4): the next person on the browser never finds one on.
                     state.readingTool = null;
+                    state.noteToolKind = 'note';
                     state.highlighterEraser = false;
                 });
             },
@@ -2375,7 +2432,7 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            editHighlights: ({ normaKey, articleId, remove, recolor, add, message }) => {
+            editHighlights: ({ normaKey, articleId, remove, recolor, reshape = [], add, message }) => {
                 const before = get().highlights;
                 // In the order they stood, so each goes back to its own place.
                 const removed = remove
@@ -2388,16 +2445,27 @@ const appStore = createStore<AppState>()(
                     const item = before.find(h => h.id === id);
                     return item && item.color !== color ? [{ id, from: item.color, to: color }] : [];
                 });
-                // A part keeps what the server holds of its highlight beyond the words (its `note`, unused here).
-                const notes = new Map(removed.map(({ item }) => [item.id, item.note]));
+                // A highlight with an author keeps its row with other words (#411): its range and colour change in place.
+                const reshaped = reshape.flatMap(({ id, text, startOffset, color }) => {
+                    const item = before.find(h => h.id === id);
+                    if (!item || (item.text === text && item.startOffset === startOffset && item.color === color)) return [];
+                    return [{ id, from: { text: item.text, startOffset: item.startOffset, color: item.color }, to: { text, startOffset, color } }];
+                });
+                const kept = [...remove, ...reshaped.map(r => r.id)];
                 // One that would repeat a highlight that stays, or another part, is not made.
-                const fresh = add.filter((part, i) => !holdsHighlight(normaKey, articleId, part.text, part.startOffset, part.color, remove)
+                const fresh = add.filter((part, i) => !holdsHighlight(normaKey, articleId, part.text, part.startOffset, part.color, kept)
                     && add.findIndex(p => p.text === part.text && p.startOffset === part.startOffset && p.color === part.color) === i);
-                const created: Highlight[] = fresh.map((part) => {
-                    const note = part.from ? notes.get(part.from) : undefined;
+                // A part keeps what the server holds of its highlight beyond the words (its `note`, unused here), and the
+                // first author of one from the Forum (gotcha 21), which the server copies from it (`splitFrom`, #412).
+                const origins = fresh.map((part) => (part.from ? before.find(h => h.id === part.from) : undefined));
+                const created: Highlight[] = fresh.map((part, i) => {
+                    const origin = origins[i];
                     return {
                         id: uuidv4(), normaKey, articleId, text: part.text, rangeSerialized: '', color: part.color, startOffset: part.startOffset,
-                        ...(note ? { note } : {}),
+                        ...(origin?.note ? { note: origin.note } : {}),
+                        ...(origin && hasAuthor(origin)
+                            ? { sourceSuggestionId: origin.sourceSuggestionId ?? null, originalAuthor: origin.originalAuthor ?? null }
+                            : {}),
                     };
                 });
                 set((state) => {
@@ -2407,16 +2475,24 @@ const appStore = createStore<AppState>()(
                         const h = state.highlights.find(x => x.id === id);
                         if (h) h.color = to;
                     }
+                    for (const { id, to } of reshaped) {
+                        const h = state.highlights.find(x => x.id === id);
+                        if (h) Object.assign(h, to);
+                    }
                     state.highlights.push(...created);
                 });
-                // The parts are sent at once; the removals wait for them (a page that goes first keeps the highlight
-                // whole), and a part refused takes the whole gesture back.
+                // The parts and the ranges are sent at once; the removals wait for them (a page that goes first keeps the
+                // highlight whole), and a part or a range refused takes the whole gesture back.
                 const saved = new Map<string, boolean>();
-                const ready = created.length > 0
-                    ? Promise.all(created.map((part) => saveHighlight(part).then((ok) => { saved.set(part.id, ok); return ok; })))
-                        .then((all) => all.every(Boolean))
+                const creations = created.map((part, i) => {
+                    const origin = origins[i];
+                    return saveHighlight(part, origin && hasAuthor(origin) ? origin.id : undefined).then((ok) => { saved.set(part.id, ok); return ok; });
+                });
+                const ranges = reshaped.map(({ id, from, to }) => sendHighlightUpdate(id, to, from));
+                const ready = creations.length + ranges.length > 0
+                    ? Promise.all([...creations, ...ranges]).then((all) => all.every(Boolean))
                     : undefined;
-                for (const { id, from, to } of recolored) sendHighlightColor(id, to, from);
+                for (const { id, from, to } of recolored) void sendHighlightUpdate(id, { color: to }, { color: from });
 
                 const putBack = (item: Highlight) => set((state) => {
                     if (state.highlights.some(h => h.id === item.id)) return;
@@ -2437,25 +2513,36 @@ const appStore = createStore<AppState>()(
                     putBack,
                     onRefused: highlightDeleteRefused,
                     ready,
-                    // The parts go (once created, when they are still on their way) and the colours come back.
+                    // The parts go (once created, when they are still on their way), the colours and the ranges come back.
                     onUndo: () => {
                         const parts = takeBackCreated(created, saved);
-                        for (const { id, from, to } of recolored) {
+                        const back = (id: string, to: HighlightShape, from: HighlightShape, written?: Promise<boolean>) => {
                             // Recorded under a temporary id, it may have its server id by now.
                             const current = serverIdOf(id);
+                            // Only while it still shows what this gesture gave it: a later gesture's colour or range
+                            // (taken back after it, a part refused late) stands, on screen and on the server.
+                            const h = get().highlights.find(x => x.id === current || x.id === id);
+                            if (!h || !isShaped(h, from)) return;
                             set((state) => {
-                                const h = state.highlights.find(x => x.id === current || x.id === id);
-                                if (h) h.color = from;
+                                const now = state.highlights.find(x => x.id === current || x.id === id);
+                                if (now) Object.assign(now, to);
                             });
-                            sendHighlightColor(current, from, to);
-                        }
-                        return parts || recolored.length > 0;
+                            // One refused is back already, on the server and on screen.
+                            void (written ?? Promise.resolve(true)).then((ok) => { if (ok) void sendHighlightUpdate(current, to, from); });
+                        };
+                        for (const { id, from, to } of recolored) back(id, { color: from }, { color: to });
+                        reshaped.forEach(({ id, from, to }, i) => back(id, from, to, ranges[i]));
+                        return parts || recolored.length > 0 || reshaped.length > 0;
                     },
                 });
             },
 
             setReadingTool: (tool) => set((state) => {
                 state.readingTool = tool;
+            }),
+
+            setNoteToolKind: (kind) => set((state) => {
+                state.noteToolKind = kind;
             }),
 
             setHighlighterInk: (ink) => set((state) => {

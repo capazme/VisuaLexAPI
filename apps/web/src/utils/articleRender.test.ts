@@ -348,6 +348,8 @@ describe('annotation signs', () => {
     expect(sign.getAttribute('role')).toBe('button');
     expect(sign.getAttribute('tabindex')).toBe('0');
     expect(sign.getAttribute('aria-haspopup')).toBe('dialog');
+    // Enter goes to the block's first card beside the text; Shift+Enter to everything of it in its sheet (A4 §6).
+    expect(sign.getAttribute('aria-keyshortcuts')).toBe('Shift+Enter');
     expect(sign.getAttribute('aria-label')).toBe('2 note e 3 evidenziazioni in questo passo');
     expect(sign.querySelector('.vlx-sign-notes')?.getAttribute('data-count')).toBe('2');
     expect(pieces(sign, '.vlx-sign-dot').map((d) => d.getAttribute('data-color'))).toEqual(['green', 'yellow']);

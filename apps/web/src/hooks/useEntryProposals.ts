@@ -5,7 +5,7 @@ import type { GlossAnchor } from '../utils/articleAnnotations';
 import {
   assistantProposalsStore, editProposalNote, flushRemovals, loadProposals, moveProposal, removeProposal, setProposalState,
 } from '../store/assistantProposals';
-import type { ProposalActions } from '../components/features/search/BlockAnnotationsPopover';
+import type { ProposalActions } from '../components/features/search/BlockAnnotationsSheet';
 import { CurrentDossierContext } from '../components/features/dossier/currentDossier';
 
 const NONE: Highlight[] = [];

@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
-import { BlockAnnotationsPopover, type BlockAnnotationsPopoverProps } from './BlockAnnotationsPopover';
+import { BlockAnnotationsSheet, type BlockAnnotationsSheetProps } from './BlockAnnotationsSheet';
 import { renderArticleHtml } from '../../../utils/articleRender';
 import { parseArticleStructure } from '../../../utils/articleStructure';
 import { describeBlock, groupAnnotationsByBlock, type LocatedThread } from '../../../utils/articleAnnotations';
@@ -45,7 +45,7 @@ function createDummyThread(over: Partial<ArticleDiscussionPassageSummary> = {}):
 function setup(
   highlights: Highlight[] = [h1],
   annotations: Annotation[] = [n1],
-  over: Partial<BlockAnnotationsPopoverProps> = {},
+  over: Partial<BlockAnnotationsSheetProps> = {},
   threads: ArticleDiscussionPassageSummary[] = [],
 ) {
   const container = document.createElement('div');
@@ -68,22 +68,21 @@ function setup(
   };
   draw();
   document.body.appendChild(container);
-  const props: BlockAnnotationsPopoverProps = {
+  const props: BlockAnnotationsSheetProps = {
     containerRef: { current: container },
     blockIndex: 2,
     blockLabel: describeBlock(RAW, STRUCTURE.blocks[2]),
     group: groupAnnotationsByBlock(RAW, STRUCTURE, highlights, annotations, locatedThreads)[2],
-    contentKey: 'v1',
     onClose: vi.fn(), onUpdateNote: vi.fn(), onRemoveNote: vi.fn(), onRemoveHighlight: vi.fn(),
     ...over,
   };
-  const utils = render(<BlockAnnotationsPopover {...props} />);
+  const utils = render(<BlockAnnotationsSheet {...props} />);
   const sign = () => container.querySelector<HTMLElement>('.vlx-sign[data-block="2"]')!;
   // RTL's own `container` must not shadow the article container.
   return { ...utils, container, props, sign, draw };
 }
 
-describe('BlockAnnotationsPopover', () => {
+describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     vi.useRealTimers();
@@ -92,7 +91,7 @@ describe('BlockAnnotationsPopover', () => {
   it('lists the block\'s notes, then its highlights, under the block\'s own words', async () => {
     setup();
     const dialog = await screen.findByRole('dialog', { name: TITLE });
-    expect(within(dialog).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
+    expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
     expect(within(dialog).getByText('Vedi Cass. 2020')).toBeInTheDocument();
     expect(within(dialog).getByText(/risarcimento del danno/)).toBeInTheDocument();
   });
@@ -109,7 +108,7 @@ describe('BlockAnnotationsPopover', () => {
       const proposalActions = actions();
       setup([h1, p1], [n1], { proposalActions });
       const dialog = await screen.findByRole('dialog', { name: TITLE });
-      expect(within(dialog).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(["Proposte dell'IA", 'Note', 'Evidenziazioni']);
+      expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(["Proposte dell'IA", 'Note', 'Evidenziazioni']);
       expect(within(dialog).getByText('La parte non inadempiente.')).toBeInTheDocument();
       fireEvent.click(within(dialog).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
       expect(proposalActions.validate).toHaveBeenCalledWith('p1', true);
@@ -134,12 +133,12 @@ describe('BlockAnnotationsPopover', () => {
       expect(proposalActions.comment).toHaveBeenCalledWith('p1', 'Il passo è un altro.');
     });
 
-    it('the last one removed closes the popover, as any last annotation; another stays, the focus on the popover', async () => {
+    it('the last one removed closes the sheet, as any last annotation; another stays, the focus in the sheet', async () => {
       const first = setup([h1, p1], [], { proposalActions: actions() });
       let dialog = await screen.findByRole('dialog', { name: TITLE });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
       expect(first.props.onClose).not.toHaveBeenCalled();
-      expect(dialog).toHaveFocus();
+      expect(dialog.contains(document.activeElement)).toBe(true);
       first.unmount();
       document.body.innerHTML = '';
       const only = setup([p1], [], { proposalActions: actions() });
@@ -167,7 +166,7 @@ describe('BlockAnnotationsPopover', () => {
         return { dialog, box };
       };
 
-      it('a press outside leaves the popover open while it is edited, changed or not', async () => {
+      it('a press outside leaves the sheet open while it is edited, changed or not', async () => {
         const { props } = setup([p1], [], { proposalActions: actions() });
         await editIt();
         fireEvent.pointerDown(document.body);
@@ -179,7 +178,7 @@ describe('BlockAnnotationsPopover', () => {
       it('changed, the X asks first; «Continua» keeps it open on the text, «Scarta» closes', async () => {
         const { props } = setup([p1], [], { proposalActions: actions() });
         const { dialog, box } = await editIt('Il creditore sceglie.');
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi annotazioni' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi' }));
         expect(props.onClose).not.toHaveBeenCalled();
         expect(within(dialog).getByRole('alert')).toHaveTextContent('Scartare la modifica?');
         expect(within(dialog).getByRole('button', { name: 'Continua' })).toHaveFocus();
@@ -187,7 +186,7 @@ describe('BlockAnnotationsPopover', () => {
         expect(props.onClose).not.toHaveBeenCalled();
         expect(box).toHaveFocus();
         expect(box).toHaveValue('Il creditore sceglie.');
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi annotazioni' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi' }));
         fireEvent.click(within(dialog).getByRole('button', { name: 'Scarta' }));
         expect(props.onClose).toHaveBeenCalled();
       });
@@ -203,7 +202,7 @@ describe('BlockAnnotationsPopover', () => {
       it('unchanged, the X closes at once', async () => {
         const { props } = setup([p1], [], { proposalActions: actions() });
         const { dialog } = await editIt();
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi annotazioni' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi' }));
         expect(props.onClose).toHaveBeenCalled();
       });
     });
@@ -212,7 +211,7 @@ describe('BlockAnnotationsPopover', () => {
       setup([h1, p1], [n1]);
       const dialog = await screen.findByRole('dialog', { name: TITLE });
       expect(within(dialog).queryByRole('checkbox')).toBeNull();
-      expect(within(dialog).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
+      expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
     });
   });
 
@@ -229,20 +228,33 @@ describe('BlockAnnotationsPopover', () => {
     expect(anchor.classList.contains('vlx-flash')).toBe(false);
   });
 
-  it('edits a note in place', async () => {
+  it('edits a note in place, as its card beside the text does: «Modifica», then Enter or «Salva»', async () => {
     const { props } = setup();
     const dialog = await screen.findByRole('dialog', { name: TITLE });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Vedi Cass. 2020' }));
-    const box = within(dialog).getByRole('textbox');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica' }));
+    const box = within(dialog).getByRole('textbox', { name: 'Testo della nota' });
     fireEvent.change(box, { target: { value: 'Vedi Cass. 2021' } });
-    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+    fireEvent.keyDown(box, { key: 'Enter' });
     expect(props.onUpdateNote).toHaveBeenCalledWith('n1', 'Vedi Cass. 2021');
+  });
+
+  it('a note being edited is not lost to its X: it asks first', async () => {
+    const { props } = setup();
+    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica' }));
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Testo della nota' }), { target: { value: 'Vedi Cass. 2021' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi' }));
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Scartare la modifica?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Scarta' }));
+    expect(props.onClose).toHaveBeenCalled();
   });
 
   it('removes a highlight and stays open; the last annotation closes it', async () => {
     const first = setup();
     let dialog = await screen.findByRole('dialog', { name: TITLE });
-    fireEvent.click(within(dialog).getByRole('button', { name: /Rimuovi/ }));
+    // The note's «Rimuovi» comes first, the highlight's after it.
+    fireEvent.click(within(dialog).getAllByRole('button', { name: /Rimuovi/ }).at(-1)!);
     expect(first.props.onRemoveHighlight).toHaveBeenCalledWith('h1');
     expect(first.props.onClose).not.toHaveBeenCalled();
     first.unmount();
@@ -274,28 +286,25 @@ describe('BlockAnnotationsPopover', () => {
     await waitFor(() => expect(container.getAttribute('aria-hidden')).toBe('true'));
   });
 
-  it('does not treat a press on its own sign as outside, but does elsewhere', async () => {
-    const { props, sign } = setup();
+  it('closes by its X or Esc, never by a stray press outside', async () => {
+    const { props } = setup();
     await screen.findByRole('dialog', { name: TITLE });
-    fireEvent.pointerDown(sign());
-    fireEvent.mouseDown(sign());
-    expect(props.onClose).not.toHaveBeenCalled();
     fireEvent.pointerDown(document.body);
     fireEvent.mouseDown(document.body);
-    expect(props.onClose).toHaveBeenCalled();
+    fireEvent.click(document.body);
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 
-  it('follows its sign when the text is redrawn under it', async () => {
-    const { props, sign, draw, rerender } = setup();
+  it('gives the focus back to its sign found again, the text redrawn meanwhile (an edit, a removal)', async () => {
+    const { props, sign, draw, unmount } = setup();
     await screen.findByRole('dialog', { name: TITLE });
     const old = sign();
     draw();
-    const fresh = sign();
-    expect(fresh).not.toBe(old);
-    const measure = vi.spyOn(fresh, 'getBoundingClientRect');
-    rerender(<BlockAnnotationsPopover {...props} contentKey="v2" />);
-    await waitFor(() => expect(measure).toHaveBeenCalled());
-    expect(props.onClose).not.toHaveBeenCalled();
+    expect(sign()).not.toBe(old);
+    fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(props.onClose).toHaveBeenCalled();
+    unmount();
+    await waitFor(() => expect(document.activeElement).toBe(sign()));
   });
 
   it('credits an imported highlight to its author', async () => {
@@ -310,7 +319,7 @@ describe('BlockAnnotationsPopover', () => {
     const { props } = setup([], [], { onOpenThread }, [thread]);
     const dialog = await screen.findByRole('dialog', { name: TITLE });
 
-    expect(within(dialog).getByRole('heading', { level: 4, name: 'Glosse' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { level: 3, name: 'Glosse' })).toBeInTheDocument();
     expect(within(dialog).getByText('“prestazioni corrispettive”')).toBeInTheDocument();
     expect(within(dialog).getByText('Disputa sulla risoluzione')).toBeInTheDocument();
     expect(within(dialog).getByText(/@marta · 1 risposta/)).toBeInTheDocument();
@@ -337,7 +346,7 @@ describe('BlockAnnotationsPopover', () => {
     expect(within(dialog).getByText('Il testo è cambiato da quando è stata aperta')).toBeInTheDocument();
   });
 
-  it('removing the last highlight of a block that still has a thread does not close the popover', async () => {
+  it('removing the last highlight of a block that still has a thread does not close the sheet', async () => {
     const thread = createDummyThread();
     const { props } = setup([h1], [], {}, [thread]);
     const dialog = await screen.findByRole('dialog', { name: TITLE });
@@ -348,7 +357,7 @@ describe('BlockAnnotationsPopover', () => {
   });
 });
 
-describe('BlockAnnotationsPopover — an application\'s glosses (D8)', () => {
+describe('BlockAnnotationsSheet — an application\'s glosses (D8)', () => {
   afterEach(() => { document.body.innerHTML = ''; });
 
   const words = 'contraenti';
@@ -359,34 +368,15 @@ describe('BlockAnnotationsPopover — an application\'s glosses (D8)', () => {
     note: aiNote('Il rimedio.'),
   };
   const proposalActions = { validate: vi.fn(), flag: vi.fn(), comment: vi.fn(), editNote: vi.fn(), remove: vi.fn(), move: vi.fn() };
-  const withGloss = (over: Partial<BlockAnnotationsPopoverProps>) => {
+  const withGloss = (over: Partial<BlockAnnotationsSheetProps>) => {
     const group = groupAnnotationsByBlock(RAW, STRUCTURE, [h1], [n1], [], [{ id: 'g1', startOffset: gloss.startOffset, text: words, state: 'proposed' }])[2];
     return setup([h1], [n1], { group, glosses: [gloss], proposalActions, ...over });
   };
 
-  it('narrow: lists the block\'s gloss cards first', async () => {
+  it('lists the block\'s gloss cards first: the column\'s are the margin\'s, this is everything of the block', async () => {
     withGloss({});
     const dialog = await screen.findByRole('dialog', { name: TITLE });
     expect(within(dialog).getByRole('article', { name: /Da validare/ })).toBeInTheDocument();
-  });
-
-  it('wide: offers the way to the margin, which closes the popover once a card took the focus', async () => {
-    const onGoToGloss = vi.fn(() => true);
-    const { props } = withGloss({ glossesInMargin: true, onGoToGloss });
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
-    expect(within(dialog).queryByRole('article')).toBeNull();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Vai alla glossa a margine' }));
-    expect(onGoToGloss).toHaveBeenCalledWith('g1');
-    expect(props.onClose).toHaveBeenCalled();
-  });
-
-  it('wide, but no card took the focus (the reader narrowed): the popover stays, its cards drawn in it', async () => {
-    const { props } = withGloss({ glossesInMargin: true, onGoToGloss: () => false });
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Vai alla glossa a margine' }));
-    expect(props.onClose).not.toHaveBeenCalled();
-    expect(await within(dialog).findByRole('article', { name: /Da validare/ })).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: 'Vai alla glossa a margine' })).toBeNull();
-    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(["Glosse dell'IA", 'Note', 'Evidenziazioni']);
   });
 });

@@ -295,7 +295,8 @@ export function signHtml(index: number, group: BlockAnnotations | undefined): st
   const open = counts.proposed + counts.review;
   const label = signAriaLabel(notes, highlights - noted.length, threads, counts, glosses);
   let html =
-    `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
+    // Enter goes to the block's first card beside the text, Shift+Enter to everything of it in its sheet (A4 §6).
+    `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" aria-keyshortcuts="Shift+Enter" data-block="${index}"` +
     ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}" data-glosses="${glossed}"` +
     (open > 0 ? ` data-proposed="${open}"` : '') +
     (noted.length + glossed > 0 ? ` title="${escapeAttr(label)}"` : '') +

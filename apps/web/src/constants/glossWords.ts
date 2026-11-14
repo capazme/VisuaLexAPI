@@ -18,7 +18,7 @@ export const GLOSS_WORDS = {
     review > 0 ? `${review} da rivedere` : '',
     validated > 0 ? `${validated} ${validated === 1 ? 'validata' : 'validate'}` : '',
   ].filter(Boolean).join(' · '),
-  /** The column beside the text and the popover's section. */
+  /** The section of a block's sheet that lists them. */
   column: "Glosse dell'IA",
   /** The notification of the bin, which offers «Annulla». */
   removed: 'Glossa rimossa',
@@ -33,6 +33,4 @@ export const GLOSS_WORDS = {
   /** The list of those whose words are no longer in the text. */
   lostTitle: "Glosse dell'IA non più nel testo",
   lostHelp: "Le parole su cui l'IA le aveva scritte non sono nel testo mostrato.",
-  /** A block with glosses in the margin, in the popover of a computer's wide reader: the way to them. */
-  goTo: (n: number) => (n === 1 ? 'Vai alla glossa a margine' : `Vai alle ${n} glosse a margine`),
 } as const;

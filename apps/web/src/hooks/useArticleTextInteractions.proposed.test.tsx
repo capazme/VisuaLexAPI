@@ -15,7 +15,7 @@ const BODY =
   '<span class="vlx-sign" role="button" tabindex="0" data-block="0" data-notes="1" data-highlights="3" data-proposed="2"></span></div>' +
   '<p class="vlx-dec-para"><span class="vlx-dec-line">Il <mark class="highlight-mark vlx-proposed" data-highlight="p2" data-proposed="review">ricorso</mark></span>' +
   '<span class="vlx-sign" role="button" tabindex="0" data-block="1" data-notes="0" data-highlights="1" data-proposed="1"></span></p>' +
-  // A block with no sign (a text drawn flat): no popover to open, so the note under the passage opens as before.
+  // A block with no sign (a text drawn flat): no sheet to open, so the note under the passage opens as before.
   '<div class="vlx-b vlx-comma"><span class="note-anchor" data-note-id="n1"><mark class="highlight-mark vlx-proposed" data-highlight="p4" data-proposed="proposed">senza segno</mark></span></div>';
 
 const NOTES: Annotation[] = [{ id: 'n1', normaKey: 'k', articleId: '1', text: 'Mia nota', createdAt: '', anchorText: 'con prestazioni', startOffset: 13 }];
@@ -24,13 +24,15 @@ const NOTES: Annotation[] = [{ id: 'n1', normaKey: 'k', articleId: '1', text: 'M
 function Harness({ hidden = false }: { hidden?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [version, setVersion] = useState(1);
-  const { openBlock, openNote } = useArticleTextInteractions(ref, 'a', { contentKey: `v${version}` });
-  const { inlineNote } = useInlineNoteAnchors(ref, NOTES);
+  const { openBlock, blockAll, openNote } = useArticleTextInteractions(ref, 'a', { contentKey: `v${version}` });
+  const [inlineNote, setInlineNote] = useState<{ note: Annotation } | null>(null);
+  useInlineNoteAnchors(ref, NOTES, (note) => setInlineNote({ note }));
   const html = useMemo(() => ({ __html: BODY }), []);
   return (
     <div>
       <div ref={ref} data-testid="body" className={hidden ? 'highlights-hidden' : undefined} dangerouslySetInnerHTML={html} />
       <output data-testid="block">{openBlock === null ? '' : String(openBlock)}</output>
+      <output data-testid="all">{blockAll ? 'all' : ''}</output>
       <output data-testid="note">{inlineNote?.note.id ?? ''}</output>
       <output data-testid="update">{openNote?.id ?? ''}</output>
       <button type="button" onClick={() => setVersion((v) => v + 1)}>ridisegna</button>
@@ -42,11 +44,27 @@ const mark = (id: string) => screen.getByTestId('body').querySelector<HTMLElemen
 const out = (id: string) => screen.getByTestId(id).textContent;
 
 describe('useArticleTextInteractions — a passage an application proposed (D7b)', () => {
-  it('a click on it opens its block\'s popover, never the note under it', () => {
+  it('a click on it opens its block\'s sheet, everything of it (it has no card beside the text), never the note under it', () => {
     render(<Harness />);
     fireEvent.click(mark('p1'));
     expect(out('block')).toBe('0');
+    expect(out('all')).toBe('all');
     expect(out('note')).toBe('');
+  });
+
+  it('a sign\'s press opens its block for the card beside the text; with Shift, everything of it in the sheet (A4 §6)', () => {
+    render(<Harness />);
+    const sign = screen.getByTestId('body').querySelector<HTMLElement>('.vlx-sign[data-block="1"]')!;
+    fireEvent.click(sign);
+    expect(out('block')).toBe('1');
+    expect(out('all')).toBe('');
+    fireEvent.click(sign, { shiftKey: true });
+    expect(out('block')).toBe('1');
+    expect(out('all')).toBe('all');
+    fireEvent.keyDown(sign, { key: 'Enter', shiftKey: true });
+    expect(out('block')).toBe('');
+    fireEvent.keyDown(sign, { key: 'Enter', shiftKey: true });
+    expect(out('all')).toBe('all');
   });
 
   it('still so once the text has been redrawn (its listener added again, now last)', () => {
@@ -63,14 +81,14 @@ describe('useArticleTextInteractions — a passage an application proposed (D7b)
     expect(out('block')).toBe('1');
   });
 
-  it('a reference inside it keeps its own click: the update note opens, not the popover', () => {
+  it('a reference inside it keeps its own click: the update note opens, not the sheet', () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId('body').querySelector('.vlx-ref')!);
     expect(out('update')).toBe('119');
     expect(out('block')).toBe('');
   });
 
-  it('with the highlights hidden it is the words again: the note under it opens; the reader\'s own highlight never opens a popover', () => {
+  it('with the highlights hidden it is the words again: the note under it opens; the reader\'s own highlight never opens a sheet', () => {
     render(<Harness hidden />);
     fireEvent.click(mark('p1'));
     expect(out('block')).toBe('');

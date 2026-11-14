@@ -21,19 +21,19 @@ import { wrapDecisionCitationsInHtml } from '../../../utils/decisionCitationMatc
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
+import { useNoteOpener, useSignTarget } from '../../../hooks/useSignTarget';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
 import { HighlightsActionsPicker } from './HighlightsActionsPicker';
-import { InlineNotePopover } from './InlineNotePopover';
-import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
 import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { quickNormParamsOf } from '../../../utils/quickNormParams';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
-import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
+import { BlockAnnotationsSheet } from './BlockAnnotationsSheet';
+import { AnnotationMargin, type AnnotationMarginHandle } from './AnnotationMargin';
 import { LooseHighlightsList } from './LooseHighlightsList';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { getRubricText, getUpdateNoteParagraphs, isNotice, parseArticleStructure } from '../../../utils/articleStructure';
@@ -47,7 +47,7 @@ import { buildArticleXrefNerPayload } from './articleXrefNer';
 import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
-import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
 import type { Annotation, Highlight } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { citeNorm, shortNorm } from '../../../utils/sources';
@@ -341,7 +341,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             },
         }),
     });
-    const { inlineNote, closeInlineNote } = useInlineNoteAnchors(contentRef, itemAnnotations);
 
     // Fetch persisted highlights + annotations from the Node backend when the
     // article first mounts (or when the user switches to a different article
@@ -756,11 +755,18 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom
     // fold; an annotation sign opens its block's notes and highlights.
-    const { updatesOpen, openNote, closeNote, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
+    const { updatesOpen, openNote, closeNote, openBlock, blockAll, closeBlock, openBlockAt } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
         updatesOpenByDefault: display.updateNotesOpen,
     });
     const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
+    // The notes and the discussions beside the text, as a word processor's comments (A4 §6): a sign's press goes to its
+    // block's first card there, else to the block's sheet; a note's wavy words to its card, else to that sheet.
+    const marginRef = useRef<AnnotationMarginHandle>(null);
+    const [marginShown, setMarginShown] = useState(false);
+    const sheetOpen = useSignTarget({ openBlock, blockAll, group: openGroup, marginShown, marginRef, closeBlock, openBlockAt });
+    const openNoteBeside = useNoteOpener(marginRef, openBlockAt);
+    useInlineNoteAnchors(contentRef, itemAnnotations, openNoteBeside);
 
     // Citation hover and click: a click jumps within the same act or opens a search, recording the
     // way back from this block first.
@@ -872,25 +878,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onExportTxt={handleExportHighlightsTxt}
             />
 
-            {inlineNote && (
-                <InlineNotePopover
-                    note={inlineNote.note}
-                    anchorEl={inlineNote.anchorEl}
-                    onClose={closeInlineNote}
-                    onUpdate={updateAnnotation}
-                    onRemove={removeAnnotation}
-                />
-            )}
-
-            {composerRect && noteAnchor && (
-                <InlineNoteComposer
-                    anchorRect={composerRect}
-                    anchorText={noteAnchor.anchorText}
-                    onSave={commitComposer}
-                    onClose={closeComposer}
-                />
-            )}
-
             {devMode && canContribute && missedCitation && (
                 <MissedCitationReporter
                     anchorRect={missedCitation.rect}
@@ -910,22 +897,41 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             )}
 
             {display.textVisible && (
-                <ArticleBody
-                    contentRef={contentRef}
+                <AnnotationMargin
+                    ref={marginRef}
+                    plain={plainArticle}
                     textRootRef={textRootRef}
-                    itemKey={itemKey}
-                    processedContent={processedContent}
-                    onPopupHighlight={handlePopupHighlight}
-                    onPopupAddNote={handlePopupAddNote}
-                    onPopupCopy={handlePopupCopy}
-                    onPopupDiscuss={readOnly ? undefined : discussion.popupDiscuss}
-                    onPopupReportCitation={devMode && canContribute && !readOnly ? handlePopupReportCitation : undefined}
-                    onPopupCreateCard={!isBeside && offersNewCard(norma_data, cardsHistorical)
-                        ? (text) => cardsRowRef.current?.createFromPassage(text)
-                        : undefined}
-                    updatesOpen={updatesOpen}
-                    copyOnly={readOnly}
-                />
+                    contentKey={processedContent}
+                    notes={shownAnnotations}
+                    onUpdateNote={updateAnnotation}
+                    onRemoveNote={removeAnnotation}
+                    // A note being written: beside the text where it has room, else in a sheet from the bottom.
+                    draft={composerRect && noteAnchor ? { text: noteAnchor.anchorText, startOffset: noteAnchor.startOffset } : null}
+                    onSaveDraft={commitComposer}
+                    onCancelDraft={closeComposer}
+                    threads={shownThreads}
+                    onOpenThread={discussion.openThread}
+                    textHash={textHash}
+                    onWideChange={setMarginShown}
+                >
+                    <ArticleBody
+                        contentRef={contentRef}
+                        textRootRef={textRootRef}
+                        itemKey={itemKey}
+                        processedContent={processedContent}
+                        onPopupHighlight={handlePopupHighlight}
+                        // A note being written keeps its words: a new selection refocuses it (the note tool takes every one).
+                        onPopupAddNote={(text, startOffset, rect) => { if (!marginRef.current?.keepDraft()) handlePopupAddNote(text, startOffset, rect); }}
+                        onPopupCopy={handlePopupCopy}
+                        onPopupDiscuss={readOnly ? undefined : discussion.popupDiscuss}
+                        onPopupReportCitation={devMode && canContribute && !readOnly ? handlePopupReportCitation : undefined}
+                        onPopupCreateCard={!isBeside && offersNewCard(norma_data, cardsHistorical)
+                            ? (text) => cardsRowRef.current?.createFromPassage(text)
+                            : undefined}
+                        updatesOpen={updatesOpen}
+                        copyOnly={readOnly}
+                    />
+                </AnnotationMargin>
             )}
 
             {!discussion.open && (
@@ -943,14 +949,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            {openBlock !== null && hasAnnotations(openGroup) && (
-                <BlockAnnotationsPopover
+            {sheetOpen && openBlock !== null && openGroup && (
+                <BlockAnnotationsSheet
                     key={openBlock}
                     containerRef={contentRef}
                     blockIndex={openBlock}
                     blockLabel={describeBlock(article_text || '', structure.blocks[openBlock])}
                     group={openGroup}
-                    contentKey={processedContent}
                     textHash={textHash}
                     onOpenThread={discussion.openThread}
                     onClose={closeBlock}

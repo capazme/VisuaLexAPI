@@ -7,7 +7,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { getSelectionAnchor } from '../../../utils/selectionOffset';
 import { getInkAnchor } from '../../../utils/inkSelection';
 import type { Ink } from '../../../utils/highlighterRules';
-import { registerInkTarget } from '../../../utils/inkTargets';
+import { registerInkTarget, type NoteKind } from '../../../utils/inkTargets';
 import { useInkOnRelease } from '../../../hooks/useInkOnRelease';
 import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
 
@@ -75,8 +75,11 @@ export function SelectionPopup({
   // The highlighter's ink, chosen in the reading bar (H1, A4): a colour, or «Nessun colore», which takes highlights away.
   const ink = useHighlighterInk();
   // The highlighter on (A4): every selection takes the ink as it is released, and this bar does not appear. Not on a
-  // text that takes no highlight.
+  // text that takes no highlight. The note tool on (§6): every selection opens the editor of a note on it, as selected.
   const inking = useAppStore((s) => s.readingTool === 'highlight') && !copyOnly;
+  const noting = useAppStore((s) => s.readingTool === 'note') && !copyOnly;
+  const noteKind = useAppStore((s) => s.noteToolKind);
+  const tooling = inking || noting;
   const popupRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -84,11 +87,30 @@ export function SelectionPopup({
     setPopup(prev => ({ ...prev, visible: false }));
   }, []);
 
-  // The reader's handler as it is now, for the registered target and the tool's release.
+  // The reader's handlers as they are now, for the registered target and the tools' release.
   const highlightRef = useRef(onHighlight);
+  const noteRef = useRef({ onAddNote, onDiscuss });
   useEffect(() => {
     highlightRef.current = onHighlight;
+    noteRef.current = { onAddNote, onDiscuss };
   });
+
+  /**
+   * A note on the words selected, as selected (a note keeps them exactly, A4), read now — the words and their box,
+   * before a press or the clearing takes the selection away (gotcha 16) —, and the editor it opens once asked: a gloss
+   * opens the discussion's composer where the reader has one, else it is a personal note. Null with no words to anchor.
+   */
+  const noteOn = useCallback((selection: Selection): ((kind: NoteKind) => void) | null => {
+    const anchor = getSelectionAnchor(textRootRef?.current ?? containerRef.current, selection);
+    if (!anchor) return null;
+    const box = selection.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
+    const rect = { x: box?.x ?? 0, y: box?.y ?? 0, width: box?.width ?? 0, height: box?.height ?? 0 };
+    return (kind) => {
+      const { onAddNote: addNote, onDiscuss: discuss } = noteRef.current;
+      if (kind === 'gloss' && discuss) discuss(anchor.text, anchor.startOffset);
+      else addNote(anchor.text, anchor.startOffset, rect);
+    };
+  }, [containerRef, textRootRef]);
 
   // The words selected here, as this text stores them: the highlighter's button applies its ink to them (A4).
   useEffect(() => {
@@ -98,29 +120,45 @@ export function SelectionPopup({
       read: (selection) => {
         const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);
         if (!anchor) return null;
+        // Read as the press starts, as the ink's words are: by the click the selection may be gone (a touch).
+        const write = noteOn(selection);
         return {
           apply: (chosen) => {
             highlightRef.current(anchor.text, chosen, anchor.startOffset);
             hidePopup();
             window.getSelection()?.removeAllRanges();
           },
+          ...(write ? {
+            note: (kind: NoteKind) => {
+              write(kind);
+              hidePopup();
+              window.getSelection()?.removeAllRanges();
+            },
+          } : {}),
         };
       },
     });
-  }, [copyOnly, containerRef, textRootRef, hidePopup]);
+  }, [copyOnly, containerRef, textRootRef, hidePopup, noteOn]);
 
-  // The tool on: the selection takes the ink as it is released, with no bar.
-  useInkOnRelease(containerRef, inking, (selection) => {
+  // A tool on: the selection takes the ink, or opens a note's editor, as it is released, with no bar.
+  useInkOnRelease(containerRef, tooling, (selection) => {
+    if (noting) {
+      const write = noteOn(selection);
+      if (!write) return;
+      write(noteKind);
+      selection.removeAllRanges();
+      return;
+    }
     const anchor = getInkAnchor(textRootRef?.current ?? containerRef.current, selection);
     if (!anchor) return;
     highlightRef.current(anchor.text, ink, anchor.startOffset);
     selection.removeAllRanges();
   });
   // Turned on with the bar open: the bar goes, adjusted during render (gotcha 11), so it never comes back stale.
-  const [wasInking, setWasInking] = useState(inking);
-  if (wasInking !== inking) {
-    setWasInking(inking);
-    if (inking && popup.visible) setPopup((prev) => ({ ...prev, visible: false }));
+  const [wasTooling, setWasTooling] = useState(tooling);
+  if (wasTooling !== tooling) {
+    setWasTooling(tooling);
+    if (tooling && popup.visible) setPopup((prev) => ({ ...prev, visible: false }));
   }
   // The text's cursor says the tool is on (`index.css`), the eraser's for «Nessun colore»: a class on the container,
   // never in the text (root rule 23).
@@ -136,8 +174,8 @@ export function SelectionPopup({
   }, [containerRef, inking, ink]);
 
   const handleMouseUp = useCallback(() => {
-    // The tool takes the selection itself (`useInkOnRelease`).
-    if (inking) return;
+    // A tool takes the selection itself (`useInkOnRelease`).
+    if (tooling) return;
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -196,7 +234,7 @@ export function SelectionPopup({
         displayText: rawSelected.trim(),
       });
     }, 10);
-  }, [containerRef, textRootRef, hidePopup, inking]);
+  }, [containerRef, textRootRef, hidePopup, tooling]);
 
   // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it moves: the
   // position's clamp counts in the container, not the window, and a phone's edge once cut the popup (D7b). A style
