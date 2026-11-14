@@ -5,7 +5,7 @@
  * One definition of "this anchor renders, here", shared by the renderer
  * (utils/articleRender.ts), which draws the marks and the annotation signs,
  * and by the popover that lists a block's annotations
- * (BlockAnnotationsPopover): what a sign counts is exactly what its block
+ * (BlockAnnotationsSheet): what a sign counts is exactly what its block
  * shows. Offsets are plain-text offsets — `article_text` without its
  * newlines (CLAUDE.md gotcha 23).
  */

@@ -1,6 +1,6 @@
 // The ingress must send the browser's scraping calls to the scrapers and nothing
 // else of the Python API. The list of those calls already exists: it is what Vite
-// proxies to port 5000 in development. These tests keep the Caddyfile in step with
+// proxies to the Python API (PYTHON_API) in development. These tests keep the Caddyfile in step with
 // it, prefix for prefix (a Vite key matches by prefix, so '/health' also covers
 // '/health/detailed').
 import { test } from 'node:test';
@@ -14,7 +14,7 @@ const vite = readFileSync(join(root, 'apps/web/vite.config.ts'), 'utf8');
 const caddyfile = readFileSync(join(root, 'infra/ingress/Caddyfile'), 'utf8');
 
 function vitePythonPaths() {
-  return [...vite.matchAll(/'(\/[\w\-/]+)'\s*:\s*'http:\/\/localhost:5000'/g)]
+  return [...vite.matchAll(/'(\/[\w\-/]+)'\s*:\s*PYTHON_API\b/g)]
     .map((m) => m[1])
     .sort();
 }
@@ -46,7 +46,7 @@ function caddyExcludedPaths() {
 test('every Vite proxy entry to the Python API was read', () => {
   // A key the regex cannot read would drop out of the comparison below and let the
   // ingress drift from Vite without a red test: count them another way.
-  const entries = vite.match(/localhost:5000/g) ?? [];
+  const entries = vite.match(/:\s*PYTHON_API\b/g) ?? [];
   assert.ok(entries.length >= 10, 'could not read the Vite proxy list');
   assert.equal(vitePythonPaths().length, entries.length);
 });

@@ -235,11 +235,20 @@ export interface HighlightCreate {
   endOffset: number;
   note?: string;
   bookmarkId?: string;
+  /**
+   * The highlight this one is cut from (A4, #412): the server copies its first author (`originalAuthorId`,
+   * `sourceSuggestionId`) onto it. Its server id, never a temporary one.
+   */
+  splitFrom?: string;
 }
 
 export interface HighlightUpdate {
   color?: 'yellow' | 'green' | 'blue' | 'red' | 'purple';
   note?: string;
+  /** The range, whole or not at all (#411): a highlight that keeps its row, and its author, with other words. */
+  text?: string;
+  startOffset?: number;
+  endOffset?: number;
 }
 
 export interface HighlightResponse {

@@ -263,7 +263,7 @@ async function readNorm(content: unknown, signal: AbortSignal): Promise<EntryTex
   if (!norma) throw new EntryUnreadable();
   const { status, data } = await postLegalApi('/fetch_article_text', articleFetchBody(norma), { signal });
   const first = (Array.isArray(data) ? data[0] : data) as
-    | { article_text?: unknown; error?: unknown; validity?: unknown; note_aggiornamento?: unknown; note_non_lette?: unknown; note_nel_testo?: unknown; parti?: unknown; testo_parziale?: unknown; norma_data?: unknown }
+    | { article_text?: unknown; text_source?: unknown; error?: unknown; validity?: unknown; note_aggiornamento?: unknown; note_non_lette?: unknown; note_nel_testo?: unknown; parti?: unknown; testo_parziale?: unknown; norma_data?: unknown }
     | undefined;
   // The request refused as invalid, or a document the source says is not there: asking again will not help.
   if (status === 400 || (first && typeof first.error === 'string' && PERMANENT.test(first.error))) throw new SourceHasNoText();
@@ -276,6 +276,9 @@ async function readNorm(content: unknown, signal: AbortSignal): Promise<EntryTex
   if (status !== 200 || !first || first.error || typeof first.article_text !== 'string' || !first.article_text) {
     throw new TextUnavailable(`fetch_article_text ${status}`);
   }
+  // The AKN export, served when Normattiva's HTML could not be read (scan A.7), is not the text the
+  // reader draws (rule 23): a passage located in it would not land. Not available yet, as a source down.
+  if (first.text_source === 'akn') throw new TextUnavailable('fetch_article_text served the AKN fallback');
   return {
     kind: 'norm',
     projection: articleProjection(first.article_text),

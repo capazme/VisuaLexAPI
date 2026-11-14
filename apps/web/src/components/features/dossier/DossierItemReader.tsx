@@ -3,17 +3,15 @@ import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw, Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
-import { proposedPassageAt, useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { useHighlightInk } from '../../../hooks/useHighlightInk';
 import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
-import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
+import { BlockAnnotationsSheet } from '../search/BlockAnnotationsSheet';
 import { LooseHighlightsList } from '../search/LooseHighlightsList';
 import { MoveProposalBar } from '../search/MoveProposalBar';
 import { LostGlossesList, LostProposalsList } from '../search/LostProposalsList';
-import { GlossMargin, type GlossMarginHandle } from '../search/GlossMargin';
-import { InlineNoteComposer } from '../search/InlineNoteComposer';
-import { InlineNotePopover } from '../search/InlineNotePopover';
+import { AnnotationMargin, type AnnotationMarginHandle, type NoteDraft } from '../search/AnnotationMargin';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
 import { todayInRome } from '../../../utils/dateUtils';
@@ -21,12 +19,15 @@ import { copyNormLink, EUROPEAN_LINK_NOTE, linkPinDay, normLink, normLinkActionL
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
 import { HighlighterButton } from '../search/HighlighterButton';
+import { NoteToolButton } from '../search/NoteToolButton';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
-import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
 import { useGlossPassage } from '../../../hooks/useGlossPassage';
+import { useNoteOpener, useSignTarget } from '../../../hooks/useSignTarget';
+import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { isGloss } from '../../../utils/aiReview';
 import { GLOSS_WORDS } from '../../../constants/glossWords';
 
@@ -70,11 +71,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   const contentRef = useRef<HTMLDivElement>(null);
   // The text alone (without the selection popup): a passage's new words are read there (D7b).
   const textRootRef = useRef<HTMLDivElement>(null);
-  const [composer, setComposer] = useState<{
-    rect: { x: number; y: number; width: number; height: number };
-    anchorText: string; startOffset: number;
-  } | null>(null);
-  const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
+  // A new note being written (A4 §6): beside the text where it has room, else in a sheet from the bottom.
+  const [draft, setDraft] = useState<NoteDraft | null>(null);
 
   const itemKey = useMemo(() => buildItemKey(norma), [norma]);
   const uniqueArticleId = useMemo(() => uniqueArticleIdFromNorma(norma), [norma]);
@@ -188,8 +186,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     (id: string, show: boolean) => (show ? showGloss(id) : hideGloss(id)),
     [showGloss, hideGloss],
   );
-  const marginRef = useRef<GlossMarginHandle>(null);
-  const [glossesWide, setGlossesWide] = useState(false);
+  const marginRef = useRef<AnnotationMarginHandle>(null);
+  const [marginShown, setMarginShown] = useState(false);
   // Highlights no sign can reach (their text changed): still removable. A proposal whose words no longer land has a
   // list of its own, at every width, with its note and its actions (D7b).
   const looseHighlights = useMemo(
@@ -203,58 +201,20 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   // Update-note references, the foldable AGGIORNAMENTO tail and the
   // annotation signs, as on the dashboard. `enabled` waits for the body: it
   // exists only once the fetch settles.
-  const { updatesOpen, openNote, closeNote, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
+  const { updatesOpen, openNote, closeNote, openBlock, blockAll, closeBlock, openBlockAt } = useArticleTextInteractions(contentRef, itemKey, {
     enabled: isReady,
     contentKey: markedHtml,
     // A past text opens its notes (the rule that applies is often in them); the toggle still folds them.
     updatesOpenByDefault: display?.updateNotesOpen ?? false,
   });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
-  // Whether the glosses are beside the text, as it was when the block was opened: a reader widened or narrowed while its
-  // popover is open (a gloss's text half edited in it) keeps the popover as it is.
-  const [openedWide, setOpenedWide] = useState<{ block: number | null; wide: boolean }>({ block: null, wide: false });
-  if (openedWide.block !== openBlock) setOpenedWide({ block: openBlock, wide: glossesWide });
-  // Narrowed meanwhile, the cards are listed in the popover (the column is gone, «Vai alla glossa» would go nowhere);
-  // widened, they stay there (one may be half edited).
-  const inMargin = glossesWide && (openedWide.block === openBlock ? openedWide.wide : true);
-  // With the glosses beside the text, a sign whose block holds only glosses focuses the first one's card (D8, as a
-  // word processor's comment); one that holds more opens the popover, which offers the way to them.
-  const onlyGlosses = !!openGroup && openGroup.glosses.length > 0
-    && openGroup.notes.length + openGroup.highlights.length + openGroup.threads.length === 0;
-  const focusCard = inMargin && onlyGlosses ? openGroup.glosses[0].id : null;
-  useEffect(() => {
-    if (!focusCard) return;
-    // The column took the press: the focus goes to the card (a DOM write), and the block is closed again so the next
-    // press on the sign does the same.
-    marginRef.current?.focus(focusCard);
-    closeBlock();
-  }, [focusCard, closeBlock]);
+  // The sign (A4 §6): the block's first card beside the text, else its sheet.
+  const sheetOpen = useSignTarget({ openBlock, blockAll, group: openGroup, marginShown, marginRef, closeBlock, openBlockAt });
 
-  // Delegated click on the article body: tapping a wavy `.note-anchor`
-  // opens the compact InlineNotePopover for that single note, exactly as
-  // ArticleTabContent does on the dashboard. `isReady` is a real dependency,
-  // not a tripwire: the body (and therefore contentRef) only exists once the
-  // fetch settles, so the listener has to be attached on that transition.
-  useEffect(() => {
-    if (!isReady) return;
-    const container = contentRef.current;
-    if (!container) return;
-    const handler = (e: MouseEvent) => {
-      // A passage an application proposed answers with its block's popover instead (D7b).
-      if (proposedPassageAt(e.target)) return;
-      const target = (e.target as HTMLElement | null)?.closest('.note-anchor') as HTMLElement | null;
-      if (!target) return;
-      const noteId = target.getAttribute('data-note-id');
-      if (!noteId) return;
-      const note = itemAnnotations.find(a => a.id === noteId);
-      if (!note) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setInlineNote({ note, anchorEl: target });
-    };
-    container.addEventListener('click', handler);
-    return () => container.removeEventListener('click', handler);
-  }, [itemAnnotations, isReady]);
+  // A note's wavy words, clicked: its card beside the text, else its block's sheet (A4 §6, no popover). `isReady`: the
+  // body (and therefore contentRef) only exists once the fetch settles, so the listener is attached on that transition.
+  const openNoteBeside = useNoteOpener(marginRef, openBlockAt);
+  useInlineNoteAnchors(contentRef, itemAnnotations, openNoteBeside, isReady);
 
   // The words selected and the ink, through the highlighter's rules (A4): a new highlight, or the same words taken away
   // or recoloured, as in every reader. Only the user's own highlights: an application's passages are left alone.
@@ -344,25 +304,37 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         <p className="mb-2 text-xs font-medium text-amber-700 dark:text-amber-300">{historicalItemLabel(norma)}</p>
       )}
       {(display?.textVisible ?? true) && (
-        <GlossMargin
+        <AnnotationMargin
           ref={marginRef}
-          glosses={glosses}
           plain={plain}
-          actions={proposalActions}
           textRootRef={textRootRef}
           contentKey={markedHtml}
-          shownId={shownGlossId}
-          onShowPassage={showGlossPassage}
-          onWideChange={setGlossesWide}
+          notes={shownAnnotations}
+          onUpdateNote={updateAnnotation}
+          onRemoveNote={removeAnnotation}
+          draft={draft}
+          onSaveDraft={(text) => {
+            if (!draft) return;
+            addAnnotation(itemKey, uniqueArticleId, text, { anchorText: draft.text, startOffset: draft.startOffset });
+            setDraft(null);
+            showToast('Nota aggiunta', 'success');
+          }}
+          onCancelDraft={() => setDraft(null)}
+          glosses={glosses}
+          glossActions={proposalActions}
+          shownGlossId={shownGlossId}
+          onShowGlossPassage={showGlossPassage}
+          onWideChange={setMarginShown}
         >
           <ArticleBody
             contentRef={contentRef}
             itemKey={itemKey}
             processedContent={markedHtml}
             onPopupHighlight={handlePopupHighlight}
-            onPopupAddNote={(text, startOffset, rect) => {
-              if (readOnly) return;
-              setComposer({ rect, anchorText: text, startOffset });
+            onPopupAddNote={(text, startOffset) => {
+              // A note being written keeps its words: a new selection refocuses it (the note tool takes every one).
+              if (readOnly || marginRef.current?.keepDraft()) return;
+              setDraft({ text, startOffset });
             }}
             onPopupCopy={handlePopupCopy}
             updatesOpen={updatesOpen}
@@ -370,7 +342,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
             textRootRef={textRootRef}
             selectionPopup={!moving}
           />
-        </GlossMargin>
+        </AnnotationMargin>
       )}
       {moving && (
         <MoveProposalBar
@@ -382,7 +354,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onSave={saveMove}
           onCancel={cancelMove}
           label={isGloss(moving) ? GLOSS_WORDS.moveTitle : undefined}
-          focusAfter={isGloss(moving) ? () => marginRef.current?.focus(moving.id) ?? false : undefined}
+          focusAfter={isGloss(moving) ? () => marginRef.current?.focus([`gloss:${moving.id}`]) ?? false : undefined}
         />
       )}
       <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
@@ -396,47 +368,21 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onClose={closeNote}
         />
       )}
-      {openBlock !== null && hasAnnotations(openGroup) && !focusCard && (
-        <BlockAnnotationsPopover
+      {sheetOpen && openBlock !== null && openGroup && (
+        <BlockAnnotationsSheet
           key={openBlock}
           containerRef={contentRef}
           blockIndex={openBlock}
           blockLabel={describeBlock(rawText, structure.blocks[openBlock])}
           group={openGroup}
-          contentKey={markedHtml}
           onClose={closeBlock}
           onUpdateNote={updateAnnotation}
           onRemoveNote={removeAnnotation}
           onRemoveHighlight={removeHighlight}
           proposalActions={proposalActions}
           glosses={glosses}
-          glossesInMargin={inMargin}
-          onGoToGloss={(id) => marginRef.current?.focus(id) ?? false}
           shownGlossId={shownGlossId}
           onShowGlossPassage={showGlossPassage}
-        />
-      )}
-      {composer && (
-        <InlineNoteComposer
-          anchorRect={composer.rect}
-          anchorText={composer.anchorText}
-          onSave={(text) => {
-            addAnnotation(itemKey, uniqueArticleId, text, {
-              anchorText: composer.anchorText, startOffset: composer.startOffset,
-            });
-            setComposer(null);
-            showToast('Nota aggiunta', 'success');
-          }}
-          onClose={() => setComposer(null)}
-        />
-      )}
-      {inlineNote && (
-        <InlineNotePopover
-          note={inlineNote.note}
-          anchorEl={inlineNote.anchorEl}
-          onClose={() => setInlineNote(null)}
-          onUpdate={updateAnnotation}
-          onRemove={removeAnnotation}
         />
       )}
       <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
@@ -475,6 +421,9 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
             className="ml-auto"
             triggerClassName="min-h-[44px] gap-1.5 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 md:min-h-0 dark:text-slate-400 dark:hover:bg-slate-700"
           />
+        )}
+        {!readOnly && (
+          <NoteToolButton triggerClassName="min-h-[44px] gap-1.5 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 md:min-h-0 dark:text-slate-400 dark:hover:bg-slate-700" />
         )}
       </div>
     </div>

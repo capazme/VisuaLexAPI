@@ -133,6 +133,8 @@ export function StudyMode({
     addAnnotation,
     removeAnnotation,
     removeHighlight,
+    loadAnnotationsForArticle,
+    loadHighlightsForArticle,
     addQuickNorm,
     removeQuickNormByParams,
     isQuickNorm
@@ -326,6 +328,15 @@ export function StudyMode({
   // article is `all{N}:{numero}`, so what Study Mode makes there is found here and in the reader alike.
   const normaKey = useMemo(() => buildItemKey(article.norma_data), [article.norma_data]);
   const articleId = uniqueArticleIdFromNorma(article.norma_data);
+
+  // Its notes and highlights read from the server, as the reader reads them (`ArticleTabContent`): an article reached
+  // with the arrows may be one whose row was never opened in the practice, and nothing of it was read yet. Once per
+  // article for the session (the store keeps what it read).
+  useEffect(() => {
+    if (!isOpen) return;
+    loadHighlightsForArticle(normaKey, articleId);
+    loadAnnotationsForArticle(normaKey, articleId);
+  }, [isOpen, normaKey, articleId, loadHighlightsForArticle, loadAnnotationsForArticle]);
 
   // Filter annotations and highlights for current article
   const articleAnnotations = useMemo(() =>

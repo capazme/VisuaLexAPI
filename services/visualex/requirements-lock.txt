@@ -1,0 +1,52 @@
+# Every Python package of the scrapers image, direct and transitive, at one exact
+# version: the `pip freeze` of the production image of release 1.11.0 (Python 3.12),
+# the versions the stored texts — and every highlight and note anchored to them —
+# were produced with (root CLAUDE.md, rule 23). The Dockerfile and CI
+# (requirements-dev.txt) install from this file; requirements.txt is the list a
+# person edits. To change a version: change it here and, for the libraries that
+# shape the text, in requirements.txt too; then the frozen-text tests must pass.
+aiocache==0.12.3
+aiofiles==25.1.0
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.5
+aiosignal==1.4.0
+attrs==26.1.0
+beautifulsoup4==4.15.0
+blinker==1.9.0
+certifi==2026.10.23
+cffi==2.1.1
+charset-normalizer==3.5.2
+click==8.5.1
+cryptography==50.0.2
+Flask==3.1.3
+frozenlist==1.8.0
+greenlet==3.5.6
+h11==0.16.0
+h2==4.4.1
+hpack==4.2.0
+Hypercorn==0.18.0
+hyperframe==6.1.0
+idna==3.20
+itsdangerous==2.2.0
+Jinja2==3.1.6
+lxml==6.1.3
+MarkupSafe==3.0.4
+multidict==7.2.1
+pdfminer.six==20260107
+playwright==1.64.1
+priority==2.0.0
+propcache==0.5.4
+pycparser==3.12
+pyee==14.0.0
+PyYAML==6.0.3
+Quart==0.22.0
+quart-cors==0.8.0
+redis==8.1.0
+requests==2.34.2
+soupsieve==4.0.1
+structlog==26.1.0
+typing_extensions==4.16.0
+urllib3==2.8.0
+Werkzeug==3.1.9
+wsproto==1.3.2
+yarl==1.25.1

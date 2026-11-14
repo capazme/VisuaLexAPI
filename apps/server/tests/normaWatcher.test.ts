@@ -226,6 +226,30 @@ describe('runNormaWatcher', () => {
     expect(await prisma.normaChangeNotification.count({ where: { watchId: watch.id } })).toBe(0);
   });
 
+  it('neither notifies nor stores an AKN fallback text (scan A.7)', async () => {
+    // The AKN export is a different string from the HTML text (accents transliterated, a
+    // markdown heading): compared with the stored HTML text it would always read as a change,
+    // and stored it would make the HTML text's return read as one too.
+    process.env.LEGAL_API_URL = 'http://legal-api.test';
+    const watch = await seedWatch('legge--7--2020--1', {
+      norma_data: { tipo_atto: 'legge' },
+      article_text: 'Old text',
+    });
+    await prisma.normaWatch.update({ where: { id: watch.id }, data: { lastSeenAt: new Date(Date.now() - 60_000) } });
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => [{ norma_data: { tipo_atto: 'legge' }, article_text: "### Art. 1\n\ne' il testo", text_source: 'akn' }],
+    })));
+
+    await runNormaWatcher();
+
+    const updated = await prisma.normaWatch.findUnique({ where: { id: watch.id } });
+    expect((updated?.normaData as { article_text?: string })?.article_text).toBe('Old text');
+    expect(updated?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - 10_000);
+    expect(await prisma.normaChangeNotification.count({ where: { watchId: watch.id } })).toBe(0);
+  });
+
   it('writes nothing when article_text is missing or empty', async () => {
     process.env.LEGAL_API_URL = 'http://legal-api.test';
     const watch = await seedWatch('legge--5--2020--1', {

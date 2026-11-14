@@ -21,6 +21,11 @@ export interface NoteEditBoxProps {
     confirmDiscard?: boolean;
     /** The question asked from outside was answered «Continua»: the editing goes on. */
     onKeep?: () => void;
+    /**
+     * The field takes the focus as it appears (default). A new note's editor beside the text gives it once the card has
+     * its place (`NoteDraftCard`): taken before, the page would scroll to the column's top.
+     */
+    autoFocus?: boolean;
 }
 
 const BUTTON = 'min-h-[44px] rounded-md px-3 text-xs';
@@ -33,7 +38,7 @@ const MAIN = cn(BUTTON, 'bg-primary-600 font-semibold text-white hover:bg-primar
  * changed text is never dropped without asking.
  */
 export function NoteEditBox({
-    value, onChange, onCommit, onCancel, label, explicit = false, dirty = false, confirmDiscard = false, onKeep,
+    value, onChange, onCommit, onCancel, label, explicit = false, dirty = false, confirmDiscard = false, onKeep, autoFocus = true,
 }: NoteEditBoxProps) {
     const [asking, setAsking] = useState(false);
     const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -61,7 +66,7 @@ export function NoteEditBox({
     const box = (
         <textarea
             ref={boxRef}
-            autoFocus
+            autoFocus={autoFocus}
             aria-label={label}
             value={value}
             onChange={(e) => onChange(e.target.value)}

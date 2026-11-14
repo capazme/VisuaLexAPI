@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from visualex_api.services.normattiva_notes import extract_update_notes, update_notes_fields
-from visualex_api.services.normattiva_scraper import NormattivaScraper
+from visualex_api.services.normattiva_scraper import AknArticleText, NormattivaScraper
 from visualex_api.tools.selectors import NormattivaSelectors
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
     ARTICLE_ENDPOINTS, FakeCache, TEXT, URN, ask, brocardi, controller, normattiva_serving, requested,
@@ -206,7 +206,7 @@ class TestOnTheWire:
     async def test_the_akn_export_s_text_is_not_read_again(self, controller, brocardi, endpoint):
         scraper = normattiva_serving(DLGS23_ART3)
         akn = "### Art. 3\n\n1. Il testo dall'export.\n\nAGGIORNAMENTO (2) …"
-        scraper.get_document.return_value = (akn, URN)
+        scraper.get_document.return_value = (AknArticleText(akn), URN)
         [result] = await ask(controller, endpoint, requested(), scraper=scraper)
         assert result["article_text"] == akn
         assert (result["note_aggiornamento"], result["note_non_lette"], result["note_nel_testo"]) == (None, False, True)

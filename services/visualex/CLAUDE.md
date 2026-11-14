@@ -40,6 +40,15 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     "does this article exist" when the HTML tree is unusable
     (`fetch_act_index`), and as a last-resort article text when HTML extraction
     fails outright (`fetch_act_article`, from `NormattivaScraper.get_document`).
+    That text is an `AknArticleText` (a `str`, the export's characters untouched)
+    and every article answer says where its text comes from, `text_source`
+    "html" or "akn" (`text_source_of`, scan A.7); `get_document`'s 24-hour memory
+    skips it (`skip_cache_func`), so the next request extracts again (from the
+    page in the persistent cache while it lasts). Downstream, an "akn" text is
+    never compared or stored by the saved-norm checks (the watcher by the field,
+    the web's check by the field or the export's «### » heading), never anchored
+    to by the assistant, never ingested by MERL-T or archived by
+    `tools/archivio-normativo`. The web reader does not read the field yet.
     Only the article INDEX is cached — in memory, capped at
     `AKN_CACHE_MAX_ACTS`, and through the shared cache manager, with an
     in-flight registry so N concurrent cold requests download the act once.
@@ -736,6 +745,13 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
 `RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
+`MAX_ARTICLES_PER_REQUEST` (`150`, G-473 — the most articles one request may expand to, after
+deduplication; above it `parse_article_input` answers `kind: "too_many"`, a 400; the web's
+dossier «Apri tutto» pages its groups at the same number),
+`STREAM_SECONDS_PER_ARTICLE` / `STREAM_MAX_SECONDS` (`30` / `5400` — the time budget of
+`/stream_article_text`: articles × allowance, at least 60 s, at most the cap; past it the stream
+ends with a line `{"kind": "time_budget", "missing": [...]}`. Without it Quart's
+`RESPONSE_TIMEOUT` (60 s) closed the body with a 200 and no error),
 `TRUSTED_PROXIES` (`0` — how many reverse proxies sit in front; `X-Forwarded-For` is
 believed only that far, and not at all at 0), `VISUALEX_LOG_FILE` (unset keeps
 `norma.log` / `visualex_api.log` in the working directory; **empty** means console

@@ -598,7 +598,7 @@ per-item review → promotion to RLCF `pending_*` → community vote.
 
 | Route | Notes |
 |---|---|
-| `POST /contrib/documents` | multer; PDF, TXT or DOCX up to 50 MB |
+| `POST /contrib/documents` | multer; PDF, TXT or DOCX up to 10 MB (the declared length is checked before multer reads the body) |
 | `POST /contrib/documents/:id/extract` | creates a `MerltExtractionJob` and enqueues |
 | `GET /contrib/documents/:id/candidates` | MERL-T scopes it with the caller's `user_id` |
 | `GET /contrib/jobs/:jobId/status`, `GET /contrib/me/jobs` | authenticate only, owner-scoped |

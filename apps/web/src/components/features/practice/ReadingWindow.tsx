@@ -9,6 +9,7 @@ import { ArticleTabContent } from '../search/ArticleTabContent';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
 import { subjectOf, titleOf, type Subject } from './practiceView';
+import { closePracticeWindow } from './practiceSwitch';
 
 /** The bar of practices floats over the results area (`fixed bottom-6`): a window's scrolling body
  *  keeps the same bottom padding as the column (spec §3.4). */
@@ -35,7 +36,6 @@ export interface ReadingWindowProps {
  */
 export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTopRight = false }: ReadingWindowProps) {
   const practice = useAppStore((s) => s.practices.find((p) => p.id === practiceId));
-  const closeBeside = useAppStore((s) => s.closeBeside);
   const subject = subjectOf(practice, besideRef);
   const title = titleOf(subject);
 
@@ -69,7 +69,8 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTo
         </h3>
         <button
           type="button"
-          onClick={() => closeBeside(practiceId, besideRef.id)}
+          // The last one brings the overview back through the passage (L-62); the focus goes to what is left.
+          onClick={() => closePracticeWindow(practiceId, besideRef)}
           aria-label={`Chiudi la finestra ${title}`}
           title="Chiudi la finestra"
           className={cn(

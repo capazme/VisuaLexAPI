@@ -4,7 +4,7 @@
 #   ./start.sh [--dev]    the development stack, on this machine, with hot reload:
 #                           Docker (infra/compose.yml): postgres, redis, falkordb, qdrant — always;
 #                             mcp-legal-it, merlt-api, merlt-worker too with MERLT_ENABLED=true.
-#                           Host: Python API (services/visualex, :5000), server (apps/server, :3001),
+#                           Host: Python API (services/visualex, :5000 or VISUALEX_API_PORT), server (apps/server, :3001),
 #                             web (apps/web, :5173).
 #                           MERLT_API_IN_DOCKER=false runs the MERL-T api and worker on the host
 #                             (developer mode: a venv with the merlt deps, no mcp-legal-it tools).
@@ -157,6 +157,9 @@ export VITE_FEATURE_MERLT="${VITE_FEATURE_MERLT:-$MERLT_ENABLED}"
 MERLT_API_IN_DOCKER="${MERLT_API_IN_DOCKER:-true}"
 MERLT_ROOT="$PROJECT_ROOT/services/merlt"
 MERLT_PORT="${MERLT_API_PORT:-8000}"
+# The Python API's port, and with it the web proxy's, the server's and MERL-T's target.
+# On a Mac the AirPlay Receiver holds 5000: VISUALEX_API_PORT=5001 moves the API instead.
+export VISUALEX_API_PORT="${VISUALEX_API_PORT:-5000}"
 MERLT_HEALTH_TIMEOUT="${MERLT_HEALTH_TIMEOUT:-60}"
 SERVER_ENV="$PROJECT_ROOT/apps/server/.env"
 VENV="$PROJECT_ROOT/services/visualex/.venv"
@@ -205,13 +208,14 @@ check_port() {
         if [ "$holder" = "ControlCenter" ]; then
             # Killing it is useless: macOS starts it again at once.
             echo -e "${RED}Port $1 is held by macOS's AirPlay Receiver${NC} - turn it off: System Settings → General → AirDrop & Handoff → AirPlay Receiver"
+            [ "$1" != "$VISUALEX_API_PORT" ] || echo -e "or move the Python API: ${YELLOW}VISUALEX_API_PORT=5001 ./start.sh${NC}"
         else
             echo -e "${RED}Port $1 in use${NC} (${holder:-unknown}) - run: ${YELLOW}kill \$(lsof -t -i:$1)${NC}"
         fi
         return 1
     fi
 }
-for p in 5000 3001 5173 3002; do check_port "$p" || exit 1; done
+for p in "$VISUALEX_API_PORT" 3001 5173 3002; do check_port "$p" || exit 1; done
 
 if ! docker info >/dev/null 2>&1; then
     echo -e "${RED}Docker is not running${NC} - start Docker Desktop and run ./start.sh again"; exit 1
@@ -275,8 +279,8 @@ echo -e "\n${YELLOW}[1/5] Data stores...${NC}"
 STORES_STARTED=1
 "${COMPOSE[@]}" up -d --wait postgres redis falkordb qdrant
 
-echo -e "\n${YELLOW}[2/5] Python API (:5000)...${NC}"
-( cd "$PROJECT_ROOT/services/visualex" && exec "$VENV/bin/python" app.py ) &
+echo -e "\n${YELLOW}[2/5] Python API (:$VISUALEX_API_PORT)...${NC}"
+( cd "$PROJECT_ROOT/services/visualex" && PORT="$VISUALEX_API_PORT" exec "$VENV/bin/python" app.py ) &
 API_PID=$!
 
 echo -e "\n${YELLOW}[3/5] Server (:3001)...${NC}"
@@ -285,7 +289,7 @@ npx prisma generate > /dev/null 2>&1 || echo -e "${YELLOW}prisma generate failed
 npx prisma migrate deploy || echo -e "${YELLOW}prisma migrate deploy failed - does DATABASE_URL in apps/server/.env point at port ${VISUALEX_PG_PORT:-5436}?${NC}"
 # The seed reads ADMIN_PASSWORD from apps/server/.env itself; the shell may override it.
 if [ -n "${ADMIN_PASSWORD:-$(server_env ADMIN_PASSWORD)}" ]; then npm run db:seed || echo -e "${YELLOW}db:seed failed${NC}"; fi
-npm run dev &
+LEGAL_API_URL="${LEGAL_API_URL:-http://localhost:$VISUALEX_API_PORT}" npm run dev &
 SERVER_PID=$!
 
 echo -e "\n${YELLOW}[4/5] Web (:5173)...${NC}"
@@ -303,7 +307,7 @@ cd "$PROJECT_ROOT"
 if [ "$MERLT_ENABLED" = "true" ]; then
     if [ "$MERLT_API_IN_DOCKER" = "true" ]; then
         echo -e "\n${YELLOW}MERL-T in Docker...${NC}"
-        "${COMPOSE[@]}" --profile merlt up -d
+        VISUALEX_API_URL="${VISUALEX_API_URL:-http://host.docker.internal:$VISUALEX_API_PORT}" "${COMPOSE[@]}" --profile merlt up -d
     else
         echo -e "\n${YELLOW}MERL-T on the host (:$MERLT_PORT)...${NC}"
         DB="postgresql://merlt:${MERLT_DB_PASSWORD:-merlt}@localhost:${VISUALEX_PG_PORT:-5436}/merlt"
@@ -316,7 +320,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
             REDIS_HOST=localhost REDIS_PORT="${VISUALEX_REDIS_PORT:-6381}" REDIS_URL="$REDIS/0" RQ_REDIS_URL="$REDIS/1" \
             FALKORDB_HOST=localhost FALKORDB_PORT="${VISUALEX_FALKOR_PORT:-6382}" FALKORDB_GRAPH_NAME="${MERLT_GRAPH_NAME:-merl_t_legal}" \
             QDRANT_HOST=localhost QDRANT_PORT="${VISUALEX_QDRANT_PORT:-6343}" QDRANT_COLLECTION="${MERLT_QDRANT_COLLECTION:-merl_t_legal_chunks}" \
-            VISUALEX_API_URL=http://localhost:5000 \
+            VISUALEX_API_URL="http://localhost:$VISUALEX_API_PORT" \
             BFF_CALLBACK_URL=http://localhost:3001/api/merlt/internal/job-callback \
             BFF_EXTRACTION_CALLBACK_URL=http://localhost:3001/api/merlt/internal/extraction-callback \
             BFF_QA_CALLBACK_URL=http://localhost:3001/api/merlt/internal/qa-callback \
@@ -343,7 +347,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
 fi
 
 sleep 3
-echo -e "\n${GREEN}Running:${NC} Python API http://localhost:5000 · server http://localhost:3001 · web http://localhost:5173 · MCP http://localhost:3002/mcp"
+echo -e "\n${GREEN}Running:${NC} Python API http://localhost:$VISUALEX_API_PORT · server http://localhost:3001 · web http://localhost:5173 · MCP http://localhost:3002/mcp"
 [ "$MERLT_ENABLED" = "true" ] && echo -e "         MERL-T http://localhost:$MERLT_PORT"
 echo -e "${YELLOW}Ctrl+C stops everything (data stays in the volumes).${NC}\n"
 wait

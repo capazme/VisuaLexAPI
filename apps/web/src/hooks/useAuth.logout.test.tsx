@@ -105,7 +105,21 @@ describe('useAuth — logout', () => {
     await act(async () => { await result.current.login('b@example.test', 'pw'); });
     expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
     localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    vi.mocked(authService.getCurrentUser).mockResolvedValue({ id: 'u3' } as never);
     await act(async () => { await result.current.register('c@example.test', 'c', 'pw'); });
     expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
+  });
+
+  it('keeps the only copy of their work when the same person signs in again on a browser marked as theirs', async () => {
+    vi.mocked(authService.getCurrentUser).mockResolvedValue({ id: 'u2' } as never);
+    vi.spyOn(appStore.getState(), 'fetchUserData').mockResolvedValue(undefined as never);
+    localStorage.setItem('visualex.user-data-owner', 'u2');
+    localStorage.setItem('merlt-qa-thread-v1', '[]');
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.login('b@example.test', 'pw'); });
+    expect(localStorage.getItem('merlt-qa-thread-v1')).toBe('[]');
+    localStorage.removeItem('merlt-qa-thread-v1');
+    localStorage.removeItem('visualex.user-data-owner');
   });
 });

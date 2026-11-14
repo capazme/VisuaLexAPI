@@ -70,6 +70,40 @@ describe('saved norm change notifications', () => {
     await prisma.normaWatch.deleteMany({ where: { userId: user.id } });
   });
 
+  it('neither notifies nor stores an AKN fallback text the reader was shown (scan A.7)', async () => {
+    const key = 'legge--11--2020--1';
+    const populated = { norma_data: { tipo_atto: 'legge' }, article_text: 'Testo pieno' };
+    await request(app).post('/api/notifications/normas/check').set(authHeader(user)).send({ normaKey: key, normaData: populated });
+
+    const akn = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: key, normaData: { norma_data: { tipo_atto: 'legge' }, article_text: "### Art. 1\n\ne' il testo", text_source: 'akn' } });
+    expect(akn.status).toBe(200);
+    expect(akn.body).toEqual({ watched: true, changed: false });
+
+    const stored = await prisma.normaWatch.findUnique({ where: { userId_normaKey: { userId: user.id, normaKey: key } } });
+    expect((stored?.normaData as { article_text?: string })?.article_text).toBe('Testo pieno');
+    expect(await prisma.normaChangeNotification.count({ where: { userId: user.id } })).toBe(0);
+
+    // The web does not send the field yet: the export's heading tells it.
+    const unmarked = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: key, normaData: { norma_data: { tipo_atto: 'legge' }, article_text: "### Art. 1\n\ne' il testo" } });
+    expect(unmarked.body).toEqual({ watched: true, changed: false });
+    expect(await prisma.normaChangeNotification.count({ where: { userId: user.id } })).toBe(0);
+
+    // Nor does it start a watch: its first snapshot would be a text that is never served again.
+    const fresh = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: 'legge--12--2020--1', normaData: { norma_data: { tipo_atto: 'legge' }, article_text: 'x', text_source: 'akn' } });
+    expect(fresh.body).toEqual({ watched: false, changed: false });
+
+    await prisma.normaWatch.deleteMany({ where: { userId: user.id } });
+  });
+
   it('rejects a check with no normaKey as a 400', async () => {
     const response = await request(app)
       .post('/api/notifications/normas/check')

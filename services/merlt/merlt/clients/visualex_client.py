@@ -88,6 +88,11 @@ class ArticleResult:
     # names ("701-800", G-387 (a)), else the first.
     parti: Optional[List[Dict[str, Any]]] = None
     testo_parziale: bool = False
+    # Scan A.7: "akn" when VisuaLex could not read Normattiva's HTML and served the AKN
+    # export instead. Not the article's text (root CLAUDE.md, rule 23): never stored
+    # (`get_document` refuses it); a model may read it. "html" otherwise, and for an
+    # answer from before the field.
+    text_source: str = "html"
 
 
 UPDATE_NOTES_LABEL = "NOTE DI AGGIORNAMENTO (Normattiva, non fanno parte del testo dell'articolo)"
@@ -398,6 +403,7 @@ class VisuaLexClient:
                         note_nel_testo=item.get("note_nel_testo") is True,
                         parti=item.get("parti") if isinstance(item.get("parti"), list) else None,
                         testo_parziale=item.get("testo_parziale") is True,
+                        text_source="akn" if item.get("text_source") == "akn" else "html",
                     ))
             return results
 
@@ -568,9 +574,13 @@ class VisuaLexClient:
             norma_visitata: The norm to fetch
 
         Returns:
-            Tuple of (article_text, url)
+            Tuple of (article_text, url). Raises when the text is the AKN fallback
+            (`ArticleResult.text_source`), as for an error.
         """
         result = await self.get_article(norma_visitata)
+        if result.text_source == "akn":
+            # What ingestion stores (scan A.7): the AKN fallback is not the article's text.
+            raise Exception("VisuaLex served the AKN fallback, not the article's text: read it again later")
         return result.text, result.url
 
     async def get_article(self, norma_visitata: NormaVisitata) -> ArticleResult:

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true, isDesktopViewport: () => true }));
@@ -13,8 +13,9 @@ vi.mock('../workspace/ArticleNavigation', () => ({ ArticleNavigation: () => null
 vi.mock('../workspace/LazyStudyMode', () => ({ LazyStudyMode: () => null }));
 
 import { appStore } from '../../../store/useAppStore';
-import { PracticeColumn } from './PracticeColumn';
+import { PracticeColumn, type PracticeLayout } from './PracticeColumn';
 import { articleRowKey, practiceArticleKey } from '../../../utils/practice';
+import { OVERVIEW_GRID } from './besideLayout';
 import { CC_RD, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
 const s = () => appStore.getState();
@@ -29,7 +30,8 @@ function setUp() {
   return { practiceId: cc.practiceId, ccId: cc.actId, l24Id: l24.actId };
 }
 
-const column = (practiceId: string) => <PracticeColumn practiceId={practiceId} onViewPdf={vi.fn()} onCrossReference={vi.fn()} />;
+const column = (practiceId: string, layout: PracticeLayout = 'overview') =>
+  <PracticeColumn practiceId={practiceId} onViewPdf={vi.fn()} onCrossReference={vi.fn()} layout={layout} />;
 const actHeadings = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
 
 let scrolled: Element[];
@@ -116,5 +118,42 @@ describe('PracticeColumn (spec §3)', () => {
     await press('ArrowDown', 'ArrowDown');
     await press('Space', ' ');
     expect(s().practices[0].acts.map((a) => a.id)).toEqual([l24Id, ccId]);
+  });
+});
+
+describe('PracticeColumn: the two views (U2)', () => {
+  const NEW = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 28994, anno: 2019 };
+
+  it('the overview draws the acts as a grid of panels and «Giurisprudenza» as a strip under it, in the decisions\' tint', () => {
+    const { practiceId } = setUp();
+    s().openDecision(NEW, { practiceId, open: false });
+    render(column(practiceId));
+    expect(screen.getByTestId('practice-acts').className).toBe(OVERVIEW_GRID);
+    const strip = screen.getByTestId('practice-decisions');
+    expect(strip).toHaveClass('border-emerald-200/70', 'bg-emerald-50/40');
+    // After the grid, not inside it: the strip takes the frame's width.
+    expect(screen.getByTestId('practice-acts')).not.toContainElement(strip);
+    expect(within(strip).getByRole('button', { name: /^Apri accanto Cass/ })).toBeInTheDocument();
+  });
+
+  it('the phone keeps its column: the acts one under the other, no panel, no tint', () => {
+    const { practiceId } = setUp();
+    s().openDecision(NEW, { practiceId, open: false });
+    render(column(practiceId, 'phone'));
+    expect(screen.getByTestId('practice-acts')).toHaveClass('space-y-3');
+    expect(screen.getByTestId('practice-decisions').className).toBe('');
+  });
+
+  it('the index draws entries, «Giurisprudenza» one of them, and leaves the reveal to the reading row', () => {
+    const { practiceId, l24Id } = setUp();
+    s().openDecision(NEW, { practiceId, open: false });
+    render(column(practiceId, 'index'));
+    expect(screen.getByTestId('practice-column')).toHaveAttribute('data-layout', 'index');
+    expect(document.querySelector('[data-practice-row]')).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Apri accanto: art\. / })).toHaveLength(3);
+    expect(within(screen.getByRole('region', { name: /Giurisprudenza/ })).getByRole('button', { name: /^Apri accanto: Cass/ })).toBeInTheDocument();
+    act(() => { s().revealPracticeArticle(practiceId, l24Id, '7'); });
+    expect(s().pendingReveal).not.toBeNull();
+    expect(scrolled).toHaveLength(0);
   });
 });

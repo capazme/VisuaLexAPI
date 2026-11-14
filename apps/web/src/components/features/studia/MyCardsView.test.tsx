@@ -24,6 +24,7 @@ import { MyCardsView } from './MyCardsView';
 import { trashService } from '../../../services/trashService';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
 import { resetNotifications } from '../../ui/notifications/notifications';
+import { CARD_GRID_COLUMNS } from '../../layout/frame';
 
 const list = vi.mocked(studiaService.list);
 const get = vi.mocked(studiaService.get);
@@ -165,7 +166,10 @@ describe('«Le mie schede», the list', () => {
     list.mockResolvedValue(page([card('r1', { prossimoRipasso: '2099-03-04' }), card('r2')]));
     renderView();
     const tile = await screen.findByRole('link', { name: /Domanda r1\?/ });
-    expect(tile.closest('ul')).toHaveClass('lg:grid-cols-2', '2xl:grid-cols-3');
+    // A grid of cards of at least 20rem, as many columns as the page's width holds, none set by breakpoint (U1).
+    const grid = tile.closest('ul')!;
+    expect(grid).toHaveClass('grid', CARD_GRID_COLUMNS);
+    expect(grid.className).not.toMatch(/\bgrid-cols-\d/);
     expect(within(tile).getByText('Domanda r1?')).toHaveClass('font-serif');
     expect(tile).toHaveTextContent('Diritto civile');
     expect(tile).toHaveTextContent('Bozza');
@@ -177,7 +181,8 @@ describe('«Le mie schede», the list', () => {
   it('puts the list in one column beside the card once one is open (G8)', async () => {
     renderView('/studia/schede/r1');
     await screen.findByRole('article', { name: 'Scheda' });
-    expect(screen.getByRole('link', { name: /Domanda r1\?/ }).closest('ul')).not.toHaveClass('lg:grid-cols-2');
+    // One column: no columns declared at all, by breakpoint or by width.
+    expect(screen.getByRole('link', { name: /Domanda r1\?/ }).closest('ul')!.className).not.toMatch(/grid-cols-/);
     // The filters keep the narrow column's layout: the search across it, not a third of a row.
     const filters = screen.getByRole('group', { name: 'Filtri' });
     expect(filters.className).not.toMatch(/\blg:flex\b/);

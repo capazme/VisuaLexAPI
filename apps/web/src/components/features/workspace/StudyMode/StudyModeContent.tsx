@@ -13,9 +13,12 @@ import { useArticleTextInteractions } from '../../../../hooks/useArticleTextInte
 import { getRubricText, getUpdateNoteParagraphs, parseArticleStructure } from '../../../../utils/articleStructure';
 import { blockStarts } from '../../../../utils/articleAnnotations';
 import { UpdateNotePopover } from '../../search/UpdateNotePopover';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../../store/useAppStore';
 import { useHighlightInk } from '../../../../hooks/useHighlightInk';
 import { uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
+import { AnnotationMargin, type AnnotationMarginHandle, type NoteDraft } from '../../search/AnnotationMargin';
+import { useInlineNoteAnchors } from '../../../../hooks/useInlineNoteAnchors';
 
 const COLOR_SHORTCUTS: Record<string, 'yellow' | 'green' | 'red' | 'blue'> = {
   '1': 'yellow',
@@ -33,8 +36,8 @@ interface StudyModeContentProps {
   annotations: Annotation[];
   normaKey: string;
   /**
-   * Fired when the user picks "Aggiungi nota" from the selection popup.
-   * The anchor carries the selected text and its document-relative plain
+   * Fired when the user picks "Aggiungi nota" from the selection popup and the screen has no room for the notes beside
+   * the text: the tools panel writes it. The anchor carries the selected text and its document-relative plain
    * offset so the saved annotation can render a wavy underline across
    * the same span in both Study Mode and the main article view.
    */
@@ -162,7 +165,22 @@ export function StudyModeContent({
 
   // Handle note from selection popup; the offset is document-relative
   // already, so the anchor resolves on the dashboard and in the dossier too.
+  // The notes beside the text (A4 §6): a new one's editor at its words where the screen has room, else the tools panel.
+  const { addAnnotation, updateAnnotation, removeAnnotation } = useAppStore(useShallow((s) => ({
+    addAnnotation: s.addAnnotation, updateAnnotation: s.updateAnnotation, removeAnnotation: s.removeAnnotation,
+  })));
+  const [draft, setDraft] = useState<NoteDraft | null>(null);
+  const [roomy, setRoomy] = useState(false);
+  const marginRef = useRef<AnnotationMarginHandle>(null);
+  // A note's wavy words: its card beside the text (Study Mode draws no sign: with no column, the tools panel lists it).
+  useInlineNoteAnchors(contentRef, annotations, (note) => { marginRef.current?.focus([`note:${note.id}`]); });
   const handleAddNote = (text: string, startOffset: number) => {
+    // A note being written keeps its words: a new selection refocuses it.
+    if (marginRef.current?.keepDraft()) return;
+    if (roomy) {
+      setDraft({ text, startOffset });
+      return;
+    }
     if (!onRequestAddNote) return;
     onRequestAddNote({ anchorText: text, startOffset });
   };
@@ -188,7 +206,27 @@ export function StudyModeContent({
       {/* Centered Content. Extra top padding clears the absolutely
           positioned StudyModeHeader (~56px tall) so the article title
           isn't tucked behind it when the scroll is at the top. */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-8 pt-20 sm:pt-24 pb-6 sm:pb-10">
+      <AnnotationMargin
+        plain={plain}
+        textRootRef={textRef}
+        contentKey={markedHtml}
+        notes={annotations}
+        onUpdateNote={updateAnnotation}
+        onRemoveNote={removeAnnotation}
+        // Narrowed while it is written, it moves to a sheet with its text.
+        draft={draft}
+        onSaveDraft={(text) => {
+          if (!draft) return;
+          addAnnotation(normaKey, uniqueArticleId, text, { anchorText: draft.text, startOffset: draft.startOffset });
+          setDraft(null);
+        }}
+        onCancelDraft={() => setDraft(null)}
+        onRoomChange={setRoomy}
+        ref={marginRef}
+        // Below the header's height; the column off the scroller's edge where it is drawn (from 52rem).
+        className="pt-20 sm:pt-24 lg:pr-8"
+      >
+      <div className="max-w-3xl mx-auto px-4 sm:px-8 pb-6 sm:pb-10">
         {/* Article Title */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -249,6 +287,7 @@ export function StudyModeContent({
           </motion.div>
         </AnimatePresence>
       </div>
+      </AnnotationMargin>
 
       {openNote && structure.notes[openNote.id] && (
         <UpdateNotePopover

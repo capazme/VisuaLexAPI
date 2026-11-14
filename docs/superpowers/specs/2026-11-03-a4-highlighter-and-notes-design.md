@@ -7,8 +7,8 @@ Web only: creating, recolouring and deleting a highlight exist on the server alr
 Two pull requests, in this order:
 
 1. **The highlighter as a tool** (§1–§5 below): this document's first round.
-2. **The note as a tool and the notes beside the text** (§6): the second round, its plan written when the first is
-   merged.
+2. **The note as a tool and the notes beside the text** (§6, as built §9), with the Forum's highlights cut (§8): the
+   second round, plan `docs/superpowers/plans/2026-11-09-a4-note-tool-and-margin.md`.
 
 ## Why
 
@@ -83,7 +83,7 @@ The user's notes are objects of their own, anchored by position: none is lost.
 `originalAuthor`), which `POST` does not accept: recreating its parts would lose the attribution (gotcha 21). On such a
 highlight the gesture acts on the whole: it is removed, or recoloured in place (`PUT` keeps it). The same for a highlight
 saved before offsets existed (it has no offset to cut at). When the server lets an author pass through a cut (a `PUT`
-of the offsets, or a `POST` that copies the author), these are cut too.
+of the offsets, or a `POST` that copies the author), these are cut too. (Since §8 they are: the server has both.)
 
 **One gesture, one «Annulla».** (Since §7: no notification, Ctrl+Z alone, the removals held until the next gesture;
 and the rules above are §7's for the same colour and the others.)
@@ -190,6 +190,66 @@ The test passed on the article, a decision, a dossier entry and Study Mode; thre
   server would be the last guard: a migration, the owners' to decide.
 - As before: «Nessun colore» over words with no highlight does nothing and says nothing.
 
+## 8. The highlights from the Forum, cut like the others (9 November 2026)
+
+The server now lets the author through a cut: `PUT /highlights/:id` takes the range (#411, G-417) and `POST /highlights`
+takes `splitFrom`, the highlight a piece is cut from, whose author it copies (#412, G-418). The limit of §3 goes: a
+highlight from the Forum is cut and recoloured as the others, and its author is kept on every piece and on Ctrl+Z.
+
+- **The author follows the words.** `InkMark.author` names a highlight's suggestion and first author (none for the
+  user's own). The parts a cut leaves keep it; so does the piece of it a selection gives another colour, which the
+  §7 rules would otherwise make the user's own ink (recoloured whole, it is recoloured in place as before). The ink over
+  plain words beside it is the user's own.
+- **One row kept, the others made from it.** The first piece of such a highlight that a gesture leaves keeps its row:
+  `reshape`, a `PUT` of its range and its colour, so the row's id and author stay. Every other piece is a `POST` with
+  `splitFrom` naming it, under its server id once it has one (a piece of a piece still being saved waits for it, never a
+  temporary id), and shows the author at once. The row is never deleted before a piece made from it (the server reads
+  it to copy the author).
+- **Joined only by author.** Two highlights of one colour are joined only when they have one author: the user's own with
+  the user's own, a suggestion's with the same suggestion's. Where a piece meets a highlight of its colour by another
+  author, the two stay two, and the ink never takes words from it: it leaves them to it (as before for a highlight that
+  could not be cut). Two highlights of one colour still never overlap.
+- **Ctrl+Z** puts the row's range and colour back with a `PUT` and deletes the pieces made from it (once they are
+  saved): the same row, the same author. A range refused takes the whole gesture back, as a part refused does.
+- A highlight saved before offsets existed is still acted on whole.
+
+## 9. The second round as built (9 November 2026)
+
+§6 as built, and what was decided while building it.
+
+- **The note tool** (`NoteToolButton`): beside the highlighter in the article's computer row (and its compact form),
+  the decision's bar, Study Mode's header and the dossier reader's actions. The phone's row keeps three buttons (the
+  status keeps its line at 320 px): there the selection bar's «Nota» opens the editor. Its menu, «Nota personale» and
+  «Glossa», only where the reader has discussions (the article, the decision); elsewhere the toggle alone. Its icon is
+  the comment's (a speech bubble with a plus), not the sticky note Study Mode's tools panel already uses. **A gloss is
+  written where discussions are written**: the tool opens the discussion panel's composer on the words (title, text,
+  who sees it are the panel's); the brief's «nel margine» holds for personal notes. A note keeps the words exactly as
+  selected (no whole words, §7).
+- **The column** (`AnnotationMargin`, `GlossMargin` generalised): the reader's anchored notes, the passage discussions
+  (as cards that open the panel), an application's glosses and a new note's editor. Highlights are no cards, as in a
+  word processor: the highlighter takes them away. Whether the reader has room is measured on the wrapper in script
+  (52rem), no longer by a container query, so a new note's editor knows before any card is there whether it is a card
+  or a sheet. Study Mode's column wraps its centred 48rem text; with no room there, a new note is written in its tools
+  panel, as before.
+- **The sign** goes to the block's first card where the column is shown; else, or with Shift, to the block's sheet
+  (`BlockAnnotationsSheet`): what the popover listed, in a sheet from the bottom (a capped width centred on a
+  computer). Shift is the keyboard's way to a block's highlights (and an application's proposed passages) beside its
+  cards, which the column does not show; the sign says it (`aria-keyshortcuts`) and the «?» dialog lists it, nothing
+  on screen. A click on a proposed passage opens the sheet, as it opened the popover.
+- **A new note's text is the column's**: it moves with the editor between the column and the sheet as the reader
+  crosses the room's threshold, and a new selection while something is written does not take it onto other words — its
+  field takes the focus again. Saved, the focus goes to the note's card (else its block's sign) and stays there
+  through the redraws the save brings (the server's id, the text drawn again), until the reader presses or moves it
+  (10 s at most).
+- **The note tool's button on a phone**: the article's phone row shows it only while the tool is on (turned on in the
+  decision's bar or the dossier's actions), so it can be turned off; Study Mode's header has it from 640 px.
+- **A note's wavy words** go to its card, else to its block's sheet; Study Mode, which draws no sign, to its card only.
+- **Study Mode's column holds the reader's notes**, not the passage discussions: Study Mode mounts no discussion panel
+  (it never had one), and a card that could not open its discussion would be a dead end. It reads the notes and
+  highlights of the article it shows, as the readers do: one reached with its arrows may never have been read.
+- `InlineNoteComposer`, `InlineNotePopover`, `BlockAnnotationsPopover` and `blockAnchorRect` are gone.
+
 ## Not in A4
 
 The labels for MERL-T on the highlights (part B of the proposal), and the assistant's glosses without personal data.
+The passage discussions in Study Mode (its column and a discussion panel over it): Study Mode has none today.

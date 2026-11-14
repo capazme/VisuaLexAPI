@@ -42,6 +42,24 @@ const renderReader = () => render(
     <DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} itemId="a1" />
   </CurrentDossierContext.Provider>,
 );
+/**
+ * The reader has room for the column beside the text (jsdom lays nothing out): its wrapper measures 1200 px, more than
+ * the 52rem the column needs.
+ */
+const wide = () => {
+  const original = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return this.hasAttribute('data-annotation-margin')
+      ? ({ x: 0, y: 0, top: 0, left: 0, right: 1200, bottom: 0, width: 1200, height: 0, toJSON: () => ({}) } as DOMRect)
+      : original.call(this);
+  });
+};
+const COLUMN = 'A margine del testo';
+/** A card placed in the column: its slot is no longer transparent. */
+const placed = (card: HTMLElement) => {
+  if (card.parentElement?.classList.contains('opacity-0')) throw new Error('not placed yet');
+  return card;
+};
 const signOf = async (container: HTMLElement, block: number) => waitFor(() => {
   const found = container.querySelector<HTMLElement>(`.vlx-sign[data-block="${block}"]`);
   if (!found || found.dataset.glosses === '0') throw new Error('no sign yet');
@@ -78,7 +96,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     expect(appStore.getState().highlights).toEqual([]);
   });
 
-  it('narrow (no column): the sign opens its popover with the gloss\'s card, «Valida» through the entry\'s route', async () => {
+  it('narrow (no column): the sign opens its sheet with the gloss\'s card, «Valida» through the entry\'s route', async () => {
     const { container } = renderReader();
     fireEvent.click(await signOf(container, 2));
     const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
@@ -87,8 +105,8 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     fireEvent.click(within(card).getByRole('button', { name: 'Valida' }));
     await waitFor(() => expect(assistantService.setProposalState).toHaveBeenCalledWith('d1', 'a1', 'g1', 'validated', undefined));
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Valida' })).toHaveAttribute('aria-pressed', 'true'));
-    // The column is drawn (a container query hides it): its cards wait, unplaced, for room.
-    expect(container.querySelector('.vlx-gloss-column')).not.toBeNull();
+    // No room, no column.
+    expect(container.querySelector('.vlx-gloss-column')).toBeNull();
   });
 
   it('a gloss whose words are not in the text is listed under it, with its actions', async () => {
@@ -108,26 +126,21 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     expect(assistantService.removeProposal).not.toHaveBeenCalled();
   });
 
-  it('wide (the column has room): the card stands beside the text and the sign focuses it, no popover', async () => {
-    // jsdom lays nothing out: the column is «shown» when it has a width.
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
-    });
+  it('wide (the column has room): the card stands beside the text and the sign focuses it, no popover; with Shift, the sheet', async () => {
+    wide();
     const { container } = renderReader();
-    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
-    const card = await waitFor(() => {
-      const found = within(column).getByRole('article', { name: /Da validare/ });
-      if (found.classList.contains('invisible')) throw new Error('not placed yet');
-      return found;
-    });
-    expect(card.style.transform).toMatch(/^translateY\(\d+px\)$/);
+    const column = await screen.findByRole('complementary', { name: COLUMN });
+    const card = await waitFor(() => placed(within(column).getByRole('article', { name: /Da validare/ })));
+    expect(card.parentElement!.style.transform).toMatch(/^translateY\(\d+px\)$/);
+    // The block holds a coloured proposal too, which has no card: the sign still goes to the gloss's card (A4 §6).
     fireEvent.click(await signOf(container, 2));
-    // The block holds a coloured proposal too: the popover opens, with the way to the gloss in the margin.
+    await waitFor(() => expect(document.activeElement).toBe(card));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Shift: everything of the block, the proposal with it, in its sheet.
+    fireEvent.click(await signOf(container, 2), { shiftKey: true });
     const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
-    expect(within(dialog).queryByRole('article', { name: /Da validare/ })).toBeNull();
-    fireEvent.click(within(dialog).getByRole('button', { name: GLOSS_WORDS.goTo(1) }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(document.activeElement).toBe(card);
+    expect(within(dialog).getByRole('heading', { name: "Proposte dell'IA" })).toBeInTheDocument();
+    expect(within(dialog).getByRole('article', { name: /Da validare/ })).toBeInTheDocument();
   });
 
   it('narrow: «Sposta» then «Annulla» gives the focus back to the block\'s sign, found by the gloss\'s words', async () => {
@@ -144,12 +157,10 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
   it('wide: «Rimuovi» in the column hands the focus to the next card', async () => {
     const second = proposal('g3', 'risarcimento del danno');
     vi.mocked(assistantService.listProposals).mockResolvedValue([gloss, second]);
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
-    });
+    wide();
     renderReader();
-    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
-    await waitFor(() => expect(column.querySelectorAll('article:not(.invisible)')).toHaveLength(2));
+    const column = await screen.findByRole('complementary', { name: COLUMN });
+    await waitFor(() => expect(column.querySelectorAll('.vlx-gloss-card:not(.opacity-0)')).toHaveLength(2));
     const [first] = within(column).getAllByRole('article');
     fireEvent.click(within(first).getByRole('button', { name: 'Rimuovi' }));
     await waitFor(() => expect(document.activeElement?.getAttribute('data-gloss')).toBe('g3'));
@@ -157,13 +168,11 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
 
   it('wide: «Rimuovi» on the last card hands the focus to the block\'s sign as the text drew it again', async () => {
     vi.mocked(assistantService.listProposals).mockResolvedValue([gloss, mark]);
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
-    });
+    wide();
     const { container } = renderReader();
-    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    const column = await screen.findByRole('complementary', { name: COLUMN });
     const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
-    await waitFor(() => expect(card.classList.contains('invisible')).toBe(false));
+    await waitFor(() => placed(card));
     const before = await signOf(container, 2);
     fireEvent.click(within(card).getByRole('button', { name: 'Rimuovi' }));
     await waitFor(() => {
@@ -176,13 +185,11 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
 
   it('wide: Esc on a card gives the focus back to its block\'s sign; Esc in its text box only cancels the editing', async () => {
     vi.mocked(assistantService.listProposals).mockResolvedValue([gloss]);
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
-    });
+    wide();
     const { container } = renderReader();
-    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    const column = await screen.findByRole('complementary', { name: COLUMN });
     const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
-    await waitFor(() => expect(card.classList.contains('invisible')).toBe(false));
+    await waitFor(() => placed(card));
     fireEvent.click(within(card).getByRole('button', { name: 'Modifica' }));
     const box = within(card).getByRole('textbox', { name: GLOSS_WORDS.noteLabel });
     fireEvent.keyDown(box, { key: 'Escape' });
@@ -196,13 +203,11 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
 
   it('wide: «Sposta» from a card, then «Annulla», gives the focus back to that card', async () => {
     vi.mocked(assistantService.listProposals).mockResolvedValue([gloss]);
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
-    });
+    wide();
     renderReader();
-    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    const column = await screen.findByRole('complementary', { name: COLUMN });
     const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
-    await waitFor(() => expect(card.classList.contains('invisible')).toBe(false));
+    await waitFor(() => placed(card));
     fireEvent.click(within(card).getByRole('button', { name: 'Sposta' }));
     const bar = await screen.findByRole('group', { name: GLOSS_WORDS.moveTitle });
     fireEvent.click(within(bar).getByRole('button', { name: 'Annulla' }));
@@ -211,13 +216,11 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
 
   it('wide, a block with glosses only: its sign focuses the card and opens nothing', async () => {
     vi.mocked(assistantService.listProposals).mockResolvedValue([gloss]);
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
-    });
+    wide();
     const { container } = renderReader();
-    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    const column = await screen.findByRole('complementary', { name: COLUMN });
     const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
-    await waitFor(() => expect(card.classList.contains('invisible')).toBe(false));
+    await waitFor(() => placed(card));
     fireEvent.click(await signOf(container, 2));
     await waitFor(() => expect(document.activeElement).toBe(card));
     expect(screen.queryByRole('dialog')).toBeNull();

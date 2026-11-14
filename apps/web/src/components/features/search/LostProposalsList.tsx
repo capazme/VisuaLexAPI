@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { Highlight, HighlightProposal, Proposal } from '../../../types';
-import type { ProposalActions } from './BlockAnnotationsPopover';
+import type { ProposalActions } from './BlockAnnotationsSheet';
 import { ProposalCard } from './ProposalCard';
 import { GlossCard } from './GlossCard';
 import { GLOSS_WORDS } from '../../../constants/glossWords';

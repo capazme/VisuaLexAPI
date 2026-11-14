@@ -5,8 +5,8 @@ Status: decided by the owner on 5 November 2026 (L-46, L-47). Web only: no route
 Two rounds, in this order:
 
 1. **The frame** (§1–§6 below): one pull request, small.
-2. **The columns** (§7): one pull request per page (the Forum's «Pronti da VisuaLex», the dossier list, «Le mie
-   schede», Gymnasium's «Oggi» and «Progressi», Academia), each planned when the one before is merged. The search page
+2. **The columns** (§7): one pull request per page (the Forum's «Pronti da VisuaLex»; the dossier list and «Le mie
+   schede» together; Gymnasium's «Oggi» and «Progressi»; Academia), each planned when the one before is merged. The search page
    and a dossier's columns are U2's; «Oggi», «Prossimi giorni» and the inbox become U4's agenda.
 
 ## Why
@@ -114,6 +114,30 @@ at the default text size, so they grow with the text size the user chose), each 
   there — at 1366 px with the sidebar 3 columns, at 1920 px 4, at 2560 px in full screen 7, so the 20 packs take 7, 5
   and 3 lines. Below three columns the grid would be 10 lines of two, a long page of packs at the Forum's foot: there
   the row stays, as on a phone. The grid is no Tab stop of its own (it scrolls nothing); the row still is.
+- **The dossier list and «Le mie schede»** (the second): grids at every width, so no container query — the grid
+  itself fits as many cards of 20rem as its width holds, one on a phone. The columns set by breakpoint go (the dossier
+  list's one, two, three; the cards' two from `lg`, three from `2xl`), and with them cards under 320 px (the dossier
+  list's 283 px at 1024 and 315 at 1280) and cards stretched past 500 px (both lists' 517–795 px at 1920 and in full
+  screen at 2560). The dossier list: two columns at 768 px, three at 1366 with the sidebar, four at 1920, seven at 2560
+  in full screen; two at 1024 (the rail) and at 1280 (the wide sidebar), where it had three. «Le mie schede»: two at
+  768 and 1024, three at 1366, four at 1920, seven at 2560 in full screen; at 1280 three with 8 px to spare, so two
+  where the scrollbar is wider than the app's own (Firefox with scrollbars always shown). Beside an open card its list
+  stays one column (G8). The counts are computed without the scrollbar's room: the page keeps 8 px for it, which
+  changes none of them.
+- **Gymnasium's «Oggi» and «Progressi»** (the third): §4 holds — «Oggi» keeps its two columns from `xl` in full screen,
+  and nothing on «Progressi» reads the full screen (its states and coming days side by side from `lg` in both views);
+  a test holds each. Their one list of cards is «Progressi»' «Per materia», the five subjects, which leave their two
+  columns from `lg` (506 px at 1366 with the sidebar, 767 at 1920, 1171 at 2560 in full screen) for the grid: one on a
+  phone, two from a window of 770 px (at 768 one, as before, where the page keeps the scrollbar's 8 px; two where the
+  scrollbar takes no room, as on an iPad), three at 1366 with the sidebar (three and two), four at 1920 (four and one,
+  as at 1470 in full screen), the five in one row at 1920 in full screen; at 2560 in full screen seven tracks, so five
+  cards of 329 px and two tracks empty at the row's end, as `auto-fill` keeps them (five stretched across would be 464
+  px each). With the rail three from 1162 px, two at 1280 with the wide sidebar, three again from 1322. Here the widths
+  count the scrollbar's 8 px, which change the count at 768 alone. «Oggi»'s other lists are rows, not cards — the
+  missions, the subjects from `md`, the institutes' road, the courses — and stay; on a phone «Le tue materie» stays the
+  row of cards that scrolls. «Oggi»'s split stays on the window (`xl`), not the frame: in full screen from a window of
+  about 1056 px, and with the rail from about 1120, the frame is as wide as at 1280 with the sidebar, where «Oggi»
+  splits, and up to 1279 it is still one column.
 
 ## Out of scope
 

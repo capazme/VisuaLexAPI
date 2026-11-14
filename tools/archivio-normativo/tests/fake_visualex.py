@@ -143,6 +143,11 @@ class FakeVisuaLex:
             if isinstance(entry, dict) and "error" in entry:
                 lines.append({"error": entry["error"], "norma_data": norma_data})
                 continue
+            if isinstance(entry, dict) and "akn" in entry:
+                # The API's last-resort AKN text, marked as such (scan A.7).
+                lines.append({"article_text": entry["akn"], "text_source": "akn", "norma_data": norma_data,
+                              "url": norma_data["urn"]})
+                continue
             line = {"article_text": entry, "norma_data": norma_data, "url": norma_data["urn"]}
             if body.get("show_brocardi_info") and number in s["brocardi"]:
                 line["brocardi_info"] = s["brocardi"][number]

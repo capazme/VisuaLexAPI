@@ -1075,25 +1075,29 @@
   }
 }
 
-/* ── The glosses beside the text (D8) ─────────────────────────
+/* ── The notes and glosses beside the text (D8, A4 §6) ────────
    As a word processor's comments: the text on the left, a column of cards on the right, each at the height of its
-   passage (GlossMargin places them with a transform, measured from the words' DOM range: no element in the text,
-   root rule 23). Only where the reader has room for a text still readable (about 32rem) beside the 17.5rem column;
-   below that the column is not drawn and the block's sign opens the cards in its popover, as on a phone. The query
-   is in rem, the root's size: the frame's own 70ch would need the text's font on the container. */
-.vlx-glossed {
-  container: vlx-glossed / inline-size;
+   passage (AnnotationMargin places them with a transform, measured from the words' DOM range: no element in the text,
+   root rule 23). Only where the reader has room for a text still readable (about 32rem) beside the 17.5rem column:
+   AnnotationMargin measures its wrapper (52rem, `MARGIN_MIN_REM`) and draws the column only then, marking the wrapper
+   `vlx-glossed`; with less room a block's sign opens its sheet, as on a phone. Measured in script rather than by a
+   container query, so a new note's editor knows where to go before any card is there. */
+.vlx-glossed .vlx-glossed-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17.5rem;
+  column-gap: 1.5rem;
+  align-items: start;
 }
 
 .vlx-gloss-column {
-  display: none;
+  position: relative;
 }
 
 .vlx-gloss-card {
   position: absolute;
   inset-inline: 0;
   top: 0;
-  transition: transform 160ms var(--ease-out), border-color 150ms ease, box-shadow 150ms ease;
+  transition: transform 160ms var(--ease-out), opacity 150ms ease;
 }
 
 /* Its first place is taken at once: from no transform it would slide down from the column's top. */
@@ -1104,20 +1108,6 @@
 @media (prefers-reduced-motion: reduce) {
   .vlx-gloss-card {
     transition: none;
-  }
-}
-
-@container vlx-glossed (min-width: 52rem) {
-  .vlx-glossed-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 17.5rem;
-    column-gap: 1.5rem;
-    align-items: start;
-  }
-
-  .vlx-gloss-column {
-    display: block;
-    position: relative;
   }
 }
 
@@ -1659,6 +1649,30 @@
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+/* The practice's two views (U2, L-62): a row's «Apri accanto» that opens the first window, and a window's «Chiudi» that
+   closes the last, pass between the overview and the reading view (`practice/practiceSwitch.ts`). Each act's panel
+   becomes its entry in the index, the practice's header and «Giurisprudenza» theirs, the windows come in from the right
+   and go back there: 260 ms, `--ease-out`, no overshoot. The pieces are named only while it plays (gotcha 22), each by
+   the `--vlx-vt` in its own style. A picture keeps its size, anchored at its top left, and its box clips it: the text
+   does not stretch while the box changes size. The root does not animate (above), so what is not a piece changes at
+   once; under reduced motion no transition is started. */
+.vlx-practice-switching .vlx-vt { view-transition-name: var(--vlx-vt); }
+.vlx-practice-switching::view-transition-group(*) { animation-duration: 260ms; animation-timing-function: var(--ease-out); }
+.vlx-practice-switching::view-transition-old(*),
+.vlx-practice-switching::view-transition-new(*) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--ease-out);
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+  overflow: clip;
+}
+.vlx-practice-switching::view-transition-new(vlx-practice-window-0):only-child,
+.vlx-practice-switching::view-transition-new(vlx-practice-window-1):only-child { animation-name: vlx-practice-window-in; }
+.vlx-practice-switching::view-transition-old(vlx-practice-window-0):only-child,
+.vlx-practice-switching::view-transition-old(vlx-practice-window-1):only-child { animation-name: vlx-practice-window-out; }
+@keyframes vlx-practice-window-in { from { opacity: 0; translate: 24px 0; } }
+@keyframes vlx-practice-window-out { to { opacity: 0; translate: 24px 0; } }
 /* The new section's title takes the focus after the change; chosen with a pointer it shows no ring. The browser
    counts that focus, given by the script after a focused menu entry, as visible, so `FOCUS_RING`'s `:focus-visible`
    alone would draw it. Unlayered, so it wins over the utilities; the attribute goes with the focus. */

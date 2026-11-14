@@ -13,7 +13,7 @@
  * ingress leaves open and need nothing. legalFetch.guard.test.ts fails on a bare fetch
  * to any other, which would work in development and be refused in production.
  */
-import { getFreshAccessToken, handleUnauthenticated, refreshAccessToken } from './api';
+import { getFreshAccessToken, handleUnauthenticated, refreshAccessToken, settleRefreshFailure } from './api';
 
 function withAuthorization(
   headers: HeadersInit | undefined,
@@ -49,12 +49,13 @@ export async function legalFetch(input: string, init: RequestInit = {}): Promise
   if (response.status !== 401 || !canBeSentAgain(init)) return response;
 
   // The token was refused: it expired between the check and the request, or the session
-  // ended. Refresh once and send again; a refresh that fails ends the session, as in api.ts.
+  // ended. Refresh once and send again; a refresh the server refuses ends the session, as in api.ts.
   let token: string;
   try {
     token = await refreshAccessToken();
-  } catch {
-    handleUnauthenticated();
+  } catch (error) {
+    // Refused: the session ends. A server or network error keeps it; the caller gets the 401 it had.
+    settleRefreshFailure(error);
     return response;
   }
   const retry = await send(token);

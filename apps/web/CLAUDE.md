@@ -40,8 +40,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/studia` redirects to `ripasso` (see «Card review» below); `/studia/progressi` is «Progressi», the page of the data (see «Progressi» below); «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
-  `triggerSearch` as the dossier's rows do; with no card open the cards are tiles across the frame (G8: two
-  columns from `lg`, three from `2xl`; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
+  `triggerSearch` as the dossier's rows do; with no card open the cards are tiles across the frame (G8) in a grid of
+  cards of at least 20rem (`CARD_GRID_COLUMNS`, U1: one column on a phone, two at 768 px, three at 1366 with the
+  sidebar, four at 1920; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
   1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below, «Cerca» under 360 px (it was cut, Q1),
@@ -463,8 +464,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   hand (the sign-in page's display line aside). The columns that fill the room past two measures (about 1500 px) come
   page by page (spec `2026-11-05-u1-frame-and-full-screen-design.md` §7): a list of cards on a wide frame becomes a grid
   of cards of at least 20rem, `CARD_GRID_COLUMNS` (`frame.ts`, written once), never a carousel or a row 2000 px long (a
-  phone may keep a row that scrolls). So far only the Forum's «Pronti da VisuaLex» does; the community's cards
-  (`CARD_GRID`), the dossier list and «Le mie schede» still set their columns by breakpoint until their pull requests.
+  phone may keep a row that scrolls). The Forum's «Pronti da VisuaLex», the dossier list, «Le mie schede» and «Progressi»'
+  «Per materia» do, and the practice's overview (U2: a grid of act panels of at least 38.75rem, `OVERVIEW_GRID` in
+  `practice/besideLayout.ts`, see «The two views»); the community's cards (`CARD_GRID`) still set their columns by
+  breakpoint.
   **The page frame** (W2, 21 Oct 2026):
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
@@ -1007,7 +1010,8 @@ actions.
 **Server-backed** (hydrated by `fetchUserData`, mutated optimistically then
 synced): bookmarks, dossiers + items, environments (read-only: the Forum's archive), quickNorms, customAliases,
 annotations and highlights (these two hydrate per-article via
-`loadAnnotationsForArticle` / `loadHighlightsForArticle`). The search history is
+`loadAnnotationsForArticle` / `loadHighlightsForArticle`: each reader for its text, Study Mode for the article it
+shows — one reached with its arrows may be a row never opened). The search history is
 not a store slice: `HistoryView` keeps it in local state and reloads it on mount.
 
 **Not in the store:** the planner's tasks are server state read per view (`planner/useTaskView`; see «The
@@ -1268,17 +1272,18 @@ reader, not Study Mode — the renderer ends each annotated block with an empty
 the text nodes are untouched. The sign sits inline after the block's text, or
 in the right margin when the `vlx-frame` size container (a wrapper around the
 text in `ArticleBody`) has room for the 70ch column plus a sign (the query
-writes the measure's number: it cannot read a variable). It opens
-`BlockAnnotationsPopover` through `useArticleTextInteractions` (one popover at
-a time with the update notes): the block's notes, edited and deleted in place
-with the Notes panel's own `NoteCard`, and its highlights, removed; *Vai al
-passo* scrolls to the passage and makes it glow (`utils/revealAnnotation.ts`).
-The popover is placed against the whole block (`utils/blockAnchorRect.ts`) —
-beside it when the margin has room, else below or above it, never over the
-passage it lists — through a virtual reference that finds the sign again on
-every measurement, because every edit redraws the text. Its focus management
-is modal: with no element in the text for floating-ui to bridge Tab back to,
-Tab cycles inside and Esc returns to the sign.
+writes the measure's number: it cannot read a variable). **No popover** (A4 §6, the owner: «nessun riquadro»): its press
+(`useArticleTextInteractions`, `openBlock`) goes to the block's first card beside the text (`useSignTarget`, below
+«The notes beside the text»), where the column is shown and the block has one there — the block is closed again, so
+the next press does the same —; else (a phone, a narrow reader, a block of highlights or an application's proposed
+passages alone), or with Shift (a click or Enter: `blockAll`, the keyboard's way to a block's highlights beside its
+cards; the sign says it, `aria-keyshortcuts`, and so does the «?» dialog), it opens the block's sheet, `BlockAnnotationsSheet` (`ui/Sheet`, a capped width centred on a computer): the
+proposals first (D7b), an application's glosses, the reader's notes (`NoteMarginCard`, edited and removed in place),
+the highlights (removed), each with *Vai al passo*, which scrolls to the passage and makes it glow
+(`utils/revealAnnotation.ts`), and the discussions (`ThreadCard`, opened in their panel). Decided as the block opens: a
+reader widened while its sheet is open keeps the sheet (a note half edited in it). Its X and Esc give the focus back to
+the sign found again (`returnFocusRef`: every edit redraws the text), a note being edited is never dropped without
+«Scartare la modifica?», and a press outside never closes it.
 
 **Passages an application proposed** (D7b: the MCP design's §8, in the documentation pull request #318, as the
 server's contract for the first cut revises it) are highlights with a `proposal` (`types/index.ts`, `HighlightProposal`): only a dossier entry's reader is
@@ -1289,25 +1294,25 @@ checkbox (`hasAiNote`). Until its note is validated («da validare» or «Da riv
 application's note by its state's own shape, as on the row's light (`.vlx-sign-ai`: a filled red flag, a yellow dashed
 ring, a green tick, each with its count; the other highlights stay dots of their colour) and names them apart
 («…; 3 passaggi proposti dall'IA: 1 da validare · 1 da rivedere · 1 validato», `signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. A click on
-such a passage opens its block's popover (`useArticleTextInteractions`, in an article's comma or a decision's
+such a passage opens its block's sheet, everything of it (`useArticleTextInteractions`, in an article's comma or a decision's
 paragraph), unless it lands on something with a click of its own (a reference, a citation, a link) or the
 highlights are hidden; the readers' note handlers skip what `proposedPassageAt` returns, whatever order the listeners were added in,
 so a note of the reader's under it never opens. The
-popover lists them first, only when given `proposalActions`, as `ProposalCard`s: the passage, its note, then
+sheet lists them first, only when given `proposalActions`, as `ProposalCard`s: the passage, its note, then
 `AiReviewControls` — a real checkbox «Proposto dall'IA, confermi?» → «Validato» (or «Validato, modificato da
 te») with the green tick, «Da rivedere» while flagged, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
 in place in `NoteEditBox`, shared with `NoteCard`, here `explicit`: «Salva» and «Annulla» under it, Enter saves,
-Shift+Enter a new line, Esc cancels without closing the popover, leaving the box saves nothing; a changed text is
+Shift+Enter a new line, Esc cancels without closing the sheet, leaving the box saves nothing; a changed text is
 never dropped without «Scartare la modifica?» — «Continua» or «Scarta» —, asked by «Annulla» or Esc, and by the
-popover's X, Esc or «Vai al passo», which a press outside never closes while a note is edited), the bin, and «Vedi la versione dell'IA» once the note was
+sheet's X, Esc or «Vai al passo»), the bin, and «Vedi la versione dell'IA» once the note was
 changed. Every proposal, a bare mark too and one that no longer lands, offers «Sposta l’evidenziazione» (the
-passage's boundaries by hand: Luca, «l'evidenziatura l'IA me la fa, però devo poterla modificare»): the popover closes,
+passage's boundaries by hand: Luca, «l'evidenziatura l'IA me la fa, però devo poterla modificare»): the sheet closes,
 the reader shows `MoveProposalBar` (portalled, fixed at the foot, the page's width on a phone; one on the page at a
 time, `assistantProposalsStore.moving`, which a removal, the feature switched off or its reader going ends) with the passage's words
 selected in the text (only when they are still at their offset) and the focus on it; meanwhile the selection popup is off
 (`ArticleBody`'s `selectionPopup`) and a click in the text opens nothing (a drag ends with one, on the very passage), nor
 Enter or Space on a sign, a reference or the update notes' toggle, and
-a changed note in the popover asks first («Scartare la modifica?»). The new words
+a changed note in the sheet asks first («Scartare la modifica?»). The new words
 are a drag or a touch, or Maiusc+frecce from the keyboard (Ctrl or Alt a word at a time, `Selection.modify`, wherever
 the focus is but in a field, under a dialog or on a key already taken) with «Sposta l'inizio» / «Sposta la fine»
 choosing the edge (`setBaseAndExtent`; a backward drag makes it the start); on a touch screen with no fine pointer
@@ -1341,23 +1346,11 @@ Study Mode or practice, and no element of it enters the text (root rule 23): `re
 `renderDecisionHtml` take `glosses` and only count them on the block's sign (`BlockAnnotations.glosses`,
 `data-glosses`, `.vlx-sign-gloss` with the state's shape, named apart by `signAriaLabel`: «…; 2 glosse dell'IA: 1 da
 validare · 1 validata»); «Nascondi evidenziazioni» leaves them, a gloss is a note. The projection tests run with glosses
-on. Where the reader has room (`.vlx-glossed`, a container query at 52 rem on the wrapper `GlossMargin` puts around
-`ArticleBody`, in the article's and the decision's dossier reader alike) the cards stand in a column on the right, as a
-word processor's comments (`GlossMargin`): each at the height of the first line of its words, read from a DOM range of
-the text root (`rangeFromPlainOffsets`), pushed down under the card above when they would overlap, in the order of the
-text (`placeGlossCards`, `utils/glossLayout.ts`, pure; words with no box, in the folded update notes, under the card
-before), placed by a `transform` (160 ms after its first place, which is taken at once; none under reduced motion) and
-measured again on every redraw, reflow or card that grows (`ResizeObserver`s); only glosses whose words land make a
-column. Once the cards are placed (`onWideChange`), a sign whose block holds only glosses focuses the first card and
-opens nothing, one that holds more opens the popover with «Vai alla glossa a margine» (`glossesInMargin`); a popover
-opened narrow keeps its cards when the reader widens (one may be half edited), one opened wide lists them as soon as it
-narrows, and if no card takes the focus («Vai alla glossa» answers false) the popover stays and lists them.
-«Rimuovi» in the column hands the focus to the next card, else the one before, else the block's sign found again after
-the text redrew (`signAt`: a sign taken before the removal is no longer in the page), else the nearest sign; Esc on a
-card (not a field's own Esc) goes back to its block's sign; «Sposta» gives it back to the card (`MoveProposalBar`'s
-`focusAfter`), or, narrow, to the sign found by the gloss's words (it has no mark). With less room — a phone, and the norms' column of a dossier that has decisions too — the column
-is not drawn (`display: none`, read by its width: `onWideChange`) and the sign's popover lists the block's `GlossCard`s
-first (44 px on a touch screen). A card (`GlossCard`, its passage's words its `aria-describedby`): the state in words and shape (feminine, as the word:
+on. Where the reader has room they are cards in the column beside the text, with the reader's notes and the
+discussions (`AnnotationMargin`, «The notes beside the text» below); the sign focuses the block's first card;
+«Sposta» gives the focus back to the card (`MoveProposalBar`'s `focusAfter`), or, narrow, to the sign found by the
+gloss's words (it has no mark). With less room — a phone, and the norms' column of a dossier that has decisions too —
+the column is not drawn and the block's sheet lists the block's `GlossCard`s first (44 px on a touch screen). A card (`GlossCard`, its passage's words its `aria-describedby`): the state in words and shape (feminine, as the word:
 «Validata»), the passage's words on one line,
 the text, then «Valida» and «Da rivedere» (toggles, `aria-pressed`, waiting while a write is out), «Modifica»
 (`NoteEditBox explicit`; an emptied text is not sent), «Sposta» (`MoveProposalBar`, named «Sposta la glossa») and
@@ -1367,6 +1360,51 @@ words with the CSS Custom Highlight API (`useGlossPassage`, `utils/glossPassage.
 discussion's tint, one passage on the page at a time). A gloss whose words no longer land is listed under the text
 (`LostGlossesList`). **Every visible word that names one is in `constants/glossWords.ts`** (`GLOSS_WORDS`), and only
 there: «glossa» is also the Forum's discussion on a passage, and the owners may choose another word.
+
+**The notes beside the text** (A4 §6, the owner, 3 November 2026: «vorrei la visualizzazione delle note allo stesso modo
+dei commenti di Microsoft word e non in pop-up»): `AnnotationMargin` (D8's `GlossMargin` generalised) wraps the text of
+every reader — the article (`ArticleTabContent`, a row and a window alike), a decision (`DecisionReadingSurface`), a
+dossier's entry (`DossierItemReader`), Study Mode (`StudyModeContent`, around its centred column) — and stands its
+cards in a column on the right, as a word processor's comments: the reader's anchored notes (`NoteMarginCard`: the
+words on one line, the text, «Modifica» in place with «Salva» and «Annulla», never emptied, «Rimuovi» with its own
+«Annulla»), the passage discussions with colleagues (`ThreadCard`: the words, title, author, replies, «Apri glossa»),
+an application's glosses (`GlossCard`) and the editor of a new note (`NoteDraftCard`, «Nuova nota», its field focused
+once it has its place, so the page does not scroll to the column's top). Each card at the height of the first line of its
+words, read from a DOM range of the text root (`rangeFromPlainOffsets`: nothing added to the text, root rule 23), pushed
+down under the card above when they would overlap, in the order of the text (`placeGlossCards`, `utils/glossLayout.ts`,
+pure; words with no box, in the folded update notes, under the card before), placed by a `transform` (160 ms after its
+first place, taken at once; none under reduced motion; transparent, never hidden, until placed, so a focus given
+meanwhile lands), measured again on every redraw, reflow or card that grows (`ResizeObserver`s); only what lands makes a
+card (the lists under the text keep the rest). The column is drawn where the reader has room for a text still readable
+beside it — the wrapper measured in script against `MARGIN_MIN_REM` (52rem; `vlx-glossed` on the wrapper, `index.css`),
+so a new note knows where to go before any card is there — and something to put in it; `onWideChange` says it is shown
+once its cards are placed, `onRoomChange` whether there is room at all (Study Mode writes a note in its tools panel
+without); a rem of slack once there, so a scrollbar the cards bring does not take the column away. With less room a new
+note's editor is a sheet from the bottom (`NoteComposerSheet`, its X asking before a text written is dropped), and the
+cards are the block's sheet's. What is written in a new note is the margin's, so it moves with the editor between the
+column and the sheet; a new selection while something is written there does not take it onto other words (the note tool
+takes every selection): the readers ask `keepDraft()`, which gives the field the focus again. Saved, the focus goes to
+the note's card, else its block's sign, and is held on those words through the redraws the save brings — the server's
+id makes a new card, the text a new sign — until the reader presses or moves it (10 s at most); given up, to the
+block's sign. A card hovered or focused shows its words in the text (the
+CSS Custom Highlight API, `utils/glossPassage.ts`; a gloss's card through `useGlossPassage`). «Rimuovi» hands the focus
+to the next card, else the one before, else the block's sign found again after the text redrew (`signAt`), else the
+nearest sign; Esc on a card (not a field's own) goes back to its block's sign. A note's wavy words clicked go to its card,
+else its block's sheet (`useInlineNoteAnchors`, `useNoteOpener`; no popover). `InlineNoteComposer` and
+`InlineNotePopover` are gone.
+
+**The note tool** (A4 §6): `NoteToolButton`, a word processor's split button beside the highlighter in the four reading
+bars (the article's computer row and its compact form; the phone's row only while the tool is on, so it can be turned off
+where there is no Esc — it keeps the selection bar's «Nota» otherwise —; the decision's; Study Mode's header from 640 px,
+mounted only there, since a button hidden by a class keeps the tool alive; the dossier reader's actions). Its words are
+read as the press starts, as the highlighter's (`InkSelection.note`). Its left half is the tool: with words selected it
+opens the editor of a note on them at once; with nothing selected it turns the tool on (`aria-pressed`), and every
+selection then opens the editor as it is released (`SelectionPopup`, `useInkOnRelease`), the words exactly as selected,
+with no selection bar, until it is pressed again or Esc. One tool at a time: `readingTool` is `'highlight'`, `'note'`
+or null. Where the reader has discussions (the article, the decision) its menu («Tipo di nota») chooses «Nota personale»
+or «Glossa» (`noteToolKind`, session-only: the discussion's composer, `onDiscuss`); elsewhere it is the toggle alone and
+writes personal notes. The two buttons share their life (`readingToolLife.ts`): the selection read as a press starts
+(`InkSelection.note`), Esc, and the tool off when the last button holding it leaves the screen.
 
 **The highlighter** (A4, the owner's decision of 3 November 2026; spec `2026-11-03-a4-highlighter-and-notes-design`):
 a word processor's split button, `HighlighterButton`, in the four reading bars — beside «Evidenziazioni» on a computer
@@ -1418,13 +1456,19 @@ while selecting, the piece exactly (`utils/inkSelection.ts`: widened in the DOM,
 the projection would join two words; `getInkAnchor` for the readers, `inkRange` for a lesson; a note keeps the words
 as selected; Alt is read from the press that made the selection, while it stands as made; a selection made from the
 keyboard, Shift and the arrows, is taken as made, as a word processor takes it). The cut is
-the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`
-(offsets cannot be changed by `PUT`), the server's `note` copied to them. A highlight from the Forum (`sourceSuggestionId`,
-`originalAuthor`: `POST` cannot carry the author, gotcha 21), or one with no offset, is never cut nor joined: removed or
-recoloured whole; the ink laid beside or over it leaves its words to it. `useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
+the word processor's: the parts outside the selection stay, trimmed of whitespace (`partsOf`), recreated with `POST`,
+the server's `note` copied to them. **A highlight from the Forum is cut like the others, its author kept on every piece**
+(9 November 2026, over the server's #411 and #412; gotcha 21): its words keep their author through a cut and a colour
+(`InkMark.author`, its suggestion and first author) — its first piece keeps its row (`reshape`: `PUT` of the range and
+the colour, `sendHighlightUpdate`), the others are made from it (`POST` with `splitFrom`, under its server id once it
+has one: the server copies the author), and the pieces show the author at once; only highlights of one author are
+joined, and the ink never takes words from a highlight of its colour by another author (it leaves them to it). Ctrl+Z
+puts the row's range back with a `PUT` and deletes the pieces; a range refused takes the gesture back. One with no
+offset is never cut nor joined: removed or recoloured whole; the ink laid beside or over it leaves its words to it.
+`useHighlightInk` turns a plan into the store's calls: a new highlight (`addHighlight`, the article's MERL-T
 event kept) or a change (`editHighlights`). **No notification** (the owner, 5 November 2026: «l'avviso per le
 evidenziazioni lo toglierei proprio»): every gesture — a new highlight, «Fai tua», a cut, a colour, «Nessun colore», a
-removal from a sign's popover — is said to a screen reader alone («Testo evidenziato in giallo», «Evidenziazione
+removal from a sign's sheet — is said to a screen reader alone («Testo evidenziato in giallo», «Evidenziazione
 rimossa», «Evidenziazioni rimosse», «Evidenziazione cambiata in verde»), and Ctrl+Z (⌘Z) takes the last one back, one
 step, with no time limit, while its text is on screen (`useHighlightInk` counts its reader's text, `store/textsOnScreen.ts`;
 see «Destructive confirmations»). «Questa occorrenza è già
@@ -1472,7 +1516,7 @@ reader: an article's `DossierItemReader` and a decision's `DecisionReadingSurfac
 `DossierDecisionRow`), each given its entry's id, the dossier from `CurrentDossierContext` (`DossierDetailView`). It asks
 nothing outside a dossier entry, with the feature off or on a text shown read-only, and draws the proposals with the
 reader's own highlights (a decision's downloads keep only the reader's); one whose words no longer land is listed under
-the text at every width, as the application's, with its note and the popover's actions (`LostProposalsList`), never
+the text at every width, as the application's, with its note and the sheet's actions (`LostProposalsList`), never
 in the reader's own boxes (`LooseHighlightsList`, desktop only, and `UnmatchedAnchors`). Each
 write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
 once and offers «Annulla»; the `DELETE` leaves when the notification closes, when the entry's reader goes (its row
@@ -1484,7 +1528,7 @@ is out the checkbox and the flag wait (`busy`, `aria-disabled`, still focusable)
 waits behind «Annulla» is what «Annulla» puts back, the server's state. A 404 «Proposta non trovata», on a write or a
 `DELETE`, is a removal done: no error, nothing put back. Errors are read as `apiClient` rejects them (`{ status,
 message, data }`): the server's `detail` is what the notification says. A state that changes is said in a `status`
-region; the focus comes back to the pencil after editing, and to the popover after a bin; «Cosa non va?» also saves on
+region; the focus comes back to the pencil after editing, and to the sheet's list after a bin; «Cosa non va?» also saves on
 Esc. On a narrow card the three buttons go under the label (`flex-wrap`). The flag is read once as the app starts
 (with the user's data) and as the dossier page mounts; on again after an off, the dossiers are read again for their
 lights. A 404 «Non disponibile» also clears the items' `assistantNotes` and
@@ -1523,7 +1567,8 @@ root registers under its practice's id with the same keys, and so does a light w
 surface's `findHostId` prop, which also names the practice for the magnifier's pressed state and
 request; the window's own id stays the way back's and the focus's); `setFindWindowDefaultPlace` lets a
 layout give the window its opening place (`ReadingRow`, in every case: right-aligned in the table's
-column, or the first window's body with the rail, under the stack pinned at its top — the practice header,
+column in the overview, or the first window's body in the reading view — beside the index, narrower than the find
+window, or the rail —, under the stack pinned at its top — the practice header,
 the first act's heading, an open row's toolbar, each marked `data-pinned-head` — and every window's
 header, so never over a control; a dragged place wins; a tool held over the table carries
 `data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
@@ -1855,7 +1900,8 @@ from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are 
 drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
 with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
-(`SubjectProgress`, two columns from `lg`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
+(`SubjectProgress`, a grid of cards of at least 20rem, `CARD_GRID_COLUMNS`, U1, three a row at 1366 px with the sidebar,
+four at 1920, the five in one row at 1920 in full screen): the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
 `stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). Every control on the page is 44 px tall at every width
 (`ProgressPage.test.tsx` guards its files against an `md:` height, as `contribuisci.test.ts` does Contribuisci's); the
@@ -1927,9 +1973,9 @@ text, and the hook returns `locations`, where `locatePassage` says where each pa
 that text (the one place «detached» is computed). A reload reaches every mounted copy of the
 subject (the phone view and the desktop panel) and keeps the previous list meanwhile. The result
 is counted on the round-B sign (`data-threads`, speech-bubble icon). In the text, words stay clean until a
-discussion is opened. The block popover (`BlockAnnotationsPopover`) lists the
-block's passage discussions with their quotation, title, author, reply count,
-and an «Apri glossa» action that opens the discussion panel (the interface calls
+discussion is opened. Each passage discussion that lands is a card beside the text (`ThreadCard` in
+`AnnotationMargin`), and the block's sheet (`BlockAnnotationsSheet`) lists the block's, with their quotation, title,
+author, reply count, and an «Apri glossa» action that opens the discussion panel (the interface calls
 a discussion a «glossa»: «Glosse sull’articolo», «Glosse sulla decisione», «Nuova glossa»,
 «Glossa sul passo»; the code keeps `thread` and `discussion`). The discussed
 words light up only for the discussion open in the panel (`focusedThreadId` →
@@ -1953,8 +1999,8 @@ withholding is a precondition for opening VisuaLex to the public.
 **A court decision takes the same tools** (`DecisionReadingSurface`, PR 4): notes and
 highlights are stored under `normaKey = decisionKey(identity)` with `articleId = ''` (wire key
 `<key>::art::`), through the store's ordinary actions; the surface mounts the article's own
-`SelectionPopup`, `InlineNoteComposer`/`InlineNotePopover`, `NotesPeekPanel`,
-`HighlightsActionsPicker`, the round-B signs and `BlockAnnotationsPopover` (a paragraph is the
+`SelectionPopup`, the notes beside the text (`AnnotationMargin`), `NotesPeekPanel`,
+`HighlightsActionsPicker`, the round-B signs and `BlockAnnotationsSheet` (a paragraph is the
 block; `decisionStructure` names them). `DecisionReadingToolbar` draws the notes and highlights
 buttons and the discussion button (`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
 (`UnmatchedAnchors`; a decision found without text hosts it through `DecisionAnchorsWithoutText`).
@@ -2138,9 +2184,9 @@ confronto parola per parola» (`tooLong`). One scroll replaces the old synchroni
 alignment).
 
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
-free notes; `InlineNoteComposer` anchored on the selection when creating an
-anchored note; `InlineNotePopover` when clicking an existing wavy underline;
-the block popover from a sign, for everything one block holds. Deliberately
+free notes; the notes beside the text (`AnnotationMargin`: a card per anchored note, read, edited and removed there,
+and the editor of a new one — the selection bar's «Nota», the note tool —, a sheet from the bottom with no room); a
+click on a wavy underline goes to its card; the block's sheet from a sign, for everything one block holds. Deliberately
 distinct entry points — don't collapse them.
 
 **Highlights**: created, removed and recoloured from the selection — `SelectionPopup`'s «Evidenzia» and H, or the
@@ -2236,8 +2282,45 @@ travels with the reference to the route, which uses it to tell homonyms apart): 
 The entry reads on the reading surface (`DecisionEntryView` over `DecisionAnswerBody`), where highlights and notes work as on an
 article (see «A court decision takes the same tools»). «Cerca nella barra di ricerca», on a decision that was not found, opens the
 palette with its citation typed in (`openCommandPaletteWith`, taken once). A subject has one mounted reading surface:
-a row whose subject a window shows folds and says «Aperto accanto» (desktop only; a phone's reader replaces the table
-instead), and the find window, the way back and the index reach the row or the window through the store's reveal actions.
+on the desktop the rows are drawn only in the overview, where no window is open, and the reading view's index mounts no
+reading surface (a row whose subject a window shows still folds and says «Aperto accanto», a guard the two views no
+longer reach; a phone's reader replaces the table instead), and the find window, the way back and the index reach the
+row or the window through the store's reveal actions.
+
+**The two views** (U2, L-61 and L-62, the owner, 5 November 2026; spec `2026-11-09-u2-practice-two-views-design.md`).
+On the desktop a practice with no window beside is **the overview** («Panoramica»): one panel per act in a grid
+(`OVERVIEW_GRID`: one column below about 1264 px of frame, two from there, three from about 1908 px; one act alone
+takes the width), a hairline box on the page's ground with its tools beside its title (the title truncates, its
+tooltip says it whole), and «Giurisprudenza» a strip of the frame's width under the panels in the decisions' tint —
+the emerald the palette gives a decision, a wash and a hairline, the text ink —, its closed rows in columns of at least
+26rem and an open one across the strip (`data-row-open`). With a window it is **the reading view** («Lettura»): the
+table becomes an index of `INDEX_WIDTH` (320 px) on the left — the header compact, each act its 17 px heading with «⋯»
+(Studio, Struttura, PDF inside it) and its articles one entry a line, «Giurisprudenza» one more entry —, the windows
+share the rest (still at most two, D10), and below 420 px a window the index folds into the rail, whose overlay is the
+same table, hidden while closed and never unmounted: the act blocks hold the structure window and Study Mode, which a
+pick from them (it opens a window, which may fold the index) must not close. The index draws no act arrows (the
+structure is in «⋯»). An entry (`PracticeIndexEntry`) opens its subject beside with the focus, or takes the focus to
+its window; the entries shown beside are marked with the window's sign and, for a screen reader, in words («Vai alla
+finestra: …, aperto accanto»; not `aria-current`, which would say it twice), and keep a hover «Togli dal tavolo». In
+the reading view a row the practice reveals (a search that landed, a pick in the structure window, a find match, the
+way back) opens beside and its row, opened by the reveal in the hidden overview, is closed again (`ReadingRow` takes
+the reveal, `besideRefOfRow`; the column takes it only in the overview), with no focus taken. Entering the reading view
+the page's scroller goes to its top; closing the last window brings the overview back at the place it was left at, one
+kept per practice (followed on `scroll` while the overview is drawn: read after the switch, the browser would already
+have clamped it). «Apri accanto» passes the focus to the window (`openBeside(…, { focus: true })`); a view that changes
+under the focus by any other way (an entry's ✕, a link in an open row) gives it to the newest window, or to the
+overview's first control.
+The phone keeps its column (`layout="phone"`) and its full-screen reader. **The passage** (`practiceSwitch.ts`, L-62):
+a row's «Apri accanto» that opens the first window and a window's «Chiudi» that closes the last play a View Transition
+— each act's panel into its index entry (`vlx-practice-act-<id>`), the header and «Giurisprudenza» into theirs, the
+windows (`vlx-practice-window-<n>`) in from the right and out again —, 260 ms on `--ease-out`, the pictures
+unstretched and clipped by their box (`object-fit: none`, anchored at the top left, `overflow: clip`; the browser's
+group animation moves the boxes and changes their width and height); any other change of view is immediate, as is
+every change without View Transitions or under reduced motion. The pieces are named only while it plays
+(`vlx-practice-switching` on the root, each piece's `--vlx-vt` on an element of class `vlx-vt`), as the section change
+names `vlx-page`; a change asked while one plays waits for its end and then decides again what it does (the view may
+have changed meanwhile). Closing the last window gives the focus to the subject's row (the act's heading when the act
+is folded), closing one of two to the window left open. Dropping the passage's commit keeps the two views.
 
 **The host props.** Despite their names, `ArticleTabContent`'s `tabId` and `readingOrigin.tabId`, `DecisionReadingSurface`'s
 `hostTabId` and `CaseLawSection`'s `tabId` name the host a surface reads in: a practice (its row) or one of its windows
@@ -2719,17 +2802,18 @@ Duplicating any of these is a defect, not a shortcut.
   surface that renders structured text.
 - `utils/articleAnnotations.ts` — `resolveAnchors`, `resolveGlosses` (D8), `groupAnnotationsByBlock`,
   `highlightsWithoutSign`, `describeBlock` (a block named by its printed enumerator or its opening
-  words, never a computed number). The renderer and the block popover both
+  words, never a computed number). The renderer, the notes beside the text and the block's sheet all
   read it: never re-derive where an anchor lands anywhere else.
 - `utils/revealAnnotation.ts` — `revealAnnotation(root, { kind, id }, near?)`:
-  scroll to an annotation and make it glow. The block popover and Study
+  scroll to an annotation and make it glow. The block's sheet and Study
   Mode's summary.
 - `utils/floatingOrigin.ts` — `getTransformOrigin(placement)` for a popover's
   entry animation.
-- `utils/blockAnchorRect.ts` — `blockAnchorRect` / `signReference`: the
-  rectangle and the virtual reference a block's popover is placed against.
 - `hooks/useNoteEditing.ts` + `features/search/NoteCard.tsx` — a note edited in
-  place; the Notes panel and the block popover.
+  place; the Notes panel. A note beside the text and in a block's sheet is `NoteMarginCard` (`MarginCards.tsx`).
+- `features/search/AnnotationMargin.tsx` + `hooks/useSignTarget.ts` — the cards beside the text (notes, discussions, an
+  application's glosses, a new note's editor) and where a sign or a note's words take the reader: a new surface with
+  notes wraps its text in it, never a popover of its own.
 - `hooks/useArticlePassageThreads.ts` — one signature, `(anchor, { enabled?,
   plainText? })`: the anchor comes from the caller. Loads passage discussions for
   the signs via `GET /article-discussions/passages` and, given `plainText`, returns
@@ -2944,7 +3028,8 @@ Breaking one of these breaks the product. Read before editing.
 meant to stay split; add new features as new files, not inside the shells:
 
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
-  `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
+  `?dossier=<id>`; `DossierListView.tsx` (a grid of cards of at least 20rem, `CARD_GRID_COLUMNS` — U1: as many
+  columns as the frame holds, four at 1920 px, seven at 2560 in full screen —, context menu, shortcuts `n` `/`
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
@@ -3019,11 +3104,12 @@ meant to stay split; add new features as new files, not inside the shells:
   `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,
   `AddItemsDialog` and `AttributionChip` (see gotchas 20-21).
 - `features/search/` — `ArticleTabContent.tsx` (the reading surface),
-  `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
-  `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
-  opened from its `(119)`), `BlockAnnotationsPopover.tsx` (a block's notes and
-  highlights, opened from its sign), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
+  `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `AnnotationMargin.tsx` and `MarginCards.tsx` (the notes beside the text),
+  `NoteComposerSheet.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
+  opened from its `(119)`), `BlockAnnotationsSheet.tsx` (everything a block holds, opened from its sign),
+  `NoteToolButton.tsx` (the note tool), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  `SearchPanel.tsx` (streaming merge logic; the stream's closing `kind: 'time_budget'` line raises «Caricamento interrotto» with `notify`, and «Carica i mancanti» appends the missing articles to
+  `searchQueue`, D-323), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
   the close button and the filters 44 px on a phone — `CommandPalette.test.tsx` reads the file; its colours are
   checked in `theme.test.ts`), `SearchField.tsx` (the search page's field)
   and `GlobalSearch.tsx` (the palette and the managers it opens, mounted by `Layout` — see gotcha 27),
@@ -3038,19 +3124,24 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/practice/` — the practice, the norm-tab's replacement (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
   header in the page frame's type — the name in `PAGE_TITLE`, the count line under it, «Salva come dossier» and «⋯» on
-  its right —, the streaming bar, then
+  its right; in the reading view's index (`layout="index"`, U2) the name in 22 px and «Salva come dossier» a 44 px
+  icon —, the streaming bar, then
   `PracticeColumn`; the topic searches are windows beside it on the desktop and the full-screen reader's
   subject on a phone); `PracticeColumn` (the acts, dragged
-  into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act, R3: a section
+  into order, then «Giurisprudenza»; `layout`: `phone`, `overview` — the grid, `rectSortingStrategy` — or `index`, see
+  «The two views»; outside the index it takes the reveal once) of `PracticeActBlock` (an act, R3 — in the overview a
+  panel, a hairline box, and in the index a heading that pins nothing, U2 —: a section
   with no card around it — its sticky heading, the act's name in Newsreader 22 px over a hairline, with Studio,
   Struttura, PDF and «⋯» as neutral quiet buttons — on a phone one row, the title and «⋯», which holds Studio,
   Struttura and PDF, and the meta line only when it says more than the count —; the index line of its rows, drawn only
   for an act of more than one article, its chips in slate, on a phone one row that scrolls sideways beside the arrows;
   the rows; the structure window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
   only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
-  `DecisionEntryView`, under «Giurisprudenza (n)» in the act's type, no card), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
+  `DecisionEntryView`, under «Giurisprudenza (n)» in the act's type, no card; in the overview a strip in the decisions'
+  tint, in the index `PracticeDecisionEntry`s), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
   «Apri accanto» (on the desktop a row whose subject a window shows folds and says «Aperto accanto ·
-  Chiudi la finestra», so one subject has one mounted reading surface, T5; on a phone it opens the
+  Chiudi la finestra», so one subject has one mounted reading surface, T5 — a guard the two views no longer reach,
+  kept and tested in `PracticeRowShell.test.tsx`; on a phone it opens the
   full-screen reader, icon-only so the row's name keeps its width, and no row ever folds));
   `PracticeBar` + `PracticeChip` (the bar of practices, `fixed bottom-6` at the column's left, beside the sidebar
   (`--sidebar-width`), not over the middle of the text, R3; `Z_INDEX.dock`, `#tour-practice-bar`; a «⋯» per chip);
@@ -3083,8 +3174,10 @@ meant to stay split; add new features as new files, not inside the shells:
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
-  from the pure `besideLayout`: half and half, thirds from 420 px a column, else a 48 px rail that opens
-  the table as an overlay closed by Esc or a click outside; `SearchPanel` mounts it on the desktop in
+  from the pure `besideLayout`: with no window the overview, the table the whole area; with windows the reading view,
+  the index at `INDEX_WIDTH` (320 px) and the windows sharing the rest while each gets 420 px, else a 48 px rail that
+  opens the index as an overlay closed by Esc or a click outside — the same table, hidden while closed (U2, «The two
+  views») —; `SearchPanel` mounts it on the desktop in
   place of the bare table, at the frame's width with or without a window beside: the search page is a `full` page
   with no cap of its own, so the row never reaches past its parent (U1; it escaped `ReaderLayout`'s `max-w-5xl`, now
   gone)) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
@@ -3113,7 +3206,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `tourConfig.practice.test.tsx` fails when one is missing, and when a tour points at a Brocardi surface). Tours never overlap: `useTour` keeps one driver on screen
   module-wide, so a tour asked while another shows is not started (it is asked again the next time its
   surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
-  `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
+  `practiceAct` is asked only for a practice that has an act, and only in the overview (its steps are the panel's tools,
+  its index line and a row's «Apri accanto»). `tourConfig.targets.test.tsx` fails when a tour's
   target is written nowhere in the sources, and checks the search tour against the search page. The popover
   (`visualex-tour-popover` in `index.css`) draws every button 44 px with a focus ring — the label centred by its
   line height, since driver.js writes `display` on the buttons inline —, and `useTour` renames

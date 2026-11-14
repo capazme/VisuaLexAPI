@@ -16,6 +16,9 @@ import structlog
 
 from visualex_api.tools.client_ip import client_address
 from visualex_api.tools.config import (
+    STREAM_MAX_SECONDS,
+    STREAM_MIN_SECONDS,
+    STREAM_SECONDS_PER_ARTICLE,
     RATE_LIMIT,
     RATE_LIMIT_WINDOW,
     TRUSTED_PROXIES,
@@ -25,7 +28,7 @@ from visualex_api.tools.config import (
 from visualex_api.tools.history_manager import history_manager
 from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
-from visualex_api.services.normattiva_scraper import NormattivaScraper
+from visualex_api.services.normattiva_scraper import NormattivaScraper, text_source_of
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services import eurlex_fetch
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn, sweep_exported_pdfs
@@ -488,35 +491,69 @@ class NormaController:
             return self._error_response(exc, 'stream_article_text')
         log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
 
+        # The stream's own time budget (config.py, STREAM_SECONDS_PER_ARTICLE): Quart's
+        # RESPONSE_TIMEOUT (60 s) would otherwise close the body silently after 20-40 articles.
+        # Never less than the framework's 60 s a short request had before.
+        budget = min(max(len(normavisitate) * STREAM_SECONDS_PER_ARTICLE, STREAM_MIN_SECONDS), STREAM_MAX_SECONDS)
+        deadline = asyncio.get_running_loop().time() + budget
+
+        async def read_one(scraper, nv):
+            article_text, url, validity, extra = await self._document_in_force(
+                scraper, nv, upcoming_asked, until)
+            result = {
+                'article_text': article_text,
+                'text_source': text_source_of(article_text),
+                'norma_data': nv.to_dict(),
+                'url': url
+            }
+            if validity:
+                result['validity'] = validity
+            result.update(extra)
+            result.update(await self._page_extras_for(scraper, nv, url, article_text))
+            return result
+
         async def result_generator():
-            for nv in normavisitate:
+            for index, nv in enumerate(normavisitate):
                 scraper = self.get_scraper_for_norma(nv)
                 if scraper is None:
                     result = {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
                     yield json.dumps(result) + "\n"
                     continue
 
-                try:
-                    article_text, url, validity, extra = await self._document_in_force(
-                        scraper, nv, upcoming_asked, until)
-                    result = {
-                        'article_text': article_text,
-                        'norma_data': nv.to_dict(),
-                        'url': url
-                    }
-                    if validity:
-                        result['validity'] = validity
-                    result.update(extra)
-                    result.update(await self._page_extras_for(scraper, nv, url, article_text))
-
-                except Exception as exc:
-                    result = {'error': str(exc), 'norma_data': nv.to_dict()}
+                # Only the budget's own deadline ends the stream: a TimeoutError raised inside
+                # one article's read (the same class as asyncio's) stays that article's error.
+                budget_spent = deadline <= asyncio.get_running_loop().time()
+                if not budget_spent:
+                    try:
+                        async with asyncio.timeout_at(deadline) as scope:
+                            result = await read_one(scraper, nv)
+                    except TimeoutError as exc:
+                        if not scope.expired():
+                            result = {'error': str(exc) or 'Timeout', 'norma_data': nv.to_dict()}
+                        else:
+                            budget_spent = True
+                    except Exception as exc:
+                        result = {'error': str(exc), 'norma_data': nv.to_dict()}
+                if budget_spent:
+                    # Past the budget: said in a line of its own, with what was not sent, so
+                    # the client can show it and ask for the rest; never a silent cut.
+                    missing = [str(left.numero_articolo) for left in normavisitate[index:]]
+                    log.warning("Article stream over its time budget",
+                                budget=budget, sent=index, missing=len(missing))
+                    yield json.dumps({
+                        'error': (f"Caricamento interrotto: tempo esaurito dopo {index} di "
+                                  f"{len(normavisitate)} articoli. Ne mancano {len(missing)}: "
+                                  f"riprova per quelli."),
+                        'kind': 'time_budget',
+                        'missing': missing,
+                    }) + "\n"
+                    return
 
                 # Send result immediately
                 yield json.dumps(result) + "\n"
 
         # Return streaming response with proper headers
-        return Response(
+        response = Response(
             result_generator(),
             mimetype='application/x-ndjson',
             headers={
@@ -524,6 +561,9 @@ class NormaController:
                 'X-Accel-Buffering': 'no'  # Disable nginx buffering
             }
         )
+        # The framework's own cut, a backstop past the budget: time to write the error line.
+        response.timeout = budget + 15
+        return response
 
     async def record_start_time(self):
         g.start_time = time()
@@ -1309,13 +1349,12 @@ class NormaController:
         so no request is made and `article_text` is never touched (gotcha 23). An undated
         request's page is already back if it had left the cache (`_validity_of_page`); a
         dated one is never read again for this, so after a restart its notes can come back
-        unread, and say so. The AKN export's text, the last-resort fallback, opens with its
-        markdown heading («### Art. …», which the HTML extractor never writes) and already
-        holds its notes and the whole article.
+        unread, and say so. The AKN export's text, the last-resort fallback (an
+        `AknArticleText`, `text_source` "akn"), already holds its notes and the whole article.
         """
         if not isinstance(scraper, NormattivaScraper) or not nv.numero_articolo:
             return {}
-        if isinstance(article_text, str) and article_text.startswith('###'):
+        if text_source_of(article_text) == 'akn':
             return {**update_notes_fields(None, akn_text=True), **parts_fields(None)}
         notes = parts = None
         try:
@@ -1704,6 +1743,7 @@ class NormaController:
                     log.info("Document fetched successfully", article_text=article_text, url=url)
                     result = {
                         'article_text': article_text,
+                        'text_source': text_source_of(article_text),
                         'norma_data': nv.to_dict(),
                         'url': url
                     }
@@ -2187,6 +2227,7 @@ class NormaController:
                         scraper, nv, upcoming_asked, until)
                     result = {
                         'article_text': article_text,
+                        'text_source': text_source_of(article_text),
                         'url': url,
                         'norma_data': nv.to_dict(),
                     }

@@ -60,7 +60,7 @@ type BodyProps = {
 function DesktopPopover({ anchorEl, onClose, norma, sentenza, onAdded, onDuplicate }: BodyProps & { anchorEl: HTMLElement }) {
     // Pass the anchor through `elements.reference` so the FIRST render
     // already has a valid position — see the identical comment in
-    // NotesPeekPanel.tsx / InlineNotePopover.tsx (gotcha #13).
+    // NotesPeekPanel.tsx (gotcha #13).
     const { refs, floatingStyles, context, placement } = useFloating({
         open: true,
         onOpenChange: (open) => { if (!open) onClose(); },

@@ -12,25 +12,24 @@ import { closeFindWindow, openFindWindow } from '../../../utils/findWindowContro
 import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { NotesPeekPanel } from '../search/NotesPeekPanel';
 import { HighlightsActionsPicker } from '../search/HighlightsActionsPicker';
-import { InlineNotePopover } from '../search/InlineNotePopover';
-import { InlineNoteComposer } from '../search/InlineNoteComposer';
-import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
+import { BlockAnnotationsSheet } from '../search/BlockAnnotationsSheet';
 import { ArticleDiscussionPanel } from '../search/ArticleDiscussionPanel';
 import { PassageThreadsStatus } from '../search/PassageThreadsStatus';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
 import { LostGlossesList, LostProposalsList } from '../search/LostProposalsList';
 import { MoveProposalBar } from '../search/MoveProposalBar';
-import { GlossMargin, type GlossMarginHandle } from '../search/GlossMargin';
+import { AnnotationMargin, type AnnotationMarginHandle } from '../search/AnnotationMargin';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
 import { useGlossPassage } from '../../../hooks/useGlossPassage';
 import { isGloss } from '../../../utils/aiReview';
 import { GLOSS_WORDS } from '../../../constants/glossWords';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
+import { useNoteOpener, useSignTarget } from '../../../hooks/useSignTarget';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
-import { blockStarts, describeBlock, groupAnnotationsByBlock, hasAnnotations, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
@@ -197,7 +196,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     () => groupAnnotationsByBlock(plain, structure, shownHighlights, decisionNotes, locatedThreads, glossAnchors),
     [plain, structure, shownHighlights, decisionNotes, locatedThreads, glossAnchors],
   );
-  const { openBlock, closeBlock } = useArticleTextInteractions(contentRef, key, { contentKey: html });
+  const { openBlock, blockAll, closeBlock, openBlockAt } = useArticleTextInteractions(contentRef, key, { contentKey: html });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
   // A gloss whose words are in no paragraph (the text changed): listed under the text with its actions.
   const lostGlosses = useMemo(() => {
@@ -205,24 +204,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     const shown = new Set(blockGroups.flatMap((g) => g.glosses.map((a) => a.id)));
     return glosses.filter((g) => !shown.has(g.id));
   }, [glosses, blockGroups]);
-  const marginRef = useRef<GlossMarginHandle>(null);
-  const [glossesWide, setGlossesWide] = useState(false);
-  // As it was when the paragraph was opened: a popover open while the reader is resized keeps its cards.
-  const [openedWide, setOpenedWide] = useState<{ block: number | null; wide: boolean }>({ block: null, wide: false });
-  if (openedWide.block !== openBlock) setOpenedWide({ block: openBlock, wide: glossesWide });
-  // Narrowed meanwhile, the cards are listed in the popover (the column is gone, «Vai alla glossa» would go nowhere);
-  // widened, they stay there (one may be half edited).
-  const inMargin = glossesWide && (openedWide.block === openBlock ? openedWide.wide : true);
-  // With the glosses beside the text, a sign whose paragraph holds only glosses focuses the first one's card (D8).
-  const onlyGlosses = !!openGroup && openGroup.glosses.length > 0
-    && openGroup.notes.length + openGroup.highlights.length + openGroup.threads.length === 0;
-  const focusCard = inMargin && onlyGlosses ? openGroup.glosses[0].id : null;
-  useEffect(() => {
-    if (!focusCard) return;
-    // The column took the press: the focus goes to the card (a DOM write), and the paragraph is closed again.
-    marginRef.current?.focus(focusCard);
-    closeBlock();
-  }, [focusCard, closeBlock]);
+  const marginRef = useRef<AnnotationMarginHandle>(null);
+  const [marginShown, setMarginShown] = useState(false);
+  // The sign (A4 §6): the paragraph's first card beside the text, else its sheet.
+  const sheetOpen = useSignTarget({ openBlock, blockAll, group: openGroup, marginShown, marginRef, closeBlock, openBlockAt });
 
   // What no longer lands is listed under the text (a free note has no anchor: the panel holds it).
   // An application's proposal that no longer lands has a list of its own, with its note and its actions (D7b).
@@ -330,7 +315,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   } = useAnnotationActions({
     key, articleId: NO_ARTICLE, plain, breaks: () => blockStarts(plain, structure), showToast,
   });
-  const { inlineNote, closeInlineNote } = useInlineNoteAnchors(contentRef, decisionNotes);
+  // A note's wavy words: its card beside the text, else its paragraph's sheet (A4 §6, no popover).
+  const openNoteBeside = useNoteOpener(marginRef, openBlockAt);
+  useInlineNoteAnchors(contentRef, decisionNotes, openNoteBeside);
 
   const exportSlug = slugify(key) || 'decisione';
   const exportNotes = () => {
@@ -432,33 +419,26 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         onToggleVisibility={() => setHighlightsHidden((v) => !v)}
         onExportTxt={exportHighlights}
       />
-      {inlineNote && (
-        <InlineNotePopover
-          note={inlineNote.note}
-          anchorEl={inlineNote.anchorEl}
-          onClose={closeInlineNote}
-          onUpdate={updateAnnotation}
-          onRemove={removeAnnotation}
-        />
-      )}
-      {composerRect && noteAnchor && (
-        <InlineNoteComposer
-          anchorRect={composerRect}
-          anchorText={noteAnchor.anchorText}
-          onSave={commitComposer}
-          onClose={closeComposer}
-        />
-      )}
-      <GlossMargin
+      <AnnotationMargin
         ref={marginRef}
-        glosses={glosses}
         plain={plain}
-        actions={proposalActions}
         textRootRef={textRootRef}
         contentKey={html}
-        shownId={shownGlossId}
-        onShowPassage={showGlossPassage}
-        onWideChange={setGlossesWide}
+        notes={decisionNotes}
+        onUpdateNote={updateAnnotation}
+        onRemoveNote={removeAnnotation}
+        // A note being written (A4 §6): beside the text where it has room, else in a sheet from the bottom.
+        draft={composerRect && noteAnchor ? { text: noteAnchor.anchorText, startOffset: noteAnchor.startOffset } : null}
+        onSaveDraft={commitComposer}
+        onCancelDraft={closeComposer}
+        threads={locatedThreads}
+        onOpenThread={discussion.openThread}
+        textHash={textHash}
+        glosses={glosses}
+        glossActions={proposalActions}
+        shownGlossId={shownGlossId}
+        onShowGlossPassage={showGlossPassage}
+        onWideChange={setMarginShown}
       >
         <ArticleBody
           contentRef={contentRef}
@@ -467,12 +447,13 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           processedContent={html}
           className="vlx-art vlx-decision"
           onPopupHighlight={handlePopupHighlight}
-          onPopupAddNote={handlePopupAddNote}
+          // A note being written keeps its words: a new selection refocuses it (the note tool takes every one).
+          onPopupAddNote={(text, startOffset, rect) => { if (!marginRef.current?.keepDraft()) handlePopupAddNote(text, startOffset, rect); }}
           onPopupCopy={copySelection}
           onPopupDiscuss={discussion.popupDiscuss}
           selectionPopup={!moving}
         />
-      </GlossMargin>
+      </AnnotationMargin>
       {moving && (
         <MoveProposalBar
           key={moving.id}
@@ -483,7 +464,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           onSave={saveMove}
           onCancel={cancelMove}
           label={isGloss(moving) ? GLOSS_WORDS.moveTitle : undefined}
-          focusAfter={isGloss(moving) ? () => marginRef.current?.focus(moving.id) ?? false : undefined}
+          focusAfter={isGloss(moving) ? () => marginRef.current?.focus([`gloss:${moving.id}`]) ?? false : undefined}
         />
       )}
       {!discussion.open && (
@@ -498,14 +479,13 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       />
       {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
       {proposalActions && <LostGlossesList glosses={lostGlosses} actions={proposalActions} />}
-      {openBlock !== null && hasAnnotations(openGroup) && !focusCard && (
-        <BlockAnnotationsPopover
+      {sheetOpen && openBlock !== null && openGroup && (
+        <BlockAnnotationsSheet
           key={openBlock}
           containerRef={contentRef}
           blockIndex={openBlock}
           blockLabel={describeBlock(plain, structure.blocks[openBlock])}
           group={openGroup}
-          contentKey={html}
           textHash={textHash}
           onOpenThread={discussion.openThread}
           onClose={closeBlock}
@@ -514,8 +494,6 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           onRemoveHighlight={removeHighlight}
           proposalActions={proposalActions}
           glosses={glosses}
-          glossesInMargin={inMargin}
-          onGoToGloss={(id) => marginRef.current?.focus(id) ?? false}
           shownGlossId={shownGlossId}
           onShowGlossPassage={showGlossPassage}
         />

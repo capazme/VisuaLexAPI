@@ -6,17 +6,12 @@ import * as authService from '../services/authService';
 import { subscribeToUser } from '../services/authEvents';
 import type { UserResponse } from '../types/api';
 import { appStore } from '../store/useAppStore';
-import { loadAssistantFeatures, resetAssistantProposals } from '../store/assistantProposals';
+import { loadAssistantFeatures } from '../store/assistantProposals';
 import { getErrorMessage } from '../utils/errors';
-import { clearDecisionCache } from '../utils/decisionFetchCache';
-import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
-import { clearEuCaseLawCache } from '../utils/euCaseLawCache';
-import { clearArticleCardsCache } from '../utils/articleCardsCache';
-import { clearRassegneCache } from '../components/features/rassegne/useRassegne';
-import { clearConsentRead } from '../features/merlt/consent/consentRead';
-import { forgetSeenProgress } from '../components/features/studia/progress/seenProgress';
-import { forgetModuleSessions } from '../components/features/studia/corsi/moduleSteps';
 import { settleShortcutUndo } from '../components/ui/notifications/notifications';
+import { claimBrowserFor, forgetUserData } from '../services/sessionEnd';
+// Registers the reset of the in-memory user state with `forgetUserData`, before any request can end a session.
+import '../services/userDataReset';
 
 interface AuthState {
   user: UserResponse | null;
@@ -45,6 +40,8 @@ export function useAuth() {
 
       try {
         const user = await authService.getCurrentUser();
+        // A browser marked as someone else's (their session ended without a sign-out) is emptied first.
+        claimBrowserFor(user.id, { signIn: false });
         setState({
           user,
           loading: false,
@@ -95,10 +92,9 @@ export function useAuth() {
 
       // Auto-login after registration
       await authService.login({ email, password });
-      // What this browser drew of Gymnasium was the last person's (their points, their level, a module's step reached).
-      forgetSeenProgress();
-      forgetModuleSessions();
       const currentUser = await authService.getCurrentUser();
+      // What this browser holds of anyone else (a practice, a question to the assistant, Gymnasium's marks) goes.
+      claimBrowserFor(currentUser.id, { signIn: true });
 
       setState({
         user: currentUser,
@@ -126,10 +122,9 @@ export function useAuth() {
 
     try {
       await authService.login({ email, password });
-      // What this browser drew of Gymnasium was the last person's (their points, their level, a module's step reached).
-      forgetSeenProgress();
-      forgetModuleSessions();
       const user = await authService.getCurrentUser();
+      // What this browser holds of anyone else (a practice, a question to the assistant, Gymnasium's marks) goes.
+      claimBrowserFor(user.id, { signIn: true });
 
       setState({
         user,
@@ -160,18 +155,9 @@ export function useAuth() {
     // The last gesture on a highlight is carried out (its removals sent) while the token is still there: it said
     // nothing, so for the reader it is done (A4).
     settleShortcutUndo();
+    // Everything of the person, from every store and from the browser's storage (`sessionEnd.ts`).
+    forgetUserData();
     authService.logout();
-    // Clear user data from store
-    appStore.getState().clearUserData();
-    clearDecisionCache();
-    clearDecisionSearchCache();
-    clearEuCaseLawCache();
-    clearRassegneCache();
-    clearArticleCardsCache();
-    clearConsentRead();
-    forgetSeenProgress();
-    forgetModuleSessions();
-    resetAssistantProposals();
     setState({
       user: null,
       loading: false,

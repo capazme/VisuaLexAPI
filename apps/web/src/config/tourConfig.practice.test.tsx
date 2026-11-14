@@ -33,7 +33,7 @@ import { PracticeBar } from '../components/features/practice/PracticeBar';
 import { PRACTICE_ACT_STEPS, PRACTICE_STEPS, TOUR_STEPS_MAP } from './tourConfig';
 import { CC_RD, article } from '../utils/__fixtures__/savedWorkspaces';
 
-const table = () => <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} />;
+const table = () => <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} layout="overview" />;
 const selectors = (steps: typeof PRACTICE_STEPS) => steps.map((s) => s.element).filter((e): e is string => typeof e === 'string');
 
 // Rendered by the reading surface of an open row, not by the table: checked in the surfaces' source.
@@ -91,6 +91,22 @@ describe('who starts the practice tours', () => {
     appStore.setState({ practices: [], activePracticeId: null, practiceRows: {} });
     appStore.getState().createPractice('Vuota');
     render(table());
+    act(() => tour.onComplete?.('practice'));
+    expect(tour.tryStartTour.mock.calls).toEqual([['practice']]);
+  });
+
+  it('the reading view (U2) asks no act tour, and a table hidden in the rail\'s closed overlay asks none until it is shown', () => {
+    tour.seen.add('practice');
+    const index = (concealed: boolean) =>
+      <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} layout="index" concealed={concealed} />;
+    const { rerender } = render(index(true));
+    expect(tour.tryStartTour).not.toHaveBeenCalled();
+    rerender(index(false));
+    // The table's own tour, now that it is drawn; never the act's, whose steps are the overview's panel.
+    expect(tour.tryStartTour.mock.calls).toEqual([['practice']]);
+    tour.seen.delete('practice');
+    const held = appStore.getState().practices[0];
+    act(() => appStore.getState().openBeside(held.id, { id: 'decision-search:x', kind: 'decision-search', query: { tema: 'danno' }, label: 'Tema' }));
     act(() => tour.onComplete?.('practice'));
     expect(tour.tryStartTour.mock.calls).toEqual([['practice']]);
   });

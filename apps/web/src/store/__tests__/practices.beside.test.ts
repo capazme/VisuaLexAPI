@@ -97,6 +97,21 @@ describe('a window asked for again takes focus, once (carry-over 11, gotcha 14)'
     expect(s().takeWindowFocusRequest(ref.id)).toBe(false);
   });
 
+  it('asked with `focus` (a row\'s or the index\'s «Apri accanto», U2), a new window takes it too; a phone asks nothing', () => {
+    viewport(true);
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    const ref = besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(article(L24, '5')) });
+    s().openBeside(practiceId, ref, undefined, { focus: true });
+    expect(practice(practiceId).beside.map((b) => b.id)).toEqual([ref.id]);
+    expect(s().windowFocusRequest).toBe(ref.id);
+    expect(s().takeWindowFocusRequest(ref.id)).toBe(true);
+
+    viewport(false);
+    const seven = besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(article(L24, '7')) });
+    s().openBeside(practiceId, seven, undefined, { focus: true });
+    expect(s().windowFocusRequest).toBeNull();
+  });
+
   it('a topic search asked again', () => {
     viewport(true);
     s().createPractice('P');

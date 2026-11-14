@@ -29,8 +29,8 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { FOUND, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
 const s = () => appStore.getState();
-const table = (streaming: Parameters<typeof PracticeTable>[0]['streaming'] = null) =>
-  <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={streaming} />;
+const table = (streaming: Parameters<typeof PracticeTable>[0]['streaming'] = null, layout: 'overview' | 'index' = 'overview') =>
+  <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={streaming} layout={layout} />;
 
 beforeEach(() => {
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
@@ -76,6 +76,16 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(field).toHaveBeenCalledTimes(1);
     expect(s().commandPaletteOpen).toBe(false);
     unsubscribe();
+  });
+
+  it('in the index (U2) the header is compact: «Salva come dossier» an icon with its name, the title in the index\'s size', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    render(table(null, 'index'));
+    const save = screen.getByRole('button', { name: 'Salva come dossier' });
+    expect(save).toHaveTextContent('');
+    expect(save).toHaveClass('min-w-[44px]', 'min-h-[44px]');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('text-[22px]');
+    expect(screen.getByTestId('practice-column')).toHaveAttribute('data-layout', 'index');
   });
 
   it('renames from a double click and from «⋯ › Rinomina»', () => {

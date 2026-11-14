@@ -112,11 +112,11 @@ function openMore(row: HTMLElement) {
 const entries = (menu: HTMLElement) => within(menu).getAllByRole('menuitem').map((item) => item.querySelector('span > span')?.textContent ?? item.textContent);
 
 describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
-  it('shows exactly notes, highlights, the highlighter, and behind «⋯» discussions, the find window and copy', () => {
+  it('shows exactly notes, highlights, the highlighter, the note tool, and behind «⋯» discussions, the find window and copy', () => {
     const { container } = show('beside');
     expect(labels(desktopRow(container))).toEqual([
       'Note', 'Evidenziazioni', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
-      'Altre azioni sull’articolo',
+      'Strumento nota (nota personale)', 'Tipo di nota', 'Altre azioni sull’articolo',
     ]);
     expect(entries(openMore(desktopRow(container)))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
   });

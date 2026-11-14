@@ -9,8 +9,8 @@ import { join } from 'node:path';
 const src = join(__dirname, '..', '..'); // apps/web/src
 const vite = readFileSync(join(src, '..', 'vite.config.ts'), 'utf8');
 
-// The Python routes are what Vite proxies to port 5000 (and what the ingress gates)…
-const pythonRoutes = [...vite.matchAll(/'(\/[\w-]+)'\s*:\s*'http:\/\/localhost:5000'/g)].map((m) => m[1]);
+// The Python routes are what Vite proxies to the Python API, PYTHON_API (and what the ingress gates)…
+const pythonRoutes = [...vite.matchAll(/'(\/[\w-]+)'\s*:\s*PYTHON_API\b/g)].map((m) => m[1]);
 // …except the two the ingress leaves open. /health/detailed is not one of them.
 const open = new Set(['/version', '/health']);
 const gated = [...pythonRoutes.filter((route) => !open.has(route)), '/health/detailed'];

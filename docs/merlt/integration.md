@@ -44,7 +44,7 @@ Prerequisiti del prodotto base: Docker con Compose v2, Node con npm 11 (la CI us
 
 3. **Prepara il prodotto base.** `start.sh` controlla che `services/visualex/.venv` esista, che importi `redis` e `playwright`, e che Chromium sia installato.
    ```bash
-   (cd services/visualex && python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/playwright install chromium)
+   (cd services/visualex && python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/playwright install chromium)
    (cd apps/server && npm ci) && (cd apps/web && npm ci)
    ```
    Usa npm 11. Con npm 10, `npm ci` fallisce sui lockfile scritti da npm 11 (`Missing: @esbuild/... from lock file`) e `npm install` li riscrive.

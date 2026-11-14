@@ -11,6 +11,10 @@ const checkNormaSchema = z.object({
   normaData: z.object({
     norma_data: z.record(z.string(), z.unknown()),
     article_text: z.string().max(2 * 1024 * 1024),
+    // Where the text came from, as the Python API says it (scan A.7). "akn" is the export served when
+    // Normattiva's HTML could not be read: never compared nor stored (normaWatcher.ts says why). Optional:
+    // a client that does not send it is read as before.
+    text_source: z.enum(['html', 'akn']).optional(),
   }),
 });
 
@@ -90,6 +94,16 @@ export const markForumRead = async (req: Request, res: Response) => {
  * an article is opened, so a changed article produces a durable notification
  * without polling Normattiva from the Node process.
  */
+/**
+ * The AKN fallback, by its field or, for a client that does not send it (today's web), by the
+ * markdown heading the export opens with («### Art. …»), which the HTML extractor never writes.
+ * A false positive only skips one check: the background watcher still compares the HTML text.
+ */
+function isAknText(normaData: { article_text: string; text_source?: 'html' | 'akn' }): boolean {
+  if (normaData.text_source) return normaData.text_source === 'akn';
+  return normaData.article_text.startsWith('### ');
+}
+
 export const checkNorma = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { normaKey, normaData } = checkNormaSchema.parse(req.body);
@@ -107,10 +121,11 @@ export const checkNorma = async (req: Request, res: Response) => {
   });
 
   // Nothing to compare: an empty body would read as a change against a
-  // populated watch and replace its text with nothing. Touch the watch if
+  // populated watch and replace its text with nothing; an AKN fallback text
+  // would read as a change against the HTML text, and back again. Touch the watch if
   // there is one, register nothing otherwise — the watcher refuses empty
   // text the same way.
-  if (!snapshotData.article_text) {
+  if (!snapshotData.article_text || isAknText(normaData)) {
     if (existing) {
       await prisma.normaWatch.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } });
     }

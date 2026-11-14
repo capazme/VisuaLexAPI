@@ -46,6 +46,31 @@ def _asks_for_original(normavisitata) -> bool:
             and not (isinstance(day, str) and day.strip()))
 
 
+class AknArticleText(str):
+    """An article's text read from Normattiva's AKN export, the last-resort fallback.
+
+    The characters are the export's, untouched; the type is the mark. It is not the
+    display text the anchors live in (root CLAUDE.md, rule 23: the export transliterates
+    accents and opens with a markdown heading), so it travels with its origin
+    (`text_source_of`, the `text_source` field on the wire) and is never kept in
+    `get_document`'s 24-hour memory, where a JSON round trip would drop the mark and the
+    next request would take it for the HTML text.
+    """
+
+    __slots__ = ()
+
+
+def text_source_of(text) -> str:
+    """Where an article's text comes from: "akn" for the AKN fallback, "html" otherwise
+    (the extractor's text of the source's page)."""
+    return "akn" if isinstance(text, AknArticleText) else "html"
+
+
+def _is_akn_result(result) -> bool:
+    """`get_document`'s cache skips an AKN text: the next request tries the HTML again."""
+    return isinstance(result, tuple) and bool(result) and isinstance(result[0], AknArticleText)
+
+
 class NormattivaScraper(BaseScraper):
     def __init__(self) -> None:
         self.base_url: str = "https://www.normattiva.it/"
@@ -53,7 +78,7 @@ class NormattivaScraper(BaseScraper):
         log.info("Normattiva scraper initialized")
         self.cache = get_cache_manager().get_persistent("normattiva")
 
-    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
+    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer(), skip_cache_func=_is_akn_result)
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:
         log.info("Fetching Normattiva document", norma=str(normavisitata))
         if normavisitata.parte:
@@ -88,7 +113,7 @@ class NormattivaScraper(BaseScraper):
                 # Last resort. This text differs from the HTML rendering — it
                 # transliterates accents and carries a markdown heading — so it
                 # is served only when the alternative is an error, and the
-                # caller marks it as such.
+                # text carries its origin (AknArticleText, never cached).
                 # The export is read at the day the request names (G-353: a date is
                 # always the text in force on it); it has no original text, so a
                 # request for the original gets the error rather than today's text.
@@ -101,7 +126,7 @@ class NormattivaScraper(BaseScraper):
                 if akn_text:
                     log.info("Served article text from the AKN export",
                              urn=urn[:100])
-                    return akn_text, urn
+                    return AknArticleText(akn_text), urn
                 raise ParsingError(f"Impossibile estrarre il testo dell'articolo da {urn}")
 
             return document_text, urn

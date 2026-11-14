@@ -12,6 +12,52 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-14
+
+The practice in two views; notes beside the text and a Forum highlight cut like any other; dossiers and
+study cards as grids; a long load that says how far it got and fetches the rest; the browser cleared
+at every way out of a session. No migration.
+
+### Reading
+
+- The practice in two views, «Panoramica» and «Lettura», with a passage between them (U2, L-61, L-62).
+- A4, second round: a highlight imported from the Forum is cut and recoloured like the others, its author
+  on every piece; the note tool; notes in the margin beside the text.
+- A long load of articles no longer stops after about 60 seconds without a word: the article stream has
+  a time budget proportional to the request (`STREAM_SECONDS_PER_ARTICLE`, 30 s; at least 60 s, at most
+  `STREAM_MAX_SECONDS`, 5400 s) and, when it runs out, ends with a `kind: "time_budget"` line naming the
+  missing articles. The web shows «Caricamento interrotto: caricati N di M articoli» with «Carica i
+  mancanti», which loads only those into the same practice (D-323, LC0).
+- When Normattiva's article page cannot be read, the AKN text served instead is marked
+  (`text_source: "akn"`) and never cached; saved norms, the assistant and MERL-T do not anchor on it (scan A.7).
+
+### Layout
+
+- U1: the dossier list and «Le mie schede» are grids of cards of at least 320 px; Gymnasium's «Per
+  materia» is a grid, and «Oggi» and «Progressi» keep their columns in full screen.
+
+### Limits
+
+- One request expands to at most 150 articles, bis and ter included (`MAX_ARTICLES_PER_REQUEST`,
+  G-473); above it the message says how many the request opens. A dossier's «Apri tutto» pages its
+  groups at 150. Note uploads (MERL-T) are refused above 10 MB before being read (scan A.4).
+
+### Privacy
+
+- Every way out of a session clears the copies of server data and the traces of use from the browser; the
+  only copy of the person's work (practices, old tabs' backup, assistant thread) is parked under the owner,
+  never deleted. A failed token refresh ends the session only when the server refuses it, not when the
+  network drops (T80).
+
+### Development
+
+- The Python dependencies are locked to the production image (`services/visualex/requirements-lock.txt`,
+  45 pins); Dockerfile and CI install from it, and Dependabot reads it (scan A.6). Developers:
+  `services/visualex/.venv/bin/pip install -r services/visualex/requirements-dev.txt`.
+- `VISUALEX_API_PORT` moves the Python API off 5000 in development (AirPlay on the Mac).
+- `@hono/node-server` 2.1.8 and `hono` 4.13.18 (closes the open Dependabot alerts on hono) in `apps/server` and `apps/mcp`.
+- Spec: the MCP's next tools (N2) and notes on decisions (D7c).
+
 ## [1.11.0] - 2026-11-06
 
 The highlighter as a tool, as a word processor has it, in every reader; one frame for every page,

@@ -9,6 +9,14 @@ HISTORY_LIMIT = 50
 HISTORY_FILE = BASE_PATH / "data" / "history.json"
 DOSSIER_FILE = BASE_PATH / "data" / "dossiers.json"
 DOSSIER_LIMIT = 100  # Max number of dossiers
+# How many articles one request may expand to (a range, a comma list, the whole act), counted
+# after deduplication. Each article is a page fetched from the source, so «1-3249» was a whole
+# code for the price of one request (scan A.4). The callers ask far less: the archive CLI sends
+# batches of 25, the web's search shows up to 50 at a time, a dossier's «Apri tutto» pages its
+# groups at this same number (dossierUtils.ts MAX_ARTICLES_PER_SEARCH, which a web test reads
+# from this line: change the default here and the web follows or its test fails). 150 by the
+# owner's word (G-473): «art. 1-100 c.c.» is 101 articles with the bis, and must open.
+MAX_ARTICLES_PER_REQUEST = max(1, int(os.getenv("MAX_ARTICLES_PER_REQUEST") or 150))
 # Used by the root app.py's rate_limit_middleware (per-IP request counter).
 RATE_LIMIT = int(os.getenv("RATE_LIMIT", 1000))  # Max requests allowed per IP within RATE_LIMIT_WINDOW seconds
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 600))  # Window size in seconds
@@ -30,6 +38,19 @@ HTTP_BACKOFF_FACTOR = float(os.getenv("HTTP_BACKOFF_FACTOR", 2.0))
 HTTP_INITIAL_BACKOFF = float(os.getenv("HTTP_INITIAL_BACKOFF", 0.5))
 HTTP_JITTER = float(os.getenv("HTTP_JITTER", 0.3))
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", 30))
+# The time budget of the article stream (`/stream_article_text`). Quart sends a response body
+# under RESPONSE_TIMEOUT (60 s) and, past it, closes the body with a 200 and no error: a stream
+# of 20-40 articles or more was cut silently. The route sets its own budget instead: the
+# number of articles × STREAM_SECONDS_PER_ARTICLE, never more than STREAM_MAX_SECONDS; past it
+# the stream ends with an error line naming what was not sent. Most articles take 1.5-3 s; the
+# allowance leaves room for the HTTP client's retries. The cap bounds what one request may hold
+# open (a client that never reads holds its generator). The defaults give 180 articles their
+# full allowance, above the per-request article ceiling (100), so the cap never cuts a request
+# that ceiling lets through; raise the cap with the ceiling if it ever goes past 180.
+STREAM_SECONDS_PER_ARTICLE = max(1.0, float(os.getenv("STREAM_SECONDS_PER_ARTICLE") or 30))
+# A short request keeps at least the 60 s it had under the framework's own limit.
+STREAM_MIN_SECONDS = 60.0
+STREAM_MAX_SECONDS = max(60.0, float(os.getenv("STREAM_MAX_SECONDS") or 5400))
 
 # Akoma Ntoso structure source. Kill switch for the whole AKN path; read at call
 # time so it can be flipped without a code change.

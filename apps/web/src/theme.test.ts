@@ -9,6 +9,7 @@ import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
 import type { Materia } from './types/studia';
 import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
 import { CARD_GRID_COLUMNS, FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
+import { OVERVIEW_GRID } from './components/features/practice/besideLayout';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -563,6 +564,50 @@ describe('Gymnasium\'s small motions (S2)', () => {
     for (const name of ['vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
     for (const rule of ['.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
+  }, 30000);
+});
+
+describe('the practice in two views (U2)', () => {
+  it('the overview\'s grid, the decisions\' strip and its open row, and the index\'s entries all generate CSS', async () => {
+    const strip = ['border-emerald-200/70', 'bg-emerald-50/40', 'dark:border-emerald-900/50', 'dark:bg-emerald-950/20'];
+    const css = await compile([
+      ...OVERVIEW_GRID.split(' '), ...strip, 'grid-cols-[repeat(auto-fill,minmax(min(26rem,100%),1fr))]',
+      '[&>[data-row-open]]:col-span-full', 'min-h-9', 'md:flex-initial',
+    ]);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(38\.75rem,\s*100%\),\s*1fr\)\)/);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(26rem,\s*100%\),\s*1fr\)\)/);
+    expect(css).toMatch(/>\s*\[data-row-open\][^{]*\{\s*grid-column:\s*1\s*\/\s*-1/);
+    expect(css).toMatch(/\.min-h-9\s*\{\s*min-height:/);
+    for (const name of strip) {
+      // The class as CSS writes it in a selector: every character it escapes, the backslash first among them.
+      const selector = `.${name.replace(/[\\/:.]/g, '\\$&')}`;
+      expect(css, name).toContain(selector);
+    }
+  }, 30000);
+});
+
+describe('the passage between the practice\'s two views (U2, L-62)', () => {
+  it('names its pieces only while it plays, lasts 260 ms on the ease-out curve, and brings the windows in from the right', async () => {
+    const css = await compile([]);
+    // Named only under the root's class: at rest a piece is no stacking context (gotcha 22).
+    expect(css).toMatch(/\.vlx-practice-switching \.vlx-vt\s*\{\s*view-transition-name:\s*var\(--vlx-vt\)/);
+    expect(css).not.toMatch(/(^|\})\s*\.vlx-vt\s*\{/);
+    const duration = css.match(/\.vlx-practice-switching::view-transition-group\(\*\)\s*\{\s*animation-duration:\s*(\d+)ms;\s*animation-timing-function:\s*var\(--ease-out\)/);
+    expect(duration).not.toBeNull();
+    expect(Number(duration![1])).toBeGreaterThanOrEqual(220);
+    expect(Number(duration![1])).toBeLessThanOrEqual(300);
+    // The pictures keep their size: the text does not stretch while a box changes size.
+    expect(css).toMatch(/::view-transition-new\(\*\)\s*\{[^}]*object-fit:\s*none/);
+    // Clipped by its box, or the old panel's picture would paint at its full size over the incoming window.
+    expect(css).toMatch(/::view-transition-new\(\*\)\s*\{[^}]*overflow:\s*clip/);
+    for (const n of [0, 1]) {
+      expect(css).toContain(`::view-transition-new(vlx-practice-window-${n}):only-child`);
+      expect(css).toContain(`::view-transition-old(vlx-practice-window-${n}):only-child`);
+    }
+    expect(css).toMatch(/@keyframes vlx-practice-window-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*translate:\s*24px 0/);
+    // Its own rules set no `animation` shorthand: the root keeps the section change's `animation: none`.
+    const own = css.split('.vlx-practice-switching').slice(1).map((rule) => rule.slice(0, rule.indexOf('}')));
+    for (const rule of own) expect(rule).not.toMatch(/animation:\s/);
   }, 30000);
 });
 

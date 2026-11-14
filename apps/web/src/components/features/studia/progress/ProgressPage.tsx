@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useIsDesktop } from '../../../../hooks/useIsDesktop';
 import { cn } from '../../../../lib/utils';
+import { CARD_GRID_COLUMNS } from '../../../layout/frame';
 import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { CardStatesBar, CardStatesBarSkeleton } from './CardStatesBar';
@@ -79,10 +80,10 @@ function SummarySkeleton() {
  * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
  * full-width frame (G6) — the summary (the streak, today's goal, the level), the subject chips, «Il tuo andamento»
  * across the page (G7: the reviews as a line over 7 days, 30 days or six months, which replaced the calendar), «Le
- * schede per stato» and «I prossimi 14 giorni» side by side from `lg`, and «Per
- * materia» in two columns from `lg`; one column below. The same read as «Oggi» (`useProgress` over `GET
- * /lingo/srs/progressi`): the whole day's for the summary and the subjects, and, while a subject is chosen, that
- * subject's for the trend, the states and the coming days — the summary stays the whole day's (the streak and the
+ * schede per stato» and «I prossimi 14 giorni» side by side from `lg`, one column below (in full screen too: nothing
+ * here reads it, U1), and «Per materia» a grid of cards of at least 20rem (U1). The same read as «Oggi» (`useProgress`
+ * over `GET /lingo/srs/progressi`): the whole day's for the summary and the subjects, and, while a subject is chosen,
+ * that subject's for the trend, the states and the coming days — the summary stays the whole day's (the streak and the
  * goal are), and the subjects list all five. The subject is the one «Oggi» remembers. While the first read travels
  * every block holds its final size; a failed read says so with «Riprova» and keeps what was on screen; a new read of
  * the same subject leaves the last answer on screen, dimmed. The level is the summary's (G1c), the whole day's.
@@ -184,7 +185,7 @@ export function ProgressPage() {
             {day.data ? (
               <SubjectProgress materie={day.data.materie} selected={materia} onSelect={choose} />
             ) : (
-              <div aria-hidden className="grid gap-2 lg:grid-cols-2">
+              <div aria-hidden className={cn('grid gap-2', CARD_GRID_COLUMNS)}>
                 {[0, 1, 2, 3, 4].map((n) => (
                   <div key={n} className={cn(PULSE, 'h-28 rounded-xl')} />
                 ))}
