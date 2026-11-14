@@ -64,7 +64,7 @@ export interface PhoneTopBarProps {
  * scrolled out (G8, as iOS's large titles), the search on the right. It lies over
  * the content area, which starts under it, on the page's paper with a hairline under it. On a phone it slides up out
  * of the way scrolling down and comes back scrolling up — at once under reduced motion; from `md` it stays, and its
- * right side leaves room for `Layout`'s Focus button.
+ * right side leaves room for `Layout`'s «Commenti» and Focus button.
  */
 export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch, barRef }: PhoneTopBarProps) {
   return (
@@ -81,7 +81,7 @@ export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch, barRef }:
       )}
     >
       {/* `px-1`: the menu's icon lines up with the page's 16 px margin. */}
-      <div className="flex h-14 items-center gap-1 px-1 md:pr-[3.25rem]">
+      <div className="flex h-14 items-center gap-1 px-1 md:pr-[9.75rem]">
         <MenuToggle {...menu} />
         {/* Keyed by the name: the page's, once the title has scrolled out, fades in, 150 ms; at once under reduced motion
             (G8; inspired by iOS's large titles, written from scratch). Empty, it keeps its place between the buttons. */}

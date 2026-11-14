@@ -386,7 +386,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
-  it('holds «Invia un commento» on a phone, after «Crediti», and opens the form from it (M1)', () => {
+  it('holds «Commenti» on a phone, after «Crediti», and opens the form from it (M1)', () => {
     const openFeedback = vi.fn();
     render(
       <MemoryRouter>
@@ -395,8 +395,8 @@ describe('Sidebar — the user menu (spec D2)', () => {
     );
     openUserMenu();
     const names = screen.getAllByRole('menuitem').map((e) => e.textContent?.trim());
-    expect(names.indexOf('Invia un commento')).toBe(names.indexOf('Crediti') + 1);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Invia un commento' }));
+    expect(names.indexOf('Commenti')).toBe(names.indexOf('Crediti') + 1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Commenti' }));
     expect(openFeedback).toHaveBeenCalledTimes(1);
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
@@ -423,7 +423,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(container.querySelector('aside')).not.toHaveAttribute('inert');
   });
 
-  it('leaves «Invia un commento» to the floating button from md', () => {
+  it('leaves «Commenti» to the button at the top right from md', () => {
     const original = window.matchMedia;
     window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;
     try {
@@ -433,7 +433,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
         </MemoryRouter>,
       );
       openUserMenu();
-      expect(screen.queryByRole('menuitem', { name: 'Invia un commento' })).toBeNull();
+      expect(screen.queryByRole('menuitem', { name: 'Commenti' })).toBeNull();
     } finally {
       window.matchMedia = original;
     }

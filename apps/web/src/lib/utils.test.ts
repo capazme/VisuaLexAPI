@@ -10,6 +10,6 @@ describe('cn', () => {
 
   it('keeps a variant\'s width beside the base one, and the padding\'s sides beside its axes', () => {
     expect(cn('max-w-frame', 'has-[[data-page-width=full]]:max-w-frame-full')).toBe('max-w-frame has-[[data-page-width=full]]:max-w-frame-full');
-    expect(cn('px-4 md:px-8 2xl:px-12 py-4 md:py-8', 'pt-8 md:pt-8 md:pb-[var(--page-foot)]')).toBe('px-4 md:px-8 2xl:px-12 py-4 md:py-8 pt-8 md:pt-8 md:pb-[var(--page-foot)]');
+    expect(cn('px-4 md:px-8 2xl:px-12 py-4 md:py-8', 'pt-8 md:pt-8 md:pb-12')).toBe('px-4 md:px-8 2xl:px-12 py-4 md:py-8 pt-8 md:pt-8 md:pb-12');
   });
 });

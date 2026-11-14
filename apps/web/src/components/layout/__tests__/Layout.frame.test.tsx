@@ -48,8 +48,8 @@ describe('Layout — the frame (U1)', () => {
 });
 
 describe('Layout — where the full-screen button floats over the page (U1)', () => {
-  const FROM_LG = 'lg:[--focus-button-room:4.25rem]';
-  const FROM_MD = 'md:[--focus-button-room:4.25rem]';
+  const FROM_LG = 'lg:[--focus-button-room:11rem]';
+  const FROM_MD = 'md:[--focus-button-room:11rem]';
 
   it('gives a top row its room from lg, where the button floats over the page\'s top right', () => {
     at('/dossier');

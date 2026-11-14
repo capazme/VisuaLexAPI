@@ -352,6 +352,19 @@ export function Layout() {
           showPhoneBar && phoneBar.hidden && 'max-md:[--phone-bar-offset:0px]',
         )}
       >
+        {/* «Commenti» (D-253), for a signed-in user from md: left of «Tutto schermo», 8 px from it, at its height and
+            in the same places — in the bar's right end between md and lg, at the window's top right from lg and in full
+            screen. Below md it is the user menu's «Commenti» (M1). */}
+        {isAuthenticated && (
+          <FeedbackButton
+            onOpen={() => setFeedbackOpen(true)}
+            className={cn(
+              'hidden md:inline-flex fixed top-4 right-[4.25rem] z-50',
+              !settings.focusMode && 'max-lg:right-14 max-lg:top-[calc(env(safe-area-inset-top)+0.375rem)]',
+            )}
+          />
+        )}
+
         {/* The full screen (U1, L-47: `focusMode` in the settings): it widens the frame, never narrows it. A toggle, so
             its name stays «Tutto schermo» and `aria-pressed` says the state; the `title` says what a press does. */}
         <motion.button
@@ -393,12 +406,12 @@ export function Layout() {
           <div
             data-testid="search-bar"
             // The phone's bar on this page (M1): 56 px below lg, the menu button beside the field and the iPhone's top
-            // edge above it; 72 px from lg. From md the Focus toggle floats at the top right: the field ends before it.
+            // edge above it; 72 px from lg. From md «Commenti» and the Focus toggle float at the top right: the field ends before them.
             // Positioned in the dropdown band, so the line under the field paints over the practice's sticky headings
             // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
             className={cn(
               'relative flex h-[var(--search-bar-height)] flex-shrink-0 items-center justify-center gap-1 border-b', Z_INDEX.dropdown,
-              'border-slate-200 bg-white/80 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[3.25rem] lg:pl-8 lg:pr-[4.5rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-900/80',
+              'border-slate-200 bg-white/80 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[9.75rem] lg:pl-8 lg:pr-[11rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-900/80',
             )}
           >
             <MenuToggle {...menuToggle} />
@@ -426,18 +439,14 @@ export function Layout() {
             // (`frame.ts`). The padding above and below does not change: the practice row is measured against it.
             PAGE_FRAME, 'py-4 md:py-8',
             settings.focusMode ? 'max-w-frame-full' : cn('max-w-frame', FULL_PAGE_FRAME),
-            // Where the full-screen button floats over the page's top right, the room it takes, which a top row keeps
-            // clear (`FOCUS_BUTTON_CLEARANCE`): from md in full screen, which draws no bar for it to sit in; from lg
-            // otherwise; never over the search page's field, which ends before it.
-            settings.focusMode ? 'md:[--focus-button-room:4.25rem]' : !showSearchBar && 'lg:[--focus-button-room:4.25rem]',
+            // Where «Commenti» and the full-screen button float over the page's top right, the room they take, which a
+            // top row keeps clear (`FOCUS_BUTTON_CLEARANCE`): from md in full screen, which draws no bar for them to sit
+            // in; from lg otherwise; never over the search page's field, which ends before them. 11 rem: the toggle's
+            // 60 px from the edge, 8 of gap, about 96 for «Commenti» and 8 of air.
+            settings.focusMode ? 'md:[--focus-button-room:11rem]' : !showSearchBar && 'lg:[--focus-button-room:11rem]',
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
             // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
-            // The feedback button floats over the page's foot from md, signed in: 24 px off the edge and 46 px tall, and
-            // 16 px of air over it, so the last row («Ripassa» of the last subject) scrolls clear of it (G8c). In
-            // `--page-foot`, which a page sized to the window takes off its height (the graph's). Not on the search page,
-            // whose practice row is the window less `md:py-8` (`h-app-row`).
-            isAuthenticated && !onSearchPage && 'md:[--page-foot:5.375rem] md:pb-[var(--page-foot)]',
           )}>
             <RoutePage>
               <Outlet />
@@ -451,9 +460,6 @@ export function Layout() {
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
 
-      {/* Feedback, for a signed-in user: the floating button from md; on a phone, where it covered the foot of every
-          page (the bars pinned to the bottom, «6 di 10» in the progress card), the user menu's «Invia un commento» (M1). */}
-      {isAuthenticated && <FeedbackButton className="max-md:hidden" onOpen={() => setFeedbackOpen(true)} />}
       <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       {/* Version changelog notification */}
