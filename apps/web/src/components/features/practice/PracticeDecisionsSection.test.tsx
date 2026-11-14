@@ -30,7 +30,7 @@ const rowNames = () => screen.getAllByRole('button', { name: /^(Espandi|Comprimi
 describe('PracticeDecisionsSection (spec §3.3)', () => {
   it('draws nothing when the practice holds no decision', () => {
     const practiceId = s().createPractice('Vuota');
-    const { container } = render(<PracticeDecisionsSection practiceId={practiceId} />);
+    const { container } = render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -40,7 +40,7 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
     s().openDecision(UNREAD, { open: false });
     s().setDecisionEntryIdentity(practiceId, oldId, OLD, { tipo: 'sentenza', data_deposito: '2008-01-11', sezione: 'U' }, 'Cass. civ., sez. un., n. 577/2008');
     s().setDecisionEntryIdentity(practiceId, newId, NEW, { tipo: 'sentenza', data_deposito: '2019-11-11', sezione: '3' }, 'Cass. civ., sez. III, n. 28994/2019');
-    render(<PracticeDecisionsSection practiceId={practiceId} />);
+    render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Giurisprudenza (3)');
     expect(rowNames()).toEqual([
       'Espandi Cass. civ., n. 10787/2024',
@@ -51,7 +51,7 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
 
   it('a row closed mounts nothing; opened, it reads the decision in place, hosted by the practice', () => {
     const { practiceId, decisionId } = s().openDecision(NEW, { open: false });
-    render(<PracticeDecisionsSection practiceId={practiceId} />);
+    render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
     expect(screen.queryByTestId('entry-view')).toBeNull();
     const toggle = screen.getByRole('button', { name: 'Espandi Cass. civ., n. 28994/2019' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -67,14 +67,14 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
 
   it('a row opened by the store (a reveal) is open, and carries its key for the column to scroll to', () => {
     const { practiceId, decisionId } = s().openDecision(NEW, { beside: false });
-    const { container } = render(<PracticeDecisionsSection practiceId={practiceId} />);
+    const { container } = render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
     expect(screen.getByTestId('entry-view')).toBeInTheDocument();
     expect(container.querySelector(`[data-practice-row="${decisionRowKey(practiceId, decisionId)}"]`)).not.toBeNull();
   });
 
   it('a found decision updates its row: the label with its section, the type and the day of deposit', () => {
     const { practiceId, decisionId } = s().openDecision({ corte: 'cassazione', numero: 28994, anno: 2019 }, { open: false });
-    render(<PracticeDecisionsSection practiceId={practiceId} />);
+    render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
     expect(screen.getByRole('button', { name: 'Espandi Cass., n. 28994/2019' })).toBeInTheDocument();
     expect(screen.queryByText(/depositata/)).toBeNull();
     act(() => {
@@ -88,7 +88,7 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
   it('«Togli dal tavolo» takes the decision off, with no confirmation', () => {
     const { practiceId } = s().openDecision(NEW, { open: false });
     s().openDecision(OLD, { open: false });
-    render(<PracticeDecisionsSection practiceId={practiceId} />);
+    render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
     const section = screen.getByRole('region', { name: /Giurisprudenza/ });
     fireEvent.click(within(section).getByRole('button', { name: 'Togli dal tavolo Cass. civ., n. 28994/2019' }));
     expect(s().practices[0].decisions.map((d) => d.reference.numero)).toEqual([577]);
@@ -98,9 +98,30 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
   it('names the toggle with the visible text, deposit included', () => {
     const { practiceId, decisionId } = s().openDecision(NEW, { open: false });
     act(() => { s().setDecisionEntryIdentity(practiceId, decisionId, NEW, { data_deposito: '2019-11-05', tipo: 'sentenza' }, 'Cass. civ., n. 28994/2019'); });
-    render(<PracticeDecisionsSection practiceId={practiceId} />);
+    render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
     const name = screen.getByRole('button', { name: /^Espandi / }).getAttribute('aria-label');
     expect(name).toContain('Cass. civ., n. 28994/2019');
     expect(name).toMatch(/Sentenza depositata/);
+  });
+});
+
+describe('PracticeDecisionsSection: the two views (U2)', () => {
+  it('in the overview the closed rows flow in columns and an open one takes the strip\'s width', () => {
+    const { practiceId, decisionId } = s().openDecision(NEW, { open: false });
+    s().openDecision(OLD, { open: false });
+    const { container } = render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
+    const rows = container.querySelector(`[data-practice-row="${decisionRowKey(practiceId, decisionId)}"]`)?.parentElement as HTMLElement;
+    expect(rows).toHaveClass('grid', '[&>[data-row-open]]:col-span-full');
+    fireEvent.click(screen.getByRole('button', { name: 'Espandi Cass. civ., n. 28994/2019' }));
+    expect(container.querySelector(`[data-practice-row="${decisionRowKey(practiceId, decisionId)}"]`)).toHaveAttribute('data-row-open');
+  });
+
+  it('in the index its decisions are entries, each opening beside (the focus, a desktop\'s, is PracticeActBlock\'s test)', () => {
+    const { practiceId, decisionId } = s().openDecision(NEW, { open: false });
+    render(<PracticeDecisionsSection practiceId={practiceId} layout="index" />);
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Giurisprudenza (1)');
+    expect(screen.queryByTestId('entry-view')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Apri accanto: Cass\. civ\., n\. 28994\/2019/ }));
+    expect(s().practices[0].beside.map((b) => b.id)).toEqual([`decision:${decisionId}`]);
   });
 });

@@ -1,4 +1,9 @@
-beautifulsoup4
+# The libraries that shape the text are pinned to the production image's versions
+# (requirements.lock): a different release can move one space of article_text and
+# drop the anchors after it (root CLAUDE.md, rule 23). tests/test_dependency_lock.py.
+beautifulsoup4==4.15.0
+# bs4's CSS selector engine: production 4.0.1, a fresh resolve 4.1 (11 Nov 2026).
+soupsieve==4.0.1
 requests
 quart
 quart_cors
@@ -8,7 +13,7 @@ aiocache
 aiohttp
 redis>=5.0
 pyyaml>=6.0
-lxml>=5.0
+lxml==6.1.3
 hypercorn
 # Pinned to the version Task 2 (2026-10-05) measured Cassazione PDFs against — a later
 # release could re-wrap or re-space the text layer, moving every note anchored to it.

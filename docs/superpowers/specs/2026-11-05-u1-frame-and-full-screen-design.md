@@ -124,6 +124,20 @@ at the default text size, so they grow with the text size the user chose), each 
   where the scrollbar is wider than the app's own (Firefox with scrollbars always shown). Beside an open card its list
   stays one column (G8). The counts are computed without the scrollbar's room: the page keeps 8 px for it, which
   changes none of them.
+- **Gymnasium's «Oggi» and «Progressi»** (the third): §4 holds — «Oggi» keeps its two columns from `xl` in full screen,
+  and nothing on «Progressi» reads the full screen (its states and coming days side by side from `lg` in both views);
+  a test holds each. Their one list of cards is «Progressi»' «Per materia», the five subjects, which leave their two
+  columns from `lg` (506 px at 1366 with the sidebar, 767 at 1920, 1171 at 2560 in full screen) for the grid: one on a
+  phone, two from a window of 770 px (at 768 one, as before, where the page keeps the scrollbar's 8 px; two where the
+  scrollbar takes no room, as on an iPad), three at 1366 with the sidebar (three and two), four at 1920 (four and one,
+  as at 1470 in full screen), the five in one row at 1920 in full screen; at 2560 in full screen seven tracks, so five
+  cards of 329 px and two tracks empty at the row's end, as `auto-fill` keeps them (five stretched across would be 464
+  px each). With the rail three from 1162 px, two at 1280 with the wide sidebar, three again from 1322. Here the widths
+  count the scrollbar's 8 px, which change the count at 768 alone. «Oggi»'s other lists are rows, not cards — the
+  missions, the subjects from `md`, the institutes' road, the courses — and stay; on a phone «Le tue materie» stays the
+  row of cards that scrolls. «Oggi»'s split stays on the window (`xl`), not the frame: in full screen from a window of
+  about 1056 px, and with the rail from about 1120, the frame is as wide as at 1280 with the sidebar, where «Oggi»
+  splits, and up to 1279 it is still one column.
 
 ## Out of scope
 

@@ -17,7 +17,10 @@ import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { LazyStudyMode as StudyMode } from '../workspace/LazyStudyMode';
 import { shownAnnex } from '../dossier/dossierLayout';
 import { PracticeArticleRow } from './PracticeArticleRow';
+import { PracticeArticleEntry } from './PracticeIndexEntry';
+import type { PracticeLayout } from './PracticeColumn';
 import { fromPracticePair, practicePair } from './practiceView';
+import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useTour } from '../../../hooks/useTour';
@@ -32,6 +35,8 @@ export interface PracticeActBlockProps {
   act: PracticeAct;
   onViewPdf: (urn: string) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
+  /** The phone's section, the overview's panel or the index's entry (U2, `PracticeColumn`). */
+  layout: PracticeLayout;
 }
 
 /**
@@ -54,10 +59,12 @@ function chipLabel(article: ArticleData): string {
 /**
  * One act on the practice's table (spec §3.2), shaped like the dossier's `DossierActBlock`: the
  * heading with its tools (Studio, Struttura, PDF, «⋯»), an index of the act's rows on top, then the
- * rows one under the other. The structure window is the desktop's (`structureWindow.blockId`), the
- * drawer the phone's: one per breakpoint (gotcha 26).
+ * rows one under the other. In the overview (U2) it is a panel of the grid, its tools beside its title; in the reading
+ * view's index, its heading with «⋯» (the tools inside it, as on a phone) and its articles one entry a line, each
+ * opening beside. The structure window is the desktop's (`structureWindow.blockId`), the drawer the phone's: one per
+ * breakpoint (gotcha 26).
  */
-export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference }: PracticeActBlockProps) {
+export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference, layout }: PracticeActBlockProps) {
   const {
     toggleActCollapse, revealPracticeArticle, revealPracticeRow, addArticlesToPractice,
     moveActToPractice, openStructureWindow, closeStructureWindow,
@@ -83,6 +90,11 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
     .filter((key) => key.startsWith(prefix))
     .map((key) => key.slice(prefix.length))));
   const isDesktop = useIsDesktop();
+  const isIndex = layout === 'index';
+  const isPanel = layout === 'overview';
+  // Studio, Struttura and PDF as buttons beside the title: the overview's panel; on a phone and in the index they are
+  // entries of «⋯».
+  const toolsShown = isDesktop && !isIndex;
   // The act's tour, on the practice's first act and once the table's own tour has been seen (when it
   // is done it hands over to this one, `PracticeTable`). Asked once: `tryStartTour` is new each render.
   const isFirstAct = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts[0]?.id === act.id);
@@ -90,7 +102,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
   const { tryStartTour, hasSeenTour } = useTour({ theme: theme as 'light' | 'dark' });
   const tourAsked = useRef(false);
   useEffect(() => {
-    if (!isFirstAct || tourAsked.current || !hasSeenTour('practice')) return;
+    // Not from the index: its steps point at the panel's tools, its index line and a row's «Apri accanto».
+    if (!isFirstAct || isIndex || tourAsked.current || !hasSeenTour('practice')) return;
     tourAsked.current = true;
     tryStartTour('practiceAct');
   });
@@ -192,12 +205,18 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         transition,
         opacity: isDragging ? 0.6 : 1,
         // Read by an open row's reading toolbar (`--reading-toolbar-top`) and by the rows' scroll margin;
-        // 0 on a phone, where the heading scrolls with the block.
-        ['--practice-head' as string]: `${isDesktop ? headerHeight : 0}px`,
+        // 0 on a phone, where the heading scrolls with the block, and in the index, which pins nothing.
+        ['--practice-head' as string]: `${isDesktop && !isIndex ? headerHeight : 0}px`,
+        // The panel and the index's entry are one piece of the passage between the views (L-62).
+        ...(layout !== 'phone' ? { ['--vlx-vt' as string]: practiceTransitionName('practice-act', act.id) } : {}),
       }}
       aria-label={heading}
-      // A section of the page, not a card (R3: one level of paper, the practice's): its title and a hairline.
-      className="practice-act"
+      data-layout={layout}
+      // Found by the passage between the views (`practiceSwitch`) to give its heading the focus.
+      data-act-id={act.id}
+      // A section of the page (R3: one level of paper, the practice's): its title and a hairline. In the overview's grid
+      // a panel (U2): a hairline box on the page's own ground, no shadow.
+      className={cn('practice-act', isPanel && 'rounded-xl border border-slate-200 px-3 pb-2 dark:border-slate-800', layout !== 'phone' && PRACTICE_VT)}
     >
       {/* The sticky-row convention: opaque — the page's own ground —, over the rows it heads (and over an open
           row's sticky toolbar, which slides up under it as the row ends). */}
@@ -208,9 +227,10 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         className={cn(
           // One row: on a phone the title (wrapping) and «⋯», which holds Studio, Struttura and PDF (R3: the text
           // first; four 44 px buttons took a row of their own), from `md` the tools beside it. Sticky from `md`
-          // only: on a phone, with an open row's toolbar pinned under it, the two took half the screen.
-          'practice-act-head relative flex items-start gap-1 border-b border-slate-200 bg-slate-50 py-1 md:sticky md:top-0 md:items-center md:gap-2 md:py-2 dark:border-slate-800 dark:bg-slate-950',
-          Z_INDEX.stickyHead,
+          // only: on a phone, with an open row's toolbar pinned under it, the two took half the screen. In the index
+          // it pins nothing: the acts are a few lines each, and their headings would stack.
+          'practice-act-head relative flex items-start gap-1 border-b border-slate-200 bg-slate-50 py-1 md:items-center md:gap-2 dark:border-slate-800 dark:bg-slate-950',
+          isIndex ? 'md:py-1' : cn('md:sticky md:top-0 md:py-2', Z_INDEX.stickyHead),
         )}
       >
         <button
@@ -223,7 +243,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         >
           <GripVertical size={18} aria-hidden />
         </button>
-        <div className="min-w-0 flex-1 py-1">
+        {/* In the overview the title gives way and the tools follow it, not the row's far end (U2). */}
+        <div className={cn('min-w-0 flex-1 py-1', isPanel && 'md:flex-initial')}>
           {/* The accordion pattern: the heading holds the toggle, its name is the act's own words. */}
           <h3 className="min-w-0">
             <div
@@ -238,28 +259,35 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                   toggleActCollapse(practiceId, act.id);
                 }
               }}
-              // The act's title, in the reader's serif (R3): 22 px.
-              className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md font-serif text-[22px] font-medium leading-tight text-slate-900 md:min-h-0 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              // The act's title, in the reader's serif (R3): 22 px; 17 px in the index, a heading among its entries.
+              className={cn(
+                'flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md font-serif font-medium leading-tight text-slate-900 md:min-h-0 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                isIndex ? 'text-[17px]' : 'text-[22px]',
+              )}
             >
               <ChevronDown
                 size={16}
                 aria-hidden
                 className={cn('flex-shrink-0 text-slate-400 transition-transform', act.isCollapsed && '-rotate-90')}
               />
-              {/* A cut act name says nothing: on a phone it wraps. */}
-              <span className="min-w-0 break-words md:truncate">{heading}</span>
+              {/* A cut act name says nothing: on a phone it wraps; on a computer, cut beside the tools or in the index, its
+                  tooltip says it whole. */}
+              <span title={isDesktop ? heading : undefined} className="min-w-0 break-words md:truncate">{heading}</span>
             </div>
           </h3>
-          {/* On a phone only what the count does not say: the act's articles are its rows and its index, just below. */}
-          <p className={cn('ml-6 truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
-            {formatNormaMeta(act.norma, act.articles.length)}
-          </p>
+          {/* On a phone only what the count does not say: the act's articles are its rows and its index, just below. The
+              index says neither: its entries are the articles. */}
+          {!isIndex && (
+            <p className={cn('ml-6 truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
+              {formatNormaMeta(act.norma, act.articles.length)}
+            </p>
+          )}
         </div>
         {/* `mt-1` on a phone: «⋯» level with the title's 44 px line, not with the column's top; `-mr-3`: its 44 px reach
             into the page's margin, as every icon on the column's right edge (R3b). */}
-        <div className="-mr-3 ml-auto mt-1 flex flex-shrink-0 items-center gap-1 md:mr-0 md:mt-0">
-          {/* The tools on a computer; on a phone they are entries of «⋯» (below), not drawn at all. */}
-          {isDesktop && <div className="flex items-center gap-1">
+        <div className={cn('-mr-3 mt-1 flex flex-shrink-0 items-center gap-1 md:mr-0 md:mt-0', !isPanel && 'ml-auto')}>
+          {/* The tools in the overview; on a phone and in the index they are entries of «⋯» (below), not drawn at all. */}
+          {toolsShown && <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => openStudy(current)}
@@ -300,7 +328,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
             label={`Azioni su ${heading}`}
             triggerClassName={MENU_TRIGGER}
             items={[
-              ...(isDesktop ? [] : [
+              ...(toolsShown ? [] : [
                 {
                   label: 'Modalità studio',
                   icon: BookOpen,
@@ -313,7 +341,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                   { label: 'Esporta PDF della norma', icon: FileDown, onSelect: () => onViewPdf(act.norma.urn as string) },
                 ] : []),
               ]),
-              { label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !isDesktop },
+              { label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !toolsShown },
               { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
             ]}
           >
@@ -322,7 +350,34 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         </div>
       </header>
 
-      {!act.isCollapsed && (
+      {!act.isCollapsed && isIndex && (
+        <div className="py-1">
+          {act.articles.length > 0 && (
+            <ul aria-label={`Articoli sul tavolo di ${heading}`} className="space-y-0.5">
+              {act.articles.map((article) => (
+                <PracticeArticleEntry key={practiceArticleKey(article)} practiceId={practiceId} actId={act.id} article={article} />
+              ))}
+            </ul>
+          )}
+          {loadingArticle && (
+            <span role="status" aria-live="polite" className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-400">
+              <Loader2 size={12} aria-hidden className="animate-spin text-primary-600 dark:text-primary-400" />
+              Caricamento…
+            </span>
+          )}
+          {act.articles.length === 0 && !loadingArticle && act.norma.urn && (
+            <button
+              type="button"
+              onClick={toggleStructure}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <Plus size={13} aria-hidden /> Scegli un articolo dalla struttura
+            </button>
+          )}
+        </div>
+      )}
+
+      {!act.isCollapsed && !isIndex && (
         <div className="py-1">
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
           {(act.articles.length > 1 || loadingArticle || showNavigation) && (

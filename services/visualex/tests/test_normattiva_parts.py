@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from visualex_api.services.normattiva_parts import extract_parts, partial_notice, parts_fields
+from visualex_api.services.normattiva_scraper import AknArticleText
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
     ARTICLE_ENDPOINTS, FakeCache, TEXT, URN, ask, brocardi, controller, normattiva_serving, requested,
     _no_history_writes,
@@ -111,7 +112,7 @@ class TestOnTheWire:
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
     async def test_the_akn_export_holds_the_whole_article(self, controller, brocardi, endpoint):
         scraper = normattiva_serving(L296_TREE)
-        scraper.get_document.return_value = ("### Art. 1\n\n1. …", URN)
+        scraper.get_document.return_value = (AknArticleText("### Art. 1\n\n1. …"), URN)
         [result] = await ask(controller, endpoint, requested(article="1"), scraper=scraper)
         assert (result["parti"], result["testo_parziale"]) == (None, False)
 
