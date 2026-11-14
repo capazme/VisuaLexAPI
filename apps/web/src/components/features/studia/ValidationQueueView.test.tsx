@@ -321,7 +321,7 @@ describe('«Da validare», the queue', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Questa sezione è riservata ai validatori di VisuaLex Gymnasium')).toBeInTheDocument();
+    expect(await screen.findByText('Questa sezione è riservata ai validatori di Learn')).toBeInTheDocument();
     expect(screen.queryByText('Non sei più tra i validatori')).toBeNull();
     // The account already said so: no request the server would refuse.
     expect(queue).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe('«Da validare», the queue', () => {
     // Someone who is not one gets the server's refusal, worded as before the account was asked.
     queue.mockRejectedValue(rejection(403));
     render(area);
-    expect(await screen.findByText('Questa sezione è riservata ai validatori di VisuaLex Gymnasium')).toBeInTheDocument();
+    expect(await screen.findByText('Questa sezione è riservata ai validatori di Learn')).toBeInTheDocument();
     expect(queue).toHaveBeenCalledTimes(2);
   });
 
