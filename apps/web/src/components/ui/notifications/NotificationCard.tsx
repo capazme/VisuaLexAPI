@@ -99,7 +99,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
       // own timeline (a `top` ran on the main thread, ahead of the clip).
       ['[data-rule]', { y: ['0%', '50%'] }, { duration: NOTIFICATION_S.open, at: '<', ...out }],
       ['[data-word]', { opacity: [0, 1], y: [6, 0] }, { duration: NOTIFICATION_S.word, delay: stagger(NOTIFICATION_S.stagger), at: `-${NOTIFICATION_S.open - 0.1}`, ...out }],
-      // The message gains a touch of weight as it rises (Geist's own axis), ending at its class's 500.
+      // The message gains a touch of weight as it rises (Inter's own axis), ending at its class's 500.
       ['[data-message]', { fontWeight: [400, 500] }, { duration: NOTIFICATION_S.word, at: '<', ...out }],
       // Open, the line gives way to the time line (or to the border), and the clip is let go: a focus ring must not
       // be cut.

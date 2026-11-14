@@ -31,7 +31,7 @@ interface BlockProps {
   children: ReactNode;
 }
 
-/** A block of the page: a tile with its heading in Newsreader (one type language, Gymnasium spec §5.1). */
+/** A block of the page: a tile with its heading in EB Garamond (one type language, Gymnasium spec §5.1). */
 function Block({ id, title, busy, stale, note, children }: BlockProps) {
   return (
     // `content-start`: beside a taller block (G6) the room left goes under the content, never between its rows.

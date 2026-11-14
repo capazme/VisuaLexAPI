@@ -42,7 +42,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; with no card open the cards are tiles across the frame (G8) in a grid of
   cards of at least 20rem (`CARD_GRID_COLUMNS`, U1: one column on a phone, two at 768 px, three at 1366 with the
-  sidebar, four at 1920; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
+  sidebar, four at 1920; `CardGroups`' `grid`), each with its front in EB Garamond, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
   1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below, «Cerca» under 360 px (it was cut, Q1),
@@ -256,8 +256,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`credits.test.ts` holds each; never restyle one, as for root rule 23); `uses` and `terms` come only
   from the conditions read on each source's page and the owners' table, and a source enters only once
   its conditions are clear (today group A: Normattiva, EUR-Lex, Corte costituzionale, Cassazione,
-  giustizia amministrativa, Senato, CONSOB, CeRDEF; and Newsreader and Geist — Geist Mono in Geist's
-  entry —, OFL-1.1 as their `@fontsource-variable` packages say: the test reads the packages, and fails
+  giustizia amministrativa, Senato, CONSOB, CeRDEF; and EB Garamond, Inter and Geist Mono — the
+  `geist` entry —, OFL-1.1 as their `@fontsource-variable` packages say: the test reads the packages, and fails
   when `main.tsx` loads a typeface no entry covers). Normattiva carries the site's
   conditions, never the open data's CC BY 4.0; the Corte costituzionale «CC BY-SA 3.0» with no version.
   `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), a page to consult in the frame's whole width
@@ -471,8 +471,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   **The page frame** (W2, 21 Oct 2026):
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
-  (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
-  small (`kicker`: «Gymnasium · la tua palestra giuridica», `PAGE_KICKER`, Geist `text-sm` slate 600; L-37, the owner,
+  (`PAGE_TITLE`: EB Garamond, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
+  small (`kicker`: «Gymnasium · la tua palestra giuridica», `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
   22 October 2026) —, the sentence under it (`line`, a short line:
   `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
   a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button
@@ -608,7 +608,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
   services' dot), in the middle — as iOS's large titles (G8) — nothing while the page's `h1` is in sight under the bar
-  (it says the name already: no «Gymnasium» over «Gymnasium · la tua palestra giuridica»), the page's name in Newsreader
+  (it says the name already: no «Gymnasium» over «Gymnasium · la tua palestra giuridica»), the page's name in EB Garamond
   once it has scrolled out, faded in over 150 ms (`motion-safe:` only), on every page (`usePageTitleInView`: an
   `IntersectionObserver` on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver`
   finding a title drawn later; a page with no `h1`, or a browser with no observer, has the name at once; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
@@ -672,7 +672,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the number first); the article's field opens empty, its placeholder saying what it takes, so Backspace there goes
   back at once (a «1» standing in it took the first press, Bill); there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
   order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
-  abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
+  abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Inter 12 px) and «A portata di mano»
   (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
   preferiti (N)» and «Gestisci alias (N)»; empty, one quiet line each, «Crea un alias» a row like a link);
   «Filtri avanzati» closed at the foot, its state in words (`activeFiltersLabel`, `utils/searchFilters.ts`); the
@@ -837,7 +837,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`, Framer Motion's `useAnimate`)
   is drawn from a line: the line grows from the centre with a tick at each end (300 ms), opens like a slit
   (an `inset` clip with the same lengths at both ends, 350 ms), and the words rise from it 60 ms apart with a touch
-  of weight (Geist's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
+  of weight (Inter's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
   `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 5 s is the
   line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
   into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a finger, or the
@@ -1710,7 +1710,7 @@ from 0.48–0.57 before). In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
-   ottobre · Diritto penale» narrowed to a subject); in Newsreader, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
+   ottobre · Diritto penale» narrowed to a subject); in EB Garamond, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
    (`todaySentence`, a part that is zero left out); under it «circa 7 minuti · Diritto civile, Diritto penale e altre 2»
    (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an estimate; the subjects
    from `todaySubjects` — those with cards due in the road's read by institute, the most first, then while today allows
@@ -1816,7 +1816,7 @@ from 0.48–0.57 before). In that order:
    row, ring or points: one line in slate 500 at the foot names them (`soonLine`: «In arrivo: caso breve, una settimana
    di serie», G8).
 
-One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
+One type language: block headings in EB Garamond (`BLOCK_HEADING`), labels in Inter; no small capitals and no double
 rule. «Da validare» shows the strip (`progress/StudyStrip`, `dense`: the streak's count without its
 line, the ring, the gear) over it (`StudiaPage`); «Le mie schede» none since G8 (the streak and the goal said a third
 time); the session shows none. «Contribuisci» (G4, spec §5.5) draws them in
@@ -1909,7 +1909,7 @@ trend's points and the coming days' columns are the exception the progress spec 
 trend, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
 day's. **The trend** (`ReviewTrend`, pure parts in `trend.ts`): the reviews of a period as a line — 7 days, 30 days
 (where it opens on a computer; on a phone 7 days — thirty points in some 250 px read as a saw, Bill) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
-Newsreader and its change on the period before, over whole days — today, only begun, out of both: the days up to
+EB Garamond and its change on the period before, over whole days — today, only begun, out of both: the days up to
 yesterday against as many before them (green 700 up, 4.5:1; ink down, never red; none when those had no reviews,
 none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,
 never under zero) resampled to `CURVE_SAMPLES` (175) points so one period's curve bends into another's
@@ -3038,7 +3038,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
-  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: a Newsreader title, the
+  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: an EB Garamond title, the
   counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
   always there at 44 px; with no dossier, a composed empty state with
   `DossierMark.tsx`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
@@ -3075,7 +3075,7 @@ meant to stay split; add new features as new files, not inside the shells:
   /dossiers/import-study`, quick norms and aliases left out). Explore shows **the community's dossiers first** (S7a,
   the Forum's reason), under a visually hidden `h2` «Dalla comunità»: a grid of `SharedEnvironmentCard`s (`CARD_GRID`,
   «I miei pubblicati»' too: one column, two from `md`, three from `xl`, a row's cards one height, `h-full`), each an
-  `article` with its title in Newsreader 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
+  `article` with its title in EB Garamond 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
   from its token `--category-*`, never a hand-written colour; one line where the card has room, wrapped between its parts
   on a narrow one, a long username cut, whole on hover), two tags then «+N», «Mi piace» a heart with its number
   (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined
@@ -3136,7 +3136,7 @@ meant to stay split; add new features as new files, not inside the shells:
   into order, then «Giurisprudenza»; `layout`: `phone`, `overview` — the grid, `rectSortingStrategy` — or `index`, see
   «The two views»; outside the index it takes the reveal once) of `PracticeActBlock` (an act, R3 — in the overview a
   panel, a hairline box, and in the index a heading that pins nothing, U2 —: a section
-  with no card around it — its sticky heading, the act's name in Newsreader 22 px over a hairline, with Studio,
+  with no card around it — its sticky heading, the act's name in EB Garamond 22 px over a hairline, with Studio,
   Struttura, PDF and «⋯» as neutral quiet buttons — on a phone one row, the title and «⋯», which holds Studio,
   Struttura and PDF, and the meta line only when it says more than the count —; the index line of its rows, drawn only
   for an act of more than one article, its chips in slate, on a phone one row that scrolls sideways beside the arrows;
