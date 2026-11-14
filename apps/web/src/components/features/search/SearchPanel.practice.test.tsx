@@ -531,6 +531,8 @@ describe('SearchPanel — an interrupted stream (D-323)', () => {
     await waitFor(() => expect(notices()).toHaveLength(1));
     expect(notices()[0].message).toBe('Caricamento interrotto: caricati 1 di 3 articoli. Mancano 2 articoli.');
     act(() => { notices()[0].action!.onClick(); });
+    // the warning closes on the click, so it cannot ask a second time
+    expect(notices().filter((n) => n.message.startsWith('Caricamento interrotto') && !n.closing)).toEqual([]);
     await waitFor(() => expect(env.requests).toHaveLength(2));
     expect(env.requests[1]).toEqual({ ...asked, article: '2,3' });
     await waitFor(() => expect(s().practices.find((p) => p.id === target)?.acts[0]?.articles).toHaveLength(3));

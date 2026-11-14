@@ -32,7 +32,7 @@ import { ReadingRow } from '../practice/ReadingRow';
 import { PracticeBar } from '../practice/PracticeBar';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
 import { dur, ease } from '../../../lib/motion';
-import { notify } from '../../ui/notifications/notifications';
+import { closeNotification, notify } from '../../ui/notifications/notifications';
 
 /** The practice whose light window or, on a phone, full-screen reader `askerId` names: where a norm
  *  cited in its text is searched and opened. */
@@ -384,12 +384,14 @@ export function SearchPanel() {
           article: missingArticles.join(','),
           targetPracticeId: params.targetPracticeId ?? streamingPracticeRef.current ?? undefined,
         };
-        notify({
+        const noticeId = notify({
           type: 'warning',
           duration: 0,
           message: `Caricamento interrotto: caricati ${articles} di ${articles + k} articoli. ${k === 1 ? 'Manca 1 articolo.' : `Mancano ${k} articoli.`}`,
-          // Queued, never started over a running search: «Apri tutto»'s queue runs one search at a time.
+          // Closed first, so it cannot ask twice; then queued, never started over a running search:
+          // «Apri tutto»'s queue runs one search at a time.
           action: { label: 'Carica i mancanti', onClick: () => {
+            closeNotification(noticeId, 'dismiss');
             const { searchQueue, triggerMultiSearch } = appStore.getState();
             triggerMultiSearch([...searchQueue, retry]);
           } },
