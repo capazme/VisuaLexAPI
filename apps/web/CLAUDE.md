@@ -2976,10 +2976,15 @@ resolves differently. Only if the inline style references no variable, fall back
 to a single narrowly-scoped `!important` with a comment justifying why every
 other route fails.
 
-**Inchiostro everywhere** (Y1, `lib/inchiostro.guard.test.ts` reads the sources): an action and the focus are
-`primary-*` (toga), everything else `slate-*` (ink), a section its hue (`--vlx-section-*`); no `blue-*`, `indigo-*`,
-`purple-*` or `violet-*` (the first two were aliases of toga, the others hues of no section) but in the colour keys the
-test lists with their reason (the courts' chips, the kinds of a suggestion's items, a highlight's four colours); no text
+**Pietra everywhere** (D-156, after Inchiostro's Y1; `lib/pietra.guard.test.ts` reads the sources): an action and the
+focus are `primary-*` (toga, now warm ink: the action is the ink itself, no accent colour), everything else `slate-*`
+(ink, warm grey), a section its hue (`--vlx-section-*`); ink and toga stay warm and near-grey in `index.css`, light
+and dark (the guard reads their values); `#8a8478` (pietra, 3.2:1) is never text; an active area is the highlighter
+(`primary-50`, dark `primary-900/20`–`/30`) with ink text; green, amber, red and the other functional colours keep their meaning
+and never decorate; no `blue-*`, `indigo-*`,
+`purple-*` or `violet-*` (the first two are aliases of toga, the others hues of no section) but in the colour keys the
+test lists with their reason (the courts' chips, the kinds of a suggestion's items); a key whose blue must stay blue
+writes the old toga value out (`authorityColor.ts`, the highlight's blue icon in `highlightColors.ts`); no text
 under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
 windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
 drop —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s
@@ -3391,10 +3396,10 @@ meant to stay split; add new features as new files, not inside the shells:
     most 200 ms and fill `backwards` only (each `slide-in-from-*` writes both axes: the offsets are
     inherited custom properties, and an error box sliding from the top inside a panel that slid from
     the side came in on the diagonal): a `both` fill keeps the element a
-    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
-    «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
-    `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
-    `toga`; motion curves for Framer Motion live in `lib/motion.ts`.
+    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is
+    «Pietra» (D-156, LexCraft's design system): `slate`, `gray`,
+    `zinc`, `neutral` are aliases of `ink` (warm grey), `blue`, `indigo`, `primary-<n>` of
+    `toga` (warm ink; `.dark` redefines its action, focus and tint steps); motion curves for Framer Motion live in `lib/motion.ts`.
     A `dark:` variant `@apply`'d inside a pseudo-element's rule is just as silent:
     it compiles to `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, which the
     browser drops (until 19 October 2026 every dark scrollbar kept its light
