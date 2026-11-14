@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
@@ -248,6 +250,18 @@ describe('searchParamsFromGroup', () => {
   it('asks for the annex a group holds, and sends no annex key when it holds none', () => {
     expect(searchParamsFromGroup(group({ allegato: 'A' }))[0]).toMatchObject({ annex: 'A' });
     expect(searchParamsFromGroup(group())[0]).not.toHaveProperty('annex');
+  });
+
+  it('pages at the API\'s own ceiling, read from its config (one number, not two)', () => {
+    let dir = __dirname;
+    while (!existsSync(join(dir, 'services', 'visualex'))) {
+      if (dirname(dir) === dir) throw new Error('services/visualex not found above ' + __dirname);
+      dir = dirname(dir);
+    }
+    const config = readFileSync(join(dir, 'services', 'visualex', 'visualex_api', 'tools', 'config.py'), 'utf8');
+    const match = config.match(/^MAX_ARTICLES_PER_REQUEST = .*\bor (\d+)\)\)$/m);
+    expect(match).not.toBeNull();
+    expect(MAX_ARTICLES_PER_SEARCH).toBe(Number(match![1]));
   });
 
   it('pages a group above the API ceiling, every page with the same act and version', () => {

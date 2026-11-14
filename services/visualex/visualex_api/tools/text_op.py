@@ -74,8 +74,8 @@ def article_input_error(error):
 
 
 TOO_MANY_ARTICLES = (
-    "La richiesta apre {count} articoli: il massimo per una richiesta è {limit}. "
-    "Dividila in più ricerche di non più di {limit} articoli ciascuna."
+    "La richiesta apre {count} articoli (bis, ter e simili compresi): il massimo per una "
+    "richiesta è {limit}. Dividila in più ricerche di non più di {limit} articoli ciascuna."
 )
 
 

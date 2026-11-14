@@ -13,8 +13,10 @@ DOSSIER_LIMIT = 100  # Max number of dossiers
 # after deduplication. Each article is a page fetched from the source, so «1-3249» was a whole
 # code for the price of one request (scan A.4). The callers ask far less: the archive CLI sends
 # batches of 25, the web's search shows up to 50 at a time, a dossier's «Apri tutto» pages its
-# groups at this same number (dossierUtils.ts MAX_ARTICLES_PER_SEARCH).
-MAX_ARTICLES_PER_REQUEST = max(1, int(os.getenv("MAX_ARTICLES_PER_REQUEST") or 100))
+# groups at this same number (dossierUtils.ts MAX_ARTICLES_PER_SEARCH, which a web test reads
+# from this line: change the default here and the web follows or its test fails). 150 by the
+# owner's word (G-473): «art. 1-100 c.c.» is 101 articles with the bis, and must open.
+MAX_ARTICLES_PER_REQUEST = max(1, int(os.getenv("MAX_ARTICLES_PER_REQUEST") or 150))
 # Used by the root app.py's rate_limit_middleware (per-IP request counter).
 RATE_LIMIT = int(os.getenv("RATE_LIMIT", 1000))  # Max requests allowed per IP within RATE_LIMIT_WINDOW seconds
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 600))  # Window size in seconds

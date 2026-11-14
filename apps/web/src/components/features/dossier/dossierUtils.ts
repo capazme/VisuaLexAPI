@@ -72,9 +72,10 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
   return Array.from(groups.values());
 }
 
-// How many articles one search may ask for: the API's ceiling (MAX_ARTICLES_PER_REQUEST in
-// services/visualex/visualex_api/tools/config.py) refuses more, so a larger group is paged.
-export const MAX_ARTICLES_PER_SEARCH = 100;
+// How many articles one search may ask for: the API's ceiling refuses more, so a larger group is
+// paged. The number lives in services/visualex/visualex_api/tools/config.py
+// (MAX_ARTICLES_PER_REQUEST); dossierUtils.test.ts reads it there and fails if this one drifts.
+export const MAX_ARTICLES_PER_SEARCH = 150;
 
 // The searches that open a group on the dashboard, the version the group holds: one, or one per
 // page of MAX_ARTICLES_PER_SEARCH articles for a group above the API's ceiling.
