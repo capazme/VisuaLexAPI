@@ -75,6 +75,7 @@ import { computeNormaGroups } from '../dossier/dossierUtils';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
 import type { Dossier } from '../../../types';
+import { notificationStore, resetNotifications } from '../../ui/notifications/notifications';
 
 const s = () => appStore.getState();
 const CC = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', url: 'urn:nir:stato:regio.decreto:1942-03-16;262' };
@@ -94,6 +95,7 @@ beforeEach(() => {
   env.tree = null;
   env.jumpTo = '';
   env.annex.ENABLED = false;
+  resetNotifications();
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, searchTrigger: null, searchQueue: [], pendingDecision: null,
@@ -490,6 +492,62 @@ describe('SearchPanel with the practices: the phone\'s full-screen reader (spec 
     expect(s().phoneReader).toBeNull();
     expect(await screen.findByTestId('practice-column')).toBeInTheDocument();
     expect(s().practiceRows[`${p}/${actId}/${practiceArticleKey(ccArticle('1218'))}`]).toBe(true);
+  });
+});
+
+describe('SearchPanel — an interrupted stream (D-323)', () => {
+  const timeBudget = (missing: string[]) => ({
+    error: `Caricamento interrotto: tempo esaurito. Ne mancano ${missing.length}: riprova per quelli.`,
+    kind: 'time_budget',
+    missing,
+  });
+  const notices = () => notificationStore.getState().entries;
+
+  it('the time-budget line raises one lasting warning with N, M and K, not «Risultato parziale»', async () => {
+    s().createPractice('P');
+    env.lines = [ccArticle('1'), ccArticle('2'), timeBudget(['3', '4', '5'])];
+    panel();
+    act(() => { s().triggerSearch(params('1-5')); });
+    await waitFor(() => expect(notices()).toHaveLength(1));
+    expect(notices()[0]).toMatchObject({
+      type: 'warning',
+      duration: 0,
+      message: 'Caricamento interrotto: caricati 2 di 5 articoli. Mancano 3 articoli.',
+      action: { label: 'Carica i mancanti' },
+    });
+    expect(s().practices[0].acts[0].articles).toHaveLength(2);
+    expect(screen.queryByText('Risultato parziale')).toBeNull();
+  });
+
+  it('«Carica i mancanti» asks again for the missing articles only, with the same practice, version and annex', async () => {
+    const target = s().createPractice('Dossier', { custom: true });
+    s().createPractice('Altra');
+    env.stream = (request) => (request.article === '1-3'
+      ? [ccArticle('1'), timeBudget(['2', '3'])]
+      : String(request.article).split(',').map(ccArticle));
+    panel();
+    const asked = { ...params('1-3'), version_date: '2020-01-01', annex: '2', targetPracticeId: target, tabLabel: 'Dossier' };
+    act(() => { s().triggerSearch(asked); });
+    await waitFor(() => expect(notices()).toHaveLength(1));
+    expect(notices()[0].message).toBe('Caricamento interrotto: caricati 1 di 3 articoli. Mancano 2 articoli.');
+    act(() => { notices()[0].action!.onClick(); });
+    // the warning closes on the click, so it cannot ask a second time
+    expect(notices().filter((n) => n.message.startsWith('Caricamento interrotto') && !n.closing)).toEqual([]);
+    await waitFor(() => expect(env.requests).toHaveLength(2));
+    expect(env.requests[1]).toEqual({ ...asked, article: '2,3' });
+    await waitFor(() => expect(s().practices.find((p) => p.id === target)?.acts[0]?.articles).toHaveLength(3));
+  });
+
+  it('a stream with fewer articles than the estimate and no closing line raises no warning: the act may not have them', async () => {
+    s().createPractice('P');
+    env.lines = [ccArticle('1'), ccArticle('2')];
+    panel();
+    act(() => { s().triggerSearch(params('1-5')); });
+    await waitFor(() => expect(s().practices[0].acts[0]?.articles).toHaveLength(2));
+    await waitFor(() => expect(env.requests).toHaveLength(1));
+    // the search has ended (its progress line is gone) and said nothing
+    await waitFor(() => expect(screen.queryByText('Caricamento articoli…')).toBeNull());
+    expect(notices().filter((n) => n.message.startsWith('Caricamento interrotto'))).toEqual([]);
   });
 });
 

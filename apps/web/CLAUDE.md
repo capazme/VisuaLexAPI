@@ -3108,7 +3108,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `NoteComposerSheet.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsSheet.tsx` (everything a block holds, opened from its sign),
   `NoteToolButton.tsx` (the note tool), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
+  `SearchPanel.tsx` (streaming merge logic; the stream's closing `kind: 'time_budget'` line raises «Caricamento interrotto» with `notify`, and «Carica i mancanti» appends the missing articles to
+  `searchQueue`, D-323), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
   the close button and the filters 44 px on a phone — `CommandPalette.test.tsx` reads the file; its colours are
   checked in `theme.test.ts`), `SearchField.tsx` (the search page's field)
   and `GlobalSearch.tsx` (the palette and the managers it opens, mounted by `Layout` — see gotcha 27),
