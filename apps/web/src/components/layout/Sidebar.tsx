@@ -480,7 +480,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             {section === 'gymnasium' && (
               <>
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}
-                <NavGroup name="Studia" heading layout={layout}>
+                <NavGroup name="Learn" heading layout={layout}>
                   <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
                   {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
                   {coursesOn && <NavItem to="/studia/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}

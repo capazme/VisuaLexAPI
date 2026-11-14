@@ -51,7 +51,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-section-switcher',
         popover: {
             title: 'Le sezioni',
-            description: 'Da qui passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. Dove la barra scrive il nome della sezione, il nome riporta alla sua pagina principale e la freccia accanto apre le altre. La barra laterale cambia con la sezione.',
+            description: 'Da qui passi da una sezione all\'altra: Work per il lavoro, Learn per lo studio, il Forum per la comunità. Dove la barra scrive il nome della sezione, il nome riporta alla sua pagina principale e la freccia accanto apre le altre. La barra laterale cambia con la sezione.',
             side: 'right',
             align: 'start',
         }
@@ -60,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Opus o Oggi e Le mie schede in Gymnasium. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Work o Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }

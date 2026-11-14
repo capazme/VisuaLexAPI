@@ -376,7 +376,7 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCoun
                 }}
                 className={cn(s.id === current && 'font-semibold')}
               >
-                VisuaLex {s.name}
+                {s.name}
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400">{s.line}</span>
             </span>

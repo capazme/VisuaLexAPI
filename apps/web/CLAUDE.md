@@ -62,7 +62,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
-  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di VisuaLex Gymnasium»
+  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di Learn»
   tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
   names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/studia/valida`
   (`ValidationQueueView`), linked for validators only (`useAuth().isValidator`, from `lingo_validatore`
@@ -84,7 +84,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the server's switch `lingo_courses`, read with `assistantPassages` from the one `GET /api/features`
   (`loadAssistantFeatures` sets `coursesSwitch`: `unknown` until it answers, a failed read keeps what was known — one
   network error must not hide «Percorsi» for the session —, read again when the browser is back online with it never
-  read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Studia») and «Oggi»'s row are not drawn,
+  read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Learn») and «Oggi»'s row are not drawn,
   nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
   redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
   turns the switch off; the server's trash then hides a course and a module too). A review session with `?corso=` waits
@@ -472,7 +472,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
   (`PAGE_TITLE`: EB Garamond, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
-  small (`kicker`: «Gymnasium · la tua palestra giuridica», `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
+  small (`kicker`: «Learn · la tua palestra giuridica», `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
   22 October 2026) —, the sentence under it (`line`, a short line:
   `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
   a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button
@@ -501,14 +501,15 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`GraphExplorerPage`, `DocumentReviewPage`'s columns: `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
   («Da validare»'s votes). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
-  over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
+  over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum — on screen Work, Learn, Labs and Forum, with no «VisuaLex» before them (D-137, D-157; the ids,
+  the CSS and the addresses keep the old names; Labs's icon `FlaskConical`, D-236) —, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
   active section — from the address on `/opus/*`, `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
   browser under `visualex-section`, Opus by default; `SectionSwitcher`: at the top of the sidebar,
   `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
   Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
   the section's name — from `xl` and in the phone's drawer — a split button (S6): the mark and the name go to the
-  section's home («Vai a Gymnasium: Oggi», `goToLabel`, `homeName`), an arrow after a thin rule opens the menu; in
+  section's home («Vai a Learn: Oggi», «Vai a Labs: Assistente», `goToLabel`, `homeName`), an arrow after a thin rule opens the menu; in
   the rail one button, the mark, opens it. Its motions are `sectionMenuMotion.ts`, Web Animations: the menu unrolls
   from the top in 260 ms (an `inset` clip with the same four lengths at both ends, a scale from 0.97), the arrow
   turns, the entries come in 40 ms apart; the page changes on the click; one check slides to the entry chosen (180 ms) and the
@@ -560,21 +561,21 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
-  Gymnasium in two groups (Gymnasium spec §4), «Studia»
+  Gymnasium in two groups (Gymnasium spec §4), «Learn»
   (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community». The sections'
   phrases (the owner's, 19 Oct 2026: «la tua palestra giuridica», «la tua officina giuridica», «il luogo del dibattito
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
-  `sectionKicker`'s «Opus · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
+  `sectionKicker`'s «Work · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
   d'ingresso», «Cestino dei compiti», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
-  fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Academia · il
+  fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
   laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
-  icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
+  icon and word and the groups' headings (the section's name, or «Learn» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
   `lg` the drawer, icon and word in rows of 44 px, its foot clear of the home indicator. From `xl` a control
   at the foot narrows the bar to the rail and widens it again, remembered in the browser under
@@ -608,7 +609,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
   services' dot), in the middle — as iOS's large titles (G8) — nothing while the page's `h1` is in sight under the bar
-  (it says the name already: no «Gymnasium» over «Gymnasium · la tua palestra giuridica»), the page's name in EB Garamond
+  (it says the name already: no «Learn» over «Learn · la tua palestra giuridica»), the page's name in EB Garamond
   once it has scrolled out, faded in over 150 ms (`motion-safe:` only), on every page (`usePageTitleInView`: an
   `IntersectionObserver` on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver`
   finding a title drawn later; a page with no `h1`, or a browser with no observer, has the name at once; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
@@ -752,7 +753,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   again by the next mount; `useAuth`'s logout drops a read on its way and forgets the «without MERL-T» answer
   (`clearConsentRead`). A level
   counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
-  administrators edit as new versions in «Testi di VisuaLex Gymnasium»); `ConsentScreen`, in the `global`
+  administrators edit as new versions in «Testi di Learn»); `ConsentScreen`, in the `global`
   slot, asks it once as the app loads when it is unanswered — the first entry, then only a new
   version — and cannot be dismissed («Nessuna raccolta» is one of its three choices). No prompt
   during work: no banner, no teaser. `ConsentChoiceModal` is the one place a level is chosen (the
@@ -894,7 +895,7 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
 - **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`: the view's name as the title under Opus's phrase (L-37),
   which the switcher focuses,
   «Cestino dei compiti» as its action, the view the frame's width, P2b), `OpusViews`: `TodayView` (Gymnasium's day
-  on one line that opens Gymnasium's «Oggi» — `StudyTodayRow`, «Gymnasium: il ripasso di oggi», absent with Gymnasium
+  on one line that opens Gymnasium's «Oggi» — `StudyTodayRow`, «Learn: il ripasso di oggi», absent with Gymnasium
   off; not a task, and it reads nothing: Gymnasium's session and progress reads mark the day and settle the missions
   when the queue is done, and opening Opus must not count toward the streak; its counts wait for a read that only
   counts —, then by date (the «Oggi» group always, with its «+ Aggiungi compito», even when only late tasks are
@@ -1679,8 +1680,8 @@ one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the
 up to what the subject's read allows, never the rest of the subject), with «Torna a Oggi» a quiet link under it; else
 «Torna a Oggi» alone.
 
-**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, titled «Oggi» under «Gymnasium · la tua
-palestra giuridica» — L-37; the section switcher keeps «Gymnasium»; spec
+**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, titled «Oggi» under «Learn · la tua
+palestra giuridica» — L-37; the section switcher keeps «Learn»; spec
 `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, as rewritten for G1b and G8, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
 `GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
@@ -1888,7 +1889,7 @@ points a session read credits silently («obiettivo» on an empty queue) show at
 level, never as «+XP» in the lesson (spec §5.3).
 
 **«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
-«Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
+«Learn» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
 `useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
 (in the sections' full-width frame, as «Oggi», G6; `StudiaPage` draws no strip over it) the page's title «Progressi»
 (L-37; «I tuoi progressi» stays the section's heading for a screen reader only), then: **the summary** (`StreakBadge compact` and `GoalRing compact`, always the whole

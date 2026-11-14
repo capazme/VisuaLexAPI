@@ -259,7 +259,7 @@ describe('App routing — Studia', () => {
     renderAt('/studia/progressi');
     expect(await screen.findByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Progressi' })).toBeInTheDocument();
-    expect(screen.getByText('Gymnasium · la tua palestra giuridica')).toBeInTheDocument();
+    expect(screen.getByText('Learn · la tua palestra giuridica')).toBeInTheDocument();
     // The read is mocked to fail here: the page says so.
     expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
   });

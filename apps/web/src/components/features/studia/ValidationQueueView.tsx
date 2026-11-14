@@ -180,7 +180,7 @@ export function ValidationQueueView() {
       )}
       {status === 'forbidden' && (
         <div role="alert" className={cn(STATE_TILE, 'text-sm text-slate-700 dark:text-slate-200')}>
-          <p className={STATE_LINE}>{neverValidator ? 'Questa sezione è riservata ai validatori di VisuaLex Gymnasium' : 'Non sei più tra i validatori'}</p>
+          <p className={STATE_LINE}>{neverValidator ? 'Questa sezione è riservata ai validatori di Learn' : 'Non sei più tra i validatori'}</p>
           <p>Se pensi sia un errore, chiedilo a un amministratore.</p>
         </div>
       )}

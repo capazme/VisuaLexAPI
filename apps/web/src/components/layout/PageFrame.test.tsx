@@ -80,13 +80,13 @@ describe('PageFrame (W2)', () => {
     );
     const title = screen.getByRole('heading', { level: 1 });
     expect(title).toHaveTextContent(/^Oggi$/);
-    const kicker = screen.getByText('Gymnasium · la tua palestra giuridica');
+    const kicker = screen.getByText('Learn · la tua palestra giuridica');
     expect(kicker).toHaveClass(...PAGE_KICKER.split(' '));
     // Over the title, in the same header, and not a heading of its own.
     expect(kicker.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(kicker.tagName).toBe('P');
     // The title names only the page: the line describes it, so the focus on it says the section too.
-    expect(title).toHaveAccessibleDescription('Gymnasium · la tua palestra giuridica');
+    expect(title).toHaveAccessibleDescription('Learn · la tua palestra giuridica');
     unmount();
     render(
       <PageFrame title="Cronologia">
@@ -104,7 +104,7 @@ describe('PageFrame (W2)', () => {
       forum: 'il luogo del dibattito giuridico',
       academia: 'il laboratorio del diritto',
     });
-    expect(sectionKicker('opus')).toBe('Opus · la tua officina giuridica');
+    expect(sectionKicker('opus')).toBe('Work · la tua officina giuridica');
     expect(sectionKicker('forum')).toBe('Forum · il luogo del dibattito giuridico');
   });
 
@@ -114,8 +114,8 @@ describe('PageFrame (W2)', () => {
         <p>corpo</p>
       </PageFrame>,
     );
-    expect(kickerOf('academia')).toBe('Academia · il laboratorio del diritto');
-    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
+    expect(kickerOf('academia')).toBe('Labs · il laboratorio del diritto');
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Labs · il laboratorio del diritto');
   });
 
   it('marks a section\'s home title for the section switcher\'s focus, and no other', () => {
