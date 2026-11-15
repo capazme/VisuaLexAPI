@@ -219,7 +219,7 @@ export function AuthPage() {
   if (entering) {
     return (
       <div role="status" aria-label="Accesso a LexCraft" className="fixed inset-0 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
-        <BookMark size={56} draw />
+        <BookMark size={56} breathe />
       </div>
     );
   }

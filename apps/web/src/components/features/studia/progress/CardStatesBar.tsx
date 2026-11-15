@@ -36,7 +36,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
         </div>
       ) : (
         // Each segment answers over 44 px at every width; on a computer the colour is drawn 28 px tall inside it.
-        <div className="flex h-11 gap-0.5">
+        <div className="vlx-grow-x flex h-11 gap-0.5">
           {CARD_STATES.filter((s) => stati[s.key] > 0).map((state, index, segments) => (
             <button
               key={state.key}
