@@ -245,7 +245,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                                             "h-11 w-11 md:h-8 md:w-8 flex items-center justify-center rounded font-bold transition-colors",
                                             sizeClass,
                                             settings.fontSize === value
-                                                ? "bg-primary-600 text-white"
+                                                ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white"
                                                 : "hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
                                         )}
                                     >

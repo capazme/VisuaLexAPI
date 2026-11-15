@@ -573,14 +573,14 @@ export function TreeViewPanel({
                         className={cn(
                           "relative px-3 py-2 text-xs font-semibold rounded-xl transition-colors border overflow-hidden",
                           isActive
-                            ? "bg-primary-600 text-white border-primary-600"
+                            ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:border-toga-400 text-white border-primary-600"
                             : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600 hover:text-primary-600 dark:hover:text-primary-400"
                         )}
                       >
                         <span className="relative block truncate max-w-[140px]">{annex.label}</span>
                         <span className={cn(
                           "relative text-[11px] block mt-0.5 font-medium",
-                          isActive ? "text-primary-100" : "text-slate-600 dark:text-slate-400"
+                          isActive ? "text-primary-100 dark:text-ink-700" : "text-slate-600 dark:text-slate-400"
                         )}>
                           {annex.article_count} articoli
                         </span>

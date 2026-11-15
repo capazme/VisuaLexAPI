@@ -127,7 +127,7 @@ function Segmented<T extends string>({ label, options, pressed, disabled, onPick
           onClick={() => onPick(o.value)}
           className={`px-3 py-1.5 text-sm ${TOUCH_TARGET_RESPONSIVE} disabled:cursor-not-allowed disabled:opacity-50 ${
             pressed === o.value
-              ? 'bg-primary-600 text-white'
+              ? 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white'
               : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
           }`}
         >

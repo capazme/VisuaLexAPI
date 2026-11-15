@@ -36,7 +36,7 @@ export function DepthSelector({
                 onClick={() => onDepthChange(d)}
                 className={`px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 ${
                   active
-                    ? 'bg-primary-600 text-white'
+                    ? 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white'
                     : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                 }`}
               >
