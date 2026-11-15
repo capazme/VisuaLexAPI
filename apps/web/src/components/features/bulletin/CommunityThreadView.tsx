@@ -174,7 +174,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
             <li key={reply.id}>
               <article className={cn('rounded-xl border p-4', reply.accepted ? 'border-slate-400 dark:border-slate-500' : 'border-slate-200 dark:border-slate-800')}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{reply.user.username || '—'} · {day(reply.createdAt)}</span>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{reply.user.username || 'utente senza nome'} · {day(reply.createdAt)}</span>
                   {reply.accepted && <Pill strong>Risposta accettata</Pill>}
                 </div>
                 {reply.hidden && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">Nascosta dalla moderazione.</p>}
@@ -206,7 +206,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                   <ul aria-label="Commenti a questa risposta" className="mt-3 space-y-2 border-l-2 border-slate-100 pl-3 dark:border-slate-800">
                     {reply.comments.map(comment => (
                       <li key={comment.id} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{comment.user.username || '—'} · {day(comment.createdAt)}</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{comment.user.username || 'utente senza nome'} · {day(comment.createdAt)}</span>
                         {itemText(comment)}
                         {visible(comment) && !comment.isOwner && (
                           <div className="mt-1">

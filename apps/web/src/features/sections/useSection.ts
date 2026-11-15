@@ -50,7 +50,7 @@ export function useDossierKind(): DossierKind | null {
 /**
  * The section a kind of dossier lives in (S7): the study dossiers in Gymnasium, the work ones in Opus — and every one
  * in Opus without Gymnasium (`VITE_FEATURE_STUDIA` off), which the user could not reach. The one place that decides
- * it: the dossier pages' kicker and hue read it.
+ * it: the dossier pages' kicker and the empty list's drawing read it.
  */
 export function sectionOfDossierKind(kind: DossierKind | null | undefined): 'opus' | 'gymnasium' {
   return kind === 'studio' && isStudiaEnabled() ? 'gymnasium' : 'opus';

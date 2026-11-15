@@ -25,7 +25,7 @@ describe('the tours and the sidebar', () => {
 
   it('points the welcome and search tours at «Ricerca»', () => {
     const search = steps.filter((s) => s.element === '#tour-nav-search');
-    expect(search.map((s) => s.popover?.title)).toEqual(['Inizia a Cercare', 'Ricerca e Cmd+K']);
+    expect(search.map((s) => s.popover?.title)).toEqual(['Inizia a cercare', 'Ricerca e Cmd+K']);
   });
 
   it('every sidebar target exists in the sidebar a user without the development mode sees', () => {

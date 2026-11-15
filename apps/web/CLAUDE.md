@@ -237,25 +237,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   card's top sits where the card on «Accedi» is centred above the foot (`--login-card-h`, its measured height), so
   «Registrati», or a form that grows (an error), grows downwards, the tabs never move and the page scrolls when the
   window is too low, and the colophon is centred against the card on «Accedi» (as tall as it, `md:min-h`; text
-  left-aligned; on a phone centred above it) and holds still; its title is 48 px up to `lg` and 68 px from it
-  (between 768 and 1023 px the column beside the card is about 200 px).
-  **The wordmark** (A3, replacing A2's seven-segment display; inspired by a signature written with a pen, written
-  from scratch in CSS, `index.css`'s `vlx-ink-*`): one face, one ink, once per opening, about 1.3 s. The book traces
-  itself (`BookMark` with `vlx-ink-book`, 450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose
-  soft edge (12 %) is the pen's tip — `--vlx-ink-edge`, an `@property` percentage, 250–950 ms — and the word itself
-  follows it 100 ms behind under its own (350–1050 ms), so each letter is faint and soft before it is sharp; the copy
-  fades as the ink ends, and the line under it rises 4 px into view (200 ms). The waits are inside the keyframes, not
-  delays. The word is one text throughout, the copy stacked on it in one grid cell (`aria-hidden`, not selectable):
-  never split into letters, which lose their kerning on WebKit and settled 1–3 px when joined again. On the ink's
-  `animationend`, or its `animationcancel` (listened to on the element, React has none: reduced motion turned on
-  halfway), the copy and the mask go, so the finished page is the page without the animation (the text's box
-  measured identical at every moment). On WebKit for iOS (`inkMark.ts`, `isIOSWebKit`: an iPhone, an iPod, an iPad,
-  an iPad with a Mac's user agent and touch points) the word only fades in from the left, no mask, no blur — the
-  brief's fallback for a mask that stutters. The animations sit inside `prefers-reduced-motion: no-preference` (as
-  `vlx-book-draw` does): the global reduced-motion rule cuts durations, not delays, and a delayed `backwards` would
-  have hidden the line for a second; under reduced motion nothing is written and the colophon fades in through that
-  rule's 150 ms opacity transition. Measured in Chromium only (headless, at 1920 and 390, the iOS path by its user
-  agent): not on Safari nor on a phone. The register form fits a window 768 px high
+  left-aligned; on a phone centred above it) and holds still; its title is the LexCraft logo (LC16, `ui/LexCraftLogo`,
+  the `h1`'s name «LexCraft»), 196 px wide up to `lg` and 260 px from it (between 768 and 1023 px the column beside the
+  card is 196 px), its «L» flush with the line under it from `md`. **The logo's intro** replaced the column that rose
+  and the word written in ink (A3, `vlx-ink-*`, gone): once per opening, the design file's variant 1 («Va e torna,
+  resta pietra», `index.css`'s `vlx-logo-*`), in its taller box from the first frame; still under reduced motion (no
+  class, and the rules only exist with motion allowed). Not yet measured in a browser. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
@@ -533,7 +520,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   and the CSS keep the old names, the addresses take the new ones, D-235; Labs's icon `FlaskConical`, D-236) —, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
   active section — from the address on `/work/*`, `/learn/*`, `/forum`, `/labs/*`, else the last one, kept in the
-  browser under `visualex-section`, Opus by default; `SectionSwitcher`: at the top of the sidebar,
+  browser under `visualex-section`, Opus by default; over it the bar's head is the LexCraft logo (LC16,
+  `ui/LexCraftLogo`), a link home named «LexCraft» and the bar's first Tab stop, in a row of its own (48 px): the
+  wordmark 120 px wide in the wide bar and the drawer, its «L» flush with the switcher's mark; in the rail the column
+  alone (`BookMark`, 32 px), centred over the icons, still. It sweeps (the cursor selects CRAFT in ink and leaves it in
+  stone, 1.5 s) once a browser session, as the shell first draws (`Layout`, `visualex-logo-sweep` in
+  `sessionStorage`), never in the rail; `SectionSwitcher`: under it, at the top of the sidebar,
   `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
   Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
   the section's name — from `xl` and in the phone's drawer — a split button (S6): the mark and the name go to the
@@ -1697,8 +1689,8 @@ it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives t
 (`focusMode`) is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
 header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
 where done are the cards out of the queue — a «Di nuovo» holds it still —; at each grade that moves it the head runs
-ahead in the section's hue (`vlx-lesson-head`, 150 ms), the ink — the hue too, at a step that reads as a colour on its
-track (`vlx-lesson-ink`, `--vlx-gymnasium-bar`, G8: it was the ink's near-grey) — catches up 70 ms later on `--ease-catch` (300 ms) and the
+ahead in Pietra's stone (`vlx-lesson-head`, `--vlx-gymnasium-wash`, 150 ms), the ink — the action's ink since LC16,
+10:1 on its track (`vlx-lesson-ink`, `--vlx-gymnasium-bar`) — catches up 70 ms later on `--ease-catch` (300 ms) and the
 bar trembles by a pixel (Web Animations, `PLUCK`), 370 ms in all, all of it `motion-safe:` only; «Restano N»
 stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
 in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
@@ -1755,7 +1747,7 @@ heights are a day's with cards to review and missions: a day done or a subject c
 with no mission at all (a server without the points, no card yet) the missions' place goes when the read comes (0.15–0.22,
 from 0.48–0.57 before). In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
-   under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
+   under the bar): a tile, its weight the title's size, no coloured edge, a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
    ottobre · Diritto penale» narrowed to a subject); in EB Garamond, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
    (`todaySentence`, a part that is zero left out); under it «circa 7 minuti · Diritto civile, Diritto penale e altre 2»
@@ -1790,7 +1782,7 @@ from 0.48–0.57 before). In that order:
    «materia-ferma»). Nothing is counted in the browser. A mission
    with nothing to do today (`vuota`) says so and leaves the summary; a goal the server counted with the queue finished
    under it says why. A mission done reads done
-   (`.vlx-mission-done`: a quieter ink, struck through in the section's hue) and slides under those still open
+   (`.vlx-mission-done`: a quieter ink, struck through in the section's ink) and slides under those still open
    (`missionOrder`), except the due cards', the day block's own count, which stays first; done since this browser last drew
    it, a drop of ink falls into its box and the ink crosses its words first (`MissionMark`'s `drip`,
    `.vlx-mission-inking`, `MISSION_INK_MS`), then it moves (a moving row keeps its padding wherever it lands; the
@@ -1803,7 +1795,7 @@ from 0.48–0.57 before). In that order:
    block's to say.
 3. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count with the bundle
    of five being filled as tally marks beside it, `StreakTally` — the fifth is the stroke across the four in the
-   section's hue —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and the current week; no ring of the
+   section's ink —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and the current week; no ring of the
    goal (G8: the goal's mission says it, and «Progressi» draws it); under them **the level** (`progress/LevelBar`, G1c: «Livello 4», «oggi +45 XP», a quiet bar of `nelLivello` of `perIlProssimo` and
    «Ancora 138 XP per il livello 5», all from the read's `livello`, which the server computes; the user's alone, G-316 — never
    in the Forum, a public dossier or anything another user sees —, no title, L-27 choice 3, and never a weight of a vote,
@@ -3025,7 +3017,8 @@ other route fails.
 
 **Pietra everywhere** (D-156, after Inchiostro's Y1; `lib/pietra.guard.test.ts` reads the sources): an action and the
 focus are `primary-*` (toga, now warm ink: the action is the ink itself, no accent colour), everything else `slate-*`
-(ink, warm grey), a section its hue (`--vlx-section-*`); ink and toga stay warm and near-grey in `index.css`, light
+(ink, warm grey), a section its tile (`--vlx-section-*`: since LC16 Work's ink for all four, the owner's «tutti in
+color pietra»); ink and toga stay warm and near-grey in `index.css`, light
 and dark (the guard reads their values); `#8a8478` (pietra, 3.2:1) is never text; an active area is the highlighter
 (`primary-50`, dark `primary-900/20`–`/30`) with ink text; green, amber, red and the other functional colours keep their meaning
 and never decorate; no `blue-*`, `indigo-*`,

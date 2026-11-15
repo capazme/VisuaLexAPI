@@ -77,7 +77,7 @@ export function ConsentCard({ onManage }: ConsentCardProps) {
             >
               <Icon size={14} aria-hidden className={cn('mt-0.5 shrink-0', active ? 'text-primary-600 dark:text-primary-400' : 'text-slate-400 dark:text-slate-500')} />
               <span>
-                <strong>{rung.label}</strong> — {rung.desc}
+                <strong>{rung.label}</strong>: {rung.desc}
                 {!active && <span className="sr-only"> (non attivo)</span>}
               </span>
             </li>

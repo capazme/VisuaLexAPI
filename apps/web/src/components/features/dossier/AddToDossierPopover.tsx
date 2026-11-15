@@ -226,7 +226,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Cerca dossier…"
-                            className="w-full pl-8 pr-2.5 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                            className="w-full pl-8 pr-2.5 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
                     </div>
                 </div>
@@ -296,12 +296,12 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             onChange={(e) => setNewTitle(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Escape') setCreating(false); }}
                             placeholder="Nome del dossier…"
-                            className="flex-1 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                            className="flex-1 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
                         <button
                             type="submit"
                             disabled={busy || !newTitle.trim()}
-                            className="px-3 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="px-3 text-sm font-semibold text-white bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             Crea e aggiungi
                         </button>

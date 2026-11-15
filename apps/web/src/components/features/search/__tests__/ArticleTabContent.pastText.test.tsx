@@ -597,11 +597,11 @@ describe('ArticleTabContent — "Confronta con..." names the version it compares
 
   it('labels a past text with its day, so it cannot pass for the text in force', () => {
     expect(compareLabel(article(MIDDLE, { versione: 'vigente', data_versione: '2007-12-29' })))
-      .toBe('art. 1284 c.c. — testo al 29/12/2007');
+      .toBe('art. 1284 c.c., testo al 29/12/2007');
   });
 
   it('labels the original text as such', () => {
     expect(compareLabel(article(MIDDLE, { versione: 'originale' })))
-      .toBe('art. 1284 c.c. — testo originale');
+      .toBe('art. 1284 c.c., testo originale');
   });
 });

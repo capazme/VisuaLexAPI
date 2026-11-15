@@ -22,6 +22,8 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  /** `/auth/me` failed once and is being asked again (LC13's retries): the loading screen says so. */
+  retrying?: boolean;
 }
 
 export function useAuth() {
@@ -67,6 +69,7 @@ export function useAuth() {
         // no answer keeps it: the user is asked again after a pause, still loading, a few times (LC13).
         const refused = !authService.isAuthenticated() || isRefusalStatus((error as { status?: unknown } | null)?.status);
         if (!refused && attempt < LOAD_USER_RETRY_DELAYS_MS.length) {
+          if (!unmounted) setState((prev) => ({ ...prev, retrying: true }));
           await new Promise((resolve) => setTimeout(resolve, LOAD_USER_RETRY_DELAYS_MS[attempt]));
           if (!unmounted) await loadUser(attempt + 1);
           return;
@@ -75,7 +78,7 @@ export function useAuth() {
         setState({
           user: null,
           loading: false,
-          error: getErrorMessage(error) || 'Failed to load user',
+          error: getErrorMessage(error) || 'Non riesco a leggere il tuo account. Riprova tra poco.',
           isAuthenticated: !refused,
         });
       }
@@ -126,7 +129,7 @@ export function useAuth() {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: getErrorMessage(error) || 'Registration failed',
+        error: getErrorMessage(error) || 'Registrazione non riuscita. Riprova tra poco.',
       }));
       throw error;
     }
@@ -160,7 +163,7 @@ export function useAuth() {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: getErrorMessage(error) || 'Login failed',
+        error: getErrorMessage(error) || 'Accesso non riuscito. Riprova tra poco.',
       }));
       throw error;
     }
@@ -208,7 +211,7 @@ export function useAuth() {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: getErrorMessage(error) || 'Password change failed',
+          error: getErrorMessage(error) || 'Cambio della password non riuscito. Riprova tra poco.',
         }));
         throw error;
       }

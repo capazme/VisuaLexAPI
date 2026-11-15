@@ -630,7 +630,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         onClick={onBack}
         className={cn('-ml-2 mb-2 inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
       >
-        <ArrowLeft size={18} aria-hidden /> Torna ai Dossier
+        <ArrowLeft size={18} aria-hidden /> Torna ai dossier
       </button>
 
       {/* In the sections' frame (W2, S7c): the dossier's name as the title, in the reader's serif and with no icon,

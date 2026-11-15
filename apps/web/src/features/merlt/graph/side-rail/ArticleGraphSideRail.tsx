@@ -243,7 +243,7 @@ function RailBody({
         <Centered>
           <AlertCircle className="h-6 w-6 text-red-500" />
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Grafo non raggiungibile — riprova più tardi.
+            Grafo non raggiungibile. Riprova più tardi.
           </p>
           <RetryButton onClick={onRetryIngestion} />
         </Centered>
@@ -286,7 +286,7 @@ function RailBody({
         <button
           type="button"
           onClick={onNavigateExplore}
-          className="w-full rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+          className="w-full rounded bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         >
           Esplora nel grafo
         </button>
@@ -317,7 +317,7 @@ function RetryButton({ onClick }: { onClick: () => void }): React.ReactElement {
     <button
       type="button"
       onClick={onClick}
-      className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+      className="rounded bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
     >
       Riprova
     </button>

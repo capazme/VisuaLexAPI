@@ -104,11 +104,11 @@ export function DayBlock({
       ref={block}
       aria-labelledby="studia-giorno"
       aria-busy={state === 'loading'}
-      // A tile with the section's hue as a rule down its left edge: the page's entry. With the goal's mark, its right
-      // side kept for it from `md`.
+      // The page's entry: its weight is the title's size, not a coloured edge. With the goal's mark, its right side
+      // kept for it from `md`.
       className={cn(
         TILE,
-        'relative grid justify-items-stretch gap-3 border-l-4 border-l-[color:var(--vlx-section-gymnasium)] dark:border-l-[color:var(--vlx-section-gymnasium)] p-5 md:justify-items-start md:p-7',
+        'relative grid justify-items-stretch gap-3 p-5 md:justify-items-start md:p-7',
         goal && 'md:pr-44',
       )}
     >

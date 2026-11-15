@@ -52,7 +52,7 @@ const PLUCK: Keyframe[] = [{ translate: '0 0' }, { translate: '0 1px' }, { trans
 /**
  * The lesson's progress (Gymnasium spec §5.4): `done / (done + remaining)`, where done are the cards out of the
  * queue — a «Di nuovo» stays in it, so the bar holds still and the note says «Torna in coda». At each grade that
- * moves it the head runs ahead in the section's hue, the ink catches up a moment later on a spring and the bar
+ * moves it the head runs ahead in stone, the ink catches up a moment later on a spring and the bar
  * trembles by a pixel (S2; inspired by Animorio's «I passi con la linea che avanza», written from scratch): 370 ms,
  * taking no key and no focus. Under reduced motion it jumps (`motion-safe:` only, no tremble). Before the queue is
  * read it is an empty track.
@@ -81,7 +81,7 @@ function LessonProgress({ done, total }: { done: number; total: number }) {
       <div
         data-testid="lesson-progress-fill"
         className={cn(
-          // The section's hue, not the ink's near-grey (G8): `vlx-lesson-ink` in `index.css`.
+          // The section's ink (G8, Pietra since LC16): `vlx-lesson-ink` in `index.css`.
           'vlx-lesson-ink absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:delay-[70ms] motion-safe:duration-300 motion-safe:ease-(--ease-catch)',
         )}
         style={width}

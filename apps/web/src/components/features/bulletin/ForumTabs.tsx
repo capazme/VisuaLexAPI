@@ -1,4 +1,4 @@
-import { Lightbulb, Package, Search, type LucideIcon } from 'lucide-react';
+import { FolderUp, Lightbulb, Search, type LucideIcon } from 'lucide-react';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { FORUM_PANEL_ID, FORUM_TAB_ORDER, type ForumTab } from './forumSections';
 
@@ -12,7 +12,7 @@ export type { ForumTab } from './forumSections';
  */
 const TABS: Record<ForumTab, { label: string; short: string; icon: LucideIcon }> = {
   explore: { label: 'Esplora', short: 'Esplora', icon: Search },
-  my: { label: 'I miei pubblicati', short: 'Miei', icon: Package },
+  my: { label: 'I miei pubblicati', short: 'Miei', icon: FolderUp },
   suggestions: { label: 'Suggerimenti', short: 'Suggeriti', icon: Lightbulb },
 };
 

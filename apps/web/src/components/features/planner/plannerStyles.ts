@@ -14,7 +14,7 @@ import type { TaskPriority } from '../../../types/tasks';
  * Safari on an iPhone zooms into it.
  */
 export const FIELD =
-  `min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 ${FIELD_TEXT} text-slate-900 placeholder:text-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:disabled:bg-slate-800 dark:[color-scheme:dark] ${FOCUS_RING}`;
+  `min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 ${FIELD_TEXT} text-slate-900 placeholder:text-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400 dark:disabled:bg-slate-800 dark:[color-scheme:dark] ${FOCUS_RING}`;
 
 export const FIELD_LABEL = 'text-sm font-medium text-slate-800 dark:text-slate-200';
 

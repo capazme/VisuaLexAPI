@@ -93,7 +93,7 @@ export function PracticeArticleRow({
             <span className="font-medium text-slate-900 dark:text-white">{articleLabel(norma)}</span>
             {rubrica && (
               <span className="text-slate-500 dark:text-slate-400">
-                {' — '}
+                {' · '}
                 <span>{rubrica}</span>
               </span>
             )}

@@ -239,7 +239,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                   />
                   <button
                     onClick={handleUrlParse}
-                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors"
+                    className="px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors"
                   >
                     Importa
                   </button>
@@ -332,7 +332,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                 <button
                   onClick={handleAddQuickNorm}
                   disabled={!actType || !article}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
                 >
                   <Plus size={18} />
                   Aggiungi ai Preferiti

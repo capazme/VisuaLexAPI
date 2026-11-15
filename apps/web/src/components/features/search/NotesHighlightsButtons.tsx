@@ -22,7 +22,7 @@ export interface NotesHighlightsButtonsProps {
 }
 
 // A switched-off tool keeps its name and gains the reason in its tooltip.
-const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);
+const tip = (name: string, reason?: string) => (reason ? `${name}: ${reason}` : name);
 
 /**
  * The notes and highlights buttons of the reading toolbar, shared by the article's

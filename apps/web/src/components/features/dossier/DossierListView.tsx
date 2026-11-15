@@ -293,11 +293,11 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <button
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
-            className="flex-1 md:flex-none dossier-create-button bg-primary-600 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-            title="Nuovo Dossier (n)"
+            className="flex-1 md:flex-none dossier-create-button bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            title="Nuovo dossier (n)"
             aria-keyshortcuts="n"
           >
-            <FolderPlus size={20} /> Nuovo Dossier
+            <FolderPlus size={20} /> Nuovo dossier
           </button>
         </>
       ) : (
@@ -316,7 +316,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
             aria-label="Nuovo dossier"
-            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <Plus size={22} aria-hidden />
           </button>
@@ -388,7 +388,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             </div>
           ) : (
             // No dossier yet: an empty state composed for the page (S7c) — line art in the
-            // section's hue, what a dossier is for, and the two ways to begin.
+            // section's ink (`--vlx-section-*`, one Pietra value since LC16), what a dossier is for, and the two ways to begin.
             <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
               <DossierMark hue={`var(--vlx-section-${sectionOfDossierKind(sectionKind)})`} />
               <h2 id="dossier-list-empty" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">

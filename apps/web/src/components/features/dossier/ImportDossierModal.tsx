@@ -22,7 +22,7 @@ export function ImportDossierModal({ dossier, discarded, onClose, onConfirm }: P
             <FolderInput className="text-primary-600" size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Importa Dossier</h2>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Importa un dossier</h2>
             <p className="text-sm text-slate-500">Qualcuno ha condiviso un dossier con te</p>
           </div>
         </div>
@@ -79,7 +79,7 @@ export function ImportDossierModal({ dossier, discarded, onClose, onConfirm }: P
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="flex-1 px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <FolderInput size={18} />
             Importa

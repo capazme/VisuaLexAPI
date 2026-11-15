@@ -168,7 +168,7 @@ export function SuggestContentModal({
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {/* Instructions */}
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 text-sm text-slate-600 dark:text-slate-400">
-            Seleziona gli elementi dal tuo stato corrente — note, evidenze, dossier, norme veloci e alias — da suggerire all'autore.
+            Seleziona gli elementi dal tuo stato corrente (note, evidenze, dossier, norme veloci e alias) da suggerire all'autore.
             L'autore potrà prendere o rifiutare ogni item singolarmente.
           </div>
 
@@ -258,7 +258,7 @@ export function SuggestContentModal({
           <button
             onClick={handleSubmit}
             disabled={!hasSelection || isSubmitting}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>

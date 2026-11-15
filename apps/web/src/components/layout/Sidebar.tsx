@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
+import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -20,6 +20,7 @@ import { Z_INDEX } from '../../constants/zIndex';
 import { preparePage } from '../../pageCode';
 import { spring } from '../../lib/motion';
 import { BookMark } from '../ui/BookMark';
+import { LexCraftLogo } from '../ui/LexCraftLogo';
 import type { SidebarLayout } from './sidebarWidth';
 import { plannerStore } from '../features/planner/plannerStore';
 import { todayCountLabel } from '../features/planner/taskDates';
@@ -42,6 +43,8 @@ interface SidebarProps {
   onToggleWide?: () => void;
   /** `Layout`'s one probe of the services: the user menu's «Stato dei servizi» and the dot on the user button. */
   serviceHealth: ServiceHealthReading;
+  /** The logo's sweep is due (once a browser session, `Layout`): it plays as the bar appears. Never in the rail. */
+  logoSweep?: boolean;
 }
 
 interface NavItemProps {
@@ -294,7 +297,7 @@ function NavGroup({ name, heading, unnamed, layout, children }: { name: string; 
   return (
     <div role={unnamed ? undefined : 'group'} aria-label={unnamed ? undefined : name} className="flex w-full flex-col items-start gap-3 md:gap-2">
       {heading && layout !== 'rail' && (
-        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
           {name}
         </p>
       )}
@@ -337,7 +340,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth, logoSweep = false }: SidebarProps) {
   const navigate = useNavigate();
   const { user, isAdmin, isValidator, logout } = useAuth();
   const coursesOn = useCoursesSwitch() === 'on';
@@ -460,12 +463,12 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         // The desktop copy is as wide as its column, which `Layout` sizes (64 px, or 224 with words);
         // the phone's drawer has room for its words.
         layout === 'drawer' ? "w-[17rem] max-w-[85vw]" : "w-full",
-        // Clean Slate/Glass effect
-        "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl",
+        // Solid: nothing scrolls under the rail on a computer, and on a phone the drawer has its own scrim.
+        "bg-card",
         "border-r border-slate-200 dark:border-slate-800",
         // Mobile slide
         "transform transition-transform duration-300 ease-smooth-out",
-        // `relative`, not `static`: backdrop-blur makes this aside a stacking
+        // `relative`, not `static`: the transform makes this aside a stacking
         // context, so anything inside it (hover tooltips) is trapped at the
         // aside's own level. Static would leave z-50 inert and page content
         // would paint over the tooltips.
@@ -473,10 +476,29 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}
     >
-      {/* The section switcher, where the open book was (sections spec S3). Below `lg`, in the drawer, it sits where
-          the phone's bar is (M1), clear of the iPhone's top edge. Every column keeps 10 px of side padding, so a 44 px
-          control in the 64 px rail sits where it sits in the wide bar. */}
-      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-[calc(0.375rem+env(safe-area-inset-top))] pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
+      {/* LexCraft's logo (LC16), a link home and the bar's first Tab stop, in a row of its own over the switcher: the
+          wordmark 120 px wide, its «L» flush with the switcher's mark (the box starts 11 of its 716 units, 1.8 px,
+          before it); in the rail the column alone, centred over the icons (32 px from the edge), never in line with the
+          entries' column-cursor, and still. In the drawer it is the head, clear of the iPhone's top edge. */}
+      <div className={cn("flex h-12 shrink-0 items-center px-2.5", layout === 'rail' && "justify-center", layout === 'drawer' && "box-content pt-[env(safe-area-inset-top)]")}>
+        <Link
+          to="/"
+          aria-label="LexCraft"
+          onClick={closeMobile}
+          className={cn(
+            "rounded-lg text-primary-600 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+            layout === 'rail' ? "grid h-11 w-11 place-items-center" : "flex h-11 items-center pl-0.5 pr-2",
+          )}
+        >
+          {layout === 'rail'
+            ? <BookMark size={32} />
+            : <LexCraftLogo motion={logoSweep ? 'sweep' : 'still'} className="h-auto w-[120px]" />}
+        </Link>
+      </div>
+
+      {/* The section switcher, where the open book was (sections spec S3), under the logo. Every column keeps 10 px of
+          side padding, so a 44 px control in the 64 px rail sits where it sits in the wide bar. */}
+      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-1.5 pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
         <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} inDrawer={layout === 'drawer'} />
       </div>
 
@@ -523,7 +545,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               </>
             )}
             {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
-              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
                 {active.name}
               </p>
             )}
@@ -656,7 +678,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   {normaChanges > 0 && <CountBadge count={normaChanges} />}
                 </button>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/collega-app'))} className={menuItemClass}>
-                  <Bot size={16} />
+                  <Plug size={16} />
                   Collega un'app AI
                 </button>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/crediti'))} className={menuItemClass}>

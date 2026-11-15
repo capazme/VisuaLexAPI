@@ -320,7 +320,7 @@ function PeekBody({
                         }}
                         placeholder={noteAnchor ? 'Scrivi la nota ancorata…' : 'Aggiungi una nota…'}
                         rows={2}
-                        className="flex-1 text-sm resize-none rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                        className="flex-1 text-sm resize-none rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                     />
                     <button
                         onClick={submitComposer}

@@ -114,7 +114,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
           })}
           {suggestion.items.length === 0 && (
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-6">
-              Nessun item — il suggerimento è stato revocato.
+              Nessun elemento: il suggerimento è stato revocato.
             </p>
           )}
         </div>
@@ -123,7 +123,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700"
             >
               <Plus size={14} /> Aggiungi item
             </button>

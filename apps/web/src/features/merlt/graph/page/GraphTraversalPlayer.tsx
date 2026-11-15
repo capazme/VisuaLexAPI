@@ -145,7 +145,7 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
               aria-label={playing && !atLastStep ? 'Pausa' : 'Riproduci'}
               title={
                 atLastStep && !playing
-                  ? 'Replay concluso — usa ← per rivedere'
+                  ? 'Replay concluso: usa ← per rivedere'
                   : playing
                     ? 'Pausa'
                     : 'Riproduci'

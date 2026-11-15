@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode 
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
+import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
 import { RoutePage } from './RouteBoundary';
 import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -103,6 +104,12 @@ export function Layout() {
   const { isAuthenticated } = useAuth();
   const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // The logo's sweep (LC16): once a browser session, as the shell first draws — the splash and the session's check
+  // are gone by then —, never again on a change of page. Read here once for both copies of the bar, recorded after.
+  const [logoSweep] = useState(logoSweepDue);
+  useEffect(() => {
+    if (logoSweep) markLogoSweep();
+  }, [logoSweep]);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
@@ -316,6 +323,7 @@ export function Layout() {
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
+            logoSweep={logoSweep}
           />
         )}
       </motion.div>
@@ -333,6 +341,7 @@ export function Layout() {
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
+            logoSweep={logoSweep}
           />
         </div>
       )}
@@ -383,7 +392,7 @@ export function Layout() {
             !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.375rem)]',
             'shadow-sm border',
             settings.focusMode
-              ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
+              ? 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white border-transparent hover:bg-primary-700'
               : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
           title={settings.focusMode ? `Esci dal tutto schermo (${FULL_SCREEN_SHORTCUT})` : `Tutto schermo (${FULL_SCREEN_SHORTCUT})`}

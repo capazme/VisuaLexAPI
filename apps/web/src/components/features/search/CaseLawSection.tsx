@@ -164,7 +164,7 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
 
             {offersCassazione && <section aria-labelledby={`${panelId}-cassazione`} className="space-y-3">
               <h4 id={`${panelId}-cassazione`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                Cassazione — menzionano l’articolo
+                Cassazione: menzionano l’articolo
               </h4>
               {searched ? (
                 <DecisionResultList
@@ -213,7 +213,7 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
             {!offersCassazione && (
               <section aria-labelledby={`${panelId}-eu`} className="space-y-3">
                 <h4 id={`${panelId}-eu`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  Corte di giustizia UE — citano l’articolo
+                  Corte di giustizia UE: citano l’articolo
                 </h4>
                 <EuCaseLawBlock norma={norma} besideId={tabId} backEntry={backEntry} />
               </section>

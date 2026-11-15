@@ -624,10 +624,33 @@ describe('Gymnasium\'s small motions (S2)', () => {
     }
   });
 
-  it('keeps Work\'s mark icon at AA on its paper ground in the dark theme (the switcher writes `text-white`)', () => {
+  it('gives the four sections one tile, Work\'s, in Pietra, in the light theme and in the dark one (LC16)', () => {
+    // The hues were VisuaLex's (Learn blue, Labs ochre, Forum teal): every section now reads Work's value, and the
+    // switcher's mark is one rule, not one per section.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const scope of [/:root\s*\{([^}]*--vlx-section-opus[^}]*)\}/, /\.dark\s*\{([^}]*--vlx-section-opus[^}]*)\}/]) {
+      const block = source.match(scope)![1];
+      const value = (name: string) => block.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1].trim();
+      const work = value('--vlx-section-opus');
+      expect(work).toMatch(/^var\(--color-toga-\d+\)$/);
+      for (const id of ['gymnasium', 'academia', 'forum']) expect(value(`--vlx-section-${id}`), id).toBe(work);
+    }
+    expect(source).not.toMatch(/\.vlx-section-mark\[data-section=/);
+  });
+
+  it('keeps the lesson bar\'s ink over 3:1 on its track, and the wash in Pietra\'s stone', () => {
+    const source = readFileSync(CSS_PATH, 'utf8');
+    expect(source).toMatch(/:root\s*\{[^}]*--vlx-gymnasium-bar:\s*var\(--color-toga-600\)/);
+    expect(source).toMatch(/\.dark\s*\{[^}]*--vlx-gymnasium-bar:\s*var\(--color-toga-500\)/);
+    for (const scope of [/:root\s*\{([^}]*--vlx-gymnasium-wash[^}]*)\}/, /\.dark\s*\{([^}]*--vlx-gymnasium-wash[^}]*)\}/]) {
+      expect(source.match(scope)![1]).toMatch(/--vlx-gymnasium-wash:\s*var\(--vlx-pietra\)/);
+    }
+  });
+
+  it('keeps every mark\'s icon at AA on its paper ground in the dark theme (the switcher writes `text-white`)', () => {
     const source = readFileSync(CSS_PATH, 'utf8');
     // The icon's colour is the one the dark rule declares; with no rule it is the switcher's white.
-    const declared = source.match(/\.dark \.vlx-section-mark\[data-section="opus"\]\s*\{\s*color:\s*var\(--color-([\w-]+)\)/)?.[1];
+    const declared = source.match(/\.dark \.vlx-section-mark\s*\{\s*color:\s*var\(--color-([\w-]+)\)/)?.[1];
     const ground = source.match(/\.dark\s*\{[^}]*--vlx-section-opus:\s*var\(--color-([\w-]+)\)/)![1];
     // The last declaration of a token is its dark value (the dark table follows the light one).
     const rgb = (name: string): number[] => {

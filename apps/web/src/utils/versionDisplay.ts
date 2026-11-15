@@ -360,11 +360,11 @@ export function buildTextAtDateParams(norma: NormaVisitata, choice: TextAtDateCh
   };
 }
 
-/** The tab suffix of a past text: " — testo al 29/12/2007", " — testo originale", or nothing. */
+/** The tab suffix of a past text: ", testo al 29/12/2007", ", testo originale", or nothing. */
 export function versionTabSuffix(request: { version?: string | null; versionDate?: string | null }): string {
   const date = textOf(request.versionDate);
-  if (date) return ` — testo al ${formatDateForDisplay(date)}`;
-  return asksForOriginal(request.version) ? ' — testo originale' : '';
+  if (date) return `, testo al ${formatDateForDisplay(date)}`;
+  return asksForOriginal(request.version) ? ', testo originale' : '';
 }
 
 /** The label a dossier shows on an item that holds a past text, or null for the text in force. */

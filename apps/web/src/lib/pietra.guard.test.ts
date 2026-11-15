@@ -3,7 +3,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 // Pietra everywhere (D-156, after Inchiostro's Y1), kept from coming back one file at a time. Colours: an action and the
-// focus are `primary-*` (toga, warm ink), the rest `slate-*` (ink, warm grey), a section its hue (`--vlx-section-*`);
+// focus are `primary-*` (toga, warm ink), the rest `slate-*` (ink, warm grey), a section its tile (`--vlx-section-*`, Work's
+// ink for all four since LC16, `theme.test.ts`);
 // `blue-*` and `indigo-*` are aliases of toga that only hid where the old blue still stood, `purple-*` and `violet-*`
 // hues of no section; and the two scales themselves stay warm and near-grey, so the blue cannot come back by value. Sizes: no
 // text under 11 px. Elevation: cards `shadow-sm` or a border, menus and popovers `shadow-md`, windows `shadow-lg`, never
@@ -79,6 +80,23 @@ describe('Pietra\'s colours', () => {
   it('every colour key still uses its hue: a key that no longer needs it leaves the list', () => {
     const stale = Object.keys(KEYS).filter((file) => !HAND_COLOUR.test(readFileSync(join(src, file), 'utf8')));
     expect(stale).toEqual([]);
+  });
+
+  // LC17 (A8): in the dark a filled action is light ink with dark text, as «Inizia una ricerca»; the mid grey with
+  // white text reads as disabled. The shared bases first: each line that fills with `bg-primary-600` says so.
+  it('the shared bases of a filled action are light ink in the dark', () => {
+    const bases = [
+      join('features', 'merlt', 'hub', 'hubStyles.ts'),
+      join('components', 'features', 'search', 'NoteEditBox.tsx'),
+      join('components', 'features', 'search', 'AnnexSuggestion.tsx'),
+      join('components', 'ui', 'AdvancedExportModal.tsx'),
+      join('features', 'merlt', 'graph', 'page', 'AskGraphField.tsx'),
+      join('components', 'features', 'dossier', 'dossierStyles.ts'),
+    ];
+    const grey = bases.flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => (/\bbg-primary-600\b/.test(line) && !['dark:bg-toga-400', 'dark:hover:bg-toga-300', 'dark:text-ink-950'].every((c) => line.includes(c)) ? `${file}:${i + 1}` : null))
+      .filter(Boolean));
+    expect(grey).toEqual([]);
   });
 });
 

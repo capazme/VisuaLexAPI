@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, Upload } from 'lucide-react';
+import { FolderUp, Upload } from 'lucide-react';
 import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { VersionHistoryModal } from './VersionHistoryModal';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
@@ -62,7 +62,7 @@ export function ForumMyEnvironmentsView({
   if (environments.length === 0) {
     return (
       <div className="text-center py-12">
-        <Package size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+        <FolderUp size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
           Nessun dossier pubblicato
         </h3>
@@ -71,7 +71,7 @@ export function ForumMyEnvironmentsView({
         </p>
         <button
           onClick={onPublishClick}
-          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors`}
+          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors`}
         >
           <Upload size={16} />
           Pubblica un dossier

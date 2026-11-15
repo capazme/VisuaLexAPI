@@ -118,7 +118,7 @@ export function AskGraphField({
           }}
           placeholder={placeholder}
           aria-label="Chiedi al grafo"
-          className={cn('min-h-[44px] min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-500 focus:outline-none dark:text-white dark:placeholder:text-slate-400', FIELD_TEXT)}
+          className={cn('min-h-[44px] min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-500 focus:outline-none dark:text-white dark:placeholder:text-slate-500 dark:placeholder:text-slate-400', FIELD_TEXT)}
         />
         <div
           role="radiogroup"
@@ -149,7 +149,7 @@ export function AskGraphField({
           disabled={!value.trim() || busy}
           aria-label="Chiedi al grafo"
           title={busy ? 'Attendi la deliberazione in corso…' : undefined}
-          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-r-[7px] bg-primary-600 px-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:disabled:bg-slate-700 dark:focus-visible:ring-offset-slate-900"
+          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-r-[7px] bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 px-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:disabled:bg-slate-700 dark:focus-visible:ring-offset-slate-900"
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Chiedi
         </button>

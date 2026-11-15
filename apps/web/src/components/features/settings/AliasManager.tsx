@@ -102,7 +102,7 @@ export function AliasManager() {
             return 'Esiste già come alias in dotazione: il tuo lo sovrascriverà.';
         }
         if (catalog.knownActs.some(n => foldAlias(n) === t)) {
-            return 'Questo nome è già riconosciuto così com\'è — un alias non serve.';
+            return 'Questo nome è già riconosciuto così com\'è: un alias non serve.';
         }
         return null;
     }, [trigger, catalog]);
@@ -203,7 +203,7 @@ export function AliasManager() {
                         <code className="bg-primary-100 dark:bg-primary-800 px-1.5 py-0.5 rounded text-xs font-mono">
                             art X [trigger]
                         </code>
-                        {' '}nella Command Palette (⌘K).
+                        {' '}nella ricerca veloce (⌘K).
                     </p>
                 </div>
 
@@ -329,7 +329,7 @@ export function AliasManager() {
                                 "w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors",
                                 "flex items-center justify-center gap-2",
                                 canSubmit
-                                    ? "bg-primary-600 text-white hover:bg-primary-700"
+                                    ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
                                     : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
                             )}
                         >
@@ -500,7 +500,7 @@ function AliasItem({
                     </button>
                     <button
                         onClick={onSaveEdit}
-                        className="px-3 py-1 text-xs rounded-lg bg-primary-600 text-white hover:bg-primary-700"
+                        className="px-3 py-1 text-xs rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
                     >
                         Salva
                     </button>

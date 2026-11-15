@@ -11,14 +11,14 @@ const SOURCE_LABELS: Record<IngestionSource, string> = {
 
 function formatStats(batch: BatchSummary): string {
   const s = batch.stats;
-  if (!s) return '—';
+  if (!s) return 'n.d.';
   const parts: string[] = [];
   if (s.nodes_new !== undefined) parts.push(`${s.nodes_new} nodi nuovi`);
   if (s.nodes_update !== undefined) parts.push(`${s.nodes_update} agg.`);
   if (s.edges_new !== undefined) parts.push(`${s.edges_new} archi nuovi`);
   if (s.duplicates !== undefined && s.duplicates > 0) parts.push(`${s.duplicates} duplicati`);
   if (s.coverage_pct !== null && s.coverage_pct !== undefined) parts.push(`${s.coverage_pct}% coverage`);
-  return parts.length > 0 ? parts.join(' · ') : '—';
+  return parts.length > 0 ? parts.join(' · ') : 'n.d.';
 }
 
 export interface BatchListTableProps {
@@ -142,11 +142,11 @@ function BatchRow({
       <td className="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">
         {showReviewInfo ? (
           <div className="space-y-0.5">
-            <p>{batch.reviewed_by ?? '—'}</p>
+            <p>{batch.reviewed_by ?? 'n.d.'}</p>
             {reviewedAgo && <p className="text-gray-400">{reviewedAgo}</p>}
           </div>
         ) : (
-          <span title={createdAbsolute}>{ageRelative ?? '—'}</span>
+          <span title={createdAbsolute}>{ageRelative ?? 'n.d.'}</span>
         )}
       </td>
     </tr>

@@ -338,7 +338,7 @@ export function ArticleDiscussionPanel({
             <option value="active">Attive</option>
             <option value="popular">Più votate</option>
           </select>
-          <button type="button" onClick={() => setComposerOpen(value => !value)} className={cn('inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700', TOUCH)}>
+          <button type="button" onClick={() => setComposerOpen(value => !value)} className={cn('inline-flex items-center gap-1.5 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700', TOUCH)}>
             <Plus size={14} /> Nuova glossa
           </button>
           <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 md:min-h-0 md:min-w-0 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
@@ -394,7 +394,7 @@ export function ArticleDiscussionPanel({
             <button type="button" onClick={cancelComposer} className="px-3 py-1.5 text-xs text-slate-500">
               Annulla
             </button>
-            <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white">
+            <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-semibold text-white">
               <Send size={13} /> Pubblica
             </button>
           </div>

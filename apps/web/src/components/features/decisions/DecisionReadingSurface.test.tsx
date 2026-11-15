@@ -490,8 +490,8 @@ describe('DecisionReadingSurface — the key passages', () => {
     const menu = screen.getByRole('menu');
     expect(menu).toHaveAccessibleDescription('Evidenziati automaticamente: non sono le tue evidenziazioni.');
     const entries = within(menu).getAllByRole('menuitem').map((e) => e.textContent);
-    expect(entries[0]).toBe('Principio di diritto — «il fornitore che consegna in ritardo la…»');
-    expect(entries[1]).toBe('Dispositivo — «La Corte accoglie il ricorso»');
+    expect(entries[0]).toBe('Principio di diritto: «il fornitore che consegna in ritardo la…»');
+    expect(entries[1]).toBe('Dispositivo: «La Corte accoglie il ricorso»');
     expect(entries[2]).toBe('Nascondi i passaggi chiave');
     await act(async () => { fireEvent.click(within(menu).getAllByRole('menuitem')[0]); });
     expect(scroll).toHaveBeenCalledOnce();
@@ -549,8 +549,8 @@ describe('DecisionReadingSurface — the key passages', () => {
     const sheet = screen.getByRole('dialog', { name: 'Passaggi chiave' });
     expect(within(sheet).getByText('Evidenziati automaticamente: non sono le tue evidenziazioni.')).toBeInTheDocument();
     expect(within(sheet).getAllByRole('button').slice(1).map((b) => b.textContent)).toEqual([
-      'Principio di diritto — «il fornitore che consegna in ritardo la…»',
-      'Dispositivo — «La Corte accoglie il ricorso»',
+      'Principio di diritto: «il fornitore che consegna in ritardo la…»',
+      'Dispositivo: «La Corte accoglie il ricorso»',
       'Nascondi i passaggi chiave',
     ]);
     await act(async () => {

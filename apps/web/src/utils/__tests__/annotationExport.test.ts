@@ -12,13 +12,13 @@ const h = (text: string, color: string) => ({ id: text, text, color }) as Highli
 describe('annotationExport', () => {
   it('writes the notes exactly as the article always did', () => {
     expect(notesTxt('art. 5 c.c.', [n('prima', 'ancora'), n('seconda')], NOW)).toBe(
-      `Note — art. 5 c.c.\nEsportato il ${stamp}\n${'─'.repeat(60)}\n` + '1. prima\n   Ancorata a: "ancora"\n\n2. seconda' + '\n',
+      `Note: art. 5 c.c.\nEsportato il ${stamp}\n${'─'.repeat(60)}\n` + '1. prima\n   Ancorata a: "ancora"\n\n2. seconda' + '\n',
     );
   });
 
   it('writes the highlights exactly as the article always did', () => {
     expect(highlightsTxt('art. 5 c.c.', [h('uno', 'yellow'), h('due', 'red')], NOW)).toBe(
-      `Evidenziazioni — art. 5 c.c.\nEsportato il ${stamp}\n${'─'.repeat(60)}\n` + '1. [yellow] uno\n\n2. [red] due' + '\n',
+      `Evidenziazioni: art. 5 c.c.\nEsportato il ${stamp}\n${'─'.repeat(60)}\n` + '1. [yellow] uno\n\n2. [red] due' + '\n',
     );
   });
 
