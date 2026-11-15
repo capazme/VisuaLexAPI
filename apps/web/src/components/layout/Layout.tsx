@@ -449,6 +449,7 @@ export function Layout() {
         {showPhoneBar && (
           <PhoneTopBar
             menu={menuToggle}
+            section={activeSection.name}
             title={barTitle}
             hidden={phoneBar.hidden}
             onReveal={phoneBar.reveal}
