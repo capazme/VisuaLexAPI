@@ -42,7 +42,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; with no card open the cards are tiles across the frame (G8) in a grid of
   cards of at least 20rem (`CARD_GRID_COLUMNS`, U1: one column on a phone, two at 768 px, three at 1366 with the
-  sidebar, four at 1920; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
+  sidebar, four at 1920; `CardGroups`' `grid`), each with its front in EB Garamond, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
   1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below, «Cerca» under 360 px (it was cut, Q1),
@@ -62,7 +62,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
-  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di VisuaLex Gymnasium»
+  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di Learn»
   tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
   names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/studia/valida`
   (`ValidationQueueView`), linked for validators only (`useAuth().isValidator`, from `lingo_validatore`
@@ -71,9 +71,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
-  verdict after «Annulla»; below `md` no feedback button floats over it, nor over any page: there it is the user
-  menu's «Invia un commento», M1; from `md` it floats at the bar's right end, which keeps 56 px clear for it,
-  `md:pr-14`, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
+  verdict after «Annulla»; nothing floats over it since D-253, «Commenti» being at the top right from `md` and in the
+  user menu below it, M1); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -84,7 +83,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the server's switch `lingo_courses`, read with `assistantPassages` from the one `GET /api/features`
   (`loadAssistantFeatures` sets `coursesSwitch`: `unknown` until it answers, a failed read keeps what was known — one
   network error must not hide «Percorsi» for the session —, read again when the browser is back online with it never
-  read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Studia») and «Oggi»'s row are not drawn,
+  read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Learn») and «Oggi»'s row are not drawn,
   nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
   redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
   turns the switch off; the server's trash then hides a course and a module too). A review session with `?corso=` waits
@@ -256,8 +255,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`credits.test.ts` holds each; never restyle one, as for root rule 23); `uses` and `terms` come only
   from the conditions read on each source's page and the owners' table, and a source enters only once
   its conditions are clear (today group A: Normattiva, EUR-Lex, Corte costituzionale, Cassazione,
-  giustizia amministrativa, Senato, CONSOB, CeRDEF; and Newsreader and Geist — Geist Mono in Geist's
-  entry —, OFL-1.1 as their `@fontsource-variable` packages say: the test reads the packages, and fails
+  giustizia amministrativa, Senato, CONSOB, CeRDEF; and EB Garamond, Inter and Geist Mono — the
+  `geist` entry —, OFL-1.1 as their `@fontsource-variable` packages say: the test reads the packages, and fails
   when `main.tsx` loads a typeface no entry covers). Normattiva carries the site's
   conditions, never the open data's CC BY 4.0; the Corte costituzionale «CC BY-SA 3.0» with no version.
   `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), a page to consult in the frame's whole width
@@ -471,14 +470,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   **The page frame** (W2, 21 Oct 2026):
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
-  (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
-  small (`kicker`: «Gymnasium · la tua palestra giuridica», `PAGE_KICKER`, Geist `text-sm` slate 600; L-37, the owner,
+  (`PAGE_TITLE`: EB Garamond, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
+  small (`kicker`: «Learn · la tua palestra giuridica», `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
   22 October 2026) —, the sentence under it (`line`, a short line:
   `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
-  a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button
-  (`FOCUS_BUTTON_CLEARANCE`, from `100vw`, `--sidebar-width` and the frame's own width, `100%` of the header's
-  containing block, so it holds at any frame width: 68 px less the frame's distance from the window's edge — 36 px
-  with a 32 px margin, 20 with 48, nothing once the frame is 68 px in —, wherever `Layout` says the button floats over
+  a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button and
+  «Commenti» beside it (`FOCUS_BUTTON_CLEARANCE`, from `100vw`, `--sidebar-width` and the frame's own width, `100%` of the header's
+  containing block, so it holds at any frame width: the room less the frame's distance from the window's edge, the
+  room 11 rem since D-253 — the toggle's 60 px, 8 of gap, about 96 for «Commenti», 8 of air; it was 4.25 —, wherever `Layout` says the buttons float over
   the page, `--focus-button-room`: from `lg`, from `md` in full screen, never over the search page's field; between
   1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»; the practice's table, alone in its row, keeps
   the same room, its header and the act's pinned heading under the button in full screen otherwise);
@@ -494,21 +493,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a cap of their own (`max-w-3xl` and up). `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
-  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. From `md`, for someone signed in
-  and on every page but the search page, it ends 16 px over the floating feedback button (G8c: it covered the last row
-  on the right, «Ripassa» of the last subject on «Oggi»): `--page-foot` (5.375 rem: the button's 24 px off the edge,
-  its 46 px and the air) as the bottom padding, which a page sized to the window takes off its height
-  (`GraphExplorerPage`, `DocumentReviewPage`'s columns: `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
-  («Da validare»'s votes). **The sections** (D-076, spec
+  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. Nothing floats at the page's foot
+  since D-253: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
+  for someone signed in, left of «Tutto schermo» with 8 px between: `right-[4.25rem]` at `top-4` from `lg` and in full
+  screen, `right-14` in the bar's right end between `md` and `lg`, whose `PhoneTopBar` and search field keep
+  `md:pr-[10.5rem]`, 8 px of air at 768 (LC4: it was 9.75, the field and the lens 3 px under «Commenti»), the search
+  field `lg:pr-[11rem]` too); the `--page-foot` room it kept is gone, and a page sized to
+  the window takes the plain 2 rem foot off its height (`GraphExplorerPage`, `DocumentReviewPage`'s columns). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
-  over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
+  over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum — on screen Work, Learn, Labs and Forum, with no «VisuaLex» before them (D-137, D-157; the ids,
+  the CSS and the addresses keep the old names; Labs's icon `FlaskConical`, D-236) —, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
   active section — from the address on `/opus/*`, `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
   browser under `visualex-section`, Opus by default; `SectionSwitcher`: at the top of the sidebar,
   `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
   Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
   the section's name — from `xl` and in the phone's drawer — a split button (S6): the mark and the name go to the
-  section's home («Vai a Gymnasium: Oggi», `goToLabel`, `homeName`), an arrow after a thin rule opens the menu; in
+  section's home («Vai a Learn: Oggi», «Vai a Labs: Assistente», `goToLabel`, `homeName`), an arrow after a thin rule opens the menu; in
   the rail one button, the mark, opens it. Its motions are `sectionMenuMotion.ts`, Web Animations: the menu unrolls
   from the top in 260 ms (an `inset` clip with the same four lengths at both ends, a scale from 0.97), the arrow
   turns, the entries come in 40 ms apart; the page changes on the click; one check slides to the entry chosen (180 ms) and the
@@ -560,21 +561,22 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
-  Gymnasium in two groups (Gymnasium spec §4), «Studia»
-  (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
+  Gymnasium in two groups (Gymnasium spec §4), «Learn»
+  (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
+  the first only a heading, its entries straight in the section's group, so a screen reader hears «Learn» once (LC4);
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community». The sections'
   phrases (the owner's, 19 Oct 2026: «la tua palestra giuridica», «la tua officina giuridica», «il luogo del dibattito
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
-  `sectionKicker`'s «Opus · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
+  `sectionKicker`'s «Work · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
   d'ingresso», «Cestino dei compiti», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
-  fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Academia · il
+  fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
   laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
-  icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
+  icon and word and the groups' headings (the section's name, or «Learn» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
   `lg` the drawer, icon and word in rows of 44 px, its foot clear of the home indicator. From `xl` a control
   at the foot narrows the bar to the rail and widens it again, remembered in the browser under
@@ -590,8 +592,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
-  «Collega un'app AI», «Crediti» (`/crediti`), on a phone «Invia un commento» (the feedback form, which `Layout` holds and
-  the floating button opens from `md`, M1), the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
+  «Collega un'app AI», «Crediti» (`/crediti`), on a phone «Commenti» (the feedback form, which `Layout` holds and
+  the button at the top right opens from `md`, M1, D-253), the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
   «Pannello Admin» (admins) and «Esci». **The services' status** (S1, 19 Oct 2026; it was a pill fixed at the bottom left,
   over the foot of the page on a phone) is `ui/ServiceHealthMenuEntry`: the status icon and phrase («Servizi operativi»,
   «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`; a screen
@@ -608,7 +610,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
   services' dot), in the middle — as iOS's large titles (G8) — nothing while the page's `h1` is in sight under the bar
-  (it says the name already: no «Gymnasium» over «Gymnasium · la tua palestra giuridica»), the page's name in Newsreader
+  (it says the name already: no «Learn» over «Learn · la tua palestra giuridica»), the page's name in EB Garamond
   once it has scrolled out, faded in over 150 ms (`motion-safe:` only), on every page (`usePageTitleInView`: an
   `IntersectionObserver` on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver`
   finding a title drawn later; a page with no `h1`, or a browser with no observer, has the name at once; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
@@ -672,7 +674,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the number first); the article's field opens empty, its placeholder saying what it takes, so Backspace there goes
   back at once (a «1» standing in it took the first press, Bill); there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
   order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
-  abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
+  abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Inter 12 px) and «A portata di mano»
   (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
   preferiti (N)» and «Gestisci alias (N)»; empty, one quiet line each, «Crea un alias» a row like a link);
   «Filtri avanzati» closed at the foot, its state in words (`activeFiltersLabel`, `utils/searchFilters.ts`); the
@@ -752,7 +754,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   again by the next mount; `useAuth`'s logout drops a read on its way and forgets the «without MERL-T» answer
   (`clearConsentRead`). A level
   counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
-  administrators edit as new versions in «Testi di VisuaLex Gymnasium»); `ConsentScreen`, in the `global`
+  administrators edit as new versions in «Testi di Learn»); `ConsentScreen`, in the `global`
   slot, asks it once as the app loads when it is unanswered — the first entry, then only a new
   version — and cannot be dismissed («Nessuna raccolta» is one of its three choices). No prompt
   during work: no banner, no teaser. `ConsentChoiceModal` is the one place a level is chosen (the
@@ -828,8 +830,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the body as the sheet closed. The notifications (K1a,
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
-  the bottom (at the top for `position="top"`; from `md` at the right, its foot over the feedback button, which it
-  covered), three at most per edge — the newest first, a fourth closes the oldest
+  the bottom (at the top for `position="top"`; from `md` at the right, 32 px from the bottom), three at most per edge — the newest first, a fourth closes the oldest
   plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
   out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
@@ -837,7 +838,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`, Framer Motion's `useAnimate`)
   is drawn from a line: the line grows from the centre with a tick at each end (300 ms), opens like a slit
   (an `inset` clip with the same lengths at both ends, 350 ms), and the words rise from it 60 ms apart with a touch
-  of weight (Geist's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
+  of weight (Inter's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
   `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 5 s is the
   line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
   into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a finger, or the
@@ -894,7 +895,7 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
 - **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`: the view's name as the title under Opus's phrase (L-37),
   which the switcher focuses,
   «Cestino dei compiti» as its action, the view the frame's width, P2b), `OpusViews`: `TodayView` (Gymnasium's day
-  on one line that opens Gymnasium's «Oggi» — `StudyTodayRow`, «Gymnasium: il ripasso di oggi», absent with Gymnasium
+  on one line that opens Gymnasium's «Oggi» — `StudyTodayRow`, «Learn: il ripasso di oggi», absent with Gymnasium
   off; not a task, and it reads nothing: Gymnasium's session and progress reads mark the day and settle the missions
   when the queue is done, and opening Opus must not count toward the streak; its counts wait for a read that only
   counts —, then by date (the «Oggi» group always, with its «+ Aggiungi compito», even when only late tasks are
@@ -1151,6 +1152,11 @@ render this way; Study Mode hides the heading and rubric blocks
 (`vlx-hide-header`) instead of cutting them, so its offsets are
 document-relative like everywhere else. No surface renders flat (`structure: null`) since the
 Brocardi sections went (D-078); the mode stays under its tests.
+**The selection** (LC4, `index.css`): one translucent stone for every paper, `rgb(138 132 120 / 0.3)`, the text's
+colour left alone, so a highlight under it keeps its hue. One rule, no `.dark` or Study Mode variant: Study Mode's papers
+hold islands of the app's theme (the note cards, the «Nuova nota» field), so no ancestor can say which paper a selection
+is on. `theme.test.ts` composites it over every paper, the note cards and the eight highlighters (text 4.5:1, tint
+1.3:1 from its paper).
 
 **Offsets are measured from the text alone.** `SelectionPopup` takes a
 `textRootRef` (the element holding only the article text) and stores the anchor
@@ -1679,8 +1685,8 @@ one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the
 up to what the subject's read allows, never the rest of the subject), with «Torna a Oggi» a quiet link under it; else
 «Torna a Oggi» alone.
 
-**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, titled «Oggi» under «Gymnasium · la tua
-palestra giuridica» — L-37; the section switcher keeps «Gymnasium»; spec
+**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, titled «Oggi» under «Learn · la tua
+palestra giuridica» — L-37; the section switcher keeps «Learn»; spec
 `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, as rewritten for G1b and G8, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
 `GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
@@ -1710,7 +1716,7 @@ from 0.48–0.57 before). In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
-   ottobre · Diritto penale» narrowed to a subject); in Newsreader, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
+   ottobre · Diritto penale» narrowed to a subject); in EB Garamond, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
    (`todaySentence`, a part that is zero left out); under it «circa 7 minuti · Diritto civile, Diritto penale e altre 2»
    (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an estimate; the subjects
    from `todaySubjects` — those with cards due in the road's read by institute, the most first, then while today allows
@@ -1816,7 +1822,7 @@ from 0.48–0.57 before). In that order:
    row, ring or points: one line in slate 500 at the foot names them (`soonLine`: «In arrivo: caso breve, una settimana
    di serie», G8).
 
-One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
+One type language: block headings in EB Garamond (`BLOCK_HEADING`), labels in Inter; no small capitals and no double
 rule. «Da validare» shows the strip (`progress/StudyStrip`, `dense`: the streak's count without its
 line, the ring, the gear) over it (`StudiaPage`); «Le mie schede» none since G8 (the streak and the goal said a third
 time); the session shows none. «Contribuisci» (G4, spec §5.5) draws them in
@@ -1888,7 +1894,7 @@ points a session read credits silently («obiettivo» on an empty queue) show at
 level, never as «+XP» in the lesson (spec §5.3).
 
 **«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
-«Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
+«Learn» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
 `useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
 (in the sections' full-width frame, as «Oggi», G6; `StudiaPage` draws no strip over it) the page's title «Progressi»
 (L-37; «I tuoi progressi» stays the section's heading for a screen reader only), then: **the summary** (`StreakBadge compact` and `GoalRing compact`, always the whole
@@ -1909,7 +1915,7 @@ trend's points and the coming days' columns are the exception the progress spec 
 trend, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
 day's. **The trend** (`ReviewTrend`, pure parts in `trend.ts`): the reviews of a period as a line — 7 days, 30 days
 (where it opens on a computer; on a phone 7 days — thirty points in some 250 px read as a saw, Bill) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
-Newsreader and its change on the period before, over whole days — today, only begun, out of both: the days up to
+EB Garamond and its change on the period before, over whole days — today, only begun, out of both: the days up to
 yesterday against as many before them (green 700 up, 4.5:1; ink down, never red; none when those had no reviews,
 none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,
 never under zero) resampled to `CURVE_SAMPLES` (175) points so one period's curve bends into another's
@@ -2352,7 +2358,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
   order), the norms first below `lg`; one kind alone takes the width, untitled as before. From `lg` each of the two
   scrolls on its own, at most the window's height (D7d, `COLUMN_SCROLLS`, `max-h-app-column`: the content area's padding
-  and `--page-foot` off it), so a decision read on the right stays put while a norm opens on the left; each is a named
+  and the 2 rem foot off it), so a decision read on the right stays put while a norm opens on the left; each is a named
   region («Norme», «Giurisprudenza (n)») and a tab stop with the focus ring, so the keyboard scrolls it. Whatever
   scrolls a text to a passage there moves its own scroller alone (`utils/scrollParent.ts`: `scrollToMiddle` for «Vai al
   passo» and `revealAnnotation`, gotcha 34): `scrollIntoView` would move the page and the other column too. An act's identity is a code's name
@@ -2976,10 +2982,15 @@ resolves differently. Only if the inline style references no variable, fall back
 to a single narrowly-scoped `!important` with a comment justifying why every
 other route fails.
 
-**Inchiostro everywhere** (Y1, `lib/inchiostro.guard.test.ts` reads the sources): an action and the focus are
-`primary-*` (toga), everything else `slate-*` (ink), a section its hue (`--vlx-section-*`); no `blue-*`, `indigo-*`,
-`purple-*` or `violet-*` (the first two were aliases of toga, the others hues of no section) but in the colour keys the
-test lists with their reason (the courts' chips, the kinds of a suggestion's items, a highlight's four colours); no text
+**Pietra everywhere** (D-156, after Inchiostro's Y1; `lib/pietra.guard.test.ts` reads the sources): an action and the
+focus are `primary-*` (toga, now warm ink: the action is the ink itself, no accent colour), everything else `slate-*`
+(ink, warm grey), a section its hue (`--vlx-section-*`); ink and toga stay warm and near-grey in `index.css`, light
+and dark (the guard reads their values); `#8a8478` (pietra, 3.2:1) is never text; an active area is the highlighter
+(`primary-50`, dark `primary-900/20`–`/30`) with ink text; green, amber, red and the other functional colours keep their meaning
+and never decorate; no `blue-*`, `indigo-*`,
+`purple-*` or `violet-*` (the first two are aliases of toga, the others hues of no section) but in the colour keys the
+test lists with their reason (the courts' chips, the kinds of a suggestion's items); a key whose blue must stay blue
+writes the old toga value out (`authorityColor.ts`, the highlight's blue icon in `highlightColors.ts`); no text
 under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
 windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
 drop —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s
@@ -3033,7 +3044,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
-  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: a Newsreader title, the
+  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: an EB Garamond title, the
   counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
   always there at 44 px; with no dossier, a composed empty state with
   `DossierMark.tsx`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
@@ -3070,7 +3081,7 @@ meant to stay split; add new features as new files, not inside the shells:
   /dossiers/import-study`, quick norms and aliases left out). Explore shows **the community's dossiers first** (S7a,
   the Forum's reason), under a visually hidden `h2` «Dalla comunità»: a grid of `SharedEnvironmentCard`s (`CARD_GRID`,
   «I miei pubblicati»' too: one column, two from `md`, three from `xl`, a row's cards one height, `h-full`), each an
-  `article` with its title in Newsreader 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
+  `article` with its title in EB Garamond 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
   from its token `--category-*`, never a hand-written colour; one line where the card has room, wrapped between its parts
   on a narrow one, a long username cut, whole on hover), two tags then «+N», «Mi piace» a heart with its number
   (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined
@@ -3131,7 +3142,7 @@ meant to stay split; add new features as new files, not inside the shells:
   into order, then «Giurisprudenza»; `layout`: `phone`, `overview` — the grid, `rectSortingStrategy` — or `index`, see
   «The two views»; outside the index it takes the reveal once) of `PracticeActBlock` (an act, R3 — in the overview a
   panel, a hairline box, and in the index a heading that pins nothing, U2 —: a section
-  with no card around it — its sticky heading, the act's name in Newsreader 22 px over a hairline, with Studio,
+  with no card around it — its sticky heading, the act's name in EB Garamond 22 px over a hairline, with Studio,
   Struttura, PDF and «⋯» as neutral quiet buttons — on a phone one row, the title and «⋯», which holds Studio,
   Struttura and PDF, and the meta line only when it says more than the count —; the index line of its rows, drawn only
   for an act of more than one article, its chips in slate, on a phone one row that scrolls sideways beside the arrows;
@@ -3392,10 +3403,10 @@ meant to stay split; add new features as new files, not inside the shells:
     most 200 ms and fill `backwards` only (each `slide-in-from-*` writes both axes: the offsets are
     inherited custom properties, and an error box sliding from the top inside a panel that slid from
     the side came in on the diagonal): a `both` fill keeps the element a
-    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
-    «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
-    `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
-    `toga`; motion curves for Framer Motion live in `lib/motion.ts`.
+    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is
+    «Pietra» (D-156, LexCraft's design system): `slate`, `gray`,
+    `zinc`, `neutral` are aliases of `ink` (warm grey), `blue`, `indigo`, `primary-<n>` of
+    `toga` (warm ink; `.dark` redefines its action, focus and tint steps); motion curves for Framer Motion live in `lib/motion.ts`.
     A `dark:` variant `@apply`'d inside a pseudo-element's rule is just as silent:
     it compiles to `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, which the
     browser drops (until 19 October 2026 every dark scrollbar kept its light

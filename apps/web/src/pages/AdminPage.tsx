@@ -122,7 +122,7 @@ export function AdminPage() {
       setFeedbacks(data);
       setFeedbackStats(stats);
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel caricamento dei feedback');
+      setError(getErrorMessage(err) || 'Errore nel caricamento dei commenti');
     } finally {
       setFeedbackLoading(false);
     }
@@ -457,7 +457,7 @@ export function AdminPage() {
                   )}
                 >
                   <MessageSquare size={16} />
-                  Feedback
+                  Commenti
                   {feedbackStats && feedbackStats.new > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                       {feedbackStats.new}
@@ -499,7 +499,7 @@ export function AdminPage() {
                     )}
                   >
                     <GraduationCap size={16} />
-                    Testi di VisuaLex Gymnasium
+                    Testi di Learn
                   </button>
                 )}
                 {opsVisible && (
@@ -676,10 +676,10 @@ export function AdminPage() {
                                   checked={u.lingo_validatore}
                                   onChange={() => handleToggleValidator(u.id, u.lingo_validatore)}
                                   disabled={actionLoading}
-                                  aria-label={`Validatore di VisuaLex Gymnasium: ${u.username}`}
+                                  aria-label={`Validatore di Learn: ${u.username}`}
                                   className="h-4 w-4 rounded border-gray-300"
                                 />
-                                Validatore di VisuaLex Gymnasium
+                                Validatore di Learn
                               </label>
                             )}
                             <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
@@ -753,7 +753,7 @@ export function AdminPage() {
                 <div className="flex items-center gap-2">
                   <MessageSquare size={20} className="text-gray-500" />
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Feedback ({feedbacks.length})
+                    Commenti ({feedbacks.length})
                   </h2>
                 </div>
                 {feedbackStats && (
@@ -808,12 +808,12 @@ export function AdminPage() {
               {feedbackLoading && feedbacks.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
                   <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-                  Caricamento feedback...
+                  Caricamento commenti...
                 </div>
               ) : feedbacks.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
                   <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                  Nessun feedback trovato
+                  Nessun commento trovato
                 </div>
               ) : (
                 feedbacks.map((f) => (
@@ -1420,10 +1420,10 @@ export function AdminPage() {
                 <Trash2 size={24} />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Elimina Feedback
+                Elimina commento
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Sei sicuro di voler eliminare questo feedback? L'azione non può essere annullata.
+                Sei sicuro di voler eliminare questo commento? L'azione non può essere annullata.
               </p>
               <div className="flex justify-center gap-3">
                 <button

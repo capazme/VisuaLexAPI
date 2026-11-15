@@ -22,7 +22,7 @@ export function StudyTodayRow() {
       )}
     >
       <GraduationCap size={18} aria-hidden className="shrink-0 text-primary-700 dark:text-primary-300" />
-      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">Gymnasium: il ripasso di oggi</span>
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">Learn: il ripasso di oggi</span>
       <ChevronRight size={16} aria-hidden className="shrink-0 text-slate-500" />
     </Link>
   );

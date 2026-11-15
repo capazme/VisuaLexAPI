@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-// Inchiostro everywhere (Y1), kept from coming back one file at a time. Colours: an action and the focus are
-// `primary-*` (toga), the rest `slate-*` (ink), a section its hue (`--vlx-section-*`); `blue-*` and `indigo-*` are
-// aliases of toga that only hid where the old blue still stood, `purple-*` and `violet-*` hues of no section. Sizes: no
+// Pietra everywhere (D-156, after Inchiostro's Y1), kept from coming back one file at a time. Colours: an action and the
+// focus are `primary-*` (toga, warm ink), the rest `slate-*` (ink, warm grey), a section its hue (`--vlx-section-*`);
+// `blue-*` and `indigo-*` are aliases of toga that only hid where the old blue still stood, `purple-*` and `violet-*`
+// hues of no section; and the two scales themselves stay warm and near-grey, so the blue cannot come back by value. Sizes: no
 // text under 11 px. Elevation: cards `shadow-sm` or a border, menus and popovers `shadow-md`, windows `shadow-lg`, never
 // `xl` or `2xl`. Flat paper: no gradient but the loading skeleton's shimmer.
 const src = join(__dirname, '..'); // apps/web/src
@@ -17,7 +18,7 @@ function sources(dir: string): string[] {
   });
 }
 
-/** A Tailwind colour utility of a hue that Inchiostro does not have, with any variant before it. */
+/** A Tailwind colour utility of a hue that Pietra does not have, with any variant before it. */
 const HAND_COLOUR = /\b(?:bg|text|border(?:-[trblxyse])?|ring(?:-offset)?|outline|divide|fill|stroke|from|via|to|shadow|placeholder|accent|caret|decoration)-(blue|indigo|purple|violet)-\d/;
 
 /**
@@ -31,8 +32,6 @@ const KEYS: Record<string, string> = {
     'the kinds of a suggestion\'s items: notes, highlights, dossiers, quick norms, aliases (purple)',
   [join('components', 'features', 'bulletin', 'SuggestContentModal.tsx')]:
     'the same kinds counted before a suggestion is sent: the aliases\' purple',
-  [join('utils', 'highlightColors.ts')]:
-    'the four colours of a highlight, which the reader chooses and learns: blue on the selection popup\'s «Evidenzia» (H1)',
 };
 
 /** Every `file:line` of the sources (outside `allowed`) where `pattern` matches. */
@@ -45,7 +44,7 @@ function hits(pattern: RegExp, allowed: string[] = []): string[] {
       .filter((hit): hit is string => hit !== null));
 }
 
-describe('Inchiostro\'s sizes, elevation and paper', () => {
+describe('Pietra\'s sizes, elevation and paper', () => {
   it('no text is written under 11 px (in px, as a length, or in rem under 0.6875)', () => {
     expect(hits(/\btext-\[(?:length:)?(?:[0-9]|10)(?:\.\d+)?px\]/)).toEqual([]);
     const smallRem = sources(src).map((file) => relative(src, file)).flatMap((file) =>
@@ -66,7 +65,7 @@ describe('Inchiostro\'s sizes, elevation and paper', () => {
   });
 });
 
-describe('Inchiostro\'s colours', () => {
+describe('Pietra\'s colours', () => {
   it('no file writes blue, indigo, purple or violet by hand, outside the colour keys', () => {
     expect(hits(HAND_COLOUR, Object.keys(KEYS))).toEqual([]);
   });
@@ -80,5 +79,27 @@ describe('Inchiostro\'s colours', () => {
   it('every colour key still uses its hue: a key that no longer needs it leaves the list', () => {
     const stale = Object.keys(KEYS).filter((file) => !HAND_COLOUR.test(readFileSync(join(src, file), 'utf8')));
     expect(stale).toEqual([]);
+  });
+});
+
+describe('Pietra\'s scales', () => {
+  // Every value `index.css` gives a step of ink or toga, the light ones in `@theme` and the dark ones in `.dark`. The
+  // values set (D-156) have a hue of 67.6–91.5 and a chroma of 0.019 at most; the bounds leave a small margin. A
+  // step with no chroma (white) has no hue to check.
+  const steps = [...readFileSync(join(src, 'index.css'), 'utf8')
+    .matchAll(/--color-(ink|toga)-(\d+):\s*oklch\(([\d.]+)%\s+([\d.]+)\s+([\d.]+)\)/g)]
+    .map((m) => ({ step: `${m[1]}-${m[2]}`, chroma: Number(m[4]), hue: Number(m[5]) }));
+
+  it('reads every step of both scales', () => {
+    for (const scale of ['ink', 'toga']) {
+      for (const n of [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]) {
+        expect(steps.map((s) => s.step), `${scale}-${n}`).toContain(`${scale}-${n}`);
+      }
+    }
+  });
+
+  it('keeps ink and toga warm and near-grey, so no step turns blue again', () => {
+    const cold = steps.filter((s) => s.chroma > 0.025 || (s.chroma > 0.001 && (s.hue < 60 || s.hue > 100)));
+    expect(cold).toEqual([]);
   });
 });

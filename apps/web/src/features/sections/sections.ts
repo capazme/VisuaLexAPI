@@ -1,4 +1,4 @@
-import { Briefcase, GraduationCap, Landmark, Users, type LucideIcon } from 'lucide-react';
+import { Briefcase, FlaskConical, GraduationCap, Users, type LucideIcon } from 'lucide-react';
 import { PAGE_CODE } from '../../pageCode';
 
 /** The four sections over the common core, Corpus (D-076; spec 2026-10-18-sections-switcher). */
@@ -6,7 +6,7 @@ export type SectionId = 'opus' | 'gymnasium' | 'academia' | 'forum';
 
 export interface Section {
   id: SectionId;
-  /** The short name, «Gymnasium»; the full one is «VisuaLex Gymnasium» (S11). */
+  /** The visible name, «Learn» (D-137, D-157). */
   name: string;
   /** The line under the name in the switcher (S3). */
   line: string;
@@ -18,9 +18,9 @@ export interface Section {
 }
 
 export const SECTIONS: readonly Section[] = [
-  { id: 'opus', name: 'Opus', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/opus/oggi', homeName: 'Oggi' },
-  { id: 'gymnasium', name: 'Gymnasium', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/studia/ripasso', homeName: 'Oggi' },
-  { id: 'academia', name: 'Academia', line: 'Grafo, feedback e validazione', icon: Landmark, home: '/merlt', homeName: 'Assistente' },
+  { id: 'opus', name: 'Work', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/opus/oggi', homeName: 'Oggi' },
+  { id: 'gymnasium', name: 'Learn', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/studia/ripasso', homeName: 'Oggi' },
+  { id: 'academia', name: 'Labs', line: 'Grafo, feedback e validazione', icon: FlaskConical, home: '/merlt', homeName: 'Assistente' },
   { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum', homeName: 'Dossier pubblici' },
 ];
 
@@ -66,8 +66,8 @@ export const SECTION_HOME_CODE: Partial<Record<SectionId, () => Promise<unknown>
   academia: () => import('../../pages/MerltHubPage'),
 };
 
-/** The split button's left part (S6): «Vai a Gymnasium: Oggi», «Vai ad Academia: Assistente». */
-export const goToLabel = (section: Section) => `Vai ${section.name.startsWith('A') ? 'ad' : 'a'} ${section.name}: ${section.homeName}`;
+/** The split button's left part (S6): «Vai a Learn: Oggi», «Vai a Labs: Assistente». */
+export const goToLabel = (section: Section) => `Vai a ${section.name}: ${section.homeName}`;
 
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);
 

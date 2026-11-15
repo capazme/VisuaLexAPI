@@ -126,7 +126,7 @@ describe('Sidebar — accessible names', () => {
   it('has the section switcher and the user menu as its only buttons, with no system buttons beside them', () => {
     renderSidebar();
     expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
-      'Sezione: Opus, cambia sezione, nuove attività nel Forum',
+      'Sezione: Work, cambia sezione, nuove attività nel Forum',
       'Menu utente',
     ]);
   });
@@ -179,7 +179,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it("Opus: the planner's views, then the dossiers", () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
-    const opus = screen.getByRole('group', { name: 'Opus' });
+    const opus = screen.getByRole('group', { name: 'Work' });
     expect(within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Dossier']);
   });
 
@@ -201,9 +201,10 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     renderSidebar('/studia/schede');
     expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
-    const study = screen.getByRole('group', { name: 'Studia' });
-    expect(within(study).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier']);
-    expect(screen.getByRole('group', { name: 'Gymnasium' })).toContainElement(study);
+    // One group reads «Learn» (LC4: the section's, its first heading's entries straight inside it), «Contribuisci» within.
+    const section = screen.getByRole('group', { name: 'Learn' });
+    expect(within(section).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier', 'Le mie schede']);
+    expect(section).toContainElement(screen.getByRole('group', { name: 'Contribuisci' }));
     cleanupAndRender('/studia/schede', () => { account.isValidator = true; });
     expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede', '/studia/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
@@ -215,7 +216,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it('keeps the section on a Corpus page after it', () => {
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/dossier');
-    expect(screen.getByRole('group', { name: 'Gymnasium' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Learn' })).toBeInTheDocument();
   });
 
   it('Forum: «Dossier pubblici» with its count, and «Community»; «Forum» is the group, written once', () => {
@@ -385,7 +386,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
-  it('holds «Invia un commento» on a phone, after «Crediti», and opens the form from it (M1)', () => {
+  it('holds «Commenti» on a phone, after «Crediti», and opens the form from it (M1)', () => {
     const openFeedback = vi.fn();
     render(
       <MemoryRouter>
@@ -394,8 +395,8 @@ describe('Sidebar — the user menu (spec D2)', () => {
     );
     openUserMenu();
     const names = screen.getAllByRole('menuitem').map((e) => e.textContent?.trim());
-    expect(names.indexOf('Invia un commento')).toBe(names.indexOf('Crediti') + 1);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Invia un commento' }));
+    expect(names.indexOf('Commenti')).toBe(names.indexOf('Crediti') + 1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Commenti' }));
     expect(openFeedback).toHaveBeenCalledTimes(1);
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
@@ -422,7 +423,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(container.querySelector('aside')).not.toHaveAttribute('inert');
   });
 
-  it('leaves «Invia un commento» to the floating button from md', () => {
+  it('leaves «Commenti» to the button at the top right from md', () => {
     const original = window.matchMedia;
     window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;
     try {
@@ -432,7 +433,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
         </MemoryRouter>,
       );
       openUserMenu();
-      expect(screen.queryByRole('menuitem', { name: 'Invia un commento' })).toBeNull();
+      expect(screen.queryByRole('menuitem', { name: 'Commenti' })).toBeNull();
     } finally {
       window.matchMedia = original;
     }
@@ -757,15 +758,15 @@ describe('Sidebar — the words', () => {
 
   it('writes the group headings: the section, or Gymnasium\'s «Studia» and «Contribuisci»', () => {
     renderLayout('wide', '/dossier');
-    expect(within(screen.getByRole('group', { name: 'Opus' })).getByText('Opus')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Work' })).getByText('Work')).toBeInTheDocument();
     cleanup();
     renderLayout('wide', '/studia/ripasso');
-    expect(within(screen.getByRole('group', { name: 'Studia' })).getByText('Studia')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Contribuisci' })).getByText('Contribuisci')).toBeInTheDocument();
     cleanup();
     // The rail has no room for them.
     renderLayout('rail', '/studia/ripasso');
-    expect(screen.queryByText('Studia')).toBeNull();
+    expect(screen.queryByText('Learn')).toBeNull();
     expect(screen.getByRole('link', { name: 'Oggi' }).textContent).toBe('');
   });
 
@@ -788,7 +789,7 @@ describe('Sidebar — the words', () => {
 
   it('draws its 11 px texts, the headings and the shortcut, in the colour that keeps AA (theme.test.ts)', () => {
     renderLayout('wide', '/studia/ripasso');
-    expect(within(screen.getByRole('group', { name: 'Studia' })).getByText('Studia')).toHaveClass(...SIDEBAR_SMALL_TEXT.split(' '));
+    expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toHaveClass(...SIDEBAR_SMALL_TEXT.split(' '));
     const shortcut = screen.getByRole('link', { name: 'Ricerca' }).querySelector('kbd') as HTMLElement;
     expect(shortcut).toHaveClass('text-[11px]', ...SIDEBAR_SMALL_TEXT.split(' '));
   });

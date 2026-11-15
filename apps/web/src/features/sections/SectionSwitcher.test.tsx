@@ -35,7 +35,7 @@ beforeEach(() => {
 describe('SectionSwitcher (spec S3)', () => {
   it('names the active section on its button', () => {
     renderSwitcher('/studia/schede');
-    expect(trigger()).toHaveAccessibleName('Sezione: Gymnasium, cambia sezione');
+    expect(trigger()).toHaveAccessibleName('Sezione: Learn, cambia sezione');
     expect(trigger()).toHaveAttribute('aria-haspopup', 'menu');
   });
 
@@ -44,9 +44,9 @@ describe('SectionSwitcher (spec S3)', () => {
     fireEvent.click(trigger());
     const items = screen.getAllByRole('menuitemradio');
     expect(items.map((i) => i.textContent)).toEqual([
-      'VisuaLex OpusDossier di lavoro e strumenti per la professione',
-      'VisuaLex GymnasiumSchede, ripasso, esami e concorsi',
-      'VisuaLex ForumDossier pubblici e community',
+      'WorkDossier di lavoro e strumenti per la professione',
+      'LearnSchede, ripasso, esami e concorsi',
+      'ForumDossier pubblici e community',
     ]);
     expect(items[0]).toHaveAttribute('aria-checked', 'true');
     expect(items[1]).toHaveAttribute('aria-checked', 'false');
@@ -57,7 +57,7 @@ describe('SectionSwitcher (spec S3)', () => {
     account.devMode = true;
     renderSwitcher();
     fireEvent.click(trigger());
-    expect(screen.getByRole('menuitemradio', { name: /VisuaLex Academia/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitemradio', { name: /Labs/ })).toBeInTheDocument();
   });
 
   it('moves by keyboard and closes with Esc, focus back on the button', () => {
@@ -66,9 +66,9 @@ describe('SectionSwitcher (spec S3)', () => {
     const menu = screen.getByRole('menu');
     expect(screen.getByRole('menuitemradio', { name: /Forum/ })).toHaveFocus();
     fireEvent.keyDown(menu, { key: 'Home' });
-    expect(screen.getByRole('menuitemradio', { name: /Opus/ })).toHaveFocus();
+    expect(screen.getByRole('menuitemradio', { name: /Work/ })).toHaveFocus();
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
-    expect(screen.getByRole('menuitemradio', { name: /Gymnasium/ })).toHaveFocus();
+    expect(screen.getByRole('menuitemradio', { name: /Learn/ })).toHaveFocus();
     fireEvent.keyDown(menu, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();
     expect(trigger()).toHaveFocus();
@@ -77,10 +77,10 @@ describe('SectionSwitcher (spec S3)', () => {
   it("goes to the chosen section's page and tells the phone's menu to close (S4)", () => {
     const onChoose = renderSwitcher('/dossier');
     fireEvent.click(trigger());
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }));
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
     expect(onChoose).toHaveBeenCalledOnce();
-    expect(trigger()).toHaveAccessibleName('Sezione: Gymnasium, cambia sezione');
+    expect(trigger()).toHaveAccessibleName('Sezione: Learn, cambia sezione');
   });
 
   it('leaves nothing running once it is gone: the wait for the new title stops with it', async () => {
@@ -92,7 +92,7 @@ describe('SectionSwitcher (spec S3)', () => {
     );
     fireEvent.click(trigger());
     // No page draws Gymnasium's title here: the change keeps waiting for it (HOLD_MAX, then up to TITLE_WAIT).
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }));
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
     unmount();
     const looked = vi.spyOn(document, 'querySelector');
@@ -107,7 +107,7 @@ describe('SectionSwitcher (spec S3)', () => {
 
   it('says the Forum has news outside it: a dot on the icon, the count on its entry (S5)', () => {
     renderSwitcher('/', 3);
-    expect(trigger()).toHaveAccessibleName('Sezione: Opus, cambia sezione, nuove attività nel Forum');
+    expect(trigger()).toHaveAccessibleName('Sezione: Work, cambia sezione, nuove attività nel Forum');
     expect(screen.getByTestId('forum-dot')).toBeInTheDocument();
     fireEvent.click(trigger());
     expect(screen.getByRole('menuitemradio', { name: /Forum.*3 notifiche/ })).toBeInTheDocument();
@@ -126,7 +126,7 @@ describe('SectionSwitcher (spec S3)', () => {
       </MemoryRouter>,
     );
     fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }), { detail: 0 });
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }), { detail: 0 });
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Gymnasium: la tua palestra giuridica' })).toHaveFocus());
     // From the keyboard the ring shows where the focus went.
     expect(screen.getByRole('heading', { name: 'Gymnasium: la tua palestra giuridica' })).not.toHaveAttribute('data-pointer-focus');
@@ -146,7 +146,7 @@ describe('SectionSwitcher (spec S3)', () => {
       </MemoryRouter>,
     );
     fireEvent.click(trigger(), { detail: 1 });
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Opus/ }), { detail: 1 });
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Work/ }), { detail: 1 });
     const heading = await screen.findByRole('heading', { name: 'Opus: la tua officina giuridica' });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(heading).toHaveAttribute('data-pointer-focus');
@@ -162,7 +162,7 @@ describe('SectionSwitcher (spec S3)', () => {
     try {
       renderSwitcher('/studia/schede');
       fireEvent.click(trigger());
-      fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }));
       expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
       expect(start).not.toHaveBeenCalled();
 
@@ -216,7 +216,7 @@ describe('SectionSwitcher (spec S3)', () => {
       renderSwitcher('/forum');
       expect(screen.queryByTestId('forum-dot')).toBeNull();
       fireEvent.click(trigger());
-      expect(screen.getByRole('menuitemradio', { name: /Opus.*2 compiti per oggi o scaduti/ })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemradio', { name: /Work.*2 compiti per oggi o scaduti/ })).toBeInTheDocument();
     } finally {
       plannerStore.setState({ todayCount: null });
     }
@@ -245,7 +245,7 @@ describe('SectionSwitcher (spec S3)', () => {
 
     it('has two parts: the section, which goes to its home, and the arrow, which opens the menu', () => {
       renderSplit();
-      expect(goHome()).toHaveAccessibleName('Vai a Gymnasium: Oggi');
+      expect(goHome()).toHaveAccessibleName('Vai a Learn: Oggi');
       expect(goHome()).not.toHaveAttribute('aria-haspopup');
       expect(arrow()).toHaveAccessibleName('Cambia sezione');
       expect(arrow()).toHaveAttribute('aria-haspopup', 'menu');
@@ -263,7 +263,7 @@ describe('SectionSwitcher (spec S3)', () => {
     it('names Academia with its article and the Forum\'s news on the arrow', () => {
       account.devMode = true;
       renderSplit('/merlt', { forumCount: 2 });
-      expect(goHome()).toHaveAccessibleName('Vai ad Academia: Assistente');
+      expect(goHome()).toHaveAccessibleName('Vai a Labs: Assistente');
       expect(arrow()).toHaveAccessibleName('Cambia sezione, nuove attività nel Forum');
       expect(screen.getByTestId('forum-dot')).toBeInTheDocument();
     });
@@ -273,11 +273,11 @@ describe('SectionSwitcher (spec S3)', () => {
       fireEvent.keyDown(arrow(), { key: 'ArrowDown' });
       const menu = screen.getByRole('menu');
       expect(arrow()).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getByRole('menuitemradio', { name: /Opus/ })).toHaveFocus();
+      expect(screen.getByRole('menuitemradio', { name: /Work/ })).toHaveFocus();
       fireEvent.keyDown(menu, { key: 'End' });
       expect(screen.getByRole('menuitemradio', { name: /Forum/ })).toHaveFocus();
       fireEvent.keyDown(menu, { key: 'Home' });
-      expect(screen.getByRole('menuitemradio', { name: /Opus/ })).toHaveFocus();
+      expect(screen.getByRole('menuitemradio', { name: /Work/ })).toHaveFocus();
       fireEvent.keyDown(menu, { key: 'ArrowUp' });
       expect(screen.getByRole('menuitemradio', { name: /Forum/ })).toHaveFocus();
       fireEvent.keyDown(menu, { key: 'Escape' });
@@ -292,7 +292,7 @@ describe('SectionSwitcher (spec S3)', () => {
       // Enter on an entry is its click, with `detail` 0.
       fireEvent.keyDown(arrow(), { key: 'ArrowDown' });
       fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
-      fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }), { detail: 0 });
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }), { detail: 0 });
       expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
       expect(arrow()).toHaveFocus();
       expect(screen.queryByRole('menu')).toBeNull();
@@ -313,10 +313,10 @@ describe('SectionSwitcher (spec S3)', () => {
         fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
         // Chosen: the check is there, nothing more can be chosen, the arrow says the menu is going.
         expect(screen.getByRole('menuitemradio', { name: /Forum/ })).toHaveAttribute('aria-checked', 'true');
-        expect(screen.getByRole('menuitemradio', { name: /Opus/ })).toHaveAttribute('aria-checked', 'false');
+        expect(screen.getByRole('menuitemradio', { name: /Work/ })).toHaveAttribute('aria-checked', 'false');
         expect(arrow()).toHaveAttribute('aria-expanded', 'false');
         // Nothing more can be chosen in it while it goes.
-        fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }), { detail: 1 });
+        fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }), { detail: 1 });
         expect(screen.getByTestId('where')).toHaveTextContent('/forum');
         await waitFor(() => expect(screen.queryByRole('menu')).toBeNull(), { timeout: 2000 });
         expect(goHome()).toHaveAccessibleName('Vai a Forum: Dossier pubblici');
@@ -361,7 +361,7 @@ describe('SectionSwitcher (spec S3)', () => {
         expect(reverse).toHaveBeenCalledOnce();
         expect(animate.mock.calls.length).toBe(unrolls);
         expect(arrow()).toHaveAttribute('aria-expanded', 'true');
-        expect(screen.getByRole('menuitemradio', { name: /Opus/ })).toHaveFocus();
+        expect(screen.getByRole('menuitemradio', { name: /Work/ })).toHaveFocus();
       } finally {
         delete (Element.prototype as Partial<Element>).animate;
       }
@@ -422,7 +422,7 @@ describe('SectionSwitcher (spec S3)', () => {
       renderSplit('/dossier', { inDrawer: true });
       fireEvent.click(arrow());
       expect(screen.getByRole('menu')).toHaveClass('w-[calc(100%-12px)]', 'left-1.5');
-      expect(screen.getByRole('menuitemradio', { name: /Opus/ })).toHaveClass('min-h-14');
+      expect(screen.getByRole('menuitemradio', { name: /Work/ })).toHaveClass('min-h-14');
     });
   });
 });

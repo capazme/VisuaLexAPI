@@ -17,11 +17,11 @@ const list = () => screen.getByRole('list');
 const cards = () => within(list()).queryAllByRole('listitem');
 
 describe('NotificationHost (K1a)', () => {
-  it('keeps the bottom stack over the feedback button from `md` (46 px, 24 px from the edge): it covered it', async () => {
+  it('keeps the bottom stack 32 px from the foot from `md`, with nothing floating there to clear', async () => {
     render(<NotificationHost />);
     await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
     const stack = list().parentElement as HTMLElement;
-    expect(stack.className).toContain('md:bottom-[max(5.5rem,calc(1rem+var(--foot-bar,0px)))]');
+    expect(stack.className).toContain('md:bottom-[max(2rem,calc(1rem+var(--foot-bar,0px)))]');
     expect(stack.className).not.toContain('md:bottom-8');
   });
 

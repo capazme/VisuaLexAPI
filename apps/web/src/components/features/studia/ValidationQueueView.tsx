@@ -180,7 +180,7 @@ export function ValidationQueueView() {
       )}
       {status === 'forbidden' && (
         <div role="alert" className={cn(STATE_TILE, 'text-sm text-slate-700 dark:text-slate-200')}>
-          <p className={STATE_LINE}>{neverValidator ? 'Questa sezione è riservata ai validatori di VisuaLex Gymnasium' : 'Non sei più tra i validatori'}</p>
+          <p className={STATE_LINE}>{neverValidator ? 'Questa sezione è riservata ai validatori di Learn' : 'Non sei più tra i validatori'}</p>
           <p>Se pensi sia un errore, chiedilo a un amministratore.</p>
         </div>
       )}
@@ -227,11 +227,10 @@ export function ValidationQueueView() {
               </div>
             )}
           </div>
-          {/* Pinned to the bottom of the screen at every width, so a long card or a tall article never pushes it out of reach.
-              From md the feedback button floats over its right end: 56 px kept for it, so «Errata» stays clear (G8c). */}
+          {/* Pinned to the bottom of the screen at every width, so a long card or a tall article never pushes it out of reach. */}
           <div
             className={cn(
-              'sticky bottom-0 -mx-4 border-t border-slate-200 bg-slate-50 px-4 py-3 md:-mx-2 md:pl-2 md:pr-14 dark:border-slate-800 dark:bg-slate-950',
+              'sticky bottom-0 -mx-4 border-t border-slate-200 bg-slate-50 px-4 py-3 md:-mx-2 md:px-2 dark:border-slate-800 dark:bg-slate-950',
               Z_INDEX.sticky,
             )}
           >

@@ -148,7 +148,7 @@ describe('MerltHubPage', () => {
 
   it('says Academia\'s line over its name (L-37)', () => {
     renderHub();
-    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Labs · il laboratorio del diritto');
   });
 
   it('does not show the stale "(presto)" copy in the header', () => {

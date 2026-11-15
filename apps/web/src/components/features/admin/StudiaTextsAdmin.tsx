@@ -234,7 +234,7 @@ export function StudiaTextsAdmin() {
 
   return (
     <div className="space-y-5">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Testi di VisuaLex Gymnasium</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Testi di Learn</h2>
 
       {failed && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">

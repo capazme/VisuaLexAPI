@@ -31,7 +31,7 @@ interface SidebarProps {
   closeMobile: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
-  /** Opens the feedback form: on a phone an entry of the user menu, «Invia un commento» (M1); from `md` the floating
+  /** Opens the feedback form: on a phone an entry of the user menu, «Commenti» (M1); from `md` the top right's
    *  button does it. Not given, no entry. */
   openFeedback?: () => void;
   /** Icons only (the desktop between `lg` and `xl`, or narrowed), icons and words (from `xl`), or the
@@ -194,7 +194,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
         "hover:bg-slate-100 dark:hover:bg-slate-800",
         // The icon keeps the same 44 px box in every layout, so widening the bar moves no icon.
         words ? "w-full h-11 overflow-hidden pr-2" : "w-11 h-11",
-        isActive && "bg-primary-50 dark:bg-primary-900/10"
+        isActive && "bg-primary-50 dark:bg-primary-900/25"
       )}
       onClick={() => {
         hide();
@@ -272,11 +272,12 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
 
 /**
  * A group of entries, named for a screen reader; with words, its name is also written over it. In the
- * rail a thin line stands for the heading.
+ * rail a thin line stands for the heading. `unnamed`: a group that bears its section's name is not a group again
+ * inside the section's (a screen reader said «Learn» twice, LC4); only the heading is drawn.
  */
-function NavGroup({ name, heading, layout, children }: { name: string; heading?: boolean; layout: SidebarLayout; children: React.ReactNode }) {
+function NavGroup({ name, heading, unnamed, layout, children }: { name: string; heading?: boolean; unnamed?: boolean; layout: SidebarLayout; children: React.ReactNode }) {
   return (
-    <div role="group" aria-label={name} className="flex w-full flex-col items-start gap-3 md:gap-2">
+    <div role={unnamed ? undefined : 'group'} aria-label={unnamed ? undefined : name} className="flex w-full flex-col items-start gap-3 md:gap-2">
       {heading && layout !== 'rail' && (
         <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
           {name}
@@ -480,7 +481,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             {section === 'gymnasium' && (
               <>
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}
-                <NavGroup name="Studia" heading layout={layout}>
+                <NavGroup name="Learn" heading unnamed layout={layout}>
                   <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
                   {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
                   {coursesOn && <NavItem to="/studia/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}
@@ -545,7 +546,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             "hover:bg-slate-100 dark:hover:bg-slate-800",
             // The avatar is 36 px below `md` and 32 px from it: inset as in the rail, so widening moves it not.
             words ? "w-full h-11 gap-2.5 overflow-hidden px-1 md:px-1.5 text-left" : "justify-center w-11 h-11",
-            showUserMenu && "bg-primary-50 dark:bg-primary-900/10"
+            showUserMenu && "bg-primary-50 dark:bg-primary-900/25"
           )}
         >
           <motion.div
@@ -635,7 +636,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 {feedbackInMenu && (
                   <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openFeedback)} className={menuItemClass}>
                     <MessageSquarePlus size={16} />
-                    Invia un commento
+                    Commenti
                   </button>
                 )}
                 <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />
