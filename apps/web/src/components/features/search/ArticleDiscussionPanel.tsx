@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { AlertTriangle, ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, ThumbsUp, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, ThumbsUp, X } from 'lucide-react';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../types';
 import { articleDiscussionService, type DiscussionAnchor } from '../../../services/articleDiscussionService';
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../hooks/useAuth';
+import { ReplyForm, ReportButton, VoteButton } from './discussionControls';
 
 interface Props {
   anchor: DiscussionAnchor;
@@ -98,7 +99,6 @@ export function ArticleDiscussionPanel({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyBody, setReplyBody] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [releasing, setReleasing] = useState<Set<string>>(new Set());
 
@@ -226,16 +226,15 @@ export function ArticleDiscussionPanel({
     }
   };
 
-  const addReply = async (event: React.FormEvent, threadId: string) => {
-    event.preventDefault();
-    if (!replyBody.trim()) return;
+  const addReply = async (threadId: string, replyBody: string) => {
     try {
-      const comment = await articleDiscussionService.comment(threadId, replyBody.trim());
+      const comment = await articleDiscussionService.comment(threadId, replyBody);
       setThreads(prev => prev.map(thread => thread.id === threadId ? { ...thread, comments: [...thread.comments, comment], updatedAt: comment.createdAt } : thread));
-      setReplyBody('');
       setReplyingTo(null);
+      return true;
     } catch {
       setError('Impossibile pubblicare la risposta.');
+      return false;
     }
   };
 
@@ -463,14 +462,7 @@ export function ArticleDiscussionPanel({
                     </span>
                     {isExpanded ? <ChevronUp size={16} className="mt-1 shrink-0 text-slate-400" /> : <ChevronDown size={16} className="mt-1 shrink-0 text-slate-400" />}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void voteThread(thread)}
-                    aria-label="Vota glossa"
-                    className={cn('inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs', thread.userVoted ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800')}
-                  >
-                    <ThumbsUp size={13} /> {thread.voteCount}
-                  </button>
+                  <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota glossa" onVote={() => void voteThread(thread)} />
                 </div>
 
                 {(isDetached || (withholdDetachedPassage && isUnknown)) && (
@@ -547,9 +539,7 @@ export function ArticleDiscussionPanel({
                       <button type="button" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)} className="text-xs text-primary-600 hover:underline">
                         Rispondi
                       </button>
-                      <button type="button" onClick={() => void reportThread(thread.id)} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-red-500">
-                        <AlertTriangle size={12} /> Segnala
-                      </button>
+                      <ReportButton onReport={() => void reportThread(thread.id)} />
                       {isLocated && onGoToPassage && (
                         <button
                           type="button"
@@ -561,10 +551,7 @@ export function ArticleDiscussionPanel({
                       )}
                     </div>
                     {replyingTo === thread.id && (
-                      <form onSubmit={event => void addReply(event, thread.id)} className="mt-3 flex gap-2">
-                        <textarea value={replyBody} onChange={event => setReplyBody(event.target.value)} required rows={2} placeholder="Scrivi una risposta…" className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm" />
-                        <button type="submit" aria-label="Invia risposta" className="self-end rounded-lg bg-primary-600 p-2 text-white"><Send size={14} /></button>
-                      </form>
+                      <ReplyForm onSend={replyBody => addReply(thread.id, replyBody)} />
                     )}
                   </div>
                 )}

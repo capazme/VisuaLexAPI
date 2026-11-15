@@ -6,6 +6,8 @@ import type {
   ArticleDiscussionPassageSummary,
   ThreadPassage,
 } from '../types';
+import type { CommunityFeedResponse, CommunityThread } from '../types/community';
+import type { Materia } from '../types/studia';
 
 /**
  * What a discussion hangs on, given by the caller. An article: its norm key, its
@@ -70,6 +72,24 @@ export const articleDiscussionService = {
   },
   async report(threadId: string, reason: string, details?: string): Promise<void> {
     await apiClient.post(`/article-discussions/${threadId}/report`, { reason, details });
+  },
+  /** The Community's feed of every discussion, by last activity; `materia` filters on the server. */
+  async feed(params: { materia?: Materia; page?: number } = {}): Promise<CommunityFeedResponse> {
+    const response = await apiClient.get('/article-discussions/feed', { params });
+    return response.data;
+  },
+  /** One discussion with its replies, the accepted one first, and their comments. */
+  async get(threadId: string): Promise<CommunityThread> {
+    const response = await apiClient.get(`/article-discussions/${encodeURIComponent(threadId)}`);
+    return response.data;
+  },
+  /** The discussion's author marks the reply that settled it; `null` withdraws the mark. */
+  async accept(threadId: string, commentId: string | null): Promise<{ acceptedCommentId: string | null }> {
+    const response = await apiClient.post(`/article-discussions/${threadId}/accept`, { commentId });
+    return response.data;
+  },
+  async reportComment(commentId: string, reason: string, details?: string): Promise<void> {
+    await apiClient.post(`/article-discussion-comments/${commentId}/report`, { reason, details });
   },
   /** Admin only: release (or withdraw again) a decision thread's withdrawn quotation. */
   async setPassageReleased(threadId: string, passageReleased: boolean): Promise<{ passageReleased: boolean }> {
