@@ -565,13 +565,18 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
   in goes to its home
-  with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
+  with no change shown. The sidebar: the Corpus entries over every section but Work — «Ricerca»
   (a link to `/` that puts the cursor on the search page's field, `focusSearchField({ focus: true })`, with no
   window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
   carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
-  section's, in a group named after it: Opus, «Oggi» (the home, `/work/oggi`, with the count of overdue and today's
-  tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
+  section's, in a group named after it: Work's five entries (D-315, LC8) in this order, «Oggi» (the home, `/work/oggi`,
+  with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the same
+  three Corpus entries, the search named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» and
+  «Anonimizzatore» `soon` (`NavItem`: «in arrivo» beside the word, in the rail's hover label and in the name, «Atti, in
+  arrivo»; each opens a plain page, `/work/atti` and `/work/anonimizzatore`, two lines in Work's frame, `ComingSoon` in
+  `App.tsx`; the Anonimizzatore's says it will come in the desktop app, D-324). «Prossimi giorni» and «Lista d'ingresso»
+  stay under «Oggi», «Analizza documento» and «Rassegne» under «Corpus»: no other page links to them yet;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
   (Oggi, the home `/learn/ripasso`, Progressi, `/learn/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
   the first only a heading, its entries straight in the section's group, so a screen reader hears «Learn» once (LC4);
@@ -582,10 +587,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
   `sectionKicker`'s «Work · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
-  d'ingresso», «Cestino dei compiti», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
+  d'ingresso», «Cestino dei compiti», «Atti», «Anonimizzatore», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
   fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
   laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
+  The active entry is marked by the logo's column (D-237, `BookMark` at 20 px, toga ink) at the row's left edge, one
+  per section (`layoutId` inside the section's `LayoutGroup`): it slides from entry to entry, and jumps under reduced motion.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Learn» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
