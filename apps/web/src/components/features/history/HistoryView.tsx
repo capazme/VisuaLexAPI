@@ -18,23 +18,6 @@ import { PageFrame } from '../../layout/PageFrame';
 import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
 import { FIELD_TEXT } from '../../../constants/interactions';
 
-// Stripe color per act_type — keyed on lowercased exact match. Codes get
-// distinct colors so the user can scan the timeline visually; everything
-// else falls back to slate. Same hex-map pattern as SharedEnvironmentCard.
-const ACT_TYPE_STRIPE: Record<string, string> = {
-    'codice civile': '#3b82f6',                // blue
-    'codice penale': '#ef4444',                // red
-    'codice di procedura civile': '#6366f1',   // indigo
-    'codice di procedura penale': '#8b5cf6',   // violet
-    'costituzione': '#f59e0b',                 // amber
-    'regolamento ue': '#0ea5e9',               // sky
-    'direttiva ue': '#06b6d4',                 // cyan
-};
-
-function stripeColor(actType: string | null | undefined): string {
-    return ACT_TYPE_STRIPE[(actType ?? '').toLowerCase()] ?? '#94a3b8';
-}
-
 // Humanized group label: today/yesterday/weekday-this-week/full-date.
 // Group key stays YYYY-MM-DD (ISO) for stable insertion order; only the
 // rendered label is humanized.
@@ -455,17 +438,11 @@ export function HistoryView() {
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative bg-white dark:bg-slate-800 p-3 pl-4 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
+                                                        "relative bg-white dark:bg-slate-800 p-3 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "active:scale-[0.98] active:border-primary-400"
                                                     )}
                                                 >
-                                                    {/* Act-type stripe — see desktop card for rationale */}
-                                                    <span
-                                                        aria-hidden
-                                                        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
-                                                        style={{ backgroundColor: stripeColor(item.act_type) }}
-                                                    />
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5 mb-1">
@@ -511,19 +488,11 @@ export function HistoryView() {
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative bg-white dark:bg-slate-800 p-4 pl-5 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow] cursor-pointer",
+                                                        "relative bg-white dark:bg-slate-800 p-4 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow] cursor-pointer",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md"
                                                     )}
                                                 >
-                                                    {/* Act-type stripe — rounded-l-xl matches card corner so it doesn't
-                                                        poke past the rounded edges; we can't use overflow-hidden on the
-                                                        card because the dropdown menu lives inside it. */}
-                                                    <span
-                                                        aria-hidden
-                                                        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
-                                                        style={{ backgroundColor: stripeColor(item.act_type) }}
-                                                    />
                                                     <div className="flex justify-between items-start gap-4">
                                                         <div className="flex-1">
                                                             <div className="flex items-baseline gap-2 mb-2">
