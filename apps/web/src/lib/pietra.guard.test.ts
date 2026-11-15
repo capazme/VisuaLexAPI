@@ -98,6 +98,32 @@ describe('Pietra\'s colours', () => {
       .filter(Boolean));
     expect(grey).toEqual([]);
   });
+
+  // LC19: disabled, a filled action is a dull grey slab with dimmed text in the dark (`slate-400` on `slate-700`, 4.73:1),
+  // the same everywhere; the light action made transparent read as nearly active. Every line that fills with the light ink
+  // and has a disabled state says so, and with `opacity-100` where that state also fades it; the shared bases whose
+  // disabled state comes from a constant (`DISABLED`) say it on their fill line.
+  it('a disabled filled action is a grey slab with dimmed text in the dark', () => {
+    const LIGHT_INK = /dark:bg-toga-400\b|dark:bg-primary-400\b|\$\{INK_BG\}/;
+    const SLAB = ['dark:disabled:bg-slate-700', 'dark:disabled:text-slate-400'];
+    const bases = [
+      join('components', 'ui', 'buttonStyles.ts'),
+      join('components', 'ui', 'IconButton.tsx'),
+      join('components', 'ui', 'FeedbackModal.tsx'),
+      join('components', 'ui', 'AdvancedExportModal.tsx'),
+    ];
+    const off = sources(src).map((file) => relative(src, file)).flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => {
+        if (!LIGHT_INK.test(line) || /^\s*(\/\/|\*)/.test(line)) return null;
+        // A chosen option (`? '…'`) is no action.
+        if (/^\s*\?\s*['"`]/.test(line)) return null;
+        if (!/\bdisabled:/.test(line) && !bases.includes(file)) return null;
+        const needs = /\bdisabled:opacity-/.test(line) || bases.includes(file) ? [...SLAB, 'dark:disabled:opacity-100'] : SLAB;
+        return needs.every((c) => line.includes(c)) ? null : `${file}:${i + 1}`;
+      })
+      .filter(Boolean));
+    expect(off).toEqual([]);
+  });
 });
 
 describe('Pietra\'s scales', () => {

@@ -49,7 +49,7 @@ import {
 import { cn } from '../lib/utils';
 
 /** A dialog's filled action: light ink in the dark. */
-const DIALOG_PRIMARY = 'px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50';
+const DIALOG_PRIMARY = 'px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50';
 
 type AdminTab = 'users' | 'feedback' | 'environments' | 'reports' | 'studia' | 'ingestion';
 

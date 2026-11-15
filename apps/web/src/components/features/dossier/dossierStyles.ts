@@ -7,7 +7,7 @@ import { FOCUS_RING } from '../studia/progress/tokens';
  */
 
 /** The header's main action: «Apri tutto». */
-export const HEADER_PRIMARY = `inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-40 ${FOCUS_RING}`;
+export const HEADER_PRIMARY = `inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-40 ${FOCUS_RING}`;
 
 /** A header's other action with words: «Aggiungi», «Esporta», the Forum's (only their icons on a phone: 44 px square). */
 export const HEADER_BUTTON = `inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 ${FOCUS_RING}`;

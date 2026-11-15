@@ -723,7 +723,7 @@ export function HistoryView() {
                             <button
                                 onClick={handleConfirmCreateDossier}
                                 disabled={!newDossierTitle.trim()}
-                                className="px-3 py-1.5 text-sm bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-3 py-1.5 text-sm bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Crea e aggiungi
                             </button>

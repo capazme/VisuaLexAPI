@@ -8,5 +8,7 @@ export const LESSON_PRIMARY = cn(
   'dark:shadow-[0_4px_0_var(--color-primary-500)] dark:active:shadow-[0_1px_0_var(--color-primary-500)]',
   INK_BG,
   ON_INK,
+  // Disabled in the dark (LC19): the grey slab of every filled action, not the light key faded.
+  'dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100',
   FOCUS_RING,
 );

@@ -194,7 +194,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
           <button
             onClick={fetchTree}
             disabled={loading}
-            className="w-full py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="w-full py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
             {loading ? 'Caricamento...' : 'Cerca articoli'}

@@ -73,4 +73,16 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Medio' })).toHaveClass('text-sm/5');
     expect(screen.getByRole('button', { name: 'Grande' })).toHaveClass('text-base/5');
   });
+  // LC19: in the dark a disabled primary is a dull grey slab with dimmed text (#b2afa9 on #42403c, 4.73:1), at full
+  // opacity, not the light action made transparent; the light theme keeps its opacity.
+  it('in the dark a disabled primary is a grey slab with dimmed text, the other variants untouched', () => {
+    render(
+      <>
+        <Button disabled>Salva</Button>
+        <Button variant="secondary" disabled>Annulla</Button>
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Salva' })).toHaveClass('dark:disabled:bg-slate-700', 'dark:disabled:text-slate-400', 'dark:disabled:opacity-100', 'disabled:opacity-50');
+    expect(screen.getByRole('button', { name: 'Annulla' })).not.toHaveClass('dark:disabled:bg-slate-700');
+  });
 });
