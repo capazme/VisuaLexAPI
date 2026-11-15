@@ -35,6 +35,8 @@ export function OpusPage() {
       kicker="opus"
       section="opus"
       className="h-full"
+      // An act's page: its own title is the one in sight (LC29), not «Atti» over it.
+      titleHidden={/^\/work\/atti\/./.test(pathname)}
       action={inView && (
         <Link to="/work/cestino" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5')}>
           <Trash2 size={15} aria-hidden />

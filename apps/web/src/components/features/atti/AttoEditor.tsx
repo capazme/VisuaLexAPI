@@ -24,7 +24,7 @@ const META_FIELD = cn(
 );
 const META_LABEL = 'text-sm text-slate-600 dark:text-slate-400';
 /** The act's text, read or written: one sheet, the same measure and padding either way, so the switch moves nothing. */
-const SHEET_TEXT = 'mx-auto block w-full max-w-[68ch] px-6 py-8 font-serif text-[17px] leading-[1.7] text-slate-900 md:px-10 md:py-10 dark:text-slate-100';
+const SHEET_TEXT = 'mx-auto block w-full max-w-measure px-6 py-8 font-serif text-[17px] leading-[1.7] text-slate-900 md:px-10 md:py-10 dark:text-slate-100';
 
 
 /**
@@ -280,7 +280,7 @@ export function AttoEditor() {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <label className="flex items-center gap-1">
             <span className={META_LABEL}>Tipo</span>
-            <input value={draft.tipo ?? ''} placeholder="—" onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} className={cn(META_FIELD, 'w-52 placeholder:text-slate-500')} />
+            <input value={draft.tipo ?? ''} placeholder="—" onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} size={Math.max((draft.tipo ?? '').length, 3)} className={cn(META_FIELD, 'placeholder:text-slate-500')} />
             <datalist id="atto-tipi">{ATTO_TIPI.map((t) => <option key={t} value={t} />)}</datalist>
           </label>
           <span aria-hidden className="text-slate-400 dark:text-slate-600">·</span>
@@ -341,7 +341,7 @@ export function AttoEditor() {
               onBlur={() => void flush()}
               maxLength={MAX_TESTO}
               placeholder="Scrivi qui il testo dell’atto."
-              className={cn(SHEET_TEXT, 'min-h-[60vh] resize-y bg-transparent placeholder:text-slate-500 focus-visible:outline-none')}
+              className={cn(SHEET_TEXT, 'min-h-[60vh] resize-none bg-transparent [field-sizing:content] placeholder:text-slate-500 focus-visible:outline-none')}
             />
             {near && <p className="border-t border-slate-200 px-4 py-2 text-xs text-amber-800 dark:border-slate-800 dark:text-amber-300">{draft.testo.length.toLocaleString('it-IT')} caratteri su {MAX_TESTO.toLocaleString('it-IT')}.</p>}
           </>) : (
