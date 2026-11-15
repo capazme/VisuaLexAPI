@@ -33,6 +33,9 @@ const apiClient: AxiosInstance = axios.create({
  */
 let refreshInFlight: Promise<string> | null = null;
 
+/** The requests that send credentials: a 401 there is a wrong password, never an expired session. */
+const CREDENTIAL_URLS = ['/auth/login', '/auth/register'];
+
 /**
  * The session is over (the server refused the refresh): everything of the person goes, then the tokens, and the
  * sign-in page opens, which brings the reader back here.
@@ -65,6 +68,22 @@ export function isRefreshRefused(error: unknown): boolean {
 
 /** The plain words a reader gets when a refresh could not reach the server. */
 export const CONNECTION_FAILED_MESSAGE = 'Connessione al server non riuscita. La sessione resta aperta: riprova tra poco.';
+
+/** A server's limit of requests (429). */
+export const TOO_MANY_REQUESTS_MESSAGE = 'Troppe richieste in poco tempo. Aspetta un minuto e riprova.';
+
+/** No answer at all (network, timeout). */
+export const NO_ANSWER_MESSAGE = 'Il server non risponde. Controlla la connessione e riprova.';
+
+/** The server's English answers a reader can meet, in Italian; any other passes as the server wrote it. */
+const SERVER_WORDS: Record<string, string> = {
+  'Invalid credentials': 'Email o password non corrette.',
+  'User with this email or username already exists': 'Esiste già un account con questa email o questo nome utente.',
+  'Internal server error': 'Errore del server. Riprova tra poco.',
+  'Not found': 'Non trovato.',
+  'Authentication required': 'Accedi per continuare.',
+  'Admin access required': 'Serve un account di amministrazione.',
+};
 
 let lastConnectionNotice = 0;
 
@@ -171,8 +190,9 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // If error is 401 and we haven't retried yet, try to refresh token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // If error is 401 and we haven't retried yet, try to refresh token. Not for the sign-in and the sign-up: their
+    // 401 answers the credentials, and goes to the form as it is (LC14).
+    if (error.response?.status === 401 && !originalRequest._retry && !CREDENTIAL_URLS.includes(originalRequest.url ?? '')) {
       originalRequest._retry = true;
 
       try {
@@ -193,9 +213,14 @@ apiClient.interceptors.response.use(
 
     // For other errors, reject with formatted error
     const responseData = error.response?.data as { detail?: string } | undefined;
+    const status = error.response?.status;
     return Promise.reject({
-      status: error.response?.status,
-      message: responseData?.detail || error.message || 'An error occurred',
+      status,
+      // The server's limit answers in English, and axios's own words («Request failed with status code 500»,
+      // «Network Error») are English too: the reader gets Italian, and what to do.
+      message: status === 429
+        ? TOO_MANY_REQUESTS_MESSAGE
+        : (responseData?.detail && (SERVER_WORDS[responseData.detail] ?? responseData.detail)) || (status ? `Richiesta non riuscita (errore ${status}). Riprova tra poco.` : NO_ANSWER_MESSAGE),
       data: responseData,
     });
   }
