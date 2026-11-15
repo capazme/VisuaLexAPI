@@ -135,7 +135,7 @@ export function AskGraphField({
               className={cn(
                 'min-h-[44px] min-w-[44px] px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
                 mode === m
-                  ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300'
+                  ? 'bg-primary-50 text-primary-700 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
               )}
             >

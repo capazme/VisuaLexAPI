@@ -115,10 +115,10 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
               aria-hidden
               className={cn(
                 'relative h-5 w-9 rounded-full transition-colors',
-                onlyChanges ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600',
+                onlyChanges ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600',
               )}
             >
-              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform', onlyChanges && 'translate-x-[0.975rem]')} />
+              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform', onlyChanges && 'translate-x-[0.975rem] dark:bg-ink-950')} />
             </span>
             Solo le modifiche
           </button>
@@ -348,7 +348,7 @@ function PhoneRows({
                     className={cn(
                       'min-h-[44px] flex-1 rounded-md px-2 text-xs font-medium',
                       choice === o.choice
-                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white'
+                        ? 'bg-white text-slate-900 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                         : 'text-slate-600 dark:text-slate-300',
                       FOCUS_RING,
                     )}

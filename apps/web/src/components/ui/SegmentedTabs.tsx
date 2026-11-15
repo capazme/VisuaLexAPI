@@ -90,7 +90,7 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
                 // The words change colour over the mark's slide (`spring.snappy`, 0.3 s).
                 'relative flex min-h-[44px] items-center justify-center rounded-md text-sm font-medium transition-colors duration-300',
                 FOCUS_RING,
-                active ? 'text-slate-900 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
+                active ? 'text-slate-900 dark:text-ink-950' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
                 tabClassName,
               )}
             >
@@ -101,7 +101,7 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
                   layoutDependency={value}
                   data-segmented-mark
                   aria-hidden
-                  className="absolute inset-0 bg-white dark:bg-slate-700"
+                  className="absolute inset-0 bg-white dark:bg-toga-400"
                   // The corners and the shadow in `style`, which Framer corrects as the mark stretches between tabs of
                   // different widths; as classes they were squashed during the slide.
                   style={MARK_STYLE}

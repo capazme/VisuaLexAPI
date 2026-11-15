@@ -348,7 +348,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
               className={cn(
                 SCOPE_BUTTON,
                 scope === value
-                  ? 'bg-white text-primary-600 shadow-sm dark:bg-slate-900 dark:text-primary-400'
+                  ? 'bg-white text-primary-600 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
               )}
             >

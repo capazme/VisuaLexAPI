@@ -205,7 +205,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                             className={cn(
                                 "flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
                                 settings.theme === 'light'
-                                    ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
+                                    ? "bg-white shadow-sm text-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                             )}
                         >
@@ -217,7 +217,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                             className={cn(
                                 "flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
                                 settings.theme === 'dark'
-                                    ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
+                                    ? "bg-white shadow-sm text-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                             )}
                         >
@@ -269,7 +269,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                                             "min-h-[44px] px-3 py-1.5 rounded text-xs border transition-colors sm:min-h-0",
                                             fontClass,
                                             settings.fontFamily === value
-                                                ? "border-primary-500 bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400"
+                                                ? "border-primary-500 bg-white text-primary-600 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
                                                 : "border-transparent hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
                                         )}
                                     >
@@ -325,13 +325,13 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                                     aria-hidden
                                     className={cn(
                                         "relative block h-6 w-11 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2",
-                                        devMode ? "bg-primary-600" : "bg-slate-300 dark:bg-slate-600"
+                                        devMode ? "bg-primary-600 dark:bg-toga-400" : "bg-slate-300 dark:bg-slate-600"
                                     )}
                                 >
                                     <span
                                         className={cn(
                                             "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                                            devMode && "translate-x-5"
+                                            devMode && "translate-x-5 dark:bg-ink-950"
                                         )}
                                     />
                                 </span>

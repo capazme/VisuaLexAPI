@@ -881,8 +881,8 @@ function LocalSwitch({ on, onChange, disabled }: { on: boolean; onChange: (on: b
         onClick={() => onChange(!on)}
         className={cn('inline-flex min-h-11 items-center gap-2.5 rounded-lg pr-2 text-sm font-medium text-slate-800 disabled:cursor-wait disabled:opacity-60 dark:text-slate-200', RING)}
       >
-        <span aria-hidden="true" className={cn('relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600 dark:bg-primary-500' : 'bg-slate-300 dark:bg-slate-600')}>
-          <span className={cn('absolute top-0.5 size-5 rounded-full bg-white shadow-sm transition-[left] motion-reduce:transition-none', on ? 'left-[1.125rem]' : 'left-0.5')} />
+        <span aria-hidden="true" className={cn('relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600')}>
+          <span className={cn('absolute top-0.5 size-5 rounded-full bg-white shadow-sm transition-[left] motion-reduce:transition-none', on ? 'left-[1.125rem] dark:bg-ink-950' : 'left-0.5')} />
         </span>
         Riconosci solo nel browser
       </button>

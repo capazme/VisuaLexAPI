@@ -72,14 +72,14 @@ export function SegmentedControl({
               'disabled:opacity-40 disabled:cursor-not-allowed',
               buttonSizeStyles[size],
               isActive
-                ? 'text-slate-900 dark:text-slate-100'
+                ? 'text-slate-900 dark:text-ink-950'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             )}
           >
             {isActive && (
               <motion.div
                 layoutId={layoutId}
-                className="absolute inset-0 bg-white dark:bg-slate-700 rounded-lg shadow-sm border border-slate-200/50 dark:border-slate-600"
+                className="absolute inset-0 bg-white dark:bg-toga-400 rounded-lg shadow-sm border border-slate-200/50 dark:border-toga-400"
                 transition={spring.snappy}
               />
             )}

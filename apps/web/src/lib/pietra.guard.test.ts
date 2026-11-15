@@ -98,6 +98,85 @@ describe('Pietra\'s colours', () => {
       .filter(Boolean));
     expect(grey).toEqual([]);
   });
+
+  // LC19: disabled, a filled action is a dull grey slab with dimmed text in the dark (`slate-400` on `slate-700`, 4.73:1),
+  // the same everywhere; the light action made transparent read as nearly active. Every line that fills with the light ink
+  // and has a disabled state says so, and with `opacity-100` where that state also fades it; the shared bases whose
+  // disabled state comes from a constant (`DISABLED`) say it on their fill line.
+  it('a disabled filled action is a grey slab with dimmed text in the dark', () => {
+    const LIGHT_INK = /dark:bg-toga-400\b|dark:bg-primary-400\b|\$\{INK_BG\}/;
+    const SLAB = ['dark:disabled:bg-slate-700', 'dark:disabled:text-slate-400'];
+    const bases = [
+      join('components', 'ui', 'buttonStyles.ts'),
+      join('components', 'ui', 'IconButton.tsx'),
+      join('components', 'ui', 'FeedbackModal.tsx'),
+      join('components', 'ui', 'AdvancedExportModal.tsx'),
+    ];
+    const off = sources(src).map((file) => relative(src, file)).flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => {
+        if (!LIGHT_INK.test(line) || /^\s*(\/\/|\*)/.test(line)) return null;
+        // A chosen option (`? '…'`) is no action.
+        if (/^\s*\?\s*['"`]/.test(line)) return null;
+        if (!/\bdisabled:/.test(line) && !bases.includes(file)) return null;
+        const needs = /\bdisabled:opacity-/.test(line) || bases.includes(file) ? [...SLAB, 'dark:disabled:opacity-100'] : SLAB;
+        return needs.every((c) => line.includes(c)) ? null : `${file}:${i + 1}`;
+      })
+      .filter(Boolean));
+    expect(off).toEqual([]);
+  });
+
+  // LC19: the chosen option of a group of filters or tabs has one look in the dark, the light ink with dark text
+  // (`dark:bg-toga-400 dark:text-ink-950`, LC17), not a grey or tinted fill nor an outline. These groups had another.
+  // Left on purpose, and not listed: page tabs marked by a line under them, single toggles, cards to choose from, the
+  // highlighted row of a list.
+  it('the chosen option of these groups is the light ink in the dark', () => {
+    const groups = [
+      join('components', 'ui', 'SettingsModal.tsx'),
+      join('components', 'ui', 'AdvancedExportModal.tsx'),
+      join('components', 'features', 'planner', 'OpusPage.tsx'),
+      join('components', 'features', 'search', 'FindWindow.tsx'),
+      join('components', 'features', 'search', 'QuickNormsManager.tsx'),
+      join('components', 'features', 'search', 'NotesPeekPanel.tsx'),
+      join('components', 'features', 'search', 'MoveProposalBar.tsx'),
+      join('components', 'features', 'compare', 'CompareView.tsx'),
+      join('components', 'features', 'compare', 'CompareBody.tsx'),
+      join('components', 'features', 'rassegne', 'RassegnePanel.tsx'),
+      join('features', 'merlt', 'graph', 'page', 'AskGraphField.tsx'),
+      join('features', 'merlt', 'qa', 'QaDeliberationPanel.tsx'),
+    ];
+    // A chosen branch (`? '…'`, or `x === y ? '…'` on one line) whose dark fill is a grey or a tint.
+    const OTHER = /\?\s*['"`][^'"`]*\bdark:bg-(?:slate-(?:600|700|900)|primary-9[05]0)\b/;
+    const other = groups.flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => (OTHER.test(line) ? `${file}:${i + 1}` : null))
+      .filter(Boolean));
+    expect(other).toEqual([]);
+  });
+
+  // LC19: a switch that is on, and CopyModal's ticked box, take the light ink in the dark (`dark:bg-toga-400`), as the
+  // actions; the mid grey stood apart. The knob turns dark on it (ink-950 on #f1eee8, 14.41:1): white was 1.16:1.
+  it('a switch that is on is the light ink in the dark, its knob dark on it', () => {
+    const switches = [
+      join('features', 'merlt', 'ops', 'OpsConfigPanel.tsx'),
+      join('components', 'ui', 'SettingsModal.tsx'),
+      join('components', 'features', 'studia', 'StudyPreferences.tsx'),
+      join('components', 'features', 'compare', 'CompareBody.tsx'),
+      join('components', 'features', 'documents', 'DocumentReviewPage.tsx'),
+    ];
+    const ON_TRACK = /\?\s*['"]bg-primary-600\b[^'"]*['"]/;
+    const grey = sources(src).map((file) => relative(src, file)).flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => {
+        const on = line.match(ON_TRACK);
+        return on && !on[0].includes('dark:bg-toga-400') ? `${file}:${i + 1}` : null;
+      })
+      .filter(Boolean));
+    expect(grey).toEqual([]);
+    // Each knob: white on the track, dark on the light track when on.
+    const knobs = switches.filter((file) => !/rounded-full bg-white[^\n]*\n?[^\n]*dark:bg-ink-950/.test(readFileSync(join(src, file), 'utf8')));
+    expect(knobs).toEqual([]);
+    const copy = readFileSync(join(src, 'components', 'ui', 'CopyModal.tsx'), 'utf8');
+    expect(copy).toContain("'bg-primary-600 border-primary-600 dark:bg-toga-400 dark:border-toga-400'");
+    expect(copy).toContain('text-white dark:text-ink-950');
+  });
 });
 
 describe('Pietra\'s scales', () => {

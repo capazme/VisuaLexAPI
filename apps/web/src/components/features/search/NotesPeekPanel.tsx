@@ -241,7 +241,7 @@ function PeekBody({
                             className={cn(
                                 'px-2 py-1 rounded text-xs transition-colors',
                                 ownerFilter === key
-                                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                                    ? 'bg-primary-100 text-primary-700 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
                             )}
                         >
