@@ -23,7 +23,7 @@ export function ReadFailure({ what, offline, stale = false, onRetry }: ReadFailu
         {stale && ' Quello che vedi è l’ultima lettura.'}
         {offline && ' Si aggiorna da sé quando torna la connessione.'}
       </p>
-      <button type="button" onClick={onRetry} className={cn(SECONDARY_BUTTON, 'bg-white dark:bg-transparent')}>
+      <button type="button" onClick={onRetry} className={cn(SECONDARY_BUTTON, 'bg-card dark:bg-transparent')}>
         Riprova
       </button>
     </div>

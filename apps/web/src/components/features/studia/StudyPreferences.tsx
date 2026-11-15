@@ -20,7 +20,7 @@ export interface StudyPreferencesProps {
 const MIN_PER_DAY = 1;
 const MAX_PER_DAY = 200;
 const CONTROL =
-  'min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+  'min-h-[44px] rounded-lg border border-slate-300 bg-card px-3 text-sm text-slate-900 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 /** A whole number in the allowed range, or null. */
 function parseGoal(text: string): number | null {

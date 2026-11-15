@@ -87,7 +87,7 @@ export function CitationPanel({ citation, desktop, onClose, leaveThen, showToast
   return (
     <aside
       aria-label={label}
-      className="w-[min(28rem,45%)] min-w-0 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      className="w-[min(28rem,45%)] min-w-0 shrink-0 overflow-y-auto border-l border-slate-200 bg-card p-4 dark:border-slate-800 dark:bg-slate-900"
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 ref={heading} tabIndex={-1} className="min-w-0 break-words text-sm font-semibold text-slate-700 focus:outline-none dark:text-slate-200">

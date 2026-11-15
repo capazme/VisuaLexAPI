@@ -57,7 +57,7 @@ export function EndProgrammeOffer({ deleted, missing, onEnd, busy }: {
         Hai eliminato il modulo {deleted.ordine}, «{deleted.titolo}». Se non vuoi altri moduli, il programma può finire {rest}
         {closingOpensExam(missing) ? ', così l’esame potrà aprirsi.' : '.'}
       </p>
-      <button type="button" onClick={onEnd} disabled={busy} className={cn(SECONDARY_BUTTON, 'justify-self-start bg-white disabled:opacity-60 dark:bg-transparent')}>
+      <button type="button" onClick={onEnd} disabled={busy} className={cn(SECONDARY_BUTTON, 'justify-self-start bg-card disabled:opacity-60 dark:bg-transparent')}>
         Il programma finisce qui
       </button>
     </div>

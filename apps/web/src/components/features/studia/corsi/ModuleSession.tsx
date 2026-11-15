@@ -296,7 +296,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     middle = (
       <div className={cn(COLUMN, 'px-4 py-6')}>
         <p className="sr-only">Carico il modulo…</p>
-        <div aria-hidden className="h-72 rounded-2xl border border-slate-200 bg-white motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
+        <div aria-hidden className="h-72 rounded-2xl border border-slate-200 bg-card motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
       </div>
     );
     bar = <div aria-hidden className="h-12 rounded-xl bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />;

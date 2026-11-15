@@ -44,7 +44,7 @@ function CardTile({ card, selected }: { card: Scheda; selected: boolean }) {
           FOCUS_RING,
           selected
             ? cn('border-2 bg-primary-50 dark:bg-primary-900/30', INK_BORDER)
-            : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/60',
+            : 'border-slate-200 bg-card hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/60',
         )}
       >
         <span className="line-clamp-3 break-words font-serif text-base leading-snug text-slate-900 dark:text-slate-50">{card.domanda}</span>

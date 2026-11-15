@@ -59,7 +59,7 @@ export function VoteBar({ cardId, busy, onVote }: VoteBarProps) {
           maxLength={REASON_MAX}
           rows={4}
           autoFocus
-          className={cn('w-full resize-y rounded-xl border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 md:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50', FOCUS_RING)}
+          className={cn('w-full resize-y rounded-xl border border-slate-300 bg-card px-3 py-2 text-base text-slate-900 md:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50', FOCUS_RING)}
         />
         <div className="flex items-center gap-2">
           <span className={cn('mr-auto text-xs tabular-nums', MUTED_TEXT)}>{open.text.length} / {REASON_MAX}</span>

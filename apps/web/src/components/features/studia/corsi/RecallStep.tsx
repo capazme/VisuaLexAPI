@@ -56,7 +56,7 @@ export function RecallStep({ blocco, where, fase, scritto, onScritto, spans, onS
             onChange={(event) => onScritto(event.target.value)}
             rows={10}
             className={cn(
-              'min-h-[44px] w-full max-w-measure resize-y rounded-xl border border-slate-300 bg-white p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+              'min-h-[44px] w-full max-w-measure resize-y rounded-xl border border-slate-300 bg-card p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
               FIELD_TEXT,
               FOCUS_RING,
             )}

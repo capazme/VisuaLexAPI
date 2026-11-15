@@ -374,7 +374,7 @@ function RenameDialog({ id, titolo, onClose, onRenamed }: { id: string; titolo: 
           onChange={(event) => setValue(event.target.value)}
           aria-invalid={!valid}
           aria-describedby={error ? `${inputId}-errore` : undefined}
-          className="min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+          className="min-h-[44px] rounded-lg border border-slate-300 bg-card px-3 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
         />
         {error && (
           <p id={`${inputId}-errore`} role="alert" className="text-sm text-red-700 dark:text-red-300">

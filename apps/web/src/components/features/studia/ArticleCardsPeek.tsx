@@ -86,7 +86,7 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: Omit<ArticleCardsPeekProps,
           <div
             style={{ transformOrigin: getTransformOrigin(placement) }}
             className={cn(
-              'flex max-h-[inherit] w-[360px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900',
+              'flex max-h-[inherit] w-[360px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-lg dark:border-slate-700 dark:bg-slate-900',
               'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-150',
             )}
           >
@@ -116,7 +116,7 @@ function MobileSheet({ onClose, ...rest }: Omit<ArticleCardsPeekProps, 'isOpen' 
         aria-modal="true"
         aria-label="Schede su questo articolo"
         className={cn(
-          'fixed inset-x-0 bottom-0 flex max-h-[70vh] flex-col rounded-t-2xl border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900',
+          'fixed inset-x-0 bottom-0 flex max-h-[70vh] flex-col rounded-t-2xl border-t border-slate-200 bg-card dark:border-slate-800 dark:bg-slate-900',
           'motion-safe:animate-in motion-safe:slide-in-from-bottom duration-200',
           Z_INDEX.citationPreview,
         )}
