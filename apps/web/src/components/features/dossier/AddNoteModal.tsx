@@ -89,7 +89,7 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
             onKeyDown={handleKeyDown}
             rows={6}
             placeholder="Scrivi un appunto, una riflessione o un promemoria da allegare al dossier…"
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 resize-y min-h-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 resize-y min-h-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           />
           <div className="flex justify-between text-xs text-slate-400">
             <span>⌘/Ctrl + Invio per salvare</span>

@@ -612,7 +612,7 @@ export function TreeViewPanel({
                         className={cn(
                           "w-full pl-8 pr-3 rounded-lg border text-xs",
                           "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800",
-                          "text-slate-700 dark:text-slate-200 placeholder:text-slate-400",
+                          "text-slate-700 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-400",
                           "focus:outline-none focus:ring-2 focus:ring-primary-500",
                           variant === 'drawer' ? "min-h-[44px] py-2" : "py-1.5"
                         )}

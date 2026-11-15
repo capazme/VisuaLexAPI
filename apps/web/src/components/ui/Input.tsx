@@ -82,7 +82,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               // Colours only: the focus ring is a box-shadow and appears at once.
               'transition-colors duration-150 ease-out outline-none',
               'text-slate-900 dark:text-slate-100',
-              'placeholder:text-slate-400 dark:placeholder:text-slate-500',
+              'placeholder:text-slate-500 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400',
               FIELD_TEXT,
               'font-medium',
               // Disabled state

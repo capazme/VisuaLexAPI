@@ -118,7 +118,7 @@ export function AskGraphField({
           }}
           placeholder={placeholder}
           aria-label="Chiedi al grafo"
-          className={cn('min-h-[44px] min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-500 focus:outline-none dark:text-white dark:placeholder:text-slate-400', FIELD_TEXT)}
+          className={cn('min-h-[44px] min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-500 focus:outline-none dark:text-white dark:placeholder:text-slate-500 dark:placeholder:text-slate-400', FIELD_TEXT)}
         />
         <div
           role="radiogroup"
