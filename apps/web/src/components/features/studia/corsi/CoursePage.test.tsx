@@ -252,6 +252,16 @@ describe('the course page', () => {
     expect(within(await screen.findByRole('region', { name: 'Esame finale' })).queryByRole('link')).toBeNull();
   });
 
+  it.each([
+    ['superato', examOf({ stato: 'superato', tentativo: attempt({ percentuale: 82, superato: true }) })],
+    ['non-superato', examOf({ stato: 'non-superato', tentativo: attempt(), nuovoEsameDal: '2026-11-23' })],
+  ])('after the hand-in (%s) offers «Rivedi l’esito» to the exam\'s address (LC12)', async (_stato, esame) => {
+    get.mockResolvedValue(page({ esame }));
+    renderPage();
+    const exam = await screen.findByRole('region', { name: 'Esame finale' });
+    expect(within(exam).getByRole('link', { name: 'Rivedi l’esito' })).toHaveAttribute('href', '/learn/percorsi/corso-1/esami/e-1');
+  });
+
   it('a failed exam, from the third day, says «Chiedi al tuo assistente un nuovo esame» with the competences under 60%', async () => {
     get.mockResolvedValue(page({ esame: examOf({ stato: 'non-superato', tentativo: attempt(), nuovoEsameDal: '2026-11-23', chiediNuovoEsame: true, competenzeSotto: ['C2'] }) }));
     renderPage();
