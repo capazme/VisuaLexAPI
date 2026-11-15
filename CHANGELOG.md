@@ -12,6 +12,34 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-15
+
+VisuaLex becomes LexCraft on screen: the name in every text a user reads, LexCraft's column as the mark,
+the addresses named after the sections, and Work's bar in five entries. Web only, no migration.
+
+### Name and mark
+
+- LexCraft in every text a user reads: page title, manifest, sign-in, the steps to connect an AI app,
+  PDF footers, examples, credits (LC5). The MCP commands keep «visualex»; consent texts, past release
+  notes and the browser's storage keys are unchanged.
+- LexCraft's column replaces the book in the splash, the app's mark and the tab icon; under reduced
+  motion it does not move.
+
+### Addresses
+
+- `/opus/…` → `/work/…`, `/studia/…` → `/learn/…`, `/merlt…` and `/grafo` → `/labs…` (LC6, D-235).
+  Every old address redirects to the new one with its path, query and hash, and stays for good: links
+  in the server's notifications (`/studia/percorsi`), saved links and bookmarks keep working. A guard
+  test refuses old addresses in the sources.
+
+### Work
+
+- Work's bar has five entries: Oggi, Corpus (the search, ⌘K), Dossier, Atti and Anonimizzatore, the
+  last two «in arrivo» with a page of their own (LC8, D-315, D-324). «Prossimi giorni» and «Lista
+  d'ingresso» are tabs of Work's page, with «Oggi» lit on all three; «Analizza documento» and
+  «Rassegne» are links on the search page.
+- The logo's column marks the active entry in every section's bar (D-237).
+
 ## [1.13.0] - 2026-11-15
 
 The web in Pietra, LexCraft's design system: warm greys and warm ink, EB Garamond to read and Inter for
