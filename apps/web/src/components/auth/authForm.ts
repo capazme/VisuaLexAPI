@@ -6,7 +6,7 @@
 import { FOCUS_RING } from '../../constants/interactions';
 
 export const FIELD =
-  'w-full h-11 rounded-md border border-slate-200 bg-slate-50 px-3.5 text-base md:text-[15px] text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 outline-none transition-[border-color,box-shadow] focus:border-primary-500 focus:ring-2 focus:ring-primary-500/25 aria-[invalid=true]:border-red-500 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:aria-[invalid=true]:border-red-400';
+  'w-full h-11 rounded-md border border-slate-200 bg-slate-50 inset-shadow-xs px-3.5 text-base md:text-[15px] text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 outline-none transition-[border-color,box-shadow] focus:border-primary-500 focus:ring-2 focus:ring-primary-500/25 aria-[invalid=true]:border-red-500 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:aria-[invalid=true]:border-red-400';
 
 export const LABEL = 'block text-sm font-medium text-slate-900 dark:text-slate-100';
 

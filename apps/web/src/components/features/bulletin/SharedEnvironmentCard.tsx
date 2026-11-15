@@ -100,12 +100,14 @@ export function SharedEnvironmentCard({
       data-shared-env={environment.id}
       aria-labelledby={titleId}
       className={cn(
+        // Resting depth only (LC30): the card is not a link, and a hover lift would make a stacking context that traps the
+        // «⋯» menu under the next card.
         'group relative flex h-full flex-col rounded-xl border',
         // Withdrawn: a dashed edge on a quieter paper, and the badge — no opacity, which would trap the «⋯» menu in a
         // stacking context of its own and fade the text under AA.
         isWithdrawn
           ? 'border-dashed border-slate-400 bg-slate-50 dark:border-slate-600 dark:bg-slate-900/60'
-          : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
+          : 'border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900',
       )}
     >
       {/* The category's hue down the leading edge, from its token; no clipping on the card, so the «⋯» menu can hang out. */}

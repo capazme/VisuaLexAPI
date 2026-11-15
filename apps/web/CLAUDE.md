@@ -3037,7 +3037,8 @@ test lists with their reason (the courts' chips, the kinds of a suggestion's ite
 writes the old toga value out (`authorityColor.ts`, the highlight's blue icon in `highlightColors.ts`); no text
 under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
 windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
-drop —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s
+drop, and `shadow-xs`–`shadow` as a faint warm top edge and a darker drop (LC30: `shadow-sm` and up carry a 1 px light top
+edge in the light too; a shared field carries `inset-shadow-xs`, `--tw-inset-shadow`, so its ring still shows) —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s
 `@apply` is read too. `Button` presses to 0.97 in
 120 ms; a hover that moves or grows something sits under `[@media(hover:hover)_and_(pointer:fine)]` (`HOVER_LIFT`).
 

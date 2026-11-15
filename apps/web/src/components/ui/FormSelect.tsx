@@ -72,7 +72,7 @@ export const FormSelect = forwardRef<HTMLSelectElement, FormSelectProps>(
           <select
             ref={ref}
             className={cn(
-              'w-full border rounded-xl appearance-none cursor-pointer',
+              'w-full border rounded-xl inset-shadow-xs appearance-none cursor-pointer',
               TRANSITION,
               FOCUS_RING.replace('focus-visible:', 'focus:'),
               'focus:border-primary-500',
