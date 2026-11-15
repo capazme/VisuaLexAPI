@@ -12,6 +12,24 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-15
+
+A course's final exam from the web, behind the courses switch, which stays off in production. Web only,
+no migration.
+
+### Learn
+
+- The final exam of a course from the web (LC9): `/learn/percorsi/:id/esami/:esameId`, with its rules,
+  every question and the written opinion on one page, the hand-in, and the result (percentage, skills
+  under 60%, when a new exam can be asked, the right answers with explanations, the opinion beside the
+  model answer with a grid to tick). The course page offers «Inizia la prova» or «Riprendi la prova».
+- «Simulazione d'esame» in «Oggi», one row per course whose next step is the exam.
+
+### Admin
+
+- The courses switch (`lingo_courses`) in «Testi di Learn»: «Accendi/Spegni i percorsi». With it off
+  nothing of the courses shows, as before.
+
 ## [1.15.0] - 2026-11-15
 
 The Forum's Community page: the discussion feed and one open discussion at its own address. Web only, no
