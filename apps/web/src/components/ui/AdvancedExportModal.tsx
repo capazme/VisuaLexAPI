@@ -367,7 +367,7 @@ export function AdvancedExportModal({
       isOpen={isOpen}
       onClose={close}
       size="lg"
-      title="Esporta Articolo"
+      title="Esporta l’articolo"
       description={shortNorm(norma_data)}
       icon={<Download size={20} />}
       variant="info"

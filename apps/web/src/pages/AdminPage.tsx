@@ -429,7 +429,7 @@ export function AdminPage() {
                   <Shield size={20} />
                 </div>
                 <div>
-                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Panel</h1>
+                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Amministrazione</h1>
                   <p className="text-xs text-gray-500">LexCraft</p>
                 </div>
               </div>
@@ -589,7 +589,7 @@ export function AdminPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
                 >
                   <UserPlus size={18} />
-                  Nuovo Utente
+                  Nuovo utente
                 </button>
               </div>
             </div>
@@ -1246,7 +1246,7 @@ export function AdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Crea Nuovo Utente
+              Nuovo utente
             </h3>
             {actionError && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
@@ -1321,7 +1321,7 @@ export function AdminPage() {
                   disabled={actionLoading}
                   className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? 'Creazione...' : 'Crea Utente'}
+                  {actionLoading ? 'Creazione...' : 'Crea l’utente'}
                 </button>
               </div>
             </form>

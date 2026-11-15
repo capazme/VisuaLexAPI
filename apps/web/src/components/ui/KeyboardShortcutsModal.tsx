@@ -25,7 +25,7 @@ const shortcutGroups: ShortcutGroup[] = [
   {
     title: 'Navigazione',
     shortcuts: [
-      { keys: [modKey, 'K'], description: 'Apri Command Palette' },
+      { keys: [modKey, 'K'], description: 'Apri la ricerca veloce' },
       { keys: [modKey, 'F'], description: 'Cerca nel testo' },
       { keys: [modKey, 'B'], description: 'Mostra o nascondi la barra laterale' },
       { keys: [modKey, 'D'], description: 'Vai ai Dossier' },
@@ -127,7 +127,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
               Usa le scorciatoie per navigare velocemente
             </p>
             <p className="text-xs text-primary-600 dark:text-primary-400">
-              Premi <KeyBadge>{modKey}</KeyBadge> + <KeyBadge>K</KeyBadge> per la Command Palette
+              Premi <KeyBadge>{modKey}</KeyBadge> + <KeyBadge>K</KeyBadge> per la ricerca veloce
             </p>
           </div>
         </div>

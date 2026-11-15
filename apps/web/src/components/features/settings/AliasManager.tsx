@@ -203,7 +203,7 @@ export function AliasManager() {
                         <code className="bg-primary-100 dark:bg-primary-800 px-1.5 py-0.5 rounded text-xs font-mono">
                             art X [trigger]
                         </code>
-                        {' '}nella Command Palette (⌘K).
+                        {' '}nella ricerca veloce (⌘K).
                     </p>
                 </div>
 
