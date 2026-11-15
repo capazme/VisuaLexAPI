@@ -406,12 +406,13 @@ export function Layout() {
           <div
             data-testid="search-bar"
             // The phone's bar on this page (M1): 56 px below lg, the menu button beside the field and the iPhone's top
-            // edge above it; 72 px from lg. From md «Commenti» and the Focus toggle float at the top right: the field ends before them.
+            // edge above it; 72 px from lg. From md «Commenti» and the Focus toggle float at the top right: the field ends before them,
+            // with 8 px of air between md and lg (10.5 rem: the toggle's 4 px and 44, 8 of gap, about 103 for «Commenti»; it was 9.75).
             // Positioned in the dropdown band, so the line under the field paints over the practice's sticky headings
             // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
             className={cn(
               'relative flex h-[var(--search-bar-height)] flex-shrink-0 items-center justify-center gap-1 border-b', Z_INDEX.dropdown,
-              'border-slate-200 bg-white/80 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[9.75rem] lg:pl-8 lg:pr-[11rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-900/80',
+              'border-slate-200 bg-white/80 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[10.5rem] lg:pl-8 lg:pr-[11rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-900/80',
             )}
           >
             <MenuToggle {...menuToggle} />

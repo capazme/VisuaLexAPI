@@ -66,7 +66,7 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
     cleanup();
     at('/');
     expect(screen.getByTestId('layout-content').className).not.toMatch(/--focus-button-room/);
-    expect(screen.getByTestId('search-bar')).toHaveClass('md:pr-[9.75rem]', 'lg:pr-[11rem]');
+    expect(screen.getByTestId('search-bar')).toHaveClass('md:pr-[10.5rem]', 'lg:pr-[11rem]');
   });
 
   it("leaves the page's foot its own padding: nothing floats there any more", () => {
