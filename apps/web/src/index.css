@@ -399,6 +399,11 @@
   }
   :disabled, [aria-disabled="true"] { cursor: not-allowed; }
 
+  /* A placeholder is text: secondary ink (5.9:1 on the paper), the dark one's 6.5:1 on the dark surface. Preflight's
+     half-tone of the text colour gave about 3:1. */
+  input::placeholder, textarea::placeholder { color: var(--color-ink-500); }
+  .dark input::placeholder, .dark textarea::placeholder { color: var(--color-ink-400); }
+
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,

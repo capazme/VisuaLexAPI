@@ -137,7 +137,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
           onKeyDown={onKeyDown}
           placeholder={placeholder ?? 'Cerca un articolo o un concetto…'}
           aria-label="Cerca nel grafo"
-          className={`min-h-[44px] w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 ${FIELD_TEXT} text-slate-800 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100`}
+          className={`min-h-[44px] w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 ${FIELD_TEXT} text-slate-800 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100`}
         />
         {state.phase === 'searching' && (
           <span

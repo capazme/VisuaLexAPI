@@ -66,7 +66,7 @@ const QUIET_LINE = 'px-3 py-2 text-sm text-ink-600 dark:text-ink-400';
 const FIELD_INPUT = cn(
   'h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-ink-900 placeholder:text-ink-500',
   FIELD_TEXT,
-  'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50 dark:placeholder:text-ink-400',
+  'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50 dark:placeholder:text-ink-500 dark:placeholder:text-ink-400',
   FOCUS_RING,
 );
 const SMALL_INPUT = cn(
@@ -852,7 +852,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               placeholder="Atto o citazione, es. art 2043 cc"
               // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
               // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
-              className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-400"
+              className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-500 dark:placeholder:text-ink-400"
               onKeyDown={(e) => {
                 // The field's order (R2): a decision, then the server still naming the act (the search runs when it
                 // answers), then a norm — unless the arrows chose another row, which Enter then picks.

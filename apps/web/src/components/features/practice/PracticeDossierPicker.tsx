@@ -59,7 +59,7 @@ export function PracticeDossierPicker({ isOpen, onPick, onClose }: PracticeDossi
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Cerca dossier…"
               aria-label="Cerca dossier"
-              className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
         </div>
