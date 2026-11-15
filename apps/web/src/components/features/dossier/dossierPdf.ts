@@ -326,7 +326,8 @@ export async function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock
   const w = createPdfWriter(doc, { footerLeft: `${header.title} · LexCraft` });
   const { ensureSpace, write } = w;
 
-  doc.setFillColor(30, 64, 175);
+  // Pietra's toga, the app's action colour (`--color-primary-600`, oklch(28.5% 0.004 84.6)): the old blue band was not Pietra (#445).
+  doc.setFillColor(43, 42, 40);
   doc.rect(0, 0, 595, 12, 'F');
   write(header.title, 22, 'bold', 28);
   write(`Fascicolo normativo · ${header.countsLine} · Esportato il ${header.exportedOn}`, 9, 'normal', 18, true);

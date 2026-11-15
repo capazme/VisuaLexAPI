@@ -275,7 +275,9 @@ export function AuthPage() {
                 !inkShown && 'motion-reduce:opacity-0',
               )}
             >
-              <BookMark size={44} className="vlx-ink-book text-primary-600 dark:text-primary-400" />
+              {/* From md the column is flush with the «L»: it spans 29.25–70.75 of the mark's 100 units, so it stood
+                  12.9 px inside the 44 px box (#446). Below md, centred, the box is centred as it is. */}
+              <BookMark size={44} className="vlx-ink-book text-primary-600 dark:text-primary-400 md:-ml-[12.9px]" />
               {/* One text, the name, for the eye and for a reader; while the pen writes, a faint blurred copy of it,
                   hidden from a reader, runs ahead of the ink's mask (WebKit kerns no pair across two elements, so the
                   word is never split into letters). The cells' padding, taken back by the grid's margins, gives the
