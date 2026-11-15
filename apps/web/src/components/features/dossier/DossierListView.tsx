@@ -434,7 +434,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   }
                 }}
                 className={cn(
-                  'dossier-card group relative flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 transition-[border-color,scale] hover:border-slate-400 active:scale-[0.98] motion-reduce:active:scale-100 md:p-5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500',
+                  'dossier-card group relative flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-[border-color,translate,scale] duration-[160ms] ease-out hover:border-slate-400 hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100 md:p-5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500',
+                  // LC30: it lifts 1 px as its shadow grows, and the press brings it back down. The shadow changes at
+                  // once: `box-shadow` is not transitioned, the focus ring is one and must appear at once (TRANSITION).
+                  'motion-safe:[@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-px motion-safe:active:translate-y-0',
                   FOCUS_RING,
                 )}
               >

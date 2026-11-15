@@ -786,6 +786,17 @@ describe('the section change (T1)', () => {
     expect(css).toMatch(/\.dark :is\(\.shadow-lg, \.shadow-xl, \.shadow-2xl\)\s*\{\s*--tw-shadow:/);
   }, 30000);
 
+  it('gives a thing on the page a light top edge and a short drop, and a field a slight inset (LC30, the owner on 15 Nov: «un po\' più di tridimensionalità, una cosa leggera»)', async () => {
+    const css = await compile(['shadow-sm', 'hover:shadow-md', 'inset-shadow-xs', 'focus-visible:ring-2']);
+    expect(css).toMatch(/\.shadow-sm\s*\{[^}]*--tw-shadow:\s*inset 0 1px 0/);
+    // The dark redraws the raised surfaces, and the hover's growth after them, or the unlayered rule would win.
+    expect(css).toMatch(/\.dark :is\(\.shadow-xs, \.shadow-sm, \.shadow\)\s*\{\s*--tw-shadow:\s*inset 0 1px 0 rgb\(255 250 240/);
+    expect(css).toMatch(/\.dark \.hover\\:shadow-md:hover\s*\{\s*--tw-shadow:/);
+    // The field's inset is Tailwind's own `--tw-inset-shadow`, composed with the rings: the focus ring still shows.
+    expect(css).toMatch(/\.inset-shadow-xs\s*\{[^}]*--tw-inset-shadow:\s*inset 0 1px 2px/);
+    expect(css).toMatch(/\.inset-shadow-xs\s*\{[^}]*box-shadow:[^;]*var\(--tw-ring-shadow\)/);
+  }, 30000);
+
   it('keeps a focus ring over a shadow in the dark: the dark rules set `--tw-shadow`, never `box-shadow` (Y1)', async () => {
     const css = await compile(['shadow-md', 'shadow-lg', 'focus-visible:ring-2']);
     // Outside the layers a `box-shadow` on `.dark .shadow-*` replaced the ring of `focus-visible:ring-2` (WCAG 2.4.7).

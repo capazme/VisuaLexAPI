@@ -123,15 +123,19 @@
   --color-neutral-800: var(--color-ink-800); --color-neutral-900: var(--color-ink-900);
   --color-neutral-950: var(--color-ink-950);
 
-  /* Elevation is two shadows: a hairline for things on the page, a ring and a soft drop for things
-     floating over it. Redefined here so the existing shadow-* classes follow. */
-  --shadow-xs: 0 1px 0 rgb(43 42 40 / 0.04);
-  --shadow-sm: 0 1px 0 rgb(43 42 40 / 0.04), 0 1px 2px rgb(43 42 40 / 0.06);
-  --shadow: 0 1px 0 rgb(43 42 40 / 0.04), 0 1px 2px rgb(43 42 40 / 0.06);
-  --shadow-md: 0 1px 0 rgb(43 42 40 / 0.04), 0 2px 6px -1px rgb(43 42 40 / 0.08);
-  --shadow-lg: 0 0 0 1px rgb(43 42 40 / 0.06), 0 12px 32px -8px rgb(43 42 40 / 0.18);
-  --shadow-xl: 0 0 0 1px rgb(43 42 40 / 0.06), 0 12px 32px -8px rgb(43 42 40 / 0.18);
-  --shadow-2xl: 0 0 0 1px rgb(43 42 40 / 0.06), 0 24px 48px -12px rgb(43 42 40 / 0.22);
+  /* Elevation, light and physical (LC30, the owner on 15 Nov: «un po' più di tridimensionalità, una cosa
+     leggera»): a thing on the page has a 1 px light top edge and a short soft drop in warm ink; a thing
+     floating over it a ring and a deeper drop; a field sits a little into the page (`inset-shadow-xs`).
+     Never a glow or a coloured shadow. Redefined here so the existing shadow-* classes follow; the dark
+     theme redraws them further down (`.dark :is(.shadow-xs, …)`). */
+  --shadow-xs: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(43 42 40 / 0.05);
+  --shadow-sm: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(43 42 40 / 0.06), 0 2px 6px -2px rgb(43 42 40 / 0.08);
+  --shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(43 42 40 / 0.06), 0 2px 6px -2px rgb(43 42 40 / 0.08);
+  --shadow-md: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(43 42 40 / 0.06), 0 6px 14px -4px rgb(43 42 40 / 0.12);
+  --shadow-lg: 0 0 0 1px rgb(43 42 40 / 0.06), 0 2px 4px rgb(43 42 40 / 0.04), 0 12px 32px -8px rgb(43 42 40 / 0.2);
+  --shadow-xl: 0 0 0 1px rgb(43 42 40 / 0.06), 0 2px 4px rgb(43 42 40 / 0.04), 0 12px 32px -8px rgb(43 42 40 / 0.2);
+  --shadow-2xl: 0 0 0 1px rgb(43 42 40 / 0.06), 0 2px 4px rgb(43 42 40 / 0.04), 0 24px 48px -12px rgb(43 42 40 / 0.24);
+  --inset-shadow-xs: inset 0 1px 2px rgb(43 42 40 / 0.06);
 
   /* Motion (spec §4.4). Tailwind reads these for its own utilities, so every transition-* and
      ease-out class already in the code follows; `lib/motion.ts` mirrors them for Framer Motion. */
@@ -1398,10 +1402,22 @@
    — a `box-shadow` written here, outside the layers, replaced the ring (WCAG 2.4.7). Unlayered, so it
    wins over the utilities' `--tw-shadow`. */
 .dark :is(.shadow-lg, .shadow-xl, .shadow-2xl) {
-  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px -12px rgb(0 0 0 / 0.7);
 }
 .dark .shadow-md {
-  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 8px 24px -10px rgb(0 0 0 / 0.55);
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 2px 4px rgb(0 0 0 / 0.25), 0 10px 26px -10px rgb(0 0 0 / 0.6);
+}
+/* A thing on the page in the dark (LC30): a faint warm top edge and a darker short drop, so a card lifts off the
+   #1f1e1c ground; no ring, the card's own border draws its edge. The hover's `shadow-md` (a card that lifts, `ui/Card`)
+   is redrawn after it, or this unlayered rule would win over the utility and the card would not grow on hover. */
+.dark :is(.shadow-xs, .shadow-sm, .shadow) {
+  --tw-shadow: inset 0 1px 0 rgb(255 250 240 / 0.04), 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+}
+.dark .hover\:shadow-md:hover {
+  --tw-shadow: inset 0 1px 0 rgb(255 250 240 / 0.05), 0 2px 4px rgb(0 0 0 / 0.35), 0 8px 18px -6px rgb(0 0 0 / 0.5);
+}
+.dark .inset-shadow-xs {
+  --tw-inset-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
 }
 
 /* LexCraft's column (ui/BookMark, and the splash in index.html; the classes keep the book's name): capital and base
@@ -1528,12 +1544,12 @@
   background: #fff;
   color: var(--color-ink-900);
   font-family: var(--font-sans);
-  box-shadow: 0 0 0 1px rgb(43 42 40 / 0.06), 0 12px 32px -8px rgb(43 42 40 / 0.22);
+  box-shadow: 0 0 0 1px rgb(43 42 40 / 0.06), 0 2px 4px rgb(43 42 40 / 0.04), 0 12px 32px -8px rgb(43 42 40 / 0.22);
 }
 .dark .driver-popover.visualex-tour-popover {
   background: var(--color-ink-900);
   color: var(--color-ink-100);
-  box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  box-shadow: 0 0 0 1px var(--color-ink-700), 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px -12px rgb(0 0 0 / 0.7);
 }
 .driver-popover.visualex-tour-popover .driver-popover-title {
   padding-right: 28px; /* clear of the close button */
