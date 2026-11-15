@@ -2,7 +2,8 @@ import { cn } from '../../../lib/utils';
 
 /**
  * The empty dossier list's drawing (S7c): line art in the manner of the section
- * switcher's mark — a rounded tile, round strokes of one weight — in the section's hue, a folder with two lines of
+ * switcher's mark — a rounded tile, round strokes of one weight — in the section's colour (`hue`, Work's ink for all
+ * four since LC16), a folder with two lines of
  * entries. Decorative: the words beside it say what to do.
  */
 export function DossierMark({ hue, className }: { hue: string; className?: string }) {

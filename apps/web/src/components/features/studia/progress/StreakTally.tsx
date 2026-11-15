@@ -12,7 +12,7 @@ const PEN = { duration: 0.22, ease: ease.inOut } as const;
 /**
  * The streak's bundle of five as tally marks (S2; inspired by Animorio's «Il contatore a tacche», written from
  * scratch): the days of the bundle being filled, one pen mark each; the fifth is the stroke across the four, in the
- * section's hue, which draws them together. `grew`: the streak grew since this browser last drew it — the newest
+ * section's ink (`--vlx-section-gymnasium`, Pietra since LC16), which draws them together. `grew`: the streak grew since this browser last drew it — the newest
  * mark comes down from the top (or the stroke passes and the four close up). Otherwise, and under reduced motion,
  * it is drawn at rest. The count says the streak; this is its picture, hidden from a screen reader.
  */

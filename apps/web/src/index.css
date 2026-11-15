@@ -1604,33 +1604,34 @@
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: var(--color-ink-900); }
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: var(--color-ink-900); }
 
-/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. The same hues colour
-   Gymnasium's small motions (the tally's stroke, the mission's drop, the lesson bar's head); none of those carries
-   meaning either. On a change of section the mark passes to the new hue (`SectionSwitcher`, T1). */
+/* The sections' tile (LC16, the owner, 15 Nov 2026: «i toggle tutti in color pietra»): the four are one, Work's — the
+   action's ink, light and dark — and the hues VisuaLex gave Learn, Labs and the Forum are gone. The tokens keep a name
+   per section, read by the switcher's mark, Gymnasium's small motions (the tally's stroke, the mission's drop and line,
+   the lesson bar) and the empty dossier list's drawing; a section that someday needs its own value writes it here.
+   Ink on the white tile 13.5:1, paper on the dark one 12.4:1. */
 :root {
   --vlx-section-opus: var(--color-toga-600);
-  --vlx-section-gymnasium: oklch(31% 0.09 268);
-  --vlx-section-academia: oklch(55% 0.09 70);
-  --vlx-section-forum: oklch(55% 0.08 190);
-  /* The lesson bar's head runs ahead of the ink: the section's hue, lighter where the ink is dark. */
-  --vlx-gymnasium-wash: oklch(64% 0.1 268);
-  /* The lesson bar's ink (G8): the section's hue at a step that reads as a colour, over 3:1 on its track. */
-  --vlx-gymnasium-bar: oklch(48% 0.14 268);
+  --vlx-section-gymnasium: var(--color-toga-600);
+  --vlx-section-academia: var(--color-toga-600);
+  --vlx-section-forum: var(--color-toga-600);
+  /* The lesson bar's head runs ahead of the ink in Pietra's stone (2.6:1 on the track, 3.9:1 against the ink). */
+  --vlx-gymnasium-wash: var(--vlx-pietra);
+  /* The lesson bar's ink (G8): the action's ink, 10.1:1 on its track (ink 200). */
+  --vlx-gymnasium-bar: var(--color-toga-600);
 }
 .dark {
   --vlx-section-opus: var(--color-toga-500);
-  --vlx-section-gymnasium: oklch(45% 0.11 268);
-  --vlx-section-academia: oklch(60% 0.09 70);
-  --vlx-section-forum: oklch(58% 0.08 190);
-  --vlx-gymnasium-wash: oklch(45% 0.11 268);
-  --vlx-gymnasium-bar: oklch(70% 0.12 268);
+  --vlx-section-gymnasium: var(--color-toga-500);
+  --vlx-section-academia: var(--color-toga-500);
+  --vlx-section-forum: var(--color-toga-500);
+  /* 3.3:1 on the dark track (ink 800), 3.2:1 against the paper ink. */
+  --vlx-gymnasium-wash: var(--vlx-pietra);
+  /* Paper on the dark track, 10.4:1. */
+  --vlx-gymnasium-bar: var(--color-toga-500);
 }
 .vlx-section-mark { background: var(--vlx-section-opus); }
-.vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
-.vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
-.vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
-/* Dark Work is the dark action, paper: its icon is ink, not the switcher's `text-white` (unlayered, so it wins). */
-.dark .vlx-section-mark[data-section="opus"] { color: var(--color-ink-950); }
+/* In the dark the tile is paper: its icon is ink, not the switcher's `text-white` (unlayered, so it wins). */
+.dark .vlx-section-mark { color: var(--color-ink-950); }
 
 /* «Analizza documento»'s box (D6): the frame's dashes stand still at rest — nothing moves for ever on an open page
    (Bill) —, turn slowly under a mouse or with the keyboard's focus on the box, and run while a file is dragged over
@@ -1654,9 +1655,9 @@
 /* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it
    (`progress/seenProgress.ts`); under reduced motion none moves and the final state is drawn at once. */
 
-/* A mission done (today's missions): its words in a quieter ink, struck through in the section's hue. Done just now,
-   the ink crosses the words first — a band of the hue running left to right, leaving them done behind it — as the
-   drop fills the box (`MissionMark`, `MISSION_INK_MS`). */
+/* A mission done (today's missions): its words in a quieter ink, struck through in the section's ink (Learn's token,
+   Work's ink since LC16). Done just now, the ink crosses the words first — a band of stone running left to right,
+   leaving them done behind it — as the drop fills the box (`MissionMark`, `MISSION_INK_MS`). */
 :root { --vlx-todo-ink: var(--color-ink-900); --vlx-done-ink: var(--color-ink-600); }
 .dark { --vlx-todo-ink: var(--color-ink-50); --vlx-done-ink: var(--color-ink-300); }
 .vlx-mission-done {
@@ -1665,7 +1666,7 @@
 }
 .vlx-mission-inking {
   color: transparent;
-  background: linear-gradient(90deg, var(--vlx-done-ink) 0 33%, var(--vlx-section-gymnasium) 33% 40%, var(--vlx-todo-ink) 47% 100%) 100% 0 / 300% 100% no-repeat;
+  background: linear-gradient(90deg, var(--vlx-done-ink) 0 33%, var(--vlx-pietra) 33% 40%, var(--vlx-todo-ink) 47% 100%) 100% 0 / 300% 100% no-repeat;
   -webkit-background-clip: text;
   background-clip: text;
   text-decoration: line-through 1.5px;
@@ -1686,7 +1687,7 @@
   100% { translate: 0 0; scale: 1 1; }
 }
 
-/* The lesson's bar: the head runs ahead in the section's hue, the ink catches up a moment later on a spring
+/* The lesson's bar: the head runs ahead in stone, the ink catches up a moment later on a spring
    (`--ease-catch`, a damped spring sampled as a `linear()` curve, a hair of overshoot), then the bar trembles by a
    pixel (`ReviewSession`, Web Animations). */
 :root {

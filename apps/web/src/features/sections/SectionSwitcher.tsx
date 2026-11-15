@@ -158,8 +158,8 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
     onChoose?.();
   };
 
-  // The section's own hue lives only here and on page headers' hairline (spec 2026-10-18-redesign-inchiostro §4.1).
-  // On a change of section it passes to the new hue in 200 ms, the change's one touch of colour (T1).
+  // The section's tile: since LC16 one Pietra tile for all four, Work's (`index.css`, `--vlx-section-*`). The colour
+  // transition (T1, 200 ms) stays, for a section that someday takes a value of its own.
   const mark = (
     <>
       <span aria-hidden data-section={section} className="vlx-section-mark grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-white transition-colors duration-200 ease-out motion-reduce:transition-none">

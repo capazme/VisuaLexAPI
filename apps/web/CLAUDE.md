@@ -1689,8 +1689,8 @@ it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives t
 (`focusMode`) is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
 header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
 where done are the cards out of the queue — a «Di nuovo» holds it still —; at each grade that moves it the head runs
-ahead in the section's hue (`vlx-lesson-head`, 150 ms), the ink — the hue too, at a step that reads as a colour on its
-track (`vlx-lesson-ink`, `--vlx-gymnasium-bar`, G8: it was the ink's near-grey) — catches up 70 ms later on `--ease-catch` (300 ms) and the
+ahead in Pietra's stone (`vlx-lesson-head`, `--vlx-gymnasium-wash`, 150 ms), the ink — the action's ink since LC16,
+10:1 on its track (`vlx-lesson-ink`, `--vlx-gymnasium-bar`) — catches up 70 ms later on `--ease-catch` (300 ms) and the
 bar trembles by a pixel (Web Animations, `PLUCK`), 370 ms in all, all of it `motion-safe:` only; «Restano N»
 stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
 in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
@@ -1747,7 +1747,7 @@ heights are a day's with cards to review and missions: a day done or a subject c
 with no mission at all (a server without the points, no card yet) the missions' place goes when the read comes (0.15–0.22,
 from 0.48–0.57 before). In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
-   under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
+   under the bar): a tile, its weight the title's size, no coloured edge, a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
    ottobre · Diritto penale» narrowed to a subject); in EB Garamond, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
    (`todaySentence`, a part that is zero left out); under it «circa 7 minuti · Diritto civile, Diritto penale e altre 2»
@@ -1782,7 +1782,7 @@ from 0.48–0.57 before). In that order:
    «materia-ferma»). Nothing is counted in the browser. A mission
    with nothing to do today (`vuota`) says so and leaves the summary; a goal the server counted with the queue finished
    under it says why. A mission done reads done
-   (`.vlx-mission-done`: a quieter ink, struck through in the section's hue) and slides under those still open
+   (`.vlx-mission-done`: a quieter ink, struck through in the section's ink) and slides under those still open
    (`missionOrder`), except the due cards', the day block's own count, which stays first; done since this browser last drew
    it, a drop of ink falls into its box and the ink crosses its words first (`MissionMark`'s `drip`,
    `.vlx-mission-inking`, `MISSION_INK_MS`), then it moves (a moving row keeps its padding wherever it lands; the
@@ -1795,7 +1795,7 @@ from 0.48–0.57 before). In that order:
    block's to say.
 3. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count with the bundle
    of five being filled as tally marks beside it, `StreakTally` — the fifth is the stroke across the four in the
-   section's hue —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and the current week; no ring of the
+   section's ink —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and the current week; no ring of the
    goal (G8: the goal's mission says it, and «Progressi» draws it); under them **the level** (`progress/LevelBar`, G1c: «Livello 4», «oggi +45 XP», a quiet bar of `nelLivello` of `perIlProssimo` and
    «Ancora 138 XP per il livello 5», all from the read's `livello`, which the server computes; the user's alone, G-316 — never
    in the Forum, a public dossier or anything another user sees —, no title, L-27 choice 3, and never a weight of a vote,
@@ -3017,7 +3017,8 @@ other route fails.
 
 **Pietra everywhere** (D-156, after Inchiostro's Y1; `lib/pietra.guard.test.ts` reads the sources): an action and the
 focus are `primary-*` (toga, now warm ink: the action is the ink itself, no accent colour), everything else `slate-*`
-(ink, warm grey), a section its hue (`--vlx-section-*`); ink and toga stay warm and near-grey in `index.css`, light
+(ink, warm grey), a section its tile (`--vlx-section-*`: since LC16 Work's ink for all four, the owner's «tutti in
+color pietra»); ink and toga stay warm and near-grey in `index.css`, light
 and dark (the guard reads their values); `#8a8478` (pietra, 3.2:1) is never text; an active area is the highlighter
 (`primary-50`, dark `primary-900/20`–`/30`) with ink text; green, amber, red and the other functional colours keep their meaning
 and never decorate; no `blue-*`, `indigo-*`,
