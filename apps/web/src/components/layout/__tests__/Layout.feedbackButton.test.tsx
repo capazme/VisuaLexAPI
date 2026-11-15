@@ -133,14 +133,18 @@ describe('Layout — the top bar from lg (LC21)', () => {
     expect(appStore.getState().settings.focusMode).toBe(true);
   });
 
-  it('draws no top bar on the search page, whose own bar holds the controls', () => {
+  it('on the search page draws the top bar too, with the path «Work › Corpus» and the field, compact, in the search\'s place (anti-slop FAIL, 15 Nov)', () => {
     at('/');
-    expect(screen.queryByTestId('top-bar')).toBeNull();
-    const searchBar = screen.getByTestId('search-bar');
-    expect(within(searchBar).getByTestId('feedback')).not.toHaveClass('fixed');
-    expect(within(searchBar).getByRole('button', { name: 'Tutto schermo' })).toBeInTheDocument();
-    expect(within(searchBar).getByTestId('news-in-bar')).toBeInTheDocument();
+    expect(screen.queryByTestId('search-bar')).toBeNull();
+    const bar = screen.getByTestId('top-bar');
+    expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toHaveTextContent('WorkCorpus');
+    expect(within(bar).getByRole('search', { name: 'Ricerca' })).toBeInTheDocument();
+    expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
+    expect(within(bar).getByRole('button', { name: 'Tutto schermo' })).toBeInTheDocument();
+    expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
     expect(screen.queryByTestId('news-floating')).toBeNull();
+    // The practice's columns are the viewport less this bar, 52 px.
+    expect(document.querySelector('main')).toHaveClass('[--search-bar-height:3.25rem]');
   });
 
   it('draws no top bar under the lesson', () => {

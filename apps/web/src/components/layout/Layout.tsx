@@ -128,7 +128,8 @@ export function Layout() {
   const onSearchPage = pathname === '/';
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
-  const showSearchBar = onSearchPage && !settings.focusMode;
+  // Below lg (from lg the top bar holds the field, compact: LC21, the anti-slop review's FAIL of the 15th).
+  const showSearchBarRaw = onSearchPage && !settings.focusMode;
   // Below lg a bar sits at the top of every page (M1): the search page's is its field, with the menu button beside it;
   // every other page has `PhoneTopBar` over its content area, and starts under it. Focus mode draws neither.
   // Gymnasium's lesson covers the shell (`LessonFrame`): no bar under it for Tab to reach.
@@ -168,8 +169,11 @@ export function Layout() {
   // LC21: from lg every page but the search page and the lesson has the top bar, which holds the controls that floated
   // («Commenti», «Tutto schermo») and the version's news; the search page's own bar holds them too. In full screen and
   // below lg they float as before.
-  const showTopBar = lgUp && showPhoneBar;
+  const showTopBar = lgUp && (showPhoneBar || (onSearchPage && !settings.focusMode));
   const controlsInBar = lgUp && !settings.focusMode && !inLesson;
+  const showSearchBar = showSearchBarRaw && !lgUp;
+  // The search page from lg: the top bar with the path and the field.
+  const searchInTopBar = showSearchBarRaw && lgUp;
   useEffect(() => {
     if (!sidebarOpen || !drawerDrawn) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -390,7 +394,9 @@ export function Layout() {
           'focus:outline-none',
           // The practice's columns (`h-app-row`) are the viewport less the search bar: 56 px below lg (and the iPhone's
           // top edge), 72 from it.
-          showSearchBar && '[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))] lg:[--search-bar-height:4.5rem]',
+          showSearchBar && '[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]',
+          // From lg the practice's columns are the viewport less the top bar, 52 px.
+          searchInTopBar && '[--search-bar-height:3.25rem]',
           // Where a page's sticky row pins (`top-[var(--phone-bar-offset,0px)]`, «Le mie schede»'s filters): under the
           // phone's bar while it is on screen, at the top once it has slid away, and at the top from lg.
           showPhoneBar && 'max-lg:[--phone-bar-offset:calc(3.5rem+env(safe-area-inset-top))]',
@@ -436,7 +442,7 @@ export function Layout() {
           {settings.focusMode ? <Minimize2 size={20} aria-hidden /> : <Maximize2 size={20} aria-hidden />}
         </motion.button>}
 
-        {showTopBar && <TopBar section={activeSection} pathname={pathname} search={search} scroller={scroller} actions={barControls} onSearch={openCommandPalette} />}
+        {showTopBar && <TopBar section={activeSection} pathname={pathname} search={search} scroller={scroller} actions={barControls} onSearch={openCommandPalette} field={searchInTopBar ? <SearchField compact /> : undefined} />}
 
         {showPhoneBar && (
           <PhoneTopBar
@@ -465,7 +471,6 @@ export function Layout() {
           >
             <MenuToggle {...menuToggle} />
             <SearchField />
-            {controlsInBar && <div className="absolute right-6 top-1/2 flex -translate-y-1/2 items-center gap-2">{barControls}</div>}
           </div>
         )}
 

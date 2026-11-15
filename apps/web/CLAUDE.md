@@ -512,7 +512,9 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   since D-253. **From `lg` (LC21) nothing floats**: `TopBar` (`components/layout/TopBar.tsx`, 52 px, every page but the search page,
   the lesson and the full screen) draws the path («Work › Dossier › Pratica …», the page's `h1` as its last step on a page deeper
   than its list), the compact search (it opens the palette), «Novità in vX» (`ChangelogNotification inBar`), «Commenti» and
-  «Tutto schermo», in line; on the search page the same controls sit inside its bar (`lg:pr-[17rem]`). What follows holds below
+  «Tutto schermo», in line; on the search page too, with «Work › Corpus» («Ricerca» in the other sections) and the
+  search field itself, compact (`SearchField compact`), in the search button's place; the practice's columns then take
+  the 52 px bar off their height (`--search-bar-height: 3.25rem`). Below `lg` the search page keeps its own bar, the field. What follows holds below
   `lg` and in full screen: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
   for someone signed in, left of «Tutto schermo» with 8 px between: `right-[4.25rem]` at `top-4` from `lg` and in full
   screen, `right-14` in the bar's right end between `md` and `lg`, whose `PhoneTopBar` and search field keep

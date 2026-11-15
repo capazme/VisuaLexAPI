@@ -677,7 +677,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             Both stay mounted, the other hidden, so a selection or a task being written survives the switch. */}
         <SegmentedTabs
           tabs={[
-            { id: 'fonti', label: 'Fonti', extra: <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
+            { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
             { id: 'compiti', label: 'Compiti' },
           ]}
           value={view}

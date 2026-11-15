@@ -31,13 +31,15 @@ function listOf(pathname: string): string {
 }
 
 /**
+ * `field`: the search page's own field, compact, in the place of the search button (its words open the menu).
  * The bar over every page from `lg` (LC21, the prototype of 12 November): where the reader is, as a path («Work ›
  * Dossier › Pratica 2026/14»), and on its right the search, compact (it opens the menu, ⌘K), the version's news and
  * the page's two controls, «Commenti» and «Tutto schermo», which until 1.19.0 floated over the page. The search page
  * keeps its own bar, its field.
  */
-export function TopBar({ section, pathname, search = '', scroller, actions, onSearch }: { section: Section; pathname: string; search?: string; scroller: HTMLElement | null; actions: ReactNode; onSearch: () => void }) {
-  const page = pageName(pathname);
+export function TopBar({ section, pathname, search = '', scroller, actions, onSearch, field }: { section: Section; pathname: string; search?: string; scroller: HTMLElement | null; actions: ReactNode; onSearch: () => void; field?: ReactNode }) {
+  // The search page is Work's «Corpus» and the other sections' «Ricerca», as the sidebar names it.
+  const page = pathname === '/' ? (section.id === 'opus' ? 'Corpus' : 'Ricerca') : pageName(pathname);
   const list = listOf(pathname);
   // Deeper than its list: a further segment, or a query that opens one item of it (`/dossier?dossier=…`).
   const deeper = page !== undefined && (pathname.replace(/\/$/, '') !== list || search.length > 1);
@@ -71,7 +73,7 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
           )}
         </ol>
       </nav>
-      <button
+      {field ?? <button
         type="button"
         // As the phone's bar: focused first (Safari does not focus a clicked button), so the menu gives the focus back here.
         onClick={(event) => {
@@ -88,7 +90,7 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         <Search aria-hidden size={15} strokeWidth={1.75} className="shrink-0" />
         <span>Norma, dossier o pagina</span>
         <kbd aria-hidden className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 font-mono text-[11px] text-slate-500 dark:border-slate-700">{PALETTE_SHORTCUT}</kbd>
-      </button>
+      </button>}
       {actions}
     </div>
   );

@@ -212,7 +212,7 @@ describe('Layout — the search page\'s field', () => {
     const bar = screen.getByTestId('search-bar');
     expect(bar).toHaveClass('h-[var(--search-bar-height)]', 'pl-1', 'lg:pl-8', 'md:pr-[10.5rem]', 'lg:pr-[17rem]');
     expect(bar.firstElementChild).toHaveAccessibleName('Apri il menu');
-    expect(document.querySelector('main')).toHaveClass('[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]', 'lg:[--search-bar-height:4.5rem]');
+    expect(document.querySelector('main')).toHaveClass('[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]');
   });
 
   it.each(['/dossier', '/history'])('is not drawn on %s', (path) => {
