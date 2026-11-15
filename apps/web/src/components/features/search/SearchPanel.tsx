@@ -707,7 +707,7 @@ export function SearchPanel() {
             aria-atomic="true"
           >
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-lg flex items-start gap-4">
-              {/* The book breathes while the texts arrive (spec 2026-10-18-redesign-inchiostro §6.3.1). */}
+              {/* The column breathes while the texts arrive (spec 2026-10-18-redesign-inchiostro §6.3.1). */}
               <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-primary-600 dark:text-primary-400">
                 <BookMark size={28} breathe />
               </div>
