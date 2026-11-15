@@ -12,6 +12,30 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-15
+
+A busy or briefly unreachable server no longer signs anyone out; the night's retouches from the browser
+tests; Learn's exam follows its state. Web only, no migration.
+
+### Sign-in
+
+- A 429, a server error or no answer on `/auth/me` keeps the session: the app asks again after 1, 2, 4
+  and 8 s, and if the server is still unreachable says «Connessione al server non riuscita. La sessione
+  resta aperta: riprova tra poco.» with «Riprova». Only a 401 or 403, or a token already gone, signs out
+  (LC13). No page is drawn without its user.
+
+### Look
+
+- The sign-in page's column lines up with the «L» of LexCraft from 768 px; no jump in opacity from the
+  splash to the app; sidebar, Forum and dossier PDF retouches from the browser tests (LC11).
+- «Segnala» in the Forum starts on «Annulla», so an Enter pressed at once does not report.
+
+### Learn
+
+- The exam's page and Oggi's row follow the attempt's state (to start, in progress, handed in); the
+  hand-in always asks for confirmation; «Rivedi l’esito» after it (LC12). Behind `lingo_courses`, off
+  in production.
+
 ## [1.16.0] - 2026-11-15
 
 A course's final exam from the web, behind the courses switch, which stays off in production. Web only,
