@@ -10,8 +10,12 @@ import { loadAssistantFeatures } from '../store/assistantProposals';
 import { getErrorMessage } from '../utils/errors';
 import { settleShortcutUndo } from '../components/ui/notifications/notifications';
 import { claimBrowserFor, forgetUserData } from '../services/sessionEnd';
+import { isRefusalStatus } from '../services/api';
 // Registers the reset of the in-memory user state with `forgetUserData`, before any request can end a session.
 import '../services/userDataReset';
+
+/** The pauses before asking `/auth/me` again after a 429, a 5xx or no answer: about 15 s in all. */
+const LOAD_USER_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
 
 interface AuthState {
   user: UserResponse | null;
@@ -32,9 +36,11 @@ export function useAuth() {
    * Load current user info on mount
    */
   useEffect(() => {
-    const loadUser = async () => {
+    let unmounted = false;
+    const loadUser = async (attempt = 0): Promise<void> => {
       if (!authService.isAuthenticated()) {
-        setState((prev) => ({ ...prev, loading: false }));
+        // Also when the token went during a retry's pause: no token is never signed in.
+        setState((prev) => ({ ...prev, loading: false, isAuthenticated: false }));
         return;
       }
 
@@ -57,16 +63,28 @@ export function useAuth() {
           void loadAssistantFeatures();
         }
       } catch (error) {
+        // Only a refusal (401, 403) or a token gone (a refused refresh cleared it) ends the session. A 429, a 5xx or
+        // no answer keeps it: the user is asked again after a pause, still loading, a few times (LC13).
+        const refused = !authService.isAuthenticated() || isRefusalStatus((error as { status?: unknown } | null)?.status);
+        if (!refused && attempt < LOAD_USER_RETRY_DELAYS_MS.length) {
+          await new Promise((resolve) => setTimeout(resolve, LOAD_USER_RETRY_DELAYS_MS[attempt]));
+          if (!unmounted) await loadUser(attempt + 1);
+          return;
+        }
+        // Retries over and the session kept: signed in with no user, which `ProtectedRoute` says in words.
         setState({
           user: null,
           loading: false,
           error: getErrorMessage(error) || 'Failed to load user',
-          isAuthenticated: false,
+          isAuthenticated: !refused,
         });
       }
     };
 
     loadUser();
+    return () => {
+      unmounted = true;
+    };
   }, []);
 
   /**

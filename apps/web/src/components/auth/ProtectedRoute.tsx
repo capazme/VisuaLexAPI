@@ -4,13 +4,14 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { BookMark } from '../ui/BookMark';
+import { CONNECTION_FAILED_MESSAGE } from '../../services/api';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
 
   // While the session is checked: the column of the splash in index.html, at the same place and size, so
@@ -28,6 +29,28 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // The session is kept but the account could not be read (a 429, a 5xx, no answer, after the retries): said in
+  // words, never a page drawn without its user (LC13).
+  if (!user) return <SessionKeptUnreachable />;
+
   // Render children if authenticated
   return <>{children}</>;
+}
+
+/** Signed in, the account not read: the session stays open and a reload asks again. */
+export function SessionKeptUnreachable() {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-50 px-4 dark:bg-slate-950">
+      <div role="alert" className="max-w-sm text-center text-slate-700 dark:text-slate-200">
+        <p className="mb-4">{CONNECTION_FAILED_MESSAGE}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="min-h-11 rounded-xl bg-primary-600 px-6 font-medium text-white hover:bg-primary-700"
+        >
+          Riprova
+        </button>
+      </div>
+    </div>
+  );
 }

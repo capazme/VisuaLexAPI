@@ -45,6 +45,11 @@ export function handleUnauthenticated(): void {
   window.location.href = '/login';
 }
 
+/** Whether an answer refuses the session: 401 or 403. A 429, a 5xx or no answer (undefined) does not. */
+export function isRefusalStatus(status: unknown): boolean {
+  return status === 401 || status === 403;
+}
+
 /**
  * Whether a failed refresh means the session is over: the server answered and refused it (401, 403), or there
  * is no refresh token. A server error (5xx), a 429 or no answer at all (network, timeout) does not: the session
@@ -52,8 +57,7 @@ export function handleUnauthenticated(): void {
  */
 export function isRefreshRefused(error: unknown): boolean {
   if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    return status === 401 || status === 403;
+    return isRefusalStatus(error.response?.status);
   }
   // `No refresh token`: nothing to refresh with.
   return true;
