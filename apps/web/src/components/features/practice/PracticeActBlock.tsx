@@ -7,6 +7,7 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData, Norma } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
+import { useSimpleReading } from './simpleReading';
 import { removePracticeActWithUndo } from './practiceUndo';
 import { Modal } from '../../ui/Modal';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -90,6 +91,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     .filter((key) => key.startsWith(prefix))
     .map((key) => key.slice(prefix.length))));
   const isDesktop = useIsDesktop();
+  const { simple, practiceItems } = useSimpleReading();
   const isIndex = layout === 'index';
   const isPanel = layout === 'overview';
   // Studio, Struttura and PDF as buttons beside the title: the overview's panel; on a phone and in the index they are
@@ -239,7 +241,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {...attributes}
           {...listeners}
           aria-label={`Sposta ${heading}`}
-          className="hidden cursor-grab rounded text-slate-300 hover:text-slate-500 md:block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600"
+          // Lettura semplice (LC28): one act, nothing to reorder.
+          className={cn(simple ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
@@ -265,11 +268,13 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 isIndex ? 'text-[17px]' : 'text-[22px]',
               )}
             >
-              <ChevronDown
-                size={16}
-                aria-hidden
-                className={cn('flex-shrink-0 text-slate-400 transition-transform', act.isCollapsed && '-rotate-90')}
-              />
+              {!simple && (
+                <ChevronDown
+                  size={16}
+                  aria-hidden
+                  className={cn('flex-shrink-0 text-slate-400 transition-transform', act.isCollapsed && '-rotate-90')}
+                />
+              )}
               {/* A cut act name says nothing: on a phone it wraps; on a computer, cut beside the tools or in the index, its
                   tooltip says it whole. */}
               <span title={isDesktop ? heading : undefined} className="min-w-0 break-words md:truncate">{heading}</span>
@@ -278,7 +283,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {/* On a phone only what the count does not say: the act's articles are its rows and its index, just below. The
               index says neither: its entries are the articles. */}
           {!isIndex && (
-            <p className={cn('ml-6 truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
+            <p className={cn(simple ? 'ml-0' : 'ml-6', 'truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
               {formatNormaMeta(act.norma, act.articles.length)}
             </p>
           )}
@@ -343,6 +348,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
               ]),
               { label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !toolsShown },
               { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
+              ...practiceItems,
             ]}
           >
             <MoreHorizontal size={18} aria-hidden />

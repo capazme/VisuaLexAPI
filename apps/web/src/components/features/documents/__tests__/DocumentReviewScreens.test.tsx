@@ -221,10 +221,13 @@ describe('«Riconosci solo nel browser» (#376 §6.3)', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText(/^Tutto nel tuo browser/, { selector: 'p' })).toBeInTheDocument();
+    const local = 'Trova le norme citate in un atto, solo nel browser: LexCraft non riceve nulla.';
+    // Said once, by the page's line; the switch's hint says only what is lost.
+    expect(screen.getByText(local)).toBeInTheDocument();
+    expect(document.body.textContent?.match(/non riceve nulla/g)).toHaveLength(1);
     await choose(container, BRIEF);
     expect(server.readOnServer).not.toHaveBeenCalled();
-    expect(screen.getByText('Trova le norme citate in un atto. Il riconoscimento è più limitato: LexCraft non riceve nulla.')).toBeInTheDocument();
+    expect(screen.getByText(local)).toBeInTheDocument();
     expect(screen.queryByText(/LexCraft non risponde/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Prepara i link' })).toBeNull();
     expect(screen.getByText(/Per inserire i link LexCraft deve ricevere le norme citate \(non il testo\)/)).toBeInTheDocument();

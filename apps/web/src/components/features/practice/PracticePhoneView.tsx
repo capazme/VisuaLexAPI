@@ -13,6 +13,10 @@ import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeSt
 import { fromPracticePair, practicePair, scrollParentOf } from './practiceView';
 import { closePracticeWithUndo } from './practiceUndo';
 import { usePracticeSaveActions, type PracticeSaveActions } from './usePracticeSaveActions';
+import { SimpleReadingContext, isSimplePractice } from './simpleReading';
+
+const SIMPLE_ON_PHONE = { simple: true, practiceItems: [] };
+const NOT_SIMPLE = { simple: false, practiceItems: [] };
 
 export interface PracticePhoneViewProps {
   onViewPdf: (urn: string) => void;
@@ -129,7 +133,11 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
               {practice.acts.length === 0 && practice.decisions.length === 0 ? (
                 <PracticeEmpty />
               ) : (
-                <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} layout="phone" />
+                // One article alone is read simply here too (LC28): no row to open, the article at once. The head above
+                // stays: on a phone it is also the way to the other practices, with «Salva come dossier» and «⋯».
+                <SimpleReadingContext.Provider value={isSimplePractice(practice) ? SIMPLE_ON_PHONE : NOT_SIMPLE}>
+                  <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} layout="phone" />
+                </SimpleReadingContext.Provider>
               )}
             </div>
           )}

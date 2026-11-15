@@ -154,7 +154,7 @@ describe('DossierDetailView — the page by act', () => {
 
   it('counts acts, articles and notes', () => {
     renderView();
-    expect(screen.getByText(/2 atti · 3 articoli · 1 nota/)).toBeInTheDocument();
+    expect(screen.getByText(/2 fonti · 3 articoli · 1 nota/)).toBeInTheDocument();
   });
 
   it('has three actions and a menu in its header, and no selection bar until asked', () => {
@@ -281,7 +281,7 @@ describe('DossierDetailView — decisions', () => {
     const lastAct = screen.getByRole('region', { name: L49 });
     expect(lastAct.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Not a note: the header's count of decisions comes with the dossier-by-act round's PR 3.
-    expect(screen.getByText(/2 atti · 3 articoli · 1 nota/)).toBeInTheDocument();
+    expect(screen.getByText(/2 fonti · 3 articoli · 1 nota/)).toBeInTheDocument();
   });
 
   it('sets the acts and the decisions in two columns from lg, «Norme» | «Giurisprudenza», the norms first below it (D7a)', () => {
@@ -390,7 +390,7 @@ describe('DossierDetailView — notes about an article', () => {
     const notes = screen.getByRole('region', { name: /Note \(1\)/ });
     expect(within(notes).queryByText('Sul primo articolo.')).toBeNull();
     expect(screen.getByTitle('1 nota')).toBeInTheDocument();
-    expect(screen.getByText(/2 atti · 3 articoli · 2 note/)).toBeInTheDocument();
+    expect(screen.getByText(/2 fonti · 3 articoli · 2 note/)).toBeInTheDocument();
   });
 
   it('writes a note to the dossier through the notes route', async () => {

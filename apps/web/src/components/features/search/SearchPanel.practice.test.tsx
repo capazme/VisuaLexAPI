@@ -204,9 +204,10 @@ describe('SearchPanel with the practices: where a search lands (spec §5.1)', ()
   });
 
   it('a citation jump from a row, then the back control, reveals the row left', async () => {
-    env.lines = [ccArticle('2043')];
+    // Two articles: one alone is the simple reading (LC28), whose row does not close.
+    env.lines = [ccArticle('2043'), ccArticle('2044')];
     panel();
-    act(() => { s().triggerSearch(params('2043')); });
+    act(() => { s().triggerSearch(params('2043-2044')); });
     await waitFor(() => expect(readers()).toEqual(['art. 2043']));
     const { id: practiceId, acts } = s().practices[0];
     act(() => {

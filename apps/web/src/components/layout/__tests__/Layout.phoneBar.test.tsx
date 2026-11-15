@@ -199,7 +199,8 @@ describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => 
     );
     return screen.getByTestId('phone-top-bar');
   }
-  const name = (bar: HTMLElement) => bar.querySelector('p')!;
+  // The page's name after the section (LC34); none yet: an empty element.
+  const name = (bar: HTMLElement) => bar.querySelector<HTMLElement>('[data-bar-name]') ?? document.createElement('span');
 
   it('shows no name while the page\'s title is in sight, and the page\'s once it has scrolled out, fading it in', () => {
     const bar = at('/forum');
@@ -209,7 +210,8 @@ describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => 
     expect(observer.target?.tagName).toBe('H1');
     // Only the menu and the magnifier: no «Forum» over «Forum · il luogo…», no name under the large title.
     expect(name(bar)).toHaveTextContent(/^$/);
-    expect(name(bar)).toHaveAttribute('aria-hidden', 'true');
+    // The section beside the menu, always (LC34).
+    expect(bar.querySelector('[data-bar-section]')).toHaveTextContent('Forum');
     expect(within(bar).getAllByRole('button')).toHaveLength(2);
 
     observer.say(false);

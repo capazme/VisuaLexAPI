@@ -48,6 +48,8 @@ export function OpusPage() {
       className="h-full"
       // On a phone the trash is an icon beside the title (LC33, after Todoist: the title, then the list).
       actionBeside
+      // An act's page: its own title is the one in sight (LC29), not «Atti» over it.
+      titleHidden={/^\/work\/atti\/./.test(pathname)}
       action={inView && (
         <Link to="/work/cestino" aria-label="Cestino dei compiti" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 max-md:w-11 max-md:justify-center')}>
           <Trash2 size={15} aria-hidden />

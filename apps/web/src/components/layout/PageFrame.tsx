@@ -39,6 +39,8 @@ export interface PageFrameProps {
   section?: SectionId;
   /** The title's id, for a landmark it names. */
   titleId?: string;
+  /** The page draws its own title (an act's, editable): the frame's header stays for a screen reader only. */
+  titleHidden?: boolean;
   /** The page's width, declared once (U1, `frame.ts`): `reading` keeps the body at the reading measure, `full` widens
    *  `Layout`'s frame to the full screen's; `work`, the frame, by default. */
   width?: PageWidth;
@@ -53,7 +55,7 @@ export interface PageFrameProps {
  * body narrows to the reading measure, never the title. A section's page names itself in the title and its section
  * over it (`kicker`, L-37). Outside it: the Scrivania, the lesson, the reader and the practice, the login.
  */
-export function PageFrame({ title, kicker, line, action, actionBeside = false, section, titleId, width = 'work', className, children }: PageFrameProps) {
+export function PageFrame({ title, kicker, line, action, actionBeside = false, section, titleId, titleHidden = false, width = 'work', className, children }: PageFrameProps) {
   // The title says only the page's name («Oggi» in Opus and in Gymnasium): the line over it describes it, so the focus
   // the section switcher puts on the title also says which section it is in.
   const kickerId = useId();
@@ -65,12 +67,13 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
         'flex gap-4 md:flex-row md:items-center md:justify-between',
         actionBeside ? 'flex-row items-start justify-between' : 'flex-col',
         action && FOCUS_BUTTON_CLEARANCE,
+        titleHidden && 'sr-only',
       )}>
         <div className="min-w-0">
-          {/* LC21: from lg the top bar's path says the section; the line stays for a screen reader, which the title's
+          {/* LC21, LC34: the bars say the section (the top bar from lg, the phone bar beside the menu); the line stays for a screen reader, which the title's
               description reads. */}
           {kickerText && (
-            <p id={kickerId} className={cn(PAGE_KICKER, 'mb-1 lg:sr-only')}>
+            <p id={kickerId} className={cn(PAGE_KICKER, 'sr-only')}>
               {kickerText}
             </p>
           )}
