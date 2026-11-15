@@ -12,6 +12,23 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-11-16
+
+The sign-in page, a light depth, a simpler reading of one article, plainer «Analizza documento» and act
+editor. Web only, no migration.
+
+### Look
+
+- The sign-in page's layout (LC31); the sign-in flow unchanged.
+- A light depth across fields, cards and bands; an empty «Oggi» in Work says what to do next (LC30).
+- The anti-slop review's small notes in the command palette, the sidebar and the tour (LC32).
+
+### Reading
+
+- One article in a practice is read simply, with the glosses and discussions in a side view (LC28).
+- «Analizza documento» and the act editor plainer: a quieter drop zone and paste box, no placeholder
+  dash in «Tipo» (LC29).
+
 ## [1.22.0] - 2026-11-15
 
 Corrections to what the 1.21.0 showed: one search width, a cleaner full screen, tabs that keep their
