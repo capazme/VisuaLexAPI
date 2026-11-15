@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Modal } from './Modal';
 import { Bug, Lightbulb, HelpCircle, Send, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -18,6 +18,7 @@ const feedbackTypes: { value: FeedbackType; label: string; icon: React.ElementTy
 ];
 
 export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps) {
+  const typeLabelId = useId();
   const [type, setType] = useState<FeedbackType>('suggestion');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,10 +76,11 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Type Selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Tipo di feedback
-            </label>
-            <div className="flex gap-2">
+            <p id={typeLabelId} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Tipo di commento
+            </p>
+            {/* Sized by their content and free to wrap: at 390 px the three did not fit on one row. */}
+            <div role="group" aria-labelledby={typeLabelId} className="flex flex-wrap gap-2">
               {feedbackTypes.map((ft) => {
                 const Icon = ft.icon;
                 const isSelected = type === ft.value;
@@ -86,9 +88,10 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
                   <button
                     key={ft.value}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => setType(ft.value)}
                     className={cn(
-                      'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-colors',
+                      'flex-auto flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-colors',
                       isSelected
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'

@@ -208,6 +208,84 @@ describe('the Inchiostro palette', () => {
     expect(ratio(rgb('ink-300'), rgb('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('tints the selection with one stone over every paper, the text kept at AA and the tint seen (LC4)', () => {
+    // One rule for every paper: Study Mode's own papers hold islands of the app's theme (the note cards), so no ancestor
+    // can say which paper a selection is on. A translucent mid-tone, no text colour: a highlight under it keeps its hue.
+    // Browsers composite in gamma sRGB.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const hex = (h: string) => [1, 3, 5].map((i) => unGamma(parseInt(h.slice(i, i + 2), 16) / 255));
+    const hsl = (h: number, s: number, l: number): number[] => {
+      const [S, L] = [s / 100, l / 100];
+      const k = (n: number) => (n + h / 30) % 12;
+      const a = S * Math.min(L, 1 - L);
+      return [0, 8, 4].map((n) => unGamma(L - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
+    };
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    // One `::selection`, at the top level (nothing before it on its line: no `.dark`, no Study Mode), no `color`.
+    const rules = [...source.matchAll(/^([^\n{}]*)::selection\s*\{([^}]*)\}/gm)];
+    expect(rules).toHaveLength(1);
+    const [, prefix, body] = rules[0];
+    expect(prefix.trim()).toBe('');
+    expect(body).not.toMatch(/(?:^|[\s;])color:/);
+    const m = body.match(/background-color:\s*rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([\d.]+)\);/);
+    if (!m) throw new Error('::selection background-color not found');
+    const stone = [m[1], m[2], m[3]].map((v) => unGamma(Number(v) / 255));
+    const alpha = Number(m[4]);
+    const white = [1, 1, 1];
+    // [where, paper, its body text]
+    const papers: [string, number[], number[]][] = [
+      ['Pietra light background', linear('ink-50'), linear('ink-800')],
+      ['Pietra light surface #faf8f4', hex('#faf8f4'), linear('ink-800')],
+      ['Study Mode light (white)', white, linear('ink-900')],
+      ['Study Mode sepia', hex('#f4ecd8'), hex('#5c4b37')],
+      ['Pietra dark surface', linear('ink-900'), linear('ink-200')],
+      ['Pietra dark background', linear('ink-950'), linear('ink-200')],
+      ['Study Mode dark (slate 900)', linear('ink-900'), linear('ink-100')],
+      // The note cards and the «Nuova nota» field (MarginCards, NoteEditBox): the app's theme, inside Study Mode too.
+      ['note card, light app', white, linear('ink-800')],
+      ['note field, light app', white, linear('ink-900')],
+      ['note card, dark app', linear('ink-900'), linear('ink-200')],
+      ['note field, dark app', linear('ink-900'), linear('ink-100')],
+    ];
+    for (const [where, paper, text] of papers) {
+      const ground = over(stone, alpha, paper);
+      expect(ratio(text, ground), `${where}: text`).toBeGreaterThanOrEqual(4.5);
+      // Seen: the browser's own blue is about 1.5:1 from white.
+      expect(ratio(ground, paper), `${where}: tint`).toBeGreaterThanOrEqual(1.3);
+    }
+    // A selected highlight: its own text on its ground under the tint, light block then dark block (not touched).
+    const hl = (kind: 'bg' | 'fg') => [...source.matchAll(new RegExp(`--hl-(?:yellow|green|red|blue)-${kind}:\\s*([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%;`, 'g'))]
+      .map((h) => hsl(Number(h[1]), Number(h[2]), Number(h[3])));
+    const [grounds, texts] = [hl('bg'), hl('fg')];
+    expect(grounds).toHaveLength(8);
+    expect(texts).toHaveLength(8);
+    grounds.forEach((ground, i) => expect(ratio(texts[i], over(stone, alpha, ground)), `highlight ${i}`).toBeGreaterThanOrEqual(4.5));
+    // The native checkboxes, radios and ranges: the action's ink (toga, light in the dark table), not the browser's blue.
+    expect(source).toMatch(/:root\s*\{\s*accent-color:\s*var\(--color-toga-600\);/);
+    expect(source).toMatch(/\.dark\s*\{\s*accent-color:\s*var\(--color-toga-400\);/);
+  });
+
   it('keeps the sidebar\'s 11 px texts at AA on its glass, over the page and over the phone\'s backdrop', () => {
     // `SIDEBAR_SMALL_TEXT` (Sidebar.tsx): slate 600 in light, slate 400 in dark (slate is ink). The aside is
     // white/80 (dark: slate-900/80) over the page (slate-50 / slate-950) or, as the phone's drawer, over the

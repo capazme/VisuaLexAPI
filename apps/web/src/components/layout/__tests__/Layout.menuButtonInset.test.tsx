@@ -53,6 +53,13 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
     expect(within(screen.getByTestId('phone-top-bar')).getByText(title)).toBeInTheDocument();
   });
 
+  // jsdom cannot measure: the class is the check. 10.5 rem leaves 8 px of air before «Commenti» at 768 (LC4).
+  it('ends its magnifier before «Commenti» from md, with the search field\'s room', () => {
+    at('/dossier');
+    const row = within(screen.getByTestId('phone-top-bar')).getByRole('button', { name: 'Apri il menu' }).parentElement;
+    expect(row).toHaveClass('md:pr-[10.5rem]');
+  });
+
   it('opens the search menu from its magnifier', async () => {
     at('/dossier');
     await userEvent.click(within(screen.getByTestId('phone-top-bar')).getByRole('button', { name: 'Apri il menu di ricerca' }));

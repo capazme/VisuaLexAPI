@@ -496,8 +496,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. Nothing floats at the page's foot
   since D-253: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
   for someone signed in, left of «Tutto schermo» with 8 px between: `right-[4.25rem]` at `top-4` from `lg` and in full
-  screen, `right-14` in the bar's right end between `md` and `lg`, whose search field and `PhoneTopBar` keep
-  `md:pr-[9.75rem]`, the search field `lg:pr-[11rem]` too); the `--page-foot` room it kept is gone, and a page sized to
+  screen, `right-14` in the bar's right end between `md` and `lg`, whose `PhoneTopBar` and search field keep
+  `md:pr-[10.5rem]`, 8 px of air at 768 (LC4: it was 9.75, the field and the lens 3 px under «Commenti»), the search
+  field `lg:pr-[11rem]` too); the `--page-foot` room it kept is gone, and a page sized to
   the window takes the plain 2 rem foot off its height (`GraphExplorerPage`, `DocumentReviewPage`'s columns). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum — on screen Work, Learn, Labs and Forum, with no «VisuaLex» before them (D-137, D-157; the ids,
@@ -561,7 +562,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
-  (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
+  (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
+  the first only a heading, its entries straight in the section's group, so a screen reader hears «Learn» once (LC4);
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community». The sections'
@@ -1150,6 +1152,11 @@ render this way; Study Mode hides the heading and rubric blocks
 (`vlx-hide-header`) instead of cutting them, so its offsets are
 document-relative like everywhere else. No surface renders flat (`structure: null`) since the
 Brocardi sections went (D-078); the mode stays under its tests.
+**The selection** (LC4, `index.css`): one translucent stone for every paper, `rgb(138 132 120 / 0.3)`, the text's
+colour left alone, so a highlight under it keeps its hue. One rule, no `.dark` or Study Mode variant: Study Mode's papers
+hold islands of the app's theme (the note cards, the «Nuova nota» field), so no ancestor can say which paper a selection
+is on. `theme.test.ts` composites it over every paper, the note cards and the eight highlighters (text 4.5:1, tint
+1.3:1 from its paper).
 
 **Offsets are measured from the text alone.** `SelectionPopup` takes a
 `textRootRef` (the element holding only the article text) and stores the anchor

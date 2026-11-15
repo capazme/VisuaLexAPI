@@ -529,6 +529,13 @@
   @apply font-serif text-slate-800 dark:text-slate-200;
 }
 
+/* EB Garamond's small x-height: 19 px up to `md`, 20 px from it (LC4). Study Mode's inline size wins over both. */
+@media (min-width: 48rem) {
+  .vlx-art {
+    font-size: 1.25rem;
+  }
+}
+
 /* Study Mode sets size, leading and theme colours itself, and keeps its own narrow column (U1, L-47). */
 .vlx-art--study {
   max-width: none;
@@ -558,6 +565,23 @@
 ::highlight(vlx-find-current) {
   background-color: hsl(var(--vlx-find-current-bg));
   color: hsl(var(--vlx-find-current-fg));
+}
+
+/* The browser's own blue, left on the selection and the native controls (LC4): Pietra's instead. The selection is one
+   translucent stone for every paper, light or dark, the text's colour left alone, so a highlight under it keeps its
+   hue. One rule, not one per theme: Study Mode's papers (white, sepia, dark) hold islands of the app's theme — the
+   note cards, the «Nuova nota» field — so no ancestor can say which paper a selection is on. Checkboxes, radios and
+   ranges take the action's ink (toga 600; light toga 400 in the dark table). `theme.test.ts` composites the tint
+   over every paper, the note cards and the highlighters. */
+:root {
+  accent-color: var(--color-toga-600);
+}
+.dark {
+  accent-color: var(--color-toga-400);
+}
+/* #8a8478, Pietra's stone, between ink 400 and 500 (no step of the scale, and toga's flip in the dark). */
+::selection {
+  background-color: rgb(138 132 120 / 0.3);
 }
 
 /* The words of the gloss a card is on (D8: hovered or focused), painted through the CSS Custom Highlight API
@@ -829,7 +853,7 @@
    shrink-to-fit ancestor: keep it inside block-level parents. */
 .vlx-frame {
   container: vlx-frame / inline-size;
-  /* The query measures in this font, close to the column's (1.1875rem): its 70ch is about the reading measure. */
+  /* The query measures in this font, close to the column's (1.1875rem, 1.25rem from `md`): its 70ch is about the reading measure. */
   font-size: 1.125rem;
   @apply font-serif;
 }
@@ -1152,7 +1176,6 @@
     --vlx-hang: 1.6em;
     --vlx-hang-item: 1.9em;
     --vlx-indent: 0.4em;
-    font-size: 1.0625rem;
     line-height: 1.65;
   }
 

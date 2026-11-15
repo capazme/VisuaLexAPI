@@ -209,7 +209,7 @@ describe('Layout — the search page\'s field', () => {
   it('is the phone\'s bar below lg, the menu button beside the field, and ends before the Focus toggle from md', () => {
     at('/');
     const bar = screen.getByTestId('search-bar');
-    expect(bar).toHaveClass('h-[var(--search-bar-height)]', 'pl-1', 'lg:pl-8', 'md:pr-[9.75rem]', 'lg:pr-[11rem]');
+    expect(bar).toHaveClass('h-[var(--search-bar-height)]', 'pl-1', 'lg:pl-8', 'md:pr-[10.5rem]', 'lg:pr-[11rem]');
     expect(bar.firstElementChild).toHaveAccessibleName('Apri il menu');
     expect(document.querySelector('main')).toHaveClass('[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]', 'lg:[--search-bar-height:4.5rem]');
   });
