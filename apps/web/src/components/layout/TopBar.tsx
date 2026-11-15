@@ -42,7 +42,8 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
   const page = pathname === '/' ? (section.id === 'opus' ? 'Corpus' : 'Ricerca') : pageName(pathname);
   const list = listOf(pathname);
   // Deeper than its list: a further segment, or a query that opens one item of it (`/dossier?dossier=…`).
-  const deeper = page !== undefined && (pathname.replace(/\/$/, '') !== list || search.length > 1);
+  // Never on the search page, whose `h1` is the desk's greeting or a practice's name, not a step of the path.
+  const deeper = pathname !== '/' && page !== undefined && (pathname.replace(/\/$/, '') !== list || search.length > 1);
   const heading = usePageHeading(scroller, pathname + search);
   const leaf = deeper && heading && heading !== page ? heading : null;
 
