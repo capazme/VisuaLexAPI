@@ -569,7 +569,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 <NavItem to="/work/oggi" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
                 {searchEntry('Corpus', ['/documents', '/rassegne'])}
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
-                <NavItem to="/work/atti" icon={FileText} label="Atti" soon onClick={closeMobile} layout={layout} />
+                <NavItem to="/work/atti" icon={FileText} label="Atti" onClick={closeMobile} layout={layout} />
                 {/* D-324, LC21: the Anonimizzatore is the desktop app's; the web draws no entry for what it will not have
                     (the address stays and says so). */}
               </>

@@ -183,7 +183,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti, in arrivo']);
+    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti']);
     expect(screen.queryByRole('link', { name: /Anonimizzatore/ })).toBeNull();
     // Corpus is Work's way to the search: no «Ricerca» above it.
     expect(screen.queryByRole('link', { name: 'Ricerca' })).toBeNull();
@@ -202,15 +202,15 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     unsubscribe();
   });
 
-  it('Work: «Atti» says «in arrivo», to the eye and to a screen reader, and opens its page', () => {
+  it('Work: «Atti» is a full entry since Luca\'s decision of 15 November (no «in arrivo»), and opens its page', () => {
     render(
       <MemoryRouter initialEntries={['/work/oggi']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const acts = screen.getByRole('link', { name: 'Atti, in arrivo' });
+    const acts = screen.getByRole('link', { name: 'Atti' });
     expect(acts).toHaveAttribute('href', '/work/atti');
-    expect(acts).toHaveTextContent(/^Attiin arrivo$/);
+    expect(acts).toHaveTextContent(/^Atti$/);
   });
 
   it('marks the active entry with the column, one in the whole bar', () => {
@@ -311,14 +311,13 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByRole('group', { name: 'Forum' })).toHaveClass('border-t');
   });
 
-  it('writes «in arrivo» under the name, so the name keeps its whole width', () => {
+  it('writes «in arrivo» under no Work entry', () => {
     render(
       <MemoryRouter initialEntries={['/work/oggi']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const tag = within(screen.getByRole('link', { name: 'Atti, in arrivo' })).getByText('in arrivo');
-    expect(tag).toHaveClass('block', 'text-[11px]');
+    expect(within(document.getElementById('tour-sidebar')!).queryByText('in arrivo')).toBeNull();
   });
 
   it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {

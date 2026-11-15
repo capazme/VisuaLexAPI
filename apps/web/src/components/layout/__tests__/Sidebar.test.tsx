@@ -75,7 +75,7 @@ describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () =>
     const dossier = screen.getAllByRole('link', { name: 'Dossier' })[0];
     fireEvent.pointerEnter(dossier, { pointerType: 'mouse' });
     expect(prepared.paths).toEqual(['/dossier']);
-    fireEvent.pointerDown(screen.getByRole('link', { name: 'Atti, in arrivo' }));
+    fireEvent.pointerDown(screen.getByRole('link', { name: 'Atti' }));
     expect(prepared.paths).toEqual(['/dossier', '/work/atti']);
     fireEvent.focus(screen.getByRole('link', { name: 'Corpus' }));
     expect(prepared.paths).toEqual(['/dossier', '/work/atti', '/']);
