@@ -65,7 +65,7 @@ export function OpusPage() {
           // Oggi · Prossime»); from md the tabs at the top, sticky.
           <div className={cn(
             'sticky top-0 z-10 -mx-2 bg-slate-50 px-2 py-2 dark:bg-slate-950',
-            'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:z-30 max-md:mx-0 max-md:border-t max-md:border-slate-200 max-md:bg-card/95 max-md:px-3 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:pt-1.5 max-md:backdrop-blur max-md:dark:border-slate-800',
+            'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:z-30 max-md:mx-0 max-md:border-t max-md:border-slate-200 max-md:bg-card max-md:px-3 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:pt-1.5 max-md:dark:border-slate-800',
           )}>
           <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 max-md:bg-transparent max-md:p-0 dark:bg-slate-800 max-md:dark:bg-transparent sm:w-fit">
             {VIEWS.map((view) => (
