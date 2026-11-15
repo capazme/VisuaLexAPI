@@ -7,6 +7,7 @@ import { BookOpen, Check, CheckCircle2, X } from 'lucide-react';
 import { register } from '../../services/authService';
 import { cn } from '../../lib/utils';
 import { getErrorMessage } from '../../utils/errors';
+import { PASSWORD_RULE, PASSWORD_RULE_ERROR, PASSWORD_RULE_HINT } from '../../services/api';
 import { FIELD, LABEL, PRIMARY_BUTTON, SWITCH_LINK, focusField } from './authForm';
 import { FormError, PasswordToggle } from './AuthFormParts';
 import { FOCUS_RING } from '../../constants/interactions';
@@ -113,8 +114,9 @@ export function RegisterForm({ onBusy, onRegistered, onSwitch }: RegisterFormPro
       return;
     }
 
-    if (password.length < 3) {
-      fail('Password deve essere almeno 3 caratteri', 'password');
+    // The server's rule, checked here first so the reader learns it before a round trip.
+    if (!PASSWORD_RULE.test(password)) {
+      fail(PASSWORD_RULE_ERROR, 'password');
       return;
     }
 
@@ -130,8 +132,9 @@ export function RegisterForm({ onBusy, onRegistered, onSwitch }: RegisterFormPro
       setRegistrationComplete(true);
       onRegistered();
     } catch (error) {
-      // The server does not say which field it refused («email or username already exists»).
-      fail(getErrorMessage(error) || 'Errore durante la registrazione. Riprova.', 'email');
+      // The server does not say which field it refused («email or username already exists»), but for the password.
+      const words = getErrorMessage(error) || 'Errore durante la registrazione. Riprova.';
+      fail(words, words === PASSWORD_RULE_ERROR ? 'password' : 'email');
     } finally {
       setLoading(false);
       onBusy(false);
@@ -251,10 +254,13 @@ export function RegisterForm({ onBusy, onRegistered, onSwitch }: RegisterFormPro
               disabled={loading}
               autoComplete="new-password"
               aria-invalid={invalid === 'password' || undefined}
-              aria-describedby={describedBy('password')}
+              aria-describedby={describedBy('password', 'register-password-rule')}
             />
             <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
           </div>
+          <p id="register-password-rule" className="text-xs text-slate-600 dark:text-slate-300">
+            {PASSWORD_RULE_HINT}
+          </p>
 
           {password.length > 0 && (
             <div role="img" aria-label={`Sicurezza della password: ${STRENGTH_WORDS[passwordStrength]}`} className="flex h-1 gap-1">

@@ -83,8 +83,20 @@ function tooManyRequestsMessage(retryAfter: unknown): string {
 /** No answer at all (network, timeout). */
 export const NO_ANSWER_MESSAGE = 'Il server non risponde. Controlla la connessione e riprova.';
 
+/**
+ * The server's rule for a password at sign-up (apps/server, `registerSchema`: at least 8 characters, one lowercase,
+ * one uppercase, one digit), the same regex, and the words that say it under the field and when it is broken.
+ */
+export const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+export const PASSWORD_RULE_HINT = 'Almeno 8 caratteri, con una maiuscola, una minuscola e un numero.';
+export const PASSWORD_RULE_ERROR = 'La password deve avere almeno 8 caratteri, con una maiuscola, una minuscola e un numero.';
+const SERVER_PASSWORD_RULE = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
+
 /** The server's English answers a reader can meet, in Italian; any other passes as the server wrote it. */
 const SERVER_WORDS: Record<string, string> = {
+  // A weak password, as the server's validation groups it by field (alone, or after the length check).
+  [`Invalid request: password (${SERVER_PASSWORD_RULE})`]: PASSWORD_RULE_ERROR,
+  [`Invalid request: password (Too small: expected string to have >=8 characters; ${SERVER_PASSWORD_RULE})`]: PASSWORD_RULE_ERROR,
   'Invalid credentials': 'Email o password non corrette.',
   'User with this email or username already exists': 'Esiste già un account con questa email o questo nome utente.',
   'Internal server error': 'Errore del server. Riprova tra poco.',
