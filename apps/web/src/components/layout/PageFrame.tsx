@@ -26,7 +26,7 @@ export const PAGE_KICKER = 'text-sm text-slate-600 dark:text-slate-400';
 export interface PageFrameProps {
   /** The page's name («Oggi», «Le mie schede»): since L-37 the section's phrase is the `kicker` over it, not the title. */
   title: ReactNode;
-  /** The section the page belongs to: its name and phrase over the title, small («Gymnasium · la tua palestra giuridica»). */
+  /** The section the page belongs to: its name over the title, small («Learn»); the phrase no longer follows it (15 Nov 2026). */
   kicker?: SectionId;
   /** The sentence under the title. */
   line?: ReactNode;

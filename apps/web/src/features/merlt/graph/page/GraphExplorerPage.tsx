@@ -1088,7 +1088,7 @@ export function GraphExplorerPage(): React.ReactElement {
     // 2rem); from lg, 2rem on top and 2rem at the bottom.
     <PageFrame
       title={GRAPH_PAGE}
-      // L-37: «Academia · il laboratorio del diritto» over the page's name.
+      // L-37: the section's name, «Labs», over the page's name.
       kicker="academia"
       // On a phone the canvas needs the height: no line there, and the slice's tools beside the title as icons.
       line={<span className="hidden md:inline">Le relazioni tra norme, principi e concetti.</span>}

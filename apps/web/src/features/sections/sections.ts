@@ -26,8 +26,8 @@ export const SECTIONS: readonly Section[] = [
 
 /**
  * The sections' phrases (the owner's, 19 October 2026); the one place to change them. Since L-37 (the owner, 22 October
- * 2026) a section page's title is the page's name — «Oggi», «Progressi», «Community» — and the phrase goes over it, small,
- * after the section's name: «Gymnasium · la tua palestra giuridica» (`sectionKicker`, drawn by `PageFrame`'s `kicker`).
+ * 2026) a section page's title is the page's name — «Oggi», «Progressi», «Community» — with the section's name over it,
+ * small (`sectionKicker`, drawn by `PageFrame`'s `kicker`). Until 15 November 2026 the phrase followed the name there.
  */
 export const SECTION_PHRASES = {
   gymnasium: 'la tua palestra giuridica',
