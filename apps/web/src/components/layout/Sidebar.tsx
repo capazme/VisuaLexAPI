@@ -492,19 +492,20 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           wordmark 120 px wide, its «L» flush with the switcher's mark (the box starts 11 of its 716 units, 1.8 px,
           before it); in the rail the column alone, centred over the icons (32 px from the edge), never in line with the
           entries' column-cursor, and still. In the drawer it is the head, clear of the iPhone's top edge. */}
-      <div className={cn("flex h-12 shrink-0 items-center px-2.5", layout === 'rail' && "justify-center", layout === 'drawer' && "box-content pt-[env(safe-area-inset-top)]")}>
+      {/* Luca, 15 November: the wordmark centred over the section tabs and a step larger (150 px), not flush left. */}
+      <div className={cn("flex shrink-0 items-center justify-center px-2.5", layout === 'rail' ? "h-12" : "h-16", layout === 'drawer' && "box-content pt-[env(safe-area-inset-top)]")}>
         <Link
           to="/"
           aria-label="LexCraft"
           onClick={closeMobile}
           className={cn(
             "rounded-lg text-primary-600 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-            layout === 'rail' ? "grid h-11 w-11 place-items-center" : "flex h-11 items-center pl-0.5 pr-2",
+            layout === 'rail' ? "grid h-11 w-11 place-items-center" : "flex h-11 items-center px-2",
           )}
         >
           {layout === 'rail'
             ? <BookMark size={32} />
-            : <LexCraftLogo motion={logoSweep ? 'sweep' : 'still'} className="h-auto w-[120px]" />}
+            : <LexCraftLogo motion={logoSweep ? 'sweep' : 'still'} className="h-auto w-[150px]" />}
         </Link>
       </div>
 
