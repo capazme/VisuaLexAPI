@@ -60,7 +60,7 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') void handleCreate();
             }}
-            placeholder="Nome Dossier..."
+            placeholder="Nome Dossier…"
             className="flex-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
             disabled={busy}
           />

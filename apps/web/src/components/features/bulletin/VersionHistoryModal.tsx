@@ -116,7 +116,7 @@ export function VersionHistoryModal({ environment, onClose, onRestored }: Versio
                   className="shrink-0"
                 >
                   <RotateCcw size={14} />
-                  {restoringId === version.id ? 'Ripristino...' : 'Ripristina'}
+                  {restoringId === version.id ? 'Ripristino…' : 'Ripristina'}
                 </Button>
               </li>
             ))}

@@ -375,7 +375,7 @@ export function ArticleDiscussionPanel({
             required
             minLength={3}
             maxLength={10000}
-            placeholder="Condividi una domanda o un'osservazione..."
+            placeholder="Condividi una domanda o un'osservazione…"
             aria-label="Testo della glossa"
             rows={4}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"

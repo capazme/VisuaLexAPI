@@ -58,9 +58,10 @@ describe('LearnPath', () => {
     ]));
     const stops = within(screen.getByRole('list', { name: 'Istituti di Diritto civile' })).getAllByRole('button');
     expect(stops.map((b) => b.getAttribute('aria-label'))).toEqual([
-      'Ripassa Azione revocatoria: 3 da ripassare, sei qui',
-      'Ripassa Risoluzione: 3 da ripassare',
-      'Ripassa Usucapione: niente da ripassare',
+      'Ripassa Azione revocatoria: 3 da ripassare · 1 nuova · 3 in apprendimento · 1 consolidata, sei qui',
+      'Ripassa Risoluzione: 3 da ripassare · 3 in apprendimento',
+      // A stop with no card due names what it holds (Papiniano, 15 Nov: not «niente da ripassare»).
+      'Ripassa Usucapione: 3 nuove · 2 consolidate',
     ]);
     expect(stops[0]).toHaveTextContent('3 da ripassare · 1 nuova · 3 in apprendimento · 1 consolidata');
     expect(stops[1]).toHaveTextContent(/3 da ripassare · 3 in apprendimento$/);
@@ -91,7 +92,7 @@ describe('LearnPath', () => {
     ]));
     const here = road().querySelectorAll('[aria-current="step"]');
     expect(here).toHaveLength(1);
-    expect(here[0]).toHaveAttribute('aria-label', 'Ripassa Furto: 5 da ripassare, sei qui');
+    expect(here[0]).toHaveAttribute('aria-label', 'Ripassa Furto: 5 da ripassare · 1 nuova · 5 in apprendimento, sei qui');
     expect(within(here[0] as HTMLElement).getByText('Inizia')).toBeInTheDocument();
     expect(within(road()).getAllByText('Inizia')).toHaveLength(1);
   });
@@ -103,7 +104,7 @@ describe('LearnPath', () => {
     ]));
     const here = road().querySelectorAll('[aria-current="step"]');
     expect(here).toHaveLength(1);
-    expect(here[0]).toHaveAttribute('aria-label', 'Ripassa Mora: niente da ripassare, sei qui');
+    expect(here[0]).toHaveAttribute('aria-label', 'Ripassa Mora: 2 nuove, sei qui');
   });
 
   it('marks no stop when nothing is due and nothing is new', () => {
@@ -115,7 +116,7 @@ describe('LearnPath', () => {
   it('starts the session narrowed to the institute tapped', async () => {
     const istituto = 'Contratto a favore del terzo & «patto»';
     renderPath(ready([tappa('DIRITTO_CIVILE', istituto, 2)]));
-    await userEvent.setup().click(screen.getByRole('button', { name: `Ripassa ${istituto}: 2 da ripassare, sei qui` }));
+    await userEvent.setup().click(screen.getByRole('button', { name: (n: string) => n.startsWith(`Ripassa ${istituto}: 2 da ripassare`) && n.endsWith(', sei qui') }));
     const search = new URLSearchParams(screen.getByTestId('where').textContent!.split('?')[1]);
     expect(search.get('materia')).toBe('DIRITTO_CIVILE');
     expect(search.get('istituto')).toBe(istituto);
@@ -186,7 +187,7 @@ describe('LearnPath', () => {
   it('keeps the road read before when a new read fails, and says so', async () => {
     const { onRetry } = renderPath({ status: 'error', data: [tappa('DIRITTO_CIVILE', 'Mora', 1)] });
     expect(road()).toHaveTextContent('Non riesco ad aggiornare il percorso: resta quello letto prima.');
-    expect(screen.getByRole('button', { name: 'Ripassa Mora: 1 da ripassare, sei qui' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: (n: string) => n.startsWith('Ripassa Mora: 1 da ripassare') && n.endsWith(', sei qui') })).toBeInTheDocument();
     await userEvent.setup().click(within(road()).getByRole('button', { name: 'Riprova' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
@@ -194,7 +195,7 @@ describe('LearnPath', () => {
   it('keeps the road read before while a new read travels', () => {
     renderPath({ status: 'loading', data: [tappa('DIRITTO_CIVILE', 'Mora', 1)] });
     expect(road()).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByRole('button', { name: 'Ripassa Mora: 1 da ripassare, sei qui' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: (n: string) => n.startsWith('Ripassa Mora: 1 da ripassare') && n.endsWith(', sei qui') })).toBeInTheDocument();
     expect(road()).not.toHaveTextContent('Non riesco');
   });
 });

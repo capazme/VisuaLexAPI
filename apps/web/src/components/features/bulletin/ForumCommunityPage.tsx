@@ -173,6 +173,8 @@ function FeedRow({ item }: { item: CommunityFeedItem }) {
     <li className="border-b border-slate-200 dark:border-slate-800">
       <Link
         to={`${COMMUNITY_PATH}/${encodeURIComponent(item.id)}`}
+        // The title first for a screen reader, then what the row says around it.
+        aria-label={`${rowTitle(item)}: ${[item.materia && MATERIA_LABEL[item.materia], item.user.username && `di ${item.user.username}`, `su ${sourceLabel(item)}`, count(item.replyCount, 'risposta', 'risposte'), count(item.voteCount, 'voto utile', 'voti utili'), item.acceptedCommentId && 'risposta accettata'].filter(Boolean).join(', ')}`}
         className={cn('flex gap-4 rounded-lg px-2 py-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-900', FOCUS_RING)}
       >
         <span aria-hidden className="flex w-10 shrink-0 flex-col items-center pt-0.5 text-slate-600 dark:text-slate-400">

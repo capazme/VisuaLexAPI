@@ -95,8 +95,8 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
             <li key={stop.istituto} className="relative">
               <button
                 type="button"
-                aria-label={`Ripassa ${stop.istituto}: ${dueLabel(stop.dovute).toLowerCase()}${isHere ? ', sei qui' : ''}`}
-                aria-describedby={`${headingId}-${index}`}
+                // The name says what the stop holds, not only the cards due (a stop of new cards is not «niente da ripassare»).
+                aria-label={`Ripassa ${stop.istituto}: ${stopLine(stop)}${isHere ? ', sei qui' : ''}`}
                 aria-current={isHere ? 'step' : undefined}
                 onClick={() => navigate(instituteSessionPath(materia, stop.istituto))}
                 className={cn(

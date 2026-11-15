@@ -707,7 +707,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 type="text"
                 value={itemSearchQuery}
                 onChange={(e) => setItemSearchQuery(e.target.value)}
-                placeholder="Cerca in questo dossier..."
+                placeholder="Cerca in questo dossier…"
                 aria-label="Cerca negli elementi del dossier"
                 className={cn(FIELD, 'pl-9 pr-11')}
               />
