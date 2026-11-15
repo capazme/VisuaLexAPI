@@ -2498,8 +2498,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   A multiple selection is removed with no confirmation, like the rest: «Annulla» is the way back (K1a). Nothing the web
   reaches deletes an entry for good any more (`removeFromDossier` and `restoreDossierItem`, which
   re-created entries under new ids, are gone). Study cards go through it too: «Elimina» on a draft or an archived card in
-  «Le mie schede» (`studiaService.trash`) moves it at once, and the notification's «Annulla» restores the trash entry
-  (`trashService.restore`) and lists it again (K1a).
+  «Le mie schede» (`studiaService.trash`) asks first («Eliminare la scheda?», the focus on «Annulla», #457), then moves
+  it, and the notification's «Annulla» restores the trash entry (`trashService.restore`) and lists it again (K1a).
   A decision in the trash is named by the server's citation.
 - **What another application changes shows without a reload** (`useDossierRefresh`, mounted by
   `DossierPage`): the open dossier (`refreshDossier(id, { quiet: true })`) or the list
@@ -2615,7 +2615,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   decisions (`DecisionView`'s actions, with `sentenza`). It lists recent dossiers,
   guards duplicates, and its inline "Nuovo dossier" waits for the server id
   before adding — `createDossier()` returns `Promise<string | null>`.
-  `DossierModal` is create-only.
+  `DossierModal` is create-only and opens on its form («Nuovo dossier», the name field focused; B7).
 - **Rows** (`DossierArticleRow`): the expand toggle lives on a header-scoped
   sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
   star and the removal are 44 px at every width (S7c). The accessible name carries the server's
