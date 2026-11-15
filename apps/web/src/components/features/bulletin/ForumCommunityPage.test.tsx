@@ -135,7 +135,7 @@ describe('ForumCommunityPage: the feed', () => {
     renderAt();
     expect(SECTION_PHRASES.forum).toBe('il luogo del dibattito giuridico');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Community$/);
-    expect(screen.getByText(sectionKicker('forum'))).toHaveTextContent('Forum · il luogo del dibattito giuridico');
+    expect(screen.getByText(sectionKicker('forum'))).toHaveTextContent(/^Forum$/);
     await screen.findByText('Nessuna discussione ancora.');
   });
 

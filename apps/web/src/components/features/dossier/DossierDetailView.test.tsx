@@ -596,7 +596,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(title.querySelector('svg')).toBeNull();
     // A name of one long word wraps rather than widening the page.
     expect(title.firstElementChild).toHaveClass('[overflow-wrap:anywhere]');
-    expect(title).toHaveAccessibleDescription('Learn · la tua palestra giuridica');
+    expect(title).toHaveAccessibleDescription('Learn');
     expect(screen.getByText('Ricorso in appello')).toBeInTheDocument();
   });
 
