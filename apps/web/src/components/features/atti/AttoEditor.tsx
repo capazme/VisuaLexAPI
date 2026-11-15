@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Copy, Download, FileUp, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Download, FileUp, Link2, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { cn } from '../../../lib/utils';
@@ -289,7 +289,20 @@ export function AttoEditor() {
 
       <div className={cn('grid grid-cols-1 gap-5', draft.dossierId && 'lg:grid-cols-[minmax(0,1fr)_17rem]')}>
         <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            {/* «Analizza documento» in the act's flow (Luca, 15-11): the citations found, linked to their norms and decisions. */}
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Link2 size={15} aria-hidden />}
+              disabled={!draft.testo.trim()}
+              onClick={() => {
+                void flush();
+                navigate('/documents', { state: { atto: { id, titolo: draft.titolo, testo: draft.testo } } });
+              }}
+            >
+              Analizza l’atto
+            </Button>
             <Button variant="quiet" size="sm" icon={<Pencil size={15} aria-hidden />} onClick={() => setEditing((now) => !now)} aria-pressed={editing}>
               {editing ? 'Fine modifica' : 'Modifica il testo'}
             </Button>

@@ -14,7 +14,12 @@ import { DOCX_XML, storedDocx, testFile } from './fixtures';
 
 const navigateMock = vi.fn();
 const triggerSearchMock = vi.fn();
-vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
+const routerState = vi.hoisted(() => ({ state: null as unknown }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => navigateMock,
+  useLocation: () => ({ state: routerState.state }),
+  Link: ({ to, children, className }: { to: string; children: import('react').ReactNode; className?: string }) => <a href={to} className={className}>{children}</a>,
+}));
 const NO_ALIASES: never[] = [];
 vi.mock('../../../../store/useAppStore', () => ({
   useAppStore: (select: (state: { triggerSearch: typeof triggerSearchMock; customAliases: never[] }) => unknown) =>

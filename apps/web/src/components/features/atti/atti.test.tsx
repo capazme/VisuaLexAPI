@@ -28,6 +28,10 @@ function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
 }
 
+function SentState() {
+  return <span data-testid="sent">{JSON.stringify(useLocation().state)}</span>;
+}
+
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -204,6 +208,20 @@ describe('AttoEditor', () => {
     expect(screen.queryByRole('textbox', { name: 'Testo dell’atto' })).toBeNull();
     expect(await screen.findByText('Verificare l’ingiustizia del danno.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Atti del dossier' })).toHaveAttribute('href', '/dossier?dossier=d1&vista=atti');
+  });
+
+  it('«Analizza l’atto» opens «Analizza documento» with the act’s text', async () => {
+    atti.get.mockResolvedValue(ATTO);
+    render(
+      <MemoryRouter initialEntries={['/work/atti/a1']}>
+        <Routes>
+          <Route path="/work/atti/:id" element={<AttoEditor />} />
+          <Route path="/documents" element={<SentState />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Analizza l’atto' }));
+    expect(await screen.findByTestId('sent')).toHaveTextContent(JSON.stringify({ atto: { id: 'a1', titolo: 'Atto di appello', testo: 'Primo motivo.' } }));
   });
 
   it('opens an empty act to be written', async () => {
