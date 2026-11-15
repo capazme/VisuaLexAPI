@@ -33,6 +33,9 @@ const apiClient: AxiosInstance = axios.create({
  */
 let refreshInFlight: Promise<string> | null = null;
 
+/** The requests that send credentials: a 401 there is a wrong password, never an expired session. */
+const CREDENTIAL_URLS = ['/auth/login', '/auth/register'];
+
 /**
  * The session is over (the server refused the refresh): everything of the person goes, then the tokens, and the
  * sign-in page opens, which brings the reader back here.
@@ -75,6 +78,7 @@ export const NO_ANSWER_MESSAGE = 'Il server non risponde. Controlla la connessio
 /** The server's English answers a reader can meet, in Italian; any other passes as the server wrote it. */
 const SERVER_WORDS: Record<string, string> = {
   'Invalid credentials': 'Email o password non corrette.',
+  'User with this email or username already exists': 'Esiste già un account con questa email o questo nome utente.',
   'Internal server error': 'Errore del server. Riprova tra poco.',
   'Not found': 'Non trovato.',
   'Authentication required': 'Accedi per continuare.',
@@ -186,8 +190,9 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // If error is 401 and we haven't retried yet, try to refresh token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // If error is 401 and we haven't retried yet, try to refresh token. Not for the sign-in and the sign-up: their
+    // 401 answers the credentials, and goes to the form as it is (LC14).
+    if (error.response?.status === 401 && !originalRequest._retry && !CREDENTIAL_URLS.includes(originalRequest.url ?? '')) {
       originalRequest._retry = true;
 
       try {
