@@ -14,3 +14,16 @@ export function changedOn(iso: string, now = new Date()): string {
 export function citationOf(item: DossierApi['items'][number]): string {
   return (item.citation ?? item.title).trim();
 }
+
+/** A dossier note's text: the app stores a note's content as the string itself. */
+export function noteTextOf(item: DossierApi['items'][number]): string {
+  return typeof item.content === 'string' ? item.content.trim() : '';
+}
+
+/** The act's title from a file's name: «Atto di appello v3.docx» → «Atto di appello v3». */
+export function titleFromFileName(name: string): string {
+  return name.replace(/\.[^.]+$/, '').trim().slice(0, 300) || 'Atto';
+}
+
+/** The files an act is loaded from: what «Analizza documento» reads in the browser, the PDF aside. */
+export const ATTO_FILE_ACCEPT = '.docx,.txt,.md,.markdown,.html,.htm';

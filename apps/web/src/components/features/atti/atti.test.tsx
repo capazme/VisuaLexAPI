@@ -13,9 +13,15 @@ const dossiers = vi.hoisted(() => ({ getAll: vi.fn(), getById: vi.fn() }));
 
 vi.mock('../../../services/attiService', async (original) => ({ ...(await original<object>()), attiService: atti }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: dossiers }));
+// «Analizza documento»'s reader has its own tests: here a file's «text» is its name's, and a PDF is refused.
+vi.mock('../documents/documentFile', () => ({
+  readDocumentFile: async (file: File) =>
+    /\.pdf$/i.test(file.name) ? { ok: false, error: 'I PDF non si leggono.' } : { ok: true, text: `Testo di ${file.name}` },
+}));
 
 import { AttiListView } from './AttiListView';
 import { AttoEditor } from './AttoEditor';
+import { DossierAttiPanel } from './DossierAttiPanel';
 import { SAVE_DELAY_MS, changedOn } from './attiText';
 
 function Where() {
@@ -44,7 +50,7 @@ const DOSSIER = {
   updated_at: '',
   items: [
     { id: 'i1', item_type: 'norm', title: 'Art. 2043', citation: 'art. 2043 c.c.' },
-    { id: 'i2', item_type: 'note', title: 'Una nota' },
+    { id: 'i2', item_type: 'note', title: 'Nota', content: 'Verificare l’ingiustizia del danno.' },
     { id: 'i3', item_type: 'sentenza', title: 'Cass. civ., sez. un., n. 34318/2023', citation: null },
   ],
 };
@@ -115,7 +121,8 @@ describe('AttoEditor', () => {
     atti.get.mockResolvedValue(ATTO);
     atti.update.mockImplementation(async (_id, input) => ({ ...ATTO, ...input }));
     renderAt('/work/atti/a1');
-    const text = await screen.findByLabelText('Testo dell’atto');
+    fireEvent.click(await screen.findByRole('button', { name: 'Modifica il testo' }));
+    const text = screen.getByLabelText('Testo dell’atto');
     vi.useFakeTimers();
     fireEvent.change(text, { target: { value: 'Primo motivo. Secondo' } });
     fireEvent.change(text, { target: { value: 'Primo motivo. Secondo motivo.' } });
@@ -156,10 +163,13 @@ describe('AttoEditor', () => {
     atti.get.mockResolvedValue({ ...ATTO, testo: 'Visto e considerato' });
     atti.update.mockResolvedValue(ATTO);
     renderAt('/work/atti/a1');
-    const text = (await screen.findByLabelText('Testo dell’atto')) as HTMLTextAreaElement;
-    expect(await screen.findByRole('button', { name: 'Cita art. 2043 c.c.' })).toBeInTheDocument();
+    expect(await screen.findByText('art. 2043 c.c.')).toBeInTheDocument();
+    // Reading: the sources are there, «Cita» only once the text is open to a correction.
+    expect(screen.queryByRole('button', { name: /^Cita/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Modifica il testo' }));
+    const text = screen.getByLabelText('Testo dell’atto') as HTMLTextAreaElement;
     expect(screen.getByRole('button', { name: 'Cita Cass. civ., sez. un., n. 34318/2023' })).toBeInTheDocument();
-    expect(screen.queryByText('Una nota')).toBeNull();
+    expect(screen.queryByText('Cita Una nota')).toBeNull();
     text.setSelectionRange(5, 5);
     fireEvent.click(screen.getByRole('button', { name: 'Cita art. 2043 c.c.' }));
     expect(text.value).toBe('Vistoart. 2043 c.c. e considerato');
@@ -184,5 +194,79 @@ describe('AttoEditor', () => {
     renderAt('/work/atti/zz');
     expect(await screen.findByRole('alert')).toHaveTextContent('Atto non trovato.');
     expect(screen.getByRole('link', { name: 'Tutti gli atti' })).toHaveAttribute('href', '/work/atti');
+  });
+
+  it('opens an act with a text to read, with the dossier’s notes beside it and the way back to the dossier’s acts', async () => {
+    atti.get.mockResolvedValue({ ...ATTO, testo: 'Primo motivo.\n\nSecondo motivo.' });
+    renderAt('/work/atti/a1');
+    const article = await screen.findByRole('article', { name: 'Testo dell’atto' });
+    expect(article.querySelectorAll('p')).toHaveLength(2);
+    expect(screen.queryByRole('textbox', { name: 'Testo dell’atto' })).toBeNull();
+    expect(await screen.findByText('Verificare l’ingiustizia del danno.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Atti del dossier' })).toHaveAttribute('href', '/dossier?dossier=d1&vista=atti');
+  });
+
+  it('opens an empty act to be written', async () => {
+    atti.get.mockResolvedValue({ ...ATTO, testo: '' });
+    renderAt('/work/atti/a1');
+    expect(await screen.findByRole('textbox', { name: 'Testo dell’atto' })).toBeInTheDocument();
+  });
+
+  it('replaces the text with a new version from its file, after the confirmation', async () => {
+    atti.get.mockResolvedValue(ATTO);
+    atti.update.mockImplementation(async (_id, input) => ({ ...ATTO, ...input }));
+    const { container } = renderAt('/work/atti/a1');
+    await screen.findByRole('article', { name: 'Testo dell’atto' });
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['Testo della versione 3.'], 'appello v3.txt', { type: 'text/plain' })] } });
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('appello v3.txt');
+    expect(atti.update).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sostituisci' }));
+    expect(await screen.findByText('Testo di appello v3.txt')).toBeInTheDocument();
+    fireEvent.blur(screen.getByLabelText('Titolo dell’atto'));
+    await waitFor(() => expect(atti.update).toHaveBeenCalledWith('a1', expect.objectContaining({ testo: 'Testo di appello v3.txt' })));
+  });
+});
+
+describe('DossierAttiPanel', () => {
+  function renderPanel() {
+    return render(
+      <MemoryRouter initialEntries={['/dossier']}>
+        <Where />
+        <Routes>
+          <Route path="/dossier" element={<DossierAttiPanel dossierId="d1" />} />
+          <Route path="/work/atti/:id" element={<span>editor</span>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it('lists the dossier’s acts only', async () => {
+    atti.list.mockResolvedValue([ATTO]);
+    renderPanel();
+    expect(await screen.findByRole('link', { name: /Atto di appello/ })).toHaveAttribute('href', '/work/atti/a1');
+    expect(atti.list).toHaveBeenCalledWith('d1');
+  });
+
+  it('loads an act from its file into the dossier and opens it', async () => {
+    atti.list.mockResolvedValue([]);
+    atti.create.mockResolvedValue({ ...ATTO, id: 'caricato' });
+    const { container } = renderPanel();
+    await screen.findByText('Questo dossier non ha ancora atti.');
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['Atto in prova.'], 'Atto di citazione.txt', { type: 'text/plain' })] } });
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/work/atti/caricato'));
+    expect(atti.create).toHaveBeenCalledWith({ titolo: 'Atto di citazione', testo: 'Testo di Atto di citazione.txt', dossierId: 'd1' });
+  });
+
+  it('refuses a PDF, saying why, and creates nothing', async () => {
+    atti.list.mockResolvedValue([]);
+    const { container } = renderPanel();
+    await screen.findByText('Questo dossier non ha ancora atti.');
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['%PDF'], 'atto.pdf', { type: 'application/pdf' })] } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('PDF');
+    expect(atti.create).not.toHaveBeenCalled();
   });
 });
