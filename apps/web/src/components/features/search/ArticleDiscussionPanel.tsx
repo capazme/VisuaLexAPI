@@ -333,15 +333,15 @@ export function ArticleDiscussionPanel({
           {label && <span className="text-xs text-slate-400">{label}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5">
+          <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className={cn('text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5', TOUCH)}>
             <option value="recent">Recenti</option>
             <option value="active">Attive</option>
             <option value="popular">Più votate</option>
           </select>
-          <button type="button" onClick={() => setComposerOpen(value => !value)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700">
+          <button type="button" onClick={() => setComposerOpen(value => !value)} className={cn('inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700', TOUCH)}>
             <Plus size={14} /> Nuova glossa
           </button>
-          <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+          <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 md:min-h-0 md:min-w-0 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
             <X size={18} />
           </button>
         </div>

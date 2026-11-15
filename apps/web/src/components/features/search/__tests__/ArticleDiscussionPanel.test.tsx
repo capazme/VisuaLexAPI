@@ -655,6 +655,15 @@ describe('ArticleDiscussionPanel', () => {
       ));
     });
 
+    // Papiniano, #449 note 10: at 390 px the head's three controls were under 44 px (91×31, 122×28, 34×34).
+    it('gives the head\'s order, «Nuova glossa» and «Chiudi glosse» 44 px to touch on a phone, their size from md', async () => {
+      vi.mocked(articleDiscussionService.list).mockResolvedValue({ data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
+      render(<ArticleDiscussionPanel anchor={dummyAnchor} isOpen={true} onClose={vi.fn()} />);
+      expect(await screen.findByRole('combobox')).toHaveClass('min-h-11', 'md:min-h-0');
+      expect(screen.getByRole('button', { name: /Nuova glossa/ })).toHaveClass('min-h-11', 'md:min-h-0');
+      expect(screen.getByRole('button', { name: 'Chiudi glosse' })).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-0', 'md:min-w-0');
+    });
+
     it('counts the replies as the Forum does: not the comments under them', async () => {
       vi.mocked(articleDiscussionService.list).mockResolvedValue({
         data: [{ ...dummyThread, comments: [reply({}), reply({ id: 'c2', parentId: 'c1' })] }],

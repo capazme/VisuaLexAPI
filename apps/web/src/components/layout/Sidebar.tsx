@@ -198,7 +198,9 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
       to={to}
       id={id}
       aria-label={accessibleName}
-      aria-current={isActive ? 'page' : undefined}
+      // «page» on its own address only; lit for a page under it or of its own, «true», so a screen reader does not
+      // hear «current page» twice (on `/work/prossimi`, here and on the planner's tab, #448).
+      aria-current={pathname === to ? 'page' : isActive ? 'true' : undefined}
       className={cn(
         "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
@@ -219,12 +221,9 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
       onFocus={(e: FocusEvent<HTMLAnchorElement>) => { preparePage(to); if (!words) handlers.onFocus(e); }}
     >
       <>
-          {/* A navigation entry is seen tens of times a day: its hover is the colour alone. */}
-          <motion.div
-            whileTap={reduceMotion ? undefined : { scale: 0.95 }}
-            transition={spring.snappy}
-            className="grid h-11 w-11 shrink-0 place-items-center"
-          >
+          {/* A navigation entry is seen tens of times a day: its hover is the colour alone. The press is CSS: framer-motion's
+              `whileTap` gave this box `tabindex="0"`, a second Tab stop in every entry (#448). */}
+          <div className="grid h-11 w-11 shrink-0 place-items-center transition-transform duration-100 motion-safe:active:scale-95">
             <Icon
               size={22}
               aria-hidden
@@ -235,7 +234,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
                   : "text-slate-500 dark:text-slate-400 stroke-[2px]"
               )}
             />
-          </motion.div>
+          </div>
 
           {words && (
             <span
@@ -257,8 +256,8 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
 
           {/* The active entry is «selected» by the logo's column (D-237), in the 21 px between the bar's edge and the icon:
               the 16 px mark (its column 6.6 px wide, from 4.7 to 11.3 px of the box) 7.5 px left of the row, so the
-              column runs from 7.2 to 13.8 px of the bar, 7.2 px from its edge and from the icon's box (21 px). It jumps
-              from entry to entry, as the dash did (seen in the browser, #448): `layoutId` does not carry it. */}
+              column runs from 7.2 to 13.8 px of the bar, 7.2 px from its edge and from the icon's box (21 px). It slides
+              from entry to entry within a section (`layoutId`, in the section's `LayoutGroup`). */}
           {isActive && (
             <motion.span
               layoutId="activeIndicator"
@@ -501,8 +500,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           </>
         )}
         {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
-            Each section names its own active column (`layoutId` within the section's group). */}
-        <LayoutGroup id={section}>
+            Each section names its own active column (`layoutId` within the section's group), and the phone's drawer apart:
+            `Layout` keeps both copies mounted, and with one name the desktop's column took its start from the hidden
+            drawer's (a box of nothing), so it jumped instead of sliding (#448). */}
+        <LayoutGroup id={layout === 'drawer' ? `drawer-${section}` : section}>
           <div ref={sectionEntries} role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
             {section === 'gymnasium' && (
               <>
@@ -578,9 +579,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             showUserMenu && "bg-primary-50 dark:bg-primary-900/25"
           )}
         >
+          {/* No `whileTap`: it made this box a second Tab stop inside the button (`tabindex="0"`). */}
           <motion.div
             whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
             transition={spring.snappy}
             className={cn(
               "relative shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold",

@@ -61,6 +61,7 @@ export function ReportButton({ onReport, label }: { onReport: () => void; label?
         title="Segnalare ai moderatori?"
         message="La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto."
         confirmLabel="Segnala"
+        focusCancel
         onCancel={() => setAsking(false)}
         onConfirm={() => {
           setAsking(false);

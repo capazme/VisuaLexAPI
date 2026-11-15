@@ -1,5 +1,5 @@
-import type { ReactNode, RefObject } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { FolderOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { CopyableCode } from '../../../../features/connections/CopyableCode';
@@ -177,18 +177,34 @@ export function ModulesSection({ corsoId, moduli, actions, headingRef, offer }: 
   );
 }
 
-/** The final exam's state (§6.4) and, while it is open or under way, the way into it (`ExamSession`, LC9). */
+/** What the exam's link says per state (`ExamSession`, LC9): to take it, or to read its result again once handed in (LC12). */
+const EXAM_LINK: Partial<Record<EsamePagina['stato'], string>> = {
+  aperto: 'Inizia la prova',
+  'in-corso': 'Riprendi la prova',
+  superato: 'Rivedi l’esito',
+  'non-superato': 'Rivedi l’esito',
+};
+
+/** The final exam's state (§6.4) and the way into it: to take it while open or under way, to read the result after. */
 export function ExamSection({ corsoId, titolo, esame, inPreparazione }: { corsoId: string; titolo: string; esame: EsamePagina; inPreparazione: boolean }) {
-  const takeable = (esame.stato === 'aperto' || esame.stato === 'in-corso') && esame.esameId;
+  const link = esame.esameId ? EXAM_LINK[esame.stato] : undefined;
+  // Back from the exam (`ExamSession` closes with `state.focus`), the focus returns to its command.
+  const fromExam = (useLocation().state as { focus?: string } | null)?.focus === 'esame';
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    if (fromExam) linkRef.current?.focus();
+    // Once, as the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <section aria-labelledby="corso-esame" className={cn(TILE, 'grid grid-cols-1 gap-2 p-5')}>
       <h3 id="corso-esame" className={BLOCK_HEADING}>
         Esame finale
       </h3>
       <ExamState titolo={titolo} esame={esame} inPreparazione={inPreparazione} />
-      {takeable && (
-        <Link to={examPath(corsoId, esame.esameId!)} className={cn(INK_BUTTON, 'justify-self-start')}>
-          {esame.stato === 'aperto' ? 'Inizia la prova' : 'Riprendi la prova'}
+      {link && (
+        <Link ref={linkRef} to={examPath(corsoId, esame.esameId!)} className={cn(INK_BUTTON, 'justify-self-start')}>
+          {link}
         </Link>
       )}
     </section>

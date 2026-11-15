@@ -12,6 +12,8 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Start the focus on «Annulla», where an Enter pressed at once must not act (the Forum's «Segnala», #449). */
+  focusCancel?: boolean;
 }
 
 export function ConfirmDialog({
@@ -23,8 +25,10 @@ export function ConfirmDialog({
   cancelLabel = 'Annulla',
   onConfirm,
   onCancel,
+  focusCancel = false,
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const Icon = variant === 'danger' ? AlertTriangle : Info;
 
   return (
@@ -38,10 +42,10 @@ export function ConfirmDialog({
       title={title}
       description={message}
       showCloseButton={false}
-      initialFocusRef={confirmRef}
+      initialFocusRef={focusCancel ? cancelRef : confirmRef}
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
+          <Button ref={cancelRef} variant="ghost" size="sm" onClick={onCancel}>
             {cancelLabel}
           </Button>
           <Button

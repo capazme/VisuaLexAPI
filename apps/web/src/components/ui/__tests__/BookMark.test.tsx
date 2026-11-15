@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BookMark } from '../BookMark';
 
@@ -29,5 +29,35 @@ describe('BookMark (LexCraft\'s column)', () => {
     expect(svg).toHaveAttribute('width', '28');
     expect(svg).toHaveAttribute('height', '28');
     expect(svg.getAttribute('class')).toBe('vlx-book vlx-book-draw vlx-book-breathe extra');
+  });
+
+  // Papiniano, #446 note 3: taking over from the splash, the opacity jumped from the splash's breath to 1.
+  describe('taking over from the splash', () => {
+    afterEach(() => {
+      document.querySelector('.vlx-splash')?.remove();
+      delete (Element.prototype as Partial<Element>).getAnimations;
+    });
+
+    it('breathes on in the splash\'s phase: its breath starts when the splash\'s did', () => {
+      const splash = document.createElement('div');
+      splash.className = 'vlx-splash';
+      splash.innerHTML = '<svg></svg>';
+      document.body.append(splash);
+      const splashBreath = { startTime: 1234 };
+      const ownBreath = { startTime: 5000 as number | null };
+      Element.prototype.getAnimations = vi.fn(function (this: Element) {
+        return [this.closest('.vlx-splash') ? splashBreath : ownBreath] as unknown as Animation[];
+      });
+      render(<BookMark breathe />);
+      expect(ownBreath.startTime).toBe(1234);
+    });
+
+    it('leaves a mark that does not breathe, or has no splash before it, alone', () => {
+      const ownBreath = { startTime: 5000 };
+      Element.prototype.getAnimations = vi.fn(() => [ownBreath] as unknown as Animation[]);
+      render(<BookMark breathe />);
+      render(<BookMark draw />);
+      expect(ownBreath.startTime).toBe(5000);
+    });
   });
 });

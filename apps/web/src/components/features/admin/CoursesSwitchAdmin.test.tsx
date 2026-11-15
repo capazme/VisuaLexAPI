@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../services/adminService', () => ({ appSwitches: vi.fn(), setAppSwitch: vi.fn() }));
@@ -31,6 +31,31 @@ describe('CoursesSwitchAdmin (LC9)', () => {
     expect(screen.getByRole('button', { name: 'Spegni i percorsi' })).toBeInTheDocument();
     // The app's own switch follows at once: the sidebar and Oggi show the courses without a reload.
     expect(coursesSwitchStore.getState().state).toBe('on');
+  });
+
+  it('turns on with one tap, with no confirmation (LC12)', async () => {
+    setAppSwitch.mockResolvedValue(row(true));
+    render(<CoursesSwitchAdmin />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Accendi i percorsi' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(setAppSwitch).toHaveBeenCalledWith('lingo_courses', true);
+  });
+
+  it('asks before turning off, and writes nothing on «Annulla» (LC12)', async () => {
+    appSwitches.mockResolvedValue([row(true)]);
+    setAppSwitch.mockResolvedValue(row(false));
+    render(<CoursesSwitchAdmin />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Spegni i percorsi' }));
+    let dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Spegnere i percorsi?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(setAppSwitch).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Spegni i percorsi' }));
+    dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Spegni' }));
+    expect(setAppSwitch).toHaveBeenCalledWith('lingo_courses', false);
+    expect(await screen.findByText('I percorsi sono spenti.')).toBeInTheDocument();
   });
 
   it('shows the error and keeps the state when the write fails', async () => {
