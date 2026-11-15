@@ -416,7 +416,7 @@ describe('CommandPalette — «A portata di mano»', () => {
   it('is one quiet line each when empty: no favourite, and «Crea un alias»', () => {
     asDesktop(true);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(screen.getByText('Nessun preferito: il fulmine su un articolo lo aggiunge qui')).toBeInTheDocument();
+    expect(screen.getByText('Nessun preferito: «Aggiungi alle norme rapide», nel menu ⋯ di un articolo, lo porta qui')).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Crea un alias' })).toBeInTheDocument();
   });
 

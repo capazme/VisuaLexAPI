@@ -346,7 +346,7 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
         element: '#command-palette-quick-norms',
         popover: {
             title: 'A portata di mano',
-            description: 'I tuoi preferiti e i tuoi alias: gli atti che apri spesso, a un clic. Il fulmine su un articolo lo aggiunge ai preferiti.',
+            description: 'I tuoi preferiti e i tuoi alias: gli atti che apri spesso, a un clic. Li aggiunge «Aggiungi alle norme rapide», nel menu ⋯ di un articolo.',
             side: 'bottom',
             align: 'center',
         }
