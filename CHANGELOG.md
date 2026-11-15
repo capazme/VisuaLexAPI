@@ -12,6 +12,20 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-15
+
+The Forum's Community page: the discussion feed and one open discussion at its own address. Web only, no
+migration.
+
+### Forum
+
+- Community (LC10): the feed of discussions on norms and decisions, filtered by subject, and one
+  discussion open at `/forum/community/:threadId`, with its replies, votes and comments.
+- A new gloss can carry a subject (optional), so the filter finds discussions started from the web.
+- The panel under an article and the Forum share the same controls: vote (named with what is voted and
+  the count), «Segnala» with a confirmation, reply; the same reply count in both places.
+- Touch targets of 44 px on the phone for vote, report, reply and the norm or decision link.
+
 ## [1.14.0] - 2026-11-15
 
 VisuaLex becomes LexCraft on screen: the name in every text a user reads, LexCraft's column as the mark,
