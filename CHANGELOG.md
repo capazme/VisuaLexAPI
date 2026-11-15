@@ -12,6 +12,32 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-15
+
+The web in Pietra, LexCraft's design system: warm greys and warm ink, EB Garamond to read and Inter for
+the interface, the sections named Work, Learn, Labs and Forum, «Commenti» at the top right. No migration.
+
+### Look
+
+- Pietra's colours (LC1, D-156): the ink and toga scales take warm greys and warm ink, so thousands of
+  classes change value, not name; the dark theme redefines the action, focus and selection-tint steps;
+  the courts' and the highlighter's blues stay blue; shadows, `theme-color` and the splash follow. The
+  guard is `lib/pietra.guard.test.ts`; text on paper is checked at 12:1 (Pietra measures 12.4:1).
+- Pietra's type (LC2): EB Garamond for reading text and titles, Inter for the interface, Geist Mono for
+  codes; all served by the app (fontsource, OFL-1.1), no request to Google Fonts; «Crediti» updated.
+  The reading text is 19 px on a phone and 20 px from `md` (LC4).
+- The text selection is one translucent stone on every paper, Study Mode's and the note cards included,
+  so a highlight under it keeps its hue; native checkboxes, radios and ranges take Pietra's ink (LC4).
+
+### Navigation
+
+- The sections take their LexCraft names: Opus → Work, Gymnasium → Learn, Academia → Labs (with the
+  flask icon), Forum (LC3, D-137, D-157, D-236). Identifiers, routes and data stored in the browser
+  are unchanged; the section switcher drops «VisuaLex».
+- Feedback is «Commenti» at the top right, beside «Tutto schermo», and the user menu's entry below
+  768 px; the round floating button and the room kept for it are gone (LC3, D-253).
+- The Learn sidebar names «Learn» once for a screen reader (LC4).
+
 ## [1.12.0] - 2026-11-14
 
 The practice in two views; notes beside the text and a Forum highlight cut like any other; dossiers and
