@@ -123,12 +123,16 @@ describe('PracticeBar (spec §5)', () => {
     }
   });
 
-  it('collapses to «N pratiche» and opens again', () => {
+  // LC21: a static row of tabs in the page's flow, over the columns: nothing to collapse, nothing floating.
+  it('is a static row in the page\'s flow, not floating and not collapsible, and says its count to a screen reader', () => {
     s().createPractice('Una');
     render(<PracticeBar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Comprimi la barra delle pratiche' }));
-    fireEvent.click(screen.getByRole('button', { name: /1 pratica/ }));
-    expect(screen.getByRole('navigation', { name: 'Pratiche' })).toBeInTheDocument();
+    const bar = screen.getByRole('navigation', { name: 'Pratiche' });
+    expect(bar).toHaveAttribute('id', 'tour-practice-bar');
+    expect(bar.className).not.toMatch(/\bfixed\b|\babsolute\b/);
+    expect(screen.queryByRole('button', { name: 'Comprimi la barra delle pratiche' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /1 pratica/ })).toBeNull();
+    expect(within(bar).getByText('(1 pratica)')).toHaveClass('sr-only');
   });
 
   it('stays out of the way of the palette', () => {
@@ -139,7 +143,8 @@ describe('PracticeBar (spec §5)', () => {
   });
 });
 
-describe('PracticeBar: its height keeps the column clear of it (spec §3.4)', () => {
+// LC21: in the page's flow it covers nothing, so the column keeps no room for it: it reports 0, null once not drawn.
+describe('PracticeBar: the room the column keeps for it (spec §3.4)', () => {
   // jsdom lays nothing out: the bar's height is given, and its ResizeObserver fired by hand.
   let height = 0;
   const observers: Array<() => void> = [];
@@ -159,14 +164,14 @@ describe('PracticeBar: its height keeps the column clear of it (spec §3.4)', ()
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('reports its height, again when its chips wrap onto a new line, and null once it is not drawn', () => {
+  it('reports no room however tall it is, also when its chips wrap onto a new line, and null once it is not drawn', () => {
     s().createPractice('Una');
     const onHeightChange = vi.fn();
     render(<PracticeBar onHeightChange={onHeightChange} />);
-    expect(onHeightChange).toHaveBeenLastCalledWith(113);
+    expect(onHeightChange).toHaveBeenLastCalledWith(0);
     height = 171; // a second line of chips
     act(() => { observers.forEach((fire) => fire()); });
-    expect(onHeightChange).toHaveBeenLastCalledWith(171);
+    expect(onHeightChange).toHaveBeenLastCalledWith(0);
     act(() => { appStore.setState({ commandPaletteOpen: true }); });
     expect(onHeightChange).toHaveBeenLastCalledWith(null);
   });
@@ -187,7 +192,7 @@ describe('PracticeBar: the chip’s «⋯» saves the practice (spec §7)', () =
     expect(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Salva come dossier' }));
     const message = await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo');
-    // Portalled to the document, in the toast band: inside the bar (fixed, transformed, blurred) it
+    // Portalled to the document, in the toast band: inside the bar it
     // would be placed against the bar and stacked in it (gotchas 22, 26).
     const toast = message.closest('[role="alert"]') as HTMLElement;
     expect(toast.closest('#tour-practice-bar')).toBeNull();

@@ -53,19 +53,44 @@ describe('HistoryView — decisions', () => {
   it('names the page with one h1 in the sections\' frame, with one search field (W2)', async () => {
     getHistory.mockResolvedValue([norm]);
     mount();
-    await screen.findAllByText(/Art\. 3/);
+    await screen.findAllByText('art. 3 l. 241/1990');
     expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent?.trim())).toEqual(['Cronologia']);
     expect(screen.getAllByRole('textbox', { name: 'Cerca nella cronologia' })).toHaveLength(1);
     // At least 16 px on a phone, or Safari on an iPhone zooms the page into it (`FIELD_TEXT`).
     expect(screen.getByRole('textbox', { name: 'Cerca nella cronologia' })).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
   });
 
-  it('leaves a norm row as it was', async () => {
+  // LC21 (B8): a norm row is titled as the norm is cited, the act's heading under it; rows of a list, no cards or dots.
+  it('titles a norm row as it is cited, with the act under it, beside a decision', async () => {
     getHistory.mockResolvedValue([norm, decision]);
     mount();
     await screen.findAllByText(/Cass\. civ\., n\. 99999\/2024/);
-    expect(screen.getAllByText(/Art\. 3/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('legge').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('art. 3 l. 241/1990').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('l. n. 241 del 1990').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Art\. 3$/)).toBeNull();
+    // The desktop row (the second title): a ruled row, no bordered card, no timeline dot beside it.
+    const title = screen.getAllByRole('button', { name: (n) => n.includes('art. 3 l. 241/1990') })[1];
+    const card = title.parentElement!.parentElement!;
+    expect(card).toHaveClass('border-b');
+    expect(card).not.toHaveClass('border-2');
+    expect(card.parentElement!.querySelector('.bg-primary-500')).toBeNull();
+  });
+
+  it('writes a list of articles as «artt.», comma by comma', async () => {
+    getHistory.mockResolvedValue([{ ...norm, act_type: 'codice civile', act_number: null, date: null, article: '2056,2057' }]);
+    mount();
+    expect((await screen.findAllByText('artt. 2056, 2057 c.c.')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Codice civile').length).toBeGreaterThan(0);
+  });
+
+  it('heads each date group with a small uppercase h2, no calendar pill', async () => {
+    getHistory.mockResolvedValue([norm]);
+    mount();
+    await screen.findAllByText('art. 3 l. 241/1990');
+    const groups = screen.getAllByRole('heading', { level: 2 });
+    expect(groups.length).toBeGreaterThan(0);
+    for (const h of groups) expect(h).toHaveClass('uppercase', 'text-xs');
+    expect(document.querySelector('.lucide-calendar')).toBeNull();
   });
 
   it('shows an unreadable key as «Sentenza», not clickable, and logs it', async () => {
@@ -82,7 +107,7 @@ describe('HistoryView — decisions', () => {
   it('opens a norm from the keyboard: its title is a button, Tab reaches it, Enter opens it; the menu sits beside it (A6)', async () => {
     getHistory.mockResolvedValue([norm]);
     mount();
-    const titles = await screen.findAllByRole('button', { name: (n) => n.includes('legge') && n.includes('Art. 3') });
+    const titles = await screen.findAllByRole('button', { name: (n) => n.includes('art. 3 l. 241/1990') });
     // One per layout (phone and desktop); none of them holds another control.
     expect(titles).toHaveLength(2);
     titles.forEach((title) => expect(title.querySelector('button')).toBeNull());

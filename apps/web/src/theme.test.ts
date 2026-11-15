@@ -55,9 +55,9 @@ describe('the page frame (W2, U1)', () => {
     expect(css).toMatch(/@media \(width >= 48rem\)\s*\{\s*--focus-button-room:\s*4\.25rem/);
   }, 30000);
 
-  it('declares the frame once, 1600 px and 2400 in full screen, its margins outside it (U1)', async () => {
+  it('declares the frame once, 1056 px (LC21) and 2400 in full screen, its margins outside it (U1)', async () => {
     const css = await compile([...PAGE_FRAME.split(' '), 'max-w-frame', 'max-w-frame-full']);
-    expect(css).toMatch(/--container-frame:\s*100rem/);
+    expect(css).toMatch(/--container-frame:\s*66rem/);
     expect(css).toMatch(/--container-frame-full:\s*150rem/);
     expect(css).toMatch(/\.max-w-frame\s*\{\s*max-width:\s*var\(--container-frame\)/);
     expect(css).toMatch(/\.max-w-frame-full\s*\{\s*max-width:\s*var\(--container-frame-full\)/);

@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
@@ -8,7 +8,9 @@ vi.mock('../../ui/FeedbackButton', () => ({
   FeedbackButton: ({ className }: { className?: string; onOpen: () => void }) => <button type="button" data-testid="feedback" className={className}>Commenti</button>,
 }));
 vi.mock('../../ui/FeedbackModal', () => ({ FeedbackModal: () => null }));
-vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
+vi.mock('../../ui/ChangelogNotification', () => ({
+  ChangelogNotification: ({ inBar }: { inBar?: boolean }) => <span data-testid={inBar ? 'news-in-bar' : 'news-floating'} />,
+}));
 vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 // The planner's host reads the tasks from the server: not under test here.
 vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
@@ -20,10 +22,11 @@ vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 const auth = vi.hoisted(() => ({ isAuthenticated: true }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => auth }));
 vi.mock('../../../hooks/useTour', () => ({
-  useTour: () => ({ startTour: vi.fn(), hasSeenTour: () => true, resetAndStartTour: vi.fn() }),
+  useTour: () => ({ startTour: vi.fn(), tryStartTour: vi.fn(), hasSeenTour: () => true, resetAndStartTour: vi.fn() }),
 }));
 
 import { Layout } from '../Layout';
+import { appStore } from '../../../store/useAppStore';
 
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
 
@@ -60,13 +63,14 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
     }
   });
 
-  it('keeps the top rows clear of it from lg, never over the search page, whose field ends before it', () => {
+  // LC21: from lg it sits in the top bar (or the search page's bar), so no top row keeps room for it outside full screen.
+  it('asks no room of the top rows outside full screen; the search page\'s field ends before the controls', () => {
     at('/dossier');
-    expect(screen.getByTestId('layout-content')).toHaveClass('lg:[--focus-button-room:11rem]');
+    expect(screen.getByTestId('layout-content').className).not.toMatch(/--focus-button-room/);
     cleanup();
     at('/');
     expect(screen.getByTestId('layout-content').className).not.toMatch(/--focus-button-room/);
-    expect(screen.getByTestId('search-bar')).toHaveClass('md:pr-[10.5rem]', 'lg:pr-[11rem]');
+    expect(screen.getByTestId('search-bar')).toHaveClass('md:pr-[10.5rem]', 'lg:pr-[17rem]');
   });
 
   it("leaves the page's foot its own padding: nothing floats there any more", () => {
@@ -84,5 +88,87 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
   it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione', '/learn/valida', '/dossier'])('draws no services pill on %s', (path) => {
     at(path);
     expect(screen.queryByText(/Servizi operativi|Controllo servizi/)).toBeNull();
+  });
+});
+
+// LC21: from lg the controls that floated sit in a bar: the top bar on every page but the search page, the lesson and
+// full screen; the search page's own bar on `/`.
+describe('Layout — the top bar from lg (LC21)', () => {
+  const original = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 1024px)' })) as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+    appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
+  });
+
+  it.each(['/dossier', '/work/oggi', '/forum', '/learn/schede'])('draws the bar on %s, with the path, the search and the three controls, none floating', (path) => {
+    at(path);
+    const bar = screen.getByTestId('top-bar');
+    expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: /Norma, dossier o pagina/ })).toBeInTheDocument();
+    expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
+    expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
+    const fullScreen = within(bar).getByRole('button', { name: 'Tutto schermo' });
+    expect(fullScreen).toHaveAttribute('aria-pressed', 'false');
+    expect(fullScreen).not.toHaveClass('fixed');
+    // One of each: nothing left floating over the page.
+    expect(screen.getAllByTestId('feedback')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Tutto schermo' })).toHaveLength(1);
+    expect(screen.queryByTestId('news-floating')).toBeNull();
+  });
+
+  it('opens the command palette from the bar\'s search', () => {
+    appStore.setState({ commandPaletteOpen: false });
+    at('/dossier');
+    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: /Norma, dossier o pagina/ }));
+    expect(appStore.getState().commandPaletteOpen).toBe(true);
+    appStore.setState({ commandPaletteOpen: false });
+  });
+
+  it('opens full screen from the bar', () => {
+    at('/dossier');
+    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: 'Tutto schermo' }));
+    expect(appStore.getState().settings.focusMode).toBe(true);
+  });
+
+  it('on the search page draws the top bar too, with the path «Work › Corpus» and the field, compact, in the search\'s place (anti-slop FAIL, 15 Nov)', () => {
+    at('/');
+    expect(screen.queryByTestId('search-bar')).toBeNull();
+    const bar = screen.getByTestId('top-bar');
+    expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toHaveTextContent('WorkCorpus');
+    expect(within(bar).getByRole('search', { name: 'Ricerca' })).toBeInTheDocument();
+    expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
+    expect(within(bar).getByRole('button', { name: 'Tutto schermo' })).toBeInTheDocument();
+    expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
+    expect(screen.queryByTestId('news-floating')).toBeNull();
+    // The practice's columns are the viewport less this bar, 52 px.
+    expect(document.querySelector('main')).toHaveClass('[--search-bar-height:3.25rem]');
+  });
+
+  it('draws no top bar under the lesson', () => {
+    at('/learn/ripasso/sessione?materia=DIRITTO_CIVILE');
+    expect(screen.queryByTestId('top-bar')).toBeNull();
+  });
+
+  it('in full screen draws no bar, and the controls float as before, with their room kept from md', () => {
+    appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
+    at('/dossier');
+    expect(screen.queryByTestId('top-bar')).toBeNull();
+    expect(screen.getByTestId('feedback')).toHaveClass('fixed');
+    expect(screen.getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('news-floating')).toBeInTheDocument();
+    expect(screen.getByTestId('layout-content')).toHaveClass('md:[--focus-button-room:11rem]');
+  });
+});
+
+describe('Layout — below lg the controls float as before', () => {
+  it('draws no top bar, and the news floats', () => {
+    at('/dossier');
+    expect(screen.queryByTestId('top-bar')).toBeNull();
+    expect(screen.getByTestId('feedback')).toHaveClass('fixed');
+    expect(screen.getByTestId('news-floating')).toBeInTheDocument();
+    expect(screen.queryByTestId('news-in-bar')).toBeNull();
   });
 });
