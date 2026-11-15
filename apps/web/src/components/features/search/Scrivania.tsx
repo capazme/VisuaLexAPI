@@ -22,8 +22,11 @@ const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 const stagger = (i: number) => ({ animationDelay: `${i * 40}ms` });
 const ENTER = 'animate-in fade-in slide-in-from-bottom-2 duration-200';
 
-const TOOL_LINK =
-  'inline-flex min-h-[44px] items-center rounded-md px-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:hover:bg-primary-950';
+/** The examples' look, underlined in the action's ink (from md, and on a phone too: they are links, not pills). */
+const TOOL_LINK = cn(
+  TOUCH_TARGET_RESPONSIVE,
+  'inline-flex items-center whitespace-nowrap font-serif text-lg text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-4 transition-colors hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-700',
+);
 
 const ROW =
   'group flex w-full min-h-[44px] items-center gap-4 border-t border-slate-200 py-3.5 text-left transition-colors hover:bg-slate-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-800 dark:hover:bg-slate-900/60';
@@ -105,7 +108,7 @@ export function Scrivania() {
         </div>
 
         {/* The Corpus tools beside the search (LC8: Work's bar no longer lists them). */}
-        <nav aria-label="Altri strumenti del Corpus" className={`-mx-2 mt-3 flex flex-wrap gap-x-2 ${ENTER}`} style={stagger(4)}>
+        <nav aria-label="Altri strumenti del Corpus" className={`mt-3 flex flex-wrap gap-x-5 gap-y-2 ${ENTER}`} style={stagger(4)}>
           {[['/documents', 'Analizza un documento'], ['/rassegne', 'Rassegne']].map(([to, label]) => (
             <Link key={to} to={to} className={TOOL_LINK}>{label}</Link>
           ))}

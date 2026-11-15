@@ -58,7 +58,10 @@ describe('the Scrivania\'s ways to the Corpus tools', () => {
     const tools = screen.getByRole('navigation', { name: 'Altri strumenti del Corpus' });
     const links = within(tools).getAllByRole('link');
     expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['Analizza un documento', '/documents'], ['Rassegne', '/rassegne']]);
-    for (const link of links) expect(link).toHaveClass('min-h-[44px]');
+    // Drawn as the examples above them: underlined, in the action's ink (#448: they read as bold text).
+    const example = screen.getByRole('button', { name: 'Art. 2043 c.c.' });
+    for (const link of links) expect(link).toHaveClass('min-h-[44px]', 'underline', 'decoration-primary-300', 'underline-offset-4', 'font-serif', 'text-primary-700');
+    expect(example).toHaveClass('underline', 'decoration-primary-300', 'font-serif', 'text-primary-700');
     expect(tools.className).not.toMatch(/(^|\s)hidden(\s|$)|max-md:hidden/);
   });
 });
