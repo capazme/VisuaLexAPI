@@ -223,6 +223,63 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(1);
   });
 
+  // Papiniano's pass on #448: the column touched the icon (0.8 px). The column (16 px mark: 6.6 px wide, from 4.7 to
+  // 11.3 px of its box) sits 7.5 px left of the row, so from 7.2 to 13.8 px of the bar: 7.2 px from the bar's edge and
+  // 7.2 px from the icon's box (21 px). The row no longer clips it (no `overflow-hidden`).
+  it('keeps the column clear of the icon: the 16 px mark, 7.5 px left of the row, which does not clip it', () => {
+    for (const layout of ['wide', 'rail', 'drawer'] as const) {
+      render(
+        <MemoryRouter initialEntries={['/work/oggi']}>
+          <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+        </MemoryRouter>,
+      );
+      const today = screen.getByRole('link', { name: 'Oggi' });
+      const mark = today.querySelector('svg.vlx-book')!;
+      expect(mark).toHaveAttribute('width', '16');
+      expect(mark.parentElement).toHaveClass('absolute', '-left-[7.5px]');
+      expect(today).not.toHaveClass('overflow-hidden');
+      cleanup();
+    }
+  });
+
+  it('keeps «Oggi» lit on the planner\'s other views and the trash, «Corpus» on the Corpus tools, in Work', () => {
+    for (const path of ['/work/prossimi', '/work/ingresso', '/work/cestino']) {
+      renderSidebar(path);
+      const today = screen.getByRole('link', { name: 'Oggi' });
+      expect(today, path).toHaveAttribute('aria-current', 'page');
+      expect(today.querySelector('svg.vlx-book'), path).not.toBeNull();
+      cleanup();
+    }
+    for (const path of ['/documents', '/rassegne']) {
+      renderSidebar(path);
+      expect(screen.getByRole('link', { name: 'Corpus' }), path).toHaveAttribute('aria-current', 'page');
+      cleanup();
+    }
+    // Elsewhere nothing changes: «Ricerca» is not lit on «Analizza documento», which is.
+    sectionStore.setState({ section: 'forum' });
+    renderSidebar('/documents');
+    expect(screen.getByRole('link', { name: 'Ricerca' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Analizza documento' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('draws no lone rule over Work\'s entries, where the Corpus ones were', () => {
+    renderSidebar('/work/oggi');
+    expect(screen.getByRole('group', { name: 'Work' })).not.toHaveClass('border-t');
+    cleanup();
+    renderSidebar('/forum');
+    expect(screen.getByRole('group', { name: 'Forum' })).toHaveClass('border-t');
+  });
+
+  it('writes «in arrivo» under the name, so «Anonimizzatore» keeps its whole width', () => {
+    render(
+      <MemoryRouter initialEntries={['/work/oggi']}>
+        <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const tag = within(screen.getByRole('link', { name: 'Anonimizzatore, in arrivo' })).getByText('in arrivo');
+    expect(tag).toHaveClass('block', 'text-[11px]');
+  });
+
   it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
     plannerStore.setState({ todayCount: 3 });
     try {
@@ -280,6 +337,14 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     account.devMode = true;
     renderSidebar('/labs');
     expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/labs', '/labs/grafo']);
+    // «Assistente» stays lit on the hub's own pages, not on the graph's (#448).
+    for (const path of ['/labs/contribuisci', '/labs/valida']) {
+      cleanupAndRender(path, () => { account.devMode = true; });
+      expect(screen.getByRole('link', { name: 'Assistente' }), path).toHaveAttribute('aria-current', 'page');
+    }
+    cleanupAndRender('/labs/grafo', () => { account.devMode = true; });
+    expect(screen.getByRole('link', { name: 'Assistente' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Grafo' })).toHaveAttribute('aria-current', 'page');
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
     expect(hrefs()).toEqual(OPUS_HREFS);

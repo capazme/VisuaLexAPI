@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -57,8 +57,11 @@ interface NavItemProps {
   end?: boolean;
   /** The keyboard shortcut that does the same, shown in the hover label (not part of the name). */
   hint?: string;
-  /** A feature on its way (D-315): «in arrivo» beside the word, in the hover label and in the name. */
+  /** A feature on its way (D-315): «in arrivo» under the word, in the hover label and in the name. */
   soon?: boolean;
+  /** Other addresses (and those under them) where the entry is lit, so the bar says where one is: «Oggi» on the
+   *  planner's other views, «Corpus» on the Corpus tools, «Assistente» on the hub's pages (#448). */
+  activeOn?: string[];
   layout: SidebarLayout;
 }
 
@@ -170,14 +173,18 @@ function useSidebarLabel() {
   return { shown, hide, handlers };
 }
 
-function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, hint, soon, layout, end }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, hint, soon, activeOn, layout, end }: NavItemProps) {
   const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
   const words = layout !== 'rail';
-  // The active column slides between the section's entries: under reduced motion it jumps.
   const reduceMotion = useReducedMotion();
+  // NavLink's rule (its address, or under it unless `end`; «/» on itself only), plus `activeOn`. A `Link`, since NavLink
+  // gives `aria-current` only on its own address.
+  const { pathname } = useLocation();
+  const under = (path: string, exact?: boolean) => pathname === path || (!exact && path !== '/' && pathname.startsWith(`${path}/`));
+  const isActive = under(to, end) || (activeOn ?? []).some((path) => under(path));
 
   // In the rail the whole control is an icon, and `label` only ever reached the eye — the
   // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
@@ -186,17 +193,18 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
   const accessibleName = showBadge ? `${label}, ${badgeLabel ?? `${badgeCount} notifiche`}` : soon ? `${label}, in arrivo` : label;
 
   return (
-    <NavLink
+    <Link
       ref={setLinkEl}
       to={to}
-      end={end}
       id={id}
       aria-label={accessibleName}
-      className={({ isActive }) => cn(
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
         "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
-        // The icon keeps the same 44 px box in every layout, so widening the bar moves no icon.
-        words ? "w-full h-11 overflow-hidden pr-2" : "w-11 h-11",
+        // The icon keeps the same 44 px box in every layout, so widening the bar moves no icon. No `overflow-hidden`:
+        // it clipped the active column, which sits left of the row; the words truncate on their own.
+        words ? "w-full h-11 pr-2" : "w-11 h-11",
         isActive && "bg-primary-50 dark:bg-primary-900/25"
       )}
       onClick={() => {
@@ -210,8 +218,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
       onPointerDown={() => preparePage(to)}
       onFocus={(e: FocusEvent<HTMLAnchorElement>) => { preparePage(to); if (!words) handlers.onFocus(e); }}
     >
-      {({ isActive }) => (
-        <>
+      <>
           {/* A navigation entry is seen tens of times a day: its hover is the colour alone. */}
           <motion.div
             whileTap={reduceMotion ? undefined : { scale: 0.95 }}
@@ -239,23 +246,26 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
               )}
             >
               {label}
+              {/* Under the name, not beside it: beside, it cut «Anonimizzatore» in the 224 px bar (#448). */}
+              {soon && <span className={cn("block text-[11px] font-medium leading-none", SIDEBAR_SMALL_TEXT)}>in arrivo</span>}
             </span>
           )}
           {/* The shortcut, for a keyboard: not in the phone's drawer. */}
           {layout === 'wide' && hint && !showBadge && (
             <kbd aria-hidden className={cn("ml-2 shrink-0 font-sans text-[11px]", SIDEBAR_SMALL_TEXT)}>{hint}</kbd>
           )}
-          {words && soon && <span aria-hidden className={cn("ml-2 shrink-0 text-[11px]", SIDEBAR_SMALL_TEXT)}>in arrivo</span>}
 
-          {/* The active entry is «selected» by the logo's column (D-237), small at the row's left edge; the svg's empty
-              side hangs past the edge, the column itself stays clear of the icon. */}
+          {/* The active entry is «selected» by the logo's column (D-237), in the 21 px between the bar's edge and the icon:
+              the 16 px mark (its column 6.6 px wide, from 4.7 to 11.3 px of the box) 7.5 px left of the row, so the
+              column runs from 7.2 to 13.8 px of the bar, 7.2 px from its edge and from the icon's box (21 px). It jumps
+              from entry to entry, as the dash did (seen in the browser, #448): `layoutId` does not carry it. */}
           {isActive && (
             <motion.span
               layoutId="activeIndicator"
-              className="absolute -left-1 top-1/2 -translate-y-1/2 text-primary-700 dark:text-primary-300"
+              className="absolute -left-[7.5px] top-1/2 -translate-y-1/2 text-primary-700 dark:text-primary-300"
               transition={reduceMotion ? { duration: 0 } : spring.snappy}
             >
-              <BookMark size={20} />
+              <BookMark size={16} />
             </motion.span>
           )}
 
@@ -271,9 +281,8 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
           <AnimatePresence>
             {!words && showTooltip && <SidebarTooltip anchor={linkEl} label={label} hint={soon ? 'in arrivo' : hint} onDismiss={hide} />}
           </AnimatePresence>
-        </>
-      )}
-    </NavLink>
+      </>
+    </Link>
   );
 }
 
@@ -373,8 +382,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     closeMobile();
   };
   // The search: «Ricerca» over every section but Work, «Corpus» among Work's entries (D-315).
-  const searchEntry = (label: string) => (
-    <NavItem to="/" icon={Search} label={label} hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
+  const searchEntry = (label: string, activeOn?: string[]) => (
+    <NavItem to="/" activeOn={activeOn} icon={Search} label={label} hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
   );
 
   // Academia's entries: the section is offered only with the development mode (sections spec S12), and
@@ -492,9 +501,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           </>
         )}
         {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
-            Each section names its own active column, so the column does not slide from the old section's entries. */}
+            Each section names its own active column (`layoutId` within the section's group). */}
         <LayoutGroup id={section}>
-          <div ref={sectionEntries} role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
+          <div ref={sectionEntries} role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
             {section === 'gymnasium' && (
               <>
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}
@@ -521,8 +530,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               <>
                 {/* Oggi, Corpus, Dossier, Atti, Anonimizzatore (D-315). «Prossimi giorni» and «Lista d'ingresso» are tabs of
                     Work's page (`OpusPage`), «Analizza documento» and «Rassegne» links of the search page (LC8). */}
-                <NavItem to="/work/oggi" icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
-                {searchEntry('Corpus')}
+                <NavItem to="/work/oggi" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
+                {searchEntry('Corpus', ['/documents', '/rassegne'])}
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <NavItem to="/work/atti" icon={FileText} label="Atti" soon onClick={closeMobile} layout={layout} />
                 {/* D-324: it will come in the desktop app. */}
@@ -531,7 +540,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             )}
             {section === 'academia' && showAssistant && (
               <>
-                <NavItem to="/labs" end icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
+                <NavItem to="/labs" end activeOn={['/labs/contribuisci', '/labs/valida']} icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
                 {/* Slice 4 Decision A: /labs/grafo is the Q&A surface; the hub stays at /labs. */}
                 {showGraph && <NavItem to="/labs/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
               </>
