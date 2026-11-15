@@ -165,8 +165,7 @@ export function useAuth() {
       // Signed in, then the account refused (401, 403): the tokens just stored go with the failure, and the form stays,
       // no redirect (#463). A 429, a 5xx or no answer keep them: the session is not refused (LC13).
       if (signedIn && isRefusalStatus((error as { status?: unknown } | null)?.status)) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+        authService.clearTokens();
       }
       setState((prev) => ({
         ...prev,
