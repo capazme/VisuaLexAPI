@@ -567,6 +567,26 @@
   color: hsl(var(--vlx-find-current-fg));
 }
 
+/* The browser's own blue, left on the selection and the native controls (LC4): Pietra's ink instead. The selection
+   is ink on paper turned over (light: ink 900 under ink 50; dark: ink 50 under ink 950), with its text colour set, so
+   it reads on every paper (Study Mode's sepia too) and stands apart from every highlighter's ground (`--hl-*`, not
+   touched). Checkboxes, radios and ranges take the action's ink (toga 600; light toga 400 in the dark table).
+   `theme.test.ts` checks both pairs. */
+:root {
+  accent-color: var(--color-toga-600);
+}
+.dark {
+  accent-color: var(--color-toga-400);
+}
+::selection {
+  background-color: var(--color-ink-900);
+  color: var(--color-ink-50);
+}
+.dark ::selection {
+  background-color: var(--color-ink-50);
+  color: var(--color-ink-950);
+}
+
 /* The words of the gloss a card is on (D8: hovered or focused), painted through the CSS Custom Highlight API
    (utils/glossPassage.ts), so the text nodes are never touched. The discussion's tint and underline
    (`.vlx-thread-focus`), not a new colour. */

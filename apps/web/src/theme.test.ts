@@ -208,6 +208,56 @@ describe('the Inchiostro palette', () => {
     expect(ratio(rgb('ink-300'), rgb('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('gives the selection and the native checkboxes Pietra\'s ink, the selected text at AA and apart from the highlighters (LC4)', () => {
+    const source = readFileSync(CSS_PATH, 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const hsl = (h: number, s: number, l: number): number[] => {
+      const [S, L] = [s / 100, l / 100];
+      const k = (n: number) => (n + h / 30) % 12;
+      const a = S * Math.min(L, 1 - L);
+      return [0, 8, 4].map((n) => L - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)))
+        .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    };
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    // The selection: ink tokens, which do not change with the theme, so each rule names its own pair.
+    const selection = (prefix: string) => {
+      const m = source.match(new RegExp(`(?:^|\\n)${prefix}::selection\\s*\\{\\s*background-color:\\s*var\\(--color-(ink-\\d+)\\);\\s*color:\\s*var\\(--color-(ink-\\d+)\\);`));
+      if (!m) throw new Error(`${prefix}::selection not found`);
+      return { bg: linear(m[1]), fg: linear(m[2]) };
+    };
+    const light = selection('');
+    const dark = selection('\\.dark ');
+    expect(ratio(light.fg, light.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(dark.fg, dark.bg)).toBeGreaterThanOrEqual(4.5);
+    // Apart from every highlighter's ground in its theme (light block, then dark), by 3:1: a selection over a highlight
+    // still reads as a selection. The highlighters' values are not touched (they are checked as they are).
+    const grounds = [...source.matchAll(/--hl-(yellow|green|red|blue)-bg:\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%;/g)]
+      .map((m) => hsl(Number(m[2]), Number(m[3]), Number(m[4])));
+    expect(grounds).toHaveLength(8);
+    for (const ground of grounds.slice(0, 4)) expect(ratio(light.bg, ground)).toBeGreaterThanOrEqual(3);
+    for (const ground of grounds.slice(4)) expect(ratio(dark.bg, ground)).toBeGreaterThanOrEqual(3);
+    // The native checkboxes, radios and ranges: the action's ink (toga, light in the dark table), not the browser's blue.
+    expect(source).toMatch(/:root\s*\{\s*accent-color:\s*var\(--color-toga-600\);/);
+    expect(source).toMatch(/\.dark\s*\{\s*accent-color:\s*var\(--color-toga-400\);/);
+  });
+
   it('keeps the sidebar\'s 11 px texts at AA on its glass, over the page and over the phone\'s backdrop', () => {
     // `SIDEBAR_SMALL_TEXT` (Sidebar.tsx): slate 600 in light, slate 400 in dark (slate is ink). The aside is
     // white/80 (dark: slate-900/80) over the page (slate-50 / slate-950) or, as the phone's drawer, over the
