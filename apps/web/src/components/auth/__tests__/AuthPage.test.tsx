@@ -434,6 +434,12 @@ describe('AuthPage: the wordmark written in ink', () => {
     expect(title.querySelector('svg')).toBeNull();
   });
 
+  // Papiniano, #446 note 1: from 768 px the column (18 px, centred in its 44 px box) stood 13 px in from the «L».
+  it('sets the column flush with the «L» from md, and leaves it centred below', () => {
+    renderAuth('/login');
+    expect(document.querySelector('svg.vlx-ink-book')).toHaveClass('md:-ml-[12.9px]');
+  });
+
   it('drops the copy and the mask once the ink is written, and only then', () => {
     renderAuth('/login');
     const title = screen.getByRole('heading', { level: 1 });
