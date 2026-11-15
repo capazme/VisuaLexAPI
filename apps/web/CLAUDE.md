@@ -3079,7 +3079,10 @@ meant to stay split; add new features as new files, not inside the shells:
   discussioni», its heading focused once it is drawn; the replies in the server's order, the accepted one first under
   «Risposta accettata», each reply's comments one level under it; voting, replying, commenting and «Segnala» use the
   controls the panel under an article draws (`search/discussionControls.tsx`: `VoteButton`, `ReplyForm`,
-  `ReportButton`); the discussion's author alone sees «Accetta» on another's reply (`accept`, «Ritira l’accettazione» on
+  `ReportButton`: 44 px to touch below `md`, the panel's size from it; the vote named «Vota la risposta di …, N voti»;
+  «Segnala» asks first in `ui/ConfirmDialog`, with «Annulla»); the panel's «Nuova glossa» asks the subject, optional
+  («Materia (facoltativa)», sent as `materia` only when chosen), which the feed filters by, and counts replies as the
+  Forum does (not the comments under them); the discussion's author alone sees «Accetta» on another's reply (`accept`, «Ritira l’accettazione» on
   the accepted one), and the discussion is read again after each change, its feed row following it. Never «validata»:
   that word waits for an expert's validation. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in

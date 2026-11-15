@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { articleDiscussionService } from '../../../services/articleDiscussionService';
 import type { CommunityItem, CommunityReply, CommunityThread } from '../../../types/community';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
-import { ReplyForm, ReportButton, VoteButton } from '../search/discussionControls';
+import { ReplyForm, ReportButton, TOUCH, VoteButton } from '../search/discussionControls';
 import { CommunityTarget } from './CommunityTarget';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
@@ -155,7 +155,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
         <CommunityTarget {...thread} />
       </div>
       {!thread.deleted && <p className="mt-4 whitespace-pre-wrap text-slate-800 dark:text-slate-200">{thread.body}</p>}
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex items-center gap-4 md:gap-3">
         <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota la discussione" onVote={() => void vote()} />
         {!thread.isOwner && !thread.deleted && (
           <ReportButton label="Segnala la discussione" onReport={() => void report(() => articleDiscussionService.report(thread.id, 'segnalazione'))} />
@@ -180,10 +180,10 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                 {reply.hidden && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">Nascosta dalla moderazione.</p>}
                 {itemText(reply)}
                 {visible(reply) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <div className="mt-2 flex flex-wrap items-center gap-4 md:gap-3">
                     <VoteButton voted={reply.userVoted} count={reply.voteCount} label={`Vota la risposta di ${reply.user.username}`} onVote={() => void voteReply(reply)} />
                     {!thread.locked && (
-                      <button type="button" onClick={() => setCommenting(commenting === reply.id ? null : reply.id)} aria-expanded={commenting === reply.id} className={cn('rounded text-xs text-primary-700 hover:underline dark:text-primary-300', FOCUS_RING)}>
+                      <button type="button" onClick={() => setCommenting(commenting === reply.id ? null : reply.id)} aria-expanded={commenting === reply.id} aria-label={`Commenta la risposta di ${reply.user.username}`} className={cn('rounded px-2 text-xs text-primary-700 hover:underline dark:text-primary-300 md:px-0', TOUCH, FOCUS_RING)}>
                         Commenta
                       </button>
                     )}
@@ -195,7 +195,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                         type="button"
                         onClick={() => void accept(reply.accepted ? null : reply.id)}
                         aria-label={reply.accepted ? 'Ritira l’accettazione' : `Accetta la risposta di ${reply.user.username}`}
-                        className={cn('ml-auto rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING)}
+                        className={cn('ml-auto rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium', TOUCH, ' text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING)}
                       >
                         {reply.accepted ? 'Ritira l’accettazione' : 'Accetta'}
                       </button>

@@ -52,7 +52,7 @@ export const articleDiscussionService = {
     anchor: DiscussionAnchor,
     title: string,
     body: string,
-    extras: { passage?: ThreadPassage; articleUrn?: string; textHash?: string } = {}
+    extras: { passage?: ThreadPassage; articleUrn?: string; textHash?: string; materia?: Materia } = {}
   ): Promise<ArticleDiscussionThread> {
     passagesInFlight.delete(passagesKey(anchor));
     const response = await apiClient.post('/article-discussions', { ...anchor, title, body, ...extras });

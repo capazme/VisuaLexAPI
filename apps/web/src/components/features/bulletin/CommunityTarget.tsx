@@ -14,7 +14,8 @@ interface Props {
   decisionLabel: string | null;
 }
 
-const LINK = cn('rounded text-xs font-medium text-primary-700 underline-offset-2 hover:underline dark:text-primary-300', FOCUS_RING);
+// A command, not text: underlined, the same for a norm (a button) and a decision (a link), 44 px to touch on a phone.
+const LINK = cn('inline-flex min-h-11 items-center rounded text-sm font-medium text-primary-700 underline decoration-1 underline-offset-2 hover:decoration-2 dark:text-primary-300 md:min-h-0', FOCUS_RING);
 
 /**
  * What a discussion hangs on, and the way to open it: a decision at its address, an article in the reader (from its

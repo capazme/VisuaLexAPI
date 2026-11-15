@@ -158,12 +158,16 @@ describe('ForumCommunityPage: the feed', () => {
     expect(within(first).getByText('Diritto civile')).toBeInTheDocument();
     expect(within(first).getByText(/Scritta da marta · 2 risposte · 4 voti/)).toBeInTheDocument();
     expect(within(first).getByText('Risposta accettata')).toBeInTheDocument();
-    expect(within(first).getByRole('button', { name: 'Apri art. 1453 c.c.' })).toBeInTheDocument();
+    const norm = within(first).getByRole('button', { name: 'Apri art. 1453 c.c.' });
+    expect(norm).toHaveClass('underline', 'min-h-11');
 
     const second = rows[1];
     expect(within(second).getByText(/Scritta da anna · 0 risposte · 1 voto$/)).toBeInTheDocument();
     expect(within(second).queryByText('Risposta accettata')).toBeNull();
-    expect(within(second).getByRole('link', { name: 'Apri Cass. civ., n. 1234/2024' })).toHaveAttribute('href', '/sentenze/cassazione-civile/1234/2024');
+    const decision = within(second).getByRole('link', { name: 'Apri Cass. civ., n. 1234/2024' });
+    expect(decision).toHaveAttribute('href', '/sentenze/cassazione-civile/1234/2024');
+    // Norms and decisions look the same: a command, not text.
+    expect(decision.className).toBe(norm.className);
     expect(document.body.textContent).not.toMatch(/validat/i);
   });
 
@@ -296,15 +300,26 @@ describe('ForumCommunityPage: the open discussion', () => {
     service.comment.mockResolvedValue({});
     service.report.mockResolvedValue(undefined);
     renderAt('/forum/community/t1');
-    fireEvent.click(await screen.findByRole('button', { name: 'Vota la discussione' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Vota la discussione' })).toHaveTextContent('5'));
+    const vote = await screen.findByRole('button', { name: 'Vota la discussione, 4 voti' });
+    // 44 px on a phone, the panel's size from md.
+    expect(vote).toHaveClass('min-h-11', 'md:min-h-0');
+    fireEvent.click(vote);
+    expect(await screen.findByRole('button', { name: 'Vota la discussione, 5 voti' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vota la risposta di luigi, 1 voto' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Commenta la risposta di luigi' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: 'Invia risposta' })).toHaveClass('min-h-11', 'min-w-11');
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Scrivi una risposta…' }), { target: { value: 'Una risposta' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invia risposta' }));
     await waitFor(() => expect(service.comment).toHaveBeenCalledWith('t1', 'Una risposta', undefined));
     await waitFor(() => expect(service.get).toHaveBeenCalledTimes(2));
 
+    // A report asks first: «Annulla» sends nothing.
     fireEvent.click(screen.getByRole('button', { name: 'Segnala la discussione' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Annulla' }));
+    expect(service.report).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Segnala la discussione' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Segnala' }));
     await waitFor(() => expect(service.report).toHaveBeenCalledWith('t1', 'segnalazione'));
     expect(await screen.findByText('Segnalazione inviata ai moderatori.')).toBeInTheDocument();
   });

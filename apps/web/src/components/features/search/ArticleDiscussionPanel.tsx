@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, ThumbsUp, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, X } from 'lucide-react';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../types';
 import { articleDiscussionService, type DiscussionAnchor } from '../../../services/articleDiscussionService';
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../hooks/useAuth';
-import { ReplyForm, ReportButton, VoteButton } from './discussionControls';
+import { ReplyForm, ReportButton, TOUCH, VoteButton } from './discussionControls';
+import { FormSelect } from '../../ui/FormSelect';
+import { MATERIA_LABEL } from '../studia/studiaLabels';
+import type { Materia } from '../../../types/studia';
 
 interface Props {
   anchor: DiscussionAnchor;
@@ -59,6 +62,12 @@ interface Props {
   passageTextAvailable?: boolean;
 }
 
+/** The replies to a thread, as the Forum counts them (`replyCount`): not the comments under them, nor an emptied one. */
+function replyCount(thread: ArticleDiscussionThread) {
+  const n = thread.comments.filter(comment => !comment.parentId && !comment.deleted).length;
+  return n === 1 ? '1 risposta' : `${n} risposte`;
+}
+
 export function ArticleDiscussionPanel({
   anchor: anchorProp,
   label,
@@ -98,6 +107,7 @@ export function ArticleDiscussionPanel({
   const [composerOpen, setComposerOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [materia, setMateria] = useState<Materia | ''>('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [releasing, setReleasing] = useState<Set<string>>(new Set());
@@ -187,6 +197,7 @@ export function ArticleDiscussionPanel({
         passage: draft?.passage,
         articleUrn,
         textHash: textHash ?? undefined,
+        ...(materia ? { materia } : {}),
       };
       const newThread = await articleDiscussionService.create(
         anchor,
@@ -203,6 +214,7 @@ export function ArticleDiscussionPanel({
       });
       setTitle('');
       setBody('');
+      setMateria('');
       setComposerOpen(false);
 
       if (draft) {
@@ -368,6 +380,16 @@ export function ArticleDiscussionPanel({
             rows={4}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
+          {/* Optional: the Forum's Community filters by it (the server keeps it only when sent). */}
+          <FormSelect
+            size="sm"
+            aria-label="Materia (facoltativa)"
+            value={materia}
+            onChange={event => setMateria(event.target.value as Materia | '')}
+          >
+            <option value="">Materia (facoltativa)</option>
+            {(Object.keys(MATERIA_LABEL) as Materia[]).map(key => <option key={key} value={key}>{MATERIA_LABEL[key]}</option>)}
+          </FormSelect>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={cancelComposer} className="px-3 py-1.5 text-xs text-slate-500">
               Annulla
@@ -457,7 +479,7 @@ export function ArticleDiscussionPanel({
                         </span>
                       )}
                       <span className="mt-1 block text-xs text-slate-400">
-                        {thread.user.username} · {new Date(thread.createdAt).toLocaleDateString('it-IT')} · {thread.comments.length} risposte
+                        {thread.user.username} · {new Date(thread.createdAt).toLocaleDateString('it-IT')} · {replyCount(thread)}
                       </span>
                     </span>
                     {isExpanded ? <ChevronUp size={16} className="mt-1 shrink-0 text-slate-400" /> : <ChevronDown size={16} className="mt-1 shrink-0 text-slate-400" />}
@@ -527,19 +549,17 @@ export function ArticleDiscussionPanel({
                         <div key={comment.id} className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
                           <div className="flex justify-between gap-2">
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{comment.user.username}</span>
-                            <button type="button" onClick={() => void voteComment(thread.id, comment.id)} className={cn('inline-flex items-center gap-1 text-xs', comment.userVoted ? 'text-primary-600' : 'text-slate-400')}>
-                              <ThumbsUp size={12} /> {comment.voteCount}
-                            </button>
+                            <VoteButton voted={comment.userVoted} count={comment.voteCount} label={`Vota la risposta di ${comment.user.username}`} onVote={() => void voteComment(thread.id, comment.id)} />
                           </div>
                           <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{comment.body}</p>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <button type="button" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)} className="text-xs text-primary-600 hover:underline">
+                    <div className="mt-3 flex items-center gap-4 md:gap-2">
+                      <button type="button" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)} className={cn('px-2 text-xs text-primary-600 hover:underline md:px-0', TOUCH)}>
                         Rispondi
                       </button>
-                      <ReportButton onReport={() => void reportThread(thread.id)} />
+                      <ReportButton label="Segnala la glossa" onReport={() => void reportThread(thread.id)} />
                       {isLocated && onGoToPassage && (
                         <button
                           type="button"
