@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import { Search } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import { FOCUS_RING } from '../../constants/interactions';
 import { Z_INDEX } from '../../constants/zIndex';
 import { cn } from '../../lib/utils';
@@ -46,6 +46,8 @@ export function MenuToggle({ open, onToggle, notice, buttonRef }: MenuToggleProp
 
 export interface PhoneTopBarProps {
   menu: MenuToggleProps;
+  /** The section's name beside the menu, always (LC34, Luca: not over the page's title). */
+  section: string;
   /** The name in the middle: none while the page's title is in sight (empty), else the page's (`phoneBarTitle`). */
   title: string;
   /** Out of the way while the reader scrolls down (`useHideOnScroll`); only on a phone, below `md`. */
@@ -66,7 +68,7 @@ export interface PhoneTopBarProps {
  * of the way scrolling down and comes back scrolling up — at once under reduced motion; from `md` it stays, and its
  * right side leaves room for `Layout`'s «Commenti» and Focus button.
  */
-export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch, barRef }: PhoneTopBarProps) {
+export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, barRef }: PhoneTopBarProps) {
   return (
     <header
       ref={barRef}
@@ -86,8 +88,16 @@ export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch, barRef }:
         <MenuToggle {...menu} />
         {/* Keyed by the name: the page's, once the title has scrolled out, fades in, 150 ms; at once under reduced motion
             (G8; inspired by iOS's large titles, written from scratch). Empty, it keeps its place between the buttons. */}
-        <p key={title} aria-hidden={title ? undefined : true} className="min-w-0 flex-1 truncate text-center font-serif text-lg font-medium text-slate-900 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150 dark:text-slate-50">
-          {title}
+        {/* The section beside the menu, always, crisp (LC34, Luca: «non ha senso che Work sia scritto lì e non accanto alle
+            tre lineette»); the page's name after it once the title has scrolled out, as the desk's path («Learn › Oggi»). */}
+        <p className="flex min-w-0 flex-1 items-center gap-1.5 truncate pl-1 text-[15px] font-semibold text-slate-900 dark:text-slate-50">
+          <span data-bar-section className="shrink-0">{section}</span>
+          {title && (
+            <span key={title} data-bar-name className="flex min-w-0 items-center gap-1.5 font-normal text-slate-600 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150 dark:text-slate-400">
+              <ChevronRight aria-hidden size={14} className="shrink-0" />
+              <span className="truncate">{title}</span>
+            </span>
+          )}
         </p>
         <button
           type="button"

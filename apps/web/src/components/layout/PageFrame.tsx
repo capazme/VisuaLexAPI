@@ -70,10 +70,10 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
         titleHidden && 'sr-only',
       )}>
         <div className="min-w-0">
-          {/* LC21: from lg the top bar's path says the section; the line stays for a screen reader, which the title's
+          {/* LC21, LC34: the bars say the section (the top bar from lg, the phone bar beside the menu); the line stays for a screen reader, which the title's
               description reads. */}
           {kickerText && (
-            <p id={kickerId} className={cn(PAGE_KICKER, 'mb-1 lg:sr-only')}>
+            <p id={kickerId} className={cn(PAGE_KICKER, 'sr-only')}>
               {kickerText}
             </p>
           )}
