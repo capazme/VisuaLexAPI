@@ -237,26 +237,23 @@ export function AuthPage() {
         {/* On a computer the card's top sits where the card on «Accedi» is centred above «Crediti» (its height and
             the foot's 4 rem): «Registrati», and a form that grows (an error, the password's strength), grow
             downwards, the tabs never move, and the colophon, centred against the card on «Accedi», holds still. */}
-        <div className="pb-6 pt-8 md:pt-[max(1.5rem,calc((100dvh-4rem-var(--login-card-h,32rem))/2))]">
-          <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-start md:gap-16">
-            {/* The logo grows only from `lg`: between 768 and 1023 px the column beside the card is 196 px (Papiniano,
-                #457), and the intro's box is 196 px wide there, the still word in it 179 px (the word written at 48 px
-                was 167). From md its «L» is flush with the line under it: the box starts 36 of its 772 units left of it. */}
-            <header
-              // On a computer as tall as the card on «Accedi», its content centred: the two on one middle line.
-              className="flex flex-col items-center gap-4 text-center md:min-h-[var(--login-card-h,32rem)] md:items-start md:justify-center md:gap-5 md:text-left"
-            >
-              {/* The page's title, for a reader the logo's name; the logo plays its intro once a browser session, as the
-                  shell's sweep: after «Esci» it stands still in its box (LC18). */}
+        {/* LC31 (Luca, 15 Nov: «mi pare decentrata … L'Hexcraft dovrebbe essere molto più grande … mettici lo slogan»):
+            one centred column — the wordmark large, the slogan close under it, the card under both —, the whole
+            centred in the window above «Crediti» (the card's measured height plus the header's ~11 rem). The
+            wordmark plays the cursor's sweep over CRAFT once a browser session (not the column dropping from above,
+            which moved the word off its centre); still after «Esci» and under reduced motion. */}
+        <div className="pb-6 pt-10 md:pt-[max(2rem,calc((100dvh-4rem-11rem-var(--login-card-h,32rem))/2))]">
+          <div className="mx-auto flex w-full max-w-[420px] flex-col items-stretch gap-8">
+            <header className="flex flex-col items-center gap-3 text-center">
               <h1>
-                <LexCraftLogo motion="intro" played={!intro} className="block h-auto w-[196px] md:-ml-[9.1px] lg:-ml-[12.1px] lg:w-[260px]" />
+                <LexCraftLogo motion="sweep" played={!intro} className="block h-auto w-[300px] sm:w-[420px]" />
               </h1>
-              <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
-                Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
+              <p className="font-serif text-xl italic leading-snug text-slate-600 sm:text-[22px] dark:text-slate-300">
+                La legge è davvero uguale per tutti
               </p>
             </header>
 
-            <main ref={cardRef} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+            <main ref={cardRef} className="min-w-0 rounded-2xl border border-slate-200 bg-card p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
               <div
                 role="tablist"
                 aria-label="Accedi o registrati"
@@ -361,10 +358,10 @@ export function AuthPage() {
 
         {/* The sources' attributions, readable before signing in: the grid's last row, at the foot of
             the window whatever the tab. */}
-        <footer className="mx-auto w-full max-w-4xl pb-4 text-sm text-slate-600 dark:text-slate-400">
+        <footer className="mx-auto w-full max-w-4xl pb-4 text-center text-sm text-slate-600 dark:text-slate-400">
           <Link
             to="/crediti"
-            className={`-ml-2 inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline dark:hover:text-slate-100 ${FOCUS_RING}`}
+            className={`inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline dark:hover:text-slate-100 ${FOCUS_RING}`}
           >
             Crediti
           </Link>
