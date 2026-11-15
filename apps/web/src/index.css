@@ -389,6 +389,16 @@
     touch-action: manipulation;
   }
 
+  /* Tailwind's preflight leaves buttons on the arrow: every enabled control shows the hand, set once here; a
+     component that needs another cursor (text, grab) still says so with its own utility. */
+  a[href], button, summary, select, label[for],
+  label:has(> input[type="checkbox"], > input[type="radio"]),
+  [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="menuitemradio"], [role="option"], [role="switch"],
+  input[type="checkbox"], input[type="radio"], input[type="file"], input[type="range"] {
+    cursor: pointer;
+  }
+  :disabled, [aria-disabled="true"] { cursor: not-allowed; }
+
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,
