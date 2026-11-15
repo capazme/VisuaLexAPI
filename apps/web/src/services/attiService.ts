@@ -55,7 +55,11 @@ export const attiService = {
 };
 
 /** The server's Italian message of a failed call, or a plain one. */
+/** An HTTP status's own words («Not Found», «Internal Server Error») or a client's: never shown to the reader. */
+const TRANSPORT_WORDS = /^(?:not found|bad request|unauthorized|forbidden|internal server error|bad gateway|service unavailable|gateway timeout|too many requests|request failed\b.*|failed to fetch|network ?error|load failed)$/i;
+
+/** The server's own sentence (Italian, the API's `detail`) when it gave one; else the caller's (LC26: «Not Found» reached the page). */
 export function attiError(error: unknown, fallback: string): string {
   const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === 'string' && message.trim() ? message : fallback;
+  return typeof message === 'string' && message.trim() && !TRANSPORT_WORDS.test(message.trim()) ? message : fallback;
 }

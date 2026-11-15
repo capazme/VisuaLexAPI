@@ -52,7 +52,7 @@ describe('QaSourceChip', () => {
         <ul>
           <QaSourceChip
             source={seed}
-            cited={{ article_urn: seed.urn, expert: 'literal', relevance: 0.9, excerpt: 'Il debitore...' }}
+            cited={{ article_urn: seed.urn, expert: 'literal', relevance: 0.9, excerpt: 'Il debitore…' }}
             onConfirm={vi.fn()}
             onRate={vi.fn()}
           />

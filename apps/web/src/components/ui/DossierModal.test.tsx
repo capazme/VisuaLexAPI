@@ -11,7 +11,7 @@ describe('DossierModal — the kind of a new dossier', () => {
     render(<DossierModal isOpen onClose={() => {}} />);
     expect(screen.getByRole('radio', { name: /Di lavoro/ })).toBeChecked();
     fireEvent.click(screen.getByRole('radio', { name: /Di studio/ }));
-    fireEvent.change(screen.getByPlaceholderText('Nome Dossier...'), { target: { value: 'GDPR' } });
+    fireEvent.change(screen.getByPlaceholderText('Nome Dossier…'), { target: { value: 'GDPR' } });
     fireEvent.click(screen.getByRole('button', { name: 'Crea' }));
     await waitFor(() => expect(createDossier).toHaveBeenCalledWith('GDPR', undefined, 'studio'));
   });
@@ -23,7 +23,7 @@ describe('DossierModal — opens on the form (B7)', () => {
     render(<DossierModal isOpen onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: 'Nuovo dossier' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Crea un dossier/ })).toBeNull();
-    await waitFor(() => expect(screen.getByPlaceholderText('Nome Dossier...')).toHaveFocus());
+    await waitFor(() => expect(screen.getByPlaceholderText('Nome Dossier…')).toHaveFocus());
   });
 });
 
@@ -50,7 +50,7 @@ describe('DossierModal — the section chooses the kind (sections spec S7)', () 
       render(<DossierModal isOpen onClose={() => {}} />);
       expect(screen.getByRole('radio', { name: /Di studio/ })).toBeChecked();
       fireEvent.click(screen.getByRole('radio', { name: /Di lavoro/ }));
-      fireEvent.change(screen.getByPlaceholderText('Nome Dossier...'), { target: { value: 'Pratica' } });
+      fireEvent.change(screen.getByPlaceholderText('Nome Dossier…'), { target: { value: 'Pratica' } });
       fireEvent.click(screen.getByRole('button', { name: 'Crea' }));
       await waitFor(() => expect(createDossier).toHaveBeenCalledWith('Pratica', undefined, 'lavoro'));
     } finally {

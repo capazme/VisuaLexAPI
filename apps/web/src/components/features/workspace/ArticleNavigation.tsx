@@ -154,8 +154,8 @@ export function ArticleNavigation({
               ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
               : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
-        title={isPrevLoading ? 'Caricamento...' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
-        aria-label={isPrevLoading ? 'Caricamento...' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
+        title={isPrevLoading ? 'Caricamento…' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
+        aria-label={isPrevLoading ? 'Caricamento…' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
       >
         {isPrevLoading ? (
           <Loader2 size={16} className="animate-spin text-primary-500" />
@@ -208,8 +208,8 @@ export function ArticleNavigation({
               ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
               : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
-        title={isNextLoading ? 'Caricamento...' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
-        aria-label={isNextLoading ? 'Caricamento...' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
+        title={isNextLoading ? 'Caricamento…' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
+        aria-label={isNextLoading ? 'Caricamento…' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
       >
         {isNextLoading ? (
           <Loader2 size={16} className="animate-spin text-primary-500" />

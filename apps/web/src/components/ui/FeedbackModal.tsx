@@ -120,10 +120,10 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
               onChange={(e) => setMessage(e.target.value)}
               placeholder={
                 type === 'bug'
-                  ? 'Descrivi il problema riscontrato...'
+                  ? 'Descrivi il problema riscontrato…'
                   : type === 'suggestion'
-                  ? 'Descrivi la tua idea o suggerimento...'
-                  : 'Scrivi il tuo messaggio...'
+                  ? 'Descrivi la tua idea o suggerimento…'
+                  : 'Scrivi il tuo messaggio…'
               }
               rows={5}
               className={cn(

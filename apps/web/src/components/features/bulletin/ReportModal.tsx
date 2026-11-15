@@ -122,7 +122,7 @@ export function ReportModal({ environmentId, onClose, onReported }: ReportModalP
             <textarea
               value={details}
               onChange={(e) => setDetails(e.target.value)}
-              placeholder="Fornisci ulteriori dettagli sulla segnalazione..."
+              placeholder="Fornisci ulteriori dettagli sulla segnalazione…"
               maxLength={500}
               rows={3}
               className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 resize-none"

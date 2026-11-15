@@ -78,8 +78,10 @@ export function DossierAttiPanel({ dossierId, onCount }: { dossierId: string; on
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end gap-3">
-        <Button icon={<FileUp size={16} aria-hidden />} loading={busy} onClick={() => fileInput.current?.click()}>
+      {/* Luca, 15 November («trovo questa sproporzione»): one row of one height, 40 px — the file's action, then
+          «oppure» and the new act's title joined to «Crea» — with no label over the field to set it lower. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button icon={<FileUp size={16} aria-hidden />} loading={busy} onClick={() => fileInput.current?.click()} className="h-10 min-h-0">
           Carica un atto
         </Button>
         <input
@@ -94,18 +96,17 @@ export function DossierAttiPanel({ dossierId, onCount }: { dossierId: string; on
             event.target.value = '';
           }}
         />
-        <form onSubmit={createEmpty} className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-            Oppure un atto vuoto
-            <input
-              value={titolo}
-              onChange={(e) => setTitolo(e.target.value)}
-              maxLength={300}
-              placeholder="Titolo"
-              className="h-10 w-64 rounded-lg border border-slate-300 bg-card px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-100"
-            />
-          </label>
-          <Button type="submit" variant="secondary" disabled={busy}>Crea</Button>
+        <span className="text-sm text-slate-600 dark:text-slate-400">oppure</span>
+        <form onSubmit={createEmpty} className="flex min-w-0 items-stretch">
+          <input
+            aria-label="Titolo di un atto vuoto"
+            value={titolo}
+            onChange={(e) => setTitolo(e.target.value)}
+            maxLength={300}
+            placeholder="Titolo di un atto vuoto"
+            className="h-10 w-64 min-w-0 rounded-l-lg border border-r-0 border-slate-300 bg-card px-3 text-sm text-slate-900 focus-visible:relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-100"
+          />
+          <Button type="submit" variant="secondary" disabled={busy} className="h-10 min-h-0 rounded-l-none">Crea</Button>
         </form>
       </div>
       <p className="max-w-prose text-sm text-slate-600 dark:text-slate-400">
