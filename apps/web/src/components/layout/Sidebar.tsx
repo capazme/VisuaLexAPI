@@ -460,12 +460,12 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         // The desktop copy is as wide as its column, which `Layout` sizes (64 px, or 224 with words);
         // the phone's drawer has room for its words.
         layout === 'drawer' ? "w-[17rem] max-w-[85vw]" : "w-full",
-        // Clean Slate/Glass effect
-        "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl",
+        // Solid: nothing scrolls under the rail on a computer, and on a phone the drawer has its own scrim.
+        "bg-card",
         "border-r border-slate-200 dark:border-slate-800",
         // Mobile slide
         "transform transition-transform duration-300 ease-smooth-out",
-        // `relative`, not `static`: backdrop-blur makes this aside a stacking
+        // `relative`, not `static`: the transform makes this aside a stacking
         // context, so anything inside it (hover tooltips) is trapped at the
         // aside's own level. Static would leave z-50 inert and page content
         // would paint over the tooltips.
