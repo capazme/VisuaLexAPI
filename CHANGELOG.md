@@ -12,6 +12,18 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-15
+
+Corrections to what the 1.21.0 showed: one search width, a cleaner full screen, tabs that keep their
+place, the wordmark in the narrow bar, the acts' row. Web only, no migration.
+
+### Look and use
+
+- One search, the same width everywhere; full screen keeps its bar; the wordmark folds in the narrow
+  rail; Work's and the dossier's tabs keep the scroll position instead of jumping to the top (LC27).
+- The dossier's «Atti» row in proportion with the others; the acts' errors in Italian, never an HTTP status's own words («Not Found»); small fixes from
+  Quality's and the anti-slop reviews of the redesign (LC26).
+
 ## [1.21.0] - 2026-11-15
 
 The rest of the redesign: Learn as a road, the Forum's Community and its people, the wordmark centred.
