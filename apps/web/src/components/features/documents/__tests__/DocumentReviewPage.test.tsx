@@ -63,17 +63,26 @@ describe('DocumentReviewPage — an act sent by its page («Analizza l’atto»)
     await waitFor(() => expect(screen.getAllByText('Atto di appello').length).toBeGreaterThan(0));
     expect(screen.queryByText('Testo incollato')).toBeNull();
   });
+
+  it('does not say the act stays on the computer — its text is on the server — until another document is chosen (LC29)', async () => {
+    routerState.state = { atto: { id: 'a1', titolo: 'Atto di appello', testo: 'Si applica l’art. 2043 c.c. al caso.' } };
+    render(<DocumentReviewPage />);
+    expect(document.body.textContent).not.toMatch(/resta sul tuo computer/);
+    expect(screen.getByText(/l’atto resta tra i tuoi atti\.$/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Scegli un altro documento' }));
+    await screen.findByRole('button', { name: /Scegli un file/ });
+    expect(document.body.textContent).toMatch(/Il documento resta sul tuo computer/);
+  });
 });
 
 describe('DocumentReviewPage — before a document', () => {
-  it('has a title with its phrase and says, to a screen reader too, what stays and what goes (#376 §6.4, G-401)', () => {
+  it('has a title with its phrase, which says once what stays and what goes (#376 §6.4, G-401; LC29)', () => {
     render(<DocumentReviewPage />);
     expect(screen.getByRole('heading', { level: 1, name: 'Analizza documento' })).toHaveClass('font-serif');
     expect(screen.getByText('Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.')).toBeInTheDocument();
-    const badge = screen.getByText(/^Il documento resta sul tuo computer/, { selector: 'p' });
-    expect(badge).toHaveTextContent('Il testo del documento non viene inviato né salvato.');
-    expect(badge).toHaveTextContent('per esempio «art. 82 GDPR»');
-    expect(badge).toHaveTextContent('con «Prepara i link» arriva a LexCraft solo l’elenco delle norme citate, mai il testo.');
+    // Once (Luca, LC29: «è duplicato 2 volte, dai, su»): no badge, nothing in the box.
+    expect(document.body.textContent?.match(/resta sul tuo computer/g)).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Scegli un file/ })).not.toHaveTextContent('resta sul tuo computer');
     // Nothing on the page says any more that nothing leaves the browser.
     expect(document.body.textContent).not.toMatch(/resta nel tuo browser/i);
   });
@@ -81,7 +90,7 @@ describe('DocumentReviewPage — before a document', () => {
   it('opens the file picker from the box, with Enter and Space as with a click', async () => {
     const { container } = render(<DocumentReviewPage />);
     const click = vi.spyOn(input(container), 'click');
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const zone = screen.getByRole('button', { name: /Scegli un file/ });
     zone.focus();
     await userEvent.keyboard('{Enter}');
     await userEvent.keyboard(' ');
@@ -91,21 +100,21 @@ describe('DocumentReviewPage — before a document', () => {
 
   it('follows a file over the window and over the box from `dragover` alone, and reads the file let go on it (D6)', async () => {
     render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const zone = screen.getByRole('button', { name: /Scegli un file/ });
     const file = testFile([PARERE], 'trascinato.txt');
     const dataTransfer = { types: ['Files'], files: [file], dropEffect: 'none' };
 
-    // Over the window: the dashes run in ink, the sheets fan out.
+    // Over the window: the dashes run in ink.
     fireEvent.dragOver(document.body, { dataTransfer });
     expect(zone).toHaveAttribute('data-phase', 'page');
     expect(zone).toHaveTextContent('Lascia qui il documento');
-    // Over the box: one line, the sheets open wide.
+    // Over the box: one line.
     fireEvent.dragOver(zone, { dataTransfer });
     expect(zone).toHaveAttribute('data-phase', 'over');
     expect(zone).toHaveTextContent('Rilascia per leggerlo');
     // No event for 400 ms (`DRAG_REST_MS`): the file went away.
     await waitFor(() => expect(zone).toHaveAttribute('data-phase', 'idle'));
-    expect(zone).toHaveTextContent('Scegli un documento');
+    expect(zone).toHaveTextContent('Trascina qui il documento');
     // A child of the box is the box: no `dragleave` to fool it.
     fireEvent.dragOver(zone.querySelector('span.font-serif')!, { dataTransfer });
     expect(zone).toHaveAttribute('data-phase', 'over');
@@ -114,18 +123,6 @@ describe('DocumentReviewPage — before a document', () => {
     expect(zone).toHaveAttribute('data-phase', 'idle');
     expect(screen.getByText('trascinato.txt', { selector: '[title]' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 2, name: 'trascinato.txt' })).toBeInTheDocument();
-  });
-
-  it('throws the ink sheet to the row when a file is let go on the box, not when it is chosen (D6)', async () => {
-    const { container } = render(<DocumentReviewPage />);
-    const flying = () => document.body.querySelector(':scope > div.fixed[aria-hidden]');
-    await userEvent.upload(input(container), testFile([PARERE], 'scelto.txt'));
-    expect(flying()).toBeNull();
-    await screen.findByRole('heading', { level: 2, name: 'scelto.txt' });
-    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
-    const again = await screen.findByRole('button', { name: /Scegli un documento/ });
-    fireEvent.drop(again, { dataTransfer: { types: ['Files'], files: [testFile([PARERE], 'lasciato.txt')], dropEffect: 'none' } });
-    expect(flying()).not.toBeNull();
   });
 
   it('a file chosen while another is read wins: the older answer is dropped', async () => {
@@ -142,7 +139,7 @@ describe('DocumentReviewPage — before a document', () => {
 
   it('reads the first of several files let go, and says the others were not read (D6)', async () => {
     render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const zone = screen.getByRole('button', { name: /Scegli un file/ });
     const files = [testFile([PARERE], 'primo.txt'), testFile(['x'], 'secondo.txt'), testFile(['y'], 'terzo.txt')];
     fireEvent.drop(zone, { dataTransfer: { types: ['Files'], files, dropEffect: 'none' } });
     expect(screen.getByText('Letto il primo dei 3 file: uno alla volta')).toBeInTheDocument();
@@ -151,7 +148,7 @@ describe('DocumentReviewPage — before a document', () => {
 
   it('a text or a link dragged over the page changes nothing, and is not taken', () => {
     render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const zone = screen.getByRole('button', { name: /Scegli un file/ });
     for (const types of [['text/plain'], ['text/uri-list', 'text/plain']]) {
       const over = new Event('dragover', { bubbles: true, cancelable: true });
       Object.defineProperty(over, 'dataTransfer', { value: { types, files: [], dropEffect: 'none' } });
@@ -165,7 +162,7 @@ describe('DocumentReviewPage — before a document', () => {
     const removed = vi.spyOn(window, 'removeEventListener');
     const cleared = vi.spyOn(window, 'clearTimeout');
     const { unmount } = render(<DocumentReviewPage />);
-    fireEvent.dragOver(screen.getByRole('button', { name: /Scegli un documento/ }), { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
+    fireEvent.dragOver(screen.getByRole('button', { name: /Scegli un file/ }), { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
     unmount();
     expect(removed.mock.calls.map(([type]) => type)).toEqual(expect.arrayContaining(['dragover', 'drop']));
     expect(cleared).toHaveBeenCalled();
@@ -184,7 +181,7 @@ describe('DocumentReviewPage — before a document', () => {
     expect(css).toMatch(/\.group:hover \.vlx-dash, \.group:focus-visible \.vlx-dash \{ animation-play-state: running; \}/);
     expect(css).toMatch(/\.group\[data-tab-hidden\] \.vlx-dash, \.group\[data-tab-hidden\] \.vlx-dash-run \{ animation-play-state: paused; \}/);
     render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const zone = screen.getByRole('button', { name: /Scegli un file/ });
     expect(zone).toHaveClass('group');
     expect(zone).not.toHaveAttribute('data-tab-hidden');
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
@@ -193,14 +190,6 @@ describe('DocumentReviewPage — before a document', () => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     act(() => { document.dispatchEvent(new Event('visibilitychange')); });
     expect(zone).not.toHaveAttribute('data-tab-hidden');
-  });
-
-  it('keeps the promise in sight in every state: the document stays on the computer', () => {
-    render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
-    expect(zone).toHaveTextContent('Il documento resta sul tuo computer');
-    fireEvent.dragOver(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
-    expect(zone).toHaveTextContent('Il documento resta sul tuo computer');
   });
 
   it('refuses a file let go outside the box, so the browser does not open it in place of the app', () => {
@@ -213,11 +202,11 @@ describe('DocumentReviewPage — before a document', () => {
 
   it('does not keep the drop wording when the box comes back', async () => {
     const { container } = render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const zone = screen.getByRole('button', { name: /Scegli un file/ });
     fireEvent.dragOver(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
     await choose(container, PARERE);
     await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
-    expect(await screen.findByRole('button', { name: /Scegli un documento/ })).toHaveTextContent('Scegli un documento');
+    expect(await screen.findByRole('button', { name: /Scegli un file/ })).toHaveTextContent('Trascina qui il documento');
   });
 
   it('says each step on the document\'s row, honestly, and announces it (D6)', async () => {
@@ -254,7 +243,7 @@ describe('DocumentReviewPage — before a document', () => {
     await waitFor(() => expect(container.querySelector('[data-stage="error"]')).toHaveTextContent('Il documento non contiene testo leggibile.'));
     await userEvent.click(screen.getByRole('button', { name: 'Chiudi l’avviso' }));
     await waitFor(() => expect(container.querySelector('[data-stage]')).toBeNull());
-    expect(screen.getByRole('button', { name: /Scegli un documento/ })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /Scegli un file/ })).toHaveFocus();
   });
 
   it('on a phone says to tap, with no word of dragging', () => {
@@ -262,8 +251,8 @@ describe('DocumentReviewPage — before a document', () => {
     window.matchMedia = ((query: string) => ({ matches: query.includes('hover: none'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
     try {
       render(<DocumentReviewPage />);
-      const zone = screen.getByRole('button', { name: /Tocca per scegliere un documento/ });
-      expect(zone).not.toHaveTextContent('trascinalo');
+      const zone = screen.getByRole('button', { name: /^Scegli un documento/ });
+      expect(zone).not.toHaveTextContent(/trascina/i);
     } finally {
       window.matchMedia = original;
     }
@@ -341,7 +330,7 @@ describe('DocumentReviewPage — the result', () => {
     expect(again.className).toMatch(/md:min-h-11/);
     expect(again.className).not.toMatch(/md:min-h-9/);
     await userEvent.click(again);
-    const zone = await screen.findByRole('button', { name: /Scegli un documento/ });
+    const zone = await screen.findByRole('button', { name: /Scegli un file/ });
     await waitFor(() => expect(zone).toHaveFocus());
     await waitFor(() => expect(screen.queryByText('6 citazioni in 2 atti', { selector: 'p:not([aria-live])' })).not.toBeInTheDocument());
   });
@@ -377,15 +366,6 @@ describe('DocumentReviewPage — motion', () => {
     window.matchMedia = originalMatchMedia;
     delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
     delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
-  });
-
-  it('under reduced motion throws no sheet when a file is let go (D6)', async () => {
-    reduceMotion(true);
-    render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
-    fireEvent.drop(zone, { dataTransfer: { types: ['Files'], files: [testFile([PARERE], 'fermo.txt')], dropEffect: 'none' } });
-    expect(document.body.querySelector(':scope > div.fixed[aria-hidden]')).toBeNull();
-    expect(await screen.findByRole('heading', { level: 2, name: 'fermo.txt' })).toBeInTheDocument();
   });
 
   it('scrolls the text column (not the window) to the citation chosen in the list, and pulses it once', async () => {
@@ -492,7 +472,7 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     await waitFor(() => expect(server.fetchActNames).toHaveBeenCalledTimes(1));
     await choose(container, BRIEF, 'memoria.txt');
     await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
-    await screen.findByRole('button', { name: /Scegli un documento/ });
+    await screen.findByRole('button', { name: /Scegli un file/ });
     await choose(container, PARERE);
     expect(server.fetchActNames).toHaveBeenCalledTimes(1);
   });
@@ -572,7 +552,7 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     server.readOnServer.mockRejectedValueOnce(new TypeError('a bug'));
     await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
-    await screen.findByRole('button', { name: /Scegli un documento/ });
+    await screen.findByRole('button', { name: /Scegli un file/ });
     await userEvent.upload(input(container), testFile([BRIEF], 'terza.txt'));
     await waitFor(() => expect(container.querySelector('[data-stage="error"]')).toHaveTextContent('Non è stato possibile cercare le citazioni in questo documento.'));
     expect(error).toHaveBeenCalled();

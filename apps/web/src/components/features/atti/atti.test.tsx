@@ -184,11 +184,17 @@ describe('AttoEditor', () => {
     atti.remove.mockResolvedValue(undefined);
     atti.list.mockResolvedValue([]);
     renderAt('/work/atti/a1');
-    fireEvent.click(await screen.findByRole('button', { name: 'Elimina' }));
+    // Not among the page's buttons: in the «⋯» menu, last.
+    expect(await screen.findByRole('button', { name: 'Altre azioni sull’atto' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Elimina/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni sull’atto' }));
+    const items = screen.getAllByRole('menuitem');
+    expect(items.map((item) => item.textContent)).toEqual(['Carica una nuova versione', 'Copia il testo', 'Scarica in .txt', 'Elimina l’atto']);
+    fireEvent.click(items.at(-1)!);
     expect(atti.remove).not.toHaveBeenCalled();
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent('Non si può annullare');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Elimina' }).at(-1)!);
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/work\/atti$/));
     expect(atti.remove).toHaveBeenCalledWith('a1');
   });
