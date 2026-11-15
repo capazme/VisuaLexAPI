@@ -7,6 +7,7 @@ import { DAY_STATE_LABEL, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } fro
 import { spring } from '../../../../lib/motion';
 import { useStreakGrowth } from './seenProgress';
 import { StreakTally } from './StreakTally';
+import { Illustration } from '../../../ui/Illustration';
 
 export interface StreakBadgeProps {
   attuale: number;
@@ -41,9 +42,8 @@ export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compac
     return (
       // An image, not a group: every child is hidden, and a group with nothing in it may be skipped.
       <div className="flex min-w-0 items-center gap-2" role="img" aria-label={name}>
-        <span aria-hidden className={cn('grid h-8 w-8 shrink-0 place-content-center rounded-full font-serif text-lg font-bold leading-none', INK_BG, ON_INK)}>
-          §
-        </span>
+        {/* LC35: the streak is the lamp kept lit, an engraving, where the «§» disc was. */}
+        <Illustration name="learn-serie" className="h-11 w-11" />
         <div aria-hidden className="min-w-0 leading-tight">
           <span className="flex items-end gap-2">
             <motion.span
@@ -68,16 +68,7 @@ export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compac
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={name}>
       <div className="flex items-center gap-3">
-        <span className="relative grid h-14 w-14 shrink-0 place-content-center" aria-hidden>
-          {!reduce && (
-            <motion.span
-              className={cn('absolute inset-0 rounded-full opacity-20', INK_BG)}
-              animate={{ scale: [1, 1.18, 1], opacity: [0.25, 0.08, 0.25] }}
-              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          )}
-          <span className={cn('relative grid h-14 w-14 place-content-center rounded-full font-serif text-3xl font-bold leading-none', INK_BG, ON_INK)}>§</span>
-        </span>
+        <Illustration name="learn-serie" className="h-16 w-16" />
         <div className="min-w-0" aria-hidden>
           <span className="flex items-end gap-3">
             <motion.span

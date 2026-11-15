@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../lib/utils';
+import { Illustration, type IllustrationName } from './Illustration';
 
 export interface EmptyStateProps {
   variant: 'dossier' | 'history' | 'environment' | 'search' | 'bookmarks' | 'threads' | 'notifications' | 'generic';
@@ -7,16 +8,19 @@ export interface EmptyStateProps {
   description?: string;
   action?: ReactNode;
   className?: string;
+  /** LC35: an engraving over the words, where the list has one of its own. */
+  art?: IllustrationName;
 }
 
 /**
- * An empty list's words (LC21): what is missing, what it is for, and the one way to begin. No illustration: the drawn
- * folders, clocks and globes were the template's, not LexCraft's (anti-slop review, 15 November); `variant` stays for
- * the callers and a test that names the case.
+ * An empty list's words (LC21): what is missing, what it is for, and the one way to begin. The template's drawn
+ * folders, clocks and globes went in LC21; since LC35 (Luca, 16 November) a list may show one of LexCraft's own
+ * engravings (`art`, `ui/Illustration`). `variant` stays for the callers and a test that names the case.
  */
-export function EmptyState({ variant, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({ variant, title, description, action, className, art }: EmptyStateProps) {
   return (
     <div data-variant={variant} className={cn('text-center py-12 md:py-16 px-4', className)}>
+      {art && <Illustration name={art} className="mx-auto mb-5 h-28 w-28" />}
       <h3 className="mb-2 font-serif text-[22px] font-normal leading-tight text-slate-900 dark:text-slate-50">
         {title}
       </h3>

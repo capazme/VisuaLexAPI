@@ -21,6 +21,7 @@ import { StudyTodayRow } from './StudyTodayRow';
 import { WeekStrip } from './WeekStrip';
 import { TaskListSkeleton, TaskViewEmpty, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { useTaskView } from './useTaskView';
+import { Illustration } from '../../ui/Illustration';
 
 const GROUPING_KEY = 'visualex-opus-today-grouping';
 type Grouping = 'date' | 'dossier';
@@ -136,9 +137,13 @@ function TodayEmpty() {
   const recent = [...dossiers].sort((a, b) => dossierRecency(b) - dossierRecency(a)).slice(0, 3);
   return (
     <div className="space-y-6">
-      <div>
-        <p className="font-serif text-lg text-slate-900 dark:text-slate-50">Nessun compito per oggi</p>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Quello che aggiungi qui è per oggi.</p>
+      <div className="flex items-center gap-4">
+        {/* LC35: the desk in order, an engraving. */}
+        <Illustration name="work-oggi-vuota" className="h-20 w-20" />
+        <div>
+          <p className="font-serif text-lg text-slate-900 dark:text-slate-50">Nessun compito per oggi</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Quello che aggiungi qui è per oggi.</p>
+        </div>
       </div>
       {recent.length > 0 && (
         <section aria-labelledby="opus-today-riprendi">
@@ -324,7 +329,7 @@ export function InboxView() {
       heading="Lista d'ingresso"
       line="I compiti che non appartengono a un dossier."
       defaults={() => ({})}
-      empty={<TaskViewEmpty title="La lista d'ingresso è vuota" line="Un compito senza dossier arriva qui." />}
+      empty={<TaskViewEmpty title="La lista d'ingresso è vuota" line="Un compito senza dossier arriva qui." art="work-ingresso-vuoto" />}
     >
       {(tasks, day, optimistic) => (
         <div>

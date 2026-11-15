@@ -10,6 +10,7 @@ import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '../../../types';
+import { Illustration } from '../../ui/Illustration';
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
 
@@ -138,9 +139,13 @@ export function ForumExploreView({
   ) : (
     // LC24: one quiet line, not a screen: the page's title row has «Pubblica un dossier» already, and «Pronti da
     // LexCraft» follows at once.
-    <p className="border-y border-slate-200 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
-      Ancora nessun dossier pubblicato dalla comunità: pubblica un tuo dossier di studio, gli altri lo aggiungono ai loro.
-    </p>
+    <div className="flex items-center gap-4 border-y border-slate-200 py-4 dark:border-slate-800">
+      {/* LC35: the empty portico, an engraving. */}
+      <Illustration name="forum-vuoto" className="h-16 w-16" />
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Ancora nessun dossier pubblicato dalla comunità: pubblica un tuo dossier di studio, gli altri lo aggiungono ai loro.
+      </p>
+    </div>
   );
   // «Pronti da VisuaLex» from elsewhere (the empty dossier list, `/forum#pronti`): once the dossiers are read and the
   // strip has its place, the content scroller alone brings it to the top (never `scrollIntoView`, gotcha 34), and the

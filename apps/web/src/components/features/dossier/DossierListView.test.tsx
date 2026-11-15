@@ -421,14 +421,16 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
   });
 
   // LC21: the line art is gone (no drawing over an empty list); the words and the two ways to begin stay.
-  it('composes the empty list: what a dossier is for and two ways to begin, with no drawing', () => {
+  it('composes the empty list: the empty folder's engraving, what a dossier is for and two ways to begin', () => {
     appStore.setState({ dossiers: [], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     const empty = screen.getByRole('region', { name: 'Nessun dossier di lavoro' });
     expect(empty).toHaveClass('mx-auto', 'items-center', 'text-center');
-    // The heading opens the region; the only pictures left are the buttons' icons.
-    expect(empty.firstElementChild).toBe(screen.getByRole('heading', { name: 'Nessun dossier di lavoro' }));
+    // LC35: the empty folder's engraving over the heading, decorative; the other pictures are the buttons' icons.
+    expect(empty.firstElementChild).toHaveAttribute('data-illustration', 'dossier-vuoti');
+    expect(empty.firstElementChild).toHaveAttribute('aria-hidden', 'true');
+    expect(empty.children[1]).toBe(screen.getByRole('heading', { name: 'Nessun dossier di lavoro' }));
     expect(empty.innerHTML).not.toContain('--vlx-section-');
     for (const svg of empty.querySelectorAll('svg')) expect(svg.closest('button')).not.toBeNull();
     expect(within(empty).getByRole('button', { name: 'Crea il tuo primo dossier' })).toHaveClass('min-h-[44px]', 'bg-primary-600');
