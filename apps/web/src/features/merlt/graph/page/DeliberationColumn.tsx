@@ -1735,7 +1735,7 @@ function TurnFeedback({
                           className={cn(
                             'rounded px-2 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                             grades[d.key] === g.value
-                              ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300'
+                              ? 'bg-primary-50 text-primary-700 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
                           )}
                         >

@@ -348,7 +348,7 @@ function PhoneRows({
                     className={cn(
                       'min-h-[44px] flex-1 rounded-md px-2 text-xs font-medium',
                       choice === o.choice
-                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white'
+                        ? 'bg-white text-slate-900 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                         : 'text-slate-600 dark:text-slate-300',
                       FOCUS_RING,
                     )}

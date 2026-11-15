@@ -124,6 +124,33 @@ describe('Pietra\'s colours', () => {
       .filter(Boolean));
     expect(off).toEqual([]);
   });
+
+  // LC19: the chosen option of a group of filters or tabs has one look in the dark, the light ink with dark text
+  // (`dark:bg-toga-400 dark:text-ink-950`, LC17), not a grey or tinted fill nor an outline. These groups had another.
+  // Left on purpose, and not listed: page tabs marked by a line under them, single toggles, cards to choose from, the
+  // highlighted row of a list.
+  it('the chosen option of these groups is the light ink in the dark', () => {
+    const groups = [
+      join('components', 'ui', 'SettingsModal.tsx'),
+      join('components', 'ui', 'AdvancedExportModal.tsx'),
+      join('components', 'features', 'planner', 'OpusPage.tsx'),
+      join('components', 'features', 'search', 'FindWindow.tsx'),
+      join('components', 'features', 'search', 'QuickNormsManager.tsx'),
+      join('components', 'features', 'search', 'NotesPeekPanel.tsx'),
+      join('components', 'features', 'search', 'MoveProposalBar.tsx'),
+      join('components', 'features', 'compare', 'CompareView.tsx'),
+      join('components', 'features', 'compare', 'CompareBody.tsx'),
+      join('components', 'features', 'rassegne', 'RassegnePanel.tsx'),
+      join('features', 'merlt', 'graph', 'page', 'AskGraphField.tsx'),
+      join('features', 'merlt', 'qa', 'QaDeliberationPanel.tsx'),
+    ];
+    // A chosen branch (`? '…'`, or `x === y ? '…'` on one line) whose dark fill is a grey or a tint.
+    const OTHER = /\?\s*['"`][^'"`]*\bdark:bg-(?:slate-(?:600|700|900)|primary-9[05]0)\b/;
+    const other = groups.flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => (OTHER.test(line) ? `${file}:${i + 1}` : null))
+      .filter(Boolean));
+    expect(other).toEqual([]);
+  });
 });
 
 describe('Pietra\'s scales', () => {
