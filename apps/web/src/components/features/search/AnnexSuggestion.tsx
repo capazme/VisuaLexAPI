@@ -131,7 +131,7 @@ export function AnnexSuggestion({
             className={cn(
               // The action in ink, as every primary action (Y1).
               "relative flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold md:min-h-0",
-              "bg-primary-600 text-white hover:bg-primary-700",
+              "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700",
               "transition-[background-color,opacity] duration-200",
               FOCUS_RING,
               isLoading && "opacity-80 cursor-wait"

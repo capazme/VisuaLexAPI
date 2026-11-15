@@ -19,7 +19,7 @@ export const HUB_TEXT = 'text-sm text-slate-700 dark:text-slate-300';
 export const HUB_NOTE = 'text-[13px] text-slate-600 dark:text-slate-400';
 
 /** A card's action, and the consent block's. */
-export const HUB_PRIMARY = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 ${FOCUS_RING}`;
+export const HUB_PRIMARY = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 ${FOCUS_RING}`;
 
 /** An action that needs more consent than the user gave: said in its words, disabled, no badge. */
 export const HUB_GATED = `inline-flex min-h-[44px] cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-4 text-sm font-medium text-slate-600 dark:border-slate-600 dark:text-slate-400 ${FOCUS_RING}`;
