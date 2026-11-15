@@ -18,7 +18,7 @@ export function Illustration({ name, label, className, style }: { name: Illustra
     <span
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
       data-illustration={name}
-      className={cn('block shrink-0 bg-slate-800 dark:bg-slate-300', className)}
+      className={cn('block shrink-0 bg-slate-800 dark:bg-slate-100', className)}
       style={{ maskImage: url, WebkitMaskImage: url, maskSize: 'contain', WebkitMaskSize: 'contain', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat', maskPosition: 'center', WebkitMaskPosition: 'center', ...style }}
     />
   );

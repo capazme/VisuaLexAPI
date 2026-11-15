@@ -30,7 +30,7 @@ export function LevelBar({ livello, className }: { livello: XpLivello; className
         {/* LC35: the level beside its laurel, an engraving. Keyed by the level: one reached while the page is open is
             pressed in too. */}
         <span className="flex items-center gap-2">
-        <Illustration name="learn-livello" className="h-9 w-9" />
+        <Illustration name="learn-livello" className="h-11 w-11" />
         <motion.p
           key={livello.livello}
           initial={levelUp && !reduce ? { scale: 1.5, opacity: 0 } : false}

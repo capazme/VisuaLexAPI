@@ -43,7 +43,7 @@ export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compac
       // An image, not a group: every child is hidden, and a group with nothing in it may be skipped.
       <div className="flex min-w-0 items-center gap-2" role="img" aria-label={name}>
         {/* LC35: the streak is the lamp kept lit, an engraving, where the «§» disc was. */}
-        <Illustration name="learn-serie" className="h-11 w-11" />
+        <Illustration name="learn-serie" className="h-12 w-12" />
         <div aria-hidden className="min-w-0 leading-tight">
           <span className="flex items-end gap-2">
             <motion.span
