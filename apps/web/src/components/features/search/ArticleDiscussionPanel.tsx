@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, LocateFixed, Plus, Send, X } from 'lucide-react';
@@ -149,6 +149,16 @@ export function ArticleDiscussionPanel({
 
   // Fetch only while the panel is shown.
   useEffect(() => { if (isOpen) void load(); }, [isOpen, load]);
+
+  // The focus goes into the side view when it opens and back to what opened it when it closes (Esc or «Chiudi»), or,
+  // if that is gone (the margin's card redrawn), stays where the page puts it (R-32).
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    panelRef.current?.focus({ preventScroll: true });
+    return () => { if (opener?.isConnected) opener.focus({ preventScroll: true }); };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -321,10 +331,12 @@ export function ArticleDiscussionPanel({
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+      ref={panelRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="article-discussions-title"
-      className={cn('fixed inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-slate-200 bg-card shadow-xl sm:w-[24rem] dark:border-slate-800', Z_INDEX.structure)}
+      className={cn('fixed inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-slate-200 bg-card shadow-lg outline-none sm:w-[24rem] dark:border-slate-800', Z_INDEX.structure)}
     >
       <div className="flex-1 overflow-y-auto p-5 sm:p-6">
       {/* The title and its close on one line; the order and «Nuova glossa» under them. */}

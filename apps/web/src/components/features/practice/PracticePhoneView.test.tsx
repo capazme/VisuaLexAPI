@@ -84,10 +84,17 @@ describe('PracticePhoneView (spec §8, P3)', () => {
   });
 
   it('rows open in place: a reveal from the store opens the row on the phone too', () => {
-    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    // Two articles: one alone is read at once (LC28).
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     render(view());
     expect(screen.queryByTestId('reader')).toBeNull();
     act(() => { s().revealPracticeArticle(practiceId, actId, '5'); });
+    expect(screen.getByTestId('reader')).toBeInTheDocument();
+  });
+
+  it('one article alone is read at once, with no row to open (LC28, the simple reading)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    render(view());
     expect(screen.getByTestId('reader')).toBeInTheDocument();
   });
 
