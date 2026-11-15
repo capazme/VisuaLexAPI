@@ -110,6 +110,15 @@ describe('AdminPage — Ingestione tab gating (MERL-T ops)', () => {
   });
 });
 
+describe('AdminPage — the comments tab', () => {
+  it('is called «Commenti», as the form users write in (LC4)', async () => {
+    renderAdminPage();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Utenti' })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Commenti' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Feedback' })).not.toBeInTheDocument();
+  });
+});
+
 describe('AdminPage — VisuaLex Studia', () => {
   afterEach(() => vi.unstubAllEnvs());
 
