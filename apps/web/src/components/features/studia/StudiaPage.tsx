@@ -27,7 +27,7 @@ const underStrip = (pathname: string) => /^\/learn\/valida(\/|$)/.test(pathname)
 const withAction = (pathname: string) => /^\/learn\/schede(\/|$)/.test(pathname);
 
 /** The review session is the lesson, a screen of its own (Gymnasium spec §5.4), and so is a course's module (courses spec §6.5). */
-const isLesson = (pathname: string) => /^\/learn\/ripasso\/sessione(\/|$)/.test(pathname) || /^\/learn\/percorsi\/[^/]+\/moduli\/[^/]+\/?$/.test(pathname);
+const isLesson = (pathname: string) => /^\/learn\/ripasso\/sessione(\/|$)/.test(pathname) || /^\/learn\/percorsi\/[^/]+\/(moduli|esami)\/[^/]+\/?$/.test(pathname);
 
 /** The streak and the goal over «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
 function AreaStrip() {

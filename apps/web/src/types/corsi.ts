@@ -89,7 +89,7 @@ export interface Mancanze {
 
 export type StatoEsame = 'assente' | 'bloccato' | 'aperto' | 'in-corso' | 'non-superato' | 'superato';
 
-/** The final exam's state on the course page (§6.4); taking it is the web's pull request (d). */
+/** The final exam's state on the course page (§6.4); taking it is `ExamSession` (`ProvaEsame` below). */
 export interface EsamePagina {
   stato: StatoEsame;
   /** The exam the state is about; null while there is none. */
@@ -166,7 +166,8 @@ export interface Opzione {
 
 /** The caller's outcome on an item, as graded by the server. */
 export interface Risposta {
-  scelta: Chiave;
+  /** Null on an exam item handed in without a choice (it counts as wrong). */
+  scelta: Chiave | null;
   corretto: boolean;
   /** The right key: sent only with an outcome. */
   corretta: Chiave;
@@ -266,5 +267,50 @@ export interface EsitoRisposta {
   corretta: Chiave;
   opzioni: Required<Opzione>[];
   /** What the answer credited («Supera un percorso» when it completes the course); null for a retry. */
+  xp: XpEsito | null;
+}
+
+// ─── The final exam (`/learn/percorsi/:id/esami/:esameId`, LC9) ──────────────────────────────────────────────────
+// S2's `POST …/esami/:esameId/inizia`, `POST …/consegna` and `POST …/aperta` (`apps/server/src/lingo/courseStudy.ts`,
+// `serializeAttempt`): one attempt per exam, every choice sent at once at the hand-in, graded by the server.
+
+/**
+ * An exam item: `ESAME` has options, `ESAME_APERTA` (the opinion, self-assessed, never scored) has none. Before the
+ * hand-in no key, explanation, model answer or rubric; after it those and the caller's `esito`.
+ */
+export interface DomandaEsame {
+  id: string;
+  tipo: 'ESAME' | 'ESAME_APERTA';
+  ordine: number;
+  applicazione: boolean;
+  testo: string;
+  competenze: string[];
+  opzioni: Opzione[] | null;
+  corretta?: Chiave | null;
+  rispostaModello?: string | null;
+  rubrica?: string[] | null;
+  /** After the hand-in: the choice (null when left without one) and the server's grade. */
+  esito?: { scelta: Chiave | null; corretto: boolean | null; segnalata: boolean } | null;
+}
+
+/** What `inizia` and `consegna` answer: the attempt, its items and, once handed in, its result. */
+export interface ProvaEsame {
+  esameId: string;
+  tentativo: {
+    id: string;
+    apertoIl: string;
+    consegnatoIl: string | null;
+    giorno: string | null;
+    percentuale: number | null;
+    superato: boolean | null;
+  };
+  /** After the hand-in: each competence's score and whether it reached 60%. */
+  perCompetenza: { codice: string; percentuale: number; superata: boolean }[] | null;
+  /** After a failed hand-in: the Rome day a new exam can be asked for. */
+  nuovoEsameDal: string | null;
+  domande: DomandaEsame[];
+  /** After the hand-in: the opinion's rubric ticks as stored. */
+  aperta: { domandaId: string; spuntate: number[] } | null;
+  /** What the hand-in credited; null on `inizia` and on a second hand-in. */
   xp: XpEsito | null;
 }

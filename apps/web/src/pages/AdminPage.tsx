@@ -13,6 +13,7 @@ import { getErrorMessage } from '../utils/errors';
 import { isMerltEnabled } from '../features/merlt/featureFlag';
 import { isStudiaEnabled } from '../features/studia/featureFlag';
 import { IngestionAdminPanel } from '../features/merlt/ops/ingestion/IngestionAdminPanel';
+import { CoursesSwitchAdmin } from '../components/features/admin/CoursesSwitchAdmin';
 import { StudiaSoglieAdmin } from '../components/features/admin/StudiaSoglieAdmin';
 import { StudiaTextsAdmin } from '../components/features/admin/StudiaTextsAdmin';
 import {
@@ -1230,6 +1231,7 @@ export function AdminPage() {
         {/* ==================== VISUALEX STUDIA TAB ==================== */}
         {studiaVisible && activeTab === 'studia' && (
           <div className="space-y-5">
+            <CoursesSwitchAdmin />
             <StudiaSoglieAdmin />
             <StudiaTextsAdmin />
           </div>

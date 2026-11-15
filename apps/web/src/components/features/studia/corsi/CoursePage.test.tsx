@@ -237,6 +237,21 @@ describe('the course page', () => {
     expect(await screen.findByRole('region', { name: 'Esame finale' })).toHaveTextContent(words);
   });
 
+  it('offers the exam while it is open or under way (LC9), and nothing to take otherwise', async () => {
+    get.mockResolvedValue(page({ esame: examOf({ stato: 'aperto' }) }));
+    const first = renderPage();
+    const open = await screen.findByRole('region', { name: 'Esame finale' });
+    expect(within(open).getByRole('link', { name: 'Inizia la prova' })).toHaveAttribute('href', '/learn/percorsi/corso-1/esami/e-1');
+    first.unmount();
+    get.mockResolvedValue(page({ esame: examOf({ stato: 'in-corso', tentativo: attempt({ consegnatoIl: null, giorno: null, percentuale: null, superato: null }) }) }));
+    const second = renderPage();
+    expect(within(await screen.findByRole('region', { name: 'Esame finale' })).getByRole('link', { name: 'Riprendi la prova' })).toBeInTheDocument();
+    second.unmount();
+    get.mockResolvedValue(page({ esame: examOf({ stato: 'bloccato' }) }));
+    renderPage();
+    expect(within(await screen.findByRole('region', { name: 'Esame finale' })).queryByRole('link')).toBeNull();
+  });
+
   it('a failed exam, from the third day, says «Chiedi al tuo assistente un nuovo esame» with the competences under 60%', async () => {
     get.mockResolvedValue(page({ esame: examOf({ stato: 'non-superato', tentativo: attempt(), nuovoEsameDal: '2026-11-23', chiediNuovoEsame: true, competenzeSotto: ['C2'] }) }));
     renderPage();

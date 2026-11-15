@@ -6,6 +6,8 @@ export const COURSES_PATH = '/learn/percorsi';
 export const coursePath = (id: string) => `${COURSES_PATH}/${encodeURIComponent(id)}`;
 /** A module's session (§6.5), by the module's id: a correction shares its order with the module it supersedes. */
 export const modulePath = (id: string, moduloId: string) => `${coursePath(id)}/moduli/${encodeURIComponent(moduloId)}`;
+/** The final exam's session (LC9). */
+export const examPath = (id: string, esameId: string) => `${coursePath(id)}/esami/${encodeURIComponent(esameId)}`;
 
 /** What a module's row offers to open it with (§6.4): a module not yet started can be read before it is started. */
 export function moduleOpenLabel(stato: StatoModulo): string {
