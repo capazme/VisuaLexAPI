@@ -37,6 +37,7 @@ import adminStudiaSoglieRoutes from './routes/adminStudiaSoglie';
 import lingoSrsRoutes from './routes/lingoSrs';
 import lingoCorsiRoutes from './routes/lingoCorsi';
 import taskRoutes from './routes/tasks';
+import attiRoutes from './routes/atti';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -154,6 +155,8 @@ app.use('/api/lingo/srs', lingoSrsRoutes);
 app.use('/api/lingo/corsi', lingoCorsiRoutes);
 // The planner's tasks, same reason.
 app.use('/api/tasks', taskRoutes);
+// The acts (Atti, draft for Alfred and Guglielmo), same reason.
+app.use('/api/atti', attiRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 // The runtime switches' administration (GET /features is mounted above, before the limiters).
