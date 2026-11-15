@@ -272,11 +272,12 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
 
 /**
  * A group of entries, named for a screen reader; with words, its name is also written over it. In the
- * rail a thin line stands for the heading.
+ * rail a thin line stands for the heading. `unnamed`: a group that bears its section's name is not a group again
+ * inside the section's (a screen reader said «Learn» twice, LC4); only the heading is drawn.
  */
-function NavGroup({ name, heading, layout, children }: { name: string; heading?: boolean; layout: SidebarLayout; children: React.ReactNode }) {
+function NavGroup({ name, heading, unnamed, layout, children }: { name: string; heading?: boolean; unnamed?: boolean; layout: SidebarLayout; children: React.ReactNode }) {
   return (
-    <div role="group" aria-label={name} className="flex w-full flex-col items-start gap-3 md:gap-2">
+    <div role={unnamed ? undefined : 'group'} aria-label={unnamed ? undefined : name} className="flex w-full flex-col items-start gap-3 md:gap-2">
       {heading && layout !== 'rail' && (
         <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
           {name}
@@ -480,7 +481,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             {section === 'gymnasium' && (
               <>
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}
-                <NavGroup name="Learn" heading layout={layout}>
+                <NavGroup name="Learn" heading unnamed layout={layout}>
                   <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
                   {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
                   {coursesOn && <NavItem to="/studia/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}

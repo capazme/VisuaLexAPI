@@ -201,10 +201,10 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     renderSidebar('/studia/schede');
     expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
-    // The section's group and, inside it, its first heading both read «Learn».
-    const [section, study] = screen.getAllByRole('group', { name: 'Learn' });
-    expect(within(study).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier']);
-    expect(section).toContainElement(study);
+    // One group reads «Learn» (LC4: the section's, its first heading's entries straight inside it), «Contribuisci» within.
+    const section = screen.getByRole('group', { name: 'Learn' });
+    expect(within(section).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier', 'Le mie schede']);
+    expect(section).toContainElement(screen.getByRole('group', { name: 'Contribuisci' }));
     cleanupAndRender('/studia/schede', () => { account.isValidator = true; });
     expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede', '/studia/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
@@ -216,7 +216,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it('keeps the section on a Corpus page after it', () => {
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/dossier');
-    expect(screen.getAllByRole('group', { name: 'Learn' })[0]).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Learn' })).toBeInTheDocument();
   });
 
   it('Forum: «Dossier pubblici» with its count, and «Community»; «Forum» is the group, written once', () => {
@@ -761,7 +761,7 @@ describe('Sidebar — the words', () => {
     expect(within(screen.getByRole('group', { name: 'Work' })).getByText('Work')).toBeInTheDocument();
     cleanup();
     renderLayout('wide', '/studia/ripasso');
-    expect(within(screen.getAllByRole('group', { name: 'Learn' })[1]).getByText('Learn')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Contribuisci' })).getByText('Contribuisci')).toBeInTheDocument();
     cleanup();
     // The rail has no room for them.
@@ -789,7 +789,7 @@ describe('Sidebar — the words', () => {
 
   it('draws its 11 px texts, the headings and the shortcut, in the colour that keeps AA (theme.test.ts)', () => {
     renderLayout('wide', '/studia/ripasso');
-    expect(within(screen.getAllByRole('group', { name: 'Learn' })[1]).getByText('Learn')).toHaveClass(...SIDEBAR_SMALL_TEXT.split(' '));
+    expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toHaveClass(...SIDEBAR_SMALL_TEXT.split(' '));
     const shortcut = screen.getByRole('link', { name: 'Ricerca' }).querySelector('kbd') as HTMLElement;
     expect(shortcut).toHaveClass('text-[11px]', ...SIDEBAR_SMALL_TEXT.split(' '));
   });
