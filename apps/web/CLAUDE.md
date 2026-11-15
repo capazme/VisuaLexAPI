@@ -1152,10 +1152,11 @@ render this way; Study Mode hides the heading and rubric blocks
 (`vlx-hide-header`) instead of cutting them, so its offsets are
 document-relative like everywhere else. No surface renders flat (`structure: null`) since the
 Brocardi sections went (D-078); the mode stays under its tests.
-**The selection** (LC4, `index.css`): a translucent tint of the opposite tone, the text's colour left alone — ink at 16% on
-a light paper, paper at 16% on a dark one — so a highlight under it keeps its hue; Study Mode's window carries its own
-paper (`data-study-theme`, `light`, `dark` or `sepia`) and the tint follows it, not the app's theme. `theme.test.ts`
-composites the tints over every paper (text 4.5:1, tint 1.3:1 from its paper, a selected highlight's text 4.5:1).
+**The selection** (LC4, `index.css`): one translucent stone for every paper, `rgb(138 132 120 / 0.3)`, the text's
+colour left alone, so a highlight under it keeps its hue. One rule, no `.dark` or Study Mode variant: Study Mode's papers
+hold islands of the app's theme (the note cards, the «Nuova nota» field), so no ancestor can say which paper a selection
+is on. `theme.test.ts` composites it over every paper, the note cards and the eight highlighters (text 4.5:1, tint
+1.3:1 from its paper).
 
 **Offsets are measured from the text alone.** `SelectionPopup` takes a
 `textRootRef` (the element holding only the article text) and stores the anchor

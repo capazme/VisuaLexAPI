@@ -208,10 +208,10 @@ describe('the Inchiostro palette', () => {
     expect(ratio(rgb('ink-300'), rgb('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('tints the selection over every paper, the text kept at AA and the tint seen, Study Mode\'s papers too (LC4)', () => {
-    // A translucent tint of the opposite tone, no text colour: a highlight under it keeps its hue. Browsers composite in
-    // gamma sRGB. The rules: `::selection` and `[data-study-theme='light'|'sepia'] ::selection` ink, `.dark ::selection`
-    // and `[data-study-theme='dark'] ::selection` paper, each `color-mix(in oklab, var(--color-ink-N) P%, transparent)`.
+  it('tints the selection with one stone over every paper, the text kept at AA and the tint seen (LC4)', () => {
+    // One rule for every paper: Study Mode's own papers hold islands of the app's theme (the note cards), so no ancestor
+    // can say which paper a selection is on. A translucent mid-tone, no text colour: a highlight under it keeps its hue.
+    // Browsers composite in gamma sRGB.
     const source = readFileSync(CSS_PATH, 'utf8');
     const linear = (name: string): number[] => {
       const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
@@ -242,45 +242,45 @@ describe('the Inchiostro palette', () => {
       const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
       return (hi + 0.05) / (lo + 0.05);
     };
-    const tint = (selector: string) => {
-      const m = source.match(new RegExp(`${selector}\\s*\\{\\s*background-color:\\s*color-mix\\(in oklab,\\s*var\\(--color-(ink-\\d+)\\)\\s+(\\d+)%,\\s*transparent\\);\\s*\\}`));
-      if (!m) throw new Error(`${selector} not found`);
-      return { colour: linear(m[1]), alpha: Number(m[2]) / 100 };
-    };
-    const esc = (s: string) => s.replace(/[[\]().*]/g, '\\$&');
-    const onLight = tint(`(?:^|\\n)${esc('::selection')}`);
-    const onDark = tint(esc('.dark ::selection'));
-    // Study Mode's paper wins over the app's theme, in both directions: same tints, written after `.dark`.
-    const studyLight = tint(`${esc("[data-study-theme='light'] ::selection")},\\s*${esc("[data-study-theme='sepia'] ::selection")}`);
-    const studyDark = tint(esc("[data-study-theme='dark'] ::selection"));
-    expect(studyLight).toEqual(onLight);
-    expect(studyDark).toEqual(onDark);
-    expect(source.indexOf("[data-study-theme='dark'] ::selection")).toBeGreaterThan(source.indexOf('.dark ::selection'));
-    expect(source).not.toMatch(/::selection\s*\{[^}]*[\s;{]color:/);
+    // One `::selection`, at the top level (nothing before it on its line: no `.dark`, no Study Mode), no `color`.
+    const rules = [...source.matchAll(/^([^\n{}]*)::selection\s*\{([^}]*)\}/gm)];
+    expect(rules).toHaveLength(1);
+    const [, prefix, body] = rules[0];
+    expect(prefix.trim()).toBe('');
+    expect(body).not.toMatch(/(?:^|[\s;])color:/);
+    const m = body.match(/background-color:\s*rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([\d.]+)\);/);
+    if (!m) throw new Error('::selection background-color not found');
+    const stone = [m[1], m[2], m[3]].map((v) => unGamma(Number(v) / 255));
+    const alpha = Number(m[4]);
     const white = [1, 1, 1];
-    // [paper, its text]: Pietra's background and surface (#faf8f4), white (Study Mode's light), sepia; the dark surface,
-    // the dark background, Study Mode's dark paper (slate 900). Texts: the reading surface's slate 800 / slate 200,
-    // Study Mode's slate 900, #5c4b37, slate 100.
-    const light: [number[], number[]][] = [[linear('ink-50'), linear('ink-800')], [hex('#faf8f4'), linear('ink-800')], [white, linear('ink-900')], [hex('#f4ecd8'), hex('#5c4b37')]];
-    const dark: [number[], number[]][] = [[linear('ink-900'), linear('ink-200')], [linear('ink-950'), linear('ink-200')], [linear('ink-900'), linear('ink-100')]];
-    for (const [cases, t] of [[light, onLight], [dark, onDark]] as const) {
-      for (const [paper, text] of cases) {
-        const ground = over(t.colour, t.alpha, paper);
-        expect(ratio(text, ground)).toBeGreaterThanOrEqual(4.5);
-        // Seen: the browser's own blue is about 1.5:1 from white.
-        expect(ratio(ground, paper)).toBeGreaterThanOrEqual(1.3);
-      }
+    // [where, paper, its body text]
+    const papers: [string, number[], number[]][] = [
+      ['Pietra light background', linear('ink-50'), linear('ink-800')],
+      ['Pietra light surface #faf8f4', hex('#faf8f4'), linear('ink-800')],
+      ['Study Mode light (white)', white, linear('ink-900')],
+      ['Study Mode sepia', hex('#f4ecd8'), hex('#5c4b37')],
+      ['Pietra dark surface', linear('ink-900'), linear('ink-200')],
+      ['Pietra dark background', linear('ink-950'), linear('ink-200')],
+      ['Study Mode dark (slate 900)', linear('ink-900'), linear('ink-100')],
+      // The note cards and the «Nuova nota» field (MarginCards, NoteEditBox): the app's theme, inside Study Mode too.
+      ['note card, light app', white, linear('ink-800')],
+      ['note field, light app', white, linear('ink-900')],
+      ['note card, dark app', linear('ink-900'), linear('ink-200')],
+      ['note field, dark app', linear('ink-900'), linear('ink-100')],
+    ];
+    for (const [where, paper, text] of papers) {
+      const ground = over(stone, alpha, paper);
+      expect(ratio(text, ground), `${where}: text`).toBeGreaterThanOrEqual(4.5);
+      // Seen: the browser's own blue is about 1.5:1 from white.
+      expect(ratio(ground, paper), `${where}: tint`).toBeGreaterThanOrEqual(1.3);
     }
     // A selected highlight: its own text on its ground under the tint, light block then dark block (not touched).
     const hl = (kind: 'bg' | 'fg') => [...source.matchAll(new RegExp(`--hl-(?:yellow|green|red|blue)-${kind}:\\s*([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%;`, 'g'))]
-      .map((m) => hsl(Number(m[1]), Number(m[2]), Number(m[3])));
+      .map((h) => hsl(Number(h[1]), Number(h[2]), Number(h[3])));
     const [grounds, texts] = [hl('bg'), hl('fg')];
     expect(grounds).toHaveLength(8);
     expect(texts).toHaveLength(8);
-    grounds.forEach((ground, i) => {
-      const t = i < 4 ? onLight : onDark;
-      expect(ratio(texts[i], over(t.colour, t.alpha, ground)), `highlight ${i}`).toBeGreaterThanOrEqual(4.5);
-    });
+    grounds.forEach((ground, i) => expect(ratio(texts[i], over(stone, alpha, ground)), `highlight ${i}`).toBeGreaterThanOrEqual(4.5));
     // The native checkboxes, radios and ranges: the action's ink (toga, light in the dark table), not the browser's blue.
     expect(source).toMatch(/:root\s*\{\s*accent-color:\s*var\(--color-toga-600\);/);
     expect(source).toMatch(/\.dark\s*\{\s*accent-color:\s*var\(--color-toga-400\);/);

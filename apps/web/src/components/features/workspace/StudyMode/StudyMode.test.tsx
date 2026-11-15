@@ -60,16 +60,3 @@ describe('StudyMode — the article\'s notes and highlights', () => {
     expect(marks).toHaveBeenCalledTimes(2);
   });
 });
-
-describe('StudyMode — its paper for the selection (LC4)', () => {
-  const before = appStore.getState().settings.studyMode;
-  afterEach(() => appStore.getState().updateStudyModeSettings(before));
-
-  it.each(['light', 'dark', 'sepia'] as const)('carries its theme «%s» on its window, for index.css\'s ::selection', (theme) => {
-    appStore.getState().updateStudyModeSettings({ theme });
-    render(<StudyMode article={ARTICLE} onClose={vi.fn()} />);
-    expect(document.querySelectorAll('[data-study-theme]')).toHaveLength(1);
-    expect(document.querySelector('[data-study-theme]')).toHaveAttribute('data-study-theme', theme);
-    expect(document.querySelector('[data-study-theme]')).toContainHTML('<p>testo</p>');
-  });
-});

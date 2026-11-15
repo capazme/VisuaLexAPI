@@ -567,29 +567,21 @@
   color: hsl(var(--vlx-find-current-fg));
 }
 
-/* The browser's own blue, left on the selection and the native controls (LC4): Pietra's ink instead. The selection is
-   a translucent tint of the opposite tone, the text's colour left alone: ink at 16% on a light paper, paper at 16% on
-   a dark one, so a highlight under it keeps its hue and the same rule holds on white, Pietra's paper and sepia. Study
-   Mode has its own paper, whatever the app's theme: its window carries `data-study-theme`, and its rules, written
-   after `.dark`'s with the same weight, win in both directions. Checkboxes, radios and ranges take the action's ink
-   (toga 600; light toga 400 in the dark table). `theme.test.ts` composites the tints over every paper. */
+/* The browser's own blue, left on the selection and the native controls (LC4): Pietra's instead. The selection is one
+   translucent stone for every paper, light or dark, the text's colour left alone, so a highlight under it keeps its
+   hue. One rule, not one per theme: Study Mode's papers (white, sepia, dark) hold islands of the app's theme — the
+   note cards, the «Nuova nota» field — so no ancestor can say which paper a selection is on. Checkboxes, radios and
+   ranges take the action's ink (toga 600; light toga 400 in the dark table). `theme.test.ts` composites the tint
+   over every paper, the note cards and the highlighters. */
 :root {
   accent-color: var(--color-toga-600);
 }
 .dark {
   accent-color: var(--color-toga-400);
 }
+/* #8a8478, Pietra's stone, between ink 400 and 500 (no step of the scale, and toga's flip in the dark). */
 ::selection {
-  background-color: color-mix(in oklab, var(--color-ink-900) 16%, transparent);
-}
-.dark ::selection {
-  background-color: color-mix(in oklab, var(--color-ink-50) 16%, transparent);
-}
-[data-study-theme='light'] ::selection, [data-study-theme='sepia'] ::selection {
-  background-color: color-mix(in oklab, var(--color-ink-900) 16%, transparent);
-}
-[data-study-theme='dark'] ::selection {
-  background-color: color-mix(in oklab, var(--color-ink-50) 16%, transparent);
+  background-color: rgb(138 132 120 / 0.3);
 }
 
 /* The words of the gloss a card is on (D8: hovered or focused), painted through the CSS Custom Highlight API
