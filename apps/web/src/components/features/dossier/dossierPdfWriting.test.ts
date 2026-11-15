@@ -53,7 +53,7 @@ describe('writeDossierPdf', () => {
       text 44,155 Note
       text 44,173 Verificare la vigenza.
       text 44,202 Codice civile
-      text 44,226 art. 2043 — Risarcimento per fatto illec
+      text 44,226 art. 2043 · Risarcimento per fatto illec
       text 44,241 Nota: Nota di prova
       text 44,253 Qualunque fatto doloso o colposo.
       text 44,275 art. 2044 · testo al 1 gennaio 2020

@@ -240,7 +240,7 @@ export function StudyModeContent({
               <h2 className="text-xl sm:text-2xl font-serif font-bold leading-tight tracking-tight">
                 Articolo {norma_data.numero_articolo}
                 {norma_data.allegato && (
-                  <span className="opacity-60 font-normal text-base sm:text-lg"> — Allegato {norma_data.allegato}</span>
+                  <span className="opacity-60 font-normal text-base sm:text-lg"> · Allegato {norma_data.allegato}</span>
                 )}
               </h2>
               {rubric && (

@@ -118,7 +118,7 @@ describe('writeDecisionPdf — what is drawn', () => {
       text 44,375.5 «parole sparite»
       setFontSize 9
       setFont times italic
-      text 44,401.5 Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0 — https://creativecommons.org/licenses/by-sa/3.0/
+      text 44,401.5 Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/
       setFont helvetica normal
       setFontSize 8
       text 44,810 Fonte: Corte costituzionale — dati aperti · licenza CC BY-SA 3.0 · consultata il 5 ottobre 2026

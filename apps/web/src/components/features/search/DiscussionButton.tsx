@@ -22,7 +22,7 @@ export function DiscussionButton({ isOpen, onToggle, name, lockedReason }: Discu
             aria-haspopup="dialog"
             aria-label={name}
             className={toolbarToggleClass(isOpen, 'relative')}
-            title={lockedReason ? `${name} — ${lockedReason}` : name}
+            title={lockedReason ? `${name}: ${lockedReason}` : name}
             disabled={Boolean(lockedReason)}
         >
             <MessageCircle size={16} aria-hidden />

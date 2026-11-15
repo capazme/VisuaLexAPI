@@ -68,7 +68,7 @@ describe('CaseLawSection', () => {
       articleUrn: NORMA.urn, besideId: 'tab-1',
       backEntry: { tabId: 'tab-1', label: 'art. 2043 c.c.' },
     });
-    expect(screen.getByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cassazione: menzionano l’articolo' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
   });
 
@@ -104,7 +104,7 @@ describe('CaseLawSection', () => {
       const view = show({ norma: { ...NORMA, tipo_atto, urn: undefined } });
       await userEvent.click(toggle());
       expect(screen.queryByRole('button', { name: 'Cerca nell’archivio della Cassazione' }), tipo_atto).toBeNull();
-      expect(screen.queryByRole('heading', { name: 'Cassazione — menzionano l’articolo' }), tipo_atto).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Cassazione: menzionano l’articolo' }), tipo_atto).toBeNull();
       // the rest of the section stays
       expect(screen.getByTestId('rassegne-panel')).toBeInTheDocument();
       view.unmount();
@@ -120,8 +120,8 @@ describe('CaseLawSection', () => {
     show({ norma: { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6' } });
     expect(eu).not.toHaveBeenCalled();
     await userEvent.click(toggle());
-    expect(screen.getByRole('heading', { name: 'Corte di giustizia UE — citano l’articolo' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Corte di giustizia UE: citano l’articolo' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Cassazione: menzionano l’articolo' })).toBeNull();
     expect(await screen.findByText('Nessuna decisione indicizzata cita questo articolo.')).toBeInTheDocument();
     expect(eu).toHaveBeenCalledExactlyOnceWith({ celex: '32016R0679', articolo: '6' });
   });

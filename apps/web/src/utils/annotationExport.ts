@@ -3,7 +3,7 @@ import { saveBlob } from './saveBlob';
 
 /** The reader's notes or highlights as the plain text the «Esporta in .txt» actions write. */
 function header(kind: 'Evidenziazioni' | 'Note', title: string, now: Date): string {
-  return [`${kind} — ${title}`, `Esportato il ${now.toLocaleString('it-IT')}`, '─'.repeat(60), ''].join('\n');
+  return [`${kind}: ${title}`, `Esportato il ${now.toLocaleString('it-IT')}`, '─'.repeat(60), ''].join('\n');
 }
 
 export function notesTxt(title: string, notes: readonly Annotation[], now: Date = new Date()): string {

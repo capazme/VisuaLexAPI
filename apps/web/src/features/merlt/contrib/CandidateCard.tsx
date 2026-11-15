@@ -215,13 +215,13 @@ export function CandidateCard({
         </div>
         {isRelation ? (
           <span className="flex min-w-0 flex-wrap items-center justify-end gap-1 text-sm font-medium text-slate-900 dark:text-white">
-            <span className="truncate">{sourceText || '—'}</span>
+            <span className="truncate">{sourceText || 'n.d.'}</span>
             <ArrowRight size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {candidate.relation_type || '—'}
+              {candidate.relation_type || 'n.d.'}
             </span>
             <ArrowRight size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
-            <span className="truncate">{targetText || '—'}</span>
+            <span className="truncate">{targetText || 'n.d.'}</span>
           </span>
         ) : (
           <span className="font-medium text-slate-900 dark:text-white">{candidate.entity_text}</span>
@@ -242,7 +242,7 @@ export function CandidateCard({
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-500">Estratto originale</label>
           <p className="rounded-lg bg-slate-50 p-2 text-sm text-slate-500 dark:bg-slate-800/60">
-            {verbatim || '—'}
+            {verbatim || 'n.d.'}
           </p>
         </div>
         <div>

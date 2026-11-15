@@ -26,7 +26,7 @@ const compareArticle = (text: string, norma: Partial<NormaVisitata> = {}, label 
   const article: ArticleData = { article_text: text, norma_data: { ...CC, ...norma } };
   return { article, sourceNorma: { tipo_atto: CC.tipo_atto }, label };
 };
-const past = (text: string, date = '2015-12-31') => compareArticle(text, { versione: 'vigente', data_versione: date }, `art. 1284 c.c. — testo al ${date}`);
+const past = (text: string, date = '2015-12-31') => compareArticle(text, { versione: 'vigente', data_versione: date }, `art. 1284 c.c., testo al ${date}`);
 
 function open(left: CompareArticle, right: CompareArticle) {
   setCompareState({ isOpen: true, leftArticle: left, rightArticle: right });
@@ -443,12 +443,12 @@ describe('CompareView — on a phone', () => {
   });
 
   it('names a past text of an article with its day, as the summary does', () => {
-    const a = compareArticle('1. Primo.', { numero_articolo: '2043', versione: 'vigente', data_versione: '2015-12-31' }, 'art. 2043 c.c. — testo al 31/12/2015');
+    const a = compareArticle('1. Primo.', { numero_articolo: '2043', versione: 'vigente', data_versione: '2015-12-31' }, 'art. 2043 c.c., testo al 31/12/2015');
     const b = compareArticle('1. Secondo.', { numero_articolo: '2059' }, 'art. 2059 c.c.');
     const { container } = open(a, b);
     const row = container.querySelector<HTMLElement>('[data-compare-row="comma"]')!;
     expect(within(row).getAllByRole('button').map((x) => x.textContent)).toEqual([
-      'art. 2043 c.c. — testo al 31/12/2015',
+      'art. 2043 c.c., testo al 31/12/2015',
       'art. 2059 c.c.',
     ]);
   });

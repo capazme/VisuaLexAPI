@@ -154,7 +154,7 @@ describe('StudiaTextsAdmin, the earlier versions', () => {
     expect(items[0]).toHaveTextContent('Admin 2');
     expect(items[1]).toHaveTextContent('Versione 1');
     expect(items[1]).toHaveTextContent('01/10/2026');
-    expect(items[1]).toHaveTextContent('—');
+    expect(items[1]).toHaveTextContent('autore non indicato');
   });
 
   it('opens one read-only, and shows its markup as text', async () => {

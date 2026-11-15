@@ -315,11 +315,11 @@ describe('buildTextAtDateParams', () => {
 
 describe('versionTabSuffix', () => {
   it('names the day that was asked for, in Italian order', () => {
-    expect(versionTabSuffix({ versionDate: '2007-12-29' })).toBe(' — testo al 29/12/2007');
+    expect(versionTabSuffix({ versionDate: '2007-12-29' })).toBe(', testo al 29/12/2007');
   });
 
   it('names the original text', () => {
-    expect(versionTabSuffix({ version: 'originale' })).toBe(' — testo originale');
+    expect(versionTabSuffix({ version: 'originale' })).toBe(', testo originale');
   });
 
   it('is empty for the text in force', () => {
@@ -347,7 +347,7 @@ describe('a day written the way a shared link may carry it ("12 ottobre 2007")',
   });
 
   it('names the tab with the day as it came', () => {
-    expect(versionTabSuffix({ versionDate: '12 ottobre 2007' })).toBe(' — testo al 12 ottobre 2007');
+    expect(versionTabSuffix({ versionDate: '12 ottobre 2007' })).toBe(', testo al 12 ottobre 2007');
   });
 
   it('is still told in the banner of an article that did not exist yet', () => {

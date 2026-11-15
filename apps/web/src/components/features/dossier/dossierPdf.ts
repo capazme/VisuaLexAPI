@@ -365,7 +365,7 @@ export async function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock
     w.y += 6;
     block.articles.forEach((article) => {
       ensureSpace(32);
-      const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
+      const head = `${article.label}${article.rubrica ? ` · ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
       write(head, 11, 'bold', 15);
       article.notes.forEach((text) => write(`Nota: ${text}`, 9, 'italic', 12));
       if (article.marksUnavailable) write(PDF_MARKS_UNAVAILABLE, 9, 'italic', 12, true);

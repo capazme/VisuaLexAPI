@@ -79,7 +79,7 @@ export function OpsConfigPanel() {
       const res = await getOpsConfig();
       setState({ status: 'success', params: res.params });
       setAcks({});
-      setToast({ message: 'Motore riavviato — modifiche applicate', type: 'success' });
+      setToast({ message: 'Motore riavviato: modifiche applicate', type: 'success' });
     } catch (err) {
       console.error('OpsConfigPanel: failed to reinitialize engine:', err);
       setToast({ message: 'Riavvio del motore non riuscito.', type: 'error' });
@@ -207,7 +207,7 @@ function RuntimeRow({
         </select>
         {ack === 'saved' && (
           <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-            applicato — attivo dalla prossima domanda
+            applicato, attivo dalla prossima domanda
           </p>
         )}
       </div>
@@ -260,7 +260,7 @@ function RuntimeRow({
         </div>
         {ack === 'saved' && (
           <p className="text-xs text-emerald-600 dark:text-emerald-400">
-            applicato — attivo dalla prossima domanda
+            applicato, attivo dalla prossima domanda
           </p>
         )}
       </div>
@@ -301,7 +301,7 @@ function RuntimeRow({
       />
       {ack === 'saved' && (
         <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-          applicato — attivo dalla prossima domanda
+          applicato, attivo dalla prossima domanda
         </p>
       )}
     </div>
@@ -353,7 +353,7 @@ function EngineStateRow({
         </select>
         {ack === 'pending-restart' && (
           <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-            in attesa di riavvio — riavvia il motore per applicare
+            in attesa di riavvio: riavvia il motore per applicare
           </p>
         )}
       </div>
@@ -410,7 +410,7 @@ function EngineStateRow({
         </div>
         {ack === 'pending-restart' && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            in attesa di riavvio — riavvia il motore per applicare
+            in attesa di riavvio: riavvia il motore per applicare
           </p>
         )}
       </div>
@@ -448,7 +448,7 @@ function EngineStateRow({
       />
       {ack === 'pending-restart' && (
         <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-          in attesa di riavvio — riavvia il motore per applicare
+          in attesa di riavvio: riavvia il motore per applicare
         </p>
       )}
     </div>

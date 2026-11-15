@@ -243,7 +243,7 @@ function RailBody({
         <Centered>
           <AlertCircle className="h-6 w-6 text-red-500" />
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Grafo non raggiungibile — riprova più tardi.
+            Grafo non raggiungibile. Riprova più tardi.
           </p>
           <RetryButton onClick={onRetryIngestion} />
         </Centered>

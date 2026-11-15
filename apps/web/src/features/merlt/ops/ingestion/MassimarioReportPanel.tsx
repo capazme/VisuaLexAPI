@@ -6,7 +6,7 @@ import type { MassimarioReport, VectorProgress } from './types';
 const NUMBER = new Intl.NumberFormat('it-IT', { useGrouping: 'always' } as unknown as Intl.NumberFormatOptions);
 const n = (value: number | null | undefined): string => NUMBER.format(value ?? 0);
 const pct = (value: number | null): string =>
-  value === null ? '—' : `${value.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`;
+  value === null ? 'n.d.' : `${value.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`;
 
 export interface MassimarioReportPanelProps {
   report: MassimarioReport;
@@ -42,7 +42,7 @@ export function MassimarioReportPanel({ report, vectors, onResume, resuming, onR
       <p className="text-slate-700 dark:text-slate-300">{report.volume.titolo}</p>
       <p className={below ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}>
         Copertura delle citazioni: {pct(citazioni.copertura_pct)} ({n(citazioni.rv_riconosciute)} su{' '}
-        {n(citazioni.rv_totali)} Rv.){below && ' — sotto la soglia del 95%'}
+        {n(citazioni.rv_totali)} Rv.){below && ', sotto la soglia del 95%'}
       </p>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600 dark:text-slate-400">
         <dt>Paragrafi</dt><dd>{n(report.paragrafi)} ({n(report.frammenti)} frammenti)</dd>
@@ -64,8 +64,8 @@ export function MassimarioReportPanel({ report, vectors, onResume, resuming, onR
       {vectors && (
         <p className="text-slate-600 dark:text-slate-400">
           Vettori: {n(vectors.done)} su {n(vectors.total)}
-          {running && ' — in corso'}
-          {vectors.error && <span className="text-amber-700 dark:text-amber-400"> — errore: {vectors.error}</span>}
+          {running && ', in corso'}
+          {vectors.error && <span className="text-amber-700 dark:text-amber-400">, errore: {vectors.error}</span>}
         </p>
       )}
       {running && onRefresh && (

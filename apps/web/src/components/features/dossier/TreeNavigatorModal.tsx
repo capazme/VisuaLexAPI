@@ -202,7 +202,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
 
           {loading && (
             <p className="text-xs text-slate-500 dark:text-slate-400 text-center animate-pulse">
-              Recupero della struttura della norma — potrebbe richiedere qualche secondo.
+              Recupero della struttura della norma. Può richiedere qualche secondo.
             </p>
           )}
 

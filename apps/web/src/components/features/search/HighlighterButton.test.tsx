@@ -109,7 +109,7 @@ describe('HighlighterButton — the highlighter as a tool (A4)', () => {
     render(<HighlighterButton />);
     fireEvent.click(inks());
     const menu = screen.getByRole('menu', { name: 'Colore dell’evidenziatore' });
-    expect(menu).toHaveAccessibleDescription('Colore dell’evidenziatore — uso suggerito');
+    expect(menu).toHaveAccessibleDescription('Colore dell’evidenziatore: uso suggerito');
     expect(within(menu).getAllByRole('menuitemradio').map((item) => item.getAttribute('aria-label'))).toEqual([
       'Giallo, uso suggerito: punto centrale',
       'Verde, uso suggerito: condizione o presupposto',

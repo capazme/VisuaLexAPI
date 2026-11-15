@@ -196,7 +196,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
           role="alert"
           className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
         >
-          Ricerca non disponibile — riprova.
+          Ricerca non disponibile. Riprova.
         </div>
       )}
     </div>

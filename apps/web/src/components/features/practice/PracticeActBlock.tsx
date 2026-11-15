@@ -292,7 +292,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
               type="button"
               onClick={() => openStudy(current)}
               disabled={studyLocked}
-              title={current && studyLocked ? `Modalità studio — ${READ_ONLY_REASON}` : 'Modalità studio'}
+              title={current && studyLocked ? `Modalità studio: ${READ_ONLY_REASON}` : 'Modalità studio'}
               aria-label="Modalità studio"
               className={cn(TOOL_BUTTON, 'practice-act-study')}
             >

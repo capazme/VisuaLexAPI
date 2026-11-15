@@ -480,7 +480,7 @@ export function importCounts(imported: number, lost: number): string {
 export function importReasonsText(reasons: string[]): string {
   if (reasons.length === 0) return '';
   const others = reasons.length - 1;
-  return ` — ${reasons[0]}${others > 0 ? ` e ${others === 1 ? 'un altro motivo' : `altri ${others} motivi`}` : ''}`;
+  return `: ${reasons[0]}${others > 0 ? ` e ${others === 1 ? 'un altro motivo' : `altri ${others} motivi`}` : ''}`;
 }
 
 /** The toast after an import: whole, or how many items were left out (not importable, or refused by the server). */

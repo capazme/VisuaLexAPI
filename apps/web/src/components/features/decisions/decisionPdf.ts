@@ -162,12 +162,12 @@ export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOpti
   const licence = identita.corte === 'corte_costituzionale' && answer.fonte.licenza ? ` · licenza ${answer.fonte.licenza}` : '';
 
   const licenceUri = identita.corte === 'corte_costituzionale' && answer.fonte.licenza ? LICENCE_URIS[answer.fonte.licenza] : undefined;
-  const licenceLine = licenceUri ? `Dati aperti della Corte costituzionale, licenza ${answer.fonte.licenza} — ${licenceUri}` : null;
+  const licenceLine = licenceUri ? `Dati aperti della Corte costituzionale, licenza ${answer.fonte.licenza}: ${licenceUri}` : null;
 
   const lost = annotations && includeUnmatched ? unmatchedAnchors(testo, highlights, notes) : { highlights: [], annotations: [] };
   const unmatched = [
     ...lost.highlights.map((h) => `«${h.text}»`),
-    ...lost.annotations.map((n) => `nota: ${n.text} — su «${n.anchorText}»`),
+    ...lost.annotations.map((n) => `nota: ${n.text}, su «${n.anchorText}»`),
   ];
 
   return {

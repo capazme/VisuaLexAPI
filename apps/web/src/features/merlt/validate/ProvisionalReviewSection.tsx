@@ -120,7 +120,7 @@ function ProvisionalReviewCard({
           <Chip>usi: {item.usage_count ?? 0}</Chip>
           <Chip>feedback+: {item.positive_feedback_count ?? 0}</Chip>
           {item.has_confirmed_citation && <Chip>citato da confermati</Chip>}
-          <Chip>fiducia: {typeof item.trust === 'number' ? item.trust.toFixed(2) : '—'}</Chip>
+          <Chip>fiducia: {typeof item.trust === 'number' ? item.trust.toFixed(2) : 'n.d.'}</Chip>
         </div>
       </div>
     </li>

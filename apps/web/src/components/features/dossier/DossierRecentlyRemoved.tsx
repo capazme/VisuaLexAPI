@@ -36,7 +36,7 @@ export function DossierRecentlyRemoved({ entries, dossiers, onRestore, onPurge, 
           className="inline-flex min-h-[44px] items-center gap-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
           <ChevronDown size={16} aria-hidden className={cn('transition-transform motion-reduce:transition-none', !open && '-rotate-90')} />
-          Rimossi di recente ({entries.length}) — ripristina
+          Rimossi di recente ({entries.length}): ripristina
         </button>
       </h2>
       {open && (
