@@ -73,10 +73,10 @@ describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () =>
     const dossier = screen.getAllByRole('link', { name: 'Dossier' })[0];
     fireEvent.pointerEnter(dossier, { pointerType: 'mouse' });
     expect(prepared.paths).toEqual(['/dossier']);
-    fireEvent.pointerDown(screen.getByRole('link', { name: 'Analizza documento' }));
-    expect(prepared.paths).toEqual(['/dossier', '/documents']);
+    fireEvent.pointerDown(screen.getByRole('link', { name: 'Atti, in arrivo' }));
+    expect(prepared.paths).toEqual(['/dossier', '/work/atti']);
     fireEvent.focus(screen.getByRole('link', { name: 'Corpus' }));
-    expect(prepared.paths).toEqual(['/dossier', '/documents', '/']);
+    expect(prepared.paths).toEqual(['/dossier', '/work/atti', '/']);
   });
 });
 
@@ -95,7 +95,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar('/');
-    expect(navHrefs()).toEqual(['/work/oggi', '/work/prossimi', '/work/ingresso', '/', '/documents', '/rassegne', '/dossier', '/work/atti', '/work/anonimizzatore']);
+    expect(navHrefs()).toEqual(['/work/oggi', '/', '/dossier', '/work/atti', '/work/anonimizzatore']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {

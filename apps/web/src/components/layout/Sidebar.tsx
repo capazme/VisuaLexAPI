@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, CalendarCheck, CalendarDays, Inbox, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
+import { Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -372,13 +372,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     focusSearchField({ focus: true }, { wait: true });
     closeMobile();
   };
-  // The search and its two tools: «Ricerca» over every section but Work, «Corpus» among Work's entries (D-315).
-  const corpusEntries = (searchLabel: string) => (
-    <>
-      <NavItem to="/" icon={Search} label={searchLabel} hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
-      <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
-      <NavItem to="/rassegne" icon={Library} label="Rassegne" onClick={closeMobile} layout={layout} />
-    </>
+  // The search: «Ricerca» over every section but Work, «Corpus» among Work's entries (D-315).
+  const searchEntry = (label: string) => (
+    <NavItem to="/" icon={Search} label={label} hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
   );
 
   // Academia's entries: the section is offered only with the development mode (sections spec S12), and
@@ -486,8 +482,15 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         id="tour-sidebar"
         className="min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
-        {/* Corpus's entries over the other sections' (sections spec S6); in Work they are Work's own, under «Corpus» (D-315). */}
-        {section !== 'opus' && corpusEntries('Ricerca')}
+        {/* Corpus's entries over the other sections' (sections spec S6). In Work the search is Work's own «Corpus» (D-315), and
+            the two tools are links of the search page (`Scrivania`, LC8). */}
+        {section !== 'opus' && (
+          <>
+            {searchEntry('Ricerca')}
+            <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
+            <NavItem to="/rassegne" icon={Library} label="Rassegne" onClick={closeMobile} layout={layout} />
+          </>
+        )}
         {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
             Each section names its own active column, so the column does not slide from the old section's entries. */}
         <LayoutGroup id={section}>
@@ -516,12 +519,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             )}
             {section === 'opus' && (
               <>
-                {/* Oggi, Corpus, Dossier, Atti, Anonimizzatore (D-315). «Prossimi giorni», «Lista d'ingresso», «Analizza
-                    documento» and «Rassegne» stay under their entry: no other page links to them yet (LC8). */}
+                {/* Oggi, Corpus, Dossier, Atti, Anonimizzatore (D-315). «Prossimi giorni» and «Lista d'ingresso» are tabs of
+                    Work's page (`OpusPage`), «Analizza documento» and «Rassegne» links of the search page (LC8). */}
                 <NavItem to="/work/oggi" icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
-                <NavItem to="/work/prossimi" icon={CalendarDays} label="Prossimi giorni" onClick={closeMobile} layout={layout} />
-                <NavItem to="/work/ingresso" icon={Inbox} label="Lista d'ingresso" onClick={closeMobile} layout={layout} />
-                {corpusEntries('Corpus')}
+                {searchEntry('Corpus')}
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <NavItem to="/work/atti" icon={FileText} label="Atti" soon onClick={closeMobile} layout={layout} />
                 {/* D-324: it will come in the desktop app. */}

@@ -17,9 +17,9 @@ import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
-/** Work's entries (D-315): Oggi, Corpus, Dossier, Atti, Anonimizzatore; the planner's two other views under Oggi and the
- *  Corpus tools under Corpus, which no other page links to. */
-const OPUS_HREFS = ['/work/oggi', '/work/prossimi', '/work/ingresso', '/', '/documents', '/rassegne', '/dossier', '/work/atti', '/work/anonimizzatore'];
+/** Work's five entries (D-315): Oggi, Corpus, Dossier, Atti, Anonimizzatore. The planner's other two views are tabs of
+ *  Work's page, the Corpus tools links of the search page (LC8). */
+const OPUS_HREFS = ['/work/oggi', '/', '/dossier', '/work/atti', '/work/anonimizzatore'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -177,14 +177,12 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Work: Oggi, Corpus, Dossier, Atti and Anonimizzatore, in this order (D-315), and nothing lost', () => {
+  it('Work: exactly Oggi, Corpus, Dossier, Atti and Anonimizzatore, in this order (D-315)', () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Corpus', 'Analizza documento', 'Rassegne', 'Dossier', 'Atti, in arrivo', 'Anonimizzatore, in arrivo']);
-    const five = ['Oggi', 'Corpus', 'Dossier', 'Atti, in arrivo', 'Anonimizzatore, in arrivo'];
-    expect(names.filter((n) => five.includes(n!))).toEqual(five);
+    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti, in arrivo', 'Anonimizzatore, in arrivo']);
     // Corpus is Work's way to the search: no «Ricerca» above it.
     expect(screen.queryByRole('link', { name: 'Ricerca' })).toBeNull();
   });
