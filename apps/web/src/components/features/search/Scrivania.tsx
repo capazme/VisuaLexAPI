@@ -1,10 +1,10 @@
 /**
  * «Scrivania»: the search page when no practice is open (spec 2026-10-18-redesign-inchiostro §5.3.2).
- * A greeting with the day, the ways to start (the field above, ⌘K, three examples), then «Riprendi»
+ * A greeting with the day, the ways to start (the field above, ⌘K, three examples, the two Corpus tools), then «Riprendi»
  * — the dossiers touched last — and the frequent searches, as typographic lists, not cards.
  * `#tour-main-content` and `#tour-quick-norms` are the tours' targets (config/tourConfig.ts).
  */
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { ArrowUpRight, Plus } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
@@ -21,6 +21,9 @@ const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 // A 40 ms cascade, once per mount, never blocking input (spec §6.3.6).
 const stagger = (i: number) => ({ animationDelay: `${i * 40}ms` });
 const ENTER = 'animate-in fade-in slide-in-from-bottom-2 duration-200';
+
+const TOOL_LINK =
+  'inline-flex min-h-[44px] items-center rounded-md px-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:hover:bg-primary-950';
 
 const ROW =
   'group flex w-full min-h-[44px] items-center gap-4 border-t border-slate-200 py-3.5 text-left transition-colors hover:bg-slate-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-800 dark:hover:bg-slate-900/60';
@@ -100,6 +103,13 @@ export function Scrivania() {
             </button>
           ))}
         </div>
+
+        {/* The Corpus tools beside the search (LC8: Work's bar no longer lists them). */}
+        <nav aria-label="Altri strumenti del Corpus" className={`-mx-2 mt-3 flex flex-wrap gap-x-2 ${ENTER}`} style={stagger(4)}>
+          {[['/documents', 'Analizza un documento'], ['/rassegne', 'Rassegne']].map(([to, label]) => (
+            <Link key={to} to={to} className={TOOL_LINK}>{label}</Link>
+          ))}
+        </nav>
 
         {recent.length > 0 && (
           <section className={`mt-16 ${ENTER}`} style={stagger(4)} aria-labelledby="scrivania-riprendi">

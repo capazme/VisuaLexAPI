@@ -50,3 +50,15 @@ describe('the Scrivania on a phone', () => {
     }
   });
 });
+
+// LC8: Work's bar no longer lists the Corpus tools; the search page reaches them, at every width.
+describe('the Scrivania\'s ways to the Corpus tools', () => {
+  it('links «Analizza un documento» and «Rassegne», in the flow of the page (seen at 390 px too)', () => {
+    renderPage();
+    const tools = screen.getByRole('navigation', { name: 'Altri strumenti del Corpus' });
+    const links = within(tools).getAllByRole('link');
+    expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['Analizza un documento', '/documents'], ['Rassegne', '/rassegne']]);
+    for (const link of links) expect(link).toHaveClass('min-h-[44px]');
+    expect(tools.className).not.toMatch(/(^|\s)hidden(\s|$)|max-md:hidden/);
+  });
+});
