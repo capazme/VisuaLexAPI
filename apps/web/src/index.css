@@ -529,6 +529,13 @@
   @apply font-serif text-slate-800 dark:text-slate-200;
 }
 
+/* EB Garamond's small x-height: 19 px up to `md`, 20 px from it (LC4). Study Mode's inline size wins over both. */
+@media (min-width: 48rem) {
+  .vlx-art {
+    font-size: 1.25rem;
+  }
+}
+
 /* Study Mode sets size, leading and theme colours itself, and keeps its own narrow column (U1, L-47). */
 .vlx-art--study {
   max-width: none;
@@ -829,7 +836,7 @@
    shrink-to-fit ancestor: keep it inside block-level parents. */
 .vlx-frame {
   container: vlx-frame / inline-size;
-  /* The query measures in this font, close to the column's (1.1875rem): its 70ch is about the reading measure. */
+  /* The query measures in this font, close to the column's (1.1875rem, 1.25rem from `md`): its 70ch is about the reading measure. */
   font-size: 1.125rem;
   @apply font-serif;
 }
@@ -1152,7 +1159,6 @@
     --vlx-hang: 1.6em;
     --vlx-hang-item: 1.9em;
     --vlx-indent: 0.4em;
-    font-size: 1.0625rem;
     line-height: 1.65;
   }
 
