@@ -1387,24 +1387,16 @@
   --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 8px 24px -10px rgb(0 0 0 / 0.55);
 }
 
-/* The book mark (ui/BookMark, and the splash in index.html): the cover traces, then the spine; while
-   something loads it breathes. The trace only with motion allowed: the global reduced-motion rule cuts durations, not
-   delays, and the spine's 420 ms of delay with a `both` fill kept it hidden that long; under reduced motion the
-   book is drawn at once. */
-.vlx-book path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 100;
-}
+/* LexCraft's column (ui/BookMark, and the splash in index.html; the classes keep the book's name): capital and base
+   in `currentColor`, the shaft in Pietra's stone. It rises from its base and fades in, then breathes while something
+   loads. The rise only with motion allowed; under reduced motion the column is whole at once. */
+.vlx-book .vlx-column-shaft { fill: #8a8478; }
+.vlx-book .vlx-column { transform-box: fill-box; transform-origin: 50% 100%; }
 @media (prefers-reduced-motion: no-preference) {
-  .vlx-book-draw path { animation: vlx-book-trace 600ms var(--ease-in-out) both; }
-  .vlx-book-draw path:last-child { animation-duration: 260ms; animation-delay: 420ms; }
+  .vlx-book-draw .vlx-column { animation: vlx-column-rise 500ms var(--ease-out) both; }
 }
 .vlx-book-breathe { animation: vlx-book-breathe 1.4s ease-in-out 700ms infinite alternate; }
-@keyframes vlx-book-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes vlx-column-rise { from { opacity: 0; transform: scaleY(0.6); } }
 @keyframes vlx-book-breathe { to { opacity: 0.4; } }
 
 /* The goal's mark (G9, `GoalMark`): each stroke is an outline uncovered by a mask whose pen path is written — the ring,
@@ -1422,7 +1414,7 @@
 @keyframes vlx-goal-mark-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes vlx-goal-mark-fade { from { opacity: 0; } }
 
-/* The sign-in's wordmark written in ink (A3, `AuthPage`): one face, one ink, one gesture. The book traces itself
+/* The sign-in's wordmark written in ink (A3, `AuthPage`): one face, one ink, one gesture. The column rises
    (0–450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose soft edge is the pen's tip
    (250–950 ms), and the ink, the word itself, follows it 100 ms behind under its own (350–1050 ms), so each letter is
    faint and soft before it is sharp; the copy fades as the ink ends, then the line under it rises 4 px into view
@@ -1434,8 +1426,7 @@
    shows whole halfway through, never hidden for good. */
 @property --vlx-ink-edge { syntax: '<percentage>'; inherits: false; initial-value: 112%; }
 @media (prefers-reduced-motion: no-preference) {
-  .vlx-ink-book path { animation: vlx-book-trace 450ms var(--ease-out) backwards; }
-  .vlx-ink-book path:last-child { animation-duration: 200ms; animation-delay: 250ms; }
+  .vlx-ink-book .vlx-column { animation: vlx-column-rise 450ms var(--ease-out) backwards; }
   .vlx-ink-word, .vlx-ink-bleed {
     mask-image: linear-gradient(to right, #000 calc(var(--vlx-ink-edge) - 12%), transparent var(--vlx-ink-edge));
   }

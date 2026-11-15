@@ -58,4 +58,13 @@ describe('the name LexCraft on screen', () => {
     const manifest = JSON.parse(readFileSync(join(src, '..', 'public', 'manifest.json'), 'utf8'));
     expect([manifest.name, manifest.short_name]).toEqual(['LexCraft', 'LexCraft']);
   });
+
+  it('the splash and the tab\'s icon draw the column, not VisuaLex\'s book (LC7)', () => {
+    const html = readFileSync(join(src, '..', 'index.html'), 'utf8');
+    const icon = readFileSync(join(src, '..', 'public', 'favicon.svg'), 'utf8');
+    for (const mark of [html, icon]) {
+      expect(mark).not.toContain('M12 7v14'); // the book's spine
+      expect(mark).toContain('vlx-column-shaft');
+    }
+  });
 });
