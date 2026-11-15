@@ -280,18 +280,18 @@ export function AttoEditor() {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <label className="flex items-center gap-1">
             <span className={META_LABEL}>Tipo</span>
-            <input value={draft.tipo ?? ''} placeholder="—" onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} size={Math.max((draft.tipo ?? '').length, 3)} className={cn(META_FIELD, 'placeholder:text-slate-500')} />
+            <input value={draft.tipo ?? ''} placeholder="Nessuno" onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} size={Math.max((draft.tipo ?? '').length, 9)} className={cn(META_FIELD, 'placeholder:text-slate-500')} />
             <datalist id="atto-tipi">{ATTO_TIPI.map((t) => <option key={t} value={t} />)}</datalist>
           </label>
-          <span aria-hidden className="text-slate-400 dark:text-slate-600">·</span>
+          <span aria-hidden className="-mx-1 text-slate-400 dark:text-slate-600">·</span>
           <label className="flex items-center gap-1">
             <span className={META_LABEL}>Dossier</span>
-            <select value={draft.dossierId ?? ''} onChange={(e) => change({ dossierId: e.target.value || null })} className={cn(META_FIELD, 'max-w-60 bg-card')}>
+            <select value={draft.dossierId ?? ''} onChange={(e) => change({ dossierId: e.target.value || null })} className={cn(META_FIELD, 'max-w-60 bg-card [field-sizing:content]')}>
               <option value="">Nessuno</option>
               {dossiers.filter((d) => d.kind !== 'studio' || d.id === draft.dossierId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </label>
-          <span aria-hidden className="text-slate-400 dark:text-slate-600">·</span>
+          <span aria-hidden className="-mx-1 text-slate-400 dark:text-slate-600">·</span>
           <div role="radiogroup" aria-label="Stato" className="flex h-11 items-center gap-0.5 rounded-md bg-slate-100 p-0.5 md:h-8 dark:bg-slate-800">
             {(['bozza', 'finale'] as AttoStato[]).map((stato) => (
               <button
@@ -347,7 +347,8 @@ export function AttoEditor() {
           </>) : (
             <article aria-label="Testo dell’atto" className={cn(SHEET_TEXT, 'min-h-[40vh]')}>
               {draft.testo.trim()
-                ? draft.testo.split(/\n+/).filter((line) => line.trim()).map((line, index) => <p key={index} className="mb-4 whitespace-pre-wrap last:mb-0">{line}</p>)
+                // As written, line for line: the same lines as in «Modifica il testo», so the switch moves nothing.
+                ? <div className="whitespace-pre-wrap">{draft.testo}</div>
                 : <p className="text-slate-600 dark:text-slate-400">L’atto non ha ancora un testo. Scrivilo con «Modifica il testo», o caricane una versione dal file con il menu ⋯.</p>}
             </article>
           )}

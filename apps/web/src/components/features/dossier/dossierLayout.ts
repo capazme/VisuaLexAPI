@@ -221,7 +221,8 @@ export function countsParts(items: DossierItem[]): string[] {
   const layout = layoutDossier(items);
   const notes = items.filter((item) => item.type === 'note').length;
   return [
-    plural(layout.acts.length, 'atto', 'atti'),
+    // «Fonte», not «atto»: an «atto» is now the user's own document (Atti, D-315).
+    plural(layout.acts.length, 'fonte', 'fonti'),
     plural(layout.acts.reduce((n, act) => n + act.articles.length, 0), 'articolo', 'articoli'),
     ...(notes > 0 ? [plural(notes, 'nota', 'note')] : []),
     ...(layout.decisions.length > 0 ? [plural(layout.decisions.length, 'sentenza', 'sentenze')] : []),

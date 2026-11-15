@@ -88,8 +88,8 @@ describe('decisions in the PDF', () => {
 describe('pdfCountsLine', () => {
   it('counts only the decisions chosen for the PDF, as the PDF prints only those', () => {
     const second: DossierItem = { ...decision, id: 's2' };
-    expect(pdfCountsLine([a1, note, decision, second], new Set())).toBe('1 atto · 1 articolo · 1 nota');
-    expect(pdfCountsLine([a1, note, decision, second], new Set(['s2']))).toBe('1 atto · 1 articolo · 1 nota · 1 sentenza');
+    expect(pdfCountsLine([a1, note, decision, second], new Set())).toBe('1 fonte · 1 articolo · 1 nota');
+    expect(pdfCountsLine([a1, note, decision, second], new Set(['s2']))).toBe('1 fonte · 1 articolo · 1 nota · 1 sentenza');
   });
 });
 

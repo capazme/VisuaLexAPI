@@ -231,8 +231,8 @@ describe('countsLine', () => {
     const norm = (id: string, article: string) => ({ id, type: 'norma' as const, addedAt: '', data: { tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07', numero_articolo: article } });
     const note = (id: string) => ({ id, type: 'note' as const, addedAt: '', data: 'x' });
     const decision: DossierItem = { id: 's', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' } };
-    expect(countsLine([norm('a', '1'), norm('b', '2')])).toBe('1 atto · 2 articoli');
-    expect(countsParts([norm('a', '1'), note('n'), note('m'), decision])).toEqual(['1 atto', '1 articolo', '2 note', '1 sentenza']);
-    expect(countsLine([])).toBe('0 atti · 0 articoli');
+    expect(countsLine([norm('a', '1'), norm('b', '2')])).toBe('1 fonte · 2 articoli');
+    expect(countsParts([norm('a', '1'), note('n'), note('m'), decision])).toEqual(['1 fonte', '1 articolo', '2 note', '1 sentenza']);
+    expect(countsLine([])).toBe('0 fonti · 0 articoli');
   });
 });

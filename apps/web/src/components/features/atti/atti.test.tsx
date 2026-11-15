@@ -210,7 +210,8 @@ describe('AttoEditor', () => {
     atti.get.mockResolvedValue({ ...ATTO, testo: 'Primo motivo.\n\nSecondo motivo.' });
     renderAt('/work/atti/a1');
     const article = await screen.findByRole('article', { name: 'Testo dell’atto' });
-    expect(article.querySelectorAll('p')).toHaveLength(2);
+    // As written, line for line (the same lines as in «Modifica il testo»).
+    expect(article).toHaveTextContent('Primo motivo. Secondo motivo.');
     expect(screen.queryByRole('textbox', { name: 'Testo dell’atto' })).toBeNull();
     expect(await screen.findByText('Verificare l’ingiustizia del danno.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Atti del dossier' })).toHaveAttribute('href', '/dossier?dossier=d1&vista=atti');
