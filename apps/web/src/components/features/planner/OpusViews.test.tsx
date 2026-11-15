@@ -83,6 +83,16 @@ describe('«Oggi»', () => {
     expect(service.list).toHaveBeenCalledWith('today', undefined);
   });
 
+  it('says under the title how many tasks, not their subtasks; «Aggiungi un compito» opens the quick add (LC33, the phone)', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-20' }), task('b', { plannedDate: '2026-10-20' }), task('c', { plannedDate: '2026-10-20', parentId: 'a' })]));
+    renderAt(<TodayView />);
+    expect(await screen.findByText('martedì 20 ottobre · 2 compiti')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi un compito' }));
+    await waitFor(() => expect(screen.getByLabelText('Nuovo compito')).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Aggiungi un compito' })).toBeInTheDocument();
+  });
+
   it('says when there is nothing for today', async () => {
     service.list.mockResolvedValue(answer([]));
     renderAt(<TodayView />);

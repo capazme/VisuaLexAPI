@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { scrollParentOf } from '../practice/practiceView';
-import { Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarCheck, Inbox, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
@@ -11,9 +11,9 @@ import { FOCUS_RING } from '../../../constants/interactions';
 /** The planner's three views, tabs of the page since Work's bar lists only its five entries (D-315, LC8): the short
  *  word on a phone, as the Forum's tabs, so the three share a 320 px row. */
 const VIEWS = [
-  { to: '/work/oggi', label: 'Oggi', short: 'Oggi' },
-  { to: '/work/prossimi', label: 'Prossimi giorni', short: 'Prossimi' },
-  { to: '/work/ingresso', label: "Lista d'ingresso", short: 'Ingresso' },
+  { to: '/work/oggi', label: 'Oggi', short: 'Oggi', icon: CalendarCheck },
+  { to: '/work/prossimi', label: 'Prossimi giorni', short: 'Prossimi', icon: CalendarDays },
+  { to: '/work/ingresso', label: "Lista d'ingresso", short: 'Ingresso', icon: Inbox },
 ];
 
 /**
@@ -46,10 +46,12 @@ export function OpusPage() {
       kicker="opus"
       section="opus"
       className="h-full"
+      // On a phone the trash is an icon beside the title (LC33, after Todoist: the title, then the list).
+      actionBeside
       action={inView && (
-        <Link to="/work/cestino" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5')}>
+        <Link to="/work/cestino" aria-label="Cestino dei compiti" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 max-md:w-11 max-md:justify-center')}>
           <Trash2 size={15} aria-hidden />
-          Cestino dei compiti
+          <span aria-hidden className="max-md:hidden">Cestino dei compiti</span>
         </Link>
       )}
     >
@@ -59,8 +61,13 @@ export function OpusPage() {
             them, never with a jump to the page's top; it comes in with a short fade (none under reduced motion). */}
         <div ref={viewTop} aria-hidden />
         {(inView || inTrash) && (
-          <div className="sticky top-0 z-10 -mx-2 bg-slate-50 px-2 py-2 dark:bg-slate-950">
-          <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-fit">
+          // On a phone the views are a bar at the screen's foot, where the thumb is (LC33, after Todoist's «In arrivo ·
+          // Oggi · Prossime»); from md the tabs at the top, sticky.
+          <div className={cn(
+            'sticky top-0 z-10 -mx-2 bg-slate-50 px-2 py-2 dark:bg-slate-950',
+            'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:z-30 max-md:mx-0 max-md:border-t max-md:border-slate-200 max-md:bg-card/95 max-md:px-3 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:pt-1.5 max-md:backdrop-blur max-md:dark:border-slate-800',
+          )}>
+          <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 max-md:bg-transparent max-md:p-0 dark:bg-slate-800 max-md:dark:bg-transparent sm:w-fit">
             {VIEWS.map((view) => (
               <NavLink
                 key={view.to}
@@ -69,12 +76,14 @@ export function OpusPage() {
                 aria-label={view.label}
                 className={({ isActive }) => cn(
                   'flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-md px-2 text-sm font-medium transition-colors sm:flex-none sm:px-4',
+                  'max-md:flex-col max-md:gap-0.5 max-md:py-1.5 max-md:text-xs max-md:shadow-none',
                   FOCUS_RING,
                   isActive
-                    ? 'bg-card text-slate-900 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                    ? 'bg-card text-slate-900 shadow-sm max-md:bg-ink-200 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 max-md:dark:bg-ink-700 max-md:dark:text-slate-50'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
                 )}
               >
+                <view.icon aria-hidden size={20} strokeWidth={1.75} className="md:hidden" />
                 <span aria-hidden className="sm:hidden">{view.short}</span>
                 <span aria-hidden className="hidden sm:inline">{view.label}</span>
               </NavLink>
@@ -83,7 +92,7 @@ export function OpusPage() {
           </div>
         )}
         {/* At least a screen tall: a view that mounts empty while it loads never shortens the page under the reader. */}
-        <div key={pathname} className="min-h-[calc(100dvh-8rem)] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
+        <div key={pathname} className={cn('min-h-[calc(100dvh-8rem)] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150', (inView || inTrash) && 'max-md:pb-24')}>
           <Outlet />
         </div>
       </div>

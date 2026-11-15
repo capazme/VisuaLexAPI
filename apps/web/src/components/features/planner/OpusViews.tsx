@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, FolderOpen, ListFilter, RotateCcw } from 'lucide-react';
+import { ChevronRight, FolderOpen, ListFilter, Plus, RotateCcw } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -58,19 +58,50 @@ function ViewFrame({ view, heading, line, defaults, options, before, children, e
   const state = useTaskView(view);
   const today = state.answer?.today ?? todayInRome();
   const tasks = state.answer?.tasks ?? [];
+  // How many, under the title (LC33, after Todoist's «Oggi · 7 attività»): the tasks, not their subtasks.
+  const count = state.answer ? tasks.filter((task) => !task.parentId).length : null;
+  // On a phone the quick add is not on the page: «+» at the thumb opens it from the screen's foot (LC33).
+  const [adding, setAdding] = useState(false);
+  const addRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!adding) return undefined;
+    addRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setAdding(false); };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [adding]);
   return (
     <section aria-labelledby={`opus-${view}`} className="min-w-0 space-y-5 pb-8">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 max-md:flex-nowrap max-md:items-center">
         <div className="min-w-0">
           {/* Where the focus goes when the last row leaves (`focusAwayFrom`). Said to a screen reader only: the page's
               title above already names the view (`OpusPage`, L-37). */}
           <h2 id={`opus-${view}`} tabIndex={-1} data-focus-fallback className="sr-only">{heading}</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">{typeof line === 'function' ? line(today) : line}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {typeof line === 'function' ? line(today) : line}
+            {count !== null && count > 0 && ` · ${count === 1 ? '1 compito' : `${count} compiti`}`}
+          </p>
         </div>
         {options}
       </div>
       {/* Keyed on the day: a page left open overnight proposes the new day, not the one it was opened on. */}
-      {defaults && <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />}
+      {defaults && (<>
+        {/* From md in the page; on a phone a sheet from the foot, over a scrim, opened by «+». */}
+        {adding && <button type="button" aria-label="Chiudi" tabIndex={-1} onClick={() => setAdding(false)} className="fixed inset-0 z-40 bg-slate-950/30 md:hidden" />}
+        <div ref={addRef} className={cn('max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50 max-md:rounded-t-2xl max-md:bg-card max-md:p-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:shadow-lg max-md:[&>form]:border-0 max-md:[&>form]:bg-transparent', !adding && 'max-md:hidden')}>
+          <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />
+        </div>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            aria-label="Aggiungi un compito"
+            className={cn('fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-slate-900 text-white shadow-lg active:scale-95 md:hidden dark:bg-slate-100 dark:text-slate-900', FOCUS_RING)}
+          >
+            <Plus size={26} aria-hidden />
+          </button>
+        )}
+      </>)}
       {typeof before === 'function' ? before(today, tasks) : before}
       <div aria-busy={state.status === 'loading'} className={cn('space-y-6', state.status === 'loading' && state.answer && 'opacity-60 transition-opacity')}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
@@ -102,7 +133,7 @@ function GroupingMenu({ value, onChange }: { value: Grouping; onChange: (value: 
       }))}
     >
       <ListFilter size={15} aria-hidden />
-      <span>Raggruppa: {label}</span>
+      <span className="max-md:sr-only">Raggruppa: {label}</span>
     </MenuButton>
   );
 }
