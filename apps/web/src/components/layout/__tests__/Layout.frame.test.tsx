@@ -31,11 +31,20 @@ const fullScreen = (on: boolean) => appStore.setState((s) => ({ settings: { ...s
 afterEach(() => fullScreen(false));
 
 describe('Layout — the frame (U1)', () => {
-  it('draws every page in the frame: the window less its margins, at most 1600 px, wider for a `full` page', () => {
+  it('draws every page in the frame: the window less its margins, at most 1056 px (LC21), wider for a `full` page', () => {
     at('/dossier');
     expect(frame()).toHaveClass(...PAGE_FRAME.split(' '), 'max-w-frame', FULL_PAGE_FRAME);
     // The old frame and its narrowing in full screen are gone.
     expect(frame().className).not.toMatch(/\bmax-w-(?:7xl|4xl)\b|\bpy-12\b/);
+    // LC21: more air above and below the page from lg.
+    expect(frame()).toHaveClass('py-4', 'md:py-8', 'lg:pt-10', 'lg:pb-24');
+  });
+
+  it('keeps the search page\'s padding as it was: the extra air from lg is for the other pages', () => {
+    at('/');
+    expect(frame()).toHaveClass('py-4', 'md:py-8');
+    expect(frame()).not.toHaveClass('lg:pt-10');
+    expect(frame()).not.toHaveClass('lg:pb-24');
   });
 
   it('widens in full screen to 2400 px, never narrows', () => {
@@ -51,10 +60,12 @@ describe('Layout — where the full-screen button floats over the page (U1)', ()
   const FROM_LG = 'lg:[--focus-button-room:11rem]';
   const FROM_MD = 'md:[--focus-button-room:11rem]';
 
-  it('gives a top row its room from lg, where the button floats over the page\'s top right', () => {
+  // LC21: from lg the button sits in the top bar, not over the page; below lg the phone's bar holds it.
+  it('gives a top row no room outside full screen: from lg the button sits in the top bar', () => {
     at('/dossier');
-    expect(frame()).toHaveClass(FROM_LG);
+    expect(frame()).not.toHaveClass(FROM_LG);
     expect(frame()).not.toHaveClass(FROM_MD);
+    expect(frame().className).not.toMatch(/--focus-button-room/);
   });
 
   it('from md in full screen, which draws no bar for the button to sit in', () => {

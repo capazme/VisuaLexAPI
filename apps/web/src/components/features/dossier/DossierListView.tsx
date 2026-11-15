@@ -32,7 +32,6 @@ import { kindLabel } from './dossierKinds';
 import { actsSummary, countsParts, layoutDossier } from './dossierLayout';
 import { ICON_BUTTON } from '../planner/plannerStyles';
 import { HEADER_BUTTON, HEADER_PRIMARY } from './dossierStyles';
-import { DossierMark } from './DossierMark';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
@@ -387,11 +386,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               <EmptyState variant="dossier" title="Nessun risultato" description="Prova a modificare i filtri di ricerca." />
             </div>
           ) : (
-            // No dossier yet: an empty state composed for the page (S7c) — line art in the
-            // section's ink (`--vlx-section-*`, one Pietra value since LC16), what a dossier is for, and the two ways to begin.
+            // No dossier yet (S7c): what a dossier is for and the two ways to begin; no drawing since LC21.
             <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
-              <DossierMark hue={`var(--vlx-section-${sectionOfDossierKind(sectionKind)})`} />
-              <h2 id="dossier-list-empty" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+              <h2 id="dossier-list-empty" className="font-serif text-[22px] font-normal leading-tight text-slate-900 dark:text-slate-50">
                 {sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
               </h2>
               <p className="mt-3 text-slate-700 dark:text-slate-300">
@@ -450,8 +447,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleQuickOpen(dossier); }}
                       disabled={!canOpen}
-                      title={canOpen ? 'Apri su Dashboard' : 'Niente da aprire'}
-                      aria-label={`Apri ${dossier.title} su Dashboard`}
+                      title={canOpen ? 'Apri nel Corpus' : 'Niente da aprire'}
+                      aria-label={`Apri ${dossier.title} nel Corpus`}
                       className={cn(ICON_BUTTON, 'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent')}
                     >
                       <ExternalLink size={16} aria-hidden />
@@ -460,7 +457,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       label={`Azioni su ${dossier.title}`}
                       triggerClassName={ICON_BUTTON}
                       items={[
-                        { label: 'Apri su Dashboard', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !canOpen },
+                        { label: 'Apri nel Corpus', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !canOpen },
                         { label: 'Rinomina / Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
                         { label: 'Elimina', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => deleteDossierWithUndo(dossier, onTrashChanged) },
                       ]}

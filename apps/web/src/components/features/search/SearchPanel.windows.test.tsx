@@ -207,7 +207,8 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     expect(s().practiceRows[`${practiceId}/${actId}/${practiceArticleKey(article(L24, '7'))}`]).toBe(true);
   });
 
-  it('the way back floats above the bar of practices (its measured height + 24 + 12), not at the top over the act heading', async () => {
+  // LC21: the bar of practices sits over the columns, in the flow, and reports no height: the way back keeps 24 + 12 px.
+  it('the way back floats at the column\'s foot (the bar of practices reports 0, + 24 + 12), not at the top over the act heading', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
       return this.id === 'tour-practice-bar' ? 138 : 0;
     });
@@ -216,7 +217,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     panel();
     const wrapper = (await screen.findByRole('button', { name: 'Torna a art. 5 l. 24/2017' })).parentElement as HTMLElement;
     expect(wrapper).not.toHaveClass('top-4');
-    await waitFor(() => expect(wrapper.style.bottom).toBe('174px'));
+    await waitFor(() => expect(wrapper.style.bottom).toBe('36px'));
   });
 
   it('on a phone it floats above the feedback button, which sits under it', async () => {

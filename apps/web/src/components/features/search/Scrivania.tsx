@@ -18,9 +18,7 @@ import { cn } from '../../../lib/utils';
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 
 
-// A 40 ms cascade, once per mount, never blocking input (spec §6.3.6).
-const stagger = (i: number) => ({ animationDelay: `${i * 40}ms` });
-const ENTER = 'animate-in fade-in slide-in-from-bottom-2 duration-200';
+// LC21: no cascade (it was 40 ms a block): the desk is opened tens of times a day, its blocks are there at once.
 
 /** The examples' look, underlined in the action's ink (from md, and on a phone too: they are links, not pills). */
 const TOOL_LINK = cn(
@@ -60,12 +58,12 @@ export function Scrivania() {
       )}
     >
       <div className="mx-auto w-full max-w-[760px]">
-        <p className={`text-sm font-medium first-letter:uppercase text-slate-500 dark:text-slate-400 ${ENTER}`} style={stagger(0)}>{day}</p>
-        <h1 className={`mt-2 font-serif text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-50 md:text-6xl ${ENTER}`} style={stagger(1)}>
+        <p className="text-sm font-medium first-letter:uppercase text-slate-500 dark:text-slate-400">{day}</p>
+        <h1 className="mt-2 font-serif text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-50 md:text-6xl">
           {greeting(hour)}
         </h1>
 
-        <div className={`mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 ${ENTER}`} style={stagger(2)}>
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
           <button
             onClick={() => focusSearchFieldOrPalette()}
             className="inline-flex h-11 items-center gap-2 rounded-md bg-primary-600 px-4 text-sm font-semibold text-white transition-[background-color,transform] hover:bg-primary-700 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-400 dark:text-slate-950 dark:hover:bg-primary-300"
@@ -84,9 +82,7 @@ export function Scrivania() {
           className={cn(
             'mt-5 flex items-center gap-2 overflow-x-auto max-md:-mx-4 max-md:px-4 max-md:py-1 md:flex-wrap md:items-baseline md:gap-x-5 md:gap-y-2 md:overflow-visible',
             HIDDEN_SCROLLBAR,
-            ENTER,
           )}
-          style={stagger(3)}
           role="group"
           aria-label="Esempi di ricerca"
         >
@@ -98,8 +94,9 @@ export function Scrivania() {
               onClick={() => focusSearchFieldOrPalette(example)}
               className={cn(
                 TOUCH_TARGET_RESPONSIVE,
-                'shrink-0 whitespace-nowrap font-serif text-lg text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-4 transition-colors hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-700',
-                'max-md:rounded-full max-md:border max-md:border-slate-300 max-md:bg-white max-md:px-4 max-md:no-underline dark:max-md:border-slate-700 dark:max-md:bg-slate-900',
+                // The prototype's: a word in the interface's type, bold and quiet, with a tint under the pointer (LC21).
+                'shrink-0 whitespace-nowrap rounded-md px-2 text-[15px] font-semibold text-slate-700 transition-colors hover:bg-slate-200/70 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
+                'max-md:rounded-full max-md:border max-md:border-slate-300 max-md:bg-white max-md:px-4 dark:max-md:border-slate-700 dark:max-md:bg-slate-900',
               )}
             >
               {example}
@@ -108,14 +105,14 @@ export function Scrivania() {
         </div>
 
         {/* The Corpus tools beside the search (LC8: Work's bar no longer lists them). */}
-        <nav aria-label="Altri strumenti del Corpus" className={`mt-3 flex flex-wrap gap-x-5 gap-y-2 ${ENTER}`} style={stagger(4)}>
+        <nav aria-label="Altri strumenti del Corpus" className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
           {[['/documents', 'Analizza un documento'], ['/rassegne', 'Rassegne']].map(([to, label]) => (
             <Link key={to} to={to} className={TOOL_LINK}>{label}</Link>
           ))}
         </nav>
 
         {recent.length > 0 && (
-          <section className={`mt-16 ${ENTER}`} style={stagger(4)} aria-labelledby="scrivania-riprendi">
+          <section className="mt-16" aria-labelledby="scrivania-riprendi">
             <h2 id="scrivania-riprendi" className="mb-3 font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">Riprendi</h2>
             <ul className="border-b border-slate-200 dark:border-slate-800">
               {recent.map((d) => (
@@ -136,7 +133,7 @@ export function Scrivania() {
           </section>
         )}
 
-        <section id="tour-quick-norms" className={`mt-14 ${ENTER}`} style={stagger(5)} aria-labelledby="scrivania-frequenti">
+        <section id="tour-quick-norms" className="mt-14" aria-labelledby="scrivania-frequenti">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="scrivania-frequenti" className="font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">Ricerche frequenti</h2>
             <button

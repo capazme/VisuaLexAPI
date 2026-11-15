@@ -360,7 +360,8 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     expect(s().activePracticeId).toBe(b);
   });
 
-  it('the column\'s bottom padding follows the bar\'s measured height (§3.4)', async () => {
+  // LC21: the bar is a row above the workspace, in the flow; it covers nothing, so the room it asks is 0.
+  it('draws the bar of practices above the workspace, and the column keeps no room for it at its foot (§3.4)', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
       return this.id === 'tour-practice-bar' ? 138 : 0;
     });
@@ -368,7 +369,10 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
     panel();
     const column = await screen.findByTestId('practice-column');
-    await waitFor(() => expect(document.getElementById(WORKSPACE_AREA_ID)?.style.getPropertyValue('--practice-bar-height')).toBe('138px'));
+    await waitFor(() => expect(document.getElementById(WORKSPACE_AREA_ID)?.style.getPropertyValue('--practice-bar-height')).toBe('0px'));
+    const bar = screen.getByRole('navigation', { name: 'Pratiche' });
+    expect(bar.compareDocumentPosition(document.getElementById(WORKSPACE_AREA_ID)!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.getElementById(WORKSPACE_AREA_ID)?.contains(bar)).toBe(false);
     expect(document.getElementById(WORKSPACE_AREA_ID)?.contains(column)).toBe(true);
     expect(column.className).toContain('var(--practice-bar-height');
   });

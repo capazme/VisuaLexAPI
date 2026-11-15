@@ -31,7 +31,7 @@ const CHOICE = cn(
   'flex min-h-[44px] w-full min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-sm transition-colors',
   FOCUS_RING,
 );
-const PRESSED = cn('border-2 bg-primary-50 font-semibold text-slate-900 dark:bg-primary-900/30 dark:text-white', INK_BORDER);
+const PRESSED = cn('border bg-ink-300/60 font-semibold text-slate-900 dark:bg-primary-900/30 dark:text-white', INK_BORDER);
 const IDLE = 'border-slate-200 text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800';
 
 /**
@@ -112,7 +112,7 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                 // From `md` a row: the choice takes what «Ripassa» leaves, all of it for a subject with no card, so every row
                 // ends where «Tutte le materie» does (a grid's empty column kept its 8 px gap).
                 // On a phone the strip makes every card as tall as the tallest: its rows keep their own height (`content-start`).
-                className={cn(ITEM, 'grid gap-1.5 max-md:content-start motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 md:flex md:items-center md:gap-2')}
+                className={cn(ITEM, 'grid gap-1.5 max-md:content-start md:flex md:items-center md:gap-2')}
                 style={{ animationDelay: `${(index + 1) * STAGGER_MS}ms` }}
               >
                 <button type="button" aria-pressed={on} onClick={() => onSelect(stop.materia)} className={cn(CHOICE, on ? PRESSED : IDLE, 'flex-wrap md:min-w-0 md:flex-1 md:flex-nowrap')}>

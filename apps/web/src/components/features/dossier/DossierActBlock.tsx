@@ -130,8 +130,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
           <button
             type="button"
             onClick={props.onOpenAct}
-            title="Apri tutto su Dashboard"
-            aria-label={`Apri tutto ${block.heading} su Dashboard`}
+            title="Apri tutto nel Corpus"
+            aria-label={`Apri tutto ${block.heading} nel Corpus`}
             className={ACTION_BUTTON}
           >
             <ExternalLink size={15} aria-hidden />

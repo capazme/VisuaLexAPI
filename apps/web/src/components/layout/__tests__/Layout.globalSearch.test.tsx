@@ -206,12 +206,13 @@ describe('Layout — the search page\'s field', () => {
     expect(screen.getByTestId('search-bar').nextElementSibling).toContainElement(screen.getByText('Pagina di ricerca'));
   });
 
-  it('is the phone\'s bar below lg, the menu button beside the field, and ends before the Focus toggle from md', () => {
+  // From lg the bar holds the news, «Commenti» and «Tutto schermo» at its right end (LC21): the field ends before them.
+  it('is the phone\'s bar below lg, the menu button beside the field, and ends before the controls at its right', () => {
     at('/');
     const bar = screen.getByTestId('search-bar');
-    expect(bar).toHaveClass('h-[var(--search-bar-height)]', 'pl-1', 'lg:pl-8', 'md:pr-[10.5rem]', 'lg:pr-[11rem]');
+    expect(bar).toHaveClass('h-[var(--search-bar-height)]', 'pl-1', 'lg:pl-8', 'md:pr-[10.5rem]', 'lg:pr-[17rem]');
     expect(bar.firstElementChild).toHaveAccessibleName('Apri il menu');
-    expect(document.querySelector('main')).toHaveClass('[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]', 'lg:[--search-bar-height:4.5rem]');
+    expect(document.querySelector('main')).toHaveClass('[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]');
   });
 
   it.each(['/dossier', '/history'])('is not drawn on %s', (path) => {

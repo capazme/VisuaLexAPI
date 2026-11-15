@@ -410,7 +410,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onClick={onOpenOnDashboard}
           className="inline-flex min-h-[44px] md:min-h-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
-          <ExternalLink size={13} /> Apri su Dashboard
+          <ExternalLink size={13} /> Apri nel Corpus
         </button>
         {/* The highlighter (H1, A4): the dossier's reader has no bar of its own, so it sits with its actions; not on a text
             read only, which takes none. */}

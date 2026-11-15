@@ -159,7 +159,7 @@ describe('DossierDetailView — the page by act', () => {
 
   it('has three actions and a menu in its header, and no selection bar until asked', () => {
     renderView();
-    expect(screen.getByRole('button', { name: 'Apri tutto su Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apri tutto nel Corpus' })).toBeInTheDocument();
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-haspopup', 'menu');
     }
@@ -602,7 +602,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
 
   it('draws the header\'s actions in one row under the title, every one 44 px', () => {
     renderView();
-    const open = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const open = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
     const row = open.parentElement!;
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) expect(row).toContainElement(screen.getByRole('button', { name }));
     // Under the title, not beside it: a long name would be squeezed.
@@ -617,7 +617,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     const title = 'Ransomware EVST – pagamento del riscatto e fondi pubblici, profili di responsabilità';
     renderView({ ...dossier, title, description: 'Richiesta di riscatto ricevuta il 3 ottobre' });
     const heading = screen.getByRole('heading', { level: 1, name: title });
-    const open = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const open = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
     const row = open.parentElement!;
     // Nothing beside the title: the header holds only the section's phrase, the title and the description.
     expect(heading.closest('header')!.querySelector('button')).toBeNull();
@@ -625,7 +625,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(screen.getByText(/creato il/).compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The row wraps as a row when the window is narrow, never a label inside its button.
     expect(row).toHaveClass('flex-wrap');
-    const buttons = ['Apri tutto su Dashboard', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
+    const buttons = ['Apri tutto nel Corpus', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
     for (const button of buttons) expect(button).toHaveClass('whitespace-nowrap');
     expect(row.lastElementChild).toContainElement(screen.getByRole('button', { name: 'Altre azioni' }));
   });
