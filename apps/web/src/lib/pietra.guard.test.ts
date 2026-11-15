@@ -151,6 +151,32 @@ describe('Pietra\'s colours', () => {
       .filter(Boolean));
     expect(other).toEqual([]);
   });
+
+  // LC19: a switch that is on, and CopyModal's ticked box, take the light ink in the dark (`dark:bg-toga-400`), as the
+  // actions; the mid grey stood apart. The knob turns dark on it (ink-950 on #f1eee8, 14.41:1): white was 1.16:1.
+  it('a switch that is on is the light ink in the dark, its knob dark on it', () => {
+    const switches = [
+      join('features', 'merlt', 'ops', 'OpsConfigPanel.tsx'),
+      join('components', 'ui', 'SettingsModal.tsx'),
+      join('components', 'features', 'studia', 'StudyPreferences.tsx'),
+      join('components', 'features', 'compare', 'CompareBody.tsx'),
+      join('components', 'features', 'documents', 'DocumentReviewPage.tsx'),
+    ];
+    const ON_TRACK = /\?\s*['"]bg-primary-600\b[^'"]*['"]/;
+    const grey = sources(src).map((file) => relative(src, file)).flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => {
+        const on = line.match(ON_TRACK);
+        return on && !on[0].includes('dark:bg-toga-400') ? `${file}:${i + 1}` : null;
+      })
+      .filter(Boolean));
+    expect(grey).toEqual([]);
+    // Each knob: white on the track, dark on the light track when on.
+    const knobs = switches.filter((file) => !/rounded-full bg-white[^\n]*\n?[^\n]*dark:bg-ink-950/.test(readFileSync(join(src, file), 'utf8')));
+    expect(knobs).toEqual([]);
+    const copy = readFileSync(join(src, 'components', 'ui', 'CopyModal.tsx'), 'utf8');
+    expect(copy).toContain("'bg-primary-600 border-primary-600 dark:bg-toga-400 dark:border-toga-400'");
+    expect(copy).toContain('text-white dark:text-ink-950');
+  });
 });
 
 describe('Pietra\'s scales', () => {

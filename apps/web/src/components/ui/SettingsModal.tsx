@@ -325,13 +325,13 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                                     aria-hidden
                                     className={cn(
                                         "relative block h-6 w-11 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2",
-                                        devMode ? "bg-primary-600" : "bg-slate-300 dark:bg-slate-600"
+                                        devMode ? "bg-primary-600 dark:bg-toga-400" : "bg-slate-300 dark:bg-slate-600"
                                     )}
                                 >
                                     <span
                                         className={cn(
                                             "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                                            devMode && "translate-x-5"
+                                            devMode && "translate-x-5 dark:bg-ink-950"
                                         )}
                                     />
                                 </span>

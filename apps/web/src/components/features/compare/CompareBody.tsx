@@ -115,10 +115,10 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
               aria-hidden
               className={cn(
                 'relative h-5 w-9 rounded-full transition-colors',
-                onlyChanges ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600',
+                onlyChanges ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600',
               )}
             >
-              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform', onlyChanges && 'translate-x-[0.975rem]')} />
+              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform', onlyChanges && 'translate-x-[0.975rem] dark:bg-ink-950')} />
             </span>
             Solo le modifiche
           </button>

@@ -246,9 +246,9 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
                             {label}
                             <span
                               aria-hidden
-                              className={cn('relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600')}
+                              className={cn('relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600')}
                             >
-                              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none', on && 'translate-x-4')} />
+                              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none', on && 'translate-x-4 dark:bg-ink-950')} />
                             </span>
                           </button>
                         </li>

@@ -167,11 +167,11 @@ function CheckboxRow({ checked, onChange, disabled = false, label, description }
           className={cn(
             'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors',
             checked
-              ? 'bg-primary-600 border-primary-600'
+              ? 'bg-primary-600 border-primary-600 dark:bg-toga-400 dark:border-toga-400'
               : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600'
           )}
         >
-          {checked && <Check size={14} className="text-white" />}
+          {checked && <Check size={14} className="text-white dark:text-ink-950" />}
         </div>
       </div>
       <div className="flex-1">
