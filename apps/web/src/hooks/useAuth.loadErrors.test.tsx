@@ -133,6 +133,20 @@ describe('ProtectedRoute — a failed /auth/me on load (LC13)', () => {
     expect(screen.getByRole('button', { name: 'Riprova' })).toBeTruthy();
   });
 
+  it('says it is retrying once the first /auth/me has failed, and not before (LC14)', async () => {
+    let fail: (reason: unknown) => void = () => {};
+    vi.mocked(authService.getCurrentUser).mockImplementationOnce(() => new Promise((_, reject) => { fail = reject; }));
+    vi.mocked(authService.getCurrentUser).mockRejectedValue(answered(503));
+    app();
+
+    await settle(0);
+    expect(screen.queryByText('Il server non risponde, riprovo…')).toBeNull();
+    fail(answered(503));
+    await settle(500);
+    const line = screen.getByText('Il server non risponde, riprovo…');
+    expect(line.closest('[role="status"]')).toBe(line);
+  });
+
   it.each([401, 403])('sends the reader to /login on a %s, as before', async (status) => {
     vi.mocked(authService.getCurrentUser).mockRejectedValue(answered(status));
     app();
