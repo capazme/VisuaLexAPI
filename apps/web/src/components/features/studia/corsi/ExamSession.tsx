@@ -72,7 +72,8 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
   const [confirm, setConfirm] = useState<{ kind: 'consegna' | 'esci'; origin: HTMLElement | null } | null>(null);
   // Whether the attempt was started before, from the course page's exam state; null while that read travels.
   const [started, setStarted] = useState<boolean | null>(null);
-  const back = () => navigate(coursePath(id));
+  // The course page gives the focus back to the exam's command it was entered from (LC12).
+  const back = () => navigate(coursePath(id), { state: { focus: 'esame' } });
 
   const phase = !prova ? 'inizio' : prova.tentativo.consegnatoIl ? 'esito' : 'domande';
   const graded = prova?.domande.filter((d) => d.tipo === 'ESAME') ?? [];
@@ -412,7 +413,7 @@ function OpinionReview({ id, esameId, opinion, parere, spuntate }: { id: string;
             <button type="button" onClick={() => void save()} disabled={state === 'busy'} aria-busy={state === 'busy' || undefined} className={INK_BUTTON}>
               Salva l’autovalutazione
             </button>
-            <p aria-live="polite" className={cn('text-sm font-medium', state === 'failed' ? 'text-red-700 dark:text-red-400' : SUCCESS_TEXT)}>
+            <p role="status" className={cn('text-sm font-medium', state === 'failed' ? 'text-red-700 dark:text-red-400' : SUCCESS_TEXT)}>
               {state === 'saved' ? 'Autovalutazione salvata.' : state === 'failed' ? 'Non registrata: riprova.' : ''}
             </p>
           </div>

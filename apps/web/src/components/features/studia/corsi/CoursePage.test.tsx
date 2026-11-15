@@ -44,9 +44,9 @@ function Where() {
   return <p data-testid="where">{pathname}</p>;
 }
 
-function renderPage(id = 'corso-1') {
+function renderPage(id = 'corso-1', state?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[`/learn/percorsi/${id}`]}>
+    <MemoryRouter initialEntries={[{ pathname: `/learn/percorsi/${id}`, state }]}>
       <Routes>
         <Route path="/learn/percorsi/:id" element={<CoursePage />} />
         <Route path="/learn/percorsi" element={<Where />} />
@@ -260,6 +260,12 @@ describe('the course page', () => {
     renderPage();
     const exam = await screen.findByRole('region', { name: 'Esame finale' });
     expect(within(exam).getByRole('link', { name: 'Rivedi l’esito' })).toHaveAttribute('href', '/learn/percorsi/corso-1/esami/e-1');
+  });
+
+  it('coming back from the exam, focuses the exam\'s command (LC12)', async () => {
+    get.mockResolvedValue(page({ esame: examOf({ stato: 'in-corso' }) }));
+    renderPage('corso-1', { focus: 'esame' });
+    expect(await screen.findByRole('link', { name: 'Riprendi la prova' })).toHaveFocus();
   });
 
   it('a failed exam, from the third day, says «Chiedi al tuo assistente un nuovo esame» with the competences under 60%', async () => {

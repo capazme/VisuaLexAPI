@@ -18,8 +18,8 @@ const get = vi.mocked(apiClient.get);
 const BASE = '/lingo/corsi/corso-1/esami/e-1';
 
 function Where() {
-  const { pathname } = useLocation();
-  return <p data-testid="where">{pathname}</p>;
+  const { pathname, state } = useLocation();
+  return <p data-testid="where" data-focus={(state as { focus?: string } | null)?.focus}>{pathname}</p>;
 }
 
 const item = (n: number, over: Partial<DomandaEsame> = {}): DomandaEsame => ({
@@ -204,7 +204,7 @@ describe('the final exam from the web (LC9)', () => {
     post.mockResolvedValueOnce({ data: { domandaId: 'q-op', spuntate: [1] } });
     await userEvent.click(screen.getByRole('button', { name: 'Salva l’autovalutazione' }));
     expect(post).toHaveBeenLastCalledWith(`${BASE}/aperta`, { spuntate: [1] });
-    expect(await screen.findByText('Autovalutazione salvata.')).toBeInTheDocument();
+    expect(await screen.findByText('Autovalutazione salvata.')).toHaveAttribute('role', 'status');
   });
 
   it('leaves to the course with nothing chosen, and asks first once something is', async () => {
@@ -214,6 +214,12 @@ describe('the final exam from the web (LC9)', () => {
     const dialog = await screen.findByRole('alertdialog');
     await pressInDialog(dialog, 'Esci');
     expect(await screen.findByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1');
+  });
+
+  it('closing hands the course page the focus back to the exam\'s command (LC12)', async () => {
+    renderExam();
+    await userEvent.click(await screen.findByRole('button', { name: 'Chiudi la prova' }));
+    expect(await screen.findByTestId('where')).toHaveAttribute('data-focus', 'esame');
   });
 });
 

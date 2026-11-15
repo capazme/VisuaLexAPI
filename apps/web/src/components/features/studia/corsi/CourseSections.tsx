@@ -1,5 +1,5 @@
-import type { ReactNode, RefObject } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { FolderOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { CopyableCode } from '../../../../features/connections/CopyableCode';
@@ -188,6 +188,14 @@ const EXAM_LINK: Partial<Record<EsamePagina['stato'], string>> = {
 /** The final exam's state (§6.4) and the way into it: to take it while open or under way, to read the result after. */
 export function ExamSection({ corsoId, titolo, esame, inPreparazione }: { corsoId: string; titolo: string; esame: EsamePagina; inPreparazione: boolean }) {
   const link = esame.esameId ? EXAM_LINK[esame.stato] : undefined;
+  // Back from the exam (`ExamSession` closes with `state.focus`), the focus returns to its command.
+  const fromExam = (useLocation().state as { focus?: string } | null)?.focus === 'esame';
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    if (fromExam) linkRef.current?.focus();
+    // Once, as the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <section aria-labelledby="corso-esame" className={cn(TILE, 'grid grid-cols-1 gap-2 p-5')}>
       <h3 id="corso-esame" className={BLOCK_HEADING}>
@@ -195,7 +203,7 @@ export function ExamSection({ corsoId, titolo, esame, inPreparazione }: { corsoI
       </h3>
       <ExamState titolo={titolo} esame={esame} inPreparazione={inPreparazione} />
       {link && (
-        <Link to={examPath(corsoId, esame.esameId!)} className={cn(INK_BUTTON, 'justify-self-start')}>
+        <Link ref={linkRef} to={examPath(corsoId, esame.esameId!)} className={cn(INK_BUTTON, 'justify-self-start')}>
           {link}
         </Link>
       )}
