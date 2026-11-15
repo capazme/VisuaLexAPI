@@ -391,6 +391,8 @@ export function StudyMode({
         // over it: Ctrl+Z runs their «Annulla» here too (`isUndoCovered`), a highlight removed in it among them.
         data-find-overlay=""
         data-undo-through=""
+        // Its paper, for the selection's tint (index.css), which follows it rather than the app's theme.
+        data-study-theme={theme}
         style={isFullscreen ? undefined : windowStyle}
         className={cn(
           "fixed z-[130] flex flex-col shadow-lg overflow-hidden",

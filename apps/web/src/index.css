@@ -567,11 +567,12 @@
   color: hsl(var(--vlx-find-current-fg));
 }
 
-/* The browser's own blue, left on the selection and the native controls (LC4): Pietra's ink instead. The selection
-   is ink on paper turned over (light: ink 900 under ink 50; dark: ink 50 under ink 950), with its text colour set, so
-   it reads on every paper (Study Mode's sepia too) and stands apart from every highlighter's ground (`--hl-*`, not
-   touched). Checkboxes, radios and ranges take the action's ink (toga 600; light toga 400 in the dark table).
-   `theme.test.ts` checks both pairs. */
+/* The browser's own blue, left on the selection and the native controls (LC4): Pietra's ink instead. The selection is
+   a translucent tint of the opposite tone, the text's colour left alone: ink at 16% on a light paper, paper at 16% on
+   a dark one, so a highlight under it keeps its hue and the same rule holds on white, Pietra's paper and sepia. Study
+   Mode has its own paper, whatever the app's theme: its window carries `data-study-theme`, and its rules, written
+   after `.dark`'s with the same weight, win in both directions. Checkboxes, radios and ranges take the action's ink
+   (toga 600; light toga 400 in the dark table). `theme.test.ts` composites the tints over every paper. */
 :root {
   accent-color: var(--color-toga-600);
 }
@@ -579,12 +580,16 @@
   accent-color: var(--color-toga-400);
 }
 ::selection {
-  background-color: var(--color-ink-900);
-  color: var(--color-ink-50);
+  background-color: color-mix(in oklab, var(--color-ink-900) 16%, transparent);
 }
 .dark ::selection {
-  background-color: var(--color-ink-50);
-  color: var(--color-ink-950);
+  background-color: color-mix(in oklab, var(--color-ink-50) 16%, transparent);
+}
+[data-study-theme='light'] ::selection, [data-study-theme='sepia'] ::selection {
+  background-color: color-mix(in oklab, var(--color-ink-900) 16%, transparent);
+}
+[data-study-theme='dark'] ::selection {
+  background-color: color-mix(in oklab, var(--color-ink-50) 16%, transparent);
 }
 
 /* The words of the gloss a card is on (D8: hovered or focused), painted through the CSS Custom Highlight API
