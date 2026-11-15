@@ -75,7 +75,7 @@ export function useAuth() {
         setState({
           user: null,
           loading: false,
-          error: getErrorMessage(error) || 'Failed to load user',
+          error: getErrorMessage(error) || 'Non riesco a leggere il tuo account. Riprova tra poco.',
           isAuthenticated: !refused,
         });
       }
@@ -126,7 +126,7 @@ export function useAuth() {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: getErrorMessage(error) || 'Registration failed',
+        error: getErrorMessage(error) || 'Registrazione non riuscita. Riprova tra poco.',
       }));
       throw error;
     }
@@ -160,7 +160,7 @@ export function useAuth() {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: getErrorMessage(error) || 'Login failed',
+        error: getErrorMessage(error) || 'Accesso non riuscito. Riprova tra poco.',
       }));
       throw error;
     }
@@ -208,7 +208,7 @@ export function useAuth() {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: getErrorMessage(error) || 'Password change failed',
+          error: getErrorMessage(error) || 'Cambio della password non riuscito. Riprova tra poco.',
         }));
         throw error;
       }

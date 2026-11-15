@@ -66,6 +66,21 @@ export function isRefreshRefused(error: unknown): boolean {
 /** The plain words a reader gets when a refresh could not reach the server. */
 export const CONNECTION_FAILED_MESSAGE = 'Connessione al server non riuscita. La sessione resta aperta: riprova tra poco.';
 
+/** A server's limit of requests (429). */
+export const TOO_MANY_REQUESTS_MESSAGE = 'Troppe richieste in poco tempo. Aspetta un minuto e riprova.';
+
+/** No answer at all (network, timeout). */
+export const NO_ANSWER_MESSAGE = 'Il server non risponde. Controlla la connessione e riprova.';
+
+/** The server's English answers a reader can meet, in Italian; any other passes as the server wrote it. */
+const SERVER_WORDS: Record<string, string> = {
+  'Invalid credentials': 'Email o password non corrette.',
+  'Internal server error': 'Errore del server. Riprova tra poco.',
+  'Not found': 'Non trovato.',
+  'Authentication required': 'Accedi per continuare.',
+  'Admin access required': 'Serve un account di amministrazione.',
+};
+
 let lastConnectionNotice = 0;
 
 /** Tells the reader once (at most every 10 s, as many requests may fail together) that the connection failed. */
@@ -193,9 +208,14 @@ apiClient.interceptors.response.use(
 
     // For other errors, reject with formatted error
     const responseData = error.response?.data as { detail?: string } | undefined;
+    const status = error.response?.status;
     return Promise.reject({
-      status: error.response?.status,
-      message: responseData?.detail || error.message || 'An error occurred',
+      status,
+      // The server's limit answers in English, and axios's own words («Request failed with status code 500»,
+      // «Network Error») are English too: the reader gets Italian, and what to do.
+      message: status === 429
+        ? TOO_MANY_REQUESTS_MESSAGE
+        : (responseData?.detail && (SERVER_WORDS[responseData.detail] ?? responseData.detail)) || (status ? `Richiesta non riuscita (errore ${status}). Riprova tra poco.` : NO_ANSWER_MESSAGE),
       data: responseData,
     });
   }
