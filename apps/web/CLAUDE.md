@@ -573,12 +573,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   section's, in a group named after it: Work's five entries (D-315, LC8), exactly, in this order, «Oggi» (the home, `/work/oggi`,
   with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the
   search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» and
-  «Anonimizzatore» `soon` (`NavItem`: «in arrivo» beside the word, in the rail's hover label and in the name, «Atti, in
+  «Anonimizzatore» `soon` (`NavItem`: «in arrivo» under the word, 11 px, in the rail's hover label and in the name, «Atti, in
   arrivo»; each opens a plain page, `/work/atti` and `/work/anonimizzatore`, two lines in Work's frame, `ComingSoon` in
   `App.tsx`; the Anonimizzatore's says it will come in the desktop app, D-324). «Prossimi giorni» and «Lista d'ingresso»
   are tabs of Work's page (`OpusPage`: «Oggi», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
-  short word on a phone; with the trash's link, only on those three views), «Analizza un documento» and «Rassegne» links
-  of the search page's Scrivania, under the examples;
+  short word on a phone; on those three views and on the trash, its way back; the trash's link only on the three), «Analizza un documento» and «Rassegne» links
+  of the search page's Scrivania, under the examples and drawn as them, underlined;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
   (Oggi, the home `/learn/ripasso`, Progressi, `/learn/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
   the first only a heading, its entries straight in the section's group, so a screen reader hears «Learn» once (LC4);
@@ -593,8 +593,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
   laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
-  The active entry is marked by the logo's column (D-237, `BookMark` at 20 px, toga ink) at the row's left edge, one
-  per section (`layoutId` inside the section's `LayoutGroup`): it slides from entry to entry, and jumps under reduced motion.
+  The active entry is marked by the logo's column (D-237, `BookMark` at 16 px, toga ink) in the 21 px between the bar's
+  edge and the icon: 7.5 px left of the row (`-left-[7.5px]`), the column from 7.2 to 13.8 px of the bar, 7.2 px clear of
+  the icon's box; the row has no `overflow-hidden`, which clipped it. One per section; it jumps from entry to entry, as the
+  dash did (`layoutId` does not carry it, seen in the browser, #448). An entry is lit (background, column, `aria-current`)
+  on its address and on its `activeOn` ones: «Oggi» on `/work/prossimi`, `/work/ingresso`, `/work/cestino`, «Corpus» on
+  `/documents` and `/rassegne` in Work, «Assistente» on `/labs/contribuisci` and `/labs/valida` (not on the graph's).
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Learn» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
