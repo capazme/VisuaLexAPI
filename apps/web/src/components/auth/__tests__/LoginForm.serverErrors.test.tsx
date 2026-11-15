@@ -98,4 +98,35 @@ describe('LoginForm — the server says no (LC14)', () => {
     expect(alert).toHaveTextContent(words);
     expect(alert).not.toHaveTextContent(/Request failed/);
   });
+
+  // #463, agreed with Irnerio: the sign-in succeeded and stored its two tokens, then the account was refused. The form
+  // says so; the tokens must not stay behind it. A 429 is no refusal: the session stays (LC13).
+  it.each([403, 401])('signed in, then /auth/me refuses (%s): both tokens go, no redirect', async (status) => {
+    // A 401 starts the refresh, which hands out tokens again; the retried /auth/me is refused once more.
+    vi.spyOn(axios, 'post').mockResolvedValue({ data: { access_token: 'a2', refresh_token: 'r2' } });
+    server({
+      '/auth/login': { status: 200, data: { access_token: 'a1', refresh_token: 'r1', token_type: 'bearer' } },
+      '/auth/me': { status },
+    });
+    renderAuth('/login');
+    signIn();
+
+    await screen.findByRole('alert');
+    expect(localStorage.getItem('access_token')).toBeNull();
+    expect(localStorage.getItem('refresh_token')).toBeNull();
+    expect(window.location.href).toBe('http://localhost/login');
+  });
+
+  it('signed in, then /auth/me answers 429: the tokens stay', async () => {
+    server({
+      '/auth/login': { status: 200, data: { access_token: 'a1', refresh_token: 'r1', token_type: 'bearer' } },
+      '/auth/me': { status: 429 },
+    });
+    renderAuth('/login');
+    signIn();
+
+    await screen.findByRole('alert');
+    expect(localStorage.getItem('access_token')).toBe('a1');
+    expect(localStorage.getItem('refresh_token')).toBe('r1');
+  });
 });
