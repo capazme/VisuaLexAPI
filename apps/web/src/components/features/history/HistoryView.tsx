@@ -434,18 +434,20 @@ export function HistoryView() {
                                             <DecisionHistoryRow key={item.id} item={item} variant="mobile" onDelete={handleDeleteItem} />
                                         ) : (
                                             <div key={idx} className="relative">
-                                                {/* Mobile Item card - compact, tap-friendly */}
-                                                <div
+                                                {/* Mobile Item card - compact, tap-friendly; a button, so Tab reaches it and Enter opens it (A6) */}
+                                                <button
+                                                    type="button"
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative bg-white dark:bg-slate-800 p-3 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
+                                                        "relative block w-full text-left bg-white dark:bg-slate-800 p-3 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
                                                         "border-slate-200 dark:border-slate-700",
-                                                        "active:scale-[0.98] active:border-primary-400"
+                                                        "active:scale-[0.98] active:border-primary-400",
+                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                                     )}
                                                 >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-1.5 mb-1">
+                                                    <span className="flex items-start justify-between gap-2">
+                                                        <span className="block flex-1 min-w-0">
+                                                            <span className="flex items-center gap-1.5 mb-1">
                                                                 <span className="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded text-xs font-bold">
                                                                     Art. {item.article}
                                                                 </span>
@@ -454,22 +456,22 @@ export function HistoryView() {
                                                                         n. {item.act_number}
                                                                     </span>
                                                                 )}
-                                                            </div>
-                                                            <p className="font-semibold text-sm text-slate-900 dark:text-white capitalize truncate">
+                                                            </span>
+                                                            <span className="block font-semibold text-sm text-slate-900 dark:text-white capitalize truncate">
                                                                 {item.act_type}
-                                                            </p>
+                                                            </span>
                                                             {item.created_at && (
-                                                                <p
-                                                                    className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5"
+                                                                <span
+                                                                    className="block text-[11px] text-slate-600 dark:text-slate-400 mt-0.5"
                                                                     title={new Date(item.created_at).toLocaleString('it-IT')}
                                                                 >
                                                                     {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: it })}
-                                                                </p>
+                                                                </span>
                                                             )}
-                                                        </div>
-                                                        <ArrowRight size={18} className="text-primary-500 flex-shrink-0 mt-1" />
-                                                    </div>
-                                                </div>
+                                                        </span>
+                                                        <ArrowRight size={18} aria-hidden className="text-primary-500 flex-shrink-0 mt-1" />
+                                                    </span>
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
@@ -484,28 +486,34 @@ export function HistoryView() {
                                                 {/* Timeline dot */}
                                                 <div className="absolute -left-[27px] top-3 w-3 h-3 bg-primary-500 rounded-full ring-4 ring-white dark:ring-slate-800" />
 
-                                                {/* Item card */}
+                                                {/* Item card: the title is a button stretched over the card (A6), so the card still opens
+                                                    on a click anywhere and Tab and Enter reach it; the menu sits beside it, above the stretch. */}
                                                 <div
-                                                    onClick={() => handleItemClick(item)}
                                                     className={cn(
                                                         "relative bg-white dark:bg-slate-800 p-4 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow] cursor-pointer",
                                                         "border-slate-200 dark:border-slate-700",
-                                                        "hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md"
+                                                        "hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md",
+                                                        "has-[[data-history-open]:focus-visible]:ring-2 has-[[data-history-open]:focus-visible]:ring-primary-500"
                                                     )}
                                                 >
                                                     <div className="flex justify-between items-start gap-4">
-                                                        <div className="flex-1">
-                                                            <div className="flex items-baseline gap-2 mb-2">
-                                                                <p className="font-bold text-primary-600 dark:text-primary-400 text-lg capitalize">
+                                                        <button
+                                                            type="button"
+                                                            data-history-open
+                                                            onClick={() => handleItemClick(item)}
+                                                            className="flex-1 block text-left focus-visible:outline-none after:absolute after:inset-0 after:rounded-xl after:content-['']"
+                                                        >
+                                                            <span className="flex items-baseline gap-2 mb-2">
+                                                                <span className="font-bold text-primary-600 dark:text-primary-400 text-lg capitalize">
                                                                     {item.act_type}
-                                                                </p>
+                                                                </span>
                                                                 {item.act_number && (
                                                                     <span className="font-medium text-slate-700 dark:text-slate-300">
                                                                         n. {item.act_number}
                                                                     </span>
                                                                 )}
-                                                            </div>
-                                                            <div className="flex flex-wrap gap-2 text-sm text-slate-500 items-center">
+                                                            </span>
+                                                            <span className="flex flex-wrap gap-2 text-sm text-slate-500 items-center">
                                                                 <span className="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg text-xs font-medium">
                                                                     Art. {item.article}
                                                                 </span>
@@ -516,16 +524,16 @@ export function HistoryView() {
                                                                 )}
                                                                 {item.created_at && (
                                                                     <span
-                                                                        className="text-xs text-slate-400 dark:text-slate-500"
+                                                                        className="text-xs text-slate-500 dark:text-slate-400"
                                                                         title={new Date(item.created_at).toLocaleString('it-IT')}
                                                                     >
                                                                         {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: it })}
                                                                     </span>
                                                                 )}
-                                                            </div>
-                                                        </div>
+                                                            </span>
+                                                        </button>
 
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-[color,background-color,border-color,opacity]">
+                                                        <div className="relative z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-[color,background-color,border-color,opacity]">
                                                             {/* Menu azioni */}
                                                             <div className="relative" ref={openMenu === item.id ? menuRef : null}>
                                                                 <button
