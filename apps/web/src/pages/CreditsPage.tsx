@@ -8,7 +8,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import { LexCraftLogo } from '../components/ui/LexCraftLogo';
 import { CREDITS, CREDIT_GROUPS, type Credit } from '../data/credits';
 import { FOCUS_RING } from '../constants/interactions';
 import { cn } from '../lib/utils';
@@ -197,8 +198,8 @@ export function CreditsPage() {
       <div className={cn(PAGE_FRAME, 'max-w-frame pt-4 pb-16 md:pt-8')}>
         <header>
           <Link to="/" className={cn('-ml-2 inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-slate-700 dark:text-slate-300', FOCUS_RING)}>
-            <BookOpen aria-hidden size={20} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-            <span className="font-serif text-lg font-medium">LexCraft</span>
+            {/* LC37 (Luca: «lì c'è vecchio logo»): the wordmark, still, as the sidebar's; not the old book and a name. */}
+            <LexCraftLogo className="block h-auto w-[140px]" />
           </Link>
         </header>
 
