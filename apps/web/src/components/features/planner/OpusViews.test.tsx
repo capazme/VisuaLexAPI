@@ -83,6 +83,24 @@ describe('«Oggi»', () => {
     expect(service.list).toHaveBeenCalledWith('today', undefined);
   });
 
+  it('says under the title how many tasks, not their subtasks; «Aggiungi un compito» opens the quick add (LC33, the phone)', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-20' }), task('b', { plannedDate: '2026-10-20' }), task('c', { plannedDate: '2026-10-20', parentId: 'a' })]));
+    // A phone: below md.
+    const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true, addEventListener: () => {}, removeEventListener: () => {} } as unknown as MediaQueryList);
+    renderAt(<TodayView />);
+    expect(await screen.findByText('martedì 20 ottobre · 2 compiti')).toBeInTheDocument();
+    const plus = screen.getByRole('button', { name: 'Aggiungi un compito' });
+    plus.focus();
+    fireEvent.click(plus);
+    const sheet = screen.getByRole('dialog', { name: 'Aggiungi un compito' });
+    await waitFor(() => expect(within(sheet).getByLabelText('Nuovo compito')).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Aggiungi un compito' })).toBeNull();
+    // The focus back on «+», the way it came (R-32).
+    await waitFor(() => expect(plus).toHaveFocus());
+    media.mockRestore();
+  });
+
   it('says when there is nothing for today', async () => {
     service.list.mockResolvedValue(answer([]));
     renderAt(<TodayView />);
