@@ -117,6 +117,15 @@ describe('AdminPage — the comments tab', () => {
     expect(screen.getByRole('button', { name: 'Commenti' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Feedback' })).not.toBeInTheDocument();
   });
+
+  it('says «commenti» inside the tab too: the heading and the empty list', async () => {
+    renderAdminPage();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Utenti' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Commenti' }));
+    expect(await screen.findByRole('heading', { name: 'Commenti (0)' })).toBeInTheDocument();
+    expect(await screen.findByText('Nessun commento trovato')).toBeInTheDocument();
+    expect(screen.queryByText(/feedback/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('AdminPage — VisuaLex Studia', () => {
