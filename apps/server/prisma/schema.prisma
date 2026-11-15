@@ -117,6 +117,7 @@ model User {
 
   // The planner's tasks (wave 1): the ones the user owns, and the ones assigned to them (empty until wave 4)
   tasks         Task[] @relation("TaskOwner")
+  atti          Atto[]
   assignedTasks Task[] @relation("TaskAssignee")
 
   @@map("users")
@@ -538,6 +539,8 @@ model Dossier {
   snapshots        DossierSnapshot[]
   // The planner's tasks filed under this dossier (the dossier is the project, answer 1).
   tasks            Task[]
+  // The acts drafted on this dossier (Atti, draft for Alfred): SetNull when the dossier goes.
+  atti             Atto[]
   // Its copy in the Forum, if published: seen by its owner only, never in the public content.
   publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
   // The course enrolments that study it (Percorsi, A1): SetNull when the dossier goes.
@@ -2128,4 +2131,39 @@ model Task {
   @@index([assigneeId])
   @@index([deletedAt])
   @@map("tasks")
+}
+
+// ─── Atti (DRAFT for Alfred and Guglielmo, 15-11-2026; not merged without their yes) ───
+// A lawyer's act being drafted (atto di citazione, appello, memoria...): its text, the dossier whose
+// sources it rests on, and where it stands. One row per act; versions, the AI's proposals and the
+// trash are open questions (docs/superpowers/specs/2026-11-15-atti-backend-draft.md).
+enum AttoStato {
+  bozza
+  finale
+}
+
+model Atto {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  // The dossier whose norms and decisions the act cites; none = an act on its own.
+  dossierId String?   @map("dossier_id")
+  titolo    String
+  // A free label for now («Atto di citazione», «Appello»): a closed list is an open question.
+  tipo      String?
+  // The text as the editor writes it (plain text with paragraphs for now).
+  testo     String    @default("") @db.Text
+  stato     AttoStato @default(bozza)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  // Which connected application created this row (MCP); null = the user. Set by the server, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dossier Dossier? @relation(fields: [dossierId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([dossierId])
+  @@map("atti")
 }

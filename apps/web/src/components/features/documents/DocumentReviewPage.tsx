@@ -11,7 +11,7 @@
  * the norms alone — copies the text with its links or downloads a copy of the Word file with them (`LinksPanel`).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { CloudOff, FileText, Laptop, RotateCcw, ShieldCheck } from 'lucide-react';
 import { formatCitationLabel, type CitationMatch } from '../../../utils/citationMatcher';
@@ -148,6 +148,9 @@ export function DocumentReviewPage() {
   const triggerSearch = useAppStore(s => s.triggerSearch);
   const customAliases = useAppStore(s => s.customAliases);
   const navigate = useNavigate();
+  // An act of a dossier sent here by its page («Analizza l'atto», Luca 15-11): its text is analysed at once, and the way
+  // back leads to it.
+  const fromAtto = (useLocation().state as { atto?: { id: string; titolo: string; testo: string } } | null)?.atto ?? null;
   const reduceMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zoneRef = useRef<HTMLButtonElement | null>(null);
@@ -336,9 +339,9 @@ export function DocumentReviewPage() {
   };
 
   /** A text pasted in the box (#391 §5.1): read as a TXT file is, its row named «Testo incollato». */
-  const handleText = async (text: string) => {
+  const handleText = async (text: string, name = PASTED_TITLE) => {
     const id = ++readingRef.current;
-    const base: DocumentJob = { id, name: PASTED_TITLE, bytes: new TextEncoder().encode(text).length, kind: 'txt', stage: 'searching', others: 0 };
+    const base: DocumentJob = { id, name, bytes: new TextEncoder().encode(text).length, kind: 'txt', stage: 'searching', others: 0 };
     setJob(base);
     await findAndShow(base, text, null);
   };
@@ -366,7 +369,7 @@ export function DocumentReviewPage() {
     if (id !== readingRef.current) return;
     focusAfterRef.current = 'result';
     setJob(null);
-    setLoaded({ fileName: file?.name ?? PASTED_TITLE, text, file, analysis: run.analysis, answers: run.answers });
+    setLoaded({ fileName: file?.name ?? base.name, text, file, analysis: run.analysis, answers: run.answers });
     resetReview();
   };
 
@@ -411,6 +414,17 @@ export function DocumentReviewPage() {
   useEffect(() => {
     handleFileRef.current = handleFile;
   });
+  // The act sent by its page, once, as the page opens.
+  const handleTextRef = useRef(handleText);
+  useEffect(() => {
+    handleTextRef.current = handleText;
+  });
+  const attoAnalysed = useRef(false);
+  useEffect(() => {
+    if (!fromAtto || attoAnalysed.current || !fromAtto.testo.trim()) return;
+    attoAnalysed.current = true;
+    void handleTextRef.current(fromAtto.testo, fromAtto.titolo);
+  }, [fromAtto]);
 
   // A file over the window, from `dragover` alone (`dragenter`/`dragleave` fire between children too): over the box or
   // elsewhere, and where on the box; with no event for `DRAG_REST_MS` it has gone. Let go anywhere but on the box, the browser
@@ -684,6 +698,11 @@ export function DocumentReviewPage() {
         </p>
       }
     >
+      {fromAtto && (
+        <Link to={`/work/atti/${encodeURIComponent(fromAtto.id)}`} className={cn('-mt-2 w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100', FOCUS_RING)}>
+          ← Torna all’atto «{fromAtto.titolo}»
+        </Link>
+      )}
 
       <input
         ref={fileInputRef}

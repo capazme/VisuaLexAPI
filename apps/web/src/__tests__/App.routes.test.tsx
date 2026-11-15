@@ -39,6 +39,8 @@ vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div /> }));
 // Loaded with their route (P1, `pageCode.ts`): vi.mock intercepts the dynamic import() too.
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div data-testid="dossier-page" /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div data-testid="history-page" /> }));
+vi.mock('../components/features/atti/AttiListView', () => ({ AttiListView: () => <div data-testid="atti-list" /> }));
+vi.mock('../components/features/atti/AttoEditor', () => ({ AttoEditor: () => <div data-testid="atto-editor" /> }));
 vi.mock('../components/features/documents/DocumentReviewPage', () => ({ DocumentReviewPage: () => <div data-testid="documents-page" /> }));
 vi.mock('../features/connections/ConnectAiAppPage', () => ({ ConnectAiAppPage: () => <div data-testid="connect-ai-app-page" /> }));
 vi.mock('../pages/CreditsPage', () => ({ CreditsPage: () => <div data-testid="credits-page" /> }));
@@ -202,9 +204,18 @@ describe('App routing', () => {
     expect(screen.getByTestId('opus-page')).toBeInTheDocument();
   });
 
-  // D-315, D-324: Work's two entries «in arrivo», a plain page each in Work's frame, no feature behind it.
+  // Atti: the list and an act's editor, in Work's frame.
   it.each([
-    ['/work/atti', /in arrivo/],
+    ['/work/atti', 'atti-list'],
+    ['/work/atti/42', 'atto-editor'],
+  ])('opens %s in Opus’s frame', async (path, testId) => {
+    renderAt(path);
+    expect(await screen.findByTestId(testId)).toBeInTheDocument();
+    expect(screen.getByTestId('opus-page')).toContainElement(screen.getByTestId(testId));
+  });
+
+  // D-324: the Anonimizzatore is the desktop app's: a plain page in Work's frame, no feature behind it.
+  it.each([
     ['/work/anonimizzatore', /app da scrivania/],
   ])('opens %s in Opus’s frame, saying what is coming', async (path, text) => {
     renderAt(path);

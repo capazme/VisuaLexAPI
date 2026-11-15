@@ -12,8 +12,8 @@ export const PAGE_CODE = {
   rassegne: () => import('./components/features/rassegne/RassegneSearchPage'),
   credits: () => import('./pages/CreditsPage'),
   connectAiApp: () => import('./features/connections/ConnectAiAppPage'),
-  // Opus's frame and its views together: one wait, not two in a row.
-  opus: () => Promise.all([import('./components/features/planner/OpusPage'), import('./components/features/planner/OpusViews')]),
+  // Opus's frame and its views together, Atti's two among them: one wait, not two in a row.
+  opus: () => Promise.all([import('./components/features/planner/OpusPage'), import('./components/features/planner/OpusViews'), import('./components/features/atti/AttiListView'), import('./components/features/atti/AttoEditor')]),
 } as const;
 
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);

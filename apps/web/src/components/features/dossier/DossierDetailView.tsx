@@ -59,6 +59,7 @@ import { lastActTitle, resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
+import { DossierAttiPanel } from '../atti/DossierAttiPanel';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
 
@@ -114,7 +115,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   // The view shown (LC21): the sources, or the dossier's tasks.
-  const [view, setView] = useState<'fonti' | 'compiti'>('fonti');
+  // `?vista=atti`: the way back from an act lands on the dossier's acts.
+  const [view, setView] = useState<'fonti' | 'atti' | 'compiti'>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
+  const [attiCount, setAttiCount] = useState<number | null>(null);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -673,11 +676,12 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           <div className="pt-2">{actions}</div>
         </div>
 
-        {/* LC21: the dossier's two views as tabs, as the prototype: «Fonti» (its norms, decisions and notes) and «Compiti».
+        {/* LC21: the dossier's views as tabs, as the prototype: «Fonti» (its norms, decisions and notes), «Atti» (Luca, 15-11) and «Compiti».
             Both stay mounted, the other hidden, so a selection or a task being written survives the switch. */}
         <SegmentedTabs
           tabs={[
             { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
+            { id: 'atti', label: 'Atti', extra: attiCount === null ? undefined : <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{attiCount}</span> },
             { id: 'compiti', label: 'Compiti' },
           ]}
           value={view}
@@ -690,6 +694,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`}>
         <div hidden={view !== 'compiti'}>
           <DossierTasksPanel dossierId={dossier.id} />
+        </div>
+        <div hidden={view !== 'atti'}>
+          <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
         </div>
         <div hidden={view !== 'fonti'}>
         {dossier.items.length > 0 && (
