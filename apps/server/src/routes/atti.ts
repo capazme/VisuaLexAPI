@@ -16,6 +16,7 @@ import { prisma } from '../lib/prisma';
  * - `PUT /api/atti/:id { titolo?, tipo?, testo?, stato?, dossierId? }` — `{ atto }`;
  * - `DELETE /api/atti/:id` — 204. Gone for good in this draft: the trash is an open question (spec).
  *
+ * Writes are rate-limited by `app.ts`'s `writeRateLimiter` on every non-GET under `/api`, mounted before this router.
  * Another user's act, or a dossier that is not the caller's, answers 404, never 403 (no existence leak).
  * The text may name a client: no message repeats it, and an unexpected error is logged by its kind only.
  */
@@ -25,8 +26,9 @@ router.param('id', (_req, _res, next, id: string) => next(hasNoNul(id) ? undefin
 
 const MAX_TITOLO = 300;
 const MAX_TIPO = 100;
-// About 400 pages of plain text: an act is long, a row is not a file store.
-export const MAX_TESTO = 1_000_000;
+// About 200 pages of plain text: an act is long, a row is not a file store. Under `app.ts`'s 2 MB body limit even
+// with every character two bytes in UTF-8 (accented Italian), so an over-long act gets this message, not a 413.
+export const MAX_TESTO = 500_000;
 
 const noNul = { message: 'Il testo contiene un carattere non valido.' };
 const id = z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' });

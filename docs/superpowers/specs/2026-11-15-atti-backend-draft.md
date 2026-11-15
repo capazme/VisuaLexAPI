@@ -15,8 +15,9 @@ Atti page can stand on.
   (plain text), `stato` `bozza | finale`, timestamps, the MCP provenance fields every user row has.
 - `routes/atti.ts`, mounted at `/api/atti`, session only (not in the delegated table: an MCP token gets the
   default-deny 403): list (`?dossierId=`, newest change first, without the text), read, create, update, delete.
-- Another user's act or dossier answers 404. Bodies are `strict` (no `userId` from a body). Text up to 1 000 000
-  characters; no NUL.
+- Another user's act or dossier answers 404. Bodies are `strict` (no `userId` from a body). Text up to 500 000
+  characters (under the 2 MB body limit with accented letters); no NUL. Writes go through `app.ts`'s
+  `writeRateLimiter` (every non-GET under `/api`), as every other route's.
 - `tests/atti.test.ts`: CRUD, validation, isolation between users, the dossier's deletion, the session. Full server
   suite green on the branch (2491 tests).
 
