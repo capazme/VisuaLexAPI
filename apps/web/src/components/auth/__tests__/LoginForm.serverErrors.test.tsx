@@ -17,10 +17,10 @@ const realLocation = window.location;
 const form = () => within(screen.getByRole('tabpanel'));
 
 /** The server: `routes` answers by URL; a status is a failure with that status and detail. */
-function server(routes: Record<string, { status: number; data?: unknown }>) {
+function server(routes: Record<string, { status: number; data?: unknown; headers?: Record<string, string> }>) {
   apiClient.defaults.adapter = (config: InternalAxiosRequestConfig) => {
     const answer = routes[config.url ?? ''] ?? { status: 404 };
-    const response = { status: answer.status, data: answer.data ?? {}, statusText: '', headers: {}, config };
+    const response = { status: answer.status, data: answer.data ?? {}, statusText: '', headers: answer.headers ?? {}, config };
     return answer.status < 400 ? Promise.resolve(response) : Promise.reject(new AxiosError('failed', undefined, config, null, response));
   };
 }
@@ -63,6 +63,24 @@ describe('LoginForm — the server says no (LC14)', () => {
     signIn();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(TOO_MANY_REQUESTS_MESSAGE);
+    // The server blocks for 15 minutes after five attempts: the words promise no time they do not know (#463).
+    expect(TOO_MANY_REQUESTS_MESSAGE).toBe('Troppe richieste in poco tempo. Riprova più tardi.');
+  });
+
+  it('the limit of requests with the server\'s Retry-After: says how long, in minutes', async () => {
+    server({ '/auth/login': { status: 429, data: { detail: 'Too many requests' }, headers: { 'retry-after': '900' } } });
+    renderAuth('/login');
+    signIn();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Troppe richieste in poco tempo. Riprova tra 15 minuti.');
+  });
+
+  it('the limit of requests with a Retry-After under a minute: «tra un minuto»', async () => {
+    server({ '/auth/login': { status: 429, headers: { 'retry-after': '40' } } });
+    renderAuth('/login');
+    signIn();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Troppe richieste in poco tempo. Riprova tra un minuto.');
   });
 
   it.each([

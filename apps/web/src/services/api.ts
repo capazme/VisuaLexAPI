@@ -69,8 +69,16 @@ export function isRefreshRefused(error: unknown): boolean {
 /** The plain words a reader gets when a refresh could not reach the server. */
 export const CONNECTION_FAILED_MESSAGE = 'Connessione al server non riuscita. La sessione resta aperta: riprova tra poco.';
 
-/** A server's limit of requests (429). */
-export const TOO_MANY_REQUESTS_MESSAGE = 'Troppe richieste in poco tempo. Aspetta un minuto e riprova.';
+/** A server's limit of requests (429). No time promised: the sign-in's limit blocks for 15 minutes, others for one. */
+export const TOO_MANY_REQUESTS_MESSAGE = 'Troppe richieste in poco tempo. Riprova più tardi.';
+
+/** The 429's words, with the wait the server gives in `Retry-After` (seconds) when it gives one. */
+function tooManyRequestsMessage(retryAfter: unknown): string {
+  const seconds = Number(retryAfter);
+  if (!retryAfter || !Number.isFinite(seconds) || seconds <= 0) return TOO_MANY_REQUESTS_MESSAGE;
+  const minutes = Math.ceil(seconds / 60);
+  return `Troppe richieste in poco tempo. Riprova tra ${minutes === 1 ? 'un minuto' : `${minutes} minuti`}.`;
+}
 
 /** No answer at all (network, timeout). */
 export const NO_ANSWER_MESSAGE = 'Il server non risponde. Controlla la connessione e riprova.';
@@ -219,7 +227,7 @@ apiClient.interceptors.response.use(
       // The server's limit answers in English, and axios's own words («Request failed with status code 500»,
       // «Network Error») are English too: the reader gets Italian, and what to do.
       message: status === 429
-        ? TOO_MANY_REQUESTS_MESSAGE
+        ? tooManyRequestsMessage(error.response?.headers?.['retry-after'])
         : (responseData?.detail && (SERVER_WORDS[responseData.detail] ?? responseData.detail)) || (status ? `Richiesta non riuscita (errore ${status}). Riprova tra poco.` : NO_ANSWER_MESSAGE),
       data: responseData,
     });
