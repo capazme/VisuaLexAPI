@@ -60,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'In Work trovi Oggi, Corpus (la ricerca), i Dossier, e Atti e Anonimizzatore in arrivo. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In Work trovi Oggi (con le schede Prossimi giorni e Lista d\'ingresso), Corpus (la ricerca, da cui si apre anche l\'analisi di un documento), i Dossier, e Atti e Anonimizzatore in arrivo. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }

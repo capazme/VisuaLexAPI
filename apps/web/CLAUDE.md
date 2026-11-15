@@ -570,13 +570,15 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
   carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
-  section's, in a group named after it: Work's five entries (D-315, LC8) in this order, «Oggi» (the home, `/work/oggi`,
-  with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the same
-  three Corpus entries, the search named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» and
+  section's, in a group named after it: Work's five entries (D-315, LC8), exactly, in this order, «Oggi» (the home, `/work/oggi`,
+  with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the
+  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» and
   «Anonimizzatore» `soon` (`NavItem`: «in arrivo» beside the word, in the rail's hover label and in the name, «Atti, in
   arrivo»; each opens a plain page, `/work/atti` and `/work/anonimizzatore`, two lines in Work's frame, `ComingSoon` in
   `App.tsx`; the Anonimizzatore's says it will come in the desktop app, D-324). «Prossimi giorni» and «Lista d'ingresso»
-  stay under «Oggi», «Analizza documento» and «Rassegne» under «Corpus»: no other page links to them yet;
+  are tabs of Work's page (`OpusPage`: «Oggi», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
+  short word on a phone; with the trash's link, only on those three views), «Analizza un documento» and «Rassegne» links
+  of the search page's Scrivania, under the examples;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
   (Oggi, the home `/learn/ripasso`, Progressi, `/learn/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
   the first only a heading, its entries straight in the section's group, so a screen reader hears «Learn» once (LC4);
