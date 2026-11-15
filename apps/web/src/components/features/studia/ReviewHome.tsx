@@ -1,53 +1,42 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import { cn } from '../../../lib/utils';
-import type { Materia } from '../../../types/studia';
-import { MATERIA_LABEL } from './studiaLabels';
 import { DayBlock } from './missions/DayBlock';
 import { MissionList } from './missions/MissionList';
 import { TodayMissions } from './missions/TodayMissions';
 import { goalMissionDone } from './missions/missions';
 import { ConfettiBurst } from './progress/Celebration';
 import { STUDY_SETTINGS_PANEL, StatsBand } from './progress/StatsBand';
-import { SubjectList } from './progress/SubjectList';
-import { rememberedMateria, rememberMateria } from './progress/rememberedSubject';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { usePercorso } from './progress/usePercorso';
+import { LearnPath } from './progress/LearnPath';
 import { useProgress } from './progress/useProgress';
 import { TodayCourses } from './corsi/TodayCourses';
 import { TodayExam } from './corsi/TodayExam';
 
 /**
- * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the sections' full-width frame, in the order the owner fixed — the
- * day's missions, the numbers, the full list (L-24) — with the day first (G8): the day block (what is on today and
- * «Inizia il ripasso», the page's entry), today's three missions, then the statistics and «Le tue materie» (the subject
- * filter and the road in one list), then «Tutte le missioni». The missions and the statistics are the whole day's
- * (`useProgress(undefined)`); a subject chosen narrows the day block and the session it starts, through a second read
- * made only while one is chosen. The subjects' cards due and their institutes come from a third, `usePercorso` (G5), on
- * which nothing above waits. The server decides what «today» is.
+ * «Oggi», Learn's home (LC23, after Duolingo's: Luca, 15 November): the day block first (what is on today and «Inizia il
+ * ripasso», the page's one action), then «Il tuo percorso», a unit per subject with its institutes as stops, and the full
+ * list of missions; beside it from `lg` the day's numbers, the streak and the level, then today's missions. The missions
+ * and the statistics are the whole day's (`useProgress(undefined)`); the road is `usePercorso` (G5), on which nothing
+ * above waits. The server decides what «today» is.
+ *
+ * From `lg` two columns, the road and a 20 rem rail (22 from `xl`): the day block on the first row, the road and the list
+ * on the second, the rail across both, sticky while it fits. On a phone one column in the document's order: the day, the
+ * rail, the road, the list.
  */
-/**
- * From `xl` two columns (G6), seven twelfths and five: the grid, the left column's place, the right column's (the band
- * and the subjects, sticky over every row) and the confetti's box. In full screen too (U1): the frame widens there, it
- * no longer narrows to 896 px, so the split depends on the width alone. The left holds three rows (the day, the
- * missions, the list); the fourth, `1fr`, takes what the right column has beyond them. With no mission (G8c) the left
- * holds two, the day and the subjects (`LONELY_ROWS`): a third, empty, would leave two gaps under them.
- */
-const SPLIT = 'xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] xl:grid-rows-[auto_auto_auto_1fr] xl:pb-0';
-const LONELY_ROWS = 'xl:grid-rows-[auto_auto_1fr]';
-const LEFT = 'xl:col-start-1';
-const ASIDE = 'xl:col-start-2 xl:row-span-full xl:self-start';
+const SPLIT = 'lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:gap-x-10 xl:grid-cols-[minmax(0,1fr)_22rem]';
+const LEFT = 'lg:col-start-1 lg:row-start-1';
+const ASIDE = 'lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start';
 /**
  * Sticky under the heading (G6), so the right column never leaves the page empty under it (G8) — while it fits in the
  * window and the settings are closed: taller, its foot must scroll into reach.
  */
-const STICK = 'xl:sticky xl:top-8';
+const STICK = 'lg:sticky lg:top-8';
 /**
  * The confetti fall over the day, the missions and the right column's box (the band and the subjects): rows 1–3 in one
  * column, rows 1–2 across both from `xl` (with no mission, the day and the subjects on the left).
  */
-const BURST = 'xl:col-span-full xl:row-end-3';
 /** `STICK`'s top, and as much again under the column. */
 const STICK_GAP = 32;
 
@@ -84,22 +73,14 @@ function useFitsInScroller(ref: RefObject<HTMLElement | null>, enabled: boolean)
 
 export function ReviewHome() {
   const navigate = useNavigate();
-  const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const day = useProgress(undefined);
-  const narrowed = useProgress(materia, materia !== undefined);
   const percorso = usePercorso();
-  const action = materia ? narrowed : day;
   const data = day.data;
   const loading = day.status === 'loading';
-  // Whether the day's read has answered once, failed included: a «Riprova» after a failure must not move the subjects
-  // back to the right column while it travels (G8c).
-  const [answered, setAnswered] = useState(false);
-  if (!answered && !loading) setAnswered(true);
-  const wide = useMediaQuery('(min-width: 1280px)');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [communityRequest, setCommunityRequest] = useState(0);
-  // The settings' line under the missions, and the day block's settings buttons, open the settings and take the
-  // reader there: the panel takes the focus once drawn.
+  // The day block's settings buttons and the road's foot open the settings and take the reader there: the panel takes
+  // the focus once drawn.
   const [focusSettings, setFocusSettings] = useState(0);
   useEffect(() => {
     if (focusSettings === 0) return;
@@ -115,85 +96,43 @@ export function ReviewHome() {
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose burst has run its course on this page.
   const [burstDone, setBurstDone] = useState<string | null>(null);
-  // Once a day (progress spec decision 10): here, when the goal's mission is done today with some review (G9: a day the
-  // streak counts with the mission empty or open says so in words, and is not celebrated) and this browser had not
-  // celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the same
-  // way). It follows the data on screen, not the read's status, so a new read halfway does not cut it short. It writes
-  // the goal's mark in the day block, and the confetti start from it.
+  // Once a day (progress spec decision 10): here, when the goal's mission is done today with some review (G9) and this
+  // browser had not celebrated when the page opened. It follows the data on screen, not the read's status.
   const celebrate = data !== null && goalMissionDone(data) && data.oggi.ripassi > 0 && !celebratedBefore(data.oggi.giorno) && burstDone !== data.oggi.giorno;
-  // No mission on the left once the day's read has answered (a server without the points, #253, or a failed read):
-  // from `xl` the left column held the day block alone, the right one ran past the window (G8c). «Le tue materie» goes
-  // left then, under the day block, and before the statistics in the document, so the keyboard follows the eye; the
-  // statistics keep the right column. Below `xl` nothing moves: one column, the order the owner fixed.
-  const lonely = wide && answered && !data?.missioni?.length;
   const aside = useRef<HTMLDivElement>(null);
   const fits = useFitsInScroller(aside, !settingsOpen);
 
-  const choose = (next: Materia | undefined) => {
-    setMateria(next);
-    rememberMateria(next);
-  };
   const reload = () => {
     day.reload();
-    narrowed.reload();
     percorso.reload();
   };
-  const start = () => navigate(materia ? `/learn/ripasso/sessione?materia=${materia}` : '/learn/ripasso/sessione');
-
-  const subjectList = (
-    <SubjectList
-      materie={data?.materie ?? null}
-      loading={loading && data === null}
-      reloading={loading && data !== null}
-      selected={materia}
-      onSelect={choose}
-      percorso={percorso}
-      onRetryPercorso={percorso.reload}
-    />
-  );
 
   return (
-    // One column on a phone and a tablet — the day, the missions, the statistics, the subjects, the full list —; from
-    // `xl` two (G6): the day, the missions and the list on the left, two thirds, and the statistics with the subjects on
-    // the right, kept in sight under the heading while the page scrolls. The document's order is the reading order the
-    // owner fixed — missions, statistics, list — on every width; the grid places the right column.
-    // One column of `minmax(0, 1fr)` below `xl` (two from it, `SPLIT`): an implicit track grows to its widest content.
-    <section className={cn('relative grid grid-cols-1 gap-6 pb-8', SPLIT, lonely && LONELY_ROWS)}>
-      {/* The day block and, under it, the courses' row (courses spec §6.2) and the exam's (LC9): one cell, so the grid keeps its rows. */}
-      <div className={cn('grid min-w-0 grid-cols-1 gap-4', LEFT)}>
-        <DayBlock
-          day={data}
-          dayFailed={day.status === 'error'}
-          action={action.data}
-          actionFailed={action.status === 'error'}
-          stops={percorso.data}
-          onRetry={reload}
-          materia={materia}
-          subject={materia && MATERIA_LABEL[materia]}
-          onAllSubjects={() => choose(undefined)}
-          onStart={start}
-          onOpenSettings={openSettingsFor}
-          settingsPanel={STUDY_SETTINGS_PANEL}
-          drawGoal={celebrate}
-          goalRef={goalRef}
-        />
-        <TodayCourses />
-        <TodayExam />
+    // LC23, after Duolingo's home (Luca, 15 November): the road in the middle — the day's one action on top, then «Il tuo
+    // percorso», a unit per subject —, and beside it from `lg` the day's numbers: the streak and the level, today's
+    // missions. One column on a phone, in the same order. A subject's own «Ripassa» narrows the session, where the
+    // subjects' filter did until LC21. The full list of missions closes the left column.
+    <section className={cn('relative grid grid-cols-1 gap-8 pb-8', SPLIT)}>
+      <div className={cn('grid min-w-0 grid-cols-1 content-start gap-4', LEFT)}>
+          <DayBlock
+            day={data}
+            dayFailed={day.status === 'error'}
+            action={data}
+            actionFailed={day.status === 'error'}
+            stops={percorso.data}
+            onRetry={reload}
+            onAllSubjects={() => {}}
+            onStart={() => navigate('/learn/ripasso/sessione')}
+            onOpenSettings={openSettingsFor}
+            settingsPanel={STUDY_SETTINGS_PANEL}
+            drawGoal={celebrate}
+            goalRef={goalRef}
+          />
+          <TodayCourses />
+          <TodayExam />
       </div>
-      <div className={cn('min-w-0 empty:hidden', LEFT)}>
-        <TodayMissions
-          day={data}
-          dayFailed={day.status === 'error'}
-          onOpenSettings={openSettingsFor}
-          settingsPanel={STUDY_SETTINGS_PANEL}
-        />
-      </div>
-      {/* With no mission, from `xl`: under the day block, the right column placed beside it by the grid. */}
-      {lonely && <div className={cn('min-w-0', LEFT)}>{subjectList}</div>}
-      {/* Under the missions on a phone; beside everything from `xl`, sticky while it fits. */}
-      {/* One column of `minmax(0, 1fr)`: an implicit track takes its width from its widest content, «Le tue materie»'s
-          strip of 240 px cards on a phone (G8b: 1370 px, the card out of the screen). */}
-      <div ref={aside} className={cn('grid min-w-0 grid-cols-1 gap-6', ASIDE, !settingsOpen && fits && STICK)}>
+      {/* The day's numbers, beside the road from `lg`, sticky while they fit. */}
+      <div ref={aside} className={cn('grid min-w-0 grid-cols-1 content-start gap-6', ASIDE, !settingsOpen && fits && STICK)}>
         <StatsBand
           aside
           data={data}
@@ -205,20 +144,28 @@ export function ReviewHome() {
           communityRequest={communityRequest}
           celebrate={celebrate}
         />
-        {!lonely && subjectList}
+        <div className="min-w-0 empty:hidden">
+          <TodayMissions
+            day={data}
+            dayFailed={day.status === 'error'}
+            onOpenSettings={openSettingsFor}
+            settingsPanel={STUDY_SETTINGS_PANEL}
+          />
+        </div>
       </div>
-      {/* The confetti start from the goal's mark, in the day block, and fall over the day, the missions and the statistics
-          (with no mission, the subjects under the day), never further: an absolute box placed on their rows (the grid's area is its containing block), out of the
-          flow, so mounting it moves nothing. */}
+      {/* The road and the full list: after the day's numbers on a phone, under the day block from `lg`. */}
+      <div className={cn('grid min-w-0 grid-cols-1 content-start gap-8', 'lg:col-start-1 lg:row-start-2')}>
+        <LearnPath percorso={percorso} materie={data?.materie ?? null} onRetry={percorso.reload} onOpenCommunity={() => openSettingsFor('comunita')} />
+        <div className="min-w-0 empty:hidden">
+          <MissionList data={data} loading={loading && data === null} />
+        </div>
+      </div>
+      {/* The confetti start from the goal's mark, in the day block, and fall over the page's first rows, out of the flow. */}
       {celebrate && data && (
-        <div aria-hidden className={cn('pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-4', BURST)}>
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[32rem]">
           <ConfettiBurst originRef={goalRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         </div>
       )}
-
-      <div className={cn('min-w-0 empty:hidden', LEFT)}>
-        <MissionList data={data} loading={loading && data === null} />
-      </div>
     </section>
   );
 }

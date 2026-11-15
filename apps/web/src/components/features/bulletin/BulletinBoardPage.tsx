@@ -467,7 +467,6 @@ export function BulletinBoardPage() {
             onImport={handleImportClick}
             onReport={handleReport}
             onSuggest={handleSuggest}
-            onPublishClick={() => setShowPublishModal(true)}
             onPacksAdded={handleStudyDossiersAdded}
             onPacksError={(message) => showToast(message, 'error')}
             onResetFilters={() => {

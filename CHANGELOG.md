@@ -12,6 +12,27 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-11-15
+
+The rest of the redesign: Learn as a road, the Forum's Community and its people, the wordmark centred.
+Web only, no migration.
+
+### Learn
+
+- «Oggi» is a road (LC23): one unit per subject, its institutes as stops joined by a line (cards due in
+  ink with their count, a ring for what is being learnt, a check for what is consolidated); «Sei qui» on
+  the first stop with cards due; «Ripassa» per subject; the rail beside the road from `lg`.
+
+### Forum
+
+- Community (LC24): the feed takes the page, each row with its «utile» count on the left, the subject,
+  the author, the source as cited, the title and the first lines, the replies and «Risposta accettata»;
+  communities by subject beside the feed; a discussion on its own page; the people's profiles.
+
+### Look
+
+- The LexCraft wordmark centred over the section tabs and 150 px wide (LC25).
+
 ## [1.20.0] - 2026-11-15
 
 LexCraft's interface, and Atti: the acts a lawyer drafts, in Work and in the dossier. One migration.

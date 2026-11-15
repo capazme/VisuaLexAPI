@@ -26,7 +26,7 @@ export interface CardFiltersProps {
 
 // 44 px at every width (Gymnasium spec §3): the row is short enough to afford it on a computer too.
 const CONTROL = cn(
-  'min-h-[44px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 transition-colors dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50',
+  'min-h-[44px] rounded-xl border border-slate-300 bg-card px-3 text-sm text-slate-900 transition-colors dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50',
   FOCUS_RING,
 );
 /** A pressed toggle: an ink edge and a tint, and `aria-pressed`, so the state is not told by colour alone. */

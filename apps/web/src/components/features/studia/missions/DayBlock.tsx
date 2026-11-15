@@ -1,7 +1,5 @@
-import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
-import { fadeInEntries } from '../../../../features/sections/useEntriesEntrance';
-import { prefersReducedMotion } from '../../../../features/sections/sectionTransition';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi, TappaIstituto } from '../../../../types/studia';
 import { estimateLabel } from '../studiaLabels';
@@ -86,13 +84,6 @@ export function DayBlock({
 
   // The cascade, once, when the block first draws what it says (not while its places are held).
   const block = useRef<HTMLElement>(null);
-  const entered = useRef(false);
-  const drawn = state !== 'loading';
-  useLayoutEffect(() => {
-    if (!drawn || entered.current) return;
-    entered.current = true;
-    if (block.current && !prefersReducedMotion()) fadeInEntries(block.current);
-  }, [drawn]);
 
   const cards = action ? action.oggi.dovute + action.oggi.nuove : 0;
   // Narrowed, the line on top names the subject; else the subjects today's cards come from.

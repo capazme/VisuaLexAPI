@@ -25,7 +25,7 @@ export function LessonBar({ status, children }: { status?: ReactNode; children: 
       data-testid="lesson-bar"
       className={cn(
         Z_INDEX.pinnedBar,
-        'relative shrink-0 border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 dark:border-slate-800 dark:bg-slate-900',
+        'relative shrink-0 border-t border-slate-200 bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 dark:border-slate-800 dark:bg-slate-900',
       )}
     >
       <div className="mx-auto w-full max-w-2xl">
@@ -55,7 +55,7 @@ export interface GradeBarProps {
 
 const GRADE =
   'flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-2 text-center leading-tight transition-[background-color,border-color,scale] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none disabled:opacity-60';
-const NEUTRAL = 'border-slate-300 bg-white text-slate-900 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
+const NEUTRAL = 'border-slate-300 bg-card text-slate-900 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
 const WARNING = 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/30';
 
 /**

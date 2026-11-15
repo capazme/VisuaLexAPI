@@ -319,7 +319,7 @@ function OpinionField({ testo, value, onChange }: { testo: string; value: string
         onChange={(event) => onChange(event.target.value)}
         rows={8}
         className={cn(
-          'min-h-[44px] w-full resize-y rounded-xl border border-slate-300 bg-white p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+          'min-h-[44px] w-full resize-y rounded-xl border border-slate-300 bg-card p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
           FIELD_TEXT,
           FOCUS_RING,
         )}

@@ -74,7 +74,7 @@ export function MissionList({ data, loading }: MissionListProps) {
         <h2 id="studia-tutte" className={BLOCK_HEADING}>
           Tutte le missioni
         </h2>
-        {todayAbove && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le tre di oggi sono qui sopra.</p>}
+        {todayAbove && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le tre di oggi sono in «Le missioni di oggi».</p>}
       </div>
       {groups.length > 0 && (
         <div className={cn(TILE, 'divide-y divide-slate-100 px-4 dark:divide-slate-800 md:px-6')}>

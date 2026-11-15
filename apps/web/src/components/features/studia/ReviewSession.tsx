@@ -117,7 +117,7 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
   return (
     <aside
       aria-label="Articolo"
-      className="w-[min(28rem,45%)] min-w-0 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      className="w-[min(28rem,45%)] min-w-0 shrink-0 overflow-y-auto border-l border-slate-200 bg-card p-4 dark:border-slate-800 dark:bg-slate-900"
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="min-w-0 break-words text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</h2>
@@ -349,7 +349,7 @@ function ReviewSessionBody() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className={cn(COLUMN, 'px-4 py-6')}>
             <p className="sr-only">Carico le schede…</p>
-            <div aria-hidden className="h-56 rounded-2xl border border-slate-200 bg-white motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
+            <div aria-hidden className="h-56 rounded-2xl border border-slate-200 bg-card motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
           </div>
         </div>
         <LessonBar>

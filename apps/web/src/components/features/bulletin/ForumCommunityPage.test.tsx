@@ -139,7 +139,7 @@ describe('ForumCommunityPage: the feed', () => {
     await screen.findByText('Nessuna discussione ancora.');
   });
 
-  it('lists the feed: title, subject, what it is about, author, replies, votes and the accepted reply\'s mark', async () => {
+  it('lists the feed as rows: «utile» count, subject, author, source as cited, title, excerpt, replies, accepted mark', async () => {
     service.feed.mockResolvedValue(page([
       item({ acceptedCommentId: 'r1' }),
       item({
@@ -154,21 +154,44 @@ describe('ForumCommunityPage: the feed', () => {
     expect(service.feed).toHaveBeenCalledWith({ page: 1 });
 
     const first = rows[0];
-    expect(within(first).getByRole('link', { name: /Risoluzione e inadempimento/ })).toHaveAttribute('href', '/forum/community/t1');
-    expect(within(first).getByText('Diritto civile')).toBeInTheDocument();
-    expect(within(first).getByText(/Scritta da marta · 2 risposte · 4 voti/)).toBeInTheDocument();
-    expect(within(first).getByText('Risposta accettata')).toBeInTheDocument();
-    const norm = within(first).getByRole('button', { name: 'Apri art. 1453 c.c.' });
-    expect(norm).toHaveClass('underline', 'min-h-11');
+    const link = within(first).getByRole('link', { name: /Risoluzione e inadempimento/ });
+    expect(link).toHaveAttribute('href', '/forum/community/t1');
+    // Everything is inside the one link: the row opens the discussion.
+    expect(within(link).getByText('4')).toBeInTheDocument();
+    expect(within(link).getByText('utili')).toBeInTheDocument();
+    expect(within(link).getByText('Diritto civile')).toBeInTheDocument();
+    expect(within(link).getByText('marta')).toBeInTheDocument();
+    expect(within(link).getByText('m')).toHaveClass('rounded-full');
+    expect(within(link).getByText('su art. 1453 c.c.')).toBeInTheDocument();
+    expect(within(link).getByText('Quando l’inadempimento…')).toHaveClass('line-clamp-2');
+    expect(within(link).getByText('2 risposte')).toBeInTheDocument();
+    expect(within(link).getByText('· 4 voti utili')).toHaveClass('sr-only');
+    expect(within(link).getByText('Risposta accettata')).toHaveClass('text-emerald-800');
+    // The source is said in the row, not a command of its own: the link to it is the discussion's.
+    expect(within(first).queryByRole('button', { name: /^Apri / })).toBeNull();
 
     const second = rows[1];
-    expect(within(second).getByText(/Scritta da anna · 0 risposte · 1 voto$/)).toBeInTheDocument();
+    expect(within(second).getByRole('link', { name: /Giudicato e motivazione/ })).toHaveAttribute('href', '/forum/community/t2');
+    expect(within(second).getByText('su Cass. civ., n. 1234/2024')).toBeInTheDocument();
+    expect(within(second).getByText('utile')).toBeInTheDocument();
+    expect(within(second).getByText('0 risposte')).toBeInTheDocument();
+    expect(within(second).getByText('· 1 voto utile')).toHaveClass('sr-only');
+    expect(within(second).getByText('anna')).toBeInTheDocument();
+    expect(within(second).queryByText('Diritto civile')).toBeNull();
     expect(within(second).queryByText('Risposta accettata')).toBeNull();
-    const decision = within(second).getByRole('link', { name: 'Apri Cass. civ., n. 1234/2024' });
-    expect(decision).toHaveAttribute('href', '/sentenze/cassazione-civile/1234/2024');
-    // Norms and decisions look the same: a command, not text.
-    expect(decision.className).toBe(norm.className);
+    expect(within(second).queryByRole('link', { name: /^Apri / })).toBeNull();
     expect(document.body.textContent).not.toMatch(/validat/i);
+  });
+
+  it('names the source as cited: the article\'s label without a URN, else its number', async () => {
+    service.feed.mockResolvedValue(page([
+      item({ id: 't3', title: 'Con etichetta', articleUrn: null, articleLabel: 'art. 2043 c.c.' }),
+      item({ id: 't4', title: 'Senza etichetta', articleUrn: null, articleLabel: null, articleId: '7' }),
+    ]));
+    renderAt();
+    const [labelled, bare] = within(await screen.findByRole('list', { name: 'Discussioni' })).getAllByRole('listitem');
+    expect(within(labelled).getByText('su art. 2043 c.c.')).toBeInTheDocument();
+    expect(within(bare).getByText('su art. 7')).toBeInTheDocument();
   });
 
   it('says when there is nothing, and while it loads', async () => {
@@ -191,14 +214,46 @@ describe('ForumCommunityPage: the feed', () => {
     expect(service.feed).toHaveBeenCalledTimes(2);
   });
 
-  it('filters by subject on the server', async () => {
+  it('draws the communities twice, a row below lg and a list in the aside «Comunità», as toggles', async () => {
+    service.feed.mockResolvedValue(page([]));
+    renderAt();
+    await screen.findByText('Nessuna discussione ancora.');
+    const groups = screen.getAllByRole('group', { name: 'Materia' });
+    expect(groups).toHaveLength(2);
+    const [row, aside] = groups;
+    expect(row).toHaveClass('lg:hidden');
+    expect(screen.getByRole('complementary', { name: 'Comunità' })).toContainElement(aside);
+    expect(screen.getByRole('complementary', { name: 'Comunità' })).toHaveClass('hidden', 'lg:block');
+    for (const group of groups) {
+      const buttons = within(group).getAllByRole('button');
+      expect(buttons.map(b => b.textContent)).toEqual([
+        'Tutte le materie', 'Diritto civile', 'Diritto penale', 'Diritto amministrativo', 'Diritto processuale civile', 'Diritto processuale penale',
+      ]);
+      expect(within(group).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'true');
+      expect(within(group).getByRole('button', { name: 'Diritto civile' })).toHaveAttribute('aria-pressed', 'false');
+    }
+    // 44 px to touch in the phone's row.
+    expect(within(row).getByRole('button', { name: 'Diritto civile' })).toHaveClass('min-h-[44px]');
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('filters by subject on the server, the choice pressed in both renderings', async () => {
     service.feed.mockResolvedValue(page([item()]));
     renderAt();
     await screen.findByRole('list', { name: 'Discussioni' });
     service.feed.mockResolvedValue(page([]));
-    fireEvent.change(screen.getByRole('combobox', { name: 'Materia' }), { target: { value: 'DIRITTO_PENALE' } });
+    const [row, aside] = screen.getAllByRole('group', { name: 'Materia' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Diritto penale' }));
     await waitFor(() => expect(service.feed).toHaveBeenLastCalledWith({ page: 1, materia: 'DIRITTO_PENALE' }));
     expect(await screen.findByText('Nessuna discussione in questa materia.')).toBeInTheDocument();
+    for (const group of [row, aside]) {
+      expect(within(group).getByRole('button', { name: 'Diritto penale' })).toHaveAttribute('aria-pressed', 'true');
+      expect(within(group).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'false');
+    }
+    // From the aside too, and back to every subject.
+    fireEvent.click(within(aside).getByRole('button', { name: 'Tutte le materie' }));
+    await waitFor(() => expect(service.feed).toHaveBeenLastCalledWith({ page: 1 }));
+    expect(within(row).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('loads the next page under the list', async () => {
@@ -221,18 +276,46 @@ describe('ForumCommunityPage: the feed', () => {
 });
 
 describe('ForumCommunityPage: the open discussion', () => {
-  it('has its own address, read by the server, marked in the list with aria-current', async () => {
+  it('has its own address, read by the server, and takes the list\'s place', async () => {
     service.feed.mockResolvedValue(page([item(), item({ id: 't2', title: 'Altra' })]));
     service.get.mockResolvedValue(thread());
     renderAt('/forum/community/t1');
-    expect(await screen.findByRole('heading', { level: 2, name: 'Risoluzione e inadempimento di scarsa importanza' })).toBeInTheDocument();
+    const title = await screen.findByRole('heading', { level: 2, name: 'Risoluzione e inadempimento di scarsa importanza' });
     expect(service.get).toHaveBeenCalledWith('t1');
+    expect(screen.getByRole('region', { name: 'Discussione aperta' })).toContainElement(title);
     expect(screen.getByText('Il testo intero della discussione.')).toBeInTheDocument();
-    await screen.findByRole('list', { name: 'Discussioni' });
-    expect(screen.getByRole('link', { name: /Risoluzione e inadempimento/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: /Altra/ })).not.toHaveAttribute('aria-current');
-    // On a phone the list gives way to the discussion, which leads back to it.
-    expect(screen.getByRole('link', { name: 'Torna alle discussioni' })).toHaveAttribute('href', '/forum/community');
+    // The feed is not drawn while a discussion is open: the discussion has the page, the communities beside it.
+    await waitFor(() => expect(service.feed).toHaveBeenCalled());
+    expect(screen.queryByRole('list', { name: 'Discussioni' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Altra/ })).toBeNull();
+    expect(screen.getByRole('complementary', { name: 'Comunità' })).toBeInTheDocument();
+    // The way back, at every width.
+    const back = screen.getByRole('link', { name: 'Torna alle discussioni' });
+    expect(back).toHaveAttribute('href', '/forum/community');
+    expect(back.className).not.toMatch(/(^|\s)(sm|md|lg|xl):hidden|(^|\s)hidden(\s|$)/);
+  });
+
+  it('heads the discussion with subject, author and long date, then the source to open', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread());
+    renderAt('/forum/community/t1');
+    const article = await screen.findByRole('article', { name: 'Risoluzione e inadempimento di scarsa importanza' });
+    expect(within(article).getByText('Diritto civile')).toBeInTheDocument();
+    expect(within(article).getAllByText('marta')[0]).toBeInTheDocument();
+    expect(within(article).getByText('· 10 novembre 2026')).toBeInTheDocument();
+    expect(within(article).getByRole('button', { name: 'Apri art. 1453 c.c.' })).toHaveClass('underline', 'min-h-11');
+  });
+
+  it('goes back to the list, narrowed, when a community is chosen with a discussion open', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread());
+    renderAt('/forum/community/t1');
+    await screen.findByText('Il testo intero della discussione.');
+    const aside = screen.getByRole('complementary', { name: 'Comunità' });
+    fireEvent.click(within(aside).getByRole('button', { name: 'Diritto amministrativo' }));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/forum\/community$/));
+    await waitFor(() => expect(service.feed).toHaveBeenLastCalledWith({ page: 1, materia: 'DIRITTO_AMMINISTRATIVO' }));
+    expect(await screen.findByText('Nessuna discussione in questa materia.')).toBeInTheDocument();
   });
 
   it('opens from the list', async () => {
@@ -257,7 +340,11 @@ describe('ForumCommunityPage: the open discussion', () => {
     renderAt('/forum/community/t1');
     const replies = await screen.findByRole('list', { name: '2 risposte' });
     const rows = within(replies).getAllByRole('article');
-    expect(within(rows[0]).getByText('Risposta accettata')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Risposta accettata')).toHaveClass('text-emerald-800');
+    expect(rows[0]).toHaveClass('border-l-2', 'border-emerald-600');
+    expect(rows[1]).toHaveClass('border-transparent');
+    expect(within(rows[0]).getByText('carlo')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('c')).toHaveClass('rounded-full');
     expect(within(rows[0]).getByText('La risposta che ha chiuso la questione.')).toBeInTheDocument();
     const comments = within(rows[0]).getByRole('list', { name: 'Commenti a questa risposta' });
     expect(within(comments).getByText('Concordo, vedi anche l’art. 1455.')).toBeInTheDocument();
@@ -288,8 +375,12 @@ describe('ForumCommunityPage: the open discussion', () => {
     service.get.mockResolvedValue(thread({ isOwner: true, acceptedCommentId: 'r1', replies: [reply({ id: 'r1', accepted: true })] }));
     await waitFor(() => expect(service.accept).toHaveBeenCalledWith('t1', 'r1'));
     expect(await screen.findByRole('button', { name: 'Ritira l’accettazione' })).toBeInTheDocument();
-    // The feed's row takes the mark too.
-    const list = screen.getByRole('list', { name: 'Discussioni' });
+    const replyRow = within(screen.getByRole('list', { name: '2 risposte' })).getByRole('article');
+    expect(within(replyRow).getByText('Risposta accettata')).toBeInTheDocument();
+    expect(replyRow).toHaveClass('border-emerald-600');
+    // Back on the list, the feed's row has taken the mark too.
+    fireEvent.click(screen.getByRole('link', { name: 'Torna alle discussioni' }));
+    const list = await screen.findByRole('list', { name: 'Discussioni' });
     expect(within(list).getByText('Risposta accettata')).toBeInTheDocument();
   });
 

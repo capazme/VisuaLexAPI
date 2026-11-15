@@ -44,7 +44,7 @@ export function XpGain({ gain, className }: { gain: XpGainValue | null; classNam
             exit={{ opacity: 0 }}
             transition={{ duration: reduce ? 0 : dur.panel, ease: ease.out }}
             className={cn(
-              'pointer-events-none inline-flex items-center whitespace-nowrap rounded-full border bg-white px-2.5 py-0.5 text-xs font-semibold tabular-nums dark:bg-slate-900',
+              'pointer-events-none inline-flex items-center whitespace-nowrap rounded-full border bg-card px-2.5 py-0.5 text-xs font-semibold tabular-nums dark:bg-slate-900',
               INK_BORDER,
               INK_TEXT,
               className,

@@ -91,7 +91,7 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
             >
               <span
                 aria-hidden
-                className={cn('relative mt-4 h-2.5 w-2.5 justify-self-center rounded-full border-2 bg-white dark:bg-slate-900', INK_BORDER, started && INK_BG)}
+                className={cn('relative mt-4 h-2.5 w-2.5 justify-self-center rounded-full border-2 bg-card dark:bg-slate-900', INK_BORDER, started && INK_BG)}
               />
               <button
                 type="button"

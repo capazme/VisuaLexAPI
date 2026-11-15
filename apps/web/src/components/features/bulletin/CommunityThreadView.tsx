@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Check } from 'lucide-react';
 import { articleDiscussionService } from '../../../services/articleDiscussionService';
 import type { CommunityItem, CommunityReply, CommunityThread } from '../../../types/community';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
@@ -23,14 +23,37 @@ export function Pill({ children, strong = false }: { children: React.ReactNode; 
   );
 }
 
-const day = (iso: string) => new Date(iso).toLocaleDateString('it-IT');
+const day = (iso: string) => new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/** The author as the Forum shows a person (LC24, after LinkedIn's): an initial in a stone disc and the name. No
+ *  qualification yet: the server does not send one (PRO-10). */
+export function AuthorName({ name, when }: { name: string; when?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-300 text-[11px] font-semibold uppercase text-slate-800 dark:bg-ink-700 dark:text-slate-100">
+        {name.charAt(0)}
+      </span>
+      <span className="font-medium text-slate-800 dark:text-slate-200">{name}</span>
+      {when && <span className="text-slate-600 dark:text-slate-400">· {when}</span>}
+    </span>
+  );
+}
+
+/** «Risposta accettata», in the states' green: the one functional colour of a discussion. */
+export function AcceptedMark() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+      <Check size={12} strokeWidth={3} aria-hidden /> Risposta accettata
+    </span>
+  );
+}
 const statusOf = (error: unknown) => (error as { status?: number } | null)?.status;
 
 /** What is left of an item its author emptied, or that moderation removed: a place, without the words. */
 function itemText(item: CommunityItem) {
   if (item.deleted) return <p className="mt-1 text-sm italic text-slate-500 dark:text-slate-400">Cancellata dall’autore.</p>;
   if (item.removed) return <p className="mt-1 text-sm italic text-slate-500 dark:text-slate-400">Rimossa dalla moderazione.</p>;
-  return <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{item.body}</p>;
+  return <p className="mt-1.5 max-w-measure whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">{item.body}</p>;
 }
 
 interface Props {
@@ -97,7 +120,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
   };
 
   const back = (
-    <Link to={COMMUNITY_PATH} className={cn('mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded text-sm font-medium text-slate-700 dark:text-slate-300 lg:hidden', FOCUS_RING)}>
+    <Link to={COMMUNITY_PATH} className={cn('mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded text-sm font-medium text-slate-700 dark:text-slate-300', FOCUS_RING)}>
       <ArrowLeft size={16} aria-hidden /> Torna alle discussioni
     </Link>
   );
@@ -144,18 +167,18 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
   return (
     <article aria-labelledby="community-thread-title">
       {back}
-      <h2 id="community-thread-title" ref={heading} tabIndex={-1} className="font-serif text-2xl font-medium tracking-tight text-slate-900 focus:outline-none dark:text-slate-50">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-slate-600 dark:text-slate-400">
+        {thread.materia && <span className="font-semibold text-slate-800 dark:text-slate-200">{MATERIA_LABEL[thread.materia]}</span>}
+        {thread.user.username ? <AuthorName name={thread.user.username} when={day(thread.createdAt)} /> : <span>{day(thread.createdAt)}</span>}
+      </div>
+      <h2 id="community-thread-title" ref={heading} tabIndex={-1} className="mt-2 font-serif text-[28px] font-normal leading-tight text-slate-900 focus:outline-none dark:text-slate-50">
         {title}
       </h2>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        {thread.user.username ? `Scritta da ${thread.user.username} · ` : ''}{day(thread.createdAt)}
-      </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {thread.materia && <Pill>{MATERIA_LABEL[thread.materia]}</Pill>}
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
         <CommunityTarget {...thread} />
       </div>
-      {!thread.deleted && <p className="mt-4 whitespace-pre-wrap text-slate-800 dark:text-slate-200">{thread.body}</p>}
-      <div className="mt-4 flex items-center gap-4 md:gap-3">
+      {!thread.deleted && <p className="mt-4 max-w-measure whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">{thread.body}</p>}
+      <div className="mt-4 flex items-center gap-4 border-b border-slate-200 pb-4 md:gap-3 dark:border-slate-800">
         <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota la discussione" onVote={() => void vote()} />
         {!thread.isOwner && !thread.deleted && (
           <ReportButton label="Segnala la discussione" onReport={() => void report(() => articleDiscussionService.report(thread.id, 'segnalazione'))} />
@@ -165,17 +188,18 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
       {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">{error}</div>}
       {notice && <div role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">{notice}</div>}
 
-      <h3 id="community-replies" className="mt-8 text-sm font-semibold text-slate-900 dark:text-slate-100">
+      <h3 id="community-replies" className="mt-6 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-400">
         {thread.replyCount === 1 ? '1 risposta' : `${thread.replyCount} risposte`}
       </h3>
       {thread.replies.length > 0 && (
-        <ul aria-labelledby="community-replies" className="mt-3 space-y-3">
+        <ul aria-labelledby="community-replies" className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">
           {thread.replies.map(reply => (
             <li key={reply.id}>
-              <article className={cn('rounded-xl border p-4', reply.accepted ? 'border-slate-400 dark:border-slate-500' : 'border-slate-200 dark:border-slate-800')}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{reply.user.username || 'utente senza nome'} · {day(reply.createdAt)}</span>
-                  {reply.accepted && <Pill strong>Risposta accettata</Pill>}
+              {/* A reply as a row, not a card (LC24): the accepted one keeps the states' green on its left edge. */}
+              <article className={cn('py-4 pl-4', reply.accepted ? 'border-l-2 border-emerald-600 dark:border-emerald-400' : 'border-l-2 border-transparent')}>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
+                  <AuthorName name={reply.user.username || 'utente senza nome'} when={day(reply.createdAt)} />
+                  {reply.accepted && <AcceptedMark />}
                 </div>
                 {reply.hidden && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">Nascosta dalla moderazione.</p>}
                 {itemText(reply)}
@@ -203,10 +227,10 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                   </div>
                 )}
                 {reply.comments.length > 0 && (
-                  <ul aria-label="Commenti a questa risposta" className="mt-3 space-y-2 border-l-2 border-slate-100 pl-3 dark:border-slate-800">
+                  <ul aria-label="Commenti a questa risposta" className="mt-3 space-y-3 border-l border-slate-300 pl-4 dark:border-slate-700">
                     {reply.comments.map(comment => (
-                      <li key={comment.id} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{comment.user.username || 'utente senza nome'} · {day(comment.createdAt)}</span>
+                      <li key={comment.id}>
+                        <span className="text-[13px]"><AuthorName name={comment.user.username || 'utente senza nome'} when={day(comment.createdAt)} /></span>
                         {itemText(comment)}
                         {visible(comment) && !comment.isOwner && (
                           <div className="mt-1">
