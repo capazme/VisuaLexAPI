@@ -9,7 +9,6 @@ describe('DossierModal — the kind of a new dossier', () => {
     const createDossier = vi.fn().mockResolvedValue('new-id');
     appStore.setState({ createDossier });
     render(<DossierModal isOpen onClose={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
     expect(screen.getByRole('radio', { name: /Di lavoro/ })).toBeChecked();
     fireEvent.click(screen.getByRole('radio', { name: /Di studio/ }));
     fireEvent.change(screen.getByPlaceholderText('Nome Dossier...'), { target: { value: 'GDPR' } });
@@ -18,14 +17,26 @@ describe('DossierModal — the kind of a new dossier', () => {
   });
 });
 
-describe('DossierModal — «Annulla» never carries the kind over', () => {
-  it('starts every creation as a dossier di lavoro', () => {
+describe('DossierModal — opens on the form (B7)', () => {
+  it('is «Nuovo dossier», with the name field focused and no step before it', async () => {
     appStore.setState({ createDossier: vi.fn().mockResolvedValue('id') });
     render(<DossierModal isOpen onClose={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
+    expect(screen.getByRole('dialog', { name: 'Nuovo dossier' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Crea un dossier/ })).toBeNull();
+    await waitFor(() => expect(screen.getByPlaceholderText('Nome Dossier...')).toHaveFocus());
+  });
+});
+
+describe('DossierModal — «Annulla» never carries the kind over', () => {
+  it('closes, and starts every creation as a dossier di lavoro', () => {
+    appStore.setState({ createDossier: vi.fn().mockResolvedValue('id') });
+    const onClose = vi.fn();
+    const { rerender } = render(<DossierModal isOpen onClose={onClose} />);
     fireEvent.click(screen.getByRole('radio', { name: /Di studio/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
-    fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
+    expect(onClose).toHaveBeenCalled();
+    rerender(<DossierModal isOpen={false} onClose={onClose} />);
+    rerender(<DossierModal isOpen onClose={onClose} />);
     expect(screen.getByRole('radio', { name: /Di lavoro/ })).toBeChecked();
   });
 });
@@ -37,7 +48,6 @@ describe('DossierModal — the section chooses the kind (sections spec S7)', () 
       const createDossier = vi.fn().mockResolvedValue('new-id');
       appStore.setState({ createDossier });
       render(<DossierModal isOpen onClose={() => {}} />);
-      fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
       expect(screen.getByRole('radio', { name: /Di studio/ })).toBeChecked();
       fireEvent.click(screen.getByRole('radio', { name: /Di lavoro/ }));
       fireEvent.change(screen.getByPlaceholderText('Nome Dossier...'), { target: { value: 'Pratica' } });
