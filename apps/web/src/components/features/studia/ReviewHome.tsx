@@ -137,7 +137,7 @@ export function ReviewHome() {
     narrowed.reload();
     percorso.reload();
   };
-  const start = () => navigate(materia ? `/studia/ripasso/sessione?materia=${materia}` : '/studia/ripasso/sessione');
+  const start = () => navigate(materia ? `/learn/ripasso/sessione?materia=${materia}` : '/learn/ripasso/sessione');
 
   const subjectList = (
     <SubjectList

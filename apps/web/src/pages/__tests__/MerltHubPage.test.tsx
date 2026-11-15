@@ -124,7 +124,7 @@ describe('MerltHubPage', () => {
   it('shows the graph card when the graph flag is enabled', () => {
     renderHub();
     expect(screen.getByTestId('hub-card-graph')).toBeInTheDocument();
-    expect(screen.getByTestId('hub-card-graph').querySelector('a[href="/grafo"]')).not.toBeNull();
+    expect(screen.getByTestId('hub-card-graph').querySelector('a[href="/labs/grafo"]')).not.toBeNull();
   });
 
   it('shows the graph card with consent none when the graph flag is on (reading is free)', () => {
@@ -342,7 +342,7 @@ describe('MerltHubPage — consent first (S7b)', () => {
       expect(action).not.toBeDisabled();
     }
     // Reading the graph is free: its action is a link, and no card nests a button in a link.
-    expect(within(cards[2]).getByRole('link', { name: 'Esplora il grafo' })).toHaveAttribute('href', '/grafo');
+    expect(within(cards[2]).getByRole('link', { name: 'Esplora il grafo' })).toHaveAttribute('href', '/labs/grafo');
     for (const card of cards) expect(card.querySelector('a button, button a')).toBeNull();
   });
 

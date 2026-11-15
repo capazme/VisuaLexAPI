@@ -1,7 +1,7 @@
 import type { QaRetrievedSource } from '../../qa/types';
 
 /**
- * Cited-source chips for the /grafo empty state (audit item 2). Kept in a
+ * Cited-source chips for the /labs/grafo empty state (audit item 2). Kept in a
  * non-component module (react-refresh boundary, same split pattern as
  * graphCenter.ts) so GraphExplorerPage's derivation stays unit-testable.
  */

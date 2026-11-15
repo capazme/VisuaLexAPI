@@ -48,7 +48,7 @@ type Outcome = { key: number; read: Read };
 const blockWhere = (blocco: number, total: number) => `Blocco ${blocco + 1} di ${total}`;
 
 /**
- * A module's session (`/studia/percorsi/:id/moduli/:moduloId`, courses spec §5 and §6.5), drawn as the lesson in
+ * A module's session (`/learn/percorsi/:id/moduli/:moduloId`, courses spec §5 and §6.5), drawn as the lesson in
  * `LessonFrame`: «Passo 4 di 11 · Richiamo» at the top with the close button, the step in the middle, the one action at
  * the foot. Behind the switch `lingo_courses`, as every page of «Percorsi».
  */

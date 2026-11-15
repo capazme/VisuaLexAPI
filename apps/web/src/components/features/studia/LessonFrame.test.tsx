@@ -79,10 +79,10 @@ describe('LessonLoading', () => {
   it('offers a way out while the session loads, by the button or Esc', async () => {
     const at = () =>
       render(
-        <MemoryRouter initialEntries={['/studia/ripasso/sessione']}>
+        <MemoryRouter initialEntries={['/learn/ripasso/sessione']}>
           <Routes>
-            <Route path="/studia/ripasso" element={<p>Oggi</p>} />
-            <Route path="/studia/ripasso/sessione" element={<LessonLoading />} />
+            <Route path="/learn/ripasso" element={<p>Oggi</p>} />
+            <Route path="/learn/ripasso/sessione" element={<LessonLoading />} />
           </Routes>
         </MemoryRouter>,
       );
@@ -97,10 +97,10 @@ describe('LessonLoading', () => {
 
   it('goes back to the course while a module\'s session loads (courses spec §6.5)', async () => {
     render(
-      <MemoryRouter initialEntries={['/studia/percorsi/c1/moduli/m1']}>
+      <MemoryRouter initialEntries={['/learn/percorsi/c1/moduli/m1']}>
         <Routes>
-          <Route path="/studia/percorsi/:id" element={<p>Il percorso</p>} />
-          <Route path="/studia/percorsi/:id/moduli/:moduloId" element={<LessonLoading />} />
+          <Route path="/learn/percorsi/:id" element={<p>Il percorso</p>} />
+          <Route path="/learn/percorsi/:id/moduli/:moduloId" element={<LessonLoading />} />
         </Routes>
       </MemoryRouter>,
     );

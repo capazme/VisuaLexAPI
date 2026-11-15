@@ -130,7 +130,7 @@ describe('ArticleGraphSideRail', () => {
     });
     render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
     fireEvent.click(screen.getByRole('button', { name: /esplora nel grafo/i }));
-    expect(navigateMock).toHaveBeenCalledWith(expect.stringContaining('/grafo?urn='));
+    expect(navigateMock).toHaveBeenCalledWith(expect.stringContaining('/labs/grafo?urn='));
   });
 
   describe('ingestion failure states (design §3.4)', () => {

@@ -5,7 +5,7 @@ import { provenanceMeta } from '../../../qa/format';
 
 /**
  * `confirmed` is what the co-evolution promotion engine and the provisional
- * review write; it used to fall into the `seed` bucket ("Corpus") on /grafo
+ * review write; it used to fall into the `seed` bucket ("Corpus") on /labs/grafo
  * and into the grey "unknown" chip on the Q&A sources.
  */
 describe('confirmed provenance', () => {

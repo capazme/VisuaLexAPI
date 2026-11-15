@@ -5,7 +5,7 @@ import { runGraphHygiene, type GraphHygieneResponse } from './opsConfigApi';
 /**
  * Admin-only control to run one graph hygiene sweep now (co-evolution
  * Slice C): reconcile provisional/confirmed duplicates, decay stale
- * provisional nodes, quarantine doubtful ones for /merlt/valida, prune faded
+ * provisional nodes, quarantine doubtful ones for /labs/valida, prune faded
  * noise. Seed and confirmed nodes are never touched. The periodic sweep
  * depends on MERLT_HYGIENE_INTERVAL_HOURS on merlt-api; this button is the
  * way to run it on demand and to see the counts.

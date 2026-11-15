@@ -42,7 +42,7 @@ describe('Layout — Impostazioni, opened from anywhere', () => {
     expect(appStore.getState().settingsDialog).toEqual({ open: false, section: null });
   });
 
-  it.each(['/', '/dossier', '/studia/ripasso'])('a reader\'s gear opens it at the colours\' meanings on %s', (path) => {
+  it.each(['/', '/dossier', '/learn/ripasso'])('a reader\'s gear opens it at the colours\' meanings on %s', (path) => {
     at(path);
     act(() => appStore.getState().openSettings('highlightColors'));
     expect(screen.getByRole('dialog', { name: 'Impostazioni' })).toHaveAttribute('data-section', 'highlightColors');

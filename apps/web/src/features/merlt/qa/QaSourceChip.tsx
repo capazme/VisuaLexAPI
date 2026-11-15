@@ -21,7 +21,7 @@ import { sourceLabel, CANON_LABEL, provenanceMeta, urnKind } from './format';
 import type { ConfirmState, QaRetrievedSource, QaSource } from './types';
 
 /**
- * One consulted source (Loop β F.0 Option A): readable label → /grafo, a
+ * One consulted source (Loop β F.0 Option A): readable label → /labs/grafo, a
  * provenance badge + trust, optional per-source relevance feedback, and
  * "ricorda nel grafo" (confirm-source) only on provisional (live_unconfirmed)
  * nodes. Legal lexicon, no scores/bars/gamification.
@@ -137,7 +137,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
   const meta = provenanceMeta(source.provenance);
   // For provisional (live:) nodes the URN is an opaque hash; prefer the
   // underlying Normattiva URL when known — it gives a readable label AND a
-  // navigable /grafo target. A bare live: hash with no source_url isn't
+  // navigable /labs/grafo target. A bare live: hash with no source_url isn't
   // navigable, so we render it as plain text (no broken link).
   const displayUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
   const label = sourceLabel(source);
@@ -146,7 +146,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
 
   // "Apri" (feature 3, quick-open): norma → the VisuaLex reader (vanilla
   // navigate('/') + triggerSearch mechanism, same as ValidationCard); sentenza
-  // → its source_url when known, else no primary action (only the /grafo jump
+  // → its source_url when known, else no primary action (only the /labs/grafo jump
   // stays, as a secondary affordance).
   const kind = urnKind(displayUrn);
   const normParams = kind.kind === 'norma' ? normRefToSearchParams(displayUrn) : null;
@@ -165,7 +165,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
       <div className="min-w-0">
         {navigable ? (
           <Link
-            to={`/grafo?urn=${encodeURIComponent(displayUrn)}`}
+            to={`/labs/grafo?urn=${encodeURIComponent(displayUrn)}`}
             className="truncate font-medium text-slate-800 hover:text-primary-600 dark:text-slate-200 dark:hover:text-primary-400"
             title={displayUrn}
           >
@@ -206,7 +206,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
       <div className="flex shrink-0 items-center gap-1">
         {navigable && (
           <Link
-            to={`/grafo?urn=${encodeURIComponent(displayUrn)}`}
+            to={`/labs/grafo?urn=${encodeURIComponent(displayUrn)}`}
             aria-label="Apri nel grafo esplorativo"
             title="Apri nel grafo esplorativo"
             className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"

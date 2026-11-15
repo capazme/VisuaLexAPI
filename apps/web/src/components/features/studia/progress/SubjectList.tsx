@@ -144,7 +144,7 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                   <button
                     type="button"
                     aria-label={`Ripassa ${label}`}
-                    onClick={() => navigate(`/studia/ripasso/sessione?materia=${stop.materia}`)}
+                    onClick={() => navigate(`/learn/ripasso/sessione?materia=${stop.materia}`)}
                     className={cn(SECONDARY_BUTTON, 'shrink-0 px-3')}
                   >
                     Ripassa

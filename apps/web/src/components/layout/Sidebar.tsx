@@ -482,16 +482,16 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               <>
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}
                 <NavGroup name="Learn" heading unnamed layout={layout}>
-                  <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
+                  <NavItem to="/learn/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
                   {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
-                  {coursesOn && <NavItem to="/studia/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}
-                  <NavItem to="/studia/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
+                  {coursesOn && <NavItem to="/learn/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}
+                  <NavItem to="/learn/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
                   <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 </NavGroup>
                 {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}
                 <NavGroup name="Contribuisci" heading layout={layout}>
-                  <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} layout={layout} />
-                  {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} layout={layout} />}
+                  <NavItem to="/learn/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} layout={layout} />
+                  {isValidator && <NavItem to="/learn/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} layout={layout} />}
                 </NavGroup>
               </>
             )}
@@ -503,17 +503,17 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             {section === 'opus' && (
               <>
                 {/* The planner's views, then the dossiers (the planner, wave 1). */}
-                <NavItem to="/opus/oggi" icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
-                <NavItem to="/opus/prossimi" icon={CalendarDays} label="Prossimi giorni" onClick={closeMobile} layout={layout} />
-                <NavItem to="/opus/ingresso" icon={Inbox} label="Lista d'ingresso" onClick={closeMobile} layout={layout} />
+                <NavItem to="/work/oggi" icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
+                <NavItem to="/work/prossimi" icon={CalendarDays} label="Prossimi giorni" onClick={closeMobile} layout={layout} />
+                <NavItem to="/work/ingresso" icon={Inbox} label="Lista d'ingresso" onClick={closeMobile} layout={layout} />
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
               </>
             )}
             {section === 'academia' && showAssistant && (
               <>
-                <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
-                {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
-                {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
+                <NavItem to="/labs" end icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
+                {/* Slice 4 Decision A: /labs/grafo is the Q&A surface; the hub stays at /labs. */}
+                {showGraph && <NavItem to="/labs/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
               </>
             )}
             {/* The section keeps its name; its areas are named apart, so «Forum» is not written twice. */}

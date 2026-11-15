@@ -37,7 +37,7 @@ function CardTile({ card, selected }: { card: Scheda; selected: boolean }) {
   return (
     <li className="min-w-0">
       <Link
-        to={`/studia/schede/${encodeURIComponent(card.id)}`}
+        to={`/learn/schede/${encodeURIComponent(card.id)}`}
         aria-current={selected ? 'true' : undefined}
         className={cn(
           'flex h-full min-h-[44px] flex-col gap-2 rounded-xl border p-3.5 transition-colors',

@@ -254,7 +254,7 @@ describe('«Oggi» in groups', () => {
   it("leads to Gymnasium's day on one line, and reads nothing of Gymnasium's (its reads mark the day)", async () => {
     service.list.mockResolvedValue(answer([]));
     renderAt(<TodayView />);
-    expect(await screen.findByRole('link', { name: 'Learn: il ripasso di oggi' })).toHaveAttribute('href', '/studia/ripasso');
+    expect(await screen.findByRole('link', { name: 'Learn: il ripasso di oggi' })).toHaveAttribute('href', '/learn/ripasso');
     await screen.findByText('Nessun compito per oggi');
     // The session's read settles the day and the missions on the server: opening Opus must not.
     expect(study.session).not.toHaveBeenCalled();

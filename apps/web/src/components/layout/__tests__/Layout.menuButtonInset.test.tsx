@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 describe('Layout — the phone\'s bar below lg (M1)', () => {
-  it.each(['/dossier', '/dossier?dossier=d1', '/history', '/forum', '/studia/schede', '/documents'])(
+  it.each(['/dossier', '/dossier?dossier=d1', '/history', '/forum', '/learn/schede', '/documents'])(
     'draws the bar with the menu button and starts the content under it on %s',
     (path) => {
       at(path);
@@ -45,7 +45,7 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
   // jsdom has no IntersectionObserver, where the bar names the page at once; with one, the name waits for the page's
   // title to scroll out (G8, `Layout.phoneBar.test.tsx`).
   it.each([
-    ['/studia/ripasso', 'Oggi'],
+    ['/learn/ripasso', 'Oggi'],
     ['/forum/community', 'Community'],
     ['/collega-app', 'Collega un’app AI'],
   ])('names the page in the middle on %s', (path, title) => {
@@ -71,7 +71,7 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
     // A phone: the bar moves below md only.
     window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(max-width: 767.98px)' })) as typeof window.matchMedia;
     try {
-      at('/studia/schede');
+      at('/learn/schede');
       const main = document.querySelector('main')!;
       expect(main).toHaveClass('max-lg:[--phone-bar-offset:calc(3.5rem+env(safe-area-inset-top))]');
       expect(main).not.toHaveClass('max-md:[--phone-bar-offset:0px]');
@@ -106,7 +106,7 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
   });
 
   it('draws no bar under Gymnasium\'s lesson, which covers the shell', () => {
-    at('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
+    at('/learn/ripasso/sessione?materia=DIRITTO_CIVILE');
     expect(screen.queryByTestId('phone-top-bar')).toBeNull();
   });
 

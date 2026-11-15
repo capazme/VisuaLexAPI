@@ -46,7 +46,7 @@ function at(path: string) {
           <Route index element={<p>Pagina di ricerca</p>} />
           <Route path="dossier" element={<p>Pagina dossier</p>} />
           <Route path="history" element={<p>Pagina cronologia</p>} />
-          <Route path="studia" element={<p>Pagina studia</p>} />
+          <Route path="learn" element={<p>Pagina studia</p>} />
           <Route path="sentenze" element={<DecisionAddress />} />
         </Route>
       </Routes>
@@ -92,7 +92,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
   it.each([
     ['/dossier', 'Pagina dossier'],
     ['/history', 'Pagina cronologia'],
-    ['/studia', 'Pagina studia'],
+    ['/learn', 'Pagina studia'],
   ])('on %s, at once, without leaving the page', (path, page) => {
     at(path);
     expect(screen.queryByPlaceholderText(PALETTE_BOX)).toBeNull();
@@ -121,7 +121,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
 
   it('a topic searched from another page lands in the practices, on the search page', async () => {
     const user = userEvent.setup();
-    at('/studia');
+    at('/learn');
     pressCmdK();
     await user.type(screen.getByPlaceholderText(PALETTE_BOX), 'danno da vacanza rovinata');
     const line = await screen.findByText('Cerca "danno da vacanza rovinata" nelle sentenze della Cassazione');

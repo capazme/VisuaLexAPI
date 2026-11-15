@@ -204,7 +204,7 @@ function PeekBody({ cards, articleLabel, onClose }: Pick<ArticleCardsPeekProps, 
             {card.comunita ? (
               <CommunityRow card={card} />
             ) : (
-              <Link to={`/studia/schede/${encodeURIComponent(card.id)}`} onClick={onClose} className={ROW}>
+              <Link to={`/learn/schede/${encodeURIComponent(card.id)}`} onClick={onClose} className={ROW}>
                 <RowBody card={card} />
               </Link>
             )}

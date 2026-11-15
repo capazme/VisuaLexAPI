@@ -71,12 +71,12 @@ export function searchGraph(q: string, limit = 10): Promise<GraphSearchItem[]> {
 /* ------------------------------------------------------------------ *
  * Wave 2 payload diet (F4) — fetch-size + depth defaults.             *
  *                                                                     *
- * URL-as-SoT note: `?depth=` in /grafo remains the override — these   *
+ * URL-as-SoT note: `?depth=` in /labs/grafo remains the override — these   *
  * defaults only apply when the param is absent. The side rail keeps   *
  * its own tighter budget (depth 1, limit 25) in ArticleGraphSideRail. *
  * ------------------------------------------------------------------ */
 
-/** Default subgraph edge budget for the /grafo page fetch. Kept on the
+/** Default subgraph edge budget for the /labs/grafo page fetch. Kept on the
  * "carica di più" ladder (50 → 100 → 200) so a well-connected article opens
  * legibly instead of as an immediate hairball; the user expands on demand. */
 export const PAGE_GRAPH_LIMIT_DEFAULT = 50;

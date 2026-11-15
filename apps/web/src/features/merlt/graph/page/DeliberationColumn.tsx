@@ -2045,7 +2045,7 @@ function formatCanonPct(weight: number): string {
 /**
  * A consulted source, provenance-colored, that RE-CENTERS the canvas on click
  * (design §3.2 "sources light up as nodes") rather than navigating away like
- * QaSourceChip's `/grafo?urn=` link. Prefers `node_id` (the real graph node)
+ * QaSourceChip's `/labs/grafo?urn=` link. Prefers `node_id` (the real graph node)
  * over the urn so the join lands on the exact provisional/seed node.
  *
  * Wave C (gap C1): a SECOND affordance row — per-source relevance (👍/👎, when

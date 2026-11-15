@@ -68,7 +68,7 @@ export const STUDY_SETTINGS_PANEL = 'studia-impostazioni';
  * «I tuoi progressi», one band (Gymnasium spec §5.1). Up to `xl` it spans the page and lays its pieces out in a row from
  * `md`; as «Oggi»'s right column from `xl` (`aside`, G6) it stacks them as on a phone (the week at the column's width):
  * the streak and the gear; the current week as seven boxes; the level (`LevelBar`, G1c: the user's alone); the cards by
- * state in one line with their bar; «Tutti i progressi →», a text link to `/studia/progressi`, where the trend, the
+ * state in one line with their bar; «Tutti i progressi →», a text link to `/learn/progressi`, where the trend, the
  * coming days and the subjects live (G3: the data in one place). No ring of the goal (G8): the goal's mission says it.
  * The gear opens the study settings in the card, under the heading (G6). While the first read travels it holds its
  * final size; a failed read leaves the heading and the gear (the day block says it failed, with «Riprova»).
@@ -110,7 +110,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
           {!data.missioni?.length && <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />}
           <StatesLine stati={data.stati} />
           <Link
-            to="/studia/progressi"
+            to="/learn/progressi"
             className={cn('-mx-1 inline-flex min-h-[44px] items-center gap-1.5 justify-self-start rounded-lg px-1 text-sm font-semibold underline-offset-4 hover:underline', INK_TEXT, FOCUS_RING)}
           >
             Tutti i progressi

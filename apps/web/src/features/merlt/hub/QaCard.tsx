@@ -38,7 +38,7 @@ export function QaCard({ qaAskable, consentGate = 'known', lastQa }: QaCardProps
   // contract (QA-PREFILL) rides in location.state; GraphExplorerPage reads it
   // once on mount to seed the "Chiedi al grafo" field.
   const goAsk = (prefillQuery?: string) => {
-    navigate('/grafo', prefillQuery ? { state: { prefillQuery } } : undefined);
+    navigate('/labs/grafo', prefillQuery ? { state: { prefillQuery } } : undefined);
   };
 
   const asked = lastQa.status === 'success' && lastQa.data;

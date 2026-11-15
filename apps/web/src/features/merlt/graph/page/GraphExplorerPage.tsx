@@ -165,7 +165,7 @@ function parseLayout(raw: string | null): GraphLayoutName {
 }
 
 /**
- * Full-canvas knowledge-graph explorer at /grafo. Slice 2a-2 builds this up
+ * Full-canvas knowledge-graph explorer at /labs/grafo. Slice 2a-2 builds this up
  * story by story; 2a.8 ships the skeleton: query-param driven fetch, canvas,
  * empty/loading/error states, and a right column reserved for the node drawer
  * (2a.10). The search box (2a.9), depth/layout controls (2a.11) and breadcrumb

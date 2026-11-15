@@ -39,11 +39,11 @@ function Where() {
 
 function renderView() {
   return render(
-    <MemoryRouter initialEntries={['/studia/percorsi']}>
+    <MemoryRouter initialEntries={['/learn/percorsi']}>
       <Routes>
-        <Route path="/studia/percorsi" element={<CoursesView />} />
-        <Route path="/studia/percorsi/:id" element={<Where />} />
-        <Route path="/studia/ripasso" element={<Where />} />
+        <Route path="/learn/percorsi" element={<CoursesView />} />
+        <Route path="/learn/percorsi/:id" element={<Where />} />
+        <Route path="/learn/ripasso" element={<Where />} />
         <Route path="/collega-app" element={<Where />} />
       </Routes>
     </MemoryRouter>,
@@ -66,7 +66,7 @@ describe('«Percorsi», the list', () => {
   it('with the switch off draws nothing and goes back to «Oggi», reading no course', async () => {
     coursesSwitchStore.setState({ state: 'off' });
     renderView();
-    expect(await screen.findByTestId('where')).toHaveTextContent('/studia/ripasso');
+    expect(await screen.findByTestId('where')).toHaveTextContent('/learn/ripasso');
     expect(list).not.toHaveBeenCalled();
     expect(readDeclaration).not.toHaveBeenCalled();
   });
@@ -112,7 +112,7 @@ describe('«Percorsi», the list', () => {
     expect(second).toHaveTextContent('In preparazione');
     expect(second).toHaveTextContent('Nessun modulo ancora');
     await userEvent.setup().click(first);
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1');
   });
 
   it('with no course says what a course is, gives the sentence to copy and the way to connect an app', async () => {
@@ -172,7 +172,7 @@ describe('«Percorsi», the list', () => {
   it('a 404 on the list is the switch turned off: back to «Oggi»', async () => {
     list.mockRejectedValue({ status: 404, message: 'Not found', data: { detail: 'Not found' } });
     renderView();
-    expect(await screen.findByTestId('where')).toHaveTextContent('/studia/ripasso');
+    expect(await screen.findByTestId('where')).toHaveTextContent('/learn/ripasso');
     expect(coursesSwitchStore.getState().state).toBe('off');
   });
 });

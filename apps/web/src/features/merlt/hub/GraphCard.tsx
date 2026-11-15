@@ -6,7 +6,7 @@ import type { AsyncSlice, HubHealth } from './useHubData';
 /**
  * Grafo card (§3.3). Visible to everyone the flag allows (reading is free, D2).
  * Shows a mini-stat when cheaply available from /health, else stays static; a
- * MERL-T it cannot reach is said in its text (S7b). "Esplora il grafo" → /grafo.
+ * MERL-T it cannot reach is said in its text (S7b). "Esplora il grafo" → /labs/grafo.
  */
 
 export interface GraphCardProps {
@@ -19,7 +19,7 @@ export function GraphCard({ health }: GraphCardProps) {
   const unreachable = health.status === 'error' || (health.status === 'success' && !health.data.reachable);
 
   return (
-    <HubCard testId="hub-card-graph" icon={Network} title="Grafo giuridico" action={<HubAction to="/grafo">Esplora il grafo</HubAction>}>
+    <HubCard testId="hub-card-graph" icon={Network} title="Grafo giuridico" action={<HubAction to="/labs/grafo">Esplora il grafo</HubAction>}>
       <p className={HUB_TEXT}>Esplora le relazioni tra norme, principi e concetti.</p>
       {reachable && nodeCount != null && (
         <p className={`mt-2 ${HUB_NOTE}`}>

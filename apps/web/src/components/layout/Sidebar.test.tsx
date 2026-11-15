@@ -18,7 +18,7 @@ import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
 /** Opus's entries: the planner's three views, then the dossiers. */
-const OPUS_HREFS = ['/', '/documents', '/rassegne', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier'];
+const OPUS_HREFS = ['/', '/documents', '/rassegne', '/work/oggi', '/work/prossimi', '/work/ingresso', '/dossier'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -165,7 +165,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   });
 
   it('starts every section with the Corpus entries, «Ricerca» and «Analizza documento»', () => {
-    for (const path of ['/', '/studia/ripasso', '/forum']) {
+    for (const path of ['/', '/learn/ripasso', '/forum']) {
       const { unmount } = render(
         <MemoryRouter initialEntries={[path]}>
           <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} />
@@ -186,11 +186,11 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
     plannerStore.setState({ todayCount: 3 });
     try {
-      renderSidebar('/opus/oggi');
+      renderSidebar('/work/oggi');
       const today = screen.getByRole('link', { name: 'Oggi, 3 compiti per oggi o scaduti' });
       expect(today).toHaveAttribute('aria-current', 'page');
       expect(today).toHaveTextContent('3');
-      cleanupAndRender('/opus/oggi', () => plannerStore.setState({ todayCount: 0 }));
+      cleanupAndRender('/work/oggi', () => plannerStore.setState({ todayCount: 0 }));
       expect(screen.getByRole('link', { name: 'Oggi' })).not.toHaveTextContent(/\d/);
     } finally {
       plannerStore.setState({ todayCount: null });
@@ -198,15 +198,15 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   });
 
   it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
-    renderSidebar('/studia/schede');
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
+    renderSidebar('/learn/schede');
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/dossier', '/learn/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
     // One group reads «Learn» (LC4: the section's, its first heading's entries straight inside it), «Contribuisci» within.
     const section = screen.getByRole('group', { name: 'Learn' });
     expect(within(section).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier', 'Le mie schede']);
     expect(section).toContainElement(screen.getByRole('group', { name: 'Contribuisci' }));
-    cleanupAndRender('/studia/schede', () => { account.isValidator = true; });
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede', '/studia/valida']);
+    cleanupAndRender('/learn/schede', () => { account.isValidator = true; });
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/dossier', '/learn/schede', '/learn/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
     expect(within(contribute).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Le mie schede', 'Da validare']);
     // The tours still find the dossiers.
@@ -238,8 +238,8 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
 
   it('Academia: «Assistente» and «Grafo», with the development mode only (S12)', () => {
     account.devMode = true;
-    renderSidebar('/merlt');
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/merlt', '/grafo']);
+    renderSidebar('/labs');
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/labs', '/labs/grafo']);
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
     expect(hrefs()).toEqual(OPUS_HREFS);
@@ -249,9 +249,9 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it('Academia follows the MERL-T flags: only «Assistente» with the graph off, nothing with MERL-T off', () => {
     account.devMode = true;
     vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'false');
-    renderSidebar('/merlt');
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/merlt']);
-    cleanupAndRender('/merlt', () => vi.stubEnv('VITE_FEATURE_MERLT', 'false'));
+    renderSidebar('/labs');
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/labs']);
+    cleanupAndRender('/labs', () => vi.stubEnv('VITE_FEATURE_MERLT', 'false'));
     expect(hrefs()).toEqual(['/', '/documents', '/rassegne']);
   });
 
@@ -760,12 +760,12 @@ describe('Sidebar — the words', () => {
     renderLayout('wide', '/dossier');
     expect(within(screen.getByRole('group', { name: 'Work' })).getByText('Work')).toBeInTheDocument();
     cleanup();
-    renderLayout('wide', '/studia/ripasso');
+    renderLayout('wide', '/learn/ripasso');
     expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Contribuisci' })).getByText('Contribuisci')).toBeInTheDocument();
     cleanup();
     // The rail has no room for them.
-    renderLayout('rail', '/studia/ripasso');
+    renderLayout('rail', '/learn/ripasso');
     expect(screen.queryByText('Learn')).toBeNull();
     expect(screen.getByRole('link', { name: 'Oggi' }).textContent).toBe('');
   });
@@ -788,7 +788,7 @@ describe('Sidebar — the words', () => {
   });
 
   it('draws its 11 px texts, the headings and the shortcut, in the colour that keeps AA (theme.test.ts)', () => {
-    renderLayout('wide', '/studia/ripasso');
+    renderLayout('wide', '/learn/ripasso');
     expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toHaveClass(...SIDEBAR_SMALL_TEXT.split(' '));
     const shortcut = screen.getByRole('link', { name: 'Ricerca' }).querySelector('kbd') as HTMLElement;
     expect(shortcut).toHaveClass('text-[11px]', ...SIDEBAR_SMALL_TEXT.split(' '));

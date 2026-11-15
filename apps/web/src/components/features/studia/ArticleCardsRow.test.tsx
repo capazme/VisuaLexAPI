@@ -103,10 +103,10 @@ describe('ArticleCardsRow', () => {
     const peek = await screen.findByRole('dialog');
     const rows = within(peek).getAllByRole('link');
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveAttribute('href', '/studia/schede/a');
+    expect(rows[0]).toHaveAttribute('href', '/learn/schede/a');
     expect(within(rows[0]).getByText('Domanda a?')).toBeInTheDocument();
     expect(within(rows[0]).getByText('Validata')).toBeInTheDocument();
-    expect(rows[1]).toHaveAttribute('href', '/studia/schede/b');
+    expect(rows[1]).toHaveAttribute('href', '/learn/schede/b');
     expect(within(rows[1]).getByText('Bozza')).toBeInTheDocument();
     // Plain text, not markup.
     expect(within(rows[1]).getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
@@ -143,7 +143,7 @@ describe('ArticleCardsRow', () => {
     renderRow();
     await user.click(await screen.findByRole('button', { name: 'Schede su questo articolo (2)' }));
     const peek = await screen.findByRole('dialog');
-    // Not a link, to /studia/schede/a or anywhere: a button, closed.
+    // Not a link, to /learn/schede/a or anywhere: a button, closed.
     const row = within(peek).getByRole('button', { name: /Domanda a\?/ });
     expect(within(peek).queryByRole('link', { name: /Domanda a\?/ })).not.toBeInTheDocument();
     expect(row).toHaveAttribute('type', 'button');
@@ -157,7 +157,7 @@ describe('ArticleCardsRow', () => {
     expect(within(peek).getByText('Art. 1454 c.c.')).toBeInTheDocument();
     // The Peek stays open, and the reader's own card stays a link.
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(within(peek).getByRole('link', { name: /Domanda b\?/ })).toHaveAttribute('href', '/studia/schede/b');
+    expect(within(peek).getByRole('link', { name: /Domanda b\?/ })).toHaveAttribute('href', '/learn/schede/b');
 
     await user.click(row);
     expect(row).toHaveAttribute('aria-expanded', 'false');

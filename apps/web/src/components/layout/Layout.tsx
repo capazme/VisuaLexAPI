@@ -122,7 +122,7 @@ export function Layout() {
   // Below lg a bar sits at the top of every page (M1): the search page's is its field, with the menu button beside it;
   // every other page has `PhoneTopBar` over its content area, and starts under it. Focus mode draws neither.
   // Gymnasium's lesson covers the shell (`LessonFrame`): no bar under it for Tab to reach.
-  const inLesson = /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname);
+  const inLesson = /^\/learn\/ripasso\/sessione(\/|$)/.test(pathname);
   const showPhoneBar = !onSearchPage && !settings.focusMode && !inLesson;
   const storedSection = sectionStore((s) => s.section);
   const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'LexCraft';

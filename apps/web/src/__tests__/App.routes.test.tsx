@@ -59,8 +59,8 @@ vi.mock('../pages/MerltHubPage', () => ({ MerltHubPage: () => <div data-testid="
 vi.mock('../features/merlt/graph/page/GraphExplorerPage', () => ({
   GraphExplorerPage: () => <div data-testid="graph-explorer" />,
 }));
-vi.mock('../features/merlt/contrib/ContribPage', () => ({ ContribPage: () => <div /> }));
-vi.mock('../features/merlt/validate/ValidationPage', () => ({ ValidationPage: () => <div /> }));
+vi.mock('../features/merlt/contrib/ContribPage', () => ({ ContribPage: () => <div data-testid="contrib-page" /> }));
+vi.mock('../features/merlt/validate/ValidationPage', () => ({ ValidationPage: () => <div data-testid="validation-page" /> }));
 // The Studia views are real (their headings are under test), so their requests are answered here:
 // unmocked, jsdom's XHR reaches for a server that isn't there.
 vi.mock('../services/studiaService', () => ({
@@ -110,16 +110,16 @@ beforeEach(() => {
 describe('App routing', () => {
   // Slice 4 absorb (Decision A): the Q&A page is gone — /merlt/qa and the legacy
   // /merlt/chiedi both redirect to the graph, the sole deliberation surface.
-  it('redirects the absorbed /merlt/qa path to /grafo', async () => {
+  it('redirects the absorbed /merlt/qa path to /labs/grafo', async () => {
     renderAt('/merlt/qa');
     expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/grafo');
+    expect(window.location.pathname).toBe('/labs/grafo');
   });
 
-  it('redirects the legacy /merlt/chiedi path to /grafo', async () => {
+  it('redirects the legacy /merlt/chiedi path to /labs/grafo', async () => {
     renderAt('/merlt/chiedi');
     expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/grafo');
+    expect(window.location.pathname).toBe('/labs/grafo');
   });
 
   // «Ambienti» absorbed by the Forum (spec 2026-10-13-environments-into-forum, D11c): an old share link keeps its content.
@@ -174,16 +174,16 @@ describe('App routing', () => {
   });
 
   it('opens Opus at «Oggi», its frame and its view loaded together', async () => {
-    renderAt('/opus');
+    renderAt('/work');
     expect(await screen.findByRole('heading', { name: 'Oggi' })).toBeInTheDocument();
     expect(screen.getByTestId('opus-page')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/opus/oggi');
+    expect(window.location.pathname).toBe('/work/oggi');
   });
 
   it.each([
-    ['/opus/prossimi', 'Prossimi giorni'],
-    ['/opus/ingresso', 'Lista d’ingresso'],
-    ['/opus/cestino', 'Cestino'],
+    ['/work/prossimi', 'Prossimi giorni'],
+    ['/work/ingresso', 'Lista d’ingresso'],
+    ['/work/cestino', 'Cestino'],
   ])('opens %s in Opus’s frame', async (path, heading) => {
     renderAt(path);
     expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
@@ -196,18 +196,18 @@ describe('App routing', () => {
     expect(screen.queryByTestId('layout')).toBeNull();
   });
 
-  it('lazy-loads the MERL-T hub at /merlt', async () => {
-    renderAt('/merlt');
+  it('lazy-loads the MERL-T hub at /labs', async () => {
+    renderAt('/labs');
     expect(await screen.findByTestId('merlt-hub')).toBeInTheDocument();
   });
 
-  it('lazy-loads the graph explorer at /grafo', async () => {
-    renderAt('/grafo');
+  it('lazy-loads the graph explorer at /labs/grafo', async () => {
+    renderAt('/labs/grafo');
     expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
   });
 
   // Spec D6: a development address opened without the development mode is not there.
-  it.each(['/merlt', '/merlt/contribuisci', '/merlt/valida', '/grafo', '/merlt/qa', '/merlt/chiedi'])(
+  it.each(['/labs', '/labs/contribuisci', '/labs/valida', '/labs/grafo', '/merlt', '/grafo', '/merlt/qa', '/merlt/chiedi'])(
     'sends %s to the search page without the development mode',
     async (path) => {
       account.devMode = false;
@@ -236,27 +236,27 @@ describe('App routing — Studia', () => {
     vi.unstubAllEnvs();
   });
 
-  it('opens «Le mie schede» at /studia/schede', async () => {
-    renderAt('/studia/schede');
+  it('opens «Le mie schede» at /learn/schede', async () => {
+    renderAt('/learn/schede');
     expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
   });
 
-  it('sends /studia to the review', async () => {
-    renderAt('/studia');
+  it('sends /learn to the review', async () => {
+    renderAt('/learn');
     expect(await screen.findByRole('heading', { name: 'Ripasso di oggi' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/studia/ripasso');
+    expect(window.location.pathname).toBe('/learn/ripasso');
   });
 
-  it('opens a session at /studia/ripasso/sessione, inside the area, as the lesson in its frame (Gymnasium spec §5.4)', async () => {
-    renderAt('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
+  it('opens a session at /learn/ripasso/sessione, inside the area, as the lesson in its frame (Gymnasium spec §5.4)', async () => {
+    renderAt('/learn/ripasso/sessione?materia=DIRITTO_CIVILE');
     const session = await screen.findByRole('heading', { name: 'Sessione di ripasso' });
     expect(screen.getByTestId('lesson-frame')).toContainElement(session);
     // The lesson is a screen of its own: the area's heading is not drawn over it.
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
-  it('opens «Progressi» at /studia/progressi, inside the area, under its heading (Gymnasium spec §5.3)', async () => {
-    renderAt('/studia/progressi');
+  it('opens «Progressi» at /learn/progressi, inside the area, under its heading (Gymnasium spec §5.3)', async () => {
+    renderAt('/learn/progressi');
     expect(await screen.findByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Progressi' })).toBeInTheDocument();
     expect(screen.getByText('Learn · la tua palestra giuridica')).toBeInTheDocument();
@@ -264,50 +264,93 @@ describe('App routing — Studia', () => {
     expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
   });
 
-  it('opens «Percorsi» at /studia/percorsi, inside the area, once the switch is on (courses spec §6.1)', async () => {
+  it('opens «Percorsi» at /learn/percorsi, inside the area, once the switch is on (courses spec §6.1)', async () => {
     features.lingoCourses = true;
-    renderAt('/studia/percorsi');
+    renderAt('/learn/percorsi');
     expect(await screen.findByRole('heading', { level: 1, name: 'Percorsi' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 2, name: 'Non hai ancora percorsi' })).toBeInTheDocument();
   });
 
-  it('opens a course at /studia/percorsi/:id under the same heading', async () => {
+  it('opens a course at /learn/percorsi/:id under the same heading', async () => {
     features.lingoCourses = true;
-    renderAt('/studia/percorsi/c1');
+    renderAt('/learn/percorsi/c1');
     expect(await screen.findByRole('heading', { level: 1, name: 'Percorsi' })).toBeInTheDocument();
     expect(await screen.findByText('Questo percorso non c’è: forse è stato eliminato.')).toBeInTheDocument();
   });
 
-  it('opens a module\'s session at /studia/percorsi/:id/moduli/:moduloId in the lesson\'s frame, over the area (§6.5)', async () => {
+  it('opens a module\'s session at /learn/percorsi/:id/moduli/:moduloId in the lesson\'s frame, over the area (§6.5)', async () => {
     features.lingoCourses = true;
-    renderAt('/studia/percorsi/c1/moduli/m1');
+    renderAt('/learn/percorsi/c1/moduli/m1');
     expect(await screen.findByTestId('lesson-frame')).toBeInTheDocument();
     expect(await screen.findByText('Questo modulo non c’è più: forse è stato eliminato.')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Percorsi' })).toBeNull();
   });
 
-  it('with the switch off, /studia/percorsi goes back to Oggi', async () => {
+  it('with the switch off, /learn/percorsi goes back to Oggi', async () => {
     features.lingoCourses = false;
-    renderAt('/studia/percorsi');
+    renderAt('/learn/percorsi');
     expect(await screen.findByRole('heading', { name: 'Ripasso di oggi' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/studia/ripasso');
+    expect(window.location.pathname).toBe('/learn/ripasso');
     features.lingoCourses = true;
   });
 
   it('keeps a card’s address inside the Studia area', async () => {
-    renderAt('/studia/schede/k1');
+    renderAt('/learn/schede/k1');
     expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
   });
 
-  it('opens «Da validare» at /studia/valida', async () => {
-    renderAt('/studia/valida');
+  it('opens «Da validare» at /learn/valida', async () => {
+    renderAt('/learn/valida');
     expect(await screen.findByRole('heading', { name: 'Da validare' })).toBeInTheDocument();
     expect(await screen.findByText('Nessuna scheda da validare')).toBeInTheDocument();
   });
 
   it('is the 404 page when VITE_FEATURE_STUDIA is off', async () => {
     vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
-    renderAt('/studia');
+    renderAt('/learn');
     expect(await screen.findByText('Pagina non trovata')).toBeInTheDocument();
+  });
+});
+
+// D-235: the addresses took their sections' names; an old one (a bookmark, a shared link, a link the server still
+// writes) lands on the new one, keeping the rest of the path, the query and the anchor, and replacing itself.
+describe('App routing — old addresses', () => {
+  it.each([
+    ['/opus', '/work/oggi', '', '', { heading: 'Oggi' }],
+    ['/opus/prossimi?vista=2#t1', '/work/prossimi', '?vista=2', '#t1', { heading: 'Prossimi giorni' }],
+    ['/opus/cestino', '/work/cestino', '', '', { heading: 'Cestino' }],
+    ['/studia', '/learn/ripasso', '', '', { heading: 'Ripasso di oggi' }],
+    ['/studia/ripasso/sessione?materia=DIRITTO_CIVILE#c', '/learn/ripasso/sessione', '?materia=DIRITTO_CIVILE', '#c', { heading: 'Sessione di ripasso' }],
+    ['/studia/percorsi', '/learn/percorsi', '', '', { heading: 'Percorsi' }],
+    ['/studia/schede/k1#art', '/learn/schede/k1', '', '#art', { heading: 'Le mie schede' }],
+    ['/merlt', '/labs', '', '', { testId: 'merlt-hub' }],
+    ['/merlt/contribuisci?documentId=d1', '/labs/contribuisci', '?documentId=d1', '', { testId: 'contrib-page' }],
+    ['/merlt/valida', '/labs/valida', '', '', { testId: 'validation-page' }],
+    ['/grafo?urn=urn%3Anir&depth=2#n1', '/labs/grafo', '?urn=urn%3Anir&depth=2', '#n1', { testId: 'graph-explorer' }],
+    ['/merlt/qa?x=1#y', '/labs/grafo', '?x=1', '#y', { testId: 'graph-explorer' }],
+    ['/merlt/chiedi', '/labs/grafo', '', '', { testId: 'graph-explorer' }],
+  ])('sends %s to %s', async (old, pathname, search, hash, page) => {
+    const before = window.history.length;
+    renderAt(old);
+    if ('heading' in page) expect(await screen.findByRole('heading', { name: page.heading })).toBeInTheDocument();
+    else expect(await screen.findByTestId(page.testId)).toBeInTheDocument();
+    expect(window.location.pathname).toBe(pathname);
+    expect(window.location.search).toBe(search);
+    expect(window.location.hash).toBe(hash);
+    // Replaced, not pushed: «back» leaves the page instead of landing on the old address again.
+    expect(window.history.length).toBe(before + 1);
+  });
+
+  it('keeps an old shared link\'s ?import=', async () => {
+    renderAt('/studia/percorsi/c1?import=abc');
+    expect(await screen.findByText('Questo percorso non c’è: forse è stato eliminato.')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/learn/percorsi/c1');
+    expect(window.location.search).toBe('?import=abc');
+  });
+
+  it('leaves look-alike addresses alone', async () => {
+    renderAt('/opuscolo');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pagina non trovata' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/opuscolo');
   });
 });
