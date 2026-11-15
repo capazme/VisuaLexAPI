@@ -1413,8 +1413,10 @@
 .dark :is(.shadow-xs, .shadow-sm, .shadow) {
   --tw-shadow: inset 0 1px 0 rgb(255 250 240 / 0.04), 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 6px -2px rgb(0 0 0 / 0.4);
 }
-.dark .hover\:shadow-md:hover {
-  --tw-shadow: inset 0 1px 0 rgb(255 250 240 / 0.05), 0 2px 4px rgb(0 0 0 / 0.35), 0 8px 18px -6px rgb(0 0 0 / 0.5);
+@media (hover: hover) {
+  .dark .hover\:shadow-md:hover {
+    --tw-shadow: inset 0 1px 0 rgb(255 250 240 / 0.05), 0 2px 4px rgb(0 0 0 / 0.35), 0 8px 18px -6px rgb(0 0 0 / 0.5);
+  }
 }
 .dark .inset-shadow-xs {
   --tw-inset-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);

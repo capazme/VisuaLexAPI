@@ -797,6 +797,16 @@ describe('the section change (T1)', () => {
     expect(css).toMatch(/\.inset-shadow-xs\s*\{[^}]*box-shadow:[^;]*var\(--tw-ring-shadow\)/);
   }, 30000);
 
+  it('brings a lifted dossier card back down on the press: the press comes after the lift (LC30)', async () => {
+    const wrap = 'motion-safe:[@media(hover:hover)_and_(pointer:fine)]:';
+    const css = await compile([`${wrap}hover:-translate-y-px`, `${wrap}active:translate-y-0`]);
+    // Under the same wrapper, or the arbitrary variant sorts last and the lift wins while pressed.
+    const lift = css.indexOf('hover\\:-translate-y-px {');
+    const press = css.indexOf('active\\:translate-y-0 {');
+    expect(lift).toBeGreaterThan(-1);
+    expect(press).toBeGreaterThan(lift);
+  }, 30000);
+
   it('keeps a focus ring over a shadow in the dark: the dark rules set `--tw-shadow`, never `box-shadow` (Y1)', async () => {
     const css = await compile(['shadow-md', 'shadow-lg', 'focus-visible:ring-2']);
     // Outside the layers a `box-shadow` on `.dark .shadow-*` replaced the ring of `focus-visible:ring-2` (WCAG 2.4.7).
