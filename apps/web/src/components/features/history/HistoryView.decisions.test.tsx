@@ -78,4 +78,29 @@ describe('HistoryView — decisions', () => {
     expect(error.mock.calls.filter((c) => c[0] === 'history: unreadable decision key')).toHaveLength(1);
     error.mockRestore();
   });
+
+  it('opens a norm from the keyboard: its title is a button, Tab reaches it, Enter opens it; the menu sits beside it (A6)', async () => {
+    getHistory.mockResolvedValue([norm]);
+    mount();
+    const titles = await screen.findAllByRole('button', { name: (n) => n.includes('legge') && n.includes('Art. 3') });
+    // One per layout (phone and desktop); none of them holds another control.
+    expect(titles).toHaveLength(2);
+    titles.forEach((title) => expect(title.querySelector('button')).toBeNull());
+    expect(titles[1].parentElement?.querySelector('button[title="Altre azioni"]')).not.toBeNull();
+    titles[1].focus();
+    expect(titles[1]).toHaveFocus();
+    // A native button: Enter is its click.
+    fireEvent.click(titles[1]);
+    expect(screen.getByTestId('where').textContent).toBe('/');
+  });
+
+  it('writes the time of a visit at 4.5:1 or more, in light and dark (Pietra\'s secondary text)', async () => {
+    getHistory.mockResolvedValue([norm]);
+    mount();
+    const times = await screen.findAllByTitle(new Date(at).toLocaleString('it-IT'));
+    times.forEach((time) => {
+      expect(time).not.toHaveClass('text-slate-400');
+      expect(time).not.toHaveClass('dark:text-slate-500');
+    });
+  });
 });

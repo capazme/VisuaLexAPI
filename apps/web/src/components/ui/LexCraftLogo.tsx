@@ -26,12 +26,14 @@ const selection = (style: CSSProperties) => <rect {...SELECTION} style={style} /
 
 interface LexCraftLogoProps {
   motion?: LogoMotion;
+  /** Its box, held still: the motion already played in this session (`logoSweep.ts`), as reduced motion holds it. */
+  played?: boolean;
   className?: string;
 }
 
-export function LexCraftLogo({ motion = 'still', className }: LexCraftLogoProps) {
+export function LexCraftLogo({ motion = 'still', played = false, className }: LexCraftLogoProps) {
   // Under reduced motion no class asks for a movement, and `index.css` holds the rest still too.
-  const moving = motion !== 'still' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const moving = motion !== 'still' && !played && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

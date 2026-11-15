@@ -42,9 +42,9 @@ export function AdvancedExportModal({
   const { article_text, norma_data } = articleData;
 
   const [sections, setSections] = useState<ExportSection[]>([
-    { id: 'text', label: 'Testo Articolo', icon: <FileText size={16} />, enabled: true },
+    { id: 'text', label: 'Testo dell’articolo', icon: <FileText size={16} />, enabled: true },
     { id: 'citation', label: 'Citazione', icon: <Scale size={16} />, enabled: true },
-    { id: 'notes', label: 'Note Personali', icon: <StickyNote size={16} />, enabled: annotations.length > 0 },
+    { id: 'notes', label: 'Note personali', icon: <StickyNote size={16} />, enabled: annotations.length > 0 },
     { id: 'highlights', label: 'Evidenziazioni', icon: <Highlighter size={16} />, enabled: highlights.length > 0 },
   ]);
 
@@ -127,7 +127,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('notes') && annotations.length > 0) {
-      rtf += `\\f0\\fs20\\b Note Personali:\\b0\\par`;
+      rtf += `\\f0\\fs20\\b Note personali:\\b0\\par`;
       annotations.forEach((n, idx) => {
         rtf += `\\f1\\fs18 ${idx + 1}. ${escape(n.text)}\\par`;
       });
@@ -390,7 +390,7 @@ export function AdvancedExportModal({
               'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
               copied
                 ? 'bg-green-600 text-white'
-                : 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white'
+                : 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white'
             )}
           >
             {copied ? (
@@ -419,7 +419,7 @@ export function AdvancedExportModal({
     >
       <div className="space-y-6">
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto Base</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto di base</h3>
           <div className="grid grid-cols-2 gap-2">
             {sections.filter(s => ['text', 'citation'].includes(s.id)).map(section => (
               <button
@@ -430,7 +430,7 @@ export function AdvancedExportModal({
                   TOUCH_TARGET_RESPONSIVE,
                   'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
                   section.enabled
-                    ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                    ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                     : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
                 )}
               >
@@ -444,7 +444,7 @@ export function AdvancedExportModal({
 
         {(annotations.length > 0 || highlights.length > 0) && (
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto Personale</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto personale</h3>
             <div className="grid grid-cols-2 gap-2">
               {sections.filter(s => ['notes', 'highlights'].includes(s.id)).map(section => {
                 const hasContent =
@@ -480,7 +480,7 @@ export function AdvancedExportModal({
         )}
 
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato Esportazione</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato di esportazione</h3>
           <div className="grid grid-cols-3 gap-2 sm:flex">
             <button
               onClick={() => setExportFormat('clipboard')}
@@ -489,7 +489,7 @@ export function AdvancedExportModal({
                 TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'clipboard'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
               )}
             >
@@ -503,7 +503,7 @@ export function AdvancedExportModal({
                 TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'markdown'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
               )}
             >
@@ -517,7 +517,7 @@ export function AdvancedExportModal({
                 TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'pdf'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
               )}
             >
@@ -531,7 +531,7 @@ export function AdvancedExportModal({
                 TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'rtf'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
               )}
             >
@@ -545,7 +545,7 @@ export function AdvancedExportModal({
                 TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'txt'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
               )}
             >

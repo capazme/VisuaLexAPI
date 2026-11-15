@@ -60,6 +60,20 @@ describe('SectionSwitcher (spec S3)', () => {
     expect(screen.getByRole('menuitemradio', { name: /Labs/ })).toBeInTheDocument();
   });
 
+  it('keeps Labs in the menu while its tools are off, «in arrivo» under its name and in its name (A7)', () => {
+    account.devMode = true;
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    try {
+      renderSwitcher();
+      fireEvent.click(trigger());
+      const labs = screen.getByRole('menuitemradio', { name: /Labs/ });
+      expect(labs.textContent).toBe('Labsin arrivo');
+      expect(labs).toHaveAccessibleName('Labs, in arrivo');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('moves by keyboard and closes with Esc, focus back on the button', () => {
     renderSwitcher();
     fireEvent.keyDown(trigger(), { key: 'ArrowUp' });

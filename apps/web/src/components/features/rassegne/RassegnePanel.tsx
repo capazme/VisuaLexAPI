@@ -327,7 +327,7 @@ function PanelBody({ view, urn, otherLabel, order, archivio, onArchivio, besideI
           {([undefined, 'civile', 'penale'] as const).map((value) => (
             <button key={value ?? 'tutte'} type="button" aria-pressed={archivio === value} onClick={() => onArchivio(value)}
               className={cn('min-h-[44px] rounded px-2 text-xs md:min-h-0',
-                archivio === value ? 'bg-slate-200 font-semibold dark:bg-slate-700' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800')}>
+                archivio === value ? 'bg-slate-200 font-semibold dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800')}>
               {value === undefined ? 'Tutte' : value === 'civile' ? 'Civile' : 'Penale'}
             </button>
           ))}

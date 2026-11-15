@@ -8,7 +8,7 @@ import axios, { AxiosError } from 'axios';
 vi.mock('../../components/ui/notifications/notifications', () => ({ notify: vi.fn() }));
 
 import { memoryStorage } from '../../test/memoryStorage';
-import { apiClient, TOO_MANY_REQUESTS_MESSAGE } from '../api';
+import { apiClient, PASSWORD_RULE_ERROR, TOO_MANY_REQUESTS_MESSAGE } from '../api';
 
 const realLocation = window.location;
 
@@ -46,6 +46,18 @@ describe('a 401 from /auth/login or /auth/register', () => {
   it('a 429 at sign-in says to retry in a while, in Italian', async () => {
     answer(429, 'Too many requests, please try again later');
     await expect(apiClient.post('/auth/login', {})).rejects.toMatchObject({ status: 429, message: TOO_MANY_REQUESTS_MESSAGE });
+  });
+});
+
+describe('a weak password at sign-up (#463)', () => {
+  // The server's words (apps/server: the register schema's regex, grouped by field in errorHandler's ZodError branch).
+  const RULE = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
+  it.each([
+    `Invalid request: password (${RULE})`,
+    `Invalid request: password (Too small: expected string to have >=8 characters; ${RULE})`,
+  ])('«%s» reaches the form in Italian', async (detail) => {
+    answer(400, detail);
+    await expect(apiClient.post('/auth/register', {})).rejects.toMatchObject({ status: 400, message: PASSWORD_RULE_ERROR });
   });
 });
 

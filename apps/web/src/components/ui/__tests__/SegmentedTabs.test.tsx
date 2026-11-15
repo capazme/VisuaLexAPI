@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { spring } from '../../../lib/motion';
+import { SegmentedControl } from '../SegmentedControl';
 import { SegmentedTabPanel, SegmentedTabs } from '../SegmentedTabs';
 import { markTransition, panelEntrance } from '../segmentedTabsMotion';
 
@@ -91,5 +92,21 @@ describe('the motion of SegmentedTabs', () => {
     expect(screen.getByRole('tabpanel').firstElementChild).toHaveClass('animate-in', 'slide-in-from-left-3');
     fireEvent.click(screen.getByRole('tab', { name: 'UNO' }));
     expect(screen.getByRole('tabpanel').firstElementChild).toHaveClass('slide-in-from-right-3');
+  });
+  // LC19: in the dark the chosen option of a group is the light ink with dark text, as every other group's; the grey
+  // mark on the grey track hardly stood out.
+  it('marks the chosen tab in the light ink in the dark, with dark text', () => {
+    render(<Harness />);
+    const chosen = screen.getByRole('tab', { name: 'UNO' });
+    expect(chosen).toHaveClass('dark:text-ink-950');
+    expect(chosen.querySelector('[data-segmented-mark]')).toHaveClass('dark:bg-toga-400');
+    expect(screen.getByRole('tab', { name: 'DUE' })).not.toHaveClass('dark:text-ink-950');
+  });
+
+  it('SegmentedControl marks its chosen option the same way', () => {
+    render(<SegmentedControl options={[{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]} value="a" onChange={() => {}} />);
+    const chosen = screen.getByRole('tab', { name: 'A' });
+    expect(chosen).toHaveClass('dark:text-ink-950');
+    expect(chosen.firstElementChild).toHaveClass('dark:bg-toga-400');
   });
 });

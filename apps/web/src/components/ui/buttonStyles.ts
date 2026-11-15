@@ -20,7 +20,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   primary: cn(
     'border border-transparent bg-toga-600 text-white',
     'hover:bg-toga-700 active:bg-toga-800',
-    'dark:bg-toga-400 dark:text-ink-950 dark:hover:bg-toga-300 dark:active:bg-toga-200'
+    'dark:bg-toga-400 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 dark:hover:bg-toga-300 dark:active:bg-toga-200'
   ),
   secondary: cn(
     'border border-ink-200 bg-card text-ink-800',

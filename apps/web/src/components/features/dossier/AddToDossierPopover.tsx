@@ -301,7 +301,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                         <button
                             type="submit"
                             disabled={busy || !newTitle.trim()}
-                            className="px-3 text-sm font-semibold text-white bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="px-3 text-sm font-semibold text-white bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             Crea e aggiungi
                         </button>

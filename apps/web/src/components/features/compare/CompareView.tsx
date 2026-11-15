@@ -214,7 +214,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             className={cn(
               "flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
               activeTab === 'available'
-                ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             )}
           >
@@ -226,7 +226,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             className={cn(
               "flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
               activeTab === 'search'
-                ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             )}
           >

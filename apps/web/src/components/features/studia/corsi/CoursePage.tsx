@@ -250,6 +250,7 @@ function Course({ id }: { id: string }) {
         title={confirming?.kind === 'end-programme' ? `Il programma finisce con ${confirming.contati} ${confirming.contati === 1 ? 'modulo' : 'moduli'}?` : ''}
         message={`${confirming?.kind === 'end-programme' && confirming.opensExam ? 'L’esame finale potrà aprirsi con i moduli che ci sono. ' : ''}Il tuo assistente non potrà aggiungere altri moduli, solo correggere quelli che ci sono.`}
         confirmLabel="Il programma finisce qui"
+        focusCancel
         onConfirm={() => confirming?.kind === 'end-programme' && void endProgramme(confirming.contati)}
         onCancel={() => setConfirming(null)}
       />
@@ -258,6 +259,7 @@ function Course({ id }: { id: string }) {
         title={confirming?.kind === 'withdraw' ? `Ritirare il modulo ${confirming.modulo.ordine}?` : ''}
         message="Le sue risposte non conteranno più per le competenze: conta la correzione che lo sostituisce."
         confirmLabel="Ritira il modulo"
+        focusCancel
         onConfirm={() => confirming?.kind === 'withdraw' && void withdraw(confirming.modulo)}
         onCancel={() => setConfirming(null)}
       />

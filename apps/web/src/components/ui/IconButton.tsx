@@ -60,7 +60,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       ),
       solid: cn(
         'text-white bg-toga-600 hover:bg-toga-700 active:bg-toga-800',
-        'dark:text-ink-950 dark:bg-toga-400 dark:hover:bg-toga-300',
+        'dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 dark:bg-toga-400 dark:hover:bg-toga-300',
         isActive && 'bg-toga-700 dark:bg-toga-300'
       ),
       danger: cn(

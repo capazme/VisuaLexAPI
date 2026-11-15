@@ -414,6 +414,17 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/forum', '/forum/community']);
   });
 
+  // Papiniano's pass on #457: from Work to Learn the column glided in from 41 px above. framer-motion's `LayoutGroup`
+  // reads its `id` once, so every section shared the first one's and the columns of two sections were one shape.
+  it('draws a new section\'s entries afresh, so its column appears in place instead of gliding from the old one', () => {
+    renderSidebar('/');
+    const work = screen.getByRole('group', { name: 'Work' });
+    fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+    expect(screen.getByRole('group', { name: 'Forum' })).not.toBe(work);
+    expect(work.isConnected).toBe(false);
+  });
+
   it('fades in the new section\'s entries only, never the Corpus ones above them (T1)', () => {
     // jsdom has no Web Animations: the spy records which elements fade in.
     const animate = vi.fn();

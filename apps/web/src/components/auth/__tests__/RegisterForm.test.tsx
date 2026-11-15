@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ login: vi.fn(), loading: false, error: null }) }));
+import { PASSWORD_RULE_ERROR } from '../../../services/api';
+
 const register = vi.fn();
 vi.mock('../../../services/authService', () => ({ register: (...args: unknown[]) => register(...args) }));
 
@@ -40,12 +42,12 @@ describe('RegisterForm', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Formato email non valido');
     expect(within(panel()).getByLabelText('Email')).toHaveFocus();
 
-    fill({ email: 'avv@studio.it', password: 'ab', confirm: 'ab' });
+    fill({ email: 'avv@studio.it', password: 'segreta123', confirm: 'segreta123' });
     submit();
-    expect(screen.getByRole('alert')).toHaveTextContent('Password deve essere almeno 3 caratteri');
+    expect(screen.getByRole('alert')).toHaveTextContent(PASSWORD_RULE_ERROR);
     expect(within(panel()).getByLabelText('Password')).toHaveFocus();
 
-    fill({ username: 'av', password: 'abc', confirm: 'abc' });
+    fill({ username: 'av', password: 'Segreta123', confirm: 'Segreta123' });
     submit();
     expect(screen.getByRole('alert')).toHaveTextContent('Username deve essere almeno 3 caratteri');
     expect(within(panel()).getByLabelText('Username')).toHaveFocus();
@@ -54,7 +56,7 @@ describe('RegisterForm', () => {
     submit();
     expect(screen.getByRole('alert')).toHaveTextContent('Username può contenere solo lettere, numeri e underscore');
 
-    fill({ username: 'avv_rossi', confirm: 'abd' });
+    fill({ username: 'avv_rossi', confirm: 'Segreta124' });
     submit();
     expect(screen.getByRole('alert')).toHaveTextContent('Le password non coincidono');
     const confirm = within(panel()).getByLabelText('Conferma password');
@@ -135,5 +137,20 @@ describe('RegisterForm', () => {
   it('draws nothing of the old design: no blurred blots, glass or gradient', () => {
     const { container } = renderAuth('/register');
     expect(container.innerHTML).not.toMatch(/blur-3xl|backdrop-blur|bg-gradient|from-blue|to-indigo/);
+  });
+
+  it('says the server\'s password rule under the field, and tells the field (#463)', () => {
+    renderAuth('/register');
+    const field = within(panel()).getByLabelText('Password');
+    expect(field).toHaveAccessibleDescription('Almeno 8 caratteri, con una maiuscola, una minuscola e un numero.');
+  });
+
+  it('says the server\'s refusal of a weak password in Italian, the focus on the password', async () => {
+    register.mockRejectedValueOnce({ status: 400, message: PASSWORD_RULE_ERROR });
+    renderAuth('/register');
+    fill({ email: 'avv@studio.it', username: 'avv_rossi', password: 'Segreta123', confirm: 'Segreta123' });
+    submit();
+    expect(await screen.findByRole('alert')).toHaveTextContent(PASSWORD_RULE_ERROR);
+    await waitFor(() => expect(within(panel()).getByLabelText('Password')).toHaveFocus());
   });
 });

@@ -195,7 +195,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'manual'
-                    ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
+                    ? 'bg-white shadow-sm text-slate-900 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                     : 'text-slate-600 dark:text-slate-400'
                 )}
               >
@@ -207,7 +207,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'url'
-                    ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
+                    ? 'bg-white shadow-sm text-slate-900 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                     : 'text-slate-600 dark:text-slate-400'
                 )}
               >

@@ -69,14 +69,34 @@ export function isRefreshRefused(error: unknown): boolean {
 /** The plain words a reader gets when a refresh could not reach the server. */
 export const CONNECTION_FAILED_MESSAGE = 'Connessione al server non riuscita. La sessione resta aperta: riprova tra poco.';
 
-/** A server's limit of requests (429). */
-export const TOO_MANY_REQUESTS_MESSAGE = 'Troppe richieste in poco tempo. Aspetta un minuto e riprova.';
+/** A server's limit of requests (429). No time promised: the sign-in's limit blocks for 15 minutes, others for one. */
+export const TOO_MANY_REQUESTS_MESSAGE = 'Troppe richieste in poco tempo. Riprova più tardi.';
+
+/** The 429's words, with the wait the server gives in `Retry-After` (seconds) when it gives one. */
+function tooManyRequestsMessage(retryAfter: unknown): string {
+  const seconds = Number(retryAfter);
+  if (!retryAfter || !Number.isFinite(seconds) || seconds <= 0) return TOO_MANY_REQUESTS_MESSAGE;
+  const minutes = Math.ceil(seconds / 60);
+  return `Troppe richieste in poco tempo. Riprova tra ${minutes === 1 ? 'un minuto' : `${minutes} minuti`}.`;
+}
 
 /** No answer at all (network, timeout). */
 export const NO_ANSWER_MESSAGE = 'Il server non risponde. Controlla la connessione e riprova.';
 
+/**
+ * The server's rule for a password at sign-up (apps/server, `registerSchema`: at least 8 characters, one lowercase,
+ * one uppercase, one digit), the same regex, and the words that say it under the field and when it is broken.
+ */
+export const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+export const PASSWORD_RULE_HINT = 'Almeno 8 caratteri, con una maiuscola, una minuscola e un numero.';
+export const PASSWORD_RULE_ERROR = 'La password deve avere almeno 8 caratteri, con una maiuscola, una minuscola e un numero.';
+const SERVER_PASSWORD_RULE = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
+
 /** The server's English answers a reader can meet, in Italian; any other passes as the server wrote it. */
 const SERVER_WORDS: Record<string, string> = {
+  // A weak password, as the server's validation groups it by field (alone, or after the length check).
+  [`Invalid request: password (${SERVER_PASSWORD_RULE})`]: PASSWORD_RULE_ERROR,
+  [`Invalid request: password (Too small: expected string to have >=8 characters; ${SERVER_PASSWORD_RULE})`]: PASSWORD_RULE_ERROR,
   'Invalid credentials': 'Email o password non corrette.',
   'User with this email or username already exists': 'Esiste già un account con questa email o questo nome utente.',
   'Internal server error': 'Errore del server. Riprova tra poco.',
@@ -219,7 +239,7 @@ apiClient.interceptors.response.use(
       // The server's limit answers in English, and axios's own words («Request failed with status code 500»,
       // «Network Error») are English too: the reader gets Italian, and what to do.
       message: status === 429
-        ? TOO_MANY_REQUESTS_MESSAGE
+        ? tooManyRequestsMessage(error.response?.headers?.['retry-after'])
         : (responseData?.detail && (SERVER_WORDS[responseData.detail] ?? responseData.detail)) || (status ? `Richiesta non riuscita (errore ${status}). Riprova tra poco.` : NO_ANSWER_MESSAGE),
       data: responseData,
     });

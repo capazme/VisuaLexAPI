@@ -34,12 +34,17 @@ export const login = async (credentials: UserLoginRequest): Promise<TokenRespons
   return response;
 };
 
+/** Drop both tokens, and nothing else: no redirect, the other data of the browser stays. */
+export const clearTokens = (): void => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+};
+
 /**
  * Logout user (clear tokens)
  */
 export const logout = (): void => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
+  clearTokens();
   currentUserRequest = null;
   forgetReturnTo();
   // Optionally redirect to login page

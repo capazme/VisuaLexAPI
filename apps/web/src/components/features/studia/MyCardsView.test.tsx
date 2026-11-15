@@ -369,7 +369,9 @@ describe('«Le mie schede», the act filter after a deletion', () => {
 
   const deleteCard = async (id: string) => {
     const detail = await screen.findByRole('article', { name: 'Scheda' });
-    await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
+    const user = userEvent.setup();
+    await user.click(within(detail).getByRole('button', { name: 'Elimina' }));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina' }));
     await waitFor(() => expect(trash).toHaveBeenCalledWith([id]));
   };
 
@@ -539,13 +541,15 @@ describe('«Le mie schede», delete', () => {
     renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     if (listAfter) list.mockResolvedValue(page(listAfter));
-    await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
+    const user = userEvent.setup();
+    await user.click(within(detail).getByRole('button', { name: 'Elimina' }));
+    await user.click(within(await screen.findByRole('alertdialog', { name: 'Eliminare la scheda?' })).getByRole('button', { name: 'Elimina' }));
   };
 
-  it('moves the card to the trash at once, with «Annulla» and no confirmation, and returns to the list (K1a)', async () => {
+  it('once confirmed moves the card to the trash, with «Annulla», and returns to the list (K1a, #457)', async () => {
     trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
     await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(trash).toHaveBeenCalledWith(['r1']);
     await waitFor(() => expect(shown?.message).toBe('Scheda nel cestino'));
     // The row under the article must not go on counting it.

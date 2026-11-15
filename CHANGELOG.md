@@ -12,6 +12,29 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-15
+
+Twenty small fixes from the day's browser tests, the dark theme's states, and a sign-in that never
+leaves tokens behind when refused. Web only, no migration.
+
+### Sign-in
+
+- If the sign-in succeeds but the account is then refused (401 or 403 on `/auth/me`), both tokens are
+  removed, with no redirect; a busy server (429, 5xx, no answer) keeps them (LC18).
+- The password rule is written under the field at sign-up and checked before sending, with the server's
+  own rule (a test compares the two); the server's refusals are in Italian.
+- A 429 says how long to wait when the server gives `Retry-After`; admin pages show the same waiting line.
+
+### Use
+
+- History rows open from the keyboard; «Nuovo dossier» opens straight on the form; confirmations start on
+  «Annulla»; Labs shows «in arrivo» while it is off; the logo's sweep and intro play once a session (LC18).
+
+### Look
+
+- In the dark theme a disabled primary action reads as off, the chosen option of a group has one look,
+  and a switch that is on takes the light ink (LC19).
+
 ## [1.18.0] - 2026-11-15
 
 The LexCraft logo in the app, animated; the independent UI review's corrections; a wrong password says

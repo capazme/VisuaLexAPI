@@ -11,7 +11,7 @@ export const FIELD =
 export const LABEL = 'block text-sm font-medium text-slate-900 dark:text-slate-100';
 
 export const PRIMARY_BUTTON =
-  'flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary-600 px-4 font-semibold text-white transition-[background-color,transform,scale] hover:bg-primary-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary-400 dark:text-slate-950 dark:hover:bg-primary-300 ' +
+  'flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary-600 px-4 font-semibold text-white transition-[background-color,transform,scale] hover:bg-primary-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary-400 dark:text-slate-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 dark:hover:bg-primary-300 ' +
   FOCUS_RING;
 
 /** The inline «Registrati» / «Accedi» under a form: it changes the tab, not the page. */

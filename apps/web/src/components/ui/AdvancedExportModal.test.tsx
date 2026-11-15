@@ -91,7 +91,7 @@ describe('AdvancedExportModal — nothing of Brocardi (D-078)', () => {
 
   it('offers the text, the citation and the reader\'s own, and no doctrine section, whatever the article still holds', () => {
     renderModal(legacyArticle);
-    expect(screen.getByRole('button', { name: /Testo Articolo/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Testo dell’articolo/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Citazione/ })).toBeInTheDocument();
     expect(screen.queryByText(/Approfondimenti|dottrina/i)).toBeNull();
     expect(screen.queryByText(BROCARDI_WORDS)).toBeNull();

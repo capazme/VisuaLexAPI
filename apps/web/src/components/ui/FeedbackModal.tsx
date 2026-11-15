@@ -160,7 +160,7 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
               disabled={isSubmitting || message.trim().length < 10}
               className={cn(
                 'flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-[color,background-color,border-color,opacity]',
-                'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white',
+                'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >

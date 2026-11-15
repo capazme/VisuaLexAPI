@@ -15,22 +15,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, loading, user, retrying } = useAuth();
   const location = useLocation();
 
-  // While the session is checked: the column of the splash in index.html, at the same place and size, so
-  // the hand-over from the splash to the app does not jump; it breathes instead of rising again.
-  // The line under it is positioned apart, so the column does not move when it appears.
-  if (loading) {
-    return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
-        <div role="status" aria-label="Caricamento di LexCraft" className="grid">
-          <BookMark size={56} breathe />
-        </div>
-        {/* Always in the page, so a screen reader hears the words when they come (LC14). */}
-        <p role="status" className="absolute inset-x-0 top-1/2 mt-12 px-4 text-center text-sm text-slate-600 dark:text-slate-300">
-          {retrying ? 'Il server non risponde, riprovo…' : ''}
-        </p>
-      </div>
-    );
-  }
+  if (loading) return <SessionLoading retrying={retrying} />;
 
   // Redirect to login if not authenticated, preserving intended destination
   if (!isAuthenticated) {
@@ -43,6 +28,25 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Render children if authenticated
   return <>{children}</>;
+}
+
+/**
+ * While the session is checked: the column of the splash in index.html, at the same place and size, so the hand-over
+ * from the splash to the app does not jump; it breathes instead of rising again. The line under it is positioned apart,
+ * so the column does not move when it appears. The admin pages wait on it too (#463).
+ */
+export function SessionLoading({ retrying = false }: { retrying?: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
+      <div role="status" aria-label="Caricamento di LexCraft" className="grid">
+        <BookMark size={56} breathe />
+      </div>
+      {/* Always in the page, so a screen reader hears the words when they come (LC14). */}
+      <p role="status" className="absolute inset-x-0 top-1/2 mt-12 px-4 text-center text-sm text-slate-600 dark:text-slate-300">
+        {retrying ? 'Il server non risponde, riprovo…' : ''}
+      </p>
+    </div>
+  );
 }
 
 /** Signed in, the account not read: the session stays open and a reload asks again. The still logo over the message

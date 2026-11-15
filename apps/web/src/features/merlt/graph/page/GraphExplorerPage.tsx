@@ -8,6 +8,8 @@ import { GRAPH_PAGE } from '../../../sections/pageNames';
 import type { SearchParams } from '../../../../types';
 import { useAppStore } from '../../../../store/useAppStore';
 import { isMerltGraphEnabled } from '../featureFlag';
+import { isMerltEnabled } from '../../featureFlag';
+import { LabsOff } from '../../LabsOff';
 import { useMerltFeatures } from '../../useMerltFeatures';
 import { useQaThread } from '../../qa/useQaThread';
 import { sendRelationFeedback } from '../../qa/qaApi';
@@ -1068,6 +1070,8 @@ export function GraphExplorerPage(): React.ReactElement {
     }
   };
 
+  // MERL-T off: every Labs address says the hub's words (#462); the graph alone off keeps its own line.
+  if (!isMerltEnabled()) return <LabsOff />;
   if (!enabled) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">

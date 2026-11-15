@@ -140,9 +140,11 @@ export function useAuth() {
    */
   const login = useCallback(async (email: string, password: string) => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
+    let signedIn = false;
 
     try {
       await authService.login({ email, password });
+      signedIn = true;
       const user = await authService.getCurrentUser();
       // What this browser holds of anyone else (a practice, a question to the assistant, Gymnasium's marks) goes.
       claimBrowserFor(user.id, { signIn: true });
@@ -160,6 +162,11 @@ export function useAuth() {
 
       return user;
     } catch (error) {
+      // Signed in, then the account refused (401, 403): the tokens just stored go with the failure, and the form stays,
+      // no redirect (#463). A 429, a 5xx or no answer keep them: the session is not refused (LC13).
+      if (signedIn && isRefusalStatus((error as { status?: unknown } | null)?.status)) {
+        authService.clearTokens();
+      }
       setState((prev) => ({
         ...prev,
         loading: false,
