@@ -256,8 +256,8 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
 
           {/* The active entry is «selected» by the logo's column (D-237), in the 21 px between the bar's edge and the icon:
               the 16 px mark (its column 6.6 px wide, from 4.7 to 11.3 px of the box) 7.5 px left of the row, so the
-              column runs from 7.2 to 13.8 px of the bar, 7.2 px from its edge and from the icon's box (21 px). It jumps
-              from entry to entry, as the dash did (seen in the browser, #448): `layoutId` does not carry it. */}
+              column runs from 7.2 to 13.8 px of the bar, 7.2 px from its edge and from the icon's box (21 px). It slides
+              from entry to entry within a section (`layoutId`, in the section's `LayoutGroup`). */}
           {isActive && (
             <motion.span
               layoutId="activeIndicator"
@@ -500,8 +500,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           </>
         )}
         {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
-            Each section names its own active column (`layoutId` within the section's group). */}
-        <LayoutGroup id={section}>
+            Each section names its own active column (`layoutId` within the section's group), and the phone's drawer apart:
+            `Layout` keeps both copies mounted, and with one name the desktop's column took its start from the hidden
+            drawer's (a box of nothing), so it jumped instead of sliding (#448). */}
+        <LayoutGroup id={layout === 'drawer' ? `drawer-${section}` : section}>
           <div ref={sectionEntries} role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
             {section === 'gymnasium' && (
               <>
