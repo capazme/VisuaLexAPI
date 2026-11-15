@@ -94,20 +94,22 @@ router.post('/', wrap(async (req, res) => {
   res.status(201).json({ atto });
 }));
 
+// The owner is in the write's own `where` (Irnerio's review): no window between a check and a write by id.
 router.put('/:id', wrap(async (req, res) => {
   const body = updateBody.parse(req.body);
-  await ownAtto(req.user!.id, req.params.id);
-  if (body.dossierId !== undefined) await ownDossier(req.user!.id, body.dossierId);
-  const atto = await prisma.atto.update({
-    where: { id: req.params.id },
+  const userId = req.user!.id;
+  if (body.dossierId !== undefined) await ownDossier(userId, body.dossierId);
+  const { count } = await prisma.atto.updateMany({
+    where: { id: req.params.id, userId },
     data: { ...body, ...(body.titolo !== undefined ? { titolo: body.titolo.trim() } : {}) },
   });
-  res.json({ atto });
+  if (count === 0) throw new AppError(404, 'Atto non trovato.');
+  res.json({ atto: await ownAtto(userId, req.params.id) });
 }));
 
 router.delete('/:id', wrap(async (req, res) => {
-  await ownAtto(req.user!.id, req.params.id);
-  await prisma.atto.delete({ where: { id: req.params.id } });
+  const { count } = await prisma.atto.deleteMany({ where: { id: req.params.id, userId: req.user!.id } });
+  if (count === 0) throw new AppError(404, 'Atto non trovato.');
   res.status(204).end();
 }));
 

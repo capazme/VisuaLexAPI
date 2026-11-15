@@ -60,6 +60,16 @@ describe('Atti (draft)', () => {
     expect((await prisma.atto.findUnique({ where: { id: atto.id } }))?.dossierId).toBeNull();
   });
 
+  it('travels in the account export, the owner\'s acts only', async () => {
+    const owner = await createTestUser('atti-export');
+    const other = await createTestUser('atti-export-other');
+    await prisma.atto.create({ data: { userId: owner.id, titolo: 'Mio', testo: 'testo mio' } });
+    await prisma.atto.create({ data: { userId: other.id, titolo: 'Altrui', testo: 'testo altrui' } });
+    const response = await request(app).get('/api/auth/export').set(authHeader(owner));
+    expect(response.status).toBe(200);
+    expect(response.body.data.atti).toEqual([expect.objectContaining({ titolo: 'Mio', testo: 'testo mio', stato: 'bozza' })]);
+  });
+
   it('needs a session', async () => {
     expect((await request(app).get('/api/atti')).status).toBe(401);
   });
