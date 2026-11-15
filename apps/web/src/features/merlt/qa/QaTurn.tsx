@@ -350,7 +350,7 @@ export function QaTurn({
                   type="button"
                   onClick={submitRefine}
                   disabled={!followUp.trim()}
-                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white disabled:bg-slate-300 dark:disabled:bg-slate-700"
+                  className="rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 px-3 py-1.5 text-sm font-medium text-white disabled:bg-slate-300 dark:disabled:bg-slate-700"
                 >
                   Invia
                 </button>

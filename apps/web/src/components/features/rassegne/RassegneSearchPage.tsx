@@ -238,13 +238,13 @@ export function RassegneSearchPage() {
                   className={cn(
                     'rounded-full px-3 py-1 text-sm ring-1 ring-inset',
                     checked
-                      ? 'bg-primary-600 text-white ring-primary-600'
+                      ? 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:ring-toga-400 text-white ring-primary-600'
                       : 'text-slate-700 ring-slate-200 hover:bg-slate-50 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800',
                     FOCUS_RING,
                     TOUCH_TARGET_RESPONSIVE,
                   )}
                 >
-                  {label} <span className={checked ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}>{count.toLocaleString('it-IT')}</span>
+                  {label} <span className={checked ? 'text-white/80 dark:text-ink-700' : 'text-slate-500 dark:text-slate-400'}>{count.toLocaleString('it-IT')}</span>
                 </button>
               );
             })}

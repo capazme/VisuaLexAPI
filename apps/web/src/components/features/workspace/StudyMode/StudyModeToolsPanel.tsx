@@ -347,7 +347,7 @@ export function StudyModeToolsPanel({
                 <button
                   onClick={handleAddNote}
                   disabled={!noteText.trim()}
-                  className="self-end p-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                  className="self-end p-2 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                 >
                   <Send size={16} />
                 </button>

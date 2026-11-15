@@ -84,7 +84,7 @@ export function DecisionPreviewPopup({
       footer={
         <button
           onClick={handleOpen}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-primary-600 hover:bg-primary-700 text-white"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white"
         >
           <ExternalLink size={14} />
           Apri accanto

@@ -329,7 +329,7 @@ export function AliasManager() {
                                 "w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors",
                                 "flex items-center justify-center gap-2",
                                 canSubmit
-                                    ? "bg-primary-600 text-white hover:bg-primary-700"
+                                    ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
                                     : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
                             )}
                         >
@@ -500,7 +500,7 @@ function AliasItem({
                     </button>
                     <button
                         onClick={onSaveEdit}
-                        className="px-3 py-1 text-xs rounded-lg bg-primary-600 text-white hover:bg-primary-700"
+                        className="px-3 py-1 text-xs rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
                     >
                         Salva
                     </button>

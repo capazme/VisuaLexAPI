@@ -123,7 +123,7 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
           <button
             onClick={submit}
             disabled={!hasSelection || busy}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
           >
             <Send size={16} /> {busy ? 'Invio...' : 'Aggiungi'}
           </button>

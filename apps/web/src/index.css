@@ -302,10 +302,11 @@
     /* In the dark the action is light ink (Pietra): the toga steps the code writes for a dark action
        (`dark:bg-toga-400`, hover 300, press 200) and for the focus (`ring-toga-500`, one class for both
        themes) take the dark table's values. The ink steps need no second value.
-       600, 700, 800: an interim for the filled actions written without a `dark:` variant (`bg-primary-600
-       text-white`), which would be ink slabs on the dark paper: the lightest warm grey that keeps white at
-       4.6:1 (#79746c, 4.64:1), hover #6f6a61 (5.37:1), press #67625a (6.05:1). The design's dark action
-       (#f1eee8, dark text) needs each of those classes touched.
+       600, 700, 800: the lightest warm grey that keeps white at 4.6:1 (#79746c, 4.64:1), hover #6f6a61
+       (5.37:1), press #67625a (6.05:1), for what still writes them with no `dark:` variant. Since LC17 no
+       filled action does (they take `dark:bg-toga-400`, dark text); left are the counters' badges
+       (`bg-primary-600 text-white`), the switches' «on» track and checkboxes (`bg-`, `accent-primary-600`),
+       and links and labels in `text-primary-600`, `hover:text-primary-700`, which the system ink would hide.
        900: the design's dark pietra #a39c90, so that a selection's tint (`dark:bg-primary-900/20`, `/30`)
        lands on the dark highlighter #4a463f: /20 gives #43413d and /30 #4f4c47 on the surface #2b2a28,
        and its few solid uses are borders. 950: the dark rule #373633. */

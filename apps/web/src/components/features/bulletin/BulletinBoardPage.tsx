@@ -431,7 +431,7 @@ export function BulletinBoardPage() {
         <button
           id="tour-forum-publish"
           onClick={() => setShowPublishModal(true)}
-          className="flex min-h-[44px] items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 md:min-h-0"
+          className="flex min-h-[44px] items-center gap-2 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 md:min-h-0"
         >
           <Upload size={18} />
           Pubblica un dossier

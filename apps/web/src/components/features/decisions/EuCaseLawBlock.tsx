@@ -152,7 +152,7 @@ export function EuCaseLawBlock({ norma, besideId, backEntry }: EuCaseLawBlockPro
             'rounded-lg border px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
             TOUCH_TARGET_RESPONSIVE,
             showOpinions
-              ? 'border-primary-600 bg-primary-600 text-white'
+              ? 'border-primary-600 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:border-toga-400 text-white'
               : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800',
           )}
         >

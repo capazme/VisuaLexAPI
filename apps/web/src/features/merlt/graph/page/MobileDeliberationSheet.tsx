@@ -105,7 +105,7 @@ export function MobileDeliberationSheet({
       <button
         type="button"
         onClick={handleOpen}
-        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full bg-primary-600 px-5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
       >
         <MessageSquare size={16} aria-hidden="true" />
         Dibattito

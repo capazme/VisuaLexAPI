@@ -81,6 +81,23 @@ describe('Pietra\'s colours', () => {
     const stale = Object.keys(KEYS).filter((file) => !HAND_COLOUR.test(readFileSync(join(src, file), 'utf8')));
     expect(stale).toEqual([]);
   });
+
+  // LC17 (A8): in the dark a filled action is light ink with dark text, as «Inizia una ricerca»; the mid grey with
+  // white text reads as disabled. The shared bases first: each line that fills with `bg-primary-600` says so.
+  it('the shared bases of a filled action are light ink in the dark', () => {
+    const bases = [
+      join('features', 'merlt', 'hub', 'hubStyles.ts'),
+      join('components', 'features', 'search', 'NoteEditBox.tsx'),
+      join('components', 'features', 'search', 'AnnexSuggestion.tsx'),
+      join('components', 'ui', 'AdvancedExportModal.tsx'),
+      join('features', 'merlt', 'graph', 'page', 'AskGraphField.tsx'),
+      join('components', 'features', 'dossier', 'dossierStyles.ts'),
+    ];
+    const grey = bases.flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => (/\bbg-primary-600\b/.test(line) && !['dark:bg-toga-400', 'dark:hover:bg-toga-300', 'dark:text-ink-950'].every((c) => line.includes(c)) ? `${file}:${i + 1}` : null))
+      .filter(Boolean));
+    expect(grey).toEqual([]);
+  });
 });
 
 describe('Pietra\'s scales', () => {

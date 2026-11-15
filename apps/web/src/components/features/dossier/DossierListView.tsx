@@ -293,7 +293,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <button
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
-            className="flex-1 md:flex-none dossier-create-button bg-primary-600 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="flex-1 md:flex-none dossier-create-button bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
             title="Nuovo dossier (n)"
             aria-keyshortcuts="n"
           >
@@ -316,7 +316,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
             aria-label="Nuovo dossier"
-            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <Plus size={22} aria-hidden />
           </button>

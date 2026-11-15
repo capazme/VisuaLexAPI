@@ -30,7 +30,7 @@ export interface NoteEditBoxProps {
 
 const BUTTON = 'min-h-[44px] rounded-md px-3 text-xs';
 const QUIET = cn(BUTTON, 'font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING);
-const MAIN = cn(BUTTON, 'bg-primary-600 font-semibold text-white hover:bg-primary-700', FOCUS_RING);
+const MAIN = cn(BUTTON, 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 font-semibold text-white hover:bg-primary-700', FOCUS_RING);
 
 /**
  * A note's text being edited in place — the note cards' (`NoteCard`): blur or Cmd/Ctrl+Enter saves, Esc cancels;

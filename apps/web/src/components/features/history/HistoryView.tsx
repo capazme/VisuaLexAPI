@@ -397,7 +397,7 @@ export function HistoryView() {
                             action={
                                 <button
                                     onClick={() => navigate('/')}
-                                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
+                                    className="px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
                                 >
                                     <Search size={18} />
                                     Inizia una ricerca
@@ -714,7 +714,7 @@ export function HistoryView() {
                             <button
                                 onClick={handleConfirmCreateDossier}
                                 disabled={!newDossierTitle.trim()}
-                                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-3 py-1.5 text-sm bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Crea e aggiungi
                             </button>

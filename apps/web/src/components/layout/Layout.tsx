@@ -392,7 +392,7 @@ export function Layout() {
             !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.375rem)]',
             'shadow-sm border',
             settings.focusMode
-              ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
+              ? 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white border-transparent hover:bg-primary-700'
               : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
           title={settings.focusMode ? `Esci dal tutto schermo (${FULL_SCREEN_SHORTCUT})` : `Tutto schermo (${FULL_SCREEN_SHORTCUT})`}

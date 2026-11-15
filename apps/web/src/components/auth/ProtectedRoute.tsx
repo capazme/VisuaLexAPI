@@ -57,7 +57,7 @@ export function SessionKeptUnreachable() {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="min-h-11 rounded-xl bg-primary-600 px-6 font-medium text-white hover:bg-primary-700"
+            className="min-h-11 rounded-xl bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-6 font-medium text-white hover:bg-primary-700"
           >
             Riprova
           </button>

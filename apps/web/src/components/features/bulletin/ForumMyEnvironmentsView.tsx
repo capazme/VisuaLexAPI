@@ -71,7 +71,7 @@ export function ForumMyEnvironmentsView({
         </p>
         <button
           onClick={onPublishClick}
-          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors`}
+          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors`}
         >
           <Upload size={16} />
           Pubblica un dossier
