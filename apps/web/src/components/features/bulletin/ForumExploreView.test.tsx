@@ -67,7 +67,6 @@ function ForumExploreViewIn({ into }: { into: HTMLElement }) {
       onImport={noop}
       onReport={noop}
       onSuggest={noop}
-      onPublishClick={noop}
       onPacksAdded={noop}
       onPacksError={noop}
       onResetFilters={noop}
@@ -100,7 +99,6 @@ function renderView(overrides: Partial<React.ComponentProps<typeof ForumExploreV
       onImport={noop}
       onReport={noop}
       onSuggest={noop}
-      onPublishClick={noop}
       onPacksAdded={noop}
       onPacksError={noop}
       onResetFilters={noop}
@@ -163,11 +161,6 @@ describe('ForumExploreView - touch targets on a phone', () => {
   it('gives the icon-only refresh button a name and 44 × 44 px', () => {
     renderView();
     expect(screen.getByRole('button', { name: "Aggiorna l'elenco" })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
-  });
-
-  it('gives «Pubblica un dossier» of the empty Forum 44 px', () => {
-    renderView();
-    expect(screen.getByRole('button', { name: 'Pubblica un dossier' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
   });
 
   it('gives «Azzera filtri» of an empty search 44 px', () => {
@@ -266,7 +259,7 @@ describe('ForumExploreView - the order of the page', () => {
       setSearchQuery: noop, category: 'all' as const, setCategory: noop, sort: 'newest' as const, setSort: noop,
       showCategoryDropdown: false, setShowCategoryDropdown: noop, showSortDropdown: false, setShowSortDropdown: noop,
       onSearchSubmit: (e: React.FormEvent) => e.preventDefault(), onRefresh: noop, onPaginate: noop, onLike: noop,
-      onImport: noop, onReport: noop, onSuggest: noop, onPublishClick: noop, onPacksAdded: noop, onPacksError: noop,
+      onImport: noop, onReport: noop, onSuggest: noop, onPacksAdded: noop, onPacksError: noop,
       onResetFilters: noop,
     });
     rerender(<ForumExploreView {...props(true)} />);
@@ -333,11 +326,18 @@ describe('ForumExploreView - the order of the page', () => {
     }
   });
 
-  it('shows the packs once, after the empty Forum', () => {
-    setDesktop(true);
-    renderView();
-    const empty = screen.getByText('Ancora nessun dossier nel Forum');
-    const packs = screen.getByRole('region', { name: 'Pronti da LexCraft' });
-    expect(follows(empty, packs)).toBe(true);
+  // LC24: the empty Forum is one quiet line; «Pubblica un dossier» is the page header's, not the view's.
+  it('shows the packs once, after the empty Forum\'s one line, with no button of its own', () => {
+    for (const desktop of [true, false]) {
+      setDesktop(desktop);
+      const { unmount } = renderView();
+      const empty = screen.getByText(/^Ancora nessun dossier pubblicato dalla comunità:/);
+      expect(empty.tagName).toBe('P');
+      expect(screen.queryByRole('button', { name: 'Pubblica un dossier' })).toBeNull();
+      const packs = screen.getAllByRole('region', { name: 'Pronti da LexCraft' });
+      expect(packs).toHaveLength(1);
+      expect(follows(empty, packs[0])).toBe(true);
+      unmount();
+    }
   });
 });

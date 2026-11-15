@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { scrollParentOf } from '../practice/practiceView';
-import { Search, Upload, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
+import { Search, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
 import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { EmptyState } from '../../ui/EmptyState';
 import { StudyPacksBand } from './StudyPacksBand';
@@ -56,7 +56,6 @@ interface ForumExploreViewProps {
   onImport: (env: SharedEnvironment) => void;
   onReport: (id: string) => void;
   onSuggest: (env: SharedEnvironment) => void;
-  onPublishClick: () => void;
   onPacksAdded: (report: StudyImportReport) => void;
   onPacksError: (message: string) => void;
   onResetFilters: () => void;
@@ -84,7 +83,6 @@ export function ForumExploreView({
   onImport,
   onReport,
   onSuggest,
-  onPublishClick,
   onPacksAdded,
   onPacksError,
   onResetFilters,
@@ -138,20 +136,11 @@ export function ForumExploreView({
       }
     />
   ) : (
-    <EmptyState
-      variant="generic"
-      title="Ancora nessun dossier nel Forum"
-      description="Pubblica un tuo dossier di studio: gli altri lo aggiungono ai loro dossier."
-      action={
-        <button
-          onClick={onPublishClick}
-          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors`}
-        >
-          <Upload size={16} />
-          Pubblica un dossier
-        </button>
-      }
-    />
+    // LC24: one quiet line, not a screen: the page's title row has «Pubblica un dossier» already, and «Pronti da
+    // LexCraft» follows at once.
+    <p className="border-y border-slate-200 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+      Ancora nessun dossier pubblicato dalla comunità: pubblica un tuo dossier di studio, gli altri lo aggiungono ai loro.
+    </p>
   );
   // «Pronti da VisuaLex» from elsewhere (the empty dossier list, `/forum#pronti`): once the dossiers are read and the
   // strip has its place, the content scroller alone brings it to the top (never `scrollIntoView`, gotcha 34), and the
