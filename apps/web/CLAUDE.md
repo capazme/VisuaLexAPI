@@ -525,7 +525,9 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   wordmark 120 px wide in the wide bar and the drawer, its «L» flush with the switcher's mark; in the rail the column
   alone (`BookMark`, 32 px), centred over the icons, still. It sweeps (the cursor selects CRAFT in ink and leaves it in
   stone, 1.5 s) once a browser session, as the shell first draws (`Layout`, `visualex-logo-sweep` in
-  `sessionStorage`), never in the rail; `SectionSwitcher`: under it, at the top of the sidebar,
+  `sessionStorage`), and in the phone's drawer at its first opening in the session (`visualex-logo-sweep-drawer`,
+  LC18), never in the rail; the sign-in page's intro plays once a browser session too (`visualex-logo-intro`), held
+  still in its box after «Esci» (`LexCraftLogo`'s `played`); `SectionSwitcher`: under it, at the top of the sidebar,
   `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
   Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
   the section's name — from `xl` and in the phone's drawer — a split button (S6): the mark and the name go to the

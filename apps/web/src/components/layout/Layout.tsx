@@ -106,10 +106,12 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // The logo's sweep (LC16): once a browser session, as the shell first draws — the splash and the session's check
   // are gone by then —, never again on a change of page. Read here once for both copies of the bar, recorded after.
-  const [logoSweep] = useState(logoSweepDue);
+  const [logoSweep] = useState(() => logoSweepDue());
   useEffect(() => {
     if (logoSweep) markLogoSweep();
   }, [logoSweep]);
+  // The phone's drawer is closed as the shell draws: its sweep plays at its first opening in the session (LC18).
+  const [drawerSweep, setDrawerSweep] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
@@ -174,7 +176,13 @@ export function Layout() {
   const menuToggle = {
     buttonRef: menuToggleRef,
     open: sidebarOpen,
-    onToggle: () => setSidebarOpen(!sidebarOpen),
+    onToggle: () => {
+      if (!sidebarOpen && !drawerSweep && logoSweepDue('sweep-drawer')) {
+        markLogoSweep('sweep-drawer');
+        setDrawerSweep(true);
+      }
+      setSidebarOpen(!sidebarOpen);
+    },
     notice: servicesNotice ? serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase() : undefined,
   };
 
@@ -341,7 +349,7 @@ export function Layout() {
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
-            logoSweep={logoSweep}
+            logoSweep={drawerSweep}
           />
         </div>
       )}

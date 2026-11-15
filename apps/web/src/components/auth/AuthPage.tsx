@@ -25,6 +25,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookMark } from '../ui/BookMark';
 import { LexCraftLogo } from '../ui/LexCraftLogo';
+import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
 import { FOCUS_RING } from '../../constants/interactions';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -61,6 +62,11 @@ export function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [tab, setTab] = useState<AuthTab>(() => authPageTab(location.pathname) ?? 'login');
+  // The logo's intro, once a browser session (LC18): read as the page opens, recorded after.
+  const [intro] = useState(() => logoSweepDue('intro'));
+  useEffect(() => {
+    if (intro) markLogoSweep('intro');
+  }, [intro]);
   // Read by the page, which passes it to the sign-in form.
   const auth = useAuth();
   // A request in flight (a sign-in, a sign-up): the tabs hold still, or its answer would land on the
@@ -240,9 +246,10 @@ export function AuthPage() {
               // On a computer as tall as the card on «Accedi», its content centred: the two on one middle line.
               className="flex flex-col items-center gap-4 text-center md:min-h-[var(--login-card-h,32rem)] md:items-start md:justify-center md:gap-5 md:text-left"
             >
-              {/* The page's title, for a reader the logo's name; the logo plays its intro once, as the page opens. */}
+              {/* The page's title, for a reader the logo's name; the logo plays its intro once a browser session, as the
+                  shell's sweep: after «Esci» it stands still in its box (LC18). */}
               <h1>
-                <LexCraftLogo motion="intro" className="block h-auto w-[196px] md:-ml-[9.1px] lg:-ml-[12.1px] lg:w-[260px]" />
+                <LexCraftLogo motion="intro" played={!intro} className="block h-auto w-[196px] md:-ml-[9.1px] lg:-ml-[12.1px] lg:w-[260px]" />
               </h1>
               <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
                 Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
