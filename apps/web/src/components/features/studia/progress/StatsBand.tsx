@@ -108,7 +108,8 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
               missions' stead, so the goal is still said. */}
           {data.livello && <LevelBar livello={data.livello} />}
           {!data.missioni?.length && <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />}
-          <StatesLine stati={data.stati} />
+          {/* The cards by state are the progress page's: beside the road (LC23) the rail keeps the streak, the level, the goal. */}
+          {!aside && <StatesLine stati={data.stati} />}
           <Link
             to="/learn/progressi"
             className={cn('-mx-1 inline-flex min-h-[44px] items-center gap-1.5 justify-self-start rounded-lg px-1 text-sm font-semibold underline-offset-4 hover:underline', INK_TEXT, FOCUS_RING)}
@@ -125,7 +126,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
             <div className={cn('h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800', aside && ASIDE_WEEK)} />
           </div>
           <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-          <div className="h-10 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          {!aside && <div className="h-10 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />}
           <div className="h-11 w-36 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
         </div>
       ) : (

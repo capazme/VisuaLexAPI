@@ -296,7 +296,7 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
                     <motion.span
                       layoutId="pill"
                       aria-hidden
-                      className="absolute inset-0 rounded-lg bg-white shadow-sm dark:bg-slate-900"
+                      className="absolute inset-0 rounded-lg bg-card shadow-sm dark:bg-slate-900"
                       transition={still ? { duration: 0 } : { duration: BEND_S, ease: ease.inOut }}
                     />
                   )}
@@ -415,7 +415,7 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
             <motion.div aria-hidden className="pointer-events-none absolute top-0" style={{ left: PAD.left, x: springX }}>
               <span
                 className={cn(
-                  'absolute top-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+                  'absolute top-0 whitespace-nowrap rounded-md border border-slate-200 bg-card px-2 py-1 text-xs font-medium text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
                   xOf(chosen) < plotW * 0.25 ? 'left-0' : xOf(chosen) > plotW * 0.75 ? 'right-0' : '-translate-x-1/2',
                 )}
               >

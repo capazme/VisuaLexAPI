@@ -15,7 +15,8 @@ export const SUCCESS_TEXT = 'text-green-700 dark:text-green-400';
 export const MUTED_TEXT = 'text-slate-500 dark:text-slate-400';
 
 /** A tile of the dashboard: the missions, the statistics, a stop of the road. */
-export const TILE = 'rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
+// LC23: the prototype's surface (#faf8f4 on the stone page), not white.
+export const TILE = 'rounded-2xl border border-slate-200 bg-card dark:border-slate-800 dark:bg-slate-900';
 /**
  * A block's heading: the reader's serif, in sentence case. One type language (Gymnasium spec §5.1): headings
  * in EB Garamond, labels in Inter; no small capitals and no double rule.

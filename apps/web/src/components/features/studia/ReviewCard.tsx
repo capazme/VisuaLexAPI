@@ -46,10 +46,10 @@ export function ReviewCard({ card, revealed, focusKey, onOpenAnchor }: ReviewCar
   return (
     <article
       aria-label="Scheda in ripasso"
-      className={cn(TILE, 'p-5 md:px-10 md:py-9', 'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2')}
+      className={cn(TILE, 'p-6 md:px-12 md:py-12', 'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2')}
     >
       {citation && <p className="mb-3 break-words text-sm font-medium text-slate-500 dark:text-slate-400">{citation}</p>}
-      <h2 ref={question} tabIndex={-1} className={cn(MEASURE, TEXT, 'text-xl text-slate-900 focus:outline-none md:text-2xl dark:text-slate-50')}>{card.domanda}</h2>
+      <h2 ref={question} tabIndex={-1} className={cn(MEASURE, TEXT, 'text-2xl leading-snug text-slate-900 focus:outline-none md:text-[30px] dark:text-slate-50')}>{card.domanda}</h2>
       {revealed && (
         <>
           <hr className={cn(MEASURE, 'my-5 origin-left border-slate-200 motion-safe:animate-vlx-rule dark:border-slate-700')} />
