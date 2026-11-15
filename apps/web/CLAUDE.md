@@ -37,14 +37,14 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   «Riprova», which reloads (the one mend for a file a deploy removed; before P1 no boundary held it and the app went
   blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
   entry chosen again, included).
-  In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
-  over `oggi`, `prossimi`, `ingresso` and `cestino`; `/opus` redirects to `oggi`),
-  `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
+  In the signed-in layout: `/` (search), `/dossier`, `/work` (the planner, below: `OpusPage`
+  over `oggi`, `prossimi`, `ingresso` and `cestino`; `/work` redirects to `oggi`),
+  `/learn` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
-  in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/studia` redirects to `ripasso` (see «Card review» below); `/studia/progressi` is «Progressi», the page of the data (see «Progressi» below); «Le mie schede» is
+  in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/learn` redirects to `ripasso` (see «Card review» below); `/learn/progressi` is «Progressi», the page of the data (see «Progressi» below); «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
-  the selected card is the route `/studia/schede/:id`, an anchor opens its article through
+  the selected card is the route `/learn/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; with no card open the cards are tiles across the frame (G8) in a grid of
   cards of at least 20rem (`CARD_GRID_COLUMNS`, U1: one column on a phone, two at 768 px, three at 1366 with the
   sidebar, four at 1920; `CardGroups`' `grid`), each with its front in EB Garamond, its subject's dot,
@@ -69,7 +69,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
   validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di Learn»
   tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
-  names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/studia/valida`
+  names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/learn/valida`
   (`ValidationQueueView`), linked for validators only (`useAuth().isValidator`, from `lingo_validatore`
   on `/auth/me`; the server checks the flag on every call): `useValidationQueue` shows the proposed cards
   one at a time, oldest first, refilling when two are left; the primary anchor's article sits beside the
@@ -82,7 +82,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
   403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides);
-  «Percorsi» is `/studia/percorsi` and a course `/studia/percorsi/:id` (courses spec
+  «Percorsi» is `/learn/percorsi` and a course `/learn/percorsi/:id` (courses spec
   `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md` §6, the web's pull request (a); the views under
   `components/features/studia/corsi/`, the routes in `services/corsiService.ts`, the shapes in `types/corsi.ts`): behind
   the server's switch `lingo_courses`, read with `assistantPassages` from the one `GET /api/features`
@@ -109,10 +109,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `PATCH { moduliPrevisti }` to the modules that count, confirmed; «così l’esame potrà aprirsi» only when modules are
   all the course lacks, `closingOpensExam`), the exam's state (taking it is pull request d), the dossier's link and the menu (rename, export as
   JSON, the trash with the toast «Il dossier «X» resta in Dossier»). «Oggi»'s row (`TodayCourses`, in the day block's
-  cell so the grid keeps its rows) offers a course's due cards first (`/studia/ripasso/sessione?corso=`, never with a
+  cell so the grid keeps its rows) offers a course's due cards first (`/learn/ripasso/sessione?corso=`, never with a
   subject; its end has «Torna a Oggi» alone) and then «Modulo del giorno: <titolo> · <percorso>», which opens the
   module's session, as each module's row does on the course page («Apri» not yet started, «Riprendi», «Rileggi»).
-  **A module's session** (pull request b; §5 steps 1–4, §6.5, §10.3) is `/studia/percorsi/:id/moduli/:moduloId` — by the
+  **A module's session** (pull request b; §5 steps 1–4, §6.5, §10.3) is `/learn/percorsi/:id/moduli/:moduloId` — by the
   module's id, since a correction shares its order — `ModuleSession`, in `LessonFrame` as the review (`StudiaPage`'s
   `isLesson`; `LessonLoading` goes back to the course): the header says «Passo 4 di 11 · Richiamo» (`moduleSteps.ts`:
   the start, each block's reading and recall, then a waiting screen until pull request c brings the quiz, which counts as
@@ -185,9 +185,15 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   address queues the decision for the search space to open in a practice; `/sentenze` alone and an
   address that does not parse both open the palette, and only the address that does not parse
   says why, in the error toast (`pushSyncError`); the addresses stay the contract with LibreLex
-  and the graph), then the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
-  `/grafo` (`/merlt/qa` and `/merlt/chiedi` redirect to `/grafo`), and a 404 for
-  anything else. The MERL-T routes are always registered, each inside `DevRoute`: without the
+  and the graph), then the MERL-T pages `/labs` (the hub), `/labs/contribuisci`, `/labs/valida` and
+  `/labs/grafo`, and a 404 for
+  anything else. **The old addresses** (D-235) redirect, with `replace`, keeping the rest of the path, the query
+  (`?import=`) and the anchor: `/opus/*` → `/work/*`, `/studia/*` → `/learn/*`, `/merlt/*` → `/labs/*`, `/grafo` →
+  `/labs/grafo`, `/merlt/qa` and `/merlt/chiedi` → `/labs/grafo` (`MovedTo` in `App.tsx`, one route per old prefix,
+  no guard of its own: the new address keeps `DevRoute` and the Studia switch). Kept for good: bookmarks, shared links
+  and the server's course notices (`/studia/percorsi`, `apps/server/src/routes/lingoCorsi.ts`) still carry them. Only
+  the redirects write an old address (`oldAddresses.guard.test.ts`); the server's paths (`/api/merlt/…`) and the code's
+  names (folders, components, `SectionId`, browser keys) keep theirs. The MERL-T routes are always registered, each inside `DevRoute`: without the
   development mode (below) the address redirects to `/`. `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
   entries and whether a page says it is unavailable. Outside the layout:
@@ -301,7 +307,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`,
   `bulletin` (the Forum, which absorbed «Ambienti»), `history`, `compare`, `settings`, `studia` (VisuaLex
-  Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
+  Gymnasium: the study cards, see `/learn` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
   user chooses or drops on the box, or pastes in «Oppure incolla il testo» (`PasteBox`, plain text, two million
@@ -506,10 +512,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   field `lg:pr-[11rem]` too); the `--page-foot` room it kept is gone, and a page sized to
   the window takes the plain 2 rem foot off its height (`GraphExplorerPage`, `DocumentReviewPage`'s columns). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
-  over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum — on screen Work, Learn, Labs and Forum, with no «VisuaLex» before them (D-137, D-157; the ids,
-  the CSS and the addresses keep the old names; Labs's icon `FlaskConical`, D-236) —, in
+  over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum — on screen Work, Learn, Labs and Forum, with no «VisuaLex» before them (D-137, D-157; the ids
+  and the CSS keep the old names, the addresses take the new ones, D-235; Labs's icon `FlaskConical`, D-236) —, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
-  active section — from the address on `/opus/*`, `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
+  active section — from the address on `/work/*`, `/learn/*`, `/forum`, `/labs/*`, else the last one, kept in the
   browser under `visualex-section`, Opus by default; `SectionSwitcher`: at the top of the sidebar,
   `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
   Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
@@ -564,10 +570,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
   carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
-  section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
+  section's, in a group named after it: Opus, «Oggi» (the home, `/work/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
-  (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
+  (Oggi, the home `/learn/ripasso`, Progressi, `/learn/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
   the first only a heading, its entries straight in the section's group, so a screen reader hears «Learn» once (LC4);
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
@@ -783,7 +789,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   action is a `Link` or a `button`, never a button inside a link. The consent and the profile (`ConsentCard`,
   `ProfileCard`, unchanged in what they do: change, revoke, the ladder, the vote's weight) open one at a time from a
   row of links at the foot («Consenso e privacy · Base», «Il tuo profilo»). The ops cards stay for administrators.
-  Tokens in `hub/hubStyles.ts` (44 px, no text under 12 px). On `/grafo` (`GraphExplorerPage`) the deliberation
+  Tokens in `hub/hubStyles.ts` (44 px, no text under 12 px). On `/labs/grafo` (`GraphExplorerPage`) the deliberation
   column is a rail while the graph is empty — no centre, no node or relation chosen, no question — opened by hand
   from the rail or by whatever fills it, and open from then on (not stored: the stored preference is the user's
   collapse); on a phone the «Dibattito» button sits over the home bar (`env(safe-area-inset-bottom)`), the truncation
@@ -1631,8 +1637,8 @@ Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `a
 `decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
 The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
 
-**Card review** (`/studia/ripasso`, `ReviewHome` with `StudyPreferences`; the session is
-`/studia/ripasso/sessione?materia=&istituto=`, `ReviewSession`; `istituto` is read only with a known `materia`, as the
+**Card review** (`/learn/ripasso`, `ReviewHome` with `StudyPreferences`; the session is
+`/learn/ripasso/sessione?materia=&istituto=`, `ReviewSession`; `istituto` is read only with a known `materia`, as the
 server refuses one alone, and passed back as the road spelt it): the server builds the day's queue and decides
 what «today» is (Studia spec decision 18), so the web app never computes a due date; the one exception,
 `nextReviewLabel`'s «Da ripassare oggi», is a display label. `useReviewSession` holds the queue: a card's
@@ -1690,7 +1696,7 @@ one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the
 up to what the subject's read allows, never the rest of the subject), with «Torna a Oggi» a quiet link under it; else
 «Torna a Oggi» alone.
 
-**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, titled «Oggi» under «Learn · la tua
+**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/learn/ripasso`, titled «Oggi» under «Learn · la tua
 palestra giuridica» — L-37; the section switcher keeps «Learn»; spec
 `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, as rewritten for G1b and G8, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
@@ -1791,7 +1797,7 @@ from 0.48–0.57 before). In that order:
    `DAY_STATE_LABEL`; `WeekRow`, its own file), then the cards by state in one line (G8, `StatesLine`:
    «3 nuove · 5 in apprendimento · 2 consolidate», each with its swatch, a list named «Le schede per stato») over the
    bar of the three colours. From `xl` the band is the top of the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
-   week at the column's width). «Tutti i progressi →», a text link (44 px, not a button across the column, G8), leads to `/studia/progressi`: the trend, the
+   week at the column's width). «Tutti i progressi →», a text link (44 px, not a button across the column, G8), leads to `/learn/progressi`: the trend, the
    coming days and the subjects' data live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
    **No text on «Oggi» or «Progressi» is under 11 px** (the goal's mark's date included, words beside the drawing):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
@@ -1898,7 +1904,7 @@ politely, at rest under reduced motion; nothing on a first visit. The
 points a session read credits silently («obiettivo» on an empty queue) show at the next progress read as `fatta` and in the
 level, never as «+XP» in the lesson (spec §5.3).
 
-**«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
+**«Progressi», the page of the data** (`progress/ProgressPage`, `/learn/progressi`, the sidebar's «Progressi» in
 «Learn» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
 `useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
 (in the sections' full-width frame, as «Oggi», G6; `StudiaPage` draws no strip over it) the page's title «Progressi»
@@ -1959,7 +1965,7 @@ row after the discussion panel and «Chiedi su questo articolo», outside `Artic
 (find-in-text and the offsets never see it): «Schede su questo articolo (n) · + Nuova scheda». The count
 (`useArticleCards`: one read per address from `/api/lingo/articolo`, kept for the session in
 `utils/articleCardsCache.ts`, shared between copies, `refresh()` after a save) opens `ArticleCardsPeek` (the reader's own
-card is a link to `/studia/schede/:id`; a community card — `comunita: true` — is a 44 px `aria-expanded` button that opens in
+card is a link to `/learn/schede/:id`; a community card — `comunita: true` — is a 44 px `aria-expanded` button that opens in
 place with its answer and explanation as text, because `GET /lingo/cards/:id` answers only the author); the row owns the
 `CardFormDialog`, and the selection popup's «Crea scheda» (`SelectionPopup.onCreateCard`, passed through
 `ArticleBody.onPopupCreateCard`, offered only by the article surface) reaches it through the row's `ref`
