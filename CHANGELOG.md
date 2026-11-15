@@ -12,6 +12,31 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-11-15
+
+LexCraft's interface, and Atti: the acts a lawyer drafts, in Work and in the dossier. One migration.
+
+### Interface
+
+- The shell and the main pages follow the «interfaccia unificata» prototype (LC21): the sections as tabs
+  under the logo, compact sidebar rows, «Impostazioni» at the bar's foot, a top bar from `lg` with the
+  path, a compact search (⌘K), the news, «Commenti» and «Tutto schermo»; the 1056 px sheet; a quieter
+  Corpus desk; practices as a row of tabs; dialog titles in the serif.
+- Over a page's title only the section's name, without the phrase (LC20).
+
+### Atti
+
+- Work's «Atti»: the list of acts and an editor with autosave; an act can belong to a dossier, where it
+  is read first; the dossier's sources with «Cita»; copy, download, delete with confirmation;
+  «Analizza l'atto». Acts are in the account export.
+- Server: table `atti` (migration `20261115230000_atti_draft`) and `/api/atti` (the session only, each
+  user sees only their own acts, 404 across users, at most 500,000 characters).
+
+### Deploy
+
+- One migration: after this release the host cannot go back to 1.19.0 with `--no-pull` alone (the deploy
+  refuses a version without a migration it has applied); going back means dropping the `atti` table by hand.
+
 ## [1.19.0] - 2026-11-15
 
 Twenty small fixes from the day's browser tests, the dark theme's states, and a sign-in that never
