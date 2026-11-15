@@ -58,6 +58,23 @@ describe('CoursesSwitchAdmin (LC9)', () => {
     expect(await screen.findByText('I percorsi sono spenti.')).toBeInTheDocument();
   });
 
+  it('keeps the focus on the switch while it writes and after, on and off (#458)', async () => {
+    let answer: (value: ReturnType<typeof row>) => void = () => {};
+    setAppSwitch.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    const user = userEvent.setup();
+    render(<CoursesSwitchAdmin />);
+    await user.click(await screen.findByRole('button', { name: 'Accendi i percorsi' }));
+    expect(screen.getByRole('button', { name: 'Accendi i percorsi' })).toHaveFocus();
+    answer(row(true));
+    expect(await screen.findByRole('button', { name: 'Spegni i percorsi' })).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Spegni' }));
+    answer(row(false));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Accendi i percorsi' })).toHaveFocus());
+  });
+
   it('shows the error and keeps the state when the write fails', async () => {
     setAppSwitch.mockRejectedValue({ status: 500, message: 'boom' });
     render(<CoursesSwitchAdmin />);

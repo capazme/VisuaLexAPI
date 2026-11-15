@@ -431,4 +431,14 @@ describe('AuthPage: the LexCraft logo', () => {
     renderAuth('/login');
     expect(screen.getByRole('img', { name: 'LexCraft' })).not.toHaveClass('vlx-logo-intro');
   });
+  // Papiniano's pass on #464: after «Esci» in the same session the intro played again.
+  it('plays the intro once a browser session: drawn again, it stands still in the same box', () => {
+    const { unmount } = renderAuth('/login');
+    expect(screen.getByRole('img', { name: 'LexCraft' })).toHaveClass('vlx-logo-intro');
+    unmount();
+    renderAuth('/login');
+    const logo = screen.getByRole('img', { name: 'LexCraft' });
+    expect(logo).not.toHaveClass('vlx-logo-intro');
+    expect(logo).toHaveAttribute('viewBox', '-36 -176 772 290');
+  });
 });

@@ -161,6 +161,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
           title="Revocare questo item?"
           message="L'item verrà rimosso dal thread e l'autore non potrà più prenderlo."
           confirmLabel="Revoca"
+          focusCancel
           onConfirm={() => handleRevoke(pendingRevokeId)}
           onCancel={() => setPendingRevokeId(null)}
         />
@@ -173,6 +174,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
           title={`Revocare ${pendingCount} item pending?`}
           message="Solo gli item non ancora revisionati verranno rimossi. Le decisioni già prese dall'autore restano."
           confirmLabel="Revoca tutti"
+          focusCancel
           onConfirm={handleRevokeAll}
           onCancel={() => setShowRevokeAll(false)}
         />

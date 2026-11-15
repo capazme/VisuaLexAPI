@@ -42,7 +42,7 @@ export const WELCOME_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Benvenuto in LexCraft',
-            description: 'Norme italiane ed europee, le sentenze che le leggono e il tuo lavoro sopra. Quattro passi per orientarti: le sezioni, la barra laterale, la ricerca.',
+            description: 'Norme italiane ed europee, le sentenze che le leggono e il tuo lavoro sopra. Tre passi per orientarti: le sezioni, la barra laterale, la ricerca.',
             side: 'over',
             align: 'center',
         }

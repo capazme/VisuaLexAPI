@@ -118,6 +118,7 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
         message="L'ambiente salvato viene eliminato per sempre. I tuoi dossier, le note e le evidenziazioni non vengono toccati, nemmeno quelli recuperati da qui."
         confirmLabel="Elimina"
         variant="danger"
+        focusCancel
       />
     </section>
   );

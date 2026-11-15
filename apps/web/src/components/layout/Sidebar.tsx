@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
@@ -9,6 +9,7 @@ import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { useSection } from '../../features/sections/useSection';
 import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
+import { prefersReducedMotion } from '../../features/sections/sectionTransition';
 import { PALETTE_SHORTCUT, focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
@@ -182,7 +183,9 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
   const words = layout !== 'rail';
-  const reduceMotion = useReducedMotion();
+  // Read at each render, which every navigation is: framer-motion's `useReducedMotion` keeps the value it first read,
+  // so a reduced motion turned on with the app open let the column slide until a reload (#457).
+  const reduceMotion = prefersReducedMotion();
   // NavLink's rule (its address, or under it unless `end`; «/» on itself only), plus `activeOn`. A `Link`, since NavLink
   // gives `aria-current` only on its own address.
   const { pathname } = useLocation();
@@ -524,8 +527,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
             Each section names its own active column (`layoutId` within the section's group), and the phone's drawer apart:
             `Layout` keeps both copies mounted, and with one name the desktop's column took its start from the hidden
-            drawer's (a box of nothing), so it jumped instead of sliding (#448). */}
-        <LayoutGroup id={layout === 'drawer' ? `drawer-${section}` : section}>
+            drawer's (a box of nothing), so it jumped instead of sliding (#448). Keyed by its id: `LayoutGroup` reads `id`
+            once, so without a new group every section kept the first one's name and the column glided in from the old
+            section's entry (#457); a new section's column appears in place. */}
+        <LayoutGroup key={layout === 'drawer' ? `drawer-${section}` : section} id={layout === 'drawer' ? `drawer-${section}` : section}>
           <div ref={sectionEntries} role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
             {section === 'gymnasium' && (
               <>

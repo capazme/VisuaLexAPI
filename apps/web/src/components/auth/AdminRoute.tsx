@@ -2,10 +2,9 @@
  * Admin route wrapper that requires admin privileges
  */
 import { Navigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { SessionKeptUnreachable } from './ProtectedRoute';
+import { SessionKeptUnreachable, SessionLoading } from './ProtectedRoute';
 import { LexCraftLogo } from '../ui/LexCraftLogo';
 
 interface AdminRouteProps {
@@ -13,29 +12,11 @@ interface AdminRouteProps {
 }
 
 export function AdminRoute({ children }: AdminRouteProps) {
-  const { isAuthenticated, isAdmin, loading, user } = useAuth();
+  const { isAuthenticated, isAdmin, loading, user, retrying } = useAuth();
   const location = useLocation();
 
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 z-50">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ repeat: Infinity, duration: 1.5, repeatType: 'reverse' }}
-          className="mb-6 relative"
-        >
-          <div className="absolute inset-0 bg-amber-500 blur-xl opacity-20 rounded-full" />
-          <ShieldAlert className="w-16 h-16 text-amber-600 relative z-10" />
-        </motion.div>
-        <div className="space-y-2 text-center">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">LexCraft Admin</h3>
-          <p className="text-sm text-slate-500 animate-pulse">Verifica autorizzazioni...</p>
-        </div>
-      </div>
-    );
-  }
+  // While the session is checked: the same screen as every signed-in page, with its line while it retries (#463).
+  if (loading) return <SessionLoading retrying={retrying} />;
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {

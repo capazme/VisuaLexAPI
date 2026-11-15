@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -94,14 +94,25 @@ describe('Layout — the sidebar\'s two copies (Gymnasium spec §4)', () => {
 });
 
 describe('Layout — the logo\'s sweep (LC16)', () => {
-  it('asks both copies of the bar for it once a browser session, not when the shell is drawn again', () => {
+  it('asks the desktop bar for it once a browser session, not when the shell is drawn again', () => {
     const first = atWidth(true);
     expect(first.desktop?.logoSweep).toBe(true);
-    expect(first.phone?.logoSweep).toBe(true);
     cleanup();
     // The shell drawn again (back from a page outside it, a reload in the same tab): no sweep.
     const again = atWidth(true);
     expect(again.desktop?.logoSweep).toBe(false);
-    expect(again.phone?.logoSweep).toBe(false);
+  });
+
+  // The subagent of LC16: on a phone the sweep played in the closed drawer, where nobody saw it.
+  it('on a phone plays it at the drawer\'s first opening in the session, not before and not again', () => {
+    const phoneNow = () => seen.props.filter((p) => p.layout === 'drawer').at(-1);
+    atWidth(false);
+    expect(phoneNow()?.logoSweep).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri il menu' }));
+    expect(phoneNow()?.logoSweep).toBe(true);
+    cleanup();
+    atWidth(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri il menu' }));
+    expect(phoneNow()?.logoSweep).toBe(false);
   });
 });

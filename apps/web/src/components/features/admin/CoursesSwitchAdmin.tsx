@@ -75,7 +75,17 @@ export function CoursesSwitchAdmin() {
           <p aria-live="polite" className="text-sm font-medium text-gray-800 dark:text-gray-100">
             {enabled ? 'I percorsi sono accesi.' : 'I percorsi sono spenti.'}
           </p>
-          <Button variant={enabled ? 'outline' : 'primary'} className={TOUCH_TARGET_RESPONSIVE} disabled={saving} onClick={() => (enabled ? setAskingOff(true) : void toggle())}>
+          {/* Not `disabled` while it writes: a disabled button drops the focus to the page (#458). */}
+          <Button
+            variant={enabled ? 'outline' : 'primary'}
+            className={TOUCH_TARGET_RESPONSIVE}
+            aria-disabled={saving}
+            onClick={() => {
+              if (saving) return;
+              if (enabled) setAskingOff(true);
+              else void toggle();
+            }}
+          >
             {enabled ? 'Spegni i percorsi' : 'Accendi i percorsi'}
           </Button>
         </div>
@@ -91,6 +101,7 @@ export function CoursesSwitchAdmin() {
         title="Spegnere i percorsi?"
         message="Nessuno vedrà più i percorsi finché non li riaccendi; i percorsi già creati restano."
         confirmLabel="Spegni"
+        focusCancel
         onConfirm={() => void toggle()}
         onCancel={() => setAskingOff(false)}
       />

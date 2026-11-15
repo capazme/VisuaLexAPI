@@ -42,9 +42,9 @@ export function AdvancedExportModal({
   const { article_text, norma_data } = articleData;
 
   const [sections, setSections] = useState<ExportSection[]>([
-    { id: 'text', label: 'Testo Articolo', icon: <FileText size={16} />, enabled: true },
+    { id: 'text', label: 'Testo dell’articolo', icon: <FileText size={16} />, enabled: true },
     { id: 'citation', label: 'Citazione', icon: <Scale size={16} />, enabled: true },
-    { id: 'notes', label: 'Note Personali', icon: <StickyNote size={16} />, enabled: annotations.length > 0 },
+    { id: 'notes', label: 'Note personali', icon: <StickyNote size={16} />, enabled: annotations.length > 0 },
     { id: 'highlights', label: 'Evidenziazioni', icon: <Highlighter size={16} />, enabled: highlights.length > 0 },
   ]);
 
@@ -127,7 +127,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('notes') && annotations.length > 0) {
-      rtf += `\\f0\\fs20\\b Note Personali:\\b0\\par`;
+      rtf += `\\f0\\fs20\\b Note personali:\\b0\\par`;
       annotations.forEach((n, idx) => {
         rtf += `\\f1\\fs18 ${idx + 1}. ${escape(n.text)}\\par`;
       });
@@ -419,7 +419,7 @@ export function AdvancedExportModal({
     >
       <div className="space-y-6">
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto Base</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto di base</h3>
           <div className="grid grid-cols-2 gap-2">
             {sections.filter(s => ['text', 'citation'].includes(s.id)).map(section => (
               <button
@@ -444,7 +444,7 @@ export function AdvancedExportModal({
 
         {(annotations.length > 0 || highlights.length > 0) && (
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto Personale</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto personale</h3>
             <div className="grid grid-cols-2 gap-2">
               {sections.filter(s => ['notes', 'highlights'].includes(s.id)).map(section => {
                 const hasContent =
@@ -480,7 +480,7 @@ export function AdvancedExportModal({
         )}
 
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato Esportazione</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato di esportazione</h3>
           <div className="grid grid-cols-3 gap-2 sm:flex">
             <button
               onClick={() => setExportFormat('clipboard')}

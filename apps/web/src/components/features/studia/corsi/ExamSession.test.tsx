@@ -97,7 +97,11 @@ async function startExam() {
   return screen.findByRole('heading', { level: 1, name: 'Le domande' });
 }
 
-beforeEach(() => coursesSwitchStore.setState({ state: 'on' }));
+beforeEach(() => {
+  coursesSwitchStore.setState({ state: 'on' });
+  // The exam's state, read from the course page: open and not started, unless a test says otherwise.
+  get.mockResolvedValue({ data: page({ esame: examOf({ stato: 'aperto' }) }) });
+});
 afterEach(() => {
   vi.clearAllMocks();
   coursesSwitchStore.setState({ state: 'unknown' });
@@ -148,7 +152,7 @@ describe('the final exam from the web (LC9)', () => {
     await userEvent.click(screen.getByRole('radio', { name: /Prima opzione 1/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent('1 domanda è senza risposta');
+    expect(dialog).toHaveTextContent('1 domanda è senza risposta: conta come sbagliata.');
     expect(post).toHaveBeenCalledTimes(1);
     post.mockResolvedValueOnce({ data: handedIn() });
     await pressInDialog(dialog, 'Consegna lo stesso');
@@ -249,5 +253,25 @@ describe('the exam\'s address follows the attempt\'s state (LC12)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Esame non superato' })).toHaveFocus();
     expect(post).toHaveBeenCalledWith(`${BASE}/inizia`, {});
     expect(screen.queryByText(/C’è un solo tentativo/)).toBeNull();
+  });
+
+  it('speaks of several missing answers in the plural (#458)', async () => {
+    await startExam();
+    await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('2 domande sono senza risposta: contano come sbagliate.');
+  });
+
+  it('says the exam\'s state could not be read, with «Riprova» in place of the command, and reads it again (#458)', async () => {
+    get.mockReset();
+    get.mockRejectedValueOnce({ status: 503 });
+    get.mockResolvedValueOnce({ data: page({ esame: examOf({ stato: 'in-corso' }) }) });
+    renderExam();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere lo stato dell’esame.');
+    expect(screen.queryByRole('button', { name: /^(Inizia|Riprendi) la prova$/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByRole('button', { name: 'Riprendi la prova' })).toBeInTheDocument();
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(post).not.toHaveBeenCalled();
   });
 });
