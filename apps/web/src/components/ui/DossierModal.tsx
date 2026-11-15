@@ -42,7 +42,7 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
       isOpen={isOpen}
       onClose={onClose}
       size="md"
-      title="Gestione Dossier"
+      title="I tuoi dossier"
       icon={<Folder size={20} />}
       variant="info"
     >
@@ -61,7 +61,7 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background'
             )}
           >
-            <FolderPlus size={20} /> Crea Nuovo Dossier
+            <FolderPlus size={20} /> Crea un dossier
           </button>
         ) : (
           <div className="space-y-3">

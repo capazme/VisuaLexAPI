@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot, ChevronDown, Settings, ShieldCheck, Sparkles } from 'lucide-react';
+import { ChevronDown, FlaskConical, Settings, ShieldCheck, UserRound } from 'lucide-react';
 import { PageFrame } from '../components/layout/PageFrame';
 import { ASSISTANT_PAGE } from '../features/sections/pageNames';
 import { cn } from '../lib/utils';
@@ -48,8 +48,8 @@ export function MerltHubPage() {
   if (!features.merltEnabled) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
-        <Bot size={40} aria-hidden className="mb-3 text-slate-400" />
-        <p className="text-slate-600 dark:text-slate-300">MERL-T non è disponibile in questa configurazione.</p>
+        <FlaskConical size={40} aria-hidden className="mb-3 text-slate-500 dark:text-slate-400" />
+        <p className="text-slate-600 dark:text-slate-300">Gli strumenti di Labs non sono accesi su questo server. Ricerca, Work, Learn e Forum funzionano come sempre.</p>
       </div>
     );
   }
@@ -124,7 +124,7 @@ export function MerltHubPage() {
             onClick={() => toggle('profile')}
             className={HUB_LINK}
           >
-            <Sparkles size={16} aria-hidden />
+            <UserRound size={16} aria-hidden />
             Il tuo profilo
             <ChevronDown size={16} aria-hidden className={cn('transition-transform motion-reduce:transition-none', footPanel === 'profile' && 'rotate-180')} />
           </button>

@@ -612,7 +612,7 @@ export function TreeViewPanel({
                         className={cn(
                           "w-full pl-8 pr-3 rounded-lg border text-xs",
                           "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800",
-                          "text-slate-700 dark:text-slate-200 placeholder:text-slate-400",
+                          "text-slate-700 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-400",
                           "focus:outline-none focus:ring-2 focus:ring-primary-500",
                           variant === 'drawer' ? "min-h-[44px] py-2" : "py-1.5"
                         )}
@@ -734,7 +734,7 @@ export function TreeViewPanel({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            aria-label={`${title} — finestra`}
+            aria-label={`${title}, finestra`}
             // A tool held over the table: a press in it is not a click away from the rail's overlay.
             data-floating-tool
             className={cn(

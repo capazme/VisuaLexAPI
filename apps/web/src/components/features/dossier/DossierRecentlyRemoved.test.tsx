@@ -17,7 +17,7 @@ describe('DossierRecentlyRemoved', () => {
   });
   it('opens on its entries', () => {
     render(<DossierRecentlyRemoved entries={[entry]} {...props} />);
-    const toggle = screen.getByRole('button', { name: 'Rimossi di recente (1) — ripristina' });
+    const toggle = screen.getByRole('button', { name: 'Rimossi di recente (1): ripristina' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggle);
     expect(screen.getByText('1 elemento')).toBeInTheDocument();

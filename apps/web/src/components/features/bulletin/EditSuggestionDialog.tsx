@@ -114,7 +114,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
           })}
           {suggestion.items.length === 0 && (
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-6">
-              Nessun item — il suggerimento è stato revocato.
+              Nessun elemento: il suggerimento è stato revocato.
             </p>
           )}
         </div>

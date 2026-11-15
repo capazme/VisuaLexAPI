@@ -32,7 +32,7 @@ export function ConflictReportPanel({ report }: ConflictReportPanelProps) {
           <div className="flex items-center gap-2 mb-2">
             <AlertOctagon size={16} className="text-red-600 dark:text-red-400 shrink-0" />
             <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              {report.urn_conflicts.length} conflitto/i URN — bloccante
+              {report.urn_conflicts.length} conflitto/i URN, bloccante
             </p>
           </div>
           <ul className="space-y-1.5 text-xs text-red-800 dark:text-red-200">
@@ -40,8 +40,8 @@ export function ConflictReportPanel({ report }: ConflictReportPanelProps) {
               <li key={c.urn} className="rounded bg-white/60 dark:bg-black/20 px-2 py-1.5">
                 <p className="font-mono font-medium">{c.urn}</p>
                 <p className="mt-0.5 text-red-700/80 dark:text-red-300/80">
-                  batch: {c.batch.tipo_documento ?? '—'} {c.batch.estremi ?? ''} vs grafo:{' '}
-                  {c.graph.tipo_documento ?? '—'} {c.graph.estremi ?? ''}
+                  batch: {c.batch.tipo_documento ?? 'n.d.'} {c.batch.estremi ?? ''} vs grafo:{' '}
+                  {c.graph.tipo_documento ?? 'n.d.'} {c.graph.estremi ?? ''}
                 </p>
               </li>
             ))}
@@ -54,7 +54,7 @@ export function ConflictReportPanel({ report }: ConflictReportPanelProps) {
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
             <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-              {report.orphan_edges.length} arco/i orfano/i — non bloccante
+              {report.orphan_edges.length} arco/i orfano/i, non bloccante
             </p>
           </div>
           <ul className="space-y-1 text-xs text-amber-800 dark:text-amber-200 font-mono">

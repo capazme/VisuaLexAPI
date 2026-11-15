@@ -51,7 +51,7 @@ export function ContribCard({ canContribute, consentGate = 'known', lastContrib 
           {lastContrib.status === 'error' && <p className={HUB_TEXT}>Contributi non raggiungibili al momento.</p>}
           {lastContrib.status === 'success' && lastContrib.data && (
             <p className={HUB_TEXT}>
-              Ultimo caricamento: doc #{lastContrib.data.documentId} —{' '}
+              Ultimo caricamento: doc #{lastContrib.data.documentId},{' '}
               <span className={STATUS_TONE[lastContrib.data.status]}>{STATUS_LABEL[lastContrib.data.status]}</span>
               {lastContrib.data.candidatesCreated != null && (
                 <span className="text-slate-600 dark:text-slate-400"> ({lastContrib.data.candidatesCreated} candidati)</span>

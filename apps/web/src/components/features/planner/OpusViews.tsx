@@ -305,7 +305,7 @@ export function TaskTrashView() {
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] text-slate-900 [overflow-wrap:anywhere] dark:text-slate-50">{task.title}</p>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  {task.parentId ? 'Sottocompito · ' : ''}Eliminato il {task.deletedAt ? deletedOn.format(new Date(task.deletedAt)) : '—'}
+                  {task.parentId ? 'Sottocompito · ' : ''}Eliminato{task.deletedAt ? ` il ${deletedOn.format(new Date(task.deletedAt))}` : ''}
                 </p>
               </div>
               <button type="button" onClick={() => void restoreTask(task, optimistic)} className={cn(SECONDARY_BUTTON, 'inline-flex items-center gap-2')}>

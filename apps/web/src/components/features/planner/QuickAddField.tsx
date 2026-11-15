@@ -98,7 +98,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
             placeholder="Aggiungi un compito"
             aria-describedby={`${id}-summary`}
             autoComplete="off"
-            className={cn('min-h-[44px] min-w-[min(12em,100%)] flex-1 rounded-lg bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-400', FIELD_TEXT)}
+            className={cn('min-h-[44px] min-w-[min(12em,100%)] flex-1 rounded-lg bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400', FIELD_TEXT)}
           />
         </div>
         <div className="ml-auto flex items-center gap-1">

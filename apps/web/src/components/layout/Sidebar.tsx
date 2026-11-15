@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
+import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -294,7 +294,7 @@ function NavGroup({ name, heading, unnamed, layout, children }: { name: string; 
   return (
     <div role={unnamed ? undefined : 'group'} aria-label={unnamed ? undefined : name} className="flex w-full flex-col items-start gap-3 md:gap-2">
       {heading && layout !== 'rail' && (
-        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
           {name}
         </p>
       )}
@@ -460,12 +460,12 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         // The desktop copy is as wide as its column, which `Layout` sizes (64 px, or 224 with words);
         // the phone's drawer has room for its words.
         layout === 'drawer' ? "w-[17rem] max-w-[85vw]" : "w-full",
-        // Clean Slate/Glass effect
-        "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl",
+        // Solid: nothing scrolls under the rail on a computer, and on a phone the drawer has its own scrim.
+        "bg-card",
         "border-r border-slate-200 dark:border-slate-800",
         // Mobile slide
         "transform transition-transform duration-300 ease-smooth-out",
-        // `relative`, not `static`: backdrop-blur makes this aside a stacking
+        // `relative`, not `static`: the transform makes this aside a stacking
         // context, so anything inside it (hover tooltips) is trapped at the
         // aside's own level. Static would leave z-50 inert and page content
         // would paint over the tooltips.
@@ -523,7 +523,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               </>
             )}
             {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
-              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
                 {active.name}
               </p>
             )}
@@ -656,7 +656,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   {normaChanges > 0 && <CountBadge count={normaChanges} />}
                 </button>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/collega-app'))} className={menuItemClass}>
-                  <Bot size={16} />
+                  <Plug size={16} />
                   Collega un'app AI
                 </button>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/crediti'))} className={menuItemClass}>

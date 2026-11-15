@@ -105,7 +105,7 @@ function NotFoundPage() {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-3 p-6 text-center">
       {/* The page's title: the phone's bar names no section over it (M1: it said the one the user came from). */}
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Pagina non trovata</h1>
+      <h1 className="font-serif text-[28px] font-medium leading-tight tracking-tight text-slate-900 md:text-3xl dark:text-slate-50">Pagina non trovata</h1>
       <p className="text-sm text-slate-500 dark:text-slate-400">
         L'indirizzo che hai aperto non esiste o non è più disponibile.
       </p>

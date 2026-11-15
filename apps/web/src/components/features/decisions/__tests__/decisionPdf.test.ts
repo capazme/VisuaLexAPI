@@ -34,7 +34,7 @@ describe('decisionPdfModel', () => {
     const cc = { ...FOUND, identita: { corte: 'corte_costituzionale', numero: 71, anno: 2020 }, fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'CC BY-SA 3.0' } };
     const m = decisionPdfModel(cc as never, { consultedOn: '2026-10-05' });
     expect(m.footer).toBe('Fonte: Corte costituzionale — dati aperti · licenza CC BY-SA 3.0 · consultata il 5 ottobre 2026');
-    expect(m.licenceLine).toBe('Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0 — https://creativecommons.org/licenses/by-sa/3.0/');
+    expect(m.licenceLine).toBe('Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/');
     const unknown = { ...cc, fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'Altra 1.0' } };
     expect(decisionPdfModel(unknown as never, { consultedOn: '2026-10-05' }).licenceLine).toBeNull();
     const ccNoLicence = { ...cc, fonte: { nome: 'Corte costituzionale — dati aperti' } };
@@ -53,7 +53,7 @@ describe('decisionPdfModel', () => {
     const quoting = { id: 'q', text: 'Da rivedere', anchorText: 'Primo' } as never;
     const m = decisionPdfModel(FOUND as never, { consultedOn: '2026-10-05', annotations: { highlights: [], notes: [quoting] } });
     expect(m.freeNotes).toEqual([]);
-    expect(m.unmatched).toEqual(['nota: Da rivedere — su «Primo»']);
+    expect(m.unmatched).toEqual(['nota: Da rivedere, su «Primo»']);
   });
 
   it('with annotations: marks in their paragraph, notes after it, the unmatched listed at the end', () => {

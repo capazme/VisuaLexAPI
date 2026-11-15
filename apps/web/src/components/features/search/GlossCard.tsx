@@ -187,7 +187,7 @@ export function GlossCard({
             {showOriginal && edited && (
                 <div id={originalId} className="mt-1 rounded-md border border-dashed border-slate-300 px-2 py-1.5 dark:border-slate-600">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Versione dell'IA</p>
-                    <p className="mt-0.5 whitespace-pre-wrap text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{note?.assistantText || '—'}</p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{note?.assistantText || 'nessun testo'}</p>
                 </div>
             )}
             {showPassage && gloss.rangeEdited && (

@@ -285,10 +285,10 @@ describe('tabLabelForGroup', () => {
   });
   it('adds the day to the title for a group asking for a past text', () => {
     expect(tabLabelForGroup('Pratica', group({ versione: 'vigente', data_versione: '2007-12-29' })))
-      .toBe('Pratica — testo al 29/12/2007');
+      .toBe('Pratica, testo al 29/12/2007');
   });
   it('says "testo originale" for the original text', () => {
-    expect(tabLabelForGroup('Pratica', group({ versione: 'originale' }))).toBe('Pratica — testo originale');
+    expect(tabLabelForGroup('Pratica', group({ versione: 'originale' }))).toBe('Pratica, testo originale');
   });
 });
 
@@ -307,9 +307,9 @@ describe('searchesForGroups', () => {
 
   it('shares one tab among the texts in force and gives a past group a tab of its own', () => {
     const { created, searches } = run([g({}), g({ numero_atto: '1', articles: ['2'] }), g(PAST)]);
-    expect(created).toEqual(['Pratica', 'Pratica — testo al 29/12/2007']);
+    expect(created).toEqual(['Pratica', 'Pratica, testo al 29/12/2007']);
     expect(searches.map((s) => s.targetPracticeId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
-    expect(searches.map((s) => s.tabLabel)).toEqual(['Pratica', 'Pratica', 'Pratica — testo al 29/12/2007']);
+    expect(searches.map((s) => s.tabLabel)).toEqual(['Pratica', 'Pratica', 'Pratica, testo al 29/12/2007']);
     expect(searches[2]).toMatchObject({ version: 'vigente', version_date: '2007-12-29' });
     expect(searches[0]).toMatchObject({ version: 'vigente', version_date: '' });
   });
@@ -324,13 +324,13 @@ describe('searchesForGroups', () => {
   it('gives every page of a large group the group\'s tab', () => {
     const articles = Array.from({ length: MAX_ARTICLES_PER_SEARCH + 1 }, (_, i) => String(i + 1));
     const { created, searches } = run([g({ articles }), g(PAST)]);
-    expect(created).toEqual(['Pratica', 'Pratica — testo al 29/12/2007']);
+    expect(created).toEqual(['Pratica', 'Pratica, testo al 29/12/2007']);
     expect(searches.map((s) => s.targetPracticeId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
   });
 
   it('creates no shared tab when every group asks for a past text', () => {
     const { created } = run([g(PAST), g({ versione: 'originale' })]);
-    expect(created).toEqual(['Pratica — testo al 29/12/2007', 'Pratica — testo originale']);
+    expect(created).toEqual(['Pratica, testo al 29/12/2007', 'Pratica, testo originale']);
   });
 });
 
@@ -580,9 +580,9 @@ describe('an imported dossier is rebuilt from what was checked', () => {
   it('words the counts, and picks the toast type from what came in and what was lost', () => {
     expect(importCounts(1, 2)).toBe('1 voce importata, 2 scartate');
     expect(importReasonsText([])).toBe('');
-    expect(importReasonsText(['Tipo di atto non riconosciuto («legge regionale»)'])).toBe(' — Tipo di atto non riconosciuto («legge regionale»)');
-    expect(importReasonsText(['a', 'b'])).toBe(' — a e un altro motivo');
-    expect(importReasonsText(['a', 'b', 'c'])).toBe(' — a e altri 2 motivi');
+    expect(importReasonsText(['Tipo di atto non riconosciuto («legge regionale»)'])).toBe(': Tipo di atto non riconosciuto («legge regionale»)');
+    expect(importReasonsText(['a', 'b'])).toBe(': a e un altro motivo');
+    expect(importReasonsText(['a', 'b', 'c'])).toBe(': a e altri 2 motivi');
     expect(importToastType(3, 0)).toBe('success');
     expect(importToastType(0, 0)).toBe('success');
     expect(importToastType(2, 1)).toBe('info');

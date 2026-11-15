@@ -838,7 +838,7 @@ export function GraphExplorerPage(): React.ReactElement {
       return;
     }
     if (nodes.length >= MAX_GRAPH_NODES) {
-      setToast({ message: 'Grafo pieno — nascondi qualcosa o ricentra.', type: 'info' });
+      setToast({ message: 'Grafo pieno: nascondi qualcosa o ricentra.', type: 'info' });
       return;
     }
     const epoch = expandEpochRef.current;
@@ -851,7 +851,7 @@ export function GraphExplorerPage(): React.ReactElement {
         const freshNodes = delta.nodes.filter((n) => !known.nodes.has(n.id));
         const freshEdges = delta.edges.filter((e) => !known.edges.has(rawEdgeKey(e)));
         if (known.nodes.size + freshNodes.length > MAX_GRAPH_NODES) {
-          setToast({ message: 'Grafo pieno — nascondi qualcosa o ricentra.', type: 'info' });
+          setToast({ message: 'Grafo pieno: nascondi qualcosa o ricentra.', type: 'info' });
           return;
         }
         setExpandedNodeIds((prev) => new Set(prev).add(id));
@@ -865,7 +865,7 @@ export function GraphExplorerPage(): React.ReactElement {
         console.error('GraphExplorerPage: node expansion failed:', err);
         if (expandEpochRef.current !== epoch) return;
         setPendingExpandId(null);
-        setToast({ message: 'Espansione non riuscita — riprova.', type: 'info' });
+        setToast({ message: 'Espansione non riuscita. Riprova.', type: 'info' });
       });
   };
 
@@ -917,7 +917,7 @@ export function GraphExplorerPage(): React.ReactElement {
   const handleAddToContext = useCallback(
     (node: GraphNode): void => {
       if (contextBasket.length >= MAX_CONTEXT_ITEMS && !contextBasket.some((it) => it.id === node.id)) {
-        setToast({ message: `Contesto pieno (max ${MAX_CONTEXT_ITEMS}) — rimuovi qualcosa.`, type: 'info' });
+        setToast({ message: `Contesto pieno (max ${MAX_CONTEXT_ITEMS}): rimuovi qualcosa.`, type: 'info' });
         return;
       }
       setContextBasket((prev) =>
@@ -1216,7 +1216,7 @@ export function GraphExplorerPage(): React.ReactElement {
                 // MERL-T is unreachable or too slow — never an unbounded spinner.
                 <IngestionErrorState
                   tone="red"
-                  message="Grafo non raggiungibile — riprova più tardi."
+                  message="Grafo non raggiungibile. Riprova più tardi."
                   onRetry={retryIngestion}
                 />
               ) : job.status === 'failed' || job.status === 'completed' ? (

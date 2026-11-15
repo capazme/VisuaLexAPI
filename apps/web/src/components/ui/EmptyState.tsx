@@ -58,8 +58,6 @@ function HistoryIllustration() {
       <line x1="60" y1="60" x2="60" y2="35" className="stroke-slate-600 dark:stroke-slate-300" strokeWidth="3" strokeLinecap="round" />
       <line x1="60" y1="60" x2="78" y2="60" className="stroke-primary-500" strokeWidth="3" strokeLinecap="round" />
       <circle cx="60" cy="60" r="4" className="fill-primary-500" />
-      {/* Search sparkle */}
-      <path d="M95 25L97 30L102 28L97 32L99 37L95 33L91 37L93 32L88 28L93 30L95 25Z" className="fill-amber-400" />
     </svg>
   );
 }
@@ -127,10 +125,6 @@ function BookmarksIllustration() {
         d="M70 40L72.5 48H81L74.5 53L77 61L70 56L63 61L65.5 53L59 48H67.5L70 40Z"
         className="fill-amber-400"
       />
-      {/* Small stars */}
-      <circle cx="45" cy="35" r="2" className="fill-amber-300" />
-      <circle cx="90" cy="50" r="1.5" className="fill-amber-300" />
-      <circle cx="38" cy="55" r="1.5" className="fill-amber-300" />
     </svg>
   );
 }
@@ -146,8 +140,6 @@ function GenericIllustration() {
       />
       <path d="M60 20L60 100" className="stroke-slate-300 dark:stroke-slate-600" strokeWidth="2" />
       <path d="M20 40L60 60L100 40" className="stroke-slate-300 dark:stroke-slate-600" strokeWidth="2" />
-      {/* Sparkle */}
-      <path d="M85 25L87 30L92 28L87 32L89 37L85 33L81 37L83 32L78 28L83 30L85 25Z" className="fill-primary-400" />
     </svg>
   );
 }
@@ -206,7 +198,7 @@ export function EmptyState({ variant, title, description, action, className }: E
       </div>
 
       {/* Title */}
-      <h3 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-white mb-2">
+      <h3 className="mb-2 font-serif text-xl font-medium tracking-tight text-slate-900 md:text-2xl dark:text-slate-50">
         {title}
       </h3>
 

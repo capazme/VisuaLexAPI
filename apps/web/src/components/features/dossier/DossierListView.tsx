@@ -294,10 +294,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
             className="flex-1 md:flex-none dossier-create-button bg-primary-600 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-            title="Nuovo Dossier (n)"
+            title="Nuovo dossier (n)"
             aria-keyshortcuts="n"
           >
-            <FolderPlus size={20} /> Nuovo Dossier
+            <FolderPlus size={20} /> Nuovo dossier
           </button>
         </>
       ) : (

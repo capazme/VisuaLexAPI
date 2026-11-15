@@ -130,6 +130,7 @@ describe('the PDFs, byte for byte', () => {
 // Taken on `develop` 25946f23, jsPDF imported statically.
 // The dossier's taken again with LC5: its footer says «· LexCraft» (D-157), nothing else changed.
 // And with LC11: its header band is Pietra's toga, rgb(43, 42, 40), not the old blue; nothing else changed.
-const DOSSIER_PDF = 'ee1999ce32d08628003c3545319cda48f674e7ad230a256f9557aa078741cb3e';
+// And with the anti-slop review: an article's rubric follows a middle dot, not an em dash (R-02); nothing else changed.
+const DOSSIER_PDF = '9ee5c2a6055fb5f5bf04f63856fdd5f88ae4a05b596f4c24b7b9ef75bf7f9e62';
 const DECISION_PDF = 'e46d4f43cce7ffc85e505b9f0788f653195e8bda245df3ce6d2226f584d61e49';
 const ARTICLE_PDF = '8e17217280fd9dfb14bcc64462110b480cc1b58c687f9f5293444f68ac479fab';

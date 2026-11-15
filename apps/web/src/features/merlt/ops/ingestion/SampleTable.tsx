@@ -1,5 +1,5 @@
 function formatCellValue(value: unknown): string {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) return 'n.d.';
   if (typeof value === 'object') {
     const json = JSON.stringify(value);
     return json.length > 60 ? `${json.slice(0, 60)}…` : json;

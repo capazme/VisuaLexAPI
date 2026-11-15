@@ -389,6 +389,21 @@
     touch-action: manipulation;
   }
 
+  /* Tailwind's preflight leaves buttons on the arrow: every enabled control shows the hand, set once here; a
+     component that needs another cursor (text, grab) still says so with its own utility. */
+  a[href], button, summary, select, label[for],
+  label:has(> input[type="checkbox"], > input[type="radio"]),
+  [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="menuitemradio"], [role="option"], [role="switch"],
+  input[type="checkbox"], input[type="radio"], input[type="file"], input[type="range"] {
+    cursor: pointer;
+  }
+  :disabled, [aria-disabled="true"] { cursor: not-allowed; }
+
+  /* A placeholder is text: secondary ink (5.9:1 on the paper), the dark one's 6.5:1 on the dark surface. Preflight's
+     half-tone of the text colour gave about 3:1. */
+  input::placeholder, textarea::placeholder { color: var(--color-ink-500); }
+  .dark input::placeholder, .dark textarea::placeholder { color: var(--color-ink-400); }
+
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,

@@ -180,11 +180,11 @@ export function AdvancedExportModal({
       lines.push('');
       const swatch = (color: string) => {
         switch (color) {
-          case 'yellow': return '🟡';
-          case 'green': return '🟢';
-          case 'red': return '🔴';
-          case 'blue': return '🔵';
-          default: return '•';
+          case 'yellow': return '[giallo]';
+          case 'green': return '[verde]';
+          case 'red': return '[rosso]';
+          case 'blue': return '[blu]';
+          default: return '[evidenziato]';
         }
       };
       highlights.forEach((h) => {
@@ -367,7 +367,7 @@ export function AdvancedExportModal({
       isOpen={isOpen}
       onClose={close}
       size="lg"
-      title="Esporta Articolo"
+      title="Esporta l’articolo"
       description={shortNorm(norma_data)}
       icon={<Download size={20} />}
       variant="info"

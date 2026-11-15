@@ -130,7 +130,7 @@ function TextareaField({ id, label, value, onChange, limit, rows, error, inputRe
         aria-describedby={error || left ? messageId : undefined}
         className={cn(
           'w-full px-4 py-2.5 border rounded-lg resize-y text-sm leading-relaxed outline-none',
-          'text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500',
+          'text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400',
           'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700',
           'transition-colors duration-200',
           'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50 focus:border-primary-500',
