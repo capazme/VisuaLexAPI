@@ -113,7 +113,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
             type="button"
             onClick={() => void restore(target)}
             disabled={!target || busy}
-            className="min-h-[44px] rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="min-h-[44px] rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             Ripristina qui
           </button>

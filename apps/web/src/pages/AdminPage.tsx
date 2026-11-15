@@ -48,6 +48,9 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+/** A dialog's filled action: light ink in the dark. */
+const DIALOG_PRIMARY = 'px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50';
+
 type AdminTab = 'users' | 'feedback' | 'environments' | 'reports' | 'studia' | 'ingestion';
 
 export function AdminPage() {
@@ -586,7 +589,7 @@ export function AdminPage() {
                 </button>
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
                 >
                   <UserPlus size={18} />
                   Nuovo utente
@@ -1319,7 +1322,7 @@ export function AdminPage() {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  className={DIALOG_PRIMARY}
                 >
                   {actionLoading ? 'Creazione...' : 'Crea l’utente'}
                 </button>
@@ -1369,7 +1372,7 @@ export function AdminPage() {
                 <button
                   onClick={handleResetPassword}
                   disabled={actionLoading || !newPassword}
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  className={DIALOG_PRIMARY}
                 >
                   {actionLoading ? 'Reset...' : 'Reset Password'}
                 </button>
