@@ -1647,7 +1647,7 @@ describe('GraphExplorerPage', () => {
       const title = screen.getByRole('heading', { level: 1, name: 'Grafo' });
       expect(title).toHaveClass('font-serif');
       expect(title.querySelector('svg')).toBeNull();
-      expect(title).toHaveAccessibleDescription('Labs · il laboratorio del diritto');
+      expect(title).toHaveAccessibleDescription('Labs');
       const search = screen.getByPlaceholderText(/cerca un articolo/i);
       expect(search).toHaveClass('min-h-[44px]');
       expect(search.closest('.max-w-md')).toBeNull();

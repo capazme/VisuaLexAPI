@@ -40,10 +40,13 @@ export const SECTION_PHRASES = {
 /** A section with a phrase. */
 export type PhrasedSection = keyof typeof SECTION_PHRASES;
 
-/** The line over a section page's title (L-37): «Opus · la tua officina giuridica». */
+/**
+ * The line over a section page's title (L-37): the section's name, «Work». On a phone, where the switcher sits in the
+ * drawer, it says where the reader is. The phrase no longer follows it (anti-slop review, 15 November 2026: a motto over
+ * every title of a working tool, R-09 and R-37); the phrases stay above, for the pages that present the sections.
+ */
 export function sectionKicker(id: PhrasedSection): string {
-  const name = SECTIONS.find((section) => section.id === id)?.name ?? id;
-  return `${name} · ${SECTION_PHRASES[id]}`;
+  return SECTIONS.find((section) => section.id === id)?.name ?? id;
 }
 
 /**

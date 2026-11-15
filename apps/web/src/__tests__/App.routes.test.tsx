@@ -147,7 +147,7 @@ describe('App routing', () => {
     renderAt('/forum/community');
     // The page's name as its title, the Forum's phrase small over it (L-37).
     expect(await screen.findByRole('heading', { level: 1, name: 'Community' })).toBeInTheDocument();
-    expect(screen.getByText('Forum · il luogo del dibattito giuridico')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleDescription('Forum');
     expect(await screen.findByText('Nessuna discussione ancora.')).toBeInTheDocument();
     expect(screen.queryByText('Pagina non trovata')).toBeNull();
     expect(screen.getByTestId('layout')).toBeInTheDocument();
@@ -282,7 +282,7 @@ describe('App routing — Studia', () => {
     renderAt('/learn/progressi');
     expect(await screen.findByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Progressi' })).toBeInTheDocument();
-    expect(screen.getByText('Learn · la tua palestra giuridica')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleDescription('Learn');
     // The read is mocked to fail here: the page says so.
     expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
   });
