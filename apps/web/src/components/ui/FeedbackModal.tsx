@@ -88,6 +88,7 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
                   <button
                     key={ft.value}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => setType(ft.value)}
                     className={cn(
                       'flex-auto flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-colors',

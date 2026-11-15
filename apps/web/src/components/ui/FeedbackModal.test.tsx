@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FeedbackModal } from './FeedbackModal';
 
@@ -19,5 +19,14 @@ describe('FeedbackModal', () => {
     const group = screen.getByRole('group', { name: 'Tipo di commento' });
     expect(group).toHaveClass('flex-wrap');
     for (const button of within(group).getAllByRole('button')) expect(button).toHaveClass('flex-auto');
+  });
+
+  it('tells a screen reader which type is chosen', () => {
+    render(<FeedbackModal isOpen onClose={vi.fn()} />);
+    const group = screen.getByRole('group', { name: 'Tipo di commento' });
+    const pressed = () => within(group).getAllByRole('button').map((b) => b.getAttribute('aria-pressed'));
+    expect(pressed()).toEqual(['false', 'true', 'false']);
+    fireEvent.click(within(group).getByRole('button', { name: 'Bug' }));
+    expect(pressed()).toEqual(['true', 'false', 'false']);
   });
 });
