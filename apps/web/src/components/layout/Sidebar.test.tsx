@@ -246,13 +246,14 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     for (const path of ['/work/prossimi', '/work/ingresso', '/work/cestino']) {
       renderSidebar(path);
       const today = screen.getByRole('link', { name: 'Oggi' });
-      expect(today, path).toHaveAttribute('aria-current', 'page');
+      // Lit for a page of its own, not its address: «true», so a screen reader says «current page» once, on the tab (#448).
+      expect(today, path).toHaveAttribute('aria-current', 'true');
       expect(today.querySelector('svg.vlx-book'), path).not.toBeNull();
       cleanup();
     }
     for (const path of ['/documents', '/rassegne']) {
       renderSidebar(path);
-      expect(screen.getByRole('link', { name: 'Corpus' }), path).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByRole('link', { name: 'Corpus' }), path).toHaveAttribute('aria-current', 'true');
       cleanup();
     }
     // Elsewhere nothing changes: «Ricerca» is not lit on «Analizza documento», which is.
@@ -260,6 +261,18 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     renderSidebar('/documents');
     expect(screen.getByRole('link', { name: 'Ricerca' })).not.toHaveAttribute('aria-current');
     expect(screen.getByRole('link', { name: 'Analizza documento' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('says «page» only on the entry\'s own address, «true» when it is lit for a page under it or of its own', () => {
+    renderSidebar('/work/oggi');
+    expect(screen.getByRole('link', { name: 'Oggi' })).toHaveAttribute('aria-current', 'page');
+    cleanup();
+    renderSidebar('/work/prossimi');
+    expect(screen.getByRole('link', { name: 'Oggi' })).toHaveAttribute('aria-current', 'true');
+    cleanup();
+    sectionStore.setState({ section: 'gymnasium' });
+    renderSidebar('/learn/schede/42');
+    expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'true');
   });
 
   it('draws no lone rule over Work\'s entries, where the Corpus ones were', () => {
@@ -340,7 +353,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     // «Assistente» stays lit on the hub's own pages, not on the graph's (#448).
     for (const path of ['/labs/contribuisci', '/labs/valida']) {
       cleanupAndRender(path, () => { account.devMode = true; });
-      expect(screen.getByRole('link', { name: 'Assistente' }), path).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByRole('link', { name: 'Assistente' }), path).toHaveAttribute('aria-current', 'true');
     }
     cleanupAndRender('/labs/grafo', () => { account.devMode = true; });
     expect(screen.getByRole('link', { name: 'Assistente' })).not.toHaveAttribute('aria-current');

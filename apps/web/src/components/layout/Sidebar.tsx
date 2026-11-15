@@ -198,7 +198,9 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
       to={to}
       id={id}
       aria-label={accessibleName}
-      aria-current={isActive ? 'page' : undefined}
+      // «page» on its own address only; lit for a page under it or of its own, «true», so a screen reader does not
+      // hear «current page» twice (on `/work/prossimi`, here and on the planner's tab, #448).
+      aria-current={pathname === to ? 'page' : isActive ? 'true' : undefined}
       className={cn(
         "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
