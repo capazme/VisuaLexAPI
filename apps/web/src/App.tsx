@@ -15,7 +15,7 @@ import { PageBoundary } from './components/layout/RouteBoundary';
 import { PAGE_CODE } from './pageCode';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 
 // The pages loaded with their route (P1, `pageCode.ts`); Ricerca, the sign-in page, a decision's address and «Pagina
 // non trovata» stay in the first chunk. They wait in the layout's `RoutePage`, «Crediti» at the root (below): nothing
@@ -92,6 +92,11 @@ function MovedTo({ from, to }: { from: string; to: string }) {
   return <Navigate to={{ pathname: to + pathname.slice(from.length), search, hash }} replace />;
 }
 
+/** A Work entry «in arrivo» (D-315): two lines under the frame's title (`OpusPage`, from `pageNames.ts`), no feature. */
+function ComingSoon({ children }: { children: ReactNode }) {
+  return <div className="flex max-w-measure flex-col gap-2 text-sm text-slate-600 dark:text-slate-400">{children}</div>;
+}
+
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
 function NotFoundPage() {
   return (
@@ -155,6 +160,15 @@ function App() {
             <Route path="prossimi" element={<UpcomingView />} />
             <Route path="ingresso" element={<InboxView />} />
             <Route path="cestino" element={<TaskTrashView />} />
+            <Route path="atti" element={<ComingSoon>
+              <p>Qui scriverai i tuoi atti, con le fonti del Corpus e dei tuoi dossier a portata di mano.</p>
+              <p>La funzione è in arrivo: per ora questa pagina non fa altro.</p>
+            </ComingSoon>} />
+            {/* D-324: the desktop app's. */}
+            <Route path="anonimizzatore" element={<ComingSoon>
+              <p>Toglierà da un documento i dati che identificano le persone, prima che tu lo condivida o lo analizzi.</p>
+              <p>È in arrivo e sarà disponibile nell'app da scrivania, non in questa versione web.</p>
+            </ComingSoon>} />
           </Route>
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentsRedirect />} />

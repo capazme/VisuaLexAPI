@@ -190,6 +190,17 @@ describe('App routing', () => {
     expect(screen.getByTestId('opus-page')).toBeInTheDocument();
   });
 
+  // D-315, D-324: Work's two entries «in arrivo», a plain page each in Work's frame, no feature behind it.
+  it.each([
+    ['/work/atti', /in arrivo/],
+    ['/work/anonimizzatore', /app da scrivania/],
+  ])('opens %s in Opus’s frame, saying what is coming', async (path, text) => {
+    renderAt(path);
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getByTestId('opus-page')).toContainElement(screen.getByText(text));
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
   it('loads «Crediti» with its route, public, outside the layout', async () => {
     renderAt('/crediti');
     expect(await screen.findByTestId('credits-page')).toBeInTheDocument();

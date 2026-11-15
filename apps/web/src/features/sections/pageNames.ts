@@ -17,6 +17,8 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/work\/prossimi(\/|$)/, 'Prossimi giorni'],
   [/^\/work\/ingresso(\/|$)/, "Lista d'ingresso"],
   [/^\/work\/cestino(\/|$)/, 'Cestino dei compiti'],
+  [/^\/work\/atti(\/|$)/, 'Atti'],
+  [/^\/work\/anonimizzatore(\/|$)/, 'Anonimizzatore'],
   [/^\/learn\/ripasso(\/|$)/, 'Oggi'],
   [/^\/learn\/percorsi(\/|$)/, 'Percorsi'],
   [/^\/learn\/progressi(\/|$)/, 'Progressi'],
