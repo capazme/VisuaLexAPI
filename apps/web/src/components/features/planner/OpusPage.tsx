@@ -55,7 +55,7 @@ export function OpusPage() {
         </Link>
       )}
     >
-      <div className="flex w-full min-w-0 flex-col gap-4">
+      <div className="flex w-full min-w-0 flex-col gap-4 max-md:-mt-3 max-md:gap-0">
         {/* Links, not `ui/SegmentedTabs` (buttons over one panel): each view has its address. Its look, the mark still. */}
         {/* LC27 (Luca, 15 Nov): the views' tabs stay at the top while the view scrolls, and a new view starts right under
             them, never with a jump to the page's top; it comes in with a short fade (none under reduced motion). */}
