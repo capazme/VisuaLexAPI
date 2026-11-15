@@ -617,6 +617,8 @@ export interface ArticleDiscussionComment {
     user: { id: string; username: string };
     createdAt: string;
     updatedAt: string;
+    /** Emptied by its author: a place kept for what hangs on it. */
+    deleted?: boolean;
     voteCount: number;
     userVoted: boolean;
     isOwner: boolean;

@@ -624,4 +624,61 @@ describe('ArticleDiscussionPanel', () => {
       expect(screen.queryByText(WITHHELD)).not.toBeInTheDocument();
     });
   });
+
+  describe('the community\'s second round (PR #449)', () => {
+    const reply = (over: Partial<ArticleDiscussionThread['comments'][number]>) => ({
+      id: 'c1', threadId: 'thread-1', parentId: null, body: 'Una risposta', isHidden: false,
+      user: { id: 'u2', username: 'luigi' }, createdAt: '2026-09-28T11:00:00Z', updatedAt: '2026-09-28T11:00:00Z',
+      voteCount: 1, userVoted: false, isOwner: false, ...over,
+    });
+
+    async function openThread(thread: ArticleDiscussionThread) {
+      vi.mocked(articleDiscussionService.list).mockResolvedValue({ data: [thread], pagination: { page: 1, limit: 20, total: 1, pages: 1 } });
+      render(<ArticleDiscussionPanel anchor={dummyAnchor} isOpen={true} onClose={vi.fn()} />);
+      fireEvent.click(await screen.findByText('Titolo discussione'));
+    }
+
+    it('asks the subject, optional, and sends it only when chosen', async () => {
+      vi.mocked(articleDiscussionService.create).mockResolvedValue({ ...dummyThread, id: 'thread-new' });
+      render(<ArticleDiscussionPanel anchor={dummyAnchor} isOpen={true} onClose={vi.fn()} />);
+      await screen.findByText('Titolo discussione');
+      fireEvent.click(screen.getByRole('button', { name: /nuova glossa/i }));
+      const subject = screen.getByRole('combobox', { name: 'Materia (facoltativa)' });
+      expect(subject).toHaveValue('');
+      expect(within(subject).getByRole('option', { name: 'Diritto processuale penale' })).toHaveValue('DIRITTO_PROCESSUALE_PENALE');
+      fireEvent.change(subject, { target: { value: 'DIRITTO_CIVILE' } });
+      fireEvent.change(screen.getByPlaceholderText('Titolo della glossa'), { target: { value: 'Titolo' } });
+      fireEvent.change(screen.getByPlaceholderText(/condividi una domanda/i), { target: { value: 'Corpo del testo' } });
+      fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
+      await waitFor(() => expect(articleDiscussionService.create).toHaveBeenCalledWith(
+        dummyAnchor, 'Titolo', 'Corpo del testo', expect.objectContaining({ materia: 'DIRITTO_CIVILE' }),
+      ));
+    });
+
+    it('counts the replies as the Forum does: not the comments under them', async () => {
+      vi.mocked(articleDiscussionService.list).mockResolvedValue({
+        data: [{ ...dummyThread, comments: [reply({}), reply({ id: 'c2', parentId: 'c1' })] }],
+        pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+      });
+      render(<ArticleDiscussionPanel anchor={dummyAnchor} isOpen={true} onClose={vi.fn()} />);
+      expect(await screen.findByText(/· 1 risposta$/)).toBeInTheDocument();
+    });
+
+    it('names each reply\'s vote by its author and count', async () => {
+      await openThread({ ...dummyThread, comments: [reply({})] });
+      expect(screen.getByRole('button', { name: 'Vota la risposta di luigi, 1 voto' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Vota glossa, 3 voti' })).toBeInTheDocument();
+    });
+
+    it('asks before reporting, and «Annulla» sends nothing', async () => {
+      vi.mocked(articleDiscussionService.report).mockResolvedValue(undefined);
+      await openThread(dummyThread);
+      fireEvent.click(screen.getByRole('button', { name: 'Segnala la glossa' }));
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Annulla' }));
+      expect(articleDiscussionService.report).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Segnala la glossa' }));
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Segnala' }));
+      await waitFor(() => expect(articleDiscussionService.report).toHaveBeenCalledWith('thread-1', 'segnalazione'));
+    });
+  });
 });
