@@ -102,7 +102,7 @@ export function AliasManager() {
             return 'Esiste già come alias in dotazione: il tuo lo sovrascriverà.';
         }
         if (catalog.knownActs.some(n => foldAlias(n) === t)) {
-            return 'Questo nome è già riconosciuto così com\'è — un alias non serve.';
+            return 'Questo nome è già riconosciuto così com\'è: un alias non serve.';
         }
         return null;
     }, [trigger, catalog]);

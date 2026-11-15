@@ -181,7 +181,7 @@ export function LinksPanel(props: LinksPanelProps) {
                     {report.skipped.map((row) => (
                       <li key={row.index} className={HINT}>
                         <button type="button" onClick={() => onSelect(row.index)} className={cn('inline-flex min-h-[44px] items-center font-medium text-slate-800 underline underline-offset-2 md:min-h-0 dark:text-slate-200', FOCUS_RING)}>{row.label}</button>
-                        {' '}— {row.reason}
+                        : {row.reason}
                       </li>
                     ))}
                   </ul>

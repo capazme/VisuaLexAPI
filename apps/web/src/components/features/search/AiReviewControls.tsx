@@ -87,7 +87,7 @@ export function AiReviewControls({
                     {showOriginal && (
                         <div id={originalId} className="rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Versione dell'IA</p>
-                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{original || '—'}</p>
+                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{original || 'nessun testo'}</p>
                         </div>
                     )}
                 </div>

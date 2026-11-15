@@ -151,7 +151,7 @@ export function NormaPicker({ value, onChange, placeholder, ariaLabel }: NormaPi
         </p>
       )}
       {state.status === 'error' && (
-        <p className="text-xs text-red-600 dark:text-red-400">Errore nel riconoscimento — riprova.</p>
+        <p className="text-xs text-red-600 dark:text-red-400">Errore nel riconoscimento. Riprova.</p>
       )}
       {state.status === 'recognized' && (
         <button

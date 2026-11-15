@@ -91,10 +91,10 @@ export function PracticeArticleEntry({ practiceId, actId, article }: { practiceI
         <>
           <span className="font-medium">{number}</span>
           {/* 600, not 500: 4.5:1 on the marked entry's ground too. */}
-          {rubrica && <span className="text-slate-600 dark:text-slate-400">{' — '}{rubrica}</span>}
+          {rubrica && <span className="text-slate-600 dark:text-slate-400">{' · '}{rubrica}</span>}
         </>
       )}
-      title={rubrica ? `${number} — ${rubrica}` : number}
+      title={rubrica ? `${number} · ${rubrica}` : number}
       removeName={shortNorm(norma) + (pastWords ? `, ${pastWords}` : '')}
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
     />

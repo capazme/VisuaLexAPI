@@ -63,7 +63,7 @@ function EarlierVersion({ version }: { version: StudiaTextVersion }) {
         <Chevron size={16} aria-hidden className="shrink-0" />
         <span className="font-medium">Versione {version.versione}</span>
         <span className="text-gray-500 dark:text-gray-400">
-          {dayOf(version.createdAt)} · {version.autore ?? '—'}
+          {dayOf(version.createdAt)} · {version.autore ?? 'autore non indicato'}
         </span>
       </button>
       {open && (

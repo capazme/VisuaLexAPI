@@ -439,7 +439,7 @@ describe('DossierDetailView — what Claude removed from it', () => {
     };
     appStore.setState({ dossiers: [structuredClone(dossier)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
     render(<MemoryRouter><DossierDetailView dossier={dossier} onBack={() => {}} showToast={() => {}} trash={trash} /></MemoryRouter>);
-    expect(screen.getByRole('button', { name: 'Rimossi di recente (1) — ripristina' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rimossi di recente (1): ripristina' })).toBeInTheDocument();
   });
 });
 

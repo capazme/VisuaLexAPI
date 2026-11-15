@@ -65,7 +65,7 @@ export function BatchDetailPanel({ batchId, onClose, onQueueRefreshNeeded }: Bat
           {batch && (
             <div className="mt-1 flex items-center gap-2 flex-wrap text-xs text-gray-500 dark:text-gray-400">
               <BatchStatusBadge status={batch.status} size="sm" />
-              <span>creato da {batch.created_by ?? '—'}</span>
+              <span>creato da {batch.created_by ?? 'n.d.'}</span>
               {batch.error && <span className="text-red-600 dark:text-red-400">{batch.error}</span>}
             </div>
           )}

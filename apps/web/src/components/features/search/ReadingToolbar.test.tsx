@@ -387,7 +387,7 @@ describe('ReadingToolbar — the highlighter and its inks (H1, A4)', () => {
         fireEvent.click(within(row).getByRole('button', { name: 'Colore dell’evidenziatore' }));
         const menu = within(row).getByRole('menu');
         // The meanings are a suggestion, and the menu says so.
-        expect(menu).toHaveAccessibleDescription('Colore dell’evidenziatore — uso suggerito');
+        expect(menu).toHaveAccessibleDescription('Colore dell’evidenziatore: uso suggerito');
         const choices = within(menu).getAllByRole('menuitemradio');
         expect(choices.map((c) => [c.textContent, c.getAttribute('aria-checked')])).toEqual([
             ['GialloPunto centrale', 'true'],
@@ -408,7 +408,7 @@ describe('ReadingToolbar — the highlighter and its inks (H1, A4)', () => {
         const menu = openMore(phoneRow(container));
         // Long now: capped under the bar, it scrolls on its own, so the last colour is never off the screen.
         expect(menu).toHaveClass('overflow-y-auto', 'max-h-[calc(100dvh-12rem)]');
-        expect(within(menu).getByText('Colore dell’evidenziatore — uso suggerito')).toBeInTheDocument();
+        expect(within(menu).getByText('Colore dell’evidenziatore: uso suggerito')).toBeInTheDocument();
         const choices = within(menu).getAllByRole('menuitemradio');
         // Named for what they set, never «Evidenzia in…», which reads as «highlight now».
         expect(choices.map((c) => c.getAttribute('aria-label'))).toEqual([

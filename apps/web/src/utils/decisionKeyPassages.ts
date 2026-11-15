@@ -276,7 +276,7 @@ export function keyPassageEntryLabels(passages: readonly KeyPassage[], plain: st
     const count = total[p.kind] > 1 ? ` ${seen[p.kind]} di ${total[p.kind]}` : '';
     const words = plain.slice(p.start, p.end).split(/\s+/).filter(Boolean);
     const quote = words.slice(0, QUOTE_WORDS).join(' ') + (words.length > QUOTE_WORDS ? '…' : '');
-    return `${KEY_PASSAGE_LABELS[p.kind]}${count} — «${quote}»`;
+    return `${KEY_PASSAGE_LABELS[p.kind]}${count}: «${quote}»`;
   });
 }
 

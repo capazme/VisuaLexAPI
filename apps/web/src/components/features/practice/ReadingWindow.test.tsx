@@ -145,7 +145,7 @@ describe('ReadingWindow (spec §4.1)', () => {
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [past]);
     const ref = besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(past) });
     draw(practiceId, [ref]);
-    expect(titleOf(ref)).toHaveTextContent('art. 5, l. 8 marzo 2017, n. 24 — testo originale');
+    expect(titleOf(ref)).toHaveTextContent('art. 5, l. 8 marzo 2017, n. 24, testo originale');
   });
 
   it('a decision window reads the decision on the entry view, the window as its place', async () => {

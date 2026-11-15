@@ -128,7 +128,7 @@ export function ReadingToolbar({
         find.onToggle(shown, find.isOpen);
     };
     // A switched-off tool keeps its name and gains the reason in its tooltip (a menu's entry, under its name).
-    const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);
+    const tip = (name: string, reason?: string) => (reason ? `${name}: ${reason}` : name);
     const lock = (reason?: string) => (reason ? { disabled: true } : {});
     // Exporting writes the article out like a copy does, and the export header
     // carries no version: anything that may not be copied, or is a reading, stays in.

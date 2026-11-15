@@ -87,7 +87,7 @@ export function IngestionRunForm({ onStarted }: IngestionRunFormProps) {
             onChange={(e) => setScopeLabel(e.target.value)}
             disabled={submitting}
             maxLength={300}
-            placeholder='es. "Codice civile — Libro IV"'
+            placeholder='es. "Codice civile, Libro IV"'
             className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none disabled:opacity-50"
             required
           />

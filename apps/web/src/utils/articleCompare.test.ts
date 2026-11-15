@@ -637,7 +637,7 @@ describe('the summary (D6)', () => {
   it('names a past text among two articles, never as the text in force', () => {
     const l = article('1. Uno.', { numero_articolo: '2043', ...at('2007-12-29') });
     const r = article('1. Uno.', { numero_articolo: '2059' });
-    expect(sentence(l, r)).toBe('Art. 2043 c.c. — testo al 29/12/2007 (1 comma) e art. 2059 c.c. (1 comma)');
+    expect(sentence(l, r)).toBe('Art. 2043 c.c., testo al 29/12/2007 (1 comma) e art. 2059 c.c. (1 comma)');
   });
   it('keeps the labels and counts in the data', () => {
     const summary = compareArticles(article('1. Uno.', at('2015-12-31')), article('1. Uno.')).summary;

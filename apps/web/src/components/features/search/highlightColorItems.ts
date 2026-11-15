@@ -12,7 +12,7 @@ const DOT: Record<HighlightColor, string> = {
 };
 
 /** The title over the four: their own menu's, and in a menu of actions. Each colour's meaning is a suggestion. */
-export const SECTION_HEADING = 'Colore dell’evidenziatore — uso suggerito';
+export const SECTION_HEADING = 'Colore dell’evidenziatore: uso suggerito';
 
 /** «Nessun colore» (A4): the highlighter's ink that takes highlights away. */
 export const NO_COLOUR_LABEL = 'Nessun colore';

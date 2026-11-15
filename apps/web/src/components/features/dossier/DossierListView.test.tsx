@@ -61,7 +61,7 @@ describe('DossierListView — the quick-open of a card', () => {
     expect(searchQueue).toHaveLength(1);
     expect(searchQueue[0]).toMatchObject({
       article: '1284', version: 'vigente', version_date: '2007-12-29',
-      tabLabel: 'Pratica Rossi — testo al 29/12/2007',
+      tabLabel: 'Pratica Rossi, testo al 29/12/2007',
     });
     expect(practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
     expect(searchQueue[0].targetPracticeId).toBe(practices[0].id);
@@ -95,7 +95,7 @@ describe('DossierListView — the quick-open of a card', () => {
     open([CIVIL, PAST]);
     fireEvent.click(screen.getByText('Testo al 29/12/2007'));
     expect(appStore.getState().searchTrigger).toMatchObject({
-      version_date: '2007-12-29', tabLabel: 'Pratica Rossi — testo al 29/12/2007',
+      version_date: '2007-12-29', tabLabel: 'Pratica Rossi, testo al 29/12/2007',
     });
   });
 });
