@@ -66,6 +66,7 @@ export const BROWSER_STORAGE: readonly StorageEntry[] = [
   { area: 'local', key: 'visualex_last_seen_version', kind: 'device', what: 'the version whose notes were shown' },
   { area: 'session', key: 'visualex_version_last_check', kind: 'device', what: 'when the version was last checked' },
   { area: 'local', key: 'visualex-opus-today-grouping', kind: 'device', what: 'Opus: how «Oggi» is grouped' },
+  { area: 'session', key: 'visualex-logo-sweep', kind: 'device', what: 'the shell\'s logo already swept in this tab\'s session' },
   { area: 'session', key: 'visualex:find-window-place', kind: 'device', what: 'where the find window sits' },
   { area: 'session', key: 'visualex:find-window-scope', kind: 'device', what: 'what the find window searches' },
   { area: 'session', key: 'visualex:case-law-open:*', kind: 'device', what: 'whether case law is open, per tab' },

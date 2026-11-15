@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { SessionKeptUnreachable } from './ProtectedRoute';
+import { LexCraftLogo } from '../ui/LexCraftLogo';
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -49,6 +50,8 @@ export function AdminRoute({ children }: AdminRouteProps) {
     return (
       <div className="min-h-svh flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
         <div className="max-w-md w-full text-center">
+          {/* The still logo heads a screen without the shell (LC16). */}
+          <LexCraftLogo className="mx-auto mb-8 block h-auto w-[160px]" />
           <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full mb-6">
             <ShieldAlert size={40} />
           </div>

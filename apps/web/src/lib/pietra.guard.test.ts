@@ -3,7 +3,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 // Pietra everywhere (D-156, after Inchiostro's Y1), kept from coming back one file at a time. Colours: an action and the
-// focus are `primary-*` (toga, warm ink), the rest `slate-*` (ink, warm grey), a section its hue (`--vlx-section-*`);
+// focus are `primary-*` (toga, warm ink), the rest `slate-*` (ink, warm grey), a section its tile (`--vlx-section-*`, Work's
+// ink for all four since LC16, `theme.test.ts`);
 // `blue-*` and `indigo-*` are aliases of toga that only hid where the old blue still stood, `purple-*` and `violet-*`
 // hues of no section; and the two scales themselves stay warm and near-grey, so the blue cannot come back by value. Sizes: no
 // text under 11 px. Elevation: cards `shadow-sm` or a border, menus and popovers `shadow-md`, windows `shadow-lg`, never

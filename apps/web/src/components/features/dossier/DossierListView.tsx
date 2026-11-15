@@ -388,7 +388,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             </div>
           ) : (
             // No dossier yet: an empty state composed for the page (S7c) — line art in the
-            // section's hue, what a dossier is for, and the two ways to begin.
+            // section's ink (`--vlx-section-*`, one Pietra value since LC16), what a dossier is for, and the two ways to begin.
             <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
               <DossierMark hue={`var(--vlx-section-${sectionOfDossierKind(sectionKind)})`} />
               <h2 id="dossier-list-empty" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">

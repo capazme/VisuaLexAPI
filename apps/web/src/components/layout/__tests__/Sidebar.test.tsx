@@ -54,9 +54,11 @@ function renderSidebar(path = '/labs') {
   );
 }
 
+// The entries' addresses: the logo's link home, over them, is not an entry.
 function navHrefs(): string[] {
   return screen
     .getAllByRole('link')
+    .filter((a) => a.getAttribute('aria-label') !== 'LexCraft')
     .map((a) => a.getAttribute('href'))
     .filter((href): href is string => href !== null);
 }

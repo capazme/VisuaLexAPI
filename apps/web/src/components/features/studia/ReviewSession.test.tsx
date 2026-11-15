@@ -756,7 +756,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       expect(bar()).toHaveAttribute('aria-valuenow', '0');
       expect(bar()).toHaveAttribute('aria-valuemax', '4');
       expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '0%' });
-      // The section's hue, not the ink's near-grey (G8).
+      // The section's ink, `vlx-lesson-ink` (G8; Pietra since LC16).
       expect(screen.getByTestId('lesson-progress-fill')).toHaveClass('vlx-lesson-ink');
 
       await show();
@@ -782,7 +782,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       expect([...fill.classList].filter((c) => /^(transition|duration|ease|animate|delay)/.test(c))).toEqual([]);
     });
 
-    it('runs its head ahead in the section’s hue and lets the ink catch up on a spring, under 400 ms (S2)', async () => {
+    it('runs its head ahead in stone and lets the ink catch up on a spring, under 400 ms (S2)', async () => {
       const user = userEvent.setup();
       renderSession([card('a'), card('b')]);
       await screen.findByText('Domanda a?');

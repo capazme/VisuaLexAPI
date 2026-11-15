@@ -1405,7 +1405,8 @@
 /* LexCraft's column (ui/BookMark, and the splash in index.html; the classes keep the book's name): capital and base
    in `currentColor`, the shaft in Pietra's stone. It rises from its base and fades in, then breathes while something
    loads. The rise only with motion allowed; under reduced motion the column is whole at once. */
-.vlx-book .vlx-column-shaft { fill: #8a8478; }
+:root { --vlx-pietra: #8a8478; }
+.vlx-book .vlx-column-shaft { fill: var(--vlx-pietra); }
 .vlx-book .vlx-column { transform-box: fill-box; transform-origin: 50% 100%; }
 @media (prefers-reduced-motion: no-preference) {
   .vlx-book-draw .vlx-column { animation: vlx-column-rise 500ms var(--ease-out) both; }
@@ -1413,6 +1414,61 @@
 .vlx-book-breathe { animation: vlx-book-breathe 1.4s ease-in-out 700ms infinite alternate; }
 @keyframes vlx-column-rise { from { opacity: 0; transform: scaleY(0.6); } }
 @keyframes vlx-book-breathe { to { opacity: 0.4; } }
+
+/* LexCraft's logo (D-136, D-201; `ui/LexCraftLogo`), variant 1 of the design file «05 Animazione di avvio.html», «Va e
+   torna, resta pietra»: its timings and curves, `transform` and `clip-path` only, CSS so it stays smooth while the app
+   loads. Ink and paper swap in the dark, as in the file. The intro (the sign-in page): after a wait the word opens and
+   the column slides to its place, the column comes down as the word rises, then the cursor runs to the end of CRAFT
+   selecting it in ink and, coming back, leaves it selected in stone. The sweep (the shell, once a session) is that last
+   run alone, inside the still logo's box: the cursor's run passes its right edge by 15 units, so the box shows what
+   overflows. Still under reduced motion: `LexCraftLogo` sets no class, and these rules exist only with motion allowed. */
+.vlx-logo {
+  --vlx-logo-ink: var(--color-ink-900);
+  --vlx-logo-paper: var(--color-ink-50);
+  --vlx-logo-sel: var(--color-toga-50);
+  --vlx-logo-wait: 450ms;
+  --vlx-logo-opening: 500ms;
+  --vlx-logo-descent: 600ms;
+  --vlx-logo-sweeping: 1500ms;
+  overflow: visible;
+}
+.dark .vlx-logo {
+  --vlx-logo-ink: var(--color-ink-50);
+  --vlx-logo-paper: var(--color-ink-950);
+  --vlx-logo-sel: var(--color-ink-700);
+}
+.vlx-logo-descend { transform-box: fill-box; transform-origin: center; }
+/* At rest the ink selection that runs with the cursor is not there. */
+.vlx-logo-sel-run { clip-path: inset(0 100% 0 0); }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-logo-intro {
+    --vlx-logo-sweep-at: calc(var(--vlx-logo-wait) + var(--vlx-logo-opening) + var(--vlx-logo-descent) - 90ms);
+  }
+  .vlx-logo-intro .vlx-logo-open {
+    animation: vlx-logo-open var(--vlx-logo-opening) var(--ease-in-out) var(--vlx-logo-wait) both;
+  }
+  .vlx-logo-intro .vlx-logo-rise {
+    animation: vlx-logo-rise var(--vlx-logo-descent) var(--ease-in-out) calc(var(--vlx-logo-wait) + var(--vlx-logo-opening) - 150ms) both;
+  }
+  .vlx-logo-intro .vlx-logo-descend {
+    animation: vlx-logo-descend var(--vlx-logo-descent) var(--ease-in-out) calc(var(--vlx-logo-wait) + var(--vlx-logo-opening) - 150ms) both;
+  }
+  :is(.vlx-logo-intro, .vlx-logo-sweep) .vlx-logo-cursor {
+    animation: vlx-logo-run var(--vlx-logo-sweeping) var(--ease-in-out) var(--vlx-logo-sweep-at, 0ms) both;
+  }
+  :is(.vlx-logo-intro, .vlx-logo-sweep) .vlx-logo-sel-rest {
+    animation: vlx-logo-sel-rest var(--vlx-logo-sweeping) var(--ease-in-out) var(--vlx-logo-sweep-at, 0ms) both;
+  }
+  :is(.vlx-logo-intro, .vlx-logo-sweep) .vlx-logo-sel-run {
+    animation: vlx-logo-sel-run var(--vlx-logo-sweeping) var(--ease-in-out) var(--vlx-logo-sweep-at, 0ms) both;
+  }
+}
+@keyframes vlx-logo-open { from { transform: translateX(var(--vlx-logo-from)); } }
+@keyframes vlx-logo-rise { from { transform: translateY(95.05px); } }
+@keyframes vlx-logo-descend { from { transform: translateY(-48.5px) scale(1.5); } }
+@keyframes vlx-logo-run { 0%, 100% { transform: none; } 46%, 54% { transform: translateX(var(--vlx-logo-run)); } }
+@keyframes vlx-logo-sel-rest { 0% { clip-path: inset(0 100% 0 0); } 46%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes vlx-logo-sel-run { 0%, 100% { clip-path: inset(0 100% 0 0); } 46%, 54% { clip-path: inset(0 0 0 0); } }
 
 /* The goal's mark (G9, `GoalMark`): each stroke is an outline uncovered by a mask whose pen path is written — the ring,
    then the tick, then the stroke under it, about a second in all, once. The pen paths carry `pathLength="1"`, so one
@@ -1428,40 +1484,6 @@
 }
 @keyframes vlx-goal-mark-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes vlx-goal-mark-fade { from { opacity: 0; } }
-
-/* The sign-in's wordmark written in ink (A3, `AuthPage`): one face, one ink, one gesture. The column rises
-   (0–450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose soft edge is the pen's tip
-   (250–950 ms), and the ink, the word itself, follows it 100 ms behind under its own (350–1050 ms), so each letter is
-   faint and soft before it is sharp; the copy fades as the ink ends, then the line under it rises 4 px into view
-   (1050–1250 ms). The word is one text throughout. Everything fills backwards only, and `AuthPage` drops the copy
-   and the mask at the end: no mask, no filter is left. On WebKit for iOS (`inkMark.ts`) the word only fades in from
-   the left, no mask, no blur. Only with motion allowed — the global rule cuts the durations, not the delays, and a
-   delayed `backwards` would hide the line for a second; under reduced motion the page fades in through that rule's
-   150 ms opacity transition. Without `@property` (Safari before 16.4) an edge cannot be interpolated: the word
-   shows whole halfway through, never hidden for good. */
-@property --vlx-ink-edge { syntax: '<percentage>'; inherits: false; initial-value: 112%; }
-@media (prefers-reduced-motion: no-preference) {
-  .vlx-ink-book .vlx-column { animation: vlx-column-rise 450ms var(--ease-out) backwards; }
-  .vlx-ink-word, .vlx-ink-bleed {
-    mask-image: linear-gradient(to right, #000 calc(var(--vlx-ink-edge) - 12%), transparent var(--vlx-ink-edge));
-  }
-  /* The waits inside the keyframes, not delays: a registered property in a delay's backwards fill read its initial
-     value (the word whole) once the timeline was set by hand. */
-  .vlx-ink-word { animation: vlx-ink-write 1050ms linear backwards; }
-  .vlx-ink-bleed { animation: vlx-ink-bleed 1050ms linear backwards; }
-  .vlx-ink-plain { animation: vlx-ink-plain 800ms var(--ease-out) 250ms backwards; }
-  .vlx-ink-line { animation: vlx-ink-rise 200ms var(--ease-out) 1050ms backwards; }
-}
-/* The copy is never seen outside its writing, whatever the motion setting becomes. */
-.vlx-ink-bleed { opacity: 0; filter: blur(1.5px); pointer-events: none; }
-@keyframes vlx-ink-write { 0%, 33.33% { --vlx-ink-edge: 0%; } to { --vlx-ink-edge: 112%; } }
-@keyframes vlx-ink-bleed {
-  0%, 23.81% { --vlx-ink-edge: 0%; opacity: 0.4; }
-  90.48% { --vlx-ink-edge: 112%; opacity: 0.4; }
-  to { --vlx-ink-edge: 112%; opacity: 0; }
-}
-@keyframes vlx-ink-plain { from { opacity: 0; translate: -6px 0; } }
-@keyframes vlx-ink-rise { from { opacity: 0; translate: 0 4px; } }
 
 /* ═══════════════════════════════════════════════════════════
    ENTRANCES — animate-in, fade-in, zoom-in-N, slide-in-from-*
@@ -1582,33 +1604,34 @@
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: var(--color-ink-900); }
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: var(--color-ink-900); }
 
-/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. The same hues colour
-   Gymnasium's small motions (the tally's stroke, the mission's drop, the lesson bar's head); none of those carries
-   meaning either. On a change of section the mark passes to the new hue (`SectionSwitcher`, T1). */
+/* The sections' tile (LC16, the owner, 15 Nov 2026: «i toggle tutti in color pietra»): the four are one, Work's — the
+   action's ink, light and dark — and the hues VisuaLex gave Learn, Labs and the Forum are gone. The tokens keep a name
+   per section, read by the switcher's mark, Gymnasium's small motions (the tally's stroke, the mission's drop and line,
+   the lesson bar) and the empty dossier list's drawing; a section that someday needs its own value writes it here.
+   Ink on the white tile 13.5:1, paper on the dark one 12.4:1. */
 :root {
   --vlx-section-opus: var(--color-toga-600);
-  --vlx-section-gymnasium: oklch(31% 0.09 268);
-  --vlx-section-academia: oklch(55% 0.09 70);
-  --vlx-section-forum: oklch(55% 0.08 190);
-  /* The lesson bar's head runs ahead of the ink: the section's hue, lighter where the ink is dark. */
-  --vlx-gymnasium-wash: oklch(64% 0.1 268);
-  /* The lesson bar's ink (G8): the section's hue at a step that reads as a colour, over 3:1 on its track. */
-  --vlx-gymnasium-bar: oklch(48% 0.14 268);
+  --vlx-section-gymnasium: var(--color-toga-600);
+  --vlx-section-academia: var(--color-toga-600);
+  --vlx-section-forum: var(--color-toga-600);
+  /* The lesson bar's head runs ahead of the ink in Pietra's stone (2.6:1 on the track, 3.9:1 against the ink). */
+  --vlx-gymnasium-wash: var(--vlx-pietra);
+  /* The lesson bar's ink (G8): the action's ink, 10.1:1 on its track (ink 200). */
+  --vlx-gymnasium-bar: var(--color-toga-600);
 }
 .dark {
   --vlx-section-opus: var(--color-toga-500);
-  --vlx-section-gymnasium: oklch(45% 0.11 268);
-  --vlx-section-academia: oklch(60% 0.09 70);
-  --vlx-section-forum: oklch(58% 0.08 190);
-  --vlx-gymnasium-wash: oklch(45% 0.11 268);
-  --vlx-gymnasium-bar: oklch(70% 0.12 268);
+  --vlx-section-gymnasium: var(--color-toga-500);
+  --vlx-section-academia: var(--color-toga-500);
+  --vlx-section-forum: var(--color-toga-500);
+  /* 3.3:1 on the dark track (ink 800), 3.2:1 against the paper ink. */
+  --vlx-gymnasium-wash: var(--vlx-pietra);
+  /* Paper on the dark track, 10.4:1. */
+  --vlx-gymnasium-bar: var(--color-toga-500);
 }
 .vlx-section-mark { background: var(--vlx-section-opus); }
-.vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
-.vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
-.vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
-/* Dark Work is the dark action, paper: its icon is ink, not the switcher's `text-white` (unlayered, so it wins). */
-.dark .vlx-section-mark[data-section="opus"] { color: var(--color-ink-950); }
+/* In the dark the tile is paper: its icon is ink, not the switcher's `text-white` (unlayered, so it wins). */
+.dark .vlx-section-mark { color: var(--color-ink-950); }
 
 /* «Analizza documento»'s box (D6): the frame's dashes stand still at rest — nothing moves for ever on an open page
    (Bill) —, turn slowly under a mouse or with the keyboard's focus on the box, and run while a file is dragged over
@@ -1632,9 +1655,9 @@
 /* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it
    (`progress/seenProgress.ts`); under reduced motion none moves and the final state is drawn at once. */
 
-/* A mission done (today's missions): its words in a quieter ink, struck through in the section's hue. Done just now,
-   the ink crosses the words first — a band of the hue running left to right, leaving them done behind it — as the
-   drop fills the box (`MissionMark`, `MISSION_INK_MS`). */
+/* A mission done (today's missions): its words in a quieter ink, struck through in the section's ink (Learn's token,
+   Work's ink since LC16). Done just now, the ink crosses the words first — a band of stone running left to right,
+   leaving them done behind it — as the drop fills the box (`MissionMark`, `MISSION_INK_MS`). */
 :root { --vlx-todo-ink: var(--color-ink-900); --vlx-done-ink: var(--color-ink-600); }
 .dark { --vlx-todo-ink: var(--color-ink-50); --vlx-done-ink: var(--color-ink-300); }
 .vlx-mission-done {
@@ -1643,7 +1666,7 @@
 }
 .vlx-mission-inking {
   color: transparent;
-  background: linear-gradient(90deg, var(--vlx-done-ink) 0 33%, var(--vlx-section-gymnasium) 33% 40%, var(--vlx-todo-ink) 47% 100%) 100% 0 / 300% 100% no-repeat;
+  background: linear-gradient(90deg, var(--vlx-done-ink) 0 33%, var(--vlx-pietra) 33% 40%, var(--vlx-todo-ink) 47% 100%) 100% 0 / 300% 100% no-repeat;
   -webkit-background-clip: text;
   background-clip: text;
   text-decoration: line-through 1.5px;
@@ -1664,7 +1687,7 @@
   100% { translate: 0 0; scale: 1 1; }
 }
 
-/* The lesson's bar: the head runs ahead in the section's hue, the ink catches up a moment later on a spring
+/* The lesson's bar: the head runs ahead in stone, the ink catches up a moment later on a spring
    (`--ease-catch`, a damped spring sampled as a `linear()` curve, a hair of overshoot), then the bar trembles by a
    pixel (`ReviewSession`, Web Animations). */
 :root {
