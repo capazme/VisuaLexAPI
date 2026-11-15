@@ -323,7 +323,7 @@ function drawPdfDecision(w: PdfWriter, decision: PdfDecision): void {
 export async function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): Promise<jsPDF> {
   const JsPdf = await loadJsPdf();
   const doc = new JsPdf({ unit: 'pt', format: 'a4' });
-  const w = createPdfWriter(doc, { footerLeft: `${header.title} · VisuaLex` });
+  const w = createPdfWriter(doc, { footerLeft: `${header.title} · LexCraft` });
   const { ensureSpace, write } = w;
 
   doc.setFillColor(30, 64, 175);

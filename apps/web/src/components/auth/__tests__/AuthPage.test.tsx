@@ -225,7 +225,7 @@ describe('AuthPage: two tabs on one page', () => {
     expect(address()).toHaveTextContent('/login');
     expect(tab('Accedi')).toHaveAttribute('aria-selected', 'true');
     await act(async () => finish());
-    expect(await screen.findByRole('status', { name: 'Accesso a VisuaLex' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Accesso a LexCraft' })).toBeInTheDocument();
   });
 
   it('holds the tabs still while a sign-up is on its way, so its confirmation shows', async () => {
@@ -421,13 +421,13 @@ describe('AuthPage: the wordmark written in ink', () => {
   };
   const copy = () => document.querySelector('.vlx-ink-bleed');
 
-  it('names the page «VisuaLex» with one text, its blurred copy and the book hidden from a reader', () => {
+  it('names the page «LexCraft» with one text, its blurred copy and the book hidden from a reader', () => {
     renderAuth('/login');
-    const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
+    const title = screen.getByRole('heading', { level: 1, name: 'LexCraft' });
     // The word itself is never split into letters (WebKit kerns no pair across two elements).
     const ink = title.querySelector('.vlx-ink-word')!;
     expect(ink.childNodes).toHaveLength(1);
-    expect(ink.textContent).toBe('VisuaLex');
+    expect(ink.textContent).toBe('LexCraft');
     expect(copy()).toHaveAttribute('aria-hidden', 'true');
     expect(copy()).toHaveClass('select-none');
     expect(document.querySelector('svg.vlx-ink-book')).toHaveAttribute('aria-hidden', 'true');
@@ -443,8 +443,8 @@ describe('AuthPage: the wordmark written in ink', () => {
     animation(title.querySelector('.vlx-ink-word')!, 'animationend', 'vlx-ink-write');
     expect(copy()).toBeNull();
     expect(title.querySelector('.vlx-ink-word')).toBeNull();
-    expect(title).toHaveTextContent(/^VisuaLex$/);
-    expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex' })).toBe(title);
+    expect(title).toHaveTextContent(/^LexCraft$/);
+    expect(screen.getByRole('heading', { level: 1, name: 'LexCraft' })).toBe(title);
   });
 
   it('ends the writing when it is cancelled, reduced motion turned on halfway', () => {
@@ -457,8 +457,8 @@ describe('AuthPage: the wordmark written in ink', () => {
   it('only fades the word in from the left on WebKit for iOS: no mask, no blurred copy', () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15');
     renderAuth('/login');
-    const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
-    expect(title.querySelector('.vlx-ink-plain')).toHaveTextContent('VisuaLex');
+    const title = screen.getByRole('heading', { level: 1, name: 'LexCraft' });
+    expect(title.querySelector('.vlx-ink-plain')).toHaveTextContent('LexCraft');
     expect(title.querySelector('.vlx-ink-word')).toBeNull();
     expect(copy()).toBeNull();
     animation(title.querySelector('.vlx-ink-plain')!, 'animationend', 'vlx-ink-plain');
@@ -475,7 +475,7 @@ describe('AuthPage: the wordmark written in ink', () => {
   it('never writes the word under reduced motion', () => {
     reduceMotion(true);
     renderAuth('/login');
-    const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
+    const title = screen.getByRole('heading', { level: 1, name: 'LexCraft' });
     expect(title.querySelector('.vlx-ink-word, .vlx-ink-plain')).toBeNull();
     expect(copy()).toBeNull();
   });

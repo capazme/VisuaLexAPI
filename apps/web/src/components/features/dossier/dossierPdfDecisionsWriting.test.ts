@@ -60,7 +60,7 @@ describe('writeDossierPdf — «Giurisprudenza»', () => {
         "text 44,243.5 Secondo paragrafo.",
         "text 44,276 Note sulla decisione",
         "text 44,292 Da rileggere",
-        "text 44,810 Pratica Rossi · VisuaLex",
+        "text 44,810 Pratica Rossi · LexCraft",
         "text 555,810 Pagina 1",
       ]
     `);

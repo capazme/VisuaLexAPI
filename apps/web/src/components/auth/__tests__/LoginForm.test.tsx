@@ -27,14 +27,14 @@ describe('LoginForm', () => {
     fireEvent.change(form().getByLabelText(/email/i), { target: { value: 'a@b.it' } });
     fireEvent.change(form().getByLabelText(/^password$/i), { target: { value: 'secret' } });
     fireEvent.submit(form().getByLabelText(/email/i).closest('form')!);
-    expect(await screen.findByRole('status', { name: 'Accesso a VisuaLex' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Accesso a LexCraft' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/'), { timeout: 2000 });
   });
 
   it('keeps the colophon to the mark, the name and the sentence: no list of sources, Brocardi least of all', () => {
     renderAuth('/login');
     const colophon = screen.getByRole('banner');
-    expect(within(colophon).getByRole('heading', { level: 1, name: 'VisuaLex' })).toBeInTheDocument();
+    expect(within(colophon).getByRole('heading', { level: 1, name: 'LexCraft' })).toBeInTheDocument();
     expect(within(colophon).queryByRole('list')).toBeNull();
     expect(document.body).not.toHaveTextContent(/Normattiva · EUR-Lex|Corte di giustizia|schede di ripasso/);
     expect(document.body).not.toHaveTextContent(/brocardi/i);

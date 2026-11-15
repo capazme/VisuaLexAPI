@@ -95,7 +95,7 @@ describe('writeDossierPdf', () => {
       text 44,723 parola parola parola parola parola parol
       text 44,735 parola parola parola parola parola parol
       text 44,747 parola parola parola parola parola parol
-      text 44,810 Pratica Rossi · VisuaLex
+      text 44,810 Pratica Rossi · LexCraft
       text 555,810 Pagina 1
       addPage
       text 44,54 parola parola parola parola parola parol
@@ -129,7 +129,7 @@ describe('writeDossierPdf', () => {
       text 44,390 parola parola parola parola parola parol
       text 44,402 parola parola parola parola parola parol
       text 44,414 parola parola parola parola parola parol
-      text 44,810 Pratica Rossi · VisuaLex
+      text 44,810 Pratica Rossi · LexCraft
       text 555,810 Pagina 2"
     `);
   });
