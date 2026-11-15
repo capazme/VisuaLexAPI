@@ -4,9 +4,9 @@ import { FolderOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { CopyableCode } from '../../../../features/connections/CopyableCode';
 import type { CompetenzaPagina, CorsoPagina, EsamePagina, Mancanze, ModuloPagina } from '../../../../types/corsi';
-import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
 import { MasteryChip, ModuleStateChip } from './CourseChips';
-import { closingOpensExam, competenceNumbers, completeSentence, fromDay, missingLines, moduleOpenLabel, modulePath, newExamSentence, onDay, thePercent } from './corsiLabels';
+import { closingOpensExam, competenceNumbers, completeSentence, examPath, fromDay, missingLines, moduleOpenLabel, modulePath, newExamSentence, onDay, thePercent } from './corsiLabels';
 
 /** The course page's parts (courses spec §6.4), drawn from `GET /lingo/corsi/:id`. */
 
@@ -177,14 +177,20 @@ export function ModulesSection({ corsoId, moduli, actions, headingRef, offer }: 
   );
 }
 
-/** The final exam's state (§6.4); taking it comes with the web's pull request (d). */
-export function ExamSection({ titolo, esame, inPreparazione }: { titolo: string; esame: EsamePagina; inPreparazione: boolean }) {
+/** The final exam's state (§6.4) and, while it is open or under way, the way into it (`ExamSession`, LC9). */
+export function ExamSection({ corsoId, titolo, esame, inPreparazione }: { corsoId: string; titolo: string; esame: EsamePagina; inPreparazione: boolean }) {
+  const takeable = (esame.stato === 'aperto' || esame.stato === 'in-corso') && esame.esameId;
   return (
     <section aria-labelledby="corso-esame" className={cn(TILE, 'grid grid-cols-1 gap-2 p-5')}>
       <h3 id="corso-esame" className={BLOCK_HEADING}>
         Esame finale
       </h3>
       <ExamState titolo={titolo} esame={esame} inPreparazione={inPreparazione} />
+      {takeable && (
+        <Link to={examPath(corsoId, esame.esameId!)} className={cn(INK_BUTTON, 'justify-self-start')}>
+          {esame.stato === 'aperto' ? 'Inizia la prova' : 'Riprendi la prova'}
+        </Link>
+      )}
     </section>
   );
 }

@@ -215,7 +215,7 @@ function Course({ id }: { id: string }) {
         ) : undefined}
         actions={{ onDelete: trashModule, onWithdraw: (modulo) => setConfirming({ kind: 'withdraw', modulo }), busy: busyModules }}
       />
-      <ExamSection titolo={data.titolo} esame={data.esame} inPreparazione={data.inPreparazione !== null} />
+      <ExamSection corsoId={data.id} titolo={data.titolo} esame={data.esame} inPreparazione={data.inPreparazione !== null} />
 
       <section aria-labelledby="corso-dossier" className="grid grid-cols-1 gap-3">
         <h3 id="corso-dossier" className={BLOCK_HEADING}>

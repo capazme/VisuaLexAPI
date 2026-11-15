@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { AvanzamentoModulo, Chiave, CorsoCestinato, CorsoDiOggi, CorsoInLista, CorsoPagina, EsitoRisposta, ModuloLezione } from '../types/corsi';
+import type { AvanzamentoModulo, Chiave, CorsoCestinato, CorsoDiOggi, CorsoInLista, CorsoPagina, EsitoRisposta, ModuloLezione, ProvaEsame } from '../types/corsi';
 import type { TestoCorrente, TestoDaAccettare } from '../types/studia';
 
 /**
@@ -10,6 +10,7 @@ import type { TestoCorrente, TestoDaAccettare } from '../types/studia';
 
 const course = (id: string) => `/lingo/corsi/${encodeURIComponent(id)}`;
 const courseModule = (id: string, moduloId: string) => `${course(id)}/moduli/${encodeURIComponent(moduloId)}`;
+const courseExam = (id: string, esameId: string) => `${course(id)}/esami/${encodeURIComponent(esameId)}`;
 const DECLARATION = '/lingo/testi/MATERIALE_STUDIO';
 
 /** What an apiClient rejection looks like (`services/api.ts`). */
@@ -103,6 +104,27 @@ export const corsiService = {
    */
   async answer(id: string, moduloId: string, domandaId: string, scelta: Chiave): Promise<EsitoRisposta> {
     const response = await apiClient.post(`${courseModule(id, moduloId)}/risposte`, { domandaId, scelta });
+    return response.data;
+  },
+
+  /**
+   * Starts the final exam, or answers the attempt already there (and its result once handed in). 409 while the exam is
+   * not open: the server's words say why.
+   */
+  async startExam(id: string, esameId: string): Promise<ProvaEsame> {
+    const response = await apiClient.post(`${courseExam(id, esameId)}/inizia`, {});
+    return response.data;
+  },
+
+  /** Every choice at once; an item left out counts as wrong. Idempotent: a second hand-in answers the stored result. */
+  async handInExam(id: string, esameId: string, risposte: { domandaId: string; scelta: Chiave }[]): Promise<ProvaEsame> {
+    const response = await apiClient.post(`${courseExam(id, esameId)}/consegna`, { risposte });
+    return response.data;
+  },
+
+  /** The opinion's rubric ticks, after the hand-in only: stored, never scored. */
+  async tickExamOpinion(id: string, esameId: string, spuntate: number[]): Promise<{ domandaId: string; spuntate: number[] }> {
+    const response = await apiClient.post(`${courseExam(id, esameId)}/aperta`, { spuntate });
     return response.data;
   },
 
