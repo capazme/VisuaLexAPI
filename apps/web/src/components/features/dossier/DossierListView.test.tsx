@@ -421,7 +421,7 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
   });
 
   // LC21: the line art is gone (no drawing over an empty list); the words and the two ways to begin stay.
-  it('composes the empty list: the empty folder's engraving, what a dossier is for and two ways to begin', () => {
+  it('composes the empty list: the empty folder’s engraving, what a dossier is for and two ways to begin', () => {
     appStore.setState({ dossiers: [], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
