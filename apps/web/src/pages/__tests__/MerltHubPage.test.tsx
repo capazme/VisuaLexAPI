@@ -105,7 +105,7 @@ describe('MerltHubPage', () => {
   it('shows a "non disponibile" message when the feature is disabled', () => {
     useMerltFeaturesMock.mockReturnValue({ ...baseFeatures, merltEnabled: false });
     renderHub();
-    expect(screen.getByText(/non è disponibile/i)).toBeInTheDocument();
+    expect(screen.getByText(/non sono accesi su questo server/i)).toBeInTheDocument();
   });
 
   it('renders the consent card with the current level and ladder', () => {

@@ -1,6 +1,6 @@
 import { useRef, type FocusEvent } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Sparkles, X } from 'lucide-react';
+import { Newspaper, X } from 'lucide-react';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
 import { Modal } from './Modal';
 import { cn } from '../../lib/utils';
@@ -70,7 +70,7 @@ export function ChangelogNotification() {
               className="shrink-0 size-9 rounded-lg bg-toga-50 dark:bg-toga-900/30 flex items-center justify-center"
               aria-hidden="true"
             >
-              <Sparkles size={18} className="text-toga-600 dark:text-toga-300" />
+              <Newspaper size={18} className="text-toga-600 dark:text-toga-300" />
             </div>
 
             <div className="flex-1 min-w-0">

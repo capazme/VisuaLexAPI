@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, 
 import { Command, useCommandState } from 'cmdk';
 import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
-import { ChevronDown, ChevronRight, Gavel, List, Search, Settings2, SlidersHorizontal, Sparkles, Tag, X, Zap } from 'lucide-react';
+import { ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { dur, ease, spring } from '../../../lib/motion';
@@ -1113,7 +1113,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           <AnimatePresence initial={false} mode="popLayout">
           {visiblePresets.map(([trigger, preset]) => (
             <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)} still={still} entering>
-              <Sparkles size={14} aria-hidden className={ROW_ICON} />
+              <Library size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={trigger} query={inputValue} /></span>
                 <span className={cn('block truncate text-xs', SUBTLE)}>
