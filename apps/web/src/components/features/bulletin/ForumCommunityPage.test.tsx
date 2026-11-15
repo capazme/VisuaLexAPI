@@ -316,7 +316,10 @@ describe('ForumCommunityPage: the open discussion', () => {
 
     // A report asks first: «Annulla» sends nothing.
     fireEvent.click(screen.getByRole('button', { name: 'Segnala la discussione' }));
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Annulla' }));
+    // The focus starts on «Annulla»: an Enter pressed at once must not report (#449, note 9).
+    const cancel = within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Annulla' });
+    await waitFor(() => expect(cancel).toHaveFocus());
+    fireEvent.click(cancel);
     expect(service.report).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Segnala la discussione' }));
     fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Segnala' }));
