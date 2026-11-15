@@ -21,6 +21,7 @@ import type { StudiaOutletContext } from './StudiaPage';
 import { anchorActLabel, searchParamsFromAnchor } from './studiaLabels';
 import { useCardSources } from './useCardSources';
 import { NO_FILTERS, useMyCards, type ActOption, type CardQuery, type FilterState } from './useMyCards';
+import { Illustration } from '../../ui/Illustration';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const LIST_PATH = '/learn/schede';
@@ -93,6 +94,8 @@ function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: (
   );
   return (
     <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-4 md:justify-items-start md:p-6')}>
+      {/* LC35: the empty card drawer, an engraving. */}
+      <Illustration name="learn-schede-vuote" className="h-24 w-24 justify-self-center md:justify-self-start" />
       <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
       <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
         {/* The citation on one line: non-breaking spaces. */}

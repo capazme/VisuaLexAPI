@@ -39,6 +39,7 @@ import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { DOSSIER_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { CARD_GRID_COLUMNS } from '../../layout/frame';
+import { Illustration } from '../../ui/Illustration';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -388,6 +389,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           ) : (
             // No dossier yet (S7c): what a dossier is for and the two ways to begin; no drawing since LC21.
             <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
+              {/* LC35: the empty folder, an engraving. */}
+              <Illustration name="dossier-vuoti" className="mb-5 h-28 w-28" />
               <h2 id="dossier-list-empty" className="font-serif text-[22px] font-normal leading-tight text-slate-900 dark:text-slate-50">
                 {sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
               </h2>
