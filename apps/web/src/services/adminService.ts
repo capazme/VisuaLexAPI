@@ -252,3 +252,20 @@ export const previewStudiaSoglie = async (soglie: StudiaSoglie): Promise<StudiaS
 export const saveStudiaSoglie = async (soglie: StudiaSoglie): Promise<StudiaSoglieEffetto & { soglie: StudiaSoglie }> => {
   return put<StudiaSoglieEffetto & { soglie: StudiaSoglie }>('/admin/studia/soglie', soglie);
 };
+
+/** A runtime switch as `GET /admin/switches` lists it (`apps/server/src/assistant/switches.ts`). */
+export interface AppSwitch {
+  key: string;
+  description: string;
+  enabled: boolean;
+  updatedAt: string | null;
+}
+
+export const appSwitches = async (): Promise<AppSwitch[]> => {
+  return (await get<{ switches: AppSwitch[] }>('/admin/switches')).switches;
+};
+
+/** Turns one switch on or off; answers the row as stored. */
+export const setAppSwitch = async (key: string, enabled: boolean): Promise<AppSwitch> => {
+  return put<AppSwitch>(`/admin/switches/${encodeURIComponent(key)}`, { enabled });
+};
