@@ -17,8 +17,9 @@ import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
-/** Opus's entries: the planner's three views, then the dossiers. */
-const OPUS_HREFS = ['/', '/documents', '/rassegne', '/work/oggi', '/work/prossimi', '/work/ingresso', '/dossier'];
+/** Work's entries (D-315): Oggi, Corpus, Dossier, Atti, Anonimizzatore; the planner's two other views under Oggi and the
+ *  Corpus tools under Corpus, which no other page links to. */
+const OPUS_HREFS = ['/work/oggi', '/work/prossimi', '/work/ingresso', '/', '/documents', '/rassegne', '/dossier', '/work/atti', '/work/anonimizzatore'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -76,7 +77,7 @@ beforeEach(() => {
 
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
-    renderSidebar();
+    renderSidebar('/forum');
     for (const name of [/Ricerca/, /Dossier/, /Analizza documento/]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
@@ -85,7 +86,7 @@ describe('Sidebar — accessible names', () => {
   });
 
   it('has no «Ricerca Veloce» and no «Sentenze»: «Ricerca» leads to the field, ⌘K opens the palette', () => {
-    renderSidebar();
+    renderSidebar('/forum');
     expect(screen.queryByRole('button', { name: /Ricerca Veloce/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /Ricerca Veloce/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Sentenze/ })).toBeNull();
@@ -103,7 +104,7 @@ describe('Sidebar — accessible names', () => {
   it('«Ricerca» goes to the search page with the cursor in its field, no window over it (the owner, D1)', () => {
     const field = vi.fn();
     const unsubscribe = subscribeSearchField(field);
-    renderSidebar('/dossier');
+    renderSidebar('/forum');
     fireEvent.click(screen.getByRole('link', { name: 'Ricerca' }));
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
     expect(field).toHaveBeenCalledWith({ focus: true });
@@ -112,7 +113,7 @@ describe('Sidebar — accessible names', () => {
   });
 
   it('gives «Ricerca» the id the tours point at', () => {
-    renderSidebar();
+    renderSidebar('/forum');
     expect(document.getElementById('tour-nav-search')).toBe(screen.getByRole('link', { name: 'Ricerca' }));
     expect(document.getElementById('tour-quick-search')).toBeNull();
   });
@@ -164,8 +165,8 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     vi.unstubAllEnvs();
   });
 
-  it('starts every section with the Corpus entries, «Ricerca» and «Analizza documento»', () => {
-    for (const path of ['/', '/learn/ripasso', '/forum']) {
+  it('starts every section but Work with the Corpus entries, «Ricerca» and «Analizza documento» (Work has them under «Corpus»)', () => {
+    for (const path of ['/learn/ripasso', '/forum']) {
       const { unmount } = render(
         <MemoryRouter initialEntries={[path]}>
           <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} />
@@ -176,11 +177,52 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it("Opus: the planner's views, then the dossiers", () => {
+  it('Work: Oggi, Corpus, Dossier, Atti and Anonimizzatore, in this order (D-315), and nothing lost', () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
-    expect(within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Dossier']);
+    const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
+    expect(names).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Corpus', 'Analizza documento', 'Rassegne', 'Dossier', 'Atti, in arrivo', 'Anonimizzatore, in arrivo']);
+    const five = ['Oggi', 'Corpus', 'Dossier', 'Atti, in arrivo', 'Anonimizzatore, in arrivo'];
+    expect(names.filter((n) => five.includes(n!))).toEqual(five);
+    // Corpus is Work's way to the search: no «Ricerca» above it.
+    expect(screen.queryByRole('link', { name: 'Ricerca' })).toBeNull();
+  });
+
+  it('Work: «Corpus» leads to the search with the cursor in its field, and carries the id the tours point at', () => {
+    const field = vi.fn();
+    const unsubscribe = subscribeSearchField(field);
+    renderSidebar('/dossier');
+    const corpus = screen.getByRole('link', { name: 'Corpus' });
+    expect(document.getElementById('tour-nav-search')).toBe(corpus);
+    expect(document.getElementById('tour-nav-dossier')).toBe(screen.getByRole('link', { name: 'Dossier' }));
+    fireEvent.click(corpus);
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
+    expect(field).toHaveBeenCalledWith({ focus: true });
+    unsubscribe();
+  });
+
+  it('Work: «Atti» and «Anonimizzatore» say «in arrivo», to the eye and to a screen reader, and open their pages', () => {
+    render(
+      <MemoryRouter initialEntries={['/work/oggi']}>
+        <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const acts = screen.getByRole('link', { name: 'Atti, in arrivo' });
+    expect(acts).toHaveAttribute('href', '/work/atti');
+    expect(acts).toHaveTextContent(/^Attiin arrivo$/);
+    expect(screen.getByRole('link', { name: 'Anonimizzatore, in arrivo' })).toHaveAttribute('href', '/work/anonimizzatore');
+  });
+
+  it('marks the active entry with the column, one in the whole bar', () => {
+    renderSidebar('/work/oggi');
+    const today = screen.getByRole('link', { name: 'Oggi' });
+    expect(today.querySelector('svg.vlx-book')).not.toBeNull();
+    expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(1);
+    cleanup();
+    renderSidebar('/forum/community');
+    expect(screen.getByRole('link', { name: 'Community' }).querySelector('svg.vlx-book')).not.toBeNull();
+    expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(1);
   });
 
   it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
@@ -801,11 +843,11 @@ describe('Sidebar — the words', () => {
   });
 
   it('shows the palette\'s shortcut beside «Ricerca» on the desktop, as the keyboard writes it, not in the phone\'s drawer', () => {
-    renderLayout('wide');
+    renderLayout('wide', '/forum');
     // Read once when the module loads, from `navigator.platform`: «⌘K» on a Mac, «Ctrl K» elsewhere.
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveTextContent(/^Ricerca(⌘K|Ctrl K)$/);
     cleanup();
-    renderLayout('drawer');
+    renderLayout('drawer', '/forum');
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveTextContent(/^Ricerca$/);
   });
 
