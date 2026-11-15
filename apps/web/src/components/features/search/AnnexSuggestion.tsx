@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowRight, Paperclip, Loader2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { FOCUS_RING } from '../../../constants/interactions';
 import type { AnnexMetadata } from '../../../types';
@@ -108,7 +108,7 @@ export function AnnexSuggestion({
             animate={{ rotate: 0 }}
             transition={spring.gentle}
           >
-            <Sparkles size={18} aria-hidden className="text-amber-700 dark:text-amber-300" />
+            <Paperclip size={18} aria-hidden className="text-amber-700 dark:text-amber-300" />
           </motion.div>
 
           {/* Content */}
