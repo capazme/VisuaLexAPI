@@ -676,6 +676,7 @@ export function HistoryView() {
                 title="Svuotare la cronologia?"
                 message="Tutte le ricerche salvate verranno rimosse. I dossier e i segnalibri non saranno toccati."
                 confirmLabel="Svuota"
+                focusCancel
                 onConfirm={handleConfirmClear}
                 onCancel={() => setClearConfirmOpen(false)}
             />

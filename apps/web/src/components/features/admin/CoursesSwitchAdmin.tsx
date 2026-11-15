@@ -91,6 +91,7 @@ export function CoursesSwitchAdmin() {
         title="Spegnere i percorsi?"
         message="Nessuno vedrà più i percorsi finché non li riaccendi; i percorsi già creati restano."
         confirmLabel="Spegni"
+        focusCancel
         onConfirm={() => void toggle()}
         onCancel={() => setAskingOff(false)}
       />

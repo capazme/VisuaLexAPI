@@ -125,6 +125,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
         title="Eliminare definitivamente?"
         message={`${title} lascia il cestino e non si potrà più ripristinare. Il resto del cestino e i tuoi dossier non saranno toccati.`}
         confirmLabel="Elimina definitivamente"
+        focusCancel
         onConfirm={() => void purge()}
         onCancel={() => setConfirmPurge(false)}
       />

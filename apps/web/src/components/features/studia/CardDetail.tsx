@@ -251,6 +251,7 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
         title="Ritirare la proposta?"
         message="La scheda torna una tua bozza; i voti ricevuti si perdono."
         confirmLabel="Ritira"
+        focusCancel
         onConfirm={() => void withdraw()}
         onCancel={() => setConfirmWithdraw(false)}
       />
