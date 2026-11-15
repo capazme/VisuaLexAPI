@@ -68,9 +68,9 @@ describe('CreditsPage', () => {
     expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1 }));
   });
 
-  it('leads back to VisuaLex', () => {
+  it('leads back to LexCraft', () => {
     renderAt('/crediti');
-    expect(screen.getByRole('link', { name: 'VisuaLex' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'LexCraft' })).toHaveAttribute('href', '/');
   });
 });
 

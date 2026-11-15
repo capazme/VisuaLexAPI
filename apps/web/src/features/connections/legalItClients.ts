@@ -19,7 +19,7 @@ export const LEGAL_IT_RELEASES_URL = 'https://github.com/capazme/mcp-legal-it/re
 
 /** The privacy sentence, word for word as the owner approved it (19 October 2026). */
 export const LEGAL_IT_PRIVACY =
-  'Il server gira sul tuo computer e interroga direttamente le fonti pubbliche; non manda i tuoi dati a VisuaLex. Quello che scrivi all’app AI resta soggetto alle sue condizioni.';
+  'Il server gira sul tuo computer e interroga direttamente le fonti pubbliche; non manda i tuoi dati a LexCraft. Quello che scrivi all’app AI resta soggetto alle sue condizioni.';
 
 /** `uv`, the one prerequisite: it installs Python and the libraries by itself. */
 export const UV_INSTALL: ClientStep[] = [

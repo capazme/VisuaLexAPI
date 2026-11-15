@@ -43,12 +43,12 @@ export function CoursesEmpty() {
           cui le hai acquisite.
         </p>
         <p>
-          Lo crea il tuo assistente AI collegato a VisuaLex: dai a lui i file e digli l’obiettivo. Ti propone un programma, tu
+          Lo crea il tuo assistente AI collegato a LexCraft: dai a lui i file e digli l’obiettivo. Ti propone un programma, tu
           lo correggi e lo confermi, e lui scrive qui il percorso e il suo dossier di studio.
         </p>
         <p>
-          In VisuaLex non si carica nessun file: i materiali li legge il fornitore del tuo assistente, alle sue condizioni.
-          VisuaLex conserva solo ciò che l’assistente scrive nel percorso, visibile solo a te.
+          In LexCraft non si carica nessun file: i materiali li legge il fornitore del tuo assistente, alle sue condizioni.
+          LexCraft conserva solo ciò che l’assistente scrive nel percorso, visibile solo a te.
         </p>
       </div>
       <div className="grid max-w-2xl grid-cols-1 gap-1.5">
@@ -70,7 +70,7 @@ function ConnectionLine({ connections }: { connections: Connections }) {
   if (connections.status === 'error') {
     return (
       <div className="grid grid-cols-1 gap-2">
-        <p className={cn('text-sm', MUTED_TEXT)}>Ti serve un’app AI collegata a VisuaLex con il permesso di creare percorsi.</p>
+        <p className={cn('text-sm', MUTED_TEXT)}>Ti serve un’app AI collegata a LexCraft con il permesso di creare percorsi.</p>
         {link}
       </div>
     );
@@ -79,7 +79,7 @@ function ConnectionLine({ connections }: { connections: Connections }) {
   if (apps.length === 0) {
     return (
       <div className="grid grid-cols-1 gap-2">
-        <p className={cn('text-sm', MUTED_TEXT)}>Non hai ancora collegato un’app AI a VisuaLex.</p>
+        <p className={cn('text-sm', MUTED_TEXT)}>Non hai ancora collegato un’app AI a LexCraft.</p>
         {link}
       </div>
     );

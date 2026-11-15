@@ -28,7 +28,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
           <ShieldAlert className="w-16 h-16 text-amber-600 relative z-10" />
         </motion.div>
         <div className="space-y-2 text-center">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">VisuaLex Admin</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">LexCraft Admin</h3>
           <p className="text-sm text-slate-500 animate-pulse">Verifica autorizzazioni...</p>
         </div>
       </div>

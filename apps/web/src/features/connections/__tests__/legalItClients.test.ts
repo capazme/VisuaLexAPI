@@ -80,7 +80,7 @@ describe('legalItClients', () => {
 
   it('keeps the privacy sentence word for word', () => {
     expect(LEGAL_IT_PRIVACY).toBe(
-      'Il server gira sul tuo computer e interroga direttamente le fonti pubbliche; non manda i tuoi dati a VisuaLex. Quello che scrivi all’app AI resta soggetto alle sue condizioni.',
+      'Il server gira sul tuo computer e interroga direttamente le fonti pubbliche; non manda i tuoi dati a LexCraft. Quello che scrivi all’app AI resta soggetto alle sue condizioni.',
     );
   });
 

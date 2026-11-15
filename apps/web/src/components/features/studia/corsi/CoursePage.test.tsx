@@ -130,7 +130,7 @@ describe('the course page', () => {
     expect(within(panel).getByText('9 di 10 moduli')).toBeInTheDocument();
     expect(within(panel).getByText('manca l’esame finale')).toBeInTheDocument();
     expect(within(panel).getByText('C4 ha 3 schede su 5')).toBeInTheDocument();
-    expect(within(panel).getByText('Completa il percorso «Proprietà intellettuale: i segni distintivi» in VisuaLex: 9 di 10 moduli, manca l’esame finale, C4 ha 3 schede su 5.')).toBeInTheDocument();
+    expect(within(panel).getByText('Completa il percorso «Proprietà intellettuale: i segni distintivi» in LexCraft: 9 di 10 moduli, manca l’esame finale, C4 ha 3 schede su 5.')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Esame finale' })).toHaveTextContent('Il tuo assistente non ha ancora scritto l’esame.');
   });
 

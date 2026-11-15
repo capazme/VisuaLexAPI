@@ -17,7 +17,7 @@ const FONTE_LABELS: Record<string, string> = {
   // No longer a source (D-078); proposals made from it may still sit in MERL-T's stores.
   brocardi: 'Brocardi.it (fonte non più in uso)',
   mechanistic: 'Estrazione strutturata',
-  visualex: 'Contributo da VisuaLex',
+  visualex: 'Contributo da LexCraft',
   manual: 'Inserimento manuale',
   unknown: 'Origine sconosciuta',
 };

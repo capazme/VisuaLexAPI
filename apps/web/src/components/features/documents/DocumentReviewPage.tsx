@@ -83,7 +83,7 @@ const rowLabel = (text: string, row: ReviewedRow) => (row.act ? formatCitationLa
 const copyName = (fileName: string) => `${fileName.replace(/\.docx$/i, '')} (con link).docx`;
 
 /** The badge's words on hover and for a screen reader (#376 §6.4, updated by G-401 for the links). */
-const PROMISE_DETAIL = 'Il testo del documento non viene inviato né salvato. Le sole citazioni trovate (per esempio «art. 82 GDPR») vengono riconosciute da VisuaLex, come quando le cerchi; con «Prepara i link» arriva a VisuaLex solo l’elenco delle norme citate, mai il testo.';
+const PROMISE_DETAIL = 'Il testo del documento non viene inviato né salvato. Le sole citazioni trovate (per esempio «art. 82 GDPR») vengono riconosciute da LexCraft, come quando le cerchi; con «Prepara i link» arriva a LexCraft solo l’elenco delle norme citate, mai il testo.';
 
 /** How long the check stays on the row before the text comes (D6): the time to see it. */
 const DONE_MS = 450;
@@ -669,8 +669,8 @@ export function DocumentReviewPage() {
     <PageFrame
       title="Analizza documento"
       line={local
-        ? 'Trova le norme citate in un atto. Il riconoscimento è più limitato: VisuaLex non riceve nulla.'
-        : 'Trova le norme citate in un atto. Il documento resta sul tuo computer: a VisuaLex arrivano solo le citazioni trovate, come in una ricerca.'}
+        ? 'Trova le norme citate in un atto. Il riconoscimento è più limitato: LexCraft non riceve nulla.'
+        : 'Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.'}
       action={
         // The promise (#376 §6.4, G-401): what stays, and what goes — said in full on hover and to a screen reader.
         <p
@@ -679,7 +679,7 @@ export function DocumentReviewPage() {
         >
           {local ? <Laptop aria-hidden="true" size={14} /> : <ShieldCheck aria-hidden="true" size={14} />}
           {local
-            ? <>Tutto nel tuo browser<span className="sr-only">: VisuaLex non riceve nulla, né il documento né le citazioni.</span></>
+            ? <>Tutto nel tuo browser<span className="sr-only">: LexCraft non riceve nulla, né il documento né le citazioni.</span></>
             : <>Il documento resta sul tuo computer<span className="sr-only">. {PROMISE_DETAIL}</span></>}
         </p>
       }
@@ -798,7 +798,7 @@ export function DocumentReviewPage() {
                 {loaded.analysis.degraded && (
                   <div role="status" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
                     <CloudOff aria-hidden="true" size={16} className="shrink-0 text-slate-500 dark:text-slate-400" />
-                    <p className="min-w-0 flex-1 basis-48">VisuaLex non risponde: ho riconosciuto solo le forme che conosco nel browser.</p>
+                    <p className="min-w-0 flex-1 basis-48">LexCraft non risponde: ho riconosciuto solo le forme che conosco nel browser.</p>
                     <Button variant="secondary" size="sm" loading={retrying} onClick={() => void retry()} className="md:min-h-11">Riprova</Button>
                   </div>
                 )}
@@ -888,8 +888,8 @@ function LocalSwitch({ on, onChange, disabled }: { on: boolean; onChange: (on: b
       </button>
       <p id="doc-local-hint" className="min-w-0 flex-1 basis-64 text-[13px] leading-snug text-slate-600 dark:text-slate-400">
         {on
-          ? 'Il riconoscimento è più limitato: VisuaLex non riceve nulla, e i link non si possono inserire.'
-          : 'Per un documento riservato: nemmeno le citazioni trovate arrivano a VisuaLex.'}
+          ? 'Il riconoscimento è più limitato: LexCraft non riceve nulla, e i link non si possono inserire.'
+          : 'Per un documento riservato: nemmeno le citazioni trovate arrivano a LexCraft.'}
       </p>
     </div>
   );

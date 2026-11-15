@@ -429,7 +429,7 @@ export function AdminPage() {
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Panel</h1>
-                  <p className="text-xs text-gray-500">VisuaLex</p>
+                  <p className="text-xs text-gray-500">LexCraft</p>
                 </div>
               </div>
 

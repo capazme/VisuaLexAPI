@@ -39,7 +39,7 @@ afterEach(() => {
 describe('ConnectAiAppPage', () => {
   it("shows the server's MCP address and copies it exactly", async () => {
     render(<ConnectAiAppPage />);
-    const address = await screen.findByRole('region', { name: /l’indirizzo di visualex/i });
+    const address = await screen.findByRole('region', { name: /l’indirizzo di lexcraft/i });
     expect(within(address).getByText(URL_)).toBeInTheDocument();
     fireEvent.click(within(address).getByRole('button', { name: /copia l’indirizzo del server mcp/i }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(URL_));
@@ -116,7 +116,7 @@ describe('ConnectAiAppPage', () => {
     expect(await screen.findByText(/non è attivo su questo server/i)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /come collegare la tua app/i })).toBeNull();
     // mcp-legal-it needs no VisuaLex server, so its commands stay: the VisuaLex part has none.
-    const visualex = screen.getByRole('region', { name: 'VisuaLex' });
+    const visualex = screen.getByRole('region', { name: 'LexCraft' });
     expect(within(visualex).queryByRole('button', { name: /^copia/i })).toBeNull();
     expect(within(screen.getByRole('region', { name: 'mcp-legal-it' })).getAllByRole('button', { name: /^copia/i }).length).toBeGreaterThan(0);
   });
@@ -133,7 +133,7 @@ describe('ConnectAiAppPage', () => {
     writeText.mockRejectedValue(new Error('denied'));
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     render(<ConnectAiAppPage />);
-    const address = await screen.findByRole('region', { name: /l’indirizzo di visualex/i });
+    const address = await screen.findByRole('region', { name: /l’indirizzo di lexcraft/i });
     fireEvent.click(within(address).getByRole('button', { name: /copia l’indirizzo/i }));
     expect(await within(address).findByText(/copialo a mano/i)).toBeInTheDocument();
   });
@@ -159,12 +159,12 @@ describe('ConnectAiAppPage — mcp-legal-it', () => {
     expect(within(parts).getByText(/sono due cose diverse/i)).toBeInTheDocument();
     const links = within(parts).getAllByRole('link');
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
-      ['VisuaLexOnline, con il tuo account', '#visualex'],
+      ['LexCraftOnline, con il tuo account', '#visualex'],
       ['mcp-legal-itSul tuo computer, senza account', '#mcp-legal-it'],
     ]);
-    expect(screen.getByRole('heading', { level: 2, name: 'VisuaLex' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'LexCraft' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'mcp-legal-it' })).toBeInTheDocument();
-    expect(document.getElementById('visualex')).toBe(screen.getByRole('region', { name: 'VisuaLex' }));
+    expect(document.getElementById('visualex')).toBe(screen.getByRole('region', { name: 'LexCraft' }));
     expect(document.getElementById('mcp-legal-it')).toBe(screen.getByRole('region', { name: 'mcp-legal-it' }));
   });
 

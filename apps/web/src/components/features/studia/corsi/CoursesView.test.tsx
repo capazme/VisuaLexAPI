@@ -139,7 +139,7 @@ describe('«Percorsi», the list', () => {
     list.mockResolvedValue([]);
     apps.mockResolvedValue([]);
     renderView();
-    expect(await screen.findByText('Non hai ancora collegato un’app AI a VisuaLex.')).toBeInTheDocument();
+    expect(await screen.findByText('Non hai ancora collegato un’app AI a LexCraft.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Collega un’app AI' })).toBeInTheDocument();
   });
 

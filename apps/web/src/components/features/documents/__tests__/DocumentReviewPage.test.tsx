@@ -53,11 +53,11 @@ describe('DocumentReviewPage — before a document', () => {
   it('has a title with its phrase and says, to a screen reader too, what stays and what goes (#376 §6.4, G-401)', () => {
     render(<DocumentReviewPage />);
     expect(screen.getByRole('heading', { level: 1, name: 'Analizza documento' })).toHaveClass('font-serif');
-    expect(screen.getByText('Trova le norme citate in un atto. Il documento resta sul tuo computer: a VisuaLex arrivano solo le citazioni trovate, come in una ricerca.')).toBeInTheDocument();
+    expect(screen.getByText('Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.')).toBeInTheDocument();
     const badge = screen.getByText(/^Il documento resta sul tuo computer/, { selector: 'p' });
     expect(badge).toHaveTextContent('Il testo del documento non viene inviato né salvato.');
     expect(badge).toHaveTextContent('per esempio «art. 82 GDPR»');
-    expect(badge).toHaveTextContent('con «Prepara i link» arriva a VisuaLex solo l’elenco delle norme citate, mai il testo.');
+    expect(badge).toHaveTextContent('con «Prepara i link» arriva a LexCraft solo l’elenco delle norme citate, mai il testo.');
     // Nothing on the page says any more that nothing leaves the browser.
     expect(document.body.textContent).not.toMatch(/resta nel tuo browser/i);
   });
@@ -512,7 +512,7 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     ]);
     expect(textBody().querySelector('[data-kind="context"]')!.className).toMatch(/decoration-dashed/);
     expect(textBody().querySelector('[data-kind="incomplete"]')!.className).toMatch(/decoration-dotted decoration-slate-400/);
-    expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull();
+    expect(screen.queryByText(/LexCraft non risponde/)).toBeNull();
   });
 
   it('opens an inherited citation with the act its words name («del medesimo decreto»)', async () => {
@@ -529,14 +529,14 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     const { container } = render(<DocumentReviewPage />);
     await choose(container, BRIEF, 'memoria.txt');
     const notice = screen.getByRole('status');
-    expect(notice).toHaveTextContent('VisuaLex non risponde: ho riconosciuto solo le forme che conosco nel browser.');
+    expect(notice).toHaveTextContent('LexCraft non risponde: ho riconosciuto solo le forme che conosco nel browser.');
     // What the browser reads stays found; the GDPR's citations wait.
     expect(visible('2 citazioni in 2 atti · 4 da completare')).toBeInTheDocument();
     await userEvent.click(within(notice).getByRole('button', { name: 'Riprova' }));
     await waitFor(() => expect(visible('5 citazioni in 3 atti · 1 da completare')).toBeInTheDocument());
     expect(server.readOnServer).toHaveBeenCalledTimes(2);
     expect(server.readOnServer.mock.calls[1][0]).toEqual(['art. 82 GDPR', 'art. 13 e 14 GDPR']);
-    expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull();
+    expect(screen.queryByText(/LexCraft non risponde/)).toBeNull();
   });
 
   it('stops asking the server for a document that was replaced, and says a fault on the row', async () => {
@@ -569,9 +569,9 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     const { container } = render(<DocumentReviewPage />);
     await choose(container, PARERE);
     expect(visible('6 citazioni in 2 atti')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('VisuaLex non risponde');
+    expect(screen.getByRole('status')).toHaveTextContent('LexCraft non risponde');
     await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
-    await waitFor(() => expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/LexCraft non risponde/)).toBeNull());
     expect(server.fetchActNames).toHaveBeenCalledTimes(2);
     error.mockRestore();
   });
