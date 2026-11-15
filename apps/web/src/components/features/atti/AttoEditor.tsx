@@ -280,7 +280,7 @@ export function AttoEditor() {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <label className="flex items-center gap-1">
             <span className={META_LABEL}>Tipo</span>
-            <input value={draft.tipo ?? ''} placeholder="Nessuno" onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} size={Math.max((draft.tipo ?? '').length, 9)} className={cn(META_FIELD, 'placeholder:text-slate-500')} />
+            <input value={draft.tipo ?? ''} placeholder="Nessuno" onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} size={Math.max((draft.tipo ?? '').length, 9)} className={cn(META_FIELD, 'min-w-24 placeholder:text-slate-500 [field-sizing:content]')} />
             <datalist id="atto-tipi">{ATTO_TIPI.map((t) => <option key={t} value={t} />)}</datalist>
           </label>
           <span aria-hidden className="-mx-1 text-slate-400 dark:text-slate-600">·</span>
