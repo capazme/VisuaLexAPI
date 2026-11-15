@@ -83,13 +83,13 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         }}
         aria-keyshortcuts="Meta+K Control+K"
         className={cn(
-          'flex h-8 min-w-[220px] items-center gap-2 rounded-lg border border-slate-200 bg-card pl-3 pr-2 text-[13px] text-slate-600 transition-colors',
+          'flex h-8 w-[22rem] items-center gap-2 rounded-lg border border-slate-200 bg-card pl-3 pr-2 text-[13px] text-slate-600 transition-colors',
           'hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600',
           FOCUS_RING,
         )}
       >
         <Search aria-hidden size={15} strokeWidth={1.75} className="shrink-0" />
-        <span>Norma, dossier o pagina</span>
+        <span>Norma, sentenza o tema</span>
         <kbd aria-hidden className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 font-mono text-[11px] text-slate-500 dark:border-slate-700">{PALETTE_SHORTCUT}</kbd>
       </button>}
       {actions}

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
@@ -10,7 +10,6 @@ import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { SectionTabs } from '../../features/sections/SectionTabs';
 import { useSection } from '../../features/sections/useSection';
 import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
-import { prefersReducedMotion } from '../../features/sections/sectionTransition';
 import { PALETTE_SHORTCUT, focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
@@ -184,9 +183,6 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
   const words = layout !== 'rail';
-  // Read at each render, which every navigation is: framer-motion's `useReducedMotion` keeps the value it first read,
-  // so a reduced motion turned on with the app open let the column slide until a reload (#457).
-  const reduceMotion = prefersReducedMotion();
   // NavLink's rule (its address, or under it unless `end`; «/» on itself only), plus `activeOn`. A `Link`, since NavLink
   // gives `aria-current` only on its own address.
   const { pathname } = useLocation();
@@ -265,19 +261,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
             <kbd aria-hidden className={cn("ml-2 shrink-0 font-sans text-[11px]", SIDEBAR_SMALL_TEXT)}>{hint}</kbd>
           )}
 
-          {/* The active entry is «selected» by the logo's column (D-237), in the 21 px between the bar's edge and the icon:
-              the 16 px mark (its column 6.6 px wide, from 4.7 to 11.3 px of the box) 7.5 px left of the row, so the
-              column runs from 7.2 to 13.8 px of the bar, 7.2 px from its edge and from the icon's box (21 px). It slides
-              from entry to entry within a section (`layoutId`, in the section's `LayoutGroup`). */}
-          {isActive && !words && (
-            <motion.span
-              layoutId="activeIndicator"
-              className="absolute -left-[7.5px] top-1/2 -translate-y-1/2 text-primary-700 dark:text-primary-300"
-              transition={reduceMotion ? { duration: 0 } : spring.snappy}
-            >
-              <BookMark size={16} />
-            </motion.span>
-          )}
+          {/* LC27 (Luca, 15 Nov: «la mini colonnina … va tolta»): the active entry is its tile alone, in the rail too. */}
 
           {/* Notification badge: on the icon in the rail, at the end of the row with words. */}
           {showBadge && (
@@ -370,6 +354,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0, maxHeight: 0 });
 
+  const logoReduce = useReducedMotion();
   const words = layout !== 'rail';
   // The floating feedback button covered the foot of every page on a phone: there it is this menu's entry (M1).
   const feedbackInMenu = !useIsDesktop() && openFeedback !== undefined;
@@ -503,9 +488,35 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             layout === 'rail' ? "grid h-11 w-11 place-items-center" : "flex h-11 items-center px-2",
           )}
         >
-          {layout === 'rail'
-            ? <BookMark size={32} />
-            : <LexCraftLogo motion={logoSweep ? 'sweep' : 'still'} className="h-auto w-[150px]" />}
+          {/* LC27 (Luca, 15 Nov): narrowing the bar, LEX and CRAFT close in on the column between them and fade, and the
+              column stays, the rail's mark; widening, they open out of it again. The wordmark's column sits at 37.8 % of
+              its width (x 260 of the 716-unit box): the halves scale from there. Under reduced motion it simply changes. */}
+          <AnimatePresence initial={false} mode="popLayout">
+            {layout === 'rail' ? (
+              <motion.span
+                key="column"
+                className="grid place-items-center"
+                initial={logoReduce ? false : { opacity: 0, scaleY: 0.7 }}
+                animate={{ opacity: 1, scaleY: 1 }}
+                exit={logoReduce ? undefined : { opacity: 0, transition: { duration: 0.08 } }}
+                transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <BookMark size={32} />
+              </motion.span>
+            ) : (
+              <motion.span
+                key="wordmark"
+                className="block"
+                style={{ transformOrigin: '37.8% 50%' }}
+                initial={logoReduce ? false : { opacity: 0, scaleX: 0.08 }}
+                animate={{ opacity: 1, scaleX: 1 }}
+                exit={logoReduce ? undefined : { opacity: 0, scaleX: 0.08 }}
+                transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <LexCraftLogo motion={logoSweep ? 'sweep' : 'still'} className="h-auto w-[150px]" />
+              </motion.span>
+            )}
+          </AnimatePresence>
         </Link>
       </div>
 

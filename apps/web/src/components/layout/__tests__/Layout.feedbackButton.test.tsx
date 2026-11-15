@@ -107,7 +107,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
     at(path);
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toBeInTheDocument();
-    expect(within(bar).getByRole('button', { name: /Norma, dossier o pagina/ })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: /Norma, sentenza o tema/ })).toBeInTheDocument();
     expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
     expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
     const fullScreen = within(bar).getByRole('button', { name: 'Tutto schermo' });
@@ -122,7 +122,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
   it('opens the command palette from the bar\'s search', () => {
     appStore.setState({ commandPaletteOpen: false });
     at('/dossier');
-    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: /Norma, dossier o pagina/ }));
+    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: /Norma, sentenza o tema/ }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
     appStore.setState({ commandPaletteOpen: false });
   });
@@ -152,14 +152,15 @@ describe('Layout — the top bar from lg (LC21)', () => {
     expect(screen.queryByTestId('top-bar')).toBeNull();
   });
 
-  it('in full screen draws no bar, and the controls float as before, with their room kept from md', () => {
+  // LC27 (Luca, 15 Nov: «il passaggio a full screen è veramente brutto»): the bar stays in full screen, its controls in it.
+  it('keeps the bar in full screen, with its controls in it and «Tutto schermo» pressed', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
     at('/dossier');
-    expect(screen.queryByTestId('top-bar')).toBeNull();
-    expect(screen.getByTestId('feedback')).toHaveClass('fixed');
-    expect(screen.getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('news-floating')).toBeInTheDocument();
-    expect(screen.getByTestId('layout-content')).toHaveClass('md:[--focus-button-room:11rem]');
+    const bar = screen.getByTestId('top-bar');
+    expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
+    expect(within(bar).getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByTestId('news-floating')).toBeNull();
+    expect(screen.getByTestId('layout-content')).not.toHaveClass('md:[--focus-button-room:11rem]');
   });
 });
 

@@ -169,11 +169,13 @@ export function Layout() {
   // LC21: from lg every page but the search page and the lesson has the top bar, which holds the controls that floated
   // («Commenti», «Tutto schermo») and the version's news; the search page's own bar holds them too. In full screen and
   // below lg they float as before.
-  const showTopBar = lgUp && (showPhoneBar || (onSearchPage && !settings.focusMode));
-  const controlsInBar = lgUp && !settings.focusMode && !inLesson;
+  // LC27 (Luca, 15 Nov: «il passaggio a full screen è veramente brutto»): from lg the top bar stays in full screen too,
+  // with its controls where they always are; full screen only hides the sidebar and widens the frame.
+  const showTopBar = lgUp && !inLesson;
+  const controlsInBar = lgUp && !inLesson;
   const showSearchBar = showSearchBarRaw && !lgUp;
-  // The search page from lg: the top bar with the path and the field.
-  const searchInTopBar = showSearchBarRaw && lgUp;
+  // The search page from lg: the top bar with the path and the field, in full screen as well.
+  const searchInTopBar = onSearchPage && lgUp;
   useEffect(() => {
     if (!sidebarOpen || !drawerDrawn) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -312,15 +314,15 @@ export function Layout() {
       {isAuthenticated && <FeedbackButton onOpen={() => setFeedbackOpen(true)} className="h-8 px-3 text-[13px] shadow-none" />}
       <button
         type="button"
-        onClick={() => updateSettings({ focusMode: true })}
+        onClick={() => updateSettings({ focusMode: !settings.focusMode })}
         id="tour-focus-toggle"
         aria-label="Tutto schermo"
-        aria-pressed={false}
+        aria-pressed={settings.focusMode}
         aria-keyshortcuts={FULL_SCREEN_KEYS}
-        title={`Tutto schermo (${FULL_SCREEN_SHORTCUT})`}
+        title={settings.focusMode ? `Esci dal tutto schermo (${FULL_SCREEN_SHORTCUT})` : `Tutto schermo (${FULL_SCREEN_SHORTCUT})`}
         className="grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
       >
-        <Maximize2 size={16} aria-hidden />
+        {settings.focusMode ? <Minimize2 size={16} aria-hidden /> : <Maximize2 size={16} aria-hidden />}
       </button>
     </>
   );
@@ -498,7 +500,8 @@ export function Layout() {
             // top row keeps clear (`FOCUS_BUTTON_CLEARANCE`): from md in full screen, which draws no bar for them to sit
             // in; from lg otherwise; never over the search page's field, which ends before them. 11 rem: the toggle's
             // 60 px from the edge, 8 of gap, about 96 for «Commenti» and 8 of air.
-            settings.focusMode && 'md:[--focus-button-room:11rem]',
+            // Only where the controls still float: full screen below lg.
+            settings.focusMode && !lgUp && 'md:[--focus-button-room:11rem]',
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
             // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-10',

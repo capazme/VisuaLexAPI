@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { scrollParentOf } from '../practice/practiceView';
 import { Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { pageName } from '../../../features/sections/pageNames';
@@ -28,6 +30,15 @@ export function OpusPage() {
   // Atti and Anonimizzatore.
   const inView = VIEWS.some((view) => pathname.startsWith(view.to));
   const inTrash = pathname.startsWith('/work/cestino');
+  const viewTop = useRef<HTMLDivElement>(null);
+  /** Scrolled past the tabs, a change of view puts the scroller back where they stick; above them, nothing moves. */
+  const keepPlace = () => {
+    const mark = viewTop.current;
+    const scroller = mark ? scrollParentOf(mark) : null;
+    if (!mark || !scroller) return;
+    const stuckAt = mark.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    if (scroller.scrollTop > stuckAt) scroller.scrollTop = stuckAt;
+  };
   return (
     <PageFrame
       // The view's name, from the one list of the pages' names (L-37).
@@ -44,18 +55,23 @@ export function OpusPage() {
     >
       <div className="flex w-full min-w-0 flex-col gap-4">
         {/* Links, not `ui/SegmentedTabs` (buttons over one panel): each view has its address. Its look, the mark still. */}
+        {/* LC27 (Luca, 15 Nov): the views' tabs stay at the top while the view scrolls, and a new view starts right under
+            them, never with a jump to the page's top; it comes in with a short fade (none under reduced motion). */}
+        <div ref={viewTop} aria-hidden />
         {(inView || inTrash) && (
+          <div className="sticky top-0 z-10 -mx-2 bg-slate-50 px-2 py-2 dark:bg-slate-950">
           <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-fit">
             {VIEWS.map((view) => (
               <NavLink
                 key={view.to}
                 to={view.to}
+                onClick={keepPlace}
                 aria-label={view.label}
                 className={({ isActive }) => cn(
                   'flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-md px-2 text-sm font-medium transition-colors sm:flex-none sm:px-4',
                   FOCUS_RING,
                   isActive
-                    ? 'bg-white text-slate-900 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                    ? 'bg-card text-slate-900 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
                 )}
               >
@@ -64,8 +80,12 @@ export function OpusPage() {
               </NavLink>
             ))}
           </nav>
+          </div>
         )}
-        <Outlet />
+        {/* At least a screen tall: a view that mounts empty while it loads never shortens the page under the reader. */}
+        <div key={pathname} className="min-h-[calc(100dvh-8rem)] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
+          <Outlet />
+        </div>
       </div>
     </PageFrame>
   );
