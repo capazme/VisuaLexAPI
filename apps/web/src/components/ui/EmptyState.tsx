@@ -198,7 +198,7 @@ export function EmptyState({ variant, title, description, action, className }: E
       </div>
 
       {/* Title */}
-      <h3 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-white mb-2">
+      <h3 className="mb-2 font-serif text-xl font-medium tracking-tight text-slate-900 md:text-2xl dark:text-slate-50">
         {title}
       </h3>
 
