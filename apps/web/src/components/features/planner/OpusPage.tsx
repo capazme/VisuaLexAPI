@@ -24,8 +24,10 @@ const VIEWS = [
  */
 export function OpusPage() {
   const { pathname } = useLocation();
-  // The tabs and the trash belong to the three views: not on the trash itself, nor on Atti and Anonimizzatore.
+  // The trash's link belongs to the three views; the tabs to them and to the trash, as its way back (#448). Neither on
+  // Atti and Anonimizzatore.
   const inView = VIEWS.some((view) => pathname.startsWith(view.to));
+  const inTrash = pathname.startsWith('/work/cestino');
   return (
     <PageFrame
       // The view's name, from the one list of the pages' names (L-37).
@@ -42,7 +44,7 @@ export function OpusPage() {
     >
       <div className="flex w-full min-w-0 flex-col gap-4">
         {/* Links, not `ui/SegmentedTabs` (buttons over one panel): each view has its address. Its look, the mark still. */}
-        {inView && (
+        {(inView || inTrash) && (
           <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-fit">
             {VIEWS.map((view) => (
               <NavLink

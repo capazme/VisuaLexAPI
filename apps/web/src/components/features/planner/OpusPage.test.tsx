@@ -30,7 +30,15 @@ describe('Work\'s page', () => {
     expect(screen.getByRole('link', { name: 'Cestino dei compiti' })).toBeInTheDocument();
   });
 
-  it.each(['/work/atti', '/work/anonimizzatore', '/work/cestino'])('on %s shows neither the tabs nor the trash', (path) => {
+  it('on the trash shows the tabs, a way back, none marked, and no link to the trash itself', () => {
+    renderAt('/work/cestino');
+    const views = screen.getByRole('navigation', { name: 'Viste di Work' });
+    expect([...views.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/work/oggi', '/work/prossimi', '/work/ingresso']);
+    expect(views.querySelector('[aria-current]')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Cestino dei compiti' })).toBeNull();
+  });
+
+  it.each(['/work/atti', '/work/anonimizzatore'])('on %s shows neither the tabs nor the trash', (path) => {
     renderAt(path);
     expect(screen.queryByRole('navigation', { name: 'Viste di Work' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Cestino dei compiti' })).toBeNull();
