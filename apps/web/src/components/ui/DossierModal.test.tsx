@@ -9,7 +9,7 @@ describe('DossierModal — the kind of a new dossier', () => {
     const createDossier = vi.fn().mockResolvedValue('new-id');
     appStore.setState({ createDossier });
     render(<DossierModal isOpen onClose={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: /Crea Nuovo Dossier/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
     expect(screen.getByRole('radio', { name: /Di lavoro/ })).toBeChecked();
     fireEvent.click(screen.getByRole('radio', { name: /Di studio/ }));
     fireEvent.change(screen.getByPlaceholderText('Nome Dossier...'), { target: { value: 'GDPR' } });
@@ -22,10 +22,10 @@ describe('DossierModal — «Annulla» never carries the kind over', () => {
   it('starts every creation as a dossier di lavoro', () => {
     appStore.setState({ createDossier: vi.fn().mockResolvedValue('id') });
     render(<DossierModal isOpen onClose={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: /Crea Nuovo Dossier/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
     fireEvent.click(screen.getByRole('radio', { name: /Di studio/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
-    fireEvent.click(screen.getByRole('button', { name: /Crea Nuovo Dossier/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
     expect(screen.getByRole('radio', { name: /Di lavoro/ })).toBeChecked();
   });
 });
@@ -37,7 +37,7 @@ describe('DossierModal — the section chooses the kind (sections spec S7)', () 
       const createDossier = vi.fn().mockResolvedValue('new-id');
       appStore.setState({ createDossier });
       render(<DossierModal isOpen onClose={() => {}} />);
-      fireEvent.click(screen.getByRole('button', { name: /Crea Nuovo Dossier/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Crea un dossier/ }));
       expect(screen.getByRole('radio', { name: /Di studio/ })).toBeChecked();
       fireEvent.click(screen.getByRole('radio', { name: /Di lavoro/ }));
       fireEvent.change(screen.getByPlaceholderText('Nome Dossier...'), { target: { value: 'Pratica' } });

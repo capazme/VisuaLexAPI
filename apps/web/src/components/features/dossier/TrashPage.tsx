@@ -29,7 +29,7 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
         onClick={onBack}
         className="mb-4 inline-flex min-h-[44px] items-center gap-2 rounded text-sm text-slate-500 hover:text-primary-600 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
-        <ArrowLeft size={16} /> Torna ai Dossier
+        <ArrowLeft size={16} /> Torna ai dossier
       </button>
       {/* The title as on every section page (W2), under the way back. */}
       <header className="mb-6">

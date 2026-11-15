@@ -22,7 +22,7 @@ export function ImportDossierModal({ dossier, discarded, onClose, onConfirm }: P
             <FolderInput className="text-primary-600" size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Importa Dossier</h2>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Importa un dossier</h2>
             <p className="text-sm text-slate-500">Qualcuno ha condiviso un dossier con te</p>
           </div>
         </div>
