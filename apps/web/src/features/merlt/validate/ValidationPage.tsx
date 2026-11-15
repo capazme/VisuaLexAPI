@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/Button';
 import { PAGE_TITLE } from '../../../components/layout/PageFrame';
 import { Toast } from '../../../components/ui/Toast';
 import { useMerltFeatures } from '../useMerltFeatures';
+import { LabsOff } from '../LabsOff';
 import { ValidationCard, type ValidationCardModel } from './ValidationCard';
 import { ProvisionalReviewSection } from './ProvisionalReviewSection';
 import {
@@ -177,7 +178,7 @@ export function ValidationPage() {
     }
   };
 
-  if (!merltEnabled) return <p className="text-slate-600 dark:text-slate-300">MERL-T non è disponibile.</p>;
+  if (!merltEnabled) return <LabsOff />;
   if (!canValidate) {
     return (
       <div className="space-y-3">

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ChevronDown, FlaskConical, Settings, ShieldCheck, UserRound } from 'lucide-react';
+import { ChevronDown, Settings, ShieldCheck, UserRound } from 'lucide-react';
 import { PageFrame } from '../components/layout/PageFrame';
 import { ASSISTANT_PAGE } from '../features/sections/pageNames';
 import { cn } from '../lib/utils';
 import { useMerltFeatures } from '../features/merlt/useMerltFeatures';
+import { LabsOff } from '../features/merlt/LabsOff';
 import { useConsent } from '../features/merlt/consent/useConsent';
 import { ConsentDialog } from '../features/merlt/consent/ConsentDialog';
 import { OpsTrainingButton } from '../features/merlt/ops/OpsTrainingButton';
@@ -45,14 +46,7 @@ export function MerltHubPage() {
     graphReadable: features.graphReadable,
   });
 
-  if (!features.merltEnabled) {
-    return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
-        <FlaskConical size={40} aria-hidden className="mb-3 text-slate-500 dark:text-slate-400" />
-        <p className="text-slate-600 dark:text-slate-300">Gli strumenti di Labs non sono accesi su questo server. Ricerca, Work, Learn e Forum funzionano come sempre.</p>
-      </div>
-    );
-  }
+  if (!features.merltEnabled) return <LabsOff />;
 
   const toggle = (panel: FootPanel) => setFootPanel((open) => (open === panel ? null : panel));
 
