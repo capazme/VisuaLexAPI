@@ -89,6 +89,21 @@ describe('«Oggi»', () => {
     expect(await screen.findByText('Nessun compito per oggi')).toBeInTheDocument();
   });
 
+  it('offers, on an empty day, the dossiers last worked on and the next days, with no count (LC30)', async () => {
+    appStore.setState({
+      dossiers: ['a', 'b', 'c', 'd'].map((id, i) => ({ id, title: `Dossier ${id}`, createdAt: `2026-11-0${i + 1}T10:00:00Z`, items: [], kind: 'lavoro' as const })),
+    });
+    service.list.mockResolvedValue(answer([]));
+    renderAt(<TodayView />);
+    const riprendi = await screen.findByRole('region', { name: 'Riprendi' });
+    // The three most recent, the newest first.
+    expect(within(riprendi).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/dossier?dossier=d', '/dossier?dossier=c', '/dossier?dossier=b',
+    ]);
+    expect(screen.getByRole('link', { name: /Vedi i prossimi giorni/ })).toHaveAttribute('href', '/work/prossimi');
+    expect(service.list).toHaveBeenCalledTimes(1);
+  });
+
   it('says a failed read and reads again on «Riprova»', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     service.list.mockRejectedValueOnce({ status: 503 }).mockResolvedValueOnce(answer([task('a', { plannedDate: TODAY })]));

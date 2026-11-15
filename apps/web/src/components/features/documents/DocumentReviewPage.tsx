@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { CloudOff, FileText, Laptop, RotateCcw, ShieldCheck } from 'lucide-react';
+import { CloudOff, FileText, RotateCcw } from 'lucide-react';
 import { formatCitationLabel, type CitationMatch } from '../../../utils/citationMatcher';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../ui/Button';
@@ -25,7 +25,7 @@ import { CitationList } from './CitationList';
 import { DOCUMENT_ACCEPT, readDocumentFile } from './documentFile';
 import { DocumentText, type TextMark } from './DocumentText';
 import { DropZone, type DropPhase } from './DropZone';
-import { DocumentRow, SheetFlight } from './DocumentRow';
+import { DocumentRow } from './DocumentRow';
 import { documentKind, type DocumentJob } from './documentJob';
 import { analyseDocument, type DocumentAnalysis } from './documentCandidates';
 import { fetchActNames, readOnServer } from './documentServer';
@@ -81,9 +81,6 @@ const rowLabel = (text: string, row: ReviewedRow) => (row.act ? formatCitationLa
 
 /** «parere.docx» → «parere (con link).docx». */
 const copyName = (fileName: string) => `${fileName.replace(/\.docx$/i, '')} (con link).docx`;
-
-/** The badge's words on hover and for a screen reader (#376 §6.4, updated by G-401 for the links). */
-const PROMISE_DETAIL = 'Il testo del documento non viene inviato né salvato. Le sole citazioni trovate (per esempio «art. 82 GDPR») vengono riconosciute da LexCraft, come quando le cerchi; con «Prepara i link» arriva a LexCraft solo l’elenco delle norme citate, mai il testo.';
 
 /** How long the check stays on the row before the text comes (D6): the time to see it. */
 const DONE_MS = 450;
@@ -151,11 +148,12 @@ export function DocumentReviewPage() {
   // An act of a dossier sent here by its page («Analizza l'atto», Luca 15-11): its text is analysed at once, and the way
   // back leads to it.
   const fromAtto = (useLocation().state as { atto?: { id: string; titolo: string; testo: string } } | null)?.atto ?? null;
+  // The page shows that act until another document is chosen: its text is on the server already, so the page does not
+  // say it stays on the computer (LC29, QA).
+  const [onAtto, setOnAtto] = useState(fromAtto !== null);
   const reduceMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zoneRef = useRef<HTMLButtonElement | null>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const markRef = useRef<HTMLSpanElement>(null);
   const textBodyRef = useRef<HTMLDivElement>(null);
   const listBodyRef = useRef<HTMLDivElement>(null);
   // The reading in flight: a file chosen while another is read wins, the older answer is dropped.
@@ -173,10 +171,7 @@ export function DocumentReviewPage() {
   // The file being read, or refused: its row under the box.
   const [job, setJob] = useState<DocumentJob | null>(null);
   const [phase, setPhase] = useState<DropPhase>('idle');
-  const [lean, setLean] = useState({ x: 0, y: 0 });
   const [landings, setLandings] = useState(0);
-  // The ink sheet thrown to the row, from where it stood.
-  const [flight, setFlight] = useState<DOMRect | null>(null);
   const [touch] = useState(isTouch);
   const [selected, setSelected] = useState<number | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -318,17 +313,14 @@ export function DocumentReviewPage() {
   /**
    * Reads a file in the browser, its row saying each step: «Leggo il documento…», «Cerco le citazioni…» (the search,
    * after a frame, so the words are on screen while it runs), the check, then the text. A refusal stays on the row.
-   * `thrown`: let go on the box, so the sheets land and one flies to the row.
+   * `thrown`: let go on the box, so a wave runs in from its frame.
    */
   const handleFile = async (file: File, thrown = false, others = 0) => {
     const id = ++readingRef.current;
     const base: DocumentJob = { id, name: file.name, bytes: file.size, kind: documentKind(file.name), stage: 'reading', others };
+    setOnAtto(false);
     setJob(base);
-    if (thrown) {
-      setLandings((n) => n + 1);
-      // Read now, as the pulse is: reduced motion throws nothing.
-      if (!prefersReducedMotion() && sheetRef.current) setFlight(sheetRef.current.getBoundingClientRect());
-    }
+    if (thrown) setLandings((n) => n + 1);
     const result = await readDocumentFile(file);
     if (id !== readingRef.current) return;
     if (!result.ok) {
@@ -342,6 +334,8 @@ export function DocumentReviewPage() {
   const handleText = async (text: string, name = PASTED_TITLE) => {
     const id = ++readingRef.current;
     const base: DocumentJob = { id, name, bytes: new TextEncoder().encode(text).length, kind: 'txt', stage: 'searching', others: 0 };
+    // A text pasted is the user's own, not the act's.
+    if (name === PASTED_TITLE) setOnAtto(false);
     setJob(base);
     await findAndShow(base, text, null);
   };
@@ -438,15 +432,6 @@ export function DocumentReviewPage() {
       const box = onBox(event);
       if (event.dataTransfer) event.dataTransfer.dropEffect = box ? 'copy' : 'none';
       setPhase(box ? 'over' : 'page');
-      const zone = zoneRef.current;
-      if (box && zone) {
-        const r = zone.getBoundingClientRect();
-        const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
-        const x = Math.round(clamp(((event.clientX - (r.left + r.width / 2)) / Math.max(1, r.width)) * 24, 8));
-        const y = Math.round(clamp(((event.clientY - (r.top + r.height / 2)) / Math.max(1, r.height)) * 16, 5));
-        // A pointer held still sends the same place over and over: no new render for it.
-        setLean((was) => (was.x === x && was.y === y ? was : { x, y }));
-      }
       window.clearTimeout(rest);
       rest = window.setTimeout(() => setPhase('idle'), DRAG_REST_MS);
     };
@@ -485,6 +470,7 @@ export function DocumentReviewPage() {
     analysisAbortRef.current?.abort();
     setJob(null);
     setPhase('idle');
+    setOnAtto(false);
     resetReview();
     focusAfterRef.current = 'zone';
     setLoaded(null);
@@ -682,21 +668,12 @@ export function DocumentReviewPage() {
   return (
     <PageFrame
       title="Analizza documento"
-      line={local
-        ? 'Trova le norme citate in un atto. Il riconoscimento è più limitato: LexCraft non riceve nulla.'
-        : 'Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.'}
-      action={
-        // The promise (#376 §6.4, G-401): what stays, and what goes — said in full on hover and to a screen reader.
-        <p
-          title={local ? undefined : PROMISE_DETAIL}
-          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-        >
-          {local ? <Laptop aria-hidden="true" size={14} /> : <ShieldCheck aria-hidden="true" size={14} />}
-          {local
-            ? <>Tutto nel tuo browser<span className="sr-only">: LexCraft non riceve nulla, né il documento né le citazioni.</span></>
-            : <>Il documento resta sul tuo computer<span className="sr-only">. {PROMISE_DETAIL}</span></>}
-        </p>
-      }
+      // Where the document goes, said once (#376 §6.4, G-401; Luca, LC29: «è duplicato 2 volte, dai, su»).
+      line={onAtto
+        ? 'Trova le norme citate nell’atto: le citazioni si riconoscono come in una ricerca, e l’atto resta tra i tuoi atti.'
+        : local
+          ? 'Trova le norme citate in un atto, solo nel browser: LexCraft non riceve nulla.'
+          : 'Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.'}
     >
       {fromAtto && (
         <Link to={`/work/atti/${encodeURIComponent(fromAtto.id)}`} className={cn('-mt-2 w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100', FOCUS_RING)}>
@@ -738,13 +715,10 @@ export function DocumentReviewPage() {
               <DropZone
                 ref={zoneElement}
                 phase={phase}
-                lean={lean}
                 landings={landings}
                 touch={touch}
                 busy={job !== null && job.stage !== 'error'}
                 onChoose={() => fileInputRef.current?.click()}
-                sheetRef={sheetRef}
-                flying={flight !== null}
               />
               <PasteBox busy={job !== null && job.stage !== 'error'} onAnalyse={(text) => void handleText(text)} />
               </div>
@@ -760,7 +734,7 @@ export function DocumentReviewPage() {
                     exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: 48 }}
                     transition={{ duration: dur.pop, ease: ease.out }}
                   >
-                    <DocumentRow job={job} onDismiss={dismissJob} markRef={markRef} hidden={flight !== null} />
+                    <DocumentRow job={job} onDismiss={dismissJob} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -865,7 +839,6 @@ export function DocumentReviewPage() {
           </motion.div>
         )}
       </AnimatePresence>
-      {flight && <SheetFlight key={landings} from={flight} target={markRef} onDone={() => setFlight(null)} />}
       {loaded && picker && rows[picker.index] && (
         <CompletionPicker
           text={loaded.text}
@@ -907,8 +880,8 @@ function LocalSwitch({ on, onChange, disabled }: { on: boolean; onChange: (on: b
       </button>
       <p id="doc-local-hint" className="min-w-0 flex-1 basis-64 text-[13px] leading-snug text-slate-600 dark:text-slate-400">
         {on
-          ? 'Il riconoscimento è più limitato: LexCraft non riceve nulla, e i link non si possono inserire.'
-          : 'Per un documento riservato: nemmeno le citazioni trovate arrivano a LexCraft.'}
+          ? 'Il riconoscimento è più limitato, e i link non si possono inserire.'
+          : 'Per un documento riservato: nemmeno le citazioni escono dal computer.'}
       </p>
     </div>
   );

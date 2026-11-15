@@ -27,7 +27,7 @@ const ACTION = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 te
  * list and the cards held while it loads share it, so the one takes the other's place.
  */
 const LAYOUT = `-mx-1 flex gap-3 px-1 pb-3 pt-1 @min-[61.5rem]:grid @min-[61.5rem]:pb-1 ${CARD_GRID_COLUMNS}`;
-const CARD = 'flex w-56 shrink-0 snap-start flex-col justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 @min-[61.5rem]:w-auto dark:border-slate-700 dark:bg-slate-900';
+const CARD = 'flex w-56 shrink-0 snap-start flex-col justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm @min-[61.5rem]:w-auto dark:border-slate-700 dark:bg-slate-900';
 const BAR = 'rounded bg-slate-100 dark:bg-slate-800';
 /** While the packs load: cards of their size — a name on two lines in the row (the cards stretch to the tallest), on one
  *  in the grid (at 20rem the names fit one, the longest 41 characters), the count, the button's 44 px — as many as the

@@ -1,12 +1,14 @@
 import { useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight, FolderOpen, ListFilter, RotateCcw } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { addDaysToIsoDate, todayInRome } from '../../../utils/dateUtils';
 import type { Task, TaskView } from '../../../types/tasks';
-import { QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { FOCUS_RING, QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { dossierRecency } from '../dossier/dossierUtils';
+import { kindLabel } from '../dossier/dossierKinds';
 import { QuickAddField } from './QuickAddField';
 import { restoreTask } from './taskActions';
 import { blockHeading, dayHeading, groupUpcoming, longDay, splitToday, UPCOMING_DAYS, weekStart } from './taskDates';
@@ -43,8 +45,8 @@ interface FrameProps {
   /** Above the rows, under the quick add: Gymnasium's day on «Oggi», the week's strip on «Prossimi giorni». */
   before?: ReactNode | ((today: string, tasks: Task[]) => ReactNode);
   children: (tasks: Task[], today: string, optimistic: ReturnType<typeof useTaskView>['optimistic']) => ReactNode;
-  /** What an empty view says; without it the view draws its groups all the same (the days of the week). */
-  empty?: { title: string; line?: string };
+  /** What an empty view shows; without it the view draws its groups all the same (the days of the week). */
+  empty?: ReactNode;
 }
 
 /**
@@ -77,7 +79,7 @@ function ViewFrame({ view, heading, line, defaults, options, before, children, e
         ) : (
           // Mounted on an empty view too: a sheet open on the last task stays open when the task leaves the view.
           <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic} className="space-y-8">
-            {tasks.length === 0 && empty ? <TaskViewEmpty {...empty} /> : children(tasks, today, state.optimistic)}
+            {tasks.length === 0 && empty ? empty : children(tasks, today, state.optimistic)}
           </TaskSheetScope>
         )}
         {state.answer?.truncated && <TruncatedNote />}
@@ -118,6 +120,53 @@ function byDossier(tasks: Task[], titleOf: (id: string) => string): { dossierId:
     .sort((a, b) => (a.dossierId === null ? 1 : b.dossierId === null ? -1 : a.title.localeCompare(b.title, 'it')));
 }
 
+const NEXT_ROW = cn(
+  'group flex min-h-[44px] w-full items-center gap-3 border-t border-slate-200 py-2.5 text-left transition-colors hover:bg-slate-100/60 dark:border-slate-800 dark:hover:bg-slate-900/60',
+  FOCUS_RING,
+);
+
+/**
+ * An empty «Oggi» (LC30, the owner: «Mi pare un po' vuota»): one quiet line, then where to go from here, from what the
+ * app already holds — the dossiers last worked on (the Corpus desk's «Riprendi», by `dossierRecency`: created or last
+ * added to, not opened) and the next days. Gymnasium's row stays above, in `before`. No counts: the planner keeps none
+ * for tomorrow, and a second read for one number is not worth it.
+ */
+function TodayEmpty() {
+  const dossiers = useAppStore((s) => s.dossiers);
+  const recent = [...dossiers].sort((a, b) => dossierRecency(b) - dossierRecency(a)).slice(0, 3);
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="font-serif text-lg text-slate-900 dark:text-slate-50">Nessun compito per oggi</p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Quello che aggiungi qui è per oggi.</p>
+      </div>
+      {recent.length > 0 && (
+        <section aria-labelledby="opus-today-riprendi">
+          <h3 id="opus-today-riprendi" className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Riprendi</h3>
+          <ul className="border-b border-slate-200 dark:border-slate-800">
+            {recent.map((d) => (
+              <li key={d.id}>
+                <Link to={`/dossier?dossier=${encodeURIComponent(d.id)}`} className={NEXT_ROW}>
+                  <span className="min-w-0 flex-1">
+                    <span title={d.title} className="block truncate font-serif text-base text-slate-900 dark:text-slate-50">{d.title}</span>
+                    <span className="block text-sm text-slate-600 dark:text-slate-400">
+                      {kindLabel(d.kind)} · {d.items.length === 1 ? '1 voce' : `${d.items.length} voci`}
+                    </span>
+                  </span>
+                  <ChevronRight size={16} aria-hidden className="shrink-0 text-slate-500" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <Link to="/work/prossimi" className={cn(QUIET_BUTTON, 'inline-flex w-fit items-center gap-1')}>
+        Vedi i prossimi giorni <ChevronRight size={15} aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
 /**
  * «Oggi»: Gymnasium's day on one line, then by date — the missed deadlines first, then the tasks late on their planned
  * day, then today's — or by dossier; a new task is for today.
@@ -143,7 +192,7 @@ export function TodayView() {
       defaults={(day) => ({ plannedDate: day })}
       options={<GroupingMenu value={grouping} onChange={choose} />}
       before={<StudyTodayRow />}
-      empty={{ title: 'Nessun compito per oggi', line: 'Quello che aggiungi qui è per oggi.' }}
+      empty={<TodayEmpty />}
     >
       {(tasks, day, optimistic) => {
         if (grouping === 'dossier') {
@@ -275,7 +324,7 @@ export function InboxView() {
       heading="Lista d'ingresso"
       line="I compiti che non appartengono a un dossier."
       defaults={() => ({})}
-      empty={{ title: "La lista d'ingresso è vuota", line: 'Un compito senza dossier arriva qui.' }}
+      empty={<TaskViewEmpty title="La lista d'ingresso è vuota" line="Un compito senza dossier arriva qui." />}
     >
       {(tasks, day, optimistic) => (
         <div>
@@ -296,7 +345,7 @@ export function TaskTrashView() {
       view="trash"
       heading="Cestino dei compiti"
       line="I compiti eliminati restano qui per 30 giorni, poi sono cancellati."
-      empty={{ title: 'Il cestino dei compiti è vuoto' }}
+      empty={<TaskViewEmpty title="Il cestino dei compiti è vuoto" />}
     >
       {(tasks, _day, optimistic) => (
         <ul aria-label="Compiti nel cestino" className="grid grid-cols-1 gap-1">

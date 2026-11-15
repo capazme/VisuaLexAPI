@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Copy, Download, FileUp, Link2, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Download, FileUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { MenuButton } from '../../ui/MenuButton';
+import { notify } from '../../ui/notifications/notifications';
+import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 import { cn } from '../../../lib/utils';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { FIELD_TEXT, FOCUS_RING } from '../../../constants/interactions';
 import { dossierService, type DossierApi } from '../../../services/dossierService';
 import { readDocumentFile } from '../documents/documentFile';
 import { ATTO_FILE_ACCEPT, SAVE_DELAY_MS, citationOf, noteTextOf } from './attiText';
@@ -14,16 +17,24 @@ import { ATTO_TIPI, MAX_TESTO, attiError, attiService, type Atto, type AttoStato
 type Draft = Pick<Atto, 'titolo' | 'tipo' | 'testo' | 'stato' | 'dossierId'>;
 type SaveState = { kind: 'saved'; at: Date } | { kind: 'pending' } | { kind: 'saving' } | { kind: 'error'; message: string };
 
-const FIELD =
-  'h-10 rounded-lg border border-slate-300 bg-card px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-100';
+/** The meta row's controls: one height (44 px on a phone, 32 from `md`), quiet until hovered or focused. */
+const META_FIELD = cn(
+  'h-11 rounded-md border border-transparent bg-transparent px-2 text-slate-900 hover:border-slate-300 focus-visible:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:h-8 dark:text-slate-100 dark:hover:border-slate-700 dark:focus-visible:border-slate-700',
+  FIELD_TEXT,
+);
+const META_LABEL = 'text-sm text-slate-600 dark:text-slate-400';
+/** The act's text, read or written: one sheet, the same measure and padding either way, so the switch moves nothing. */
+const SHEET_TEXT = 'mx-auto block w-full max-w-measure px-6 py-8 font-serif text-[17px] leading-[1.7] text-slate-900 md:px-10 md:py-10 dark:text-slate-100';
 
 
 /**
  * An act of a dossier (`/work/atti/:id`), to read first (Luca, 15-11: the act is written in Word or WordCraft, LexCraft is
- * where it is read and checked): the text as a page, and beside it the dossier's norms and decisions and its notes. A new
- * version comes from its file («Carica una nuova versione», after a confirmation); «Modifica il testo» opens the text to
- * a correction, which saves itself `SAVE_DELAY_MS` after the last change («Cita» then writes a source where the cursor
- * is). Title, kind, dossier and state save the same way. The text can be copied or downloaded; «Elimina» asks first.
+ * where it is read and checked): the title, one quiet line with kind · dossier · state, the text as a sheet in the reading
+ * serif (its bar: «Modifica il testo», «Analizza l’atto»), and beside it from `lg` the dossier's norms and decisions and
+ * its notes (LC29, Luca: no form dump). «Modifica il testo» opens the text to a correction, which saves itself
+ * `SAVE_DELAY_MS` after the last change («Cita» then writes a source where the cursor is). Title, kind, dossier and state
+ * save the same way. The rare actions sit in the «⋯» menu: a new version from its file (after a confirmation), copy,
+ * download, and «Elimina l’atto», red there only, which asks first.
  */
 export function AttoEditor() {
   const { id = '' } = useParams();
@@ -40,7 +51,6 @@ export function AttoEditor() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const latest = useRef<Draft | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -159,10 +169,9 @@ export function AttoEditor() {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(latest.current?.testo ?? '');
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      notify({ type: 'success', message: 'Testo copiato.', duration: 2000 });
     } catch {
-      setCopied(false);
+      notify({ type: 'error', message: 'Il testo non è stato copiato.', duration: 4000 });
     }
   };
 
@@ -218,83 +227,101 @@ export function AttoEditor() {
   const near = draft.testo.length > MAX_TESTO * 0.9;
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-6">
+      {/* The way back, then how the act stands and its other actions; clear of the full-screen button (D-253). */}
+      <div className={cn('flex flex-wrap items-center justify-between gap-x-3 gap-y-2', FOCUS_BUTTON_CLEARANCE)}>
         {back}
-        <p role="status" className={cn('flex items-center gap-2 text-sm', save.kind === 'error' ? 'text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-400')}>
-          {saveWords}
-          {save.kind === 'error' && <Button size="sm" variant="secondary" onClick={() => void flush()}>Riprova</Button>}
-        </p>
+        <div className="flex items-center gap-2">
+          <p role="status" className={cn('flex items-center gap-2 text-sm', save.kind === 'error' ? 'text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-400')}>
+            {saveWords}
+            {save.kind === 'error' && <Button size="sm" variant="secondary" onClick={() => void flush()}>Riprova</Button>}
+          </p>
+          {/* The rare actions in one menu; «Elimina» last, red there only, and it asks first. */}
+          <MenuButton
+            label="Altre azioni sull’atto"
+            title="Altre azioni"
+            triggerClassName="h-11 w-11 justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:h-8 md:w-8 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            items={[
+              { label: 'Carica una nuova versione', icon: FileUp, onSelect: () => fileInput.current?.click() },
+              { label: 'Copia il testo', icon: Copy, onSelect: () => void copy() },
+              { label: 'Scarica in .txt', icon: Download, onSelect: download },
+              { label: 'Elimina l’atto', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => setConfirmDelete(true) },
+            ]}
+          >
+            <MoreHorizontal aria-hidden size={18} />
+          </MenuButton>
+        </div>
       </div>
-
-      <label className="sr-only" htmlFor="atto-titolo">Titolo dell’atto</label>
+      {/* Out of the menu, which is gone once closed: the input outlives the click that opens it. */}
       <input
-        id="atto-titolo"
-        value={draft.titolo}
-        onChange={(e) => change({ titolo: e.target.value })}
-        onBlur={() => void flush()}
-        maxLength={300}
-        className="w-full border-b border-transparent bg-transparent pb-1 font-serif text-[28px] leading-tight text-slate-900 focus-visible:border-slate-400 focus-visible:outline-none md:text-3xl dark:text-slate-50"
+        ref={fileInput}
+        type="file"
+        accept={ATTO_FILE_ACCEPT}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(event) => {
+          void readNewVersion(event.target.files?.[0]);
+          event.target.value = '';
+        }}
       />
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-          Tipo
-          <input value={draft.tipo ?? ''} onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} className={cn(FIELD, 'w-60')} />
-          <datalist id="atto-tipi">{ATTO_TIPI.map((t) => <option key={t} value={t} />)}</datalist>
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-          Dossier
-          <select value={draft.dossierId ?? ''} onChange={(e) => change({ dossierId: e.target.value || null })} className={cn(FIELD, 'w-60')}>
-            <option value="">Nessuno</option>
-            {dossiers.filter((d) => d.kind !== 'studio' || d.id === draft.dossierId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </label>
-        <div role="radiogroup" aria-label="Stato" className="flex h-10 items-center gap-0.5 rounded-lg border border-slate-300 bg-card p-0.5 dark:border-slate-700">
-          {(['bozza', 'finale'] as AttoStato[]).map((stato) => (
-            <button
-              key={stato}
-              type="button"
-              role="radio"
-              aria-checked={draft.stato === stato}
-              onClick={() => change({ stato })}
-              className={cn('h-full rounded-md px-3 text-sm font-medium', FOCUS_RING, draft.stato === stato ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-50' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400')}
-            >
-              {stato === 'bozza' ? 'Bozza' : 'Finale'}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" icon={<FileUp size={15} aria-hidden />} onClick={() => fileInput.current?.click()}>Carica una nuova versione</Button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept={ATTO_FILE_ACCEPT}
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden
-            onChange={(event) => {
-              void readNewVersion(event.target.files?.[0]);
-              event.target.value = '';
-            }}
-          />
-          <Button variant="secondary" size="sm" icon={<Copy size={15} aria-hidden />} onClick={() => void copy()}>{copied ? 'Copiato' : 'Copia il testo'}</Button>
-          <Button variant="secondary" size="sm" icon={<Download size={15} aria-hidden />} onClick={download}>Scarica .txt</Button>
-          {/* Quiet: a destructive action seen at every visit; the confirmation is where it turns red. */}
-          <Button variant="quiet" size="sm" icon={<Trash2 size={15} aria-hidden />} onClick={() => setConfirmDelete(true)} className="text-red-700 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">Elimina</Button>
+      <div className="flex flex-col gap-2">
+        <label className="sr-only" htmlFor="atto-titolo">Titolo dell’atto</label>
+        <input
+          id="atto-titolo"
+          value={draft.titolo}
+          onChange={(e) => change({ titolo: e.target.value })}
+          onBlur={() => void flush()}
+          maxLength={300}
+          className="w-full border-b border-transparent bg-transparent pb-1 font-serif text-[28px] font-medium leading-tight tracking-tight text-slate-900 hover:border-slate-200 focus-visible:border-slate-400 focus-visible:outline-none md:text-3xl dark:text-slate-50 dark:hover:border-slate-800"
+        />
+        {/* One quiet line: kind · dossier · state, each editable where it stands. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <label className="flex items-center gap-1">
+            <span className={META_LABEL}>Tipo</span>
+            <input value={draft.tipo ?? ''} placeholder="Nessuno" onChange={(e) => change({ tipo: e.target.value.trim() ? e.target.value : null })} list="atto-tipi" maxLength={100} size={Math.max((draft.tipo ?? '').length, 9)} className={cn(META_FIELD, 'min-w-24 placeholder:text-slate-500 [field-sizing:content]')} />
+            <datalist id="atto-tipi">{ATTO_TIPI.map((t) => <option key={t} value={t} />)}</datalist>
+          </label>
+          <span aria-hidden className="-mx-1 text-slate-400 dark:text-slate-600">·</span>
+          <label className="flex items-center gap-1">
+            <span className={META_LABEL}>Dossier</span>
+            <select value={draft.dossierId ?? ''} onChange={(e) => change({ dossierId: e.target.value || null })} className={cn(META_FIELD, 'max-w-60 bg-card [field-sizing:content]')}>
+              <option value="">Nessuno</option>
+              {dossiers.filter((d) => d.kind !== 'studio' || d.id === draft.dossierId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </label>
+          <span aria-hidden className="-mx-1 text-slate-400 dark:text-slate-600">·</span>
+          <div role="radiogroup" aria-label="Stato" className="flex h-11 items-center gap-0.5 rounded-md bg-slate-100 p-0.5 md:h-8 dark:bg-slate-800">
+            {(['bozza', 'finale'] as AttoStato[]).map((stato) => (
+              <button
+                key={stato}
+                type="button"
+                role="radio"
+                aria-checked={draft.stato === stato}
+                onClick={() => change({ stato })}
+                className={cn('h-full rounded px-3 text-sm', FOCUS_RING, draft.stato === stato ? 'bg-card font-medium text-slate-900 shadow-sm dark:bg-slate-950 dark:text-slate-50' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100')}
+              >
+                {stato === 'bozza' ? 'Bozza' : 'Finale'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {deleteError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{deleteError}</p>}
       {fileError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{fileError}</p>}
 
-      <div className={cn('grid grid-cols-1 gap-5', draft.dossierId && 'lg:grid-cols-[minmax(0,1fr)_17rem]')}>
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex flex-wrap justify-end gap-2">
+      <div className={cn('grid grid-cols-1 gap-6 lg:gap-10', draft.dossierId ? 'lg:grid-cols-[minmax(0,48rem)_16rem]' : 'max-w-[48rem]')}>
+        {/* The sheet: its bar on top (correct the text, analyse it), then the text in the reading serif. */}
+        <div className="flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-slate-200 bg-card shadow-sm has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-primary-500 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-2 py-1.5 dark:border-slate-800">
+            <Button variant="quiet" size="sm" icon={<Pencil size={15} aria-hidden />} onClick={() => setEditing((now) => !now)} aria-pressed={editing}>
+              {editing ? 'Fine modifica' : 'Modifica il testo'}
+            </Button>
             {/* «Analizza documento» in the act's flow (Luca, 15-11): the citations found, linked to their norms and decisions. */}
             <Button
               variant="secondary"
               size="sm"
-              icon={<Link2 size={15} aria-hidden />}
               disabled={!draft.testo.trim()}
               onClick={() => {
                 void flush();
@@ -303,42 +330,40 @@ export function AttoEditor() {
             >
               Analizza l’atto
             </Button>
-            <Button variant="quiet" size="sm" icon={<Pencil size={15} aria-hidden />} onClick={() => setEditing((now) => !now)} aria-pressed={editing}>
-              {editing ? 'Fine modifica' : 'Modifica il testo'}
-            </Button>
           </div>
           {editing ? (<>
-          <label className="sr-only" htmlFor="atto-testo">Testo dell’atto</label>
-          <textarea
-            id="atto-testo"
-            ref={textRef}
-            value={draft.testo}
-            onChange={(e) => change({ testo: e.target.value })}
-            onBlur={() => void flush()}
-            maxLength={MAX_TESTO}
-            placeholder="Scrivi qui il testo dell’atto."
-            className="min-h-[60vh] w-full resize-y rounded-xl border border-slate-200 bg-card px-6 py-5 font-serif text-[17px] leading-relaxed text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-800 dark:text-slate-100"
-          />
-          {near && <p className="text-xs text-amber-800 dark:text-amber-300">{draft.testo.length.toLocaleString('it-IT')} caratteri su {MAX_TESTO.toLocaleString('it-IT')}.</p>}
+            <label className="sr-only" htmlFor="atto-testo">Testo dell’atto</label>
+            <textarea
+              id="atto-testo"
+              ref={textRef}
+              value={draft.testo}
+              onChange={(e) => change({ testo: e.target.value })}
+              onBlur={() => void flush()}
+              maxLength={MAX_TESTO}
+              placeholder="Scrivi qui il testo dell’atto."
+              className={cn(SHEET_TEXT, 'min-h-[60vh] resize-none bg-transparent [field-sizing:content] placeholder:text-slate-500 focus-visible:outline-none')}
+            />
+            {near && <p className="border-t border-slate-200 px-4 py-2 text-xs text-amber-800 dark:border-slate-800 dark:text-amber-300">{draft.testo.length.toLocaleString('it-IT')} caratteri su {MAX_TESTO.toLocaleString('it-IT')}.</p>}
           </>) : (
-            <article aria-label="Testo dell’atto" className="min-h-[40vh] rounded-xl border border-slate-200 bg-card px-6 py-6 font-serif text-[17px] leading-relaxed text-slate-900 md:px-10 dark:border-slate-800 dark:text-slate-100">
+            <article aria-label="Testo dell’atto" className={cn(SHEET_TEXT, 'min-h-[40vh]')}>
               {draft.testo.trim()
-                ? draft.testo.split(/\n+/).filter((line) => line.trim()).map((line, index) => <p key={index} className="mb-3 whitespace-pre-wrap last:mb-0">{line}</p>)
-                : <p className="text-slate-600 dark:text-slate-400">L’atto non ha ancora un testo. Caricane una versione dal file, o scrivilo con «Modifica il testo».</p>}
+                // As written, line for line: the same lines as in «Modifica il testo», so the switch moves nothing.
+                ? <div className="whitespace-pre-wrap">{draft.testo}</div>
+                : <p className="text-slate-600 dark:text-slate-400">L’atto non ha ancora un testo. Scrivilo con «Modifica il testo», o caricane una versione dal file con il menu ⋯.</p>}
             </article>
           )}
         </div>
         {draft.dossierId && (
-          <aside aria-labelledby="atto-fonti" className="flex flex-col gap-2 lg:sticky lg:top-4 lg:self-start">
-            <h2 id="atto-fonti" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Fonti del dossier</h2>
+          <aside aria-labelledby="atto-fonti" className="flex flex-col gap-3 lg:sticky lg:top-4 lg:self-start">
+            <h2 id="atto-fonti" className="text-sm font-medium text-slate-700 dark:text-slate-300">Fonti del dossier</h2>
             {sources.length === 0 ? (
               <p className="text-sm text-slate-600 dark:text-slate-400">Il dossier non ha ancora norme né sentenze.</p>
             ) : (
-              <ul className="flex flex-col divide-y divide-slate-200 rounded-xl border border-slate-200 bg-card dark:divide-slate-800 dark:border-slate-800">
+              <ul className="-mt-1 flex flex-col">
                 {sources.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2 px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-slate-200" title={citationOf(item)}>{citationOf(item)}</span>
-                    {editing && <button type="button" onClick={() => cite(citationOf(item))} aria-label={`Cita ${citationOf(item)}`} className={cn('min-h-11 shrink-0 rounded-md px-3 text-xs font-semibold md:min-h-0 md:px-2 md:py-1 text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}>
+                  <li key={item.id} className="flex min-h-9 items-center gap-2 border-b border-slate-200/70 py-1 last:border-b-0 dark:border-slate-800">
+                    <span className="min-w-0 flex-1 truncate font-serif text-[15px] text-slate-800 dark:text-slate-200" title={citationOf(item)}>{citationOf(item)}</span>
+                    {editing && <button type="button" onClick={() => cite(citationOf(item))} aria-label={`Cita ${citationOf(item)}`} className={cn('min-h-11 shrink-0 rounded-md px-3 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:px-2 md:py-1 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}>
                       Cita
                     </button>}
                   </li>
@@ -347,17 +372,17 @@ export function AttoEditor() {
             )}
             {notes.length > 0 && (
               <>
-                <h2 className="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Note del dossier</h2>
-                <ul className="flex flex-col gap-2">
+                <h2 className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">Note del dossier</h2>
+                <ul className="flex flex-col gap-3">
                   {notes.map((item) => (
-                    <li key={item.id} className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-card px-3 py-2 font-serif text-[15px] leading-snug text-slate-800 dark:border-slate-800 dark:text-slate-200">
+                    <li key={item.id} className="whitespace-pre-wrap border-l-2 border-slate-200 pl-3 font-serif text-[15px] leading-snug text-slate-700 dark:border-slate-700 dark:text-slate-300">
                       {noteTextOf(item)}
                     </li>
                   ))}
                 </ul>
               </>
             )}
-            <Link to={`/dossier?dossier=${encodeURIComponent(draft.dossierId)}`} className={cn('w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:underline dark:text-slate-400', FOCUS_RING)}>Apri il dossier</Link>
+            <Link to={`/dossier?dossier=${encodeURIComponent(draft.dossierId)}`} className={cn('mt-1 w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100', FOCUS_RING)}>Apri il dossier</Link>
           </aside>
         )}
       </div>

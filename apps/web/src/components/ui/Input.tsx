@@ -78,7 +78,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={error ? true : undefined}
             aria-describedby={describedByIds}
             className={cn(
-              'w-full py-2.5 border rounded-lg',
+              'w-full py-2.5 border rounded-lg inset-shadow-xs',
               // Colours only: the focus ring is a box-shadow and appears at once.
               'transition-colors duration-150 ease-out outline-none',
               'text-slate-900 dark:text-slate-100',

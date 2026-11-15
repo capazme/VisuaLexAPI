@@ -269,16 +269,14 @@ describe('AuthPage: two tabs on one page', () => {
     expect(allPanels()).toHaveLength(2);
   });
 
-  it('centres the colophon against the card on a computer, above it on a phone', () => {
+  // LC31 (Luca, 15 Nov): one centred column, the wordmark large and the slogan close under it, the card under both.
+  it('centres the wordmark, the slogan and the card in one column', () => {
     renderAuth('/login');
     const colophon = screen.getByRole('banner');
-    // The card hangs from the top of its row; the colophon is as tall as the card on «Accedi» and centred in it.
-    expect(colophon.parentElement!.className).toContain('md:items-start');
-    expect(colophon).toHaveClass('md:min-h-[var(--login-card-h,32rem)]', 'md:justify-center');
-    expect(colophon.className).toMatch(/(^|\s)items-center\b/);
-    expect(colophon.className).toMatch(/(^|\s)text-center\b/);
-    expect(colophon.className).toContain('md:items-start');
-    expect(colophon.className).toContain('md:text-left');
+    expect(colophon.parentElement!).toHaveClass('mx-auto', 'max-w-[420px]', 'flex-col');
+    expect(colophon).toHaveClass('items-center', 'text-center', 'gap-3');
+    expect(colophon).toHaveTextContent('La legge è davvero uguale per tutti');
+    expect(colophon.nextElementSibling).toBe(screen.getByRole('main'));
   });
 
   /** The end of the box's height transition: jsdom has no `TransitionEvent`, so its `propertyName` is given by hand. */
@@ -306,7 +304,7 @@ describe('AuthPage: two tabs on one page', () => {
     expect(frame.style.height).toBe('');
     expect(frame).toHaveClass('overflow-clip');
     expect(page.style.getPropertyValue('--login-card-h')).toBe('420px');
-    expect(page.querySelector('.md\\:pt-\\[max\\(1\\.5rem\\2c calc\\(\\(100dvh-4rem-var\\(--login-card-h\\2c 32rem\\)\\)\\/2\\)\\)\\]')).not.toBeNull();
+    expect(page.querySelector('.md\\:pt-\\[max\\(2rem\\2c calc\\(\\(100dvh-4rem-11rem-var\\(--login-card-h\\2c 32rem\\)\\)\\/2\\)\\)\\]')).not.toBeNull();
 
     fireEvent.click(tab('Registrati'));
     // From the old height to the new, in 220 ms; the page's centre is still «Accedi»'s.
@@ -411,34 +409,34 @@ describe('AuthPage: two tabs on one page', () => {
 
 // The LexCraft logo (LC16): it takes the place of the column and the word written in ink, and of their two motions.
 describe('AuthPage: the LexCraft logo', () => {
-  it('names the page «LexCraft» with the logo, which plays its intro once', () => {
+  // LC31: the cursor's sweep over CRAFT, not the intro whose column dropped from above and moved the word off centre.
+  it('names the page «LexCraft» with the logo, which plays the cursor\'s sweep once', () => {
     renderAuth('/login');
     const title = screen.getByRole('heading', { level: 1, name: 'LexCraft' });
     const logo = within(title).getByRole('img', { name: 'LexCraft' });
-    expect(logo).toHaveClass('vlx-logo', 'vlx-logo-intro');
-    // The column that rose and the pen that wrote are gone.
+    expect(logo).toHaveClass('vlx-logo', 'vlx-logo-sweep');
+    expect(logo).not.toHaveClass('vlx-logo-intro');
     expect(document.querySelector('.vlx-ink-book, .vlx-ink-word, .vlx-ink-bleed, .vlx-ink-plain')).toBeNull();
   });
 
-  it('never wider than the 196 px column beside the card between 768 and 1023 px', () => {
+  it('is large: 300 px on a phone, 420 px (the card\'s width) from sm', () => {
     renderAuth('/login');
-    const logo = screen.getByRole('img', { name: 'LexCraft' });
-    expect(logo).toHaveClass('w-[196px]', 'lg:w-[260px]');
+    expect(screen.getByRole('img', { name: 'LexCraft' })).toHaveClass('w-[300px]', 'sm:w-[420px]');
   });
 
   it('stands still under reduced motion', () => {
     reduceMotion(true);
     renderAuth('/login');
-    expect(screen.getByRole('img', { name: 'LexCraft' })).not.toHaveClass('vlx-logo-intro');
+    expect(screen.getByRole('img', { name: 'LexCraft' })).not.toHaveClass('vlx-logo-sweep');
   });
   // Papiniano's pass on #464: after «Esci» in the same session the intro played again.
-  it('plays the intro once a browser session: drawn again, it stands still in the same box', () => {
+  it('plays the sweep once a browser session: drawn again, it stands still in the same box', () => {
     const { unmount } = renderAuth('/login');
-    expect(screen.getByRole('img', { name: 'LexCraft' })).toHaveClass('vlx-logo-intro');
+    expect(screen.getByRole('img', { name: 'LexCraft' })).toHaveClass('vlx-logo-sweep');
     unmount();
     renderAuth('/login');
     const logo = screen.getByRole('img', { name: 'LexCraft' });
-    expect(logo).not.toHaveClass('vlx-logo-intro');
-    expect(logo).toHaveAttribute('viewBox', '-36 -176 772 290');
+    expect(logo).not.toHaveClass('vlx-logo-sweep');
+    expect(logo).toHaveAttribute('viewBox', '-11.0 -96.9 716.3 130.9');
   });
 });

@@ -90,13 +90,13 @@ function normaChangesLabel(count: number): string {
   return count === 1 ? '1 norma salvata cambiata' : `${count} norme salvate cambiate`;
 }
 
-/** A count drawn on a control; the control's name says what it counts. 11 px on red 600: no smaller, and AA. */
+/** A count drawn on a control; the control's name says what it counts. 11 px in ink, not red: a count of tasks is not a danger (LC32). */
 function CountBadge({ count, className }: { count: number; className?: string }) {
   return (
     <span
       aria-hidden
       className={cn(
-        'min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none',
+        'min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-[11px] font-semibold leading-none',
         className,
       )}
     >

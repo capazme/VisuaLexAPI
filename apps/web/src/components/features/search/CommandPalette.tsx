@@ -99,11 +99,8 @@ function RowHighlight({ value, still }: { value: string; still: boolean }) {
   const chosen = useCommandState((state) => state.value?.toLowerCase() === value.toLowerCase());
   const scope = useContext(ChosenRowScope);
   if (!chosen) return null;
-  // A tint and an edge in toga: the tint alone is too faint a mark for the row in use.
-  const tint = cn(
-    'absolute inset-0 -z-10 rounded-lg bg-ink-100 dark:bg-ink-800',
-    'before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-toga-600 dark:before:bg-toga-300',
-  );
+  // A stone tile, as the sidebar's active row (LC32: no edge bar beside it, the anti-slop review).
+  const tint = 'absolute inset-0 -z-10 rounded-lg bg-ink-200 dark:bg-ink-700';
   return still
     ? <span aria-hidden className={tint} />
     : <motion.span aria-hidden layoutId={`command-palette-chosen-row:${scope}`} transition={spring.snappy} className={tint} />;
@@ -1054,7 +1051,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             Gestisci
           </button>
           {quickNorms.length === 0 ? (
-            <p className={QUIET_LINE}>Nessun preferito: il fulmine su un articolo lo aggiunge qui</p>
+            <p className={QUIET_LINE}>Nessun preferito: «Aggiungi alle norme rapide», nel menu ⋯ di un articolo, lo porta qui</p>
           ) : (
             <AnimatePresence initial={false} mode="popLayout">
               {visibleQuickNorms.map((qn) => (
