@@ -12,6 +12,27 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-15
+
+The LexCraft logo in the app, animated; the independent UI review's corrections; a wrong password says
+so; primary actions readable in the dark. Web only, no migration.
+
+### Look
+
+- The LexCraft logo in the sidebar and at sign-in, with its sweep and intro from the design file; still
+  under reduced motion (LC16). The sections share Pietra's ink and are told apart by name and icon.
+- The independent UI review's corrections (LC15): a pointer on every enabled control, readable
+  placeholders, no em dashes as joints in visible strings, no off-palette stripes, a solid sidebar,
+  plainer icons, sentence case, a plainer tour, colour words in the Markdown export.
+- In the dark theme, filled primary actions are light ink instead of a grey slab that looked disabled;
+  the chosen option of a group stands out (LC17).
+
+### Sign-in
+
+- A wrong password or an unknown email shows «Email o password non corrette.» and keeps the email,
+  instead of reloading an empty form; sign-in errors are in Italian; while `/auth/me` is retried the
+  loading screen says «Il server non risponde, riprovo…» (LC14).
+
 ## [1.17.0] - 2026-11-15
 
 A busy or briefly unreachable server no longer signs anyone out; the night's retouches from the browser
