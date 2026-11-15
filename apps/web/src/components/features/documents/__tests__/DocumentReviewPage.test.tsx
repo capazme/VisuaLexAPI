@@ -9,7 +9,12 @@ import { PARERE, testFile } from './fixtures';
 
 const navigateMock = vi.fn();
 const triggerSearchMock = vi.fn();
-vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
+const routerState = vi.hoisted(() => ({ state: null as unknown }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => navigateMock,
+  useLocation: () => ({ state: routerState.state }),
+  Link: ({ to, children, className }: { to: string; children: import('react').ReactNode; className?: string }) => <a href={to} className={className}>{children}</a>,
+}));
 const NO_ALIASES: never[] = [];
 vi.mock('../../../../store/useAppStore', () => ({
   useAppStore: (select: (state: { triggerSearch: typeof triggerSearchMock; customAliases: never[] }) => unknown) =>
@@ -44,9 +49,20 @@ beforeEach(() => {
   // Framer Motion puts the window's scroll back after measuring a height of `auto`; jsdom has no scrollTo.
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   navigateMock.mockReset();
+  routerState.state = null;
   triggerSearchMock.mockReset();
   server.fetchActNames.mockReset().mockResolvedValue(RECORDED.act_names);
   server.readOnServer.mockReset().mockImplementation(answerAsRecorded);
+});
+
+describe('DocumentReviewPage — an act sent by its page («Analizza l’atto»)', () => {
+  it('analyses the act at once, under its title, and leads back to it', async () => {
+    routerState.state = { atto: { id: 'a1', titolo: 'Atto di appello', testo: 'Si applica l’art. 2043 c.c. al caso.' } };
+    render(<DocumentReviewPage />);
+    expect(screen.getByRole('link', { name: /Torna all’atto «Atto di appello»/ })).toHaveAttribute('href', '/work/atti/a1');
+    await waitFor(() => expect(screen.getAllByText('Atto di appello').length).toBeGreaterThan(0));
+    expect(screen.queryByText('Testo incollato')).toBeNull();
+  });
 });
 
 describe('DocumentReviewPage — before a document', () => {

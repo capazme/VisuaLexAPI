@@ -52,7 +52,7 @@ function renderDetail(d: Dossier) {
 function renderList(d: Dossier) {
   appStore.setState({ dossiers: [d] });
   render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-  fireEvent.click(screen.getByRole('button', { name: 'Apri Ricorso Rossi su Dashboard' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Apri Ricorso Rossi nel Corpus' }));
 }
 
 /** Every queued or triggered search, in order. */
@@ -61,7 +61,7 @@ const searches = () => [...(s().searchTrigger ? [s().searchTrigger!] : []), ...s
 describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 15, T17)', () => {
   it('a dossier with two past groups: ONE practice, active, every search targeting it, its decisions closed and unread', () => {
     renderDetail(TWO_PAST);
-    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto nel Corpus' }));
     fireEvent.click(screen.getByRole('button', { name: /^Apri tutto\s*\d+ gruppi/ }));
     expect(s().practices).toHaveLength(1);
     const [practice] = s().practices;
@@ -80,7 +80,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
   it('the table draws the dossier\'s decisions closed and asks for none of them until one is opened (T17)', async () => {
     fetchDecision.mockReturnValue(new Promise(() => {}));
     renderDetail(TWO_PAST);
-    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto nel Corpus' }));
     fireEvent.click(screen.getByRole('button', { name: /^Apri tutto\s*\d+ gruppi/ }));
     const { container } = render(<MemoryRouter><PracticeTable onViewPdf={() => {}} onCrossReference={() => {}} streaming={null} layout="overview" /></MemoryRouter>);
     const section = await within(container).findByRole('region', { name: /Giurisprudenza/ });
@@ -96,7 +96,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
 
   it('a dossier with one group: «Apri tutto» opens it with its decisions', () => {
     renderDetail(dossierOf([norm('a', CIVIL), decision('s1', 28994)]));
-    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto nel Corpus' }));
     expect(s().practices).toHaveLength(1);
     expect(s().practices[0].decisions).toHaveLength(1);
     expect(searches().map((q) => q.targetPracticeId)).toEqual([s().practices[0].id]);
@@ -104,7 +104,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
 
   it('one group picked brings no decision', () => {
     renderDetail(TWO_PAST);
-    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto nel Corpus' }));
     // the picker is drawn last: its row, not the page's
     fireEvent.click(screen.getAllByText('Testo al 29/12/2007').at(-1) as HTMLElement);
     expect(s().practices).toHaveLength(1);
@@ -115,7 +115,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
   // D7a: the decisions count too. Before, a dossier of decisions alone had «Apri tutto» disabled.
   it('a dossier of decisions alone opens them in one practice, with no search to run', () => {
     renderDetail(dossierOf([decision('s1', 28994), decision('s2', 577)]));
-    const button = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const button = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
     expect(button).toBeEnabled();
     fireEvent.click(button);
     expect(s().practices).toHaveLength(1);
@@ -126,7 +126,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
 
   it('a dossier with neither an article nor a decision opens nothing', () => {
     renderDetail(dossierOf([{ id: 'n1', type: 'note', addedAt: '', data: 'Solo una nota' }]));
-    const button = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const button = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
     expect(button).toBeDisabled();
     fireEvent.click(button);
     expect(s().practices).toEqual([]);
@@ -134,7 +134,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
 
   it('the picker says where everything goes: one practice', () => {
     renderDetail(TWO_PAST);
-    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto nel Corpus' }));
     expect(screen.getByText(/apri tutto in una sola pratica/)).toBeInTheDocument();
   });
 });

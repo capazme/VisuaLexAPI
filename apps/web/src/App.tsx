@@ -31,6 +31,8 @@ const ConnectAiAppPage = lazy(() => PAGE_CODE.connectAiApp().then(m => ({ defaul
 const OpusPage = lazy(() => PAGE_CODE.opus().then(([m]) => ({ default: m.OpusPage })));
 // Loaded with Opus's frame (`PAGE_CODE.opus`): by the time a view renders, its module is there.
 const TodayView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TodayView })));
+const AttiListView = lazy(() => PAGE_CODE.opus().then(([, , m]) => ({ default: m.AttiListView })));
+const AttoEditor = lazy(() => PAGE_CODE.opus().then(([, , , m]) => ({ default: m.AttoEditor })));
 const UpcomingView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.UpcomingView })));
 const InboxView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.InboxView })));
 const TaskTrashView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TaskTrashView })));
@@ -163,10 +165,9 @@ function App() {
             <Route path="prossimi" element={<UpcomingView />} />
             <Route path="ingresso" element={<InboxView />} />
             <Route path="cestino" element={<TaskTrashView />} />
-            <Route path="atti" element={<ComingSoon>
-              <p>Qui scriverai i tuoi atti, con le fonti del Corpus e dei tuoi dossier a portata di mano.</p>
-              <p>La funzione è in arrivo: per ora questa pagina non fa altro.</p>
-            </ComingSoon>} />
+            {/* Atti: the user's acts and the editor of one, with the linked dossier's sources beside the text. */}
+            <Route path="atti" element={<AttiListView />} />
+            <Route path="atti/:id" element={<AttoEditor />} />
             {/* D-324: the desktop app's. */}
             <Route path="anonimizzatore" element={<ComingSoon>
               <p>Toglierà da un documento i dati che identificano le persone, prima che tu lo condivida o lo analizzi.</p>

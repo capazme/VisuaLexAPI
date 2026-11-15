@@ -28,7 +28,7 @@ const dossier = (data: NormaVisitata[]): Dossier => ({
 function open(items: NormaVisitata[]) {
   appStore.setState({ dossiers: [dossier(items)], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
   render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-  fireEvent.click(screen.getByRole('button', { name: 'Apri Pratica Rossi su Dashboard' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Apri Pratica Rossi nel Corpus' }));
 }
 
 beforeEach(() => {
@@ -45,7 +45,7 @@ describe('DossierListView — the quick-open of a card', () => {
     ] };
     appStore.setState({ dossiers: [decisions], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    const button = screen.getByRole('button', { name: 'Apri Pratica Rossi su Dashboard' });
+    const button = screen.getByRole('button', { name: 'Apri Pratica Rossi nel Corpus' });
     expect(button).toBeEnabled();
     fireEvent.click(button);
     const { practices, searchTrigger, searchQueue } = appStore.getState();
@@ -201,7 +201,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
     const { unmount } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     // The page's name, its section's phrase over it (L-37): the section says the kind.
     expect(screen.getByRole('heading', { level: 1, name: 'Dossier' })).toBeInTheDocument();
-    expect(screen.getByText('Work · la tua officina giuridica')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleDescription('Work');
     expect(titles().sort()).toEqual(['Pratica Rossi', 'Senza tipo']);
     // The kind filter is gone: the section is the filter.
     expect(screen.queryByRole('group', { name: 'Tipo di dossier' })).toBeNull();
@@ -210,7 +210,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
     sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     expect(screen.getByRole('heading', { level: 1, name: 'Dossier' })).toBeInTheDocument();
-    expect(screen.getByText('Learn · la tua palestra giuridica')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleDescription('Learn');
     expect(titles()).toEqual(['Diritto penale']);
     expect(screen.getAllByText('Di studio', { selector: 'span' })).toHaveLength(1);
     expect(screen.getByText('Pubblicato nel Forum')).toBeInTheDocument();
@@ -394,7 +394,7 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     // Said as it is seen: the spaces round «·» are in the text.
     expect(line).toHaveTextContent(/^1 atto · 1 articolo · 1 nota$/);
     expect(within(card).getByText('Creato il 1 agosto 2026')).toBeInTheDocument();
-    for (const name of ['Apri Pratica Rossi su Dashboard', 'Azioni su Pratica Rossi']) {
+    for (const name of ['Apri Pratica Rossi nel Corpus', 'Azioni su Pratica Rossi']) {
       const control = within(card).getByRole('button', { name });
       expect(control).toHaveClass('min-h-[44px]', 'min-w-[44px]');
       expect(control.className).not.toMatch(/opacity-0/);
@@ -420,15 +420,17 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     expect(within(card).getByText(address)).toHaveClass('break-words', 'line-clamp-2');
   });
 
-  it('composes the empty list: line art in the section\'s hue, what a dossier is for, and two ways to begin', () => {
+  // LC21: the line art is gone (no drawing over an empty list); the words and the two ways to begin stay.
+  it('composes the empty list: what a dossier is for and two ways to begin, with no drawing', () => {
     appStore.setState({ dossiers: [], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     const empty = screen.getByRole('region', { name: 'Nessun dossier di lavoro' });
     expect(empty).toHaveClass('mx-auto', 'items-center', 'text-center');
-    const drawing = empty.querySelector('svg')!;
-    expect(drawing).toHaveAttribute('aria-hidden', 'true');
-    expect(drawing.innerHTML).toContain('var(--vlx-section-opus)');
+    // The heading opens the region; the only pictures left are the buttons' icons.
+    expect(empty.firstElementChild).toBe(screen.getByRole('heading', { name: 'Nessun dossier di lavoro' }));
+    expect(empty.innerHTML).not.toContain('--vlx-section-');
+    for (const svg of empty.querySelectorAll('svg')) expect(svg.closest('button')).not.toBeNull();
     expect(within(empty).getByRole('button', { name: 'Crea il tuo primo dossier' })).toHaveClass('min-h-[44px]', 'bg-primary-600');
     expect(within(empty).getByRole('button', { name: 'Pronti da LexCraft' })).toHaveClass('min-h-[44px]');
   });

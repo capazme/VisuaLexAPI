@@ -32,7 +32,7 @@ interface Options {
  * is cleared, its act unfolds (and folds again only when the user folds it), its row opens, comes into view without
  * moving the decision (`bringRowIntoView`; the link clicked is held where it was, `keepLinkAt`, the cleared search
  * having made the decision's column a scroller again), takes the focus and is ringed for 1.6 s (`flashedId`). Not held, a click offers the choice
- * (`CitedNormChoice`: Dashboard, or a dossier) and opens nothing by itself; the preview's button, «Apri su Dashboard»
+ * (`CitedNormChoice`: the Corpus, or a dossier) and opens nothing by itself; the preview's button, «Apri nel Corpus»
  * there, is already a choice, and goes to Dashboard as before.
  */
 export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, clearSearch }: Options) {

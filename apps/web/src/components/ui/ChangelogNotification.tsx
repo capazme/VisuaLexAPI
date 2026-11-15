@@ -19,7 +19,7 @@ import { focusPage } from '../../utils/focusPage';
  * with the focus on the body), to the page's `<main>` (`focusPage`), not the body. A screen reader hears the news from
  * a status region present from the first render (a region that arrives with its text is often not read).
  */
-export function ChangelogNotification() {
+export function ChangelogNotification({ inBar = false }: { inBar?: boolean } = {}) {
   const { currentVersion, hasNewVersion, lastSeenVersion, dismissNotification, showChangelog, setShowChangelog } =
     useVersionCheck();
   const still = useReducedMotion();
@@ -51,8 +51,25 @@ export function ChangelogNotification() {
         {shown && !showChangelog ? `Novità in v${currentVersion}` : ''}
       </div>
 
+      {/* LC21: from lg the news is a quiet word in the top bar, not a card floating over the page; reading it is dismissing it. */}
+      {inBar && shown && (
+        <button
+          type="button"
+          onClick={() => setShowChangelog(true)}
+          className={cn(
+            'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 px-3 text-xs font-semibold text-slate-700',
+            'hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
+            TRANSITION,
+            FOCUS_RING,
+          )}
+        >
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-600 dark:bg-amber-400" />
+          Novità in v{currentVersion}
+        </button>
+      )}
+
       <AnimatePresence>
-        {shown && !showChangelog && (
+        {!inBar && shown && !showChangelog && (
           <motion.div
             initial={away}
             animate={still ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}

@@ -59,7 +59,11 @@ import { lastActTitle, resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
+import { DossierAttiPanel } from '../atti/DossierAttiPanel';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
+
+const VIEW_PANEL = 'dossier-view';
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { kindLabel } from './dossierKinds';
@@ -110,6 +114,10 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const navigate = useNavigate();
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  // The view shown (LC21): the sources, or the dossier's tasks.
+  // `?vista=atti`: the way back from an act lands on the dossier's acts.
+  const [view, setView] = useState<'fonti' | 'atti' | 'compiti'>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
+  const [attiCount, setAttiCount] = useState<number | null>(null);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -571,7 +579,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         className={rowPrimary}
       >
         <ExternalLink size={16} aria-hidden />
-        <span>Apri tutto<span className="hidden sm:inline"> su Dashboard</span></span>
+        <span>Apri tutto<span className="hidden sm:inline"> nel Corpus</span></span>
       </button>
       <MenuButton
         label="Aggiungi"
@@ -623,12 +631,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   return (
     // The dossier its entries' readers ask the server about (D7b's proposals).
     <CurrentDossierContext.Provider value={dossier.id}>
-    <div className="animate-in slide-in-from-right-10 duration-200">
-      {/* The way back, one control at every width (S7c), over the frame. */}
+    <div>
+      {/* The way back (S7c), over the frame, below lg; from lg the top bar's path is the way back (LC21). No entrance: a
+          page opened tens of times a day does not slide in. */}
       <button
         type="button"
         onClick={onBack}
-        className={cn('-ml-2 mb-2 inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
+        className={cn('-ml-2 mb-2 inline-flex lg:hidden min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
       >
         <ArrowLeft size={18} aria-hidden /> Torna ai dossier
       </button>
@@ -667,9 +676,29 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           <div className="pt-2">{actions}</div>
         </div>
 
-        {/* The dossier's tasks (the planner, wave 1), before its entries. */}
-        <DossierTasksPanel dossierId={dossier.id} />
-
+        {/* LC21: the dossier's views as tabs, as the prototype: «Fonti» (its norms, decisions and notes), «Atti» (Luca, 15-11) and «Compiti».
+            Both stay mounted, the other hidden, so a selection or a task being written survives the switch. */}
+        <SegmentedTabs
+          tabs={[
+            { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
+            { id: 'atti', label: 'Atti', extra: attiCount === null ? undefined : <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{attiCount}</span> },
+            { id: 'compiti', label: 'Compiti' },
+          ]}
+          value={view}
+          onChange={setView}
+          label="Viste del dossier"
+          panelId={VIEW_PANEL}
+          className="mb-6 w-fit max-w-full"
+          tabClassName="gap-2 px-4"
+        />
+        <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`}>
+        <div hidden={view !== 'compiti'}>
+          <DossierTasksPanel dossierId={dossier.id} />
+        </div>
+        <div hidden={view !== 'atti'}>
+          <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
+        </div>
+        <div hidden={view !== 'fonti'}>
         {dossier.items.length > 0 && (
           <div className="mb-4 flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
@@ -818,6 +847,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             showToast={showToast}
           />
         )}
+        </div>
+        </div>
 
         {moveToModalOpen && (
           <MoveToDossierModal

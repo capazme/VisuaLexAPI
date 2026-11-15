@@ -458,8 +458,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
 - `components/layout/` — `Layout`, `Sidebar`, `PageFrame`, `frame.ts`. **The frame** (U1, L-46 and L-47, 5 Nov 2026:
   one frame, one reading measure, the room left over to columns): `Layout`'s content area is the window less its
   margins (`PAGE_FRAME`: 16 px, 32 from `md`, 48 from 1536 px, padding outside the frame, `box-content`), at most
-  1600 px (`max-w-frame`) and 2400 px in full screen (`max-w-frame-full`), the theme's `--container-frame*` tokens; the
-  padding above and below stays 16/32 px (`h-app-row` is measured against it). **The full screen** (`settings.focusMode`,
+  1056 px since LC21 (`max-w-frame`, the prototype's sheet; it was 1600) and 2400 px in full screen (`max-w-frame-full`), the theme's `--container-frame*` tokens; the
+  padding above and below stays 16/32 px on the search page (`h-app-row` is measured against it), 40 over and 96 under from `lg` elsewhere (LC21). **The full screen** (`settings.focusMode`,
   the button at the top right and ⌘⇧F, Ctrl+Shift+F outside a Mac — not ⌘Space, which opens Spotlight; without Shift,
   F is the find window's) widens, never narrows: it takes the sidebar and the search page's field away
   (⌘K stays) and gives their room to the frame; the narrow column for reading lives in Study Mode alone. The button is
@@ -486,7 +486,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
   (`PAGE_TITLE`: EB Garamond, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
-  small (`kicker`: «Learn · la tua palestra giuridica», `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
+  small (`kicker`: «Learn», the name alone since 15 Nov 2026, `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
   22 October 2026) —, the sentence under it (`line`, a short line:
   `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
   a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button and
@@ -509,11 +509,17 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   and fails on a title of their own, an icon in an `h1` or a cap of their own (`max-w-3xl` and up). `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
   the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. Nothing floats at the page's foot
-  since D-253: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
+  since D-253. **From `lg` (LC21) nothing floats**: `TopBar` (`components/layout/TopBar.tsx`, 52 px, every page but the search page,
+  the lesson and the full screen) draws the path («Work › Dossier › Pratica …», the page's `h1` as its last step on a page deeper
+  than its list), the compact search (it opens the palette), «Novità in vX» (`ChangelogNotification inBar`), «Commenti» and
+  «Tutto schermo», in line; on the search page too, with «Work › Corpus» («Ricerca» in the other sections) and the
+  search field itself, compact (`SearchField compact`), in the search button's place; the practice's columns then take
+  the 52 px bar off their height (`--search-bar-height: 3.25rem`). Below `lg` the search page keeps its own bar, the field. What follows holds below
+  `lg` and in full screen: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
   for someone signed in, left of «Tutto schermo» with 8 px between: `right-[4.25rem]` at `top-4` from `lg` and in full
   screen, `right-14` in the bar's right end between `md` and `lg`, whose `PhoneTopBar` and search field keep
   `md:pr-[10.5rem]`, 8 px of air at 768 (LC4: it was 9.75, the field and the lens 3 px under «Commenti»), the search
-  field `lg:pr-[11rem]` too); the `--page-foot` room it kept is gone, and a page sized to
+  field's own bar); the `--page-foot` room it kept is gone, and a page sized to
   the window takes the plain 2 rem foot off its height (`GraphExplorerPage`, `DocumentReviewPage`'s columns). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum — on screen Work, Learn, Labs and Forum, with no «VisuaLex» before them (D-137, D-157; the ids
@@ -527,7 +533,9 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   stone, 1.5 s) once a browser session, as the shell first draws (`Layout`, `visualex-logo-sweep` in
   `sessionStorage`), and in the phone's drawer at its first opening in the session (`visualex-logo-sweep-drawer`,
   LC18), never in the rail; the sign-in page's intro plays once a browser session too (`visualex-logo-intro`), held
-  still in its box after «Esci» (`LexCraftLogo`'s `played`); `SectionSwitcher`: under it, at the top of the sidebar,
+  still in its box after «Esci» (`LexCraftLogo`'s `played`); since LC21, where the bar has words (from `xl`, the phone's drawer) the sections are
+  a row of tabs under the logo (`features/sections/SectionTabs.tsx`: Work, Learn, Forum, Labs where it is on; the active one a stone tile,
+  `aria-current`), and only the rail keeps `SectionSwitcher`: under it, at the top of the sidebar,
   `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
   Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
   the section's name — from `xl` and in the phone's drawer — a split button (S6): the mark and the name go to the
@@ -583,7 +591,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Work's five entries (D-315, LC8), exactly, in this order, «Oggi» (the home, `/work/oggi`,
   with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the
-  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» and
+  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» `soon` (since LC21 the web draws no «Anonimizzatore» entry: it is the desktop app's, D-324; its
+  address still answers) — as they were, «Atti» and
   «Anonimizzatore» `soon` (`NavItem`: «in arrivo» under the word, 11 px, in the rail's hover label and in the name, «Atti, in
   arrivo»; each opens a plain page, `/work/atti` and `/work/anonimizzatore`, two lines in Work's frame, `ComingSoon` in
   `App.tsx`; the Anonimizzatore's says it will come in the desktop app, D-324). «Prossimi giorni» and «Lista d'ingresso»
@@ -598,7 +607,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community». The sections'
   phrases (the owner's, 19 Oct 2026: «la tua palestra giuridica», «la tua officina giuridica», «il luogo del dibattito
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
-  `sectionKicker`'s «Work · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
+  `sectionKicker`'s «Work» (the name alone since 15 Nov 2026: the owner dropped the phrase over the titles), `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
   d'ingresso», «Cestino dei compiti», «Atti», «Anonimizzatore», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
   fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
@@ -645,7 +654,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
   services' dot), in the middle — as iOS's large titles (G8) — nothing while the page's `h1` is in sight under the bar
-  (it says the name already: no «Learn» over «Learn · la tua palestra giuridica»), the page's name in EB Garamond
+  (it says the name already: no second «Learn» over it), the page's name in EB Garamond
   once it has scrolled out, faded in over 150 ms (`motion-safe:` only), on every page (`usePageTitleInView`: an
   `IntersectionObserver` on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver`
   finding a title drawn later; a page with no `h1`, or a browser with no observer, has the name at once; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
@@ -1720,8 +1729,7 @@ one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the
 up to what the subject's read allows, never the rest of the subject), with «Torna a Oggi» a quiet link under it; else
 «Torna a Oggi» alone.
 
-**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/learn/ripasso`, titled «Oggi» under «Learn · la tua
-palestra giuridica» — L-37; the section switcher keeps «Learn»; spec
+**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/learn/ripasso`, titled «Oggi» under «Learn» — L-37; the section switcher keeps «Learn»; spec
 `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, as rewritten for G1b and G8, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
 `GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
@@ -3082,8 +3090,7 @@ meant to stay split; add new features as new files, not inside the shells:
   there are none — on one row on a computer, half and half under the search on
   a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: an EB Garamond title, the
   counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
-  always there at 44 px; with no dossier, a composed empty state with
-  `DossierMark.tsx`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  always there at 44 px; with no dossier, a composed empty state, words and two actions, no drawing since LC21), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
   (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),
@@ -3204,8 +3211,8 @@ meant to stay split; add new features as new files, not inside the shells:
   Chiudi la finestra», so one subject has one mounted reading surface, T5 — a guard the two views no longer reach,
   kept and tested in `PracticeRowShell.test.tsx`; on a phone it opens the
   full-screen reader, icon-only so the row's name keeps its width, and no row ever folds));
-  `PracticeBar` + `PracticeChip` (the bar of practices, `fixed bottom-6` at the column's left, beside the sidebar
-  (`--sidebar-width`), not over the middle of the text, R3; `Z_INDEX.dock`, `#tour-practice-bar`; a «⋯» per chip);
+  `PracticeBar` + `PracticeChip` (the bar of practices: since LC21 a still row of tabs over the reading columns, in the page's flow,
+  `#tour-practice-bar`, reporting a height of 0; it was a card `fixed bottom-6`; a «⋯» per chip);
   `PracticePhoneView` (the phone's table: its head, `PhonePracticeHead`, one row, is the practice's name with «▾» — a
   tap lists the practices with «Nuova pratica»; R3 took the carousel's chevrons and dots away —, the count after it,
   which gives way first, «Salva come dossier» as a 44 px icon and its «⋯» (`usePracticeSaveActions`); with all of R3

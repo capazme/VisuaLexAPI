@@ -60,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione principale',
-            description: 'In Work trovi Oggi (con le schede Prossimi giorni e Lista d\'ingresso), Corpus (la ricerca, da cui si apre anche l\'analisi di un documento), i Dossier, e Atti e Anonimizzatore in arrivo. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In Work trovi Oggi (con le schede Prossimi giorni e Lista d\'ingresso), Corpus (la ricerca, da cui si apre anche l\'analisi di un documento), i Dossier e gli Atti, dove scrivi un atto con le fonti del suo dossier accanto. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
@@ -187,7 +187,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card-actions',
         popover: {
             title: 'Azioni rapide sulla scheda',
-            description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier sulla Dashboard senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
+            description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier nel Corpus senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
             side: 'left',
             align: 'center',
         }
