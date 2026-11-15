@@ -149,7 +149,9 @@ export function Modal({
                     'border-b border-slate-100 dark:border-slate-800'
                   )}
                 >
-                  {icon && (
+                  {/* LC21: an icon beside the title only where its colour says something (danger, success); a grey or ink
+                      tile beside «Impostazioni» was decoration. */}
+                  {icon && (variant === 'danger' || variant === 'success') && (
                     <div
                       className={cn(
                         'shrink-0 flex items-center justify-center w-10 h-10 rounded-lg',
@@ -166,7 +168,7 @@ export function Modal({
                       {title && (
                         <h2
                           id={titleId}
-                          className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+                          className="font-serif text-[22px] font-normal leading-tight text-slate-900 dark:text-slate-100"
                         >
                           {title}
                         </h2>

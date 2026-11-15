@@ -187,7 +187,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card-actions',
         popover: {
             title: 'Azioni rapide sulla scheda',
-            description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier sulla Dashboard senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
+            description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier nel Corpus senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
             side: 'left',
             align: 'center',
         }

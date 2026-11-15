@@ -24,7 +24,7 @@ import { appStore } from '../../../store/useAppStore';
 import { Layout } from '../Layout';
 
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
-const INSET = ['pt-[calc(4.5rem+env(safe-area-inset-top))]', 'md:pt-[calc(4.5rem+env(safe-area-inset-top))]', 'lg:pt-8'];
+const INSET = ['pt-[calc(4.5rem+env(safe-area-inset-top))]', 'md:pt-[calc(4.5rem+env(safe-area-inset-top))]', 'lg:pt-10'];
 
 beforeEach(() => {
   appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false }, commandPaletteOpen: false }));
@@ -102,7 +102,8 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
     at('/');
     expect(screen.queryByTestId('phone-top-bar')).toBeNull();
     expect(within(screen.getByTestId('search-bar')).getByRole('button', { name: 'Apri il menu' })).toBeInTheDocument();
-    for (const cls of INSET) expect(screen.getByTestId('layout-content')).not.toHaveClass(cls);
+    // `lg:pt-10` is every page's from lg (LC21); the phone's inset is what is left out.
+    for (const cls of INSET.slice(0, 2)) expect(screen.getByTestId('layout-content')).not.toHaveClass(cls);
   });
 
   it('draws no bar under Gymnasium\'s lesson, which covers the shell', () => {
@@ -120,7 +121,8 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
     at('/dossier');
     expect(screen.queryByTestId('phone-top-bar')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Apri il menu' })).toBeNull();
-    for (const cls of INSET) expect(screen.getByTestId('layout-content')).not.toHaveClass(cls);
+    // `lg:pt-10` is every page's from lg (LC21); the phone's inset is what is left out.
+    for (const cls of INSET.slice(0, 2)) expect(screen.getByTestId('layout-content')).not.toHaveClass(cls);
   });
 });
 

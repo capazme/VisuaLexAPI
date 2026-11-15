@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Layers, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import {
   DndContext,
   KeyboardSensor,
@@ -14,7 +14,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useCompare } from '../../../hooks/useCompare';
 import { cn } from '../../../lib/utils';
-import { Z_INDEX } from '../../../constants/zIndex';
 import { closeAllPracticesWithUndo } from './practiceUndo';
 import { PracticeChip } from './PracticeChip';
 
@@ -33,8 +32,7 @@ const HEADER_BUTTON =
  * it is not drawn — so the column keeps its last row clear of it (spec §3.4).
  */
 export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: number | null) => void } = {}) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [barNode, setBarNode] = useState<HTMLDivElement | null>(null);
+  const [barNode, setBarNode] = useState<HTMLElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const ids = useAppStore(useShallow((s) => s.practices.map((p) => p.id)));
   const activePracticeId = useAppStore((s) => s.activePracticeId);
@@ -56,7 +54,8 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
       onHeightChange(null);
       return undefined;
     }
-    const measure = () => onHeightChange(barNode.offsetHeight);
+    // Nothing floats over the column since LC21: the room it keeps at its foot is the fallback's least.
+    const measure = () => onHeightChange(0);
     measure();
     if (typeof ResizeObserver === 'undefined') return () => onHeightChange(null);
     const observer = new ResizeObserver(measure);
@@ -75,84 +74,54 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
   };
 
   const newPractice = () => {
-    setIsExpanded(true);
     setEditingId(createPractice(NEW_PRACTICE_LABEL, { activate: true }));
   };
 
   const count = `${ids.length} ${ids.length === 1 ? 'pratica' : 'pratiche'}`;
 
   return (
-    <>
-      {/* At the bottom left of the column, beside the sidebar, not over the middle of the text (R3). */}
-      <div ref={setBarNode} id="tour-practice-bar" className={cn('fixed bottom-6 left-[calc(var(--sidebar-width,0px)+1.5rem)]', Z_INDEX.dock)}>
-        {!isExpanded ? (
-          <button
-            type="button"
-            onClick={() => setIsExpanded(true)}
-            aria-expanded={false}
-            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-lg transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            <Layers size={18} aria-hidden className="text-primary-500" />
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{count}</span>
-            <ChevronUp size={14} aria-hidden className="text-slate-400" />
-          </button>
-        ) : (
-          <nav
-            aria-label="Pratiche"
-            className="rounded-2xl border border-slate-200/60 bg-white/95 shadow-md ring-1 ring-black/5 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
-          >
-            <div className="flex items-center justify-between gap-4 rounded-t-2xl border-b border-slate-200/60 bg-slate-50/50 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
-              <div className="flex items-center gap-2">
-                <Layers size={14} aria-hidden className="text-primary-500" />
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Pratiche</span>
-                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  {ids.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button type="button" onClick={newPractice} className={HEADER_BUTTON}>
-                  <Plus size={14} aria-hidden />
-                  Nuova pratica
-                </button>
-                <button
-                  type="button"
-                  onClick={closeAllPracticesWithUndo}
-                  aria-label="Chiudi tutte le pratiche"
-                  title="Chiudi tutte"
-                  className={cn(HEADER_BUTTON, 'hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30')}
-                >
-                  <X size={14} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsExpanded(false)}
-                  aria-label="Comprimi la barra delle pratiche"
-                  aria-expanded
-                  className={HEADER_BUTTON}
-                >
-                  <ChevronDown size={14} aria-hidden />
-                </button>
-              </div>
-            </div>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-                {/* Wraps rather than scrolls: a scrolling row would clip the chips' menus. */}
-                <div className="flex max-w-[calc(100vw-var(--sidebar-width,0px)-3rem)] flex-wrap gap-2 p-3">
-                  {ids.map((id) => (
-                    <PracticeChip
-                      key={id}
-                      practiceId={id}
-                      isActive={id === activePracticeId}
-                      editing={editingId === id}
-                      onEditingChange={(editing) => setEditingId(editing ? id : null)}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </nav>
-        )}
+    // LC21: a row of tabs over the reading columns, in the page's flow, where it floated as a card at the bottom left
+    // (the prototype has nothing floating over the text). It scrolls away with the page and the columns, sticky, stay.
+    <nav
+      ref={setBarNode}
+      id="tour-practice-bar"
+      aria-label="Pratiche"
+      className="mb-4 flex min-w-0 items-center gap-3 border-b border-slate-200 pb-3 dark:border-slate-800"
+    >
+      <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-400">
+        Pratiche <span className="sr-only">({count})</span>
+      </span>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+          {/* Wraps rather than scrolls: a scrolling row would clip the chips' menus. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {ids.map((id) => (
+              <PracticeChip
+                key={id}
+                practiceId={id}
+                isActive={id === activePracticeId}
+                editing={editingId === id}
+                onEditingChange={(editing) => setEditingId(editing ? id : null)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+      <div className="flex shrink-0 items-center gap-1">
+        <button type="button" onClick={newPractice} className={HEADER_BUTTON}>
+          <Plus size={14} aria-hidden />
+          Nuova pratica
+        </button>
+        <button
+          type="button"
+          onClick={closeAllPracticesWithUndo}
+          aria-label="Chiudi tutte le pratiche"
+          title="Chiudi tutte"
+          className={cn(HEADER_BUTTON, 'hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30')}
+        >
+          <X size={14} aria-hidden />
+        </button>
       </div>
-    </>
+    </nav>
   );
 }

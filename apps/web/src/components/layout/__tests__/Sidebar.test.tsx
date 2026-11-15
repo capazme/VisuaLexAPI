@@ -97,7 +97,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar('/');
-    expect(navHrefs()).toEqual(['/work/oggi', '/', '/dossier', '/work/atti', '/work/anonimizzatore']);
+    expect(navHrefs()).toEqual(['/work/oggi', '/', '/dossier', '/work/atti']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {

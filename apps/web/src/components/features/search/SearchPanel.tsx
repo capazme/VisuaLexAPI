@@ -646,6 +646,8 @@ export function SearchPanel() {
       <PracticeNotice />
       {isDesktop ? (
         <>
+          {/* The practices' tabs, over the columns (LC21). */}
+          <PracticeBar onHeightChange={setPracticeBarHeight} />
           <div
             id={WORKSPACE_AREA_ID}
             className="w-full"
@@ -654,7 +656,6 @@ export function SearchPanel() {
           >
             <ReadingRow onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
           </div>
-          <PracticeBar onHeightChange={setPracticeBarHeight} />
         </>
       ) : (
         <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />

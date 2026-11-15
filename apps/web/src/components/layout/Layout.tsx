@@ -32,6 +32,7 @@ import { spring } from '../../lib/motion';
 import { SECTIONS, sectionForPath } from '../../features/sections/sections';
 import { sectionStore } from '../../features/sections/useSection';
 import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
+import { TopBar } from './TopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
 import { openSearchMenu } from '../../utils/searchFieldControl';
@@ -123,7 +124,7 @@ export function Layout() {
   const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const onSearchPage = pathname === '/';
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
@@ -134,7 +135,8 @@ export function Layout() {
   const inLesson = /^\/learn\/ripasso\/sessione(\/|$)/.test(pathname);
   const showPhoneBar = !onSearchPage && !settings.focusMode && !inLesson;
   const storedSection = sectionStore((s) => s.section);
-  const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'LexCraft';
+  const activeSection = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection)) ?? SECTIONS[0];
+  const sectionName = activeSection.name;
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [phoneBarElement, setPhoneBarElement] = useState<HTMLElement | null>(null);
   const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname, bar: phoneBarElement });
@@ -161,7 +163,13 @@ export function Layout() {
   // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or an
   // overlay over the drawer (a modal dialog, a sheet, the palette) is theirs. Only while the drawer is drawn: a window
   // widened past `lg` with it open hides it by CSS and keeps the state, and its Esc belongs to the page (gotcha 26).
-  const drawerDrawn = !useMediaQuery('(min-width: 1024px)');
+  const lgUp = useMediaQuery('(min-width: 1024px)');
+  const drawerDrawn = !lgUp;
+  // LC21: from lg every page but the search page and the lesson has the top bar, which holds the controls that floated
+  // («Commenti», «Tutto schermo») and the version's news; the search page's own bar holds them too. In full screen and
+  // below lg they float as before.
+  const showTopBar = lgUp && showPhoneBar;
+  const controlsInBar = lgUp && !settings.focusMode && !inLesson;
   useEffect(() => {
     if (!sidebarOpen || !drawerDrawn) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -293,6 +301,26 @@ export function Layout() {
     return () => window.removeEventListener('keydown', handler);
   }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage]);
 
+  // The controls of the top bar (LC21): the version's news, «Commenti», «Tutto schermo», compact and in line.
+  const barControls = (
+    <>
+      <ChangelogNotification inBar />
+      {isAuthenticated && <FeedbackButton onOpen={() => setFeedbackOpen(true)} className="h-8 px-3 text-[13px] shadow-none" />}
+      <button
+        type="button"
+        onClick={() => updateSettings({ focusMode: true })}
+        id="tour-focus-toggle"
+        aria-label="Tutto schermo"
+        aria-pressed={false}
+        aria-keyshortcuts={FULL_SCREEN_KEYS}
+        title={`Tutto schermo (${FULL_SCREEN_SHORTCUT})`}
+        className="grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+      >
+        <Maximize2 size={16} aria-hidden />
+      </button>
+    </>
+  );
+
   return (
     <div
       className="h-app overflow-hidden flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300"
@@ -372,7 +400,7 @@ export function Layout() {
         {/* «Commenti» (D-253), for a signed-in user from md: left of «Tutto schermo», 8 px from it, at its height and
             in the same places — in the bar's right end between md and lg, at the window's top right from lg and in full
             screen. Below md it is the user menu's «Commenti» (M1). */}
-        {isAuthenticated && (
+        {isAuthenticated && !controlsInBar && (
           <FeedbackButton
             onOpen={() => setFeedbackOpen(true)}
             className={cn(
@@ -384,7 +412,7 @@ export function Layout() {
 
         {/* The full screen (U1, L-47: `focusMode` in the settings): it widens the frame, never narrows it. A toggle, so
             its name stays «Tutto schermo» and `aria-pressed` says the state; the `title` says what a press does. */}
-        <motion.button
+        {!controlsInBar && <motion.button
           type="button"
           whileHover={reduceMotion ? undefined : { scale: 1.05 }}
           whileTap={reduceMotion ? undefined : { scale: 0.95 }}
@@ -406,7 +434,9 @@ export function Layout() {
           title={settings.focusMode ? `Esci dal tutto schermo (${FULL_SCREEN_SHORTCUT})` : `Tutto schermo (${FULL_SCREEN_SHORTCUT})`}
         >
           {settings.focusMode ? <Minimize2 size={20} aria-hidden /> : <Maximize2 size={20} aria-hidden />}
-        </motion.button>
+        </motion.button>}
+
+        {showTopBar && <TopBar section={activeSection} pathname={pathname} search={search} scroller={scroller} actions={barControls} onSearch={openCommandPalette} />}
 
         {showPhoneBar && (
           <PhoneTopBar
@@ -429,11 +459,13 @@ export function Layout() {
             // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
             className={cn(
               'relative flex h-[var(--search-bar-height)] flex-shrink-0 items-center justify-center gap-1 border-b', Z_INDEX.dropdown,
-              'border-slate-200 bg-white/80 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[10.5rem] lg:pl-8 lg:pr-[11rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-900/80',
+              // LC21: the page's own ground, as the top bar of the other pages: no white band over the stone.
+              'border-slate-200 bg-slate-50/90 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[10.5rem] lg:pl-8 lg:pr-[17rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-950/90',
             )}
           >
             <MenuToggle {...menuToggle} />
             <SearchField />
+            {controlsInBar && <div className="absolute right-6 top-1/2 flex -translate-y-1/2 items-center gap-2">{barControls}</div>}
           </div>
         )}
 
@@ -455,16 +487,16 @@ export function Layout() {
             // The frame (U1): the window less its margins, at most 1600 px; 2400 in full screen, which gives the content
             // the room of the sidebar and of the search page's field, and on a page that declares itself `full`
             // (`frame.ts`). The padding above and below does not change: the practice row is measured against it.
-            PAGE_FRAME, 'py-4 md:py-8',
+            PAGE_FRAME, 'py-4 md:py-8', !onSearchPage && 'lg:pt-10 lg:pb-24',
             settings.focusMode ? 'max-w-frame-full' : cn('max-w-frame', FULL_PAGE_FRAME),
             // Where «Commenti» and the full-screen button float over the page's top right, the room they take, which a
             // top row keeps clear (`FOCUS_BUTTON_CLEARANCE`): from md in full screen, which draws no bar for them to sit
             // in; from lg otherwise; never over the search page's field, which ends before them. 11 rem: the toggle's
             // 60 px from the edge, 8 of gap, about 96 for «Commenti» and 8 of air.
-            settings.focusMode ? 'md:[--focus-button-room:11rem]' : !showSearchBar && 'lg:[--focus-button-room:11rem]',
+            settings.focusMode && 'md:[--focus-button-room:11rem]',
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
             // md:py-8 wins).
-            showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
+            showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-10',
           )}>
             <RoutePage>
               <Outlet />
@@ -481,7 +513,7 @@ export function Layout() {
       <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       {/* Version changelog notification */}
-      <ChangelogNotification />
+      {!controlsInBar && <ChangelogNotification />}
 
       {/* Global Undo Toast Container */}
       <NotificationHost />

@@ -17,9 +17,9 @@ import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
-/** Work's five entries (D-315): Oggi, Corpus, Dossier, Atti, Anonimizzatore. The planner's other two views are tabs of
- *  Work's page, the Corpus tools links of the search page (LC8). */
-const OPUS_HREFS = ['/work/oggi', '/', '/dossier', '/work/atti', '/work/anonimizzatore'];
+/** Work's four entries (D-315, LC21): Oggi, Corpus, Dossier, Atti. The planner's other two views are tabs of Work's page,
+ *  the Corpus tools links of the search page (LC8); the Anonimizzatore is the desktop app's, with no entry on the web. */
+const OPUS_HREFS = ['/work/oggi', '/', '/dossier', '/work/atti'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -178,12 +178,13 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Work: exactly Oggi, Corpus, Dossier, Atti and Anonimizzatore, in this order (D-315)', () => {
+  it('Work: exactly Oggi, Corpus, Dossier and Atti, in this order (D-315); no «Anonimizzatore» on the web (LC21)', () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti, in arrivo', 'Anonimizzatore, in arrivo']);
+    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti, in arrivo']);
+    expect(screen.queryByRole('link', { name: /Anonimizzatore/ })).toBeNull();
     // Corpus is Work's way to the search: no «Ricerca» above it.
     expect(screen.queryByRole('link', { name: 'Ricerca' })).toBeNull();
   });
@@ -201,7 +202,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     unsubscribe();
   });
 
-  it('Work: «Atti» and «Anonimizzatore» say «in arrivo», to the eye and to a screen reader, and open their pages', () => {
+  it('Work: «Atti» says «in arrivo», to the eye and to a screen reader, and opens its page', () => {
     render(
       <MemoryRouter initialEntries={['/work/oggi']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
@@ -210,7 +211,6 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     const acts = screen.getByRole('link', { name: 'Atti, in arrivo' });
     expect(acts).toHaveAttribute('href', '/work/atti');
     expect(acts).toHaveTextContent(/^Attiin arrivo$/);
-    expect(screen.getByRole('link', { name: 'Anonimizzatore, in arrivo' })).toHaveAttribute('href', '/work/anonimizzatore');
   });
 
   it('marks the active entry with the column, one in the whole bar', () => {
@@ -228,19 +228,29 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   // 11.3 px of its box) sits 7.5 px left of the row, so from 7.2 to 13.8 px of the bar: 7.2 px from the bar's edge and
   // 7.2 px from the icon's box (21 px). The row no longer clips it (no `overflow-hidden`).
   it('keeps the column clear of the icon: the 16 px mark, 7.5 px left of the row, which does not clip it', () => {
-    for (const layout of ['wide', 'rail', 'drawer'] as const) {
-      render(
-        <MemoryRouter initialEntries={['/work/oggi']}>
-          <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
-        </MemoryRouter>,
-      );
-      const today = screen.getByRole('link', { name: 'Oggi' });
-      const mark = today.querySelector('svg.vlx-book')!;
-      expect(mark).toHaveAttribute('width', '16');
-      expect(mark.parentElement).toHaveClass('absolute', '-left-[7.5px]');
-      expect(today).not.toHaveClass('overflow-hidden');
-      cleanup();
-    }
+    render(
+      <MemoryRouter initialEntries={['/work/oggi']}>
+        <Sidebar theme="light" isOpen layout="rail" serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const today = screen.getByRole('link', { name: 'Oggi' });
+    const mark = today.querySelector('svg.vlx-book')!;
+    expect(mark).toHaveAttribute('width', '16');
+    expect(mark.parentElement).toHaveClass('absolute', '-left-[7.5px]');
+    expect(today).not.toHaveClass('overflow-hidden');
+  });
+
+  // LC21: with words the active row is its tile alone; the sliding column is the rail's.
+  it.each(['wide', 'drawer'] as const)('draws no column with words (%s): the active row is marked by its tile', (layout) => {
+    render(
+      <MemoryRouter initialEntries={['/work/oggi']}>
+        <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const today = screen.getByRole('link', { name: 'Oggi' });
+    expect(today).toHaveAttribute('aria-current', 'page');
+    expect(today).toHaveClass('bg-primary-50');
+    expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(0);
   });
 
   it('keeps «Oggi» lit on the planner\'s other views and the trash, «Corpus» on the Corpus tools, in Work', () => {
@@ -301,13 +311,13 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByRole('group', { name: 'Forum' })).toHaveClass('border-t');
   });
 
-  it('writes «in arrivo» under the name, so «Anonimizzatore» keeps its whole width', () => {
+  it('writes «in arrivo» under the name, so the name keeps its whole width', () => {
     render(
       <MemoryRouter initialEntries={['/work/oggi']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const tag = within(screen.getByRole('link', { name: 'Anonimizzatore, in arrivo' })).getByText('in arrivo');
+    const tag = within(screen.getByRole('link', { name: 'Atti, in arrivo' })).getByText('in arrivo');
     expect(tag).toHaveClass('block', 'text-[11px]');
   });
 
@@ -881,6 +891,7 @@ describe('Sidebar — the words', () => {
   function renderLayout(layout: 'rail' | 'wide' | 'drawer', path = '/', onToggleWide?: () => void) {
     render(
       <MemoryRouter initialEntries={[path]}>
+        <Where />
         <Sidebar theme="light" isOpen layout={layout} onToggleWide={onToggleWide} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
@@ -896,20 +907,32 @@ describe('Sidebar — the words', () => {
     const forum = screen.getByRole('link', { name: 'Dossier pubblici, 3 notifiche' });
     expect(forum).toHaveTextContent(/^Dossier pubblici3$/);
     expect(screen.getByRole('link', { name: 'Community' })).toHaveTextContent(/^Community$/);
-    // The section is named beside its mark, on the split button's left part, which goes to its home (S6).
-    expect(screen.getByRole('button', { name: 'Vai a Forum: Dossier pubblici' })).toHaveTextContent('Forum');
-    expect(screen.getByRole('button', { name: 'Cambia sezione' })).toHaveAttribute('aria-haspopup', 'menu');
+    // The sections are a row of tabs (LC21); the active one says it goes to its home (S6). No switcher menu.
+    const tabs = screen.getByRole('group', { name: 'Sezioni' });
+    expect(within(tabs).getAllByRole('button').map((b) => b.textContent)).toEqual(['Work', 'Learn', 'Forum']);
+    const current = within(tabs).getByRole('button', { name: 'Vai a Forum: Dossier pubblici' });
+    expect(current).toHaveAttribute('aria-current', 'true');
+    expect(within(tabs).getAllByRole('button').filter((b) => b.hasAttribute('aria-current'))).toEqual([current]);
+    expect(screen.queryByRole('button', { name: 'Cambia sezione' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Sezione:/ })).toBeNull();
+    // Rows of 36 px (44 in the drawer, a touch target), icons of 18.
+    const community = screen.getByRole('link', { name: 'Community' });
+    expect(community).toHaveClass(layout === 'drawer' ? 'h-11' : 'h-9');
+    expect(community.querySelector('svg')).toHaveAttribute('width', '18');
     // The username is shown, so the name carries it (label in name).
     expect(screen.getByRole('button', { name: 'Menu utente di tester' })).toHaveTextContent('tester');
   });
 
-  it('writes the group headings: the section, or Gymnasium\'s «Studia» and «Contribuisci»', () => {
+  it('writes no section name over its entries (it is on the tab above), only the other headings, as «Contribuisci»', () => {
     renderLayout('wide', '/dossier');
-    expect(within(screen.getByRole('group', { name: 'Work' })).getByText('Work')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Work' })).queryByText('Work')).toBeNull();
+    cleanup();
+    renderLayout('wide', '/forum');
+    expect(within(screen.getByRole('group', { name: 'Forum' })).queryByText('Forum')).toBeNull();
     cleanup();
     renderLayout('wide', '/learn/ripasso');
-    expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toBeInTheDocument();
-    expect(within(screen.getByRole('group', { name: 'Contribuisci' })).getByText('Contribuisci')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Learn' })).queryByText('Learn')).toBeNull();
+    expect(within(screen.getByRole('group', { name: 'Contribuisci' })).getByText('Contribuisci')).toHaveClass('uppercase', 'text-[11px]');
     cleanup();
     // The rail has no room for them.
     renderLayout('rail', '/learn/ripasso');
@@ -936,9 +959,48 @@ describe('Sidebar — the words', () => {
 
   it('draws its 11 px texts, the headings and the shortcut, in the colour that keeps AA (theme.test.ts)', () => {
     renderLayout('wide', '/learn/ripasso');
-    expect(within(screen.getByRole('group', { name: 'Learn' })).getByText('Learn')).toHaveClass(...SIDEBAR_SMALL_TEXT.split(' '));
+    expect(within(screen.getByRole('group', { name: 'Contribuisci' })).getByText('Contribuisci')).toHaveClass('text-[11px]', ...SIDEBAR_SMALL_TEXT.split(' '));
     const shortcut = screen.getByRole('link', { name: 'Ricerca' }).querySelector('kbd') as HTMLElement;
     expect(shortcut).toHaveClass('text-[11px]', ...SIDEBAR_SMALL_TEXT.split(' '));
+  });
+
+  it('offers Labs as a fourth tab in the development mode only, and a tab goes to its section\'s home', () => {
+    account.devMode = true;
+    renderLayout('drawer', '/work/oggi');
+    const tabs = screen.getByRole('group', { name: 'Sezioni' });
+    expect(within(tabs).getAllByRole('button').map((b) => b.textContent)).toEqual(['Work', 'Learn', 'Forum', 'Labs']);
+    expect(within(tabs).getByRole('button', { name: 'Vai a Work: Oggi' })).toHaveAttribute('aria-current', 'true');
+    // 44 px in the drawer, a touch target.
+    expect(within(tabs).getByRole('button', { name: 'Labs' })).toHaveClass('h-11');
+    fireEvent.click(within(tabs).getByRole('button', { name: 'Learn' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso');
+    expect(handlers.closeMobile).toHaveBeenCalled();
+  });
+
+  it('keeps the one switcher button in the rail, which four words would not fit', () => {
+    renderLayout('rail', '/forum');
+    expect(screen.queryByRole('group', { name: 'Sezioni' })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Sezione: Forum, cambia sezione/ })).toBeInTheDocument();
+  });
+
+  it.each(['wide', 'drawer'] as const)('keeps «Impostazioni» in sight at the foot (%s), between the user button and «Riduci»; it opens the settings and closes the drawer', (layout) => {
+    renderLayout(layout, '/', layout === 'wide' ? vi.fn() : undefined);
+    const settings = screen.getByRole('button', { name: 'Impostazioni' });
+    expect(settings).toHaveClass(layout === 'drawer' ? 'h-11' : 'h-9');
+    const user = screen.getByRole('button', { name: 'Menu utente di tester' });
+    expect(user.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    if (layout === 'wide') {
+      const narrow = screen.getByRole('button', { name: 'Riduci la barra laterale' });
+      expect(settings.compareDocumentPosition(narrow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    fireEvent.click(settings);
+    expect(handlers.openSettings).toHaveBeenCalledTimes(1);
+    expect(handlers.closeMobile).toHaveBeenCalled();
+  });
+
+  it('draws no «Impostazioni» button in the rail, which keeps it in the user menu', () => {
+    renderLayout('rail');
+    expect(screen.queryByRole('button', { name: 'Impostazioni' })).toBeNull();
   });
 
   it('shows no hover label where the word is written', () => {

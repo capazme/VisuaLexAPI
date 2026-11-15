@@ -182,7 +182,8 @@
      in, 1600 px; `max-w-frame-full`: the same in full screen and on a `full` page, 2400 px (`components/layout/frame.ts`).
      `max-w-measure`: a long text's column, 70 characters of its own font; `.vlx-art` reads it too, and the signs'
      container query writes its number (`theme.test.ts` keeps the two equal). */
-  --container-frame: 100rem;
+  /* LC21: the prototype's sheet (12 November), 1056 px of content: a working page reads as a page, not a dashboard. */
+  --container-frame: 66rem;
   --container-frame-full: 150rem;
   --container-measure: 70ch;
 }

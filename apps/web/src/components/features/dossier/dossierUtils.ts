@@ -30,7 +30,7 @@ export function formatTimestampLong(ts: string | number | undefined | null): str
 // One group = one norm (tipo + numero + data) in one version and one annex, and all its
 // articles in the dossier. Two versions of one article are two groups, never "1284,1284";
 // nor are art. 1 of annex A and art. 1 of the body of the same decree one request "1,1".
-// Used both by the detail view ("Apri tutti su Dashboard") and the list view
+// Used both by the detail view ("Apri tutti nel Corpus") and the list view
 // ("apri rapido dalla card"). `triggerSearch` in the store overwrites any
 // previous search, so the consuming UI must pick a single group to open at
 // once — see OpenOnDashboardPicker for the multi-group UX.

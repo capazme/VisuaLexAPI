@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
+import { Loader2, Search, ArrowRight, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
@@ -12,7 +12,7 @@ import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } from '../../../services/historyService';
 import { NormaChangesSection } from './NormaChangesSection';
-import { labelFromParams } from '../../../utils/sources';
+import { actHeading, labelFromParams } from '../../../utils/sources';
 import { DecisionHistoryRow } from './DecisionHistoryRow';
 import { PageFrame } from '../../layout/PageFrame';
 import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
@@ -55,6 +55,19 @@ function historyToSearchParams(item: SearchHistoryItem): SearchParams {
         version: 'vigente',
     };
 }
+
+// «2056,2057,2058» as the server keeps it, read as «2056, 2057, 2058» (B8).
+const articlesOf = (item: SearchHistoryItem) => item.article?.toString().split(',').map((a) => a.trim()).filter(Boolean).join(', ') ?? '';
+
+// The row's title: the norm as it is cited, «art. 2043 c.c.», «artt. 2056, 2057 c.c.» (B8).
+function historyLabel(item: SearchHistoryItem): string {
+    const articles = articlesOf(item);
+    const label = labelFromParams({ act_type: item.act_type ?? '', act_number: item.act_number, date: item.date, article: articles });
+    return articles.includes(',') ? label.replace(/^art\. /, 'artt. ') : label;
+}
+
+// The row's second line: the act by its name («Codice civile») or its citation.
+const actHeadingOf = (item: SearchHistoryItem) => actHeading({ tipo_atto: item.act_type ?? '', numero_atto: item.act_number, data: item.date });
 
 // A quick norm is suggested with the norm's short label, the act's with no article (source convention).
 function generateQuickNormLabel(item: SearchHistoryItem): string {
@@ -410,21 +423,13 @@ export function HistoryView() {
                                 <div key={key} className="relative">
                                     {/* Date label with timeline line */}
                                     {/* Mobile: smaller, simpler date label */}
-                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-1 z-10">
-                                        <div className="flex items-center gap-1.5 bg-primary-50 dark:bg-primary-900/30 px-2.5 py-1 rounded-full">
-                                            <Calendar size={12} className="text-primary-600 dark:text-primary-400" />
-                                            <span className="text-xs font-bold text-primary-600 dark:text-primary-400">{label}</span>
-                                        </div>
-                                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-slate-50 dark:bg-slate-950 py-1 z-10">
+                                        <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-400">{label}</h2>
                                     </div>
 
                                     {/* Desktop: full date label */}
-                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-2 z-10">
-                                        <div className="flex items-center gap-2 bg-primary-50 dark:bg-primary-900/30 px-3 py-1.5 rounded-full">
-                                            <Calendar size={14} className="text-primary-600 dark:text-primary-400" />
-                                            <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{label}</span>
-                                        </div>
-                                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-slate-50 dark:bg-slate-950 py-2 z-10">
+                                        <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-400">{label}</h2>
                                     </div>
 
                                     {/* Timeline items */}
@@ -448,17 +453,10 @@ export function HistoryView() {
                                                     <span className="flex items-start justify-between gap-2">
                                                         <span className="block flex-1 min-w-0">
                                                             <span className="flex items-center gap-1.5 mb-1">
-                                                                <span className="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded text-xs font-bold">
-                                                                    Art. {item.article}
-                                                                </span>
-                                                                {item.act_number && (
-                                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                                                                        n. {item.act_number}
-                                                                    </span>
-                                                                )}
+                                                                <span className="font-serif text-base text-slate-900 dark:text-slate-50">{historyLabel(item)}</span>
                                                             </span>
-                                                            <span className="block font-semibold text-sm text-slate-900 dark:text-white capitalize truncate">
-                                                                {item.act_type}
+                                                            <span className="block text-[13px] text-slate-600 dark:text-slate-400 truncate">
+                                                                {actHeadingOf(item)}
                                                             </span>
                                                             {item.created_at && (
                                                                 <span
@@ -477,22 +475,20 @@ export function HistoryView() {
                                     </div>
 
                                     {/* Desktop: full timeline with dots */}
-                                    <div className="hidden md:block space-y-3 pl-6 border-l-2 border-primary-100 dark:border-primary-900 relative">
+                                    <div className="hidden md:block border-t border-slate-200 dark:border-slate-800">
                                         {items.map((item, idx) => item.decision_key ? (
                                             <DecisionHistoryRow key={item.id} item={item} variant="desktop" onDelete={handleDeleteItem}
                                                 id={idx === 0 ? 'tour-history-item' : undefined} />
                                         ) : (
                                             <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
-                                                {/* Timeline dot */}
-                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-primary-500 rounded-full ring-4 ring-white dark:ring-slate-800" />
 
                                                 {/* Item card: the title is a button stretched over the card (A6), so the card still opens
                                                     on a click anywhere and Tab and Enter reach it; the menu sits beside it, above the stretch. */}
                                                 <div
                                                     className={cn(
-                                                        "relative bg-white dark:bg-slate-800 p-4 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow] cursor-pointer",
-                                                        "border-slate-200 dark:border-slate-700",
-                                                        "hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md",
+                                                        // LC21: a row of the list, as the prototype's: a rule under it, the hover a tint, no card.
+                                                        "relative border-b border-slate-200 px-2 py-3 transition-colors cursor-pointer dark:border-slate-800",
+                                                        "hover:bg-slate-100 dark:hover:bg-slate-900",
                                                         "has-[[data-history-open]:focus-visible]:ring-2 has-[[data-history-open]:focus-visible]:ring-primary-500"
                                                     )}
                                                 >
@@ -503,25 +499,12 @@ export function HistoryView() {
                                                             onClick={() => handleItemClick(item)}
                                                             className="flex-1 block text-left focus-visible:outline-none after:absolute after:inset-0 after:rounded-xl after:content-['']"
                                                         >
-                                                            <span className="flex items-baseline gap-2 mb-2">
-                                                                <span className="font-bold text-primary-600 dark:text-primary-400 text-lg capitalize">
-                                                                    {item.act_type}
-                                                                </span>
-                                                                {item.act_number && (
-                                                                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                                                                        n. {item.act_number}
-                                                                    </span>
-                                                                )}
+                                                            {/* The norm as it is cited («art. 2043 c.c.»), then the act's name and when it was read (B8). */}
+                                                            <span className="block font-serif text-lg leading-snug text-slate-900 dark:text-slate-50">
+                                                                {historyLabel(item)}
                                                             </span>
-                                                            <span className="flex flex-wrap gap-2 text-sm text-slate-500 items-center">
-                                                                <span className="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg text-xs font-medium">
-                                                                    Art. {item.article}
-                                                                </span>
-                                                                {item.date && (
-                                                                    <span className="text-slate-500 dark:text-slate-400">
-                                                                        del {item.date}
-                                                                    </span>
-                                                                )}
+                                                            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-slate-600 dark:text-slate-400">
+                                                                <span>{actHeadingOf(item)}</span>
                                                                 {item.created_at && (
                                                                     <span
                                                                         className="text-xs text-slate-500 dark:text-slate-400"

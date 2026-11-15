@@ -16,7 +16,7 @@ interface CitationPanelProps {
   desktop: boolean;
   onClose: () => void;
   /**
-   * Leaving the lesson from the panel (a reader's «Apri su Dashboard», a link to a decision's address): the session asks
+   * Leaving the lesson from the panel (a reader's «Apri nel Corpus», a link to a decision's address): the session asks
    * first when something would be lost (§6.5), then runs `go`.
    */
   leaveThen: (go: () => void) => void;

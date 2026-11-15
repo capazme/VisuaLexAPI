@@ -2,11 +2,12 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
+import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
+import { SectionTabs } from '../../features/sections/SectionTabs';
 import { useSection } from '../../features/sections/useSection';
 import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
 import { prefersReducedMotion } from '../../features/sections/sectionTransition';
@@ -212,7 +213,9 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
         "hover:bg-slate-100 dark:hover:bg-slate-800",
         // The icon keeps the same 44 px box in every layout, so widening the bar moves no icon. No `overflow-hidden`:
         // it clipped the active column, which sits left of the row; the words truncate on their own.
-        words ? "w-full h-11 pr-2" : "w-11 h-11",
+        // LC21: with words the row is the prototype's, 36 px (the drawer's 44, a touch target), the icon 12 px in and 12 from the
+        // words; the rail keeps its 44 px square.
+        words ? cn("w-full gap-3 pl-3 pr-2", layout === 'drawer' ? "h-11" : "h-9") : "w-11 h-11",
         isActive && "bg-primary-50 dark:bg-primary-900/25"
       )}
       onClick={() => {
@@ -229,15 +232,17 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
       <>
           {/* A navigation entry is seen tens of times a day: its hover is the colour alone. The press is CSS: framer-motion's
               `whileTap` gave this box `tabindex="0"`, a second Tab stop in every entry (#448). */}
-          <div className="grid h-11 w-11 shrink-0 place-items-center transition-transform duration-100 motion-safe:active:scale-95">
+          <div className={cn("grid shrink-0 place-items-center transition-transform duration-100 motion-safe:active:scale-95", words ? "h-5 w-5" : "h-11 w-11")}>
             <Icon
-              size={22}
+              size={words ? 18 : 22}
               aria-hidden
               className={cn(
                 "transition-colors duration-200",
-                isActive
-                  ? "text-primary-600 dark:text-primary-400 stroke-[2.5px]"
-                  : "text-slate-500 dark:text-slate-400 stroke-[2px]"
+                words
+                  ? cn("stroke-[1.5px]", isActive ? "text-slate-900 dark:text-slate-50" : "text-slate-600 dark:text-slate-400")
+                  : isActive
+                    ? "text-primary-600 dark:text-primary-400 stroke-[2.5px]"
+                    : "text-slate-500 dark:text-slate-400 stroke-[2px]"
               )}
             />
           </div>
@@ -247,7 +252,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
               aria-hidden
               className={cn(
                 "min-w-0 flex-1 truncate whitespace-nowrap text-sm",
-                isActive ? "font-semibold text-primary-700 dark:text-primary-300" : "font-medium text-slate-700 dark:text-slate-300"
+                isActive ? "font-semibold text-slate-900 dark:text-slate-50" : "font-medium text-slate-800 dark:text-slate-300"
               )}
             >
               {label}
@@ -264,7 +269,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
               the 16 px mark (its column 6.6 px wide, from 4.7 to 11.3 px of the box) 7.5 px left of the row, so the
               column runs from 7.2 to 13.8 px of the bar, 7.2 px from its edge and from the icon's box (21 px). It slides
               from entry to entry within a section (`layoutId`, in the section's `LayoutGroup`). */}
-          {isActive && (
+          {isActive && !words && (
             <motion.span
               layoutId="activeIndicator"
               className="absolute -left-[7.5px] top-1/2 -translate-y-1/2 text-primary-700 dark:text-primary-300"
@@ -298,9 +303,11 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
  */
 function NavGroup({ name, heading, unnamed, layout, children }: { name: string; heading?: boolean; unnamed?: boolean; layout: SidebarLayout; children: React.ReactNode }) {
   return (
-    <div role={unnamed ? undefined : 'group'} aria-label={unnamed ? undefined : name} className="flex w-full flex-col items-start gap-3 md:gap-2">
-      {heading && layout !== 'rail' && (
-        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
+    <div role={unnamed ? undefined : 'group'} aria-label={unnamed ? undefined : name} className={cn("flex w-full flex-col items-start", layout === 'rail' ? "gap-3 md:gap-2" : "gap-0.5")}>
+      {/* LC21: the section's own name is not written again over its entries (it is on the tab above); a group's heading is the
+          prototype's small capitals. */}
+      {heading && !unnamed && layout !== 'rail' && (
+        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.06em]", SIDEBAR_SMALL_TEXT)}>
           {name}
         </p>
       )}
@@ -327,15 +334,16 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
       }}
       {...(wide ? {} : handlers)}
       className={cn(
-        "flex h-11 shrink-0 items-center rounded-xl transition-colors duration-200",
+        "flex shrink-0 items-center rounded-xl transition-colors duration-200",
+        wide ? "h-9 rounded-lg pl-3 gap-3" : "h-11",
         SIDEBAR_TOGGLE_TEXT,
         "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
         wide ? "w-full overflow-hidden" : "w-11",
       )}
     >
-      <span className="grid h-11 w-11 shrink-0 place-items-center"><Icon size={20} aria-hidden /></span>
-      {wide && <span aria-hidden className="min-w-0 truncate whitespace-nowrap text-sm">Riduci</span>}
+      <span className={cn("grid shrink-0 place-items-center", wide ? "h-5 w-5" : "h-11 w-11")}><Icon size={wide ? 18 : 20} strokeWidth={wide ? 1.5 : 2} aria-hidden /></span>
+      {wide && <span aria-hidden className="min-w-0 truncate whitespace-nowrap text-sm font-medium">Riduci</span>}
       <AnimatePresence>
         {!wide && shown && <SidebarTooltip anchor={el} label={label} onDismiss={hide} />}
       </AnimatePresence>
@@ -467,7 +475,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         // the phone's drawer has room for its words.
         layout === 'drawer' ? "w-[17rem] max-w-[85vw]" : "w-full",
         // Solid: nothing scrolls under the rail on a computer, and on a phone the drawer has its own scrim.
-        "bg-card",
+        // LC21: the prototype's bar, a step darker than the page in the light, the page's own ground in the dark.
+        "bg-slate-100 dark:bg-slate-950",
         "border-r border-slate-200 dark:border-slate-800",
         // Mobile slide
         "transform transition-transform duration-300 ease-smooth-out",
@@ -501,8 +510,12 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
       {/* The section switcher, where the open book was (sections spec S3), under the logo. Every column keeps 10 px of
           side padding, so a 44 px control in the 64 px rail sits where it sits in the wide bar. */}
-      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-1.5 pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
-        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} inDrawer={layout === 'drawer'} />
+      {/* LC21: with words the sections are a row of tabs under the logo (the prototype of 12 November); the rail, which four
+          words would not fit, keeps the one button and its menu. */}
+      <div id="tour-section-switcher" className={cn("flex items-center", words ? "px-3 pb-3 pt-1" : "px-2.5 pt-1.5 pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50")}>
+        {words
+          ? <SectionTabs forumCount={forumNotifications.total} onChoose={closeMobile} inDrawer={layout === 'drawer'} />
+          : <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={false} inDrawer={false} />}
       </div>
 
       {/* Navigation */}
@@ -513,7 +526,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       <motion.nav
         layoutScroll
         id="tour-sidebar"
-        className="min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
+        className={cn("min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1", words ? "px-3 py-2 gap-0.5" : "px-2.5 py-4 gap-3 md:gap-2")}
       >
         {/* Corpus's entries over the other sections' (sections spec S6). In Work the search is Work's own «Corpus» (D-315), and
             the two tools are links of the search page (`Scrivania`, LC8). */}
@@ -531,7 +544,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             once, so without a new group every section kept the first one's name and the column glided in from the old
             section's entry (#457); a new section's column appears in place. */}
         <LayoutGroup key={layout === 'drawer' ? `drawer-${section}` : section} id={layout === 'drawer' ? `drawer-${section}` : section}>
-          <div ref={sectionEntries} role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
+          <div ref={sectionEntries} role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start", words ? "gap-0.5" : "gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
             {section === 'gymnasium' && (
               <>
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}
@@ -549,11 +562,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 </NavGroup>
               </>
             )}
-            {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
-              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
-                {active.name}
-              </p>
-            )}
             {section === 'opus' && (
               <>
                 {/* Oggi, Corpus, Dossier, Atti, Anonimizzatore (D-315). «Prossimi giorni» and «Lista d'ingresso» are tabs of
@@ -562,8 +570,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 {searchEntry('Corpus', ['/documents', '/rassegne'])}
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <NavItem to="/work/atti" icon={FileText} label="Atti" soon onClick={closeMobile} layout={layout} />
-                {/* D-324: it will come in the desktop app. */}
-                <NavItem to="/work/anonimizzatore" icon={EyeOff} label="Anonimizzatore" soon onClick={closeMobile} layout={layout} />
+                {/* D-324, LC21: the Anonimizzatore is the desktop app's; the web draws no entry for what it will not have
+                    (the address stays and says so). */}
               </>
             )}
             {section === 'academia' && showAssistant && (
@@ -587,7 +595,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       {/* User Menu, and on the desktop from `xl` the control that narrows or widens the bar. On a phone the
           drawer's foot clears the home indicator. */}
       <div className={cn(
-        "flex flex-col items-start gap-1 px-2.5 py-4 border-t border-slate-100 dark:border-slate-800/50",
+        "flex flex-col items-start gap-0.5 border-t border-slate-200 dark:border-slate-800", words ? "px-3 py-3" : "px-2.5 py-4",
         layout === 'drawer' && "pb-[max(1rem,env(safe-area-inset-bottom))]",
       )}>
         <button
@@ -602,7 +610,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
             // The avatar is 36 px below `md` and 32 px from it: inset as in the rail, so widening moves it not.
-            words ? "w-full h-11 gap-2.5 overflow-hidden px-1 md:px-1.5 text-left" : "justify-center w-11 h-11",
+            words ? cn("w-full gap-2.5 overflow-hidden px-2 text-left", layout === 'drawer' ? "h-11" : "h-10") : "justify-center w-11 h-11",
             showUserMenu && "bg-primary-50 dark:bg-primary-900/25"
           )}
         >
@@ -631,6 +639,27 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             <CountBadge count={normaChanges} className={words ? "shrink-0" : "absolute top-0 right-0 ring-2 ring-white dark:ring-slate-900"} />
           )}
         </button>
+        {/* LC21: «Impostazioni» in sight at the bar's foot, as the prototype has it (it stays in the user menu too). With words
+            only: the rail keeps its two controls. */}
+        {words && (
+          <button
+            type="button"
+            onClick={() => {
+              closeMobile();
+              openSettings();
+            }}
+            className={cn(
+              "flex w-full shrink-0 items-center gap-3 rounded-lg pl-3 text-left transition-colors duration-200",
+              layout === 'drawer' ? "h-11" : "h-9",
+              SIDEBAR_TOGGLE_TEXT,
+              "hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+            )}
+          >
+            <span className="grid h-5 w-5 shrink-0 place-items-center"><Settings size={18} strokeWidth={1.5} aria-hidden /></span>
+            <span className="min-w-0 truncate whitespace-nowrap text-sm font-medium">Impostazioni</span>
+          </button>
+        )}
         {onToggleWide && layout !== 'drawer' && <WidthToggle layout={layout} onToggle={onToggleWide} />}
 
         {/* User Dropdown Menu - rendered via Portal */}
