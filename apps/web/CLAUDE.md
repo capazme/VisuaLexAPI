@@ -165,9 +165,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   due and check cards offered as one count. `corsi.guard.test.ts` keeps the folder's
   targets at 44 px and its text at 11 px or more,
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
-  share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
-  «Community» under the Forum's phrase (L-37), an empty state composed for the page, «Le discussioni arrivano presto»
-  with «Esplora i dossier pubblici», see `features/bulletin/` below; no sample posts, no counts, no server route), `/documents`, `/collega-app` («Collega un'app AI»,
+  share link's `?import=`), `/forum/community` and `/forum/community/:threadId` («Community», `ForumCommunityPage`: the
+  discussions of the community and one of them open, see `features/bulletin/` below), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
@@ -3082,9 +3081,23 @@ meant to stay split; add new features as new files, not inside the shells:
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
   `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
   «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
-  (`ForumCommunityPage`, `/forum/community`, a placeholder: an empty state composed for the page, S7a — centred in the
-  column, `CommunityMark`, line art in the manner of the section's mark in the Forum's hue, «Le discussioni arrivano
-  presto», two lines on what it will be, and «Esplora i dossier pubblici», a link drawn as the one button). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  (`ForumCommunityPage`, LC10): the feed of every discussion on a norm or a decision (`articleDiscussionService.feed`,
+  `GET /article-discussions/feed`, by last activity, 20 a page with «Altre discussioni»), each row its title, «Scritta da
+  … · N risposte · N voti», its subject as a pill, what it hangs on (`CommunityTarget`: a decision a link to its address,
+  an article a button that opens it in the reader from its URN, as a card's anchor does; with no URN that names an
+  article, the name alone) and the dark pill «Risposta accettata» when it has one; «Materia» filters on the server
+  (`materia`); loading, empty («Nessuna discussione ancora.», or «… in questa materia.») and a failed read with «Riprova»
+  each have their own state. A discussion opens at `/forum/community/:threadId` (`CommunityThreadView`, read with `get`):
+  beside the list from `lg` (two panes, the row `aria-current="page"`), the whole page below it with «Torna alle
+  discussioni», its heading focused once it is drawn; the replies in the server's order, the accepted one first under
+  «Risposta accettata», each reply's comments one level under it; voting, replying, commenting and «Segnala» use the
+  controls the panel under an article draws (`search/discussionControls.tsx`: `VoteButton`, `ReplyForm`,
+  `ReportButton`: 44 px to touch below `md`, the panel's size from it; the vote named «Vota la risposta di …, N voti»;
+  «Segnala» asks first in `ui/ConfirmDialog`, with «Annulla»); the panel's «Nuova glossa» asks the subject, optional
+  («Materia (facoltativa)», sent as `materia` only when chosen), which the feed filters by, and counts replies as the
+  Forum does (not the comments under them); the discussion's author alone sees «Accetta» on another's reply (`accept`, «Ritira l’accettazione» on
+  the accepted one), and the discussion is read again after each change, its feed row following it. Never «validata»:
+  that word waits for an expert's validation. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
   equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
   `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row

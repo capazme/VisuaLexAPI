@@ -53,6 +53,12 @@ vi.mock('../components/features/planner/OpusViews', () => ({
   TaskTrashView: () => <h2>Cestino</h2>,
 }));
 vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div data-testid="forum" /> }));
+vi.mock('../services/articleDiscussionService', () => ({
+  articleDiscussionService: {
+    feed: vi.fn().mockResolvedValue({ data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } }),
+    get: vi.fn().mockRejectedValue({ status: 404 }),
+  },
+}));
 // Lazy-loaded pages (vi.mock also intercepts dynamic import()).
 vi.mock('../pages/AdminPage', () => ({ AdminPage: () => <div /> }));
 vi.mock('../pages/MerltHubPage', () => ({ MerltHubPage: () => <div data-testid="merlt-hub" /> }));
@@ -137,13 +143,19 @@ describe('App routing', () => {
     expect(window.location.pathname).toBe('/forum');
   });
 
-  it('opens the Community placeholder at /forum/community, titled by its name under the Forum\'s phrase, and a way to the public dossiers', async () => {
+  it('opens the Community at /forum/community, titled by its name under the Forum\'s phrase, and a discussion at its own address', async () => {
     renderAt('/forum/community');
-    // The page's name as its title, the Forum's phrase small over it (L-37), and the S7a empty state.
+    // The page's name as its title, the Forum's phrase small over it (L-37).
     expect(await screen.findByRole('heading', { level: 1, name: 'Community' })).toBeInTheDocument();
     expect(screen.getByText('Forum · il luogo del dibattito giuridico')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Le discussioni arrivano presto' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Esplora i dossier pubblici' })).toHaveAttribute('href', '/forum');
+    expect(await screen.findByText('Nessuna discussione ancora.')).toBeInTheDocument();
+    expect(screen.queryByText('Pagina non trovata')).toBeNull();
+    expect(screen.getByTestId('layout')).toBeInTheDocument();
+  });
+
+  it('opens one discussion at /forum/community/:threadId, inside the layout', async () => {
+    renderAt('/forum/community/t1');
+    expect(await screen.findByText('Questa discussione non c’è più.')).toBeInTheDocument();
     expect(screen.queryByText('Pagina non trovata')).toBeNull();
     expect(screen.getByTestId('layout')).toBeInTheDocument();
   });
