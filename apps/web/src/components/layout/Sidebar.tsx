@@ -294,7 +294,7 @@ function NavGroup({ name, heading, unnamed, layout, children }: { name: string; 
   return (
     <div role={unnamed ? undefined : 'group'} aria-label={unnamed ? undefined : name} className="flex w-full flex-col items-start gap-3 md:gap-2">
       {heading && layout !== 'rail' && (
-        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
           {name}
         </p>
       )}
@@ -523,7 +523,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               </>
             )}
             {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
-              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-xs font-medium", SIDEBAR_SMALL_TEXT)}>
                 {active.name}
               </p>
             )}
