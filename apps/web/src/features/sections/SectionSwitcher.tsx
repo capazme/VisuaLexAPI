@@ -5,6 +5,7 @@ import { Z_INDEX } from '../../constants/zIndex';
 import { useSection } from './useSection';
 import { SECTION_HOME_CODE, SECTIONS, goToLabel, type Section, type SectionId } from './sections';
 import { prefersReducedMotion } from './sectionTransition';
+import { isMerltEnabled } from '../merlt/featureFlag';
 import { plannerStore } from '../../components/features/planner/plannerStore';
 import { todayCountLabel } from '../../components/features/planner/taskDates';
 import { SECTION_MENU_MS, rollName, rollUpMenu, slideCheck, unrollMenu, type RollingUp } from './sectionMenuMotion';
@@ -351,12 +352,15 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCoun
         const isChecked = s.id === checked;
         const badge = s.id === 'forum' ? forumCount : s.id === 'opus' ? opusCount : 0;
         const badgeLabel = s.id === 'opus' ? todayCountLabel(badge) : `${badge} notifiche`;
+        // Labs with its tools off (A7) stays, said «in arrivo» as the sidebar says Atti and Anonimizzatore.
+        const soon = s.id === 'academia' && !isMerltEnabled();
         return (
           <button
             key={s.id}
             type="button"
             role="menuitemradio"
             aria-checked={isChecked}
+            aria-label={soon ? `${s.name}, in arrivo` : undefined}
             tabIndex={-1}
             onClick={(event) => !chosen && onChoose(s.id, event)}
             className={cn(
@@ -378,7 +382,7 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCoun
               >
                 {s.name}
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">{s.line}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{soon ? 'in arrivo' : s.line}</span>
             </span>
             {badge > 0 && (
               <span className="ml-auto flex shrink-0 self-start pt-0.5">
