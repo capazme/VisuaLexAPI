@@ -35,7 +35,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
  * from the splash to the app does not jump; it breathes instead of rising again. The line under it is positioned apart,
  * so the column does not move when it appears. The admin pages wait on it too (#463).
  */
-export function SessionLoading({ retrying }: { retrying: boolean }) {
+export function SessionLoading({ retrying = false }: { retrying?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
       <div role="status" aria-label="Caricamento di LexCraft" className="grid">
