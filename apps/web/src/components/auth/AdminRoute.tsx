@@ -5,13 +5,14 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { SessionKeptUnreachable } from './ProtectedRoute';
 
 interface AdminRouteProps {
   children: React.ReactNode;
 }
 
 export function AdminRoute({ children }: AdminRouteProps) {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
+  const { isAuthenticated, isAdmin, loading, user } = useAuth();
   const location = useLocation();
 
   // Show loading state while checking authentication
@@ -39,6 +40,9 @@ export function AdminRoute({ children }: AdminRouteProps) {
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+
+  // The account not read (LC13): not taken for «not an administrator».
+  if (!user) return <SessionKeptUnreachable />;
 
   // Show access denied if not admin
   if (!isAdmin) {
