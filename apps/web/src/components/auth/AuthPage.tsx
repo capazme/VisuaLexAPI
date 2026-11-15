@@ -243,9 +243,9 @@ export function AuthPage() {
       style={centreHeight ? ({ '--login-card-h': `${centreHeight}px` } as CSSProperties) : undefined}
     >
       {/* LC36 (Luca, 16 Nov: «uno sfondo semi animato per la login page»): his engraving of a law library behind the
-          page, in the theme's ink, faint, drifting very slowly (still under reduced motion); its middle is empty, where
+          page, in the theme's ink, light but present, drifting very slowly (still under reduced motion); its middle is empty, where
           the wordmark and the card sit, and the card stays opaque over it. */}
-      <div aria-hidden data-testid="login-library" className="vlx-login-library pointer-events-none fixed inset-0 bg-slate-800 opacity-[0.12] dark:bg-slate-100 dark:opacity-[0.08]" style={LIBRARY} />
+      <div aria-hidden data-testid="login-library" className="vlx-login-library pointer-events-none fixed inset-0 bg-slate-800 opacity-[0.2] dark:bg-slate-100 dark:opacity-[0.13]" style={LIBRARY} />
       <div className="relative grid min-h-full grid-rows-[1fr_auto] px-4 md:px-10">
         {/* On a computer the card's top sits where the card on «Accedi» is centred above «Crediti» (its height and
             the foot's 4 rem): «Registrati», and a form that grows (an error, the password's strength), grow
