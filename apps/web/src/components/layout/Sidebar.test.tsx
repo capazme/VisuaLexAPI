@@ -158,7 +158,8 @@ describe('Sidebar — accessible names', () => {
   });
 });
 
-const hrefs = () => screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+// The entries' addresses: the logo's link home, over them, is not an entry.
+const hrefs = () => screen.getAllByRole('link').filter((a) => a.getAttribute('aria-label') !== 'LexCraft').map((a) => a.getAttribute('href'));
 
 describe('Sidebar — the entries of each section (sections spec S6)', () => {
   afterEach(() => {
@@ -946,7 +947,7 @@ describe('Sidebar — the words', () => {
 
   it('gives the drawer rows of 44 px and a foot clear of the home indicator', () => {
     renderLayout('drawer');
-    for (const link of screen.getAllByRole('link')) expect(link).toHaveClass('h-11', 'w-full');
+    for (const link of within(screen.getByRole('navigation')).getAllByRole('link')) expect(link).toHaveClass('h-11', 'w-full');
     expect(screen.getByRole('complementary')).toHaveClass('w-[17rem]');
     expect(screen.getByRole('button', { name: 'Menu utente di tester' }).parentElement).toHaveClass('pb-[max(1rem,env(safe-area-inset-bottom))]');
   });
@@ -959,6 +960,45 @@ describe('Sidebar — the words', () => {
     const menu = screen.getByRole('menu', { name: 'Menu utente' });
     expect(menu.style.left).toBe('10px');
     expect(menu.style.bottom).toBe(`${window.innerHeight - 700 + 8}px`);
+  });
+
+  it.each(['wide', 'drawer'] as const)('heads the bar with the LexCraft logo (%s), a link home and its first Tab stop (LC16)', (layout) => {
+    renderLayout(layout, '/forum');
+    const home = screen.getAllByRole('link')[0];
+    expect(home).toHaveAccessibleName('LexCraft');
+    expect(home).toHaveAttribute('href', '/');
+    // The wordmark, not the column alone; still unless the shell asks for its sweep.
+    const logo = within(home).getByRole('img', { name: 'LexCraft' });
+    expect(logo).toHaveClass('vlx-logo');
+    expect(logo).not.toHaveClass('vlx-logo-sweep');
+    // Its own row, over the switcher's (the tours still find the switcher).
+    expect(home.compareDocumentPosition(document.getElementById('tour-section-switcher')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('in the rail keeps only the column, the same link, centred over the icons and still', () => {
+    renderLayout('rail', '/forum');
+    const home = screen.getAllByRole('link')[0];
+    expect(home).toHaveAccessibleName('LexCraft');
+    expect(home).toHaveAttribute('href', '/');
+    expect(home.querySelector('.vlx-logo')).toBeNull();
+    expect(home.querySelector('.vlx-book')).not.toBeNull();
+    expect(home.parentElement).toHaveClass('justify-center');
+  });
+
+  it('sweeps the logo when the shell says it is due, never in the rail', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Sidebar theme="light" isOpen layout="wide" logoSweep serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('img', { name: 'LexCraft' })).toHaveClass('vlx-logo-sweep');
+    cleanup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Sidebar theme="light" isOpen layout="rail" logoSweep serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    expect(document.querySelector('.vlx-logo-sweep')).toBeNull();
   });
 
   it('offers the toggle that narrows or widens the bar only when the layout gives one, never in the drawer', () => {

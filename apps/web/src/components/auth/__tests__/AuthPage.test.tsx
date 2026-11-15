@@ -409,80 +409,26 @@ describe('AuthPage: two tabs on one page', () => {
   });
 });
 
-// The wordmark written in ink (A3): one face, one ink; the word one text throughout, nothing left on the finished page.
-describe('AuthPage: the wordmark written in ink', () => {
-  // jsdom's events carry no `animationName`: it is written on them as a browser would.
-  const animation = (target: Element, type: 'animationend' | 'animationcancel', animationName: string) => {
-    const event = new Event(type, { bubbles: true });
-    Object.defineProperty(event, 'animationName', { value: animationName });
-    act(() => {
-      target.dispatchEvent(event);
-    });
-  };
-  const copy = () => document.querySelector('.vlx-ink-bleed');
-
-  it('names the page «LexCraft» with one text, its blurred copy and the book hidden from a reader', () => {
+// The LexCraft logo (LC16): it takes the place of the column and the word written in ink, and of their two motions.
+describe('AuthPage: the LexCraft logo', () => {
+  it('names the page «LexCraft» with the logo, which plays its intro once', () => {
     renderAuth('/login');
     const title = screen.getByRole('heading', { level: 1, name: 'LexCraft' });
-    // The word itself is never split into letters (WebKit kerns no pair across two elements).
-    const ink = title.querySelector('.vlx-ink-word')!;
-    expect(ink.childNodes).toHaveLength(1);
-    expect(ink.textContent).toBe('LexCraft');
-    expect(copy()).toHaveAttribute('aria-hidden', 'true');
-    expect(copy()).toHaveClass('select-none');
-    expect(document.querySelector('svg.vlx-ink-book')).toHaveAttribute('aria-hidden', 'true');
-    expect(title.querySelector('svg')).toBeNull();
+    const logo = within(title).getByRole('img', { name: 'LexCraft' });
+    expect(logo).toHaveClass('vlx-logo', 'vlx-logo-intro');
+    // The column that rose and the pen that wrote are gone.
+    expect(document.querySelector('.vlx-ink-book, .vlx-ink-word, .vlx-ink-bleed, .vlx-ink-plain')).toBeNull();
   });
 
-  // Papiniano, #446 note 1: from 768 px the column (18 px, centred in its 44 px box) stood 13 px in from the «L».
-  it('sets the column flush with the «L» from md, and leaves it centred below', () => {
+  it('never wider than the 196 px column beside the card between 768 and 1023 px', () => {
     renderAuth('/login');
-    expect(document.querySelector('svg.vlx-ink-book')).toHaveClass('md:-ml-[12.9px]');
+    const logo = screen.getByRole('img', { name: 'LexCraft' });
+    expect(logo).toHaveClass('w-[196px]', 'lg:w-[260px]');
   });
 
-  it('drops the copy and the mask once the ink is written, and only then', () => {
-    renderAuth('/login');
-    const title = screen.getByRole('heading', { level: 1 });
-    // The copy's own end bubbles up: it is not the ink's.
-    animation(copy()!, 'animationend', 'vlx-ink-bleed');
-    expect(copy()).not.toBeNull();
-    animation(title.querySelector('.vlx-ink-word')!, 'animationend', 'vlx-ink-write');
-    expect(copy()).toBeNull();
-    expect(title.querySelector('.vlx-ink-word')).toBeNull();
-    expect(title).toHaveTextContent(/^LexCraft$/);
-    expect(screen.getByRole('heading', { level: 1, name: 'LexCraft' })).toBe(title);
-  });
-
-  it('ends the writing when it is cancelled, reduced motion turned on halfway', () => {
-    renderAuth('/login');
-    animation(document.querySelector('.vlx-ink-word')!, 'animationcancel', 'vlx-ink-write');
-    expect(copy()).toBeNull();
-    expect(document.querySelector('.vlx-ink-word')).toBeNull();
-  });
-
-  it('only fades the word in from the left on WebKit for iOS: no mask, no blurred copy', () => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15');
-    renderAuth('/login');
-    const title = screen.getByRole('heading', { level: 1, name: 'LexCraft' });
-    expect(title.querySelector('.vlx-ink-plain')).toHaveTextContent('LexCraft');
-    expect(title.querySelector('.vlx-ink-word')).toBeNull();
-    expect(copy()).toBeNull();
-    animation(title.querySelector('.vlx-ink-plain')!, 'animationend', 'vlx-ink-plain');
-    expect(title.querySelector('.vlx-ink-plain')).toBeNull();
-  });
-
-  it('turns the colophon\'s opacity on after its first frames, the fade reduced motion sees', async () => {
-    renderAuth('/login');
-    const header = screen.getByRole('heading', { level: 1 }).closest('header')!;
-    expect(header).toHaveClass('motion-reduce:opacity-0');
-    await waitFor(() => expect(header).not.toHaveClass('motion-reduce:opacity-0'));
-  });
-
-  it('never writes the word under reduced motion', () => {
+  it('stands still under reduced motion', () => {
     reduceMotion(true);
     renderAuth('/login');
-    const title = screen.getByRole('heading', { level: 1, name: 'LexCraft' });
-    expect(title.querySelector('.vlx-ink-word, .vlx-ink-plain')).toBeNull();
-    expect(copy()).toBeNull();
+    expect(screen.getByRole('img', { name: 'LexCraft' })).not.toHaveClass('vlx-logo-intro');
   });
 });

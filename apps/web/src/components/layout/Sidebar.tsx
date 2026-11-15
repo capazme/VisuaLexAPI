@@ -20,6 +20,7 @@ import { Z_INDEX } from '../../constants/zIndex';
 import { preparePage } from '../../pageCode';
 import { spring } from '../../lib/motion';
 import { BookMark } from '../ui/BookMark';
+import { LexCraftLogo } from '../ui/LexCraftLogo';
 import type { SidebarLayout } from './sidebarWidth';
 import { plannerStore } from '../features/planner/plannerStore';
 import { todayCountLabel } from '../features/planner/taskDates';
@@ -42,6 +43,8 @@ interface SidebarProps {
   onToggleWide?: () => void;
   /** `Layout`'s one probe of the services: the user menu's «Stato dei servizi» and the dot on the user button. */
   serviceHealth: ServiceHealthReading;
+  /** The logo's sweep is due (once a browser session, `Layout`): it plays as the bar appears. Never in the rail. */
+  logoSweep?: boolean;
 }
 
 interface NavItemProps {
@@ -337,7 +340,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth, logoSweep = false }: SidebarProps) {
   const navigate = useNavigate();
   const { user, isAdmin, isValidator, logout } = useAuth();
   const coursesOn = useCoursesSwitch() === 'on';
@@ -473,10 +476,29 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}
     >
-      {/* The section switcher, where the open book was (sections spec S3). Below `lg`, in the drawer, it sits where
-          the phone's bar is (M1), clear of the iPhone's top edge. Every column keeps 10 px of side padding, so a 44 px
-          control in the 64 px rail sits where it sits in the wide bar. */}
-      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-[calc(0.375rem+env(safe-area-inset-top))] pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
+      {/* LexCraft's logo (LC16), a link home and the bar's first Tab stop, in a row of its own over the switcher: the
+          wordmark 120 px wide, its «L» flush with the switcher's mark (the box starts 11 of its 716 units, 1.8 px,
+          before it); in the rail the column alone, centred over the icons (32 px from the edge), never in line with the
+          entries' column-cursor, and still. In the drawer it is the head, clear of the iPhone's top edge. */}
+      <div className={cn("flex h-12 shrink-0 items-center px-2.5", layout === 'rail' && "justify-center", layout === 'drawer' && "box-content pt-[env(safe-area-inset-top)]")}>
+        <Link
+          to="/"
+          aria-label="LexCraft"
+          onClick={closeMobile}
+          className={cn(
+            "rounded-lg text-primary-600 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+            layout === 'rail' ? "grid h-11 w-11 place-items-center" : "flex h-11 items-center pl-0.5 pr-2",
+          )}
+        >
+          {layout === 'rail'
+            ? <BookMark size={32} />
+            : <LexCraftLogo motion={logoSweep ? 'sweep' : 'still'} className="h-auto w-[120px]" />}
+        </Link>
+      </div>
+
+      {/* The section switcher, where the open book was (sections spec S3), under the logo. Every column keeps 10 px of
+          side padding, so a 44 px control in the 64 px rail sits where it sits in the wide bar. */}
+      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-1.5 pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
         <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} inDrawer={layout === 'drawer'} />
       </div>
 

@@ -4,6 +4,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { BookMark } from '../ui/BookMark';
+import { LexCraftLogo } from '../ui/LexCraftLogo';
 import { CONNECTION_FAILED_MESSAGE } from '../../services/api';
 
 interface ProtectedRouteProps {
@@ -37,19 +38,23 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   return <>{children}</>;
 }
 
-/** Signed in, the account not read: the session stays open and a reload asks again. */
+/** Signed in, the account not read: the session stays open and a reload asks again. The still logo over the message
+ *  (LC16): a screen without the shell still says whose it is. */
 export function SessionKeptUnreachable() {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-50 px-4 dark:bg-slate-950">
-      <div role="alert" className="max-w-sm text-center text-slate-700 dark:text-slate-200">
-        <p className="mb-4">{CONNECTION_FAILED_MESSAGE}</p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="min-h-11 rounded-xl bg-primary-600 px-6 font-medium text-white hover:bg-primary-700"
-        >
-          Riprova
-        </button>
+      <div className="flex max-w-sm flex-col items-center gap-6">
+        <LexCraftLogo className="h-auto w-[160px]" />
+        <div role="alert" className="text-center text-slate-700 dark:text-slate-200">
+          <p className="mb-4">{CONNECTION_FAILED_MESSAGE}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="min-h-11 rounded-xl bg-primary-600 px-6 font-medium text-white hover:bg-primary-700"
+          >
+            Riprova
+          </button>
+        </div>
       </div>
     </div>
   );

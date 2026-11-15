@@ -1,10 +1,10 @@
-import { render } from '@testing-library/react';
+import { cleanup, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const seen = vi.hoisted(() => ({ props: [] as Array<{ layout?: string; onToggleWide?: () => void }> }));
+const seen = vi.hoisted(() => ({ props: [] as Array<{ layout?: string; onToggleWide?: () => void; logoSweep?: boolean }> }));
 vi.mock('../Sidebar', () => ({
-  Sidebar: (props: { layout?: string; onToggleWide?: () => void }) => {
+  Sidebar: (props: { layout?: string; onToggleWide?: () => void; logoSweep?: boolean }) => {
     seen.props.push(props);
     return null;
   },
@@ -48,6 +48,7 @@ function atWidth(xl: boolean) {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false }, sidebarVisible: true }));
   sidebarWidthStore.setState({ collapsed: false });
 });
@@ -89,5 +90,18 @@ describe('Layout — the sidebar\'s two copies (Gymnasium spec §4)', () => {
     expect(atWidth(true).sidebarWidth).toBe('0px');
     appStore.setState((s) => ({ sidebarVisible: true, settings: { ...s.settings, focusMode: true } }));
     expect(atWidth(true).sidebarWidth).toBe('0px');
+  });
+});
+
+describe('Layout — the logo\'s sweep (LC16)', () => {
+  it('asks both copies of the bar for it once a browser session, not when the shell is drawn again', () => {
+    const first = atWidth(true);
+    expect(first.desktop?.logoSweep).toBe(true);
+    expect(first.phone?.logoSweep).toBe(true);
+    cleanup();
+    // The shell drawn again (back from a page outside it, a reload in the same tab): no sweep.
+    const again = atWidth(true);
+    expect(again.desktop?.logoSweep).toBe(false);
+    expect(again.phone?.logoSweep).toBe(false);
   });
 });
