@@ -275,6 +275,23 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'true');
   });
 
+  // Papiniano, #448 note 8: each entry was two Tab stops, the second (the icon's box, given `tabindex="0"` by
+  // framer-motion's `whileTap`) with the browser's blue ring.
+  it('is one Tab stop per entry, and one for the avatar: nothing focusable inside them', () => {
+    for (const layout of ['wide', 'rail', 'drawer'] as const) {
+      render(
+        <MemoryRouter initialEntries={['/work/oggi']}>
+          <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+        </MemoryRouter>,
+      );
+      const controls = [...screen.getAllByRole('link'), screen.getByRole('button', { name: /Menu utente/ })];
+      for (const control of controls) {
+        expect(control.querySelectorAll('[tabindex]:not([tabindex="-1"]), a, button'), control.getAttribute('aria-label') ?? '').toHaveLength(0);
+      }
+      cleanup();
+    }
+  });
+
   it('draws no lone rule over Work\'s entries, where the Corpus ones were', () => {
     renderSidebar('/work/oggi');
     expect(screen.getByRole('group', { name: 'Work' })).not.toHaveClass('border-t');

@@ -221,12 +221,9 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
       onFocus={(e: FocusEvent<HTMLAnchorElement>) => { preparePage(to); if (!words) handlers.onFocus(e); }}
     >
       <>
-          {/* A navigation entry is seen tens of times a day: its hover is the colour alone. */}
-          <motion.div
-            whileTap={reduceMotion ? undefined : { scale: 0.95 }}
-            transition={spring.snappy}
-            className="grid h-11 w-11 shrink-0 place-items-center"
-          >
+          {/* A navigation entry is seen tens of times a day: its hover is the colour alone. The press is CSS: framer-motion's
+              `whileTap` gave this box `tabindex="0"`, a second Tab stop in every entry (#448). */}
+          <div className="grid h-11 w-11 shrink-0 place-items-center transition-transform duration-100 motion-safe:active:scale-95">
             <Icon
               size={22}
               aria-hidden
@@ -237,7 +234,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
                   : "text-slate-500 dark:text-slate-400 stroke-[2px]"
               )}
             />
-          </motion.div>
+          </div>
 
           {words && (
             <span
@@ -580,9 +577,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             showUserMenu && "bg-primary-50 dark:bg-primary-900/25"
           )}
         >
+          {/* No `whileTap`: it made this box a second Tab stop inside the button (`tabindex="0"`). */}
           <motion.div
             whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
             transition={spring.snappy}
             className={cn(
               "relative shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold",
