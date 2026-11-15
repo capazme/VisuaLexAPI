@@ -195,8 +195,8 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
         <ul aria-labelledby="community-replies" className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">
           {thread.replies.map(reply => (
             <li key={reply.id}>
-              {/* A reply as a row, not a card (LC24): the accepted one keeps the states' green on its left edge. */}
-              <article className={cn('py-4 pl-4', reply.accepted ? 'border-l-2 border-emerald-600 dark:border-emerald-400' : 'border-l-2 border-transparent')}>
+              {/* A reply as a row, not a card (LC24); «Risposta accettata» says the accepted one (no green edge besides it). */}
+              <article className="py-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
                   <AuthorName name={reply.user.username || 'utente senza nome'} when={day(reply.createdAt)} />
                   {reply.accepted && <AcceptedMark />}

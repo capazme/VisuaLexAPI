@@ -341,8 +341,9 @@ describe('ForumCommunityPage: the open discussion', () => {
     const replies = await screen.findByRole('list', { name: '2 risposte' });
     const rows = within(replies).getAllByRole('article');
     expect(within(rows[0]).getByText('Risposta accettata')).toHaveClass('text-emerald-800');
-    expect(rows[0]).toHaveClass('border-l-2', 'border-emerald-600');
-    expect(rows[1]).toHaveClass('border-transparent');
+    // The label alone says it (anti-slop, 15 Nov): no green edge besides it.
+    expect(rows[0]).not.toHaveClass('border-emerald-600');
+    expect(rows[1]).not.toHaveClass('border-l-2');
     expect(within(rows[0]).getByText('carlo')).toBeInTheDocument();
     expect(within(rows[0]).getByText('c')).toHaveClass('rounded-full');
     expect(within(rows[0]).getByText('La risposta che ha chiuso la questione.')).toBeInTheDocument();
@@ -377,7 +378,7 @@ describe('ForumCommunityPage: the open discussion', () => {
     expect(await screen.findByRole('button', { name: 'Ritira l’accettazione' })).toBeInTheDocument();
     const replyRow = within(screen.getByRole('list', { name: '2 risposte' })).getByRole('article');
     expect(within(replyRow).getByText('Risposta accettata')).toBeInTheDocument();
-    expect(replyRow).toHaveClass('border-emerald-600');
+    expect(within(replyRow).getByText('Risposta accettata')).toBeInTheDocument();
     // Back on the list, the feed's row has taken the mark too.
     fireEvent.click(screen.getByRole('link', { name: 'Torna alle discussioni' }));
     const list = await screen.findByRole('list', { name: 'Discussioni' });

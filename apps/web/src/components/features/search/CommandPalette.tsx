@@ -694,7 +694,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // looked up at every render while open, so a field that mounts later (the address /sentenze) or goes
   // is followed, and passed at render time (gotcha 13).
   const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
-  const anchor = field?.isConnected ? field : null;
+  // The top bar's compact field (LC21) is no field to grow from (Luca, 15 Nov: the menu was as narrow as it): the menu
+  // then hangs at the top, centred and wide, as from every other page — one menu, one place.
+  const anchor = field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
   // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
   const growFrom = anchor?.offsetHeight || 44;
   // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
@@ -1367,7 +1369,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           >
             {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
                 lists scroll inside it past that. */}
-            <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-900">
+            <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
               {content}
             </PanelGrowth>
           </div>

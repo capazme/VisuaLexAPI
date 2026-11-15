@@ -226,7 +226,7 @@ export function SuggestContentModal({
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Scrivi un messaggio per l'autore..."
+              placeholder="Scrivi un messaggio per l'autore…"
               rows={3}
               maxLength={1000}
               aria-label="Messaggio opzionale per l'autore"

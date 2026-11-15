@@ -1324,7 +1324,7 @@ export function AdminPage() {
                   disabled={actionLoading}
                   className={DIALOG_PRIMARY}
                 >
-                  {actionLoading ? 'Creazione...' : 'Crea l’utente'}
+                  {actionLoading ? 'Creazione…' : 'Crea l’utente'}
                 </button>
               </div>
             </form>
@@ -1374,7 +1374,7 @@ export function AdminPage() {
                   disabled={actionLoading || !newPassword}
                   className={DIALOG_PRIMARY}
                 >
-                  {actionLoading ? 'Reset...' : 'Reset Password'}
+                  {actionLoading ? 'Reset…' : 'Reset Password'}
                 </button>
               </div>
             </div>
@@ -1408,7 +1408,7 @@ export function AdminPage() {
                   disabled={actionLoading}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? 'Eliminazione...' : 'Elimina'}
+                  {actionLoading ? 'Eliminazione…' : 'Elimina'}
                 </button>
               </div>
             </div>
@@ -1442,7 +1442,7 @@ export function AdminPage() {
                   disabled={actionLoading}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? 'Eliminazione...' : 'Elimina'}
+                  {actionLoading ? 'Eliminazione…' : 'Elimina'}
                 </button>
               </div>
             </div>
@@ -1476,7 +1476,7 @@ export function AdminPage() {
                   disabled={actionLoading}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? 'Eliminazione...' : 'Elimina'}
+                  {actionLoading ? 'Eliminazione…' : 'Elimina'}
                 </button>
               </div>
             </div>

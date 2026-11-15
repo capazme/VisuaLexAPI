@@ -404,7 +404,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                         {showInfo
                             ? 'Nascondi dettagli'
                             : versionLoading
-                                ? 'Caricamento...'
+                                ? 'Caricamento…'
                                 : versionError
                                     ? 'Versione (errore)'
                                     : `Versione ${versionInfo?.version || '1.0.0'}`
@@ -473,7 +473,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
 
                     {showInfo && !versionInfo && (
                         <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-500 text-center">
-                            {versionLoading ? 'Caricamento...' : versionError ? (
+                            {versionLoading ? 'Caricamento…' : versionError ? (
                                 <div className="space-y-2">
                                     <p className="text-red-500">Impossibile caricare le informazioni</p>
                                     <button
@@ -483,7 +483,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                                         Riprova
                                     </button>
                                 </div>
-                            ) : 'Caricamento...'}
+                            ) : 'Caricamento…'}
                         </div>
                     )}
                 </div>

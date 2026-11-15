@@ -77,8 +77,8 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
 
   const placeholder = compact ? 'Norma, sentenza o tema' : isDesktop ? 'Norma, sentenza o tema: art. 2043 c.c., Cass. civ. 10787/2024' : 'Norma, sentenza o tema';
   return (
-    <div className={cn('relative w-full', compact ? 'max-w-[22rem]' : 'max-w-3xl')}>
-      <form id={SEARCH_FIELD_FORM_ID} role="search" aria-label="Ricerca" onSubmit={(event) => event.preventDefault()} className="flex items-center">
+    <div className={cn('relative', compact ? 'w-[22rem]' : 'w-full max-w-3xl')}>
+      <form id={SEARCH_FIELD_FORM_ID} role="search" aria-label="Ricerca" data-compact={compact ? '' : undefined} onSubmit={(event) => event.preventDefault()} className="flex items-center">
         <button
           ref={buttonRef}
           type="button"

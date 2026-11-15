@@ -213,31 +213,16 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(acts).toHaveTextContent(/^Atti$/);
   });
 
-  it('marks the active entry with the column, one in the whole bar', () => {
-    renderSidebar('/work/oggi');
-    const today = screen.getByRole('link', { name: 'Oggi' });
-    expect(today.querySelector('svg.vlx-book')).not.toBeNull();
-    expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(1);
-    cleanup();
-    renderSidebar('/forum/community');
-    expect(screen.getByRole('link', { name: 'Community' }).querySelector('svg.vlx-book')).not.toBeNull();
-    expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(1);
-  });
-
-  // Papiniano's pass on #448: the column touched the icon (0.8 px). The column (16 px mark: 6.6 px wide, from 4.7 to
-  // 11.3 px of its box) sits 7.5 px left of the row, so from 7.2 to 13.8 px of the bar: 7.2 px from the bar's edge and
-  // 7.2 px from the icon's box (21 px). The row no longer clips it (no `overflow-hidden`).
-  it('keeps the column clear of the icon: the 16 px mark, 7.5 px left of the row, which does not clip it', () => {
+  // LC27 (Luca, 15 Nov: «la mini colonnina … va tolta»): no sliding column in any layout; the active entry is its tile.
+  it.each(['rail', 'wide'] as const)('marks the active entry with its tile alone, no column (%s)', (layout) => {
     render(
       <MemoryRouter initialEntries={['/work/oggi']}>
-        <Sidebar theme="light" isOpen layout="rail" serviceHealth={serviceHealth} {...handlers} />
+        <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
     const today = screen.getByRole('link', { name: 'Oggi' });
-    const mark = today.querySelector('svg.vlx-book')!;
-    expect(mark).toHaveAttribute('width', '16');
-    expect(mark.parentElement).toHaveClass('absolute', '-left-[7.5px]');
-    expect(today).not.toHaveClass('overflow-hidden');
+    expect(today).toHaveClass('bg-primary-50');
+    expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(0);
   });
 
   // LC21: with words the active row is its tile alone; the sliding column is the rail's.
@@ -259,7 +244,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
       const today = screen.getByRole('link', { name: 'Oggi' });
       // Lit for a page of its own, not its address: «true», so a screen reader says «current page» once, on the tab (#448).
       expect(today, path).toHaveAttribute('aria-current', 'true');
-      expect(today.querySelector('svg.vlx-book'), path).not.toBeNull();
+      expect(today, path).toHaveClass('bg-primary-50');
       cleanup();
     }
     for (const path of ['/documents', '/rassegne']) {

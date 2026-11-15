@@ -227,7 +227,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                       setUrlInput(e.target.value);
                       setUrlError(null);
                     }}
-                    placeholder="Incolla link di Normattiva..."
+                    placeholder="Incolla link di Normattiva…"
                     className={cn(
                       'flex-1 px-4 py-2.5 rounded-xl text-sm',
                       'bg-slate-50 dark:bg-slate-800 border',

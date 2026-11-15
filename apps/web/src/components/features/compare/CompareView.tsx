@@ -285,7 +285,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="es. art 2043 cc, legge 241/1990 art 1..."
+                  placeholder="es. art 2043 cc, legge 241/1990 art 1…"
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   autoFocus
                 />
@@ -316,7 +316,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                       disabled={isSearching || (version === 'data' && !versionDate)}
                       className="px-3 py-1 text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
-                      {isSearching ? 'Cercando...' : 'Cerca'}
+                      {isSearching ? 'Cercando…' : 'Cerca'}
                     </button>
                   ) : (
                     <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase">

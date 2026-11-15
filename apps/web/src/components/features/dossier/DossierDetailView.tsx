@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { loadAssistantFeatures } from '../../../store/assistantProposals';
 import { CurrentDossierContext } from './currentDossier';
 import {
@@ -62,6 +62,7 @@ import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import { DossierAttiPanel } from '../atti/DossierAttiPanel';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
+import { scrollParentOf } from '../practice/practiceView';
 
 const VIEW_PANEL = 'dossier-view';
 import type { useTrash } from './useTrash';
@@ -116,6 +117,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   // The view shown (LC21): the sources, or the dossier's tasks.
   // `?vista=atti`: the way back from an act lands on the dossier's acts.
+  const viewTop = useRef<HTMLDivElement>(null);
+  /** A new view starts under the tabs: scrolled past them, the scroller goes back to where they stick; above, it stays. */
+  const chooseView = (next: 'fonti' | 'atti' | 'compiti') => {
+    const mark = viewTop.current;
+    const scroller = mark ? scrollParentOf(mark) : null;
+    const stuckAt = mark && scroller ? mark.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop : null;
+    setView(next);
+    if (scroller && stuckAt !== null && scroller.scrollTop > stuckAt) scroller.scrollTop = stuckAt;
+  };
   const [view, setView] = useState<'fonti' | 'atti' | 'compiti'>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
   const [attiCount, setAttiCount] = useState<number | null>(null);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
@@ -678,6 +688,10 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
         {/* LC21: the dossier's views as tabs, as the prototype: «Fonti» (its norms, decisions and notes), «Atti» (Luca, 15-11) and «Compiti».
             Both stay mounted, the other hidden, so a selection or a task being written survives the switch. */}
+        {/* LC27 (Luca, 15 Nov): the tabs stay at the top while the view scrolls, and a change of view starts the new
+            one right under them, in place — no jump to the page's top, no scrolling to it. */}
+        <div ref={viewTop} aria-hidden />
+        <div className="sticky top-0 z-10 -mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950">
         <SegmentedTabs
           tabs={[
             { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
@@ -685,13 +699,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             { id: 'compiti', label: 'Compiti' },
           ]}
           value={view}
-          onChange={setView}
+          onChange={chooseView}
           label="Viste del dossier"
           panelId={VIEW_PANEL}
-          className="mb-6 w-fit max-w-full"
+          className="w-fit max-w-full"
           tabClassName="gap-2 px-4"
         />
-        <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`}>
+        </div>
+        <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`} className="min-h-[calc(100dvh-8rem)]">
         <div hidden={view !== 'compiti'}>
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
@@ -707,7 +722,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 type="text"
                 value={itemSearchQuery}
                 onChange={(e) => setItemSearchQuery(e.target.value)}
-                placeholder="Cerca in questo dossier..."
+                placeholder="Cerca in questo dossier…"
                 aria-label="Cerca negli elementi del dossier"
                 className={cn(FIELD, 'pl-9 pr-11')}
               />

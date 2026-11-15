@@ -292,7 +292,7 @@ describe('ReviewHome', () => {
     percorso.mockResolvedValue([{ materia: 'DIRITTO_CIVILE', istituto: 'Mora del debitore', nuove: 0, apprendimento: 2, consolidate: 0, dovute: 2 }]);
     renderHome();
     const alert = await screen.findByRole('alert');
-    expect(await within(road()).findByRole('button', { name: 'Ripassa Mora del debitore: 2 da ripassare, sei qui' })).toBeInTheDocument();
+    expect(await within(road()).findByRole('button', { name: (n: string) => n.startsWith('Ripassa Mora del debitore: 2 da ripassare') && n.endsWith(', sei qui') })).toBeInTheDocument();
     // Said once, by the day block: the road is no second alert.
     expect(screen.getAllByRole('alert')).toHaveLength(1);
     expect(road()).not.toHaveTextContent('Non riesco');
@@ -772,8 +772,8 @@ describe('ReviewHome', () => {
       renderHome();
       const institutes = await screen.findByRole('list', { name: 'Istituti di Diritto civile' });
       expect(within(institutes).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
-        'Ripassa Mora del debitore: 4 da ripassare, sei qui',
-        'Ripassa Risoluzione per inadempimento: 3 da ripassare',
+        'Ripassa Mora del debitore: 4 da ripassare · 1 nuova · 4 in apprendimento, sei qui',
+        'Ripassa Risoluzione per inadempimento: 3 da ripassare · 1 nuova · 3 in apprendimento',
       ]);
       expect(road().querySelectorAll('[aria-current="step"]')).toHaveLength(1);
       expect(within(institutes).getAllByRole('button')[0]).toHaveAttribute('aria-current', 'step');
@@ -809,7 +809,7 @@ describe('ReviewHome', () => {
       expect(screen.queryByRole('alert')).toBeNull();
       percorso.mockResolvedValue([tappa('DIRITTO_CIVILE', 'Mora del debitore', 1)]);
       await userEvent.setup().click(within(road()).getByRole('button', { name: 'Riprova' }));
-      expect(await screen.findByRole('button', { name: 'Ripassa Mora del debitore: 1 da ripassare, sei qui' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: (n: string) => n.startsWith('Ripassa Mora del debitore: 1 da ripassare') && n.endsWith(', sei qui') })).toBeInTheDocument();
       expect(percorso).toHaveBeenCalledTimes(2);
       // The road's «Riprova» reads the road alone.
       expect(progress).toHaveBeenCalledTimes(1);

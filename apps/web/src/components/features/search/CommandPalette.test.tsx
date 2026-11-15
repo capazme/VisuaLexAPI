@@ -480,7 +480,7 @@ describe('CommandPalette — a topic for the Cassazione', () => {
   it('is not offered for a box with no letter or digit', async () => {
     const user = fakeTimeUser();
     renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), '...');
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), '…');
     await settle();
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
   });

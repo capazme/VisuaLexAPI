@@ -351,7 +351,7 @@ export function HistoryView() {
                         <input
                             ref={searchInputRef}
                             type="text"
-                            placeholder="Cerca nella cronologia..."
+                            placeholder="Cerca nella cronologia…"
                             aria-label="Cerca nella cronologia"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
