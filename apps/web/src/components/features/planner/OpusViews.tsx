@@ -160,7 +160,7 @@ function TodayEmpty() {
           </ul>
         </section>
       )}
-      <Link to="/work/prossimi" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1')}>
+      <Link to="/work/prossimi" className={cn(QUIET_BUTTON, 'inline-flex w-fit items-center gap-1')}>
         Vedi i prossimi giorni <ChevronRight size={15} aria-hidden />
       </Link>
     </div>
