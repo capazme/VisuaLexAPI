@@ -158,9 +158,10 @@ function App() {
           </Route>
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentsRedirect />} />
-          {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» a placeholder. */}
+          {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» with one discussion at its own. */}
           <Route path="forum" element={<BulletinBoardPage />} />
           <Route path="forum/community" element={<ForumCommunityPage />} />
+          <Route path="forum/community/:threadId" element={<ForumCommunityPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
           <Route path="rassegne" element={<RassegneSearchPage />} />
           {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
