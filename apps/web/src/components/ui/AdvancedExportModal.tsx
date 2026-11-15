@@ -318,7 +318,7 @@ export function AdvancedExportModal({
       const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.md`;
+      link.download = `LexCraft_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.md`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -330,7 +330,7 @@ export function AdvancedExportModal({
       try {
         const doc = await buildPdf();
         if (!live.current) return;
-        doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
+        doc.save(`LexCraft_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
         onClose();
       } catch (err) {
         console.error('PDF export failed:', err);
@@ -343,7 +343,7 @@ export function AdvancedExportModal({
       const blob = new Blob([rtfContent], { type: 'application/rtf' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.rtf`;
+      link.download = `LexCraft_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.rtf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -353,7 +353,7 @@ export function AdvancedExportModal({
       const blob = new Blob([content], { type: 'text/plain' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.txt`;
+      link.download = `LexCraft_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

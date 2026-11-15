@@ -247,7 +247,7 @@ export function CompletionPicker(props: CompletionPickerProps) {
               {reading.state === 'none' && (localOnly
                 ? 'Non riconosco un atto: leggo solo nel browser, scegli dall’elenco o scrivi tipo, numero e anno.'
                 : reading.offline
-                  ? <><CloudOff aria-hidden size={13} className="mr-1 inline align-[-2px]" />VisuaLex non risponde: leggo solo nel browser.</>
+                  ? <><CloudOff aria-hidden size={13} className="mr-1 inline align-[-2px]" />LexCraft non risponde: leggo solo nel browser.</>
                   : 'Non riconosco un atto in queste parole.')}
             </p>
           </div>

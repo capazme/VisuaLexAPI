@@ -4,6 +4,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 
 MERL-T integration across server and web (routes, gates, guards, surfaces, slice history): `docs/merlt/claude-notes.md`.
 
+**The name** (D-157, D-120): what a user reads (text, `aria-label`, `title`, placeholders, messages, exported text)
+says «LexCraft»; the code, comments, browser keys, `vlx-` classes, anchors, addresses and the MCP server's name in
+commands (`SERVER_NAME`) keep «VisuaLex». Still «VisuaLex» on screen until Privacy's step: the consent and privacy texts,
+and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a line that is not a comment, outside its list.
+
 ### Frontend (`apps/web/src`)
 
 - `App.tsx` — routing. **Pages loaded with their route** (P1): Dossier, the Forum and its Community, Opus (its frame

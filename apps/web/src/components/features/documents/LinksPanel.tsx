@@ -55,7 +55,7 @@ const HINT = 'text-[13px] leading-snug text-slate-600 dark:text-slate-400';
 /** The PDF line (§9), under «Copia con i link» and in the report. */
 export const PDF_LINE = 'Per depositare un PDF con i link attivi, esporta il PDF da Word («Salva con nome» › PDF), non stamparlo in PDF: la stampa toglie i link.';
 /** What a request for links sends (§8, G-401), said before the first one. */
-export const LINKS_SEND_LINE = 'Per i link, a VisuaLex arriva l’elenco delle norme citate (per esempio «art. 2043 c.c.»), non il testo del documento.';
+export const LINKS_SEND_LINE = 'Per i link, a LexCraft arriva l’elenco delle norme citate (per esempio «art. 2043 c.c.»), non il testo del documento.';
 
 function RowButtons({ rows, onSelect }: { rows: readonly UnlinkedRow[]; onSelect: (index: number) => void }) {
   return (
@@ -88,8 +88,8 @@ export function LinksPanel(props: LinksPanelProps) {
 
       {localOnly ? (
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <p className={cn(LINE, 'min-w-0 flex-1 basis-64')}>Per inserire i link VisuaLex deve ricevere le norme citate (non il testo). Con «Riconosci solo nel browser» non riceve nulla.</p>
-          <Button variant="secondary" onClick={onLeaveLocal} className="md:min-h-11">Riconosci con VisuaLex questo documento</Button>
+          <p className={cn(LINE, 'min-w-0 flex-1 basis-64')}>Per inserire i link LexCraft deve ricevere le norme citate (non il testo). Con «Riconosci solo nel browser» non riceve nulla.</p>
+          <Button variant="secondary" onClick={onLeaveLocal} className="md:min-h-11">Riconosci con LexCraft questo documento</Button>
         </div>
       ) : phase !== 'ready' ? (
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">

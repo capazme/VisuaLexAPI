@@ -128,6 +128,7 @@ describe('the PDFs, byte for byte', () => {
 });
 
 // Taken on `develop` 25946f23, jsPDF imported statically.
-const DOSSIER_PDF = '1aaee56aa1ff46553d5f88ddb0f20a01a846133902333727cb0c52c03e915376';
+// The dossier's taken again with LC5: its footer says «· LexCraft» (D-157), nothing else changed.
+const DOSSIER_PDF = 'ad3faaea475baa4c2e28f7e8451375049be70a8ba521054363f790ae4e159c4e';
 const DECISION_PDF = 'e46d4f43cce7ffc85e505b9f0788f653195e8bda245df3ce6d2226f584d61e49';
 const ARTICLE_PDF = '8e17217280fd9dfb14bcc64462110b480cc1b58c687f9f5293444f68ac479fab';

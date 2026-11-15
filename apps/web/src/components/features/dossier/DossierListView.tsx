@@ -407,7 +407,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     community's dossiers since S7a: the address takes the reader to their strip. */}
                 <button type="button" onClick={() => navigate('/forum#pronti')} className={cn(HEADER_BUTTON, 'justify-center sm:whitespace-nowrap')}>
                   <BookOpen size={18} aria-hidden />
-                  Pronti da VisuaLex
+                  Pronti da LexCraft
                 </button>
               </div>
             </section>

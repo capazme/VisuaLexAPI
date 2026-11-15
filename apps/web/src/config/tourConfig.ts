@@ -41,7 +41,7 @@ export type TourType = keyof typeof TOUR_KEYS;
 export const WELCOME_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Benvenuto in VisuaLex',
+            title: 'Benvenuto in LexCraft',
             description: 'Il tuo assistente per la consultazione di normativa italiana ed europea. Ti guideremo alla scoperta delle funzionalità principali.',
             side: 'over',
             align: 'center',
@@ -266,7 +266,7 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Dossier pubblici',
-            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di VisuaLex.',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di LexCraft.',
             side: 'over',
             align: 'center',
         }

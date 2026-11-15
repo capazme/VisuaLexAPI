@@ -198,7 +198,7 @@ export function CreditsPage() {
         <header>
           <Link to="/" className={cn('-ml-2 inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-slate-700 dark:text-slate-300', FOCUS_RING)}>
             <BookOpen aria-hidden size={20} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-            <span className="font-serif text-lg font-medium">VisuaLex</span>
+            <span className="font-serif text-lg font-medium">LexCraft</span>
           </Link>
         </header>
 
@@ -206,7 +206,7 @@ export function CreditsPage() {
           <PageFrame title="Crediti">
             {/* The opening across the frame; the long paragraph at a reading measure. */}
             <p className="max-w-measure font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
-              VisuaLex usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
+              LexCraft usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
               per ciascuna, cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri tipografici
               dell’interfaccia.
             </p>

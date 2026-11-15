@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // the hand-over from the splash to the app does not jump; it breathes instead of tracing again.
   if (loading) {
     return (
-      <div role="status" aria-label="Caricamento di VisuaLex" className="fixed inset-0 z-50 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
+      <div role="status" aria-label="Caricamento di LexCraft" className="fixed inset-0 z-50 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
         <BookMark size={56} breathe />
       </div>
     );

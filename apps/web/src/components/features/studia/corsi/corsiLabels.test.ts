@@ -18,7 +18,7 @@ describe('«Percorsi»\'s words', () => {
     expect(missingLines(missingOf({ moduli: { contati: 9, previsti: 10 }, manca: { esame: true }, competenzeSenzaModulo: ['C2'], schede: [{ codice: 'C4', schede: 1, servono: 5 }] })))
       .toEqual(['9 di 10 moduli', 'manca l’esame finale', 'C2 senza un modulo', 'C4 ha 1 scheda su 5']);
     expect(missingLines(missingOf({ moduli: { contati: 10, previsti: 10 } }))).toEqual([]);
-    expect(completeSentence('IP', missingOf({ moduli: { contati: 10, previsti: 10 } }))).toBe('Completa il percorso «IP» in VisuaLex.');
+    expect(completeSentence('IP', missingOf({ moduli: { contati: 10, previsti: 10 } }))).toBe('Completa il percorso «IP» in LexCraft.');
   });
 
   it('says closing the programme opens the exam only when modules are all the course lacks', () => {

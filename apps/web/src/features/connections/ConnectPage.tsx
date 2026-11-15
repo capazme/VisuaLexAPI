@@ -78,7 +78,7 @@ export function ConnectPage() {
         className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
       >
         <h1 id="connect-title" className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
-          <Link2 size={20} aria-hidden /> Collegare un’applicazione a VisuaLex
+          <Link2 size={20} aria-hidden /> Collegare un’applicazione a LexCraft
         </h1>
 
         {state.status === 'loading' && <p className="mt-4 text-sm text-slate-500">Caricamento della richiesta…</p>}

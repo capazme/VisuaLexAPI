@@ -92,7 +92,7 @@ function ClientCard({ client }: { client: AiClient | LegalItClient }) {
 
 /** The two parts of the page, named at its top: what each is, in one line. */
 const PARTS: { href: string; name: string; line: string }[] = [
-  { href: '#visualex', name: 'VisuaLex', line: 'Online, con il tuo account' },
+  { href: '#visualex', name: 'LexCraft', line: 'Online, con il tuo account' },
   { href: '#mcp-legal-it', name: 'mcp-legal-it', line: 'Sul tuo computer, senza account' },
 ];
 
@@ -115,7 +115,7 @@ function LegalItSection() {
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
           Un server MCP che aggiunge a Claude oltre 200 strumenti di diritto italiano: le norme da Normattiva ed EUR-Lex, la
           giurisprudenza, i calcoli legali e i modelli di atti. Si installa sul tuo computer e non richiede un account
-          VisuaLex.
+          LexCraft.
         </p>
       </header>
 
@@ -206,14 +206,14 @@ export function ConnectAiAppPage() {
     <PageFrame title="Collega un’app AI" width="reading">
       <div className="space-y-8 pb-12">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Un’app di intelligenza artificiale collegata a VisuaLex può leggere i tuoi dossier, crearne di nuovi e aggiungervi
+          Un’app di intelligenza artificiale collegata a LexCraft può leggere i tuoi dossier, crearne di nuovi e aggiungervi
           norme, sentenze, note e schede di studio, con il tuo account. Il collegamento usa il protocollo MCP: copi
-          l’indirizzo nell’app, accedi a VisuaLex e scegli tu i permessi.
+          l’indirizzo nell’app, accedi a LexCraft e scegli tu i permessi.
         </p>
 
         <nav aria-label="Le due parti della pagina" className="space-y-2">
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Sono due cose diverse: VisuaLex collega l’app AI al tuo account e ai tuoi dossier, online; mcp-legal-it si installa sul
+            Sono due cose diverse: LexCraft collega l’app AI al tuo account e ai tuoi dossier, online; mcp-legal-it si installa sul
             tuo computer e dà all’app AI strumenti di diritto italiano, senza account.
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
@@ -236,7 +236,7 @@ export function ConnectAiAppPage() {
 
         <section id="visualex" aria-labelledby="visualex-title" className={cn(anchorTarget, 'space-y-8')}>
           <h2 id="visualex-title" className={partTitle}>
-            VisuaLex
+            LexCraft
           </h2>
           <section
             aria-labelledby="ai-personal-data"
@@ -261,7 +261,7 @@ export function ConnectAiAppPage() {
 
           <section aria-labelledby="mcp-address" className="space-y-2">
             <h2 id="mcp-address" className={sectionTitle}>
-              L’indirizzo di VisuaLex
+              L’indirizzo di LexCraft
             </h2>
             {state.status === 'loading' && <p className="text-sm text-slate-500">Caricamento…</p>}
             {state.status === 'error' && (

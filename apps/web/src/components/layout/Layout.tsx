@@ -125,7 +125,7 @@ export function Layout() {
   const inLesson = /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname);
   const showPhoneBar = !onSearchPage && !settings.focusMode && !inLesson;
   const storedSection = sectionStore((s) => s.section);
-  const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'VisuaLex';
+  const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'LexCraft';
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [phoneBarElement, setPhoneBarElement] = useState<HTMLElement | null>(null);
   const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname, bar: phoneBarElement });

@@ -264,7 +264,7 @@ export const NO_LINK_WORDS: Record<NoLinkReason, string> = {
   needs_confirmation: 'da confermare',
   left_out: 'lasciate senza link da te',
   invalid_address: 'indirizzo non valido',
-  unanswered: 'VisuaLex non ha ancora risposto',
+  unanswered: 'LexCraft non ha ancora risposto',
   date_incomplete: 'la data dell’atto non è completa',
   article_missing: 'Normattiva non conferma l’articolo in questo atto',
   ambiguous_part: 'l’articolo è sia nel testo sia in un allegato',

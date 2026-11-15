@@ -232,7 +232,7 @@ describe('ForumExploreView - the order of the page', () => {
     window.matchMedia = original;
   });
 
-  it('puts the community\'s grid first on a computer, three columns from xl, and «Pronti da VisuaLex» after it', () => {
+  it('puts the community\'s grid first on a computer, three columns from xl, and «Pronti da LexCraft» after it', () => {
     setDesktop(true);
     renderView({ environments: five, pagination: { page: 1, pages: 1, total: 5 } });
     const cards = screen.getAllByRole('article');
@@ -241,7 +241,7 @@ describe('ForumExploreView - the order of the page', () => {
     // One grid: every card, the same height in its row.
     expect(new Set(cards.map((card) => card.parentElement)).size).toBe(1);
     expect(cards[0]).toHaveClass('h-full', 'flex-col');
-    const packs = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    const packs = screen.getByRole('region', { name: 'Pronti da LexCraft' });
     expect(follows(cards[4], packs)).toBe(true);
   });
 
@@ -249,10 +249,10 @@ describe('ForumExploreView - the order of the page', () => {
     setDesktop(false);
     renderView({ environments: five, pagination: { page: 1, pages: 1, total: 5 } });
     const cards = screen.getAllByRole('article');
-    const packs = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    const packs = screen.getByRole('region', { name: 'Pronti da LexCraft' });
     expect(follows(cards[1], packs)).toBe(true);
     expect(follows(packs, cards[2])).toBe(true);
-    expect(screen.getAllByRole('region', { name: 'Pronti da VisuaLex' })).toHaveLength(1);
+    expect(screen.getAllByRole('region', { name: 'Pronti da LexCraft' })).toHaveLength(1);
     // The tour's first card is still the first.
     expect(cards[0]).toHaveAttribute('id', 'tour-forum-card');
   });
@@ -260,7 +260,7 @@ describe('ForumExploreView - the order of the page', () => {
   it('keeps the strip in its place on a phone while a new read travels: never mounted again', () => {
     setDesktop(false);
     const { rerender } = renderView({ environments: five, pagination: { page: 1, pages: 1, total: 5 } });
-    const packs = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    const packs = screen.getByRole('region', { name: 'Pronti da LexCraft' });
     const props = (loading: boolean) => ({
       environments: five, pagination: { page: 1, pages: 1, total: 5 }, loading, likingIds: new Set<string>(), searchQuery: '',
       setSearchQuery: noop, category: 'all' as const, setCategory: noop, sort: 'newest' as const, setSort: noop,
@@ -270,9 +270,9 @@ describe('ForumExploreView - the order of the page', () => {
       onResetFilters: noop,
     });
     rerender(<ForumExploreView {...props(true)} />);
-    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toBe(packs);
+    expect(screen.getByRole('region', { name: 'Pronti da LexCraft' })).toBe(packs);
     rerender(<ForumExploreView {...props(false)} />);
-    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toBe(packs);
+    expect(screen.getByRole('region', { name: 'Pronti da LexCraft' })).toBe(packs);
   });
 
   // P1: the count's line came with the read and moved the cards down 44 px (CLS 0.12 on a phone), and the cards held in
@@ -299,12 +299,12 @@ describe('ForumExploreView - the order of the page', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Dalla comunità' })).toHaveClass('sr-only');
     // The cards after the strip are not read as its part.
     const more = screen.getByRole('heading', { level: 2, name: 'Altri dossier della comunità' });
-    const packs = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    const packs = screen.getByRole('region', { name: 'Pronti da LexCraft' });
     expect(follows(packs, more) && follows(more, screen.getAllByRole('article')[2])).toBe(true);
     expect(await screen.findByRole('heading', { level: 2, name: 'I più aggiunti' })).toBeInTheDocument();
   });
 
-  it('brings «Pronti da VisuaLex» to the top of the content and focuses it, from /forum#pronti', async () => {
+  it('brings «Pronti da LexCraft» to the top of the content and focuses it, from /forum#pronti', async () => {
     setDesktop(true);
     window.history.replaceState(null, '', '/forum#pronti');
     const scrollTo = vi.fn();
@@ -324,7 +324,7 @@ describe('ForumExploreView - the order of the page', () => {
       unmount();
       (document.activeElement as HTMLElement | null)?.blur();
       render(<ForumExploreViewIn into={scroller} />);
-      await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+      await screen.findByRole('list', { name: 'Pronti da LexCraft' });
       expect(scrollTo).toHaveBeenCalledTimes(1);
       expect(document.activeElement).not.toBe(document.getElementById('pronti'));
     } finally {
@@ -337,7 +337,7 @@ describe('ForumExploreView - the order of the page', () => {
     setDesktop(true);
     renderView();
     const empty = screen.getByText('Ancora nessun dossier nel Forum');
-    const packs = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    const packs = screen.getByRole('region', { name: 'Pronti da LexCraft' });
     expect(follows(empty, packs)).toBe(true);
   });
 });
