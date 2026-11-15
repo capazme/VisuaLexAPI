@@ -70,7 +70,10 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ kind: 'consegna' | 'esci'; origin: HTMLElement | null } | null>(null);
-  const back = () => navigate(coursePath(id));
+  // Whether the attempt was started before, from the course page's exam state; null while that read travels.
+  const [started, setStarted] = useState<boolean | null>(null);
+  // The course page gives the focus back to the exam's command it was entered from (LC12).
+  const back = () => navigate(coursePath(id), { state: { focus: 'esame' } });
 
   const phase = !prova ? 'inizio' : prova.tentativo.consegnatoIl ? 'esito' : 'domande';
   const graded = prova?.domande.filter((d) => d.tipo === 'ESAME') ?? [];
@@ -80,7 +83,7 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
 
   // Each phase opens with its heading focused, so a screen reader hears where it is.
   const heading = useRef<HTMLHeadingElement>(null);
-  useLayoutEffect(() => heading.current?.focus({ preventScroll: true }), [phase]);
+  useLayoutEffect(() => heading.current?.focus({ preventScroll: true }), [phase, started]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -117,6 +120,25 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
     }
   };
 
+  // The address follows the state: the rules with «Inizia» or «Riprendi la prova», or straight the result once handed in
+  // (`inizia` answers it then, writing nothing). A failed read falls back to the rules with «Inizia la prova».
+  useEffect(() => {
+    let live = true;
+    corsiService.get(id).then(
+      async ({ esame }) => {
+        const mine = esame.esameId === esameId;
+        if (mine && (esame.stato === 'superato' || esame.stato === 'non-superato')) await start();
+        if (live) setStarted(mine && esame.stato === 'in-corso');
+      },
+      () => live && setStarted(false),
+    );
+    return () => {
+      live = false;
+    };
+    // Read once per exam: `Exam` is keyed by course and exam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handIn = async () => {
     setConfirm(null);
     setBusy(true);
@@ -136,7 +158,9 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
   let bar: React.ReactNode;
   let line = 'Esame finale';
 
-  if (phase === 'inizio') {
+  if (phase === 'inizio' && started === null) {
+    middle = null;
+  } else if (phase === 'inizio') {
     middle = (
       <div className={cn(COLUMN, 'grid grid-cols-1 gap-5 px-4 pb-10 pt-4 md:pt-8')}>
         <h1 ref={heading} tabIndex={-1} className={TITLE}>
@@ -152,7 +176,7 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
     );
     bar = (
       <button type="button" onClick={() => void start()} disabled={busy} aria-busy={busy || undefined} className={cn(LESSON_PRIMARY, 'disabled:opacity-70')}>
-        {busy ? 'Inizio la prova…' : 'Inizia la prova'}
+        {busy ? 'Inizio la prova…' : started ? 'Riprendi la prova' : 'Inizia la prova'}
       </button>
     );
   } else if (phase === 'domande') {
@@ -186,7 +210,8 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
         type="button"
         disabled={busy}
         aria-busy={busy || undefined}
-        onClick={(event) => (missing > 0 ? setConfirm({ kind: 'consegna', origin: event.currentTarget }) : void handIn())}
+        // One attempt, no way back: the hand-in always asks first (LC12).
+        onClick={(event) => setConfirm({ kind: 'consegna', origin: event.currentTarget })}
         className={cn(LESSON_PRIMARY, 'disabled:opacity-70')}
       >
         {busy ? 'Consegno…' : 'Consegna'}
@@ -241,10 +266,10 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
         title={confirm?.kind === 'consegna' ? 'Consegni la prova?' : 'Esci dalla prova?'}
         message={
           confirm?.kind === 'consegna'
-            ? `${missing === 1 ? '1 domanda è senza risposta' : `${missing} domande sono senza risposta`}: conta come sbagliata. Dopo la consegna non si torna indietro.`
+            ? `${missing === 0 ? '' : `${missing === 1 ? '1 domanda è senza risposta' : `${missing} domande sono senza risposta`}: conta come sbagliata. `}Dopo la consegna non si torna indietro.`
             : 'La prova resta iniziata e la riprendi dal percorso, ma le scelte fatte e il parere scritto vanno persi.'
         }
-        confirmLabel={confirm?.kind === 'consegna' ? 'Consegna lo stesso' : 'Esci'}
+        confirmLabel={confirm?.kind === 'consegna' ? (missing === 0 ? 'Consegna' : 'Consegna lo stesso') : 'Esci'}
         cancelLabel="Continua la prova"
         emphasis="cancel"
         origin={confirm?.origin}
@@ -388,7 +413,7 @@ function OpinionReview({ id, esameId, opinion, parere, spuntate }: { id: string;
             <button type="button" onClick={() => void save()} disabled={state === 'busy'} aria-busy={state === 'busy' || undefined} className={INK_BUTTON}>
               Salva l’autovalutazione
             </button>
-            <p aria-live="polite" className={cn('text-sm font-medium', state === 'failed' ? 'text-red-700 dark:text-red-400' : SUCCESS_TEXT)}>
+            <p role="status" className={cn('text-sm font-medium', state === 'failed' ? 'text-red-700 dark:text-red-400' : SUCCESS_TEXT)}>
               {state === 'saved' ? 'Autovalutazione salvata.' : state === 'failed' ? 'Non registrata: riprova.' : ''}
             </p>
           </div>

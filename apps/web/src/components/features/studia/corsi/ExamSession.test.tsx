@@ -11,13 +11,15 @@ import { apiClient } from '../../../../services/api';
 import { coursesSwitchStore } from './coursesSwitch';
 import { ExamSession } from './ExamSession';
 import type { DomandaEsame, ProvaEsame } from '../../../../types/corsi';
+import { examOf, page } from './__fixtures__/corsi';
 
 const post = vi.mocked(apiClient.post);
+const get = vi.mocked(apiClient.get);
 const BASE = '/lingo/corsi/corso-1/esami/e-1';
 
 function Where() {
-  const { pathname } = useLocation();
-  return <p data-testid="where">{pathname}</p>;
+  const { pathname, state } = useLocation();
+  return <p data-testid="where" data-focus={(state as { focus?: string } | null)?.focus}>{pathname}</p>;
 }
 
 const item = (n: number, over: Partial<DomandaEsame> = {}): DomandaEsame => ({
@@ -128,6 +130,7 @@ describe('the final exam from the web (LC9)', () => {
     expect(screen.getByText('Esame finale · 2 di 2 risposte')).toBeInTheDocument();
     post.mockResolvedValueOnce({ data: handedIn() });
     await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    await pressInDialog(await screen.findByRole('alertdialog'), 'Consegna');
     expect(post).toHaveBeenLastCalledWith(`${BASE}/consegna`, { risposte: [{ domandaId: 'q-1', scelta: 'a' }, { domandaId: 'q-2', scelta: 'b' }] });
     expect(await screen.findByRole('heading', { level: 1, name: 'Esame non superato' })).toHaveFocus();
     expect(screen.getByText(/50% in tutto/)).toBeInTheDocument();
@@ -152,6 +155,18 @@ describe('the final exam from the web (LC9)', () => {
     await waitFor(() => expect(post).toHaveBeenLastCalledWith(`${BASE}/consegna`, { risposte: [{ domandaId: 'q-1', scelta: 'a' }] }));
   });
 
+  it('asks before handing in with every question answered too, without speaking of missing answers (LC12)', async () => {
+    await startExam();
+    await userEvent.click(screen.getByRole('radio', { name: /Prima opzione 1/ }));
+    await userEvent.click(screen.getByRole('radio', { name: /Seconda opzione 2/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Consegni la prova?');
+    expect(dialog).not.toHaveTextContent('senza risposta');
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Continua la prova' })).toHaveFocus());
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps every choice on screen when the hand-in does not arrive, and hands in again', async () => {
     await startExam();
     await userEvent.click(screen.getByRole('radio', { name: /Prima opzione 1/ }));
@@ -159,11 +174,14 @@ describe('the final exam from the web (LC9)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     post.mockRejectedValueOnce({ status: undefined });
     await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    await pressInDialog(await screen.findByRole('alertdialog'), 'Consegna');
     expect(await screen.findByRole('alert')).toHaveTextContent('Non consegnato: riprova.');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull(), { timeout: 2000 });
     expect(screen.getByRole('radio', { name: /Prima opzione 1/ })).toBeChecked();
     expect(screen.getByRole('radio', { name: /Seconda opzione 2/ })).toBeChecked();
     post.mockResolvedValueOnce({ data: handedIn() });
     await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    await pressInDialog(await screen.findByRole('alertdialog'), 'Consegna');
     expect(await screen.findByRole('heading', { level: 1, name: 'Esame non superato' })).toBeInTheDocument();
     warn.mockRestore();
   });
@@ -186,7 +204,7 @@ describe('the final exam from the web (LC9)', () => {
     post.mockResolvedValueOnce({ data: { domandaId: 'q-op', spuntate: [1] } });
     await userEvent.click(screen.getByRole('button', { name: 'Salva l’autovalutazione' }));
     expect(post).toHaveBeenLastCalledWith(`${BASE}/aperta`, { spuntate: [1] });
-    expect(await screen.findByText('Autovalutazione salvata.')).toBeInTheDocument();
+    expect(await screen.findByText('Autovalutazione salvata.')).toHaveAttribute('role', 'status');
   });
 
   it('leaves to the course with nothing chosen, and asks first once something is', async () => {
@@ -196,5 +214,40 @@ describe('the final exam from the web (LC9)', () => {
     const dialog = await screen.findByRole('alertdialog');
     await pressInDialog(dialog, 'Esci');
     expect(await screen.findByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1');
+  });
+
+  it('closing hands the course page the focus back to the exam\'s command (LC12)', async () => {
+    renderExam();
+    await userEvent.click(await screen.findByRole('button', { name: 'Chiudi la prova' }));
+    expect(await screen.findByTestId('where')).toHaveAttribute('data-focus', 'esame');
+  });
+});
+
+describe('the exam\'s address follows the attempt\'s state (LC12)', () => {
+  it('offers «Inizia la prova» on an exam not started, read from the course page', async () => {
+    get.mockResolvedValueOnce({ data: page({ esame: examOf({ stato: 'aperto' }) }) });
+    renderExam();
+    expect(await screen.findByRole('button', { name: 'Inizia la prova' })).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/lingo/corsi/corso-1');
+    expect(screen.getByRole('heading', { level: 1, name: 'Esame finale' })).toHaveFocus();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('offers «Riprendi la prova» on an attempt started', async () => {
+    get.mockResolvedValueOnce({ data: page({ esame: examOf({ stato: 'in-corso' }) }) });
+    renderExam();
+    expect(await screen.findByRole('button', { name: 'Riprendi la prova' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Inizia la prova' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Esame finale' })).toHaveFocus();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('shows the result straight away on an exam handed in, without the rules', async () => {
+    get.mockResolvedValueOnce({ data: page({ esame: examOf({ stato: 'non-superato' }) }) });
+    post.mockResolvedValueOnce({ data: handedIn() });
+    renderExam();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Esame non superato' })).toHaveFocus();
+    expect(post).toHaveBeenCalledWith(`${BASE}/inizia`, {});
+    expect(screen.queryByText(/C’è un solo tentativo/)).toBeNull();
   });
 });

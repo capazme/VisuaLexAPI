@@ -4,15 +4,16 @@ import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../../../services/corsiService', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../services/corsiService')>();
-  return { ...actual, corsiService: { list: vi.fn() } };
+  return { ...actual, corsiService: { list: vi.fn(), get: vi.fn() } };
 });
 
 import { corsiService } from '../../../../services/corsiService';
 import { coursesSwitchStore } from './coursesSwitch';
 import { TodayExam } from './TodayExam';
-import { listed } from './__fixtures__/corsi';
+import { examOf, listed, page } from './__fixtures__/corsi';
 
 const list = vi.mocked(corsiService.list);
+const get = vi.mocked(corsiService.get);
 const renderRow = () => render(<MemoryRouter><TodayExam /></MemoryRouter>);
 
 beforeEach(() => coursesSwitchStore.setState({ state: 'on' }));
@@ -48,5 +49,15 @@ describe('«Oggi»\'s «Simulazione d\'esame» (LC9)', () => {
     await act(async () => {});
     expect(list).toHaveBeenCalled();
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('says «Riprendi la prova» once the attempt is started, as the course page does (LC12)', async () => {
+    list.mockResolvedValue([listed({ prossimo: { tipo: 'esame', id: 'e-1' } })]);
+    get.mockResolvedValue(page({ esame: examOf({ stato: 'in-corso' }) }));
+    renderRow();
+    const go = await screen.findByRole('link', { name: 'Riprendi la prova di «Proprietà intellettuale: i segni distintivi»' });
+    expect(go).toHaveTextContent('Riprendi la prova');
+    expect(go).toHaveAttribute('href', '/learn/percorsi/corso-1/esami/e-1');
+    expect(get).toHaveBeenCalledWith('corso-1');
   });
 });

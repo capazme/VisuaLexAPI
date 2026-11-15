@@ -3,6 +3,7 @@ import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import * as adminService from '../../../services/adminService';
 import { setCoursesSwitch } from '../studia/corsi/coursesSwitch';
 import { Button } from '../../ui/Button';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
 const PANEL = 'rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800';
 const KEY = 'lingo_courses';
@@ -19,6 +20,8 @@ export function CoursesSwitchAdmin() {
   const [round, setRound] = useState(0);
   const [saving, setSaving] = useState(false);
   const [writeFailed, setWriteFailed] = useState(false);
+  // Turning off hides the courses from everyone: it asks first; turning on stays one tap (LC12).
+  const [askingOff, setAskingOff] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -37,6 +40,7 @@ export function CoursesSwitchAdmin() {
 
   const toggle = async () => {
     if (enabled === null) return;
+    setAskingOff(false);
     setSaving(true);
     setWriteFailed(false);
     try {
@@ -71,7 +75,7 @@ export function CoursesSwitchAdmin() {
           <p aria-live="polite" className="text-sm font-medium text-gray-800 dark:text-gray-100">
             {enabled ? 'I percorsi sono accesi.' : 'I percorsi sono spenti.'}
           </p>
-          <Button variant={enabled ? 'outline' : 'primary'} className={TOUCH_TARGET_RESPONSIVE} disabled={saving} onClick={() => void toggle()}>
+          <Button variant={enabled ? 'outline' : 'primary'} className={TOUCH_TARGET_RESPONSIVE} disabled={saving} onClick={() => (enabled ? setAskingOff(true) : void toggle())}>
             {enabled ? 'Spegni i percorsi' : 'Accendi i percorsi'}
           </Button>
         </div>
@@ -81,6 +85,15 @@ export function CoursesSwitchAdmin() {
           Non sono riuscito a cambiare l’interruttore. Riprova.
         </p>
       )}
+      <ConfirmDialog
+        open={askingOff}
+        variant="danger"
+        title="Spegnere i percorsi?"
+        message="Nessuno vedrà più i percorsi finché non li riaccendi; i percorsi già creati restano."
+        confirmLabel="Spegni"
+        onConfirm={() => void toggle()}
+        onCancel={() => setAskingOff(false)}
+      />
     </section>
   );
 }
