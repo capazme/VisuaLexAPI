@@ -1418,7 +1418,7 @@ const appStore = createStore<AppState>()(
                     console.error('Failed to fetch user data:', error);
                     set((state) => {
                         state.isLoadingData = false;
-                        state.dataError = getErrorMessage(error) || 'Failed to load user data';
+                        state.dataError = getErrorMessage(error) || 'Non riesco a leggere i tuoi dati. Riprova tra poco.';
                     });
                 }
             },
