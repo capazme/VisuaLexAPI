@@ -42,7 +42,7 @@ export const WELCOME_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Benvenuto in LexCraft',
-            description: 'Il tuo assistente per la consultazione di normativa italiana ed europea. Ti guideremo alla scoperta delle funzionalità principali.',
+            description: 'Norme italiane ed europee, le sentenze che le leggono e il tuo lavoro sopra. Quattro passi per orientarti: le sezioni, la barra laterale, la ricerca.',
             side: 'over',
             align: 'center',
         }
@@ -59,7 +59,7 @@ export const WELCOME_STEPS: DriveStep[] = [
     {
         element: '#tour-sidebar',
         popover: {
-            title: 'Navigazione Principale',
+            title: 'Navigazione principale',
             description: 'In Work trovi Oggi (con le schede Prossimi giorni e Lista d\'ingresso), Corpus (la ricerca, da cui si apre anche l\'analisi di un documento), i Dossier, e Atti e Anonimizzatore in arrivo. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
@@ -68,8 +68,8 @@ export const WELCOME_STEPS: DriveStep[] = [
     {
         element: '#tour-nav-search',
         popover: {
-            title: 'Inizia a Cercare',
-            description: 'Ricerca (in Work si chiama Corpus) ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce. Prova subito!',
+            title: 'Inizia a cercare',
+            description: 'Ricerca (in Work si chiama Corpus) ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce.',
             side: 'right',
             align: 'start',
         }
@@ -87,7 +87,7 @@ export const SEARCH_STEPS: DriveStep[] = [
     {
         element: '#tour-search-field',
         popover: {
-            title: 'Cerca una Norma',
+            title: 'Cerca una norma',
             description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024": il campo si apre nel menu di ricerca, e Invio cerca. Non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
             side: 'bottom',
             align: 'center',
@@ -105,16 +105,16 @@ export const SEARCH_STEPS: DriveStep[] = [
     {
         element: '#tour-quick-norms',
         popover: {
-            title: 'Norme Preferite',
-            description: 'Le ricerche che ripeti spesso vengono salvate qui per un accesso rapido con un solo click.',
+            title: 'Norme preferite',
+            description: 'Le ricerche che ripeti spesso restano qui, a un clic.',
             side: 'top',
             align: 'center',
         }
     },
     {
         popover: {
-            title: 'Sei Pronto!',
-            description: 'Hai scoperto le funzionalità principali. Ricorda: passa il mouse sulle citazioni per un\'anteprima rapida.',
+            title: 'Ultimo passo',
+            description: 'Passa il mouse su una citazione per vederne l\'anteprima.',
             side: 'over',
             align: 'center',
         }
@@ -132,7 +132,7 @@ export const SEARCH_STEPS: DriveStep[] = [
 export const DOSSIER_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'I tuoi Dossier',
+            title: 'I tuoi dossier',
             description: 'I dossier sono raccolte tematiche per organizzare le tue ricerche: casi, progetti, studi comparativi.',
             side: 'over',
             align: 'center',
@@ -141,7 +141,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
     {
         element: '#tour-dossier-create',
         popover: {
-            title: 'Crea un Nuovo Dossier',
+            title: 'Crea un nuovo dossier',
             description: 'Clicca qui per creare un dossier e assegnare titolo, descrizione e tag. Scorciatoia tastiera: <kbd>n</kbd>.',
             side: 'bottom',
             align: 'start',
@@ -150,7 +150,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
     {
         element: '#tour-dossier-search',
         popover: {
-            title: 'Cerca nei Dossier',
+            title: 'Cerca nei dossier',
             description: 'Cerca per titolo, descrizione o contenuto. Scorciatoia tastiera: <kbd>/</kbd> per mettere a fuoco il campo.',
             side: 'bottom',
             align: 'center',
@@ -177,7 +177,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
     {
         element: '#tour-dossier-card',
         popover: {
-            title: 'Card Dossier',
+            title: 'La scheda di un dossier',
             description: 'Ogni card mostra titolo, tag, quante norme, note e sentenze contiene e quando l\'hai creato. Clicca per aprire.',
             side: 'right',
             align: 'center',
@@ -186,7 +186,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
     {
         element: '#tour-dossier-card-actions',
         popover: {
-            title: 'Azioni Rapide sulla Card',
+            title: 'Azioni rapide sulla scheda',
             description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier sulla Dashboard senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
             side: 'left',
             align: 'center',
@@ -217,7 +217,7 @@ export const HISTORY_STEPS: DriveStep[] = [
     {
         element: '#tour-history-search',
         popover: {
-            title: 'Cerca nella Cronologia',
+            title: 'Cerca nella cronologia',
             description: 'Filtra per tipo di atto, numero o data per trovare velocemente ricerche passate.',
             side: 'bottom',
             align: 'center',
@@ -226,7 +226,7 @@ export const HISTORY_STEPS: DriveStep[] = [
     {
         element: '#tour-history-item',
         popover: {
-            title: 'Elemento Cronologia',
+            title: 'Elemento cronologia',
             description: 'Clicca per rieseguire la ricerca. Ogni voce mostra tipo atto, articoli e data della consultazione.',
             side: 'right',
             align: 'center',
@@ -235,7 +235,7 @@ export const HISTORY_STEPS: DriveStep[] = [
     {
         element: '#tour-history-actions',
         popover: {
-            title: 'Azioni Rapide',
+            title: 'Azioni rapide',
             description: 'Dal menu puoi: salvare come Norma Rapida, aggiungere a un Dossier o eliminare dalla cronologia.',
             side: 'left',
             align: 'center',
@@ -244,7 +244,7 @@ export const HISTORY_STEPS: DriveStep[] = [
     {
         element: '#tour-history-quick-norm',
         popover: {
-            title: 'Salva come Norma Rapida',
+            title: 'Salva come norma rapida',
             description: 'Le norme che consulti spesso meritano un accesso veloce. Salvale qui per trovarle sempre a portata di click.',
             side: 'left',
             align: 'center',
@@ -327,7 +327,7 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
         element: '[cmdk-input]',
         popover: {
-            title: 'Ricerca intelligente',
+            title: 'Ricerca veloce',
             description: 'Scrivi la citazione come la scriveresti: "art. 2043 c.c.", "l. 241/1990", "Cass. civ. 10787/2024". Mentre scrivi, il campo filtra anche l\'elenco degli atti.',
             side: 'bottom',
             align: 'center',
@@ -359,7 +359,7 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
 export const STUDY_MODE_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Modalità Studio',
+            title: 'Modalità studio',
             description: 'Benvenuto nella modalità studio: lettura immersiva a schermo intero per concentrarti sul testo.',
             side: 'over',
             align: 'center',
@@ -368,7 +368,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
     {
         element: '#tour-study-close',
         popover: {
-            title: 'Chiudi Modalità Studio',
+            title: 'Chiudi modalità studio',
             description: 'Premi Escape o clicca qui per tornare alla vista normale.',
             side: 'bottom',
             align: 'end',
@@ -377,7 +377,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
     {
         element: '#tour-study-typography',
         popover: {
-            title: 'Controlli Tipografia',
+            title: 'Controlli tipografia',
             description: 'Regola dimensione del font e interlinea per una lettura ottimale secondo le tue preferenze.',
             side: 'bottom',
             align: 'center',
@@ -386,7 +386,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
     {
         element: '#tour-study-theme',
         popover: {
-            title: 'Tema di Lettura',
+            title: 'Tema di lettura',
             description: 'Scegli tra chiaro, scuro o seppia. Ogni tema è studiato per ridurre l\'affaticamento visivo.',
             side: 'bottom',
             align: 'center',
@@ -395,7 +395,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
     {
         element: '#study-mode-article-body',
         popover: {
-            title: 'Area di Lettura',
+            title: 'Area di lettura',
             description: 'Il testo dell\'articolo in formato ottimizzato. Seleziona per evidenziare o aggiungere note.',
             side: 'top',
             align: 'center',
@@ -404,7 +404,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
     {
         element: '#tour-study-notes',
         popover: {
-            title: 'Pannello Note',
+            title: 'Pannello note',
             description: 'Note ed evidenziazioni: seleziona il testo e scegli un colore, o aggiungi un\'annotazione personale. Vengono salvate automaticamente e le ritrovi anche fuori dalla modalità studio.',
             side: 'left',
             align: 'center',
@@ -413,7 +413,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
     {
         element: '#tour-study-navigation',
         popover: {
-            title: 'Navigazione Articoli',
+            title: 'Navigazione articoli',
             description: 'Passa all\'articolo precedente o successivo senza uscire dalla modalità studio.',
             side: 'top',
             align: 'center',
@@ -428,7 +428,7 @@ export const TREE_VIEW_STEPS: DriveStep[] = [
     {
         element: '#tour-tree-header',
         popover: {
-            title: 'Struttura Documento',
+            title: 'Struttura documento',
             description: 'Visualizza l\'indice completo della norma: libri, titoli, capi, sezioni e articoli.',
             side: 'right',
             align: 'start',
@@ -437,7 +437,7 @@ export const TREE_VIEW_STEPS: DriveStep[] = [
     {
         element: '#tour-tree-structure',
         popover: {
-            title: 'Navigazione Gerarchica',
+            title: 'Navigazione gerarchica',
             description: 'Espandi le sezioni per vedere i contenuti. La struttura riflette l\'organizzazione ufficiale della norma.',
             side: 'right',
             align: 'center',
@@ -464,7 +464,7 @@ export const PRACTICE_STEPS: DriveStep[] = [
     {
         element: '#tour-practice-bar',
         popover: {
-            title: 'Le Pratiche',
+            title: 'Le pratiche',
             description: 'Ogni pratica è un tavolo di lavoro con le norme e le sentenze di una questione. Qui passi dall\'una all\'altra, ne apri una nuova e le riordini trascinando.',
             side: 'top',
             align: 'center',
@@ -473,7 +473,7 @@ export const PRACTICE_STEPS: DriveStep[] = [
     {
         element: '#tour-practice-header',
         popover: {
-            title: 'Il Tavolo',
+            title: 'Il tavolo',
             description: 'Il nome della pratica (doppio clic per cambiarlo), quanto contiene e il menu delle azioni. Le ricerche e gli articoli che apri finiscono qui.',
             side: 'bottom',
             align: 'start',
@@ -482,7 +482,7 @@ export const PRACTICE_STEPS: DriveStep[] = [
     {
         element: '#tour-practice-save',
         popover: {
-            title: 'Salva come Dossier',
+            title: 'Salva come dossier',
             description: 'Trasforma il tavolo in un dossier: gli articoli e le sentenze restano al loro posto, con il testo che stavi leggendo.',
             side: 'bottom',
             align: 'end',
@@ -491,7 +491,7 @@ export const PRACTICE_STEPS: DriveStep[] = [
     {
         element: '.practice-act',
         popover: {
-            title: 'Un Atto sul Tavolo',
+            title: 'Un atto sul tavolo',
             description: 'Le norme sono raggruppate per atto, con i suoi articoli in fila: aprine uno per leggerlo qui, sul posto.',
             side: 'top',
             align: 'start',
@@ -506,7 +506,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
         element: '.practice-act-head',
         popover: {
-            title: 'Intestazione dell\'Atto',
+            title: 'Intestazione dell\'atto',
             description: 'Tipo, numero e data dell\'atto. Clicca per comprimerlo, trascina la maniglia per riordinare, usa il menu per spostarlo in un\'altra pratica o toglierlo.',
             side: 'bottom',
             align: 'start',
@@ -515,7 +515,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
         element: '.practice-act-index',
         popover: {
-            title: 'Gli Articoli sul Tavolo',
+            title: 'Gli articoli sul tavolo',
             description: 'Un chip per ogni articolo caricato: cliccalo per aprire e raggiungere la riga. Con le frecce scorri anche quelli non ancora caricati.',
             side: 'bottom',
             align: 'start',
@@ -524,7 +524,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
         element: '.practice-row-beside',
         popover: {
-            title: 'Apri Accanto',
+            title: 'Apri accanto',
             description: 'Leggi un articolo o una sentenza in una finestra accanto al tavolo, per confrontarli senza perdere il posto. Se ne aprono due alla volta.',
             side: 'left',
             align: 'center',
@@ -533,7 +533,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
         element: '.practice-act-study',
         popover: {
-            title: 'Modalità Studio',
+            title: 'Modalità studio',
             description: 'Lettura immersiva a schermo intero con opzioni di tipografia e presa appunti.',
             side: 'bottom',
             align: 'center',
@@ -542,7 +542,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
         element: '.practice-act-structure',
         popover: {
-            title: 'Struttura Atto',
+            title: 'Struttura atto',
             description: 'Visualizza l\'indice completo con titoli, capi e sezioni. Clicca un articolo per caricarlo sul tavolo.',
             side: 'bottom',
             align: 'center',
@@ -551,7 +551,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
         element: '.glass-toolbar',
         popover: {
-            title: 'Barra Strumenti',
+            title: 'Barra strumenti',
             description: 'In una riga aperta: note personali, evidenziatore, glosse, ricerca nel testo, copia, esportazione e altro.',
             side: 'bottom',
             align: 'center',
@@ -566,7 +566,7 @@ export const QUICK_NORMS_STEPS: DriveStep[] = [
     {
         element: '#tour-quicknorms-panel',
         popover: {
-            title: 'Le tue Norme Rapide',
+            title: 'Le tue norme rapide',
             description: 'Qui trovi le norme che hai salvato per un accesso veloce. Un click per aprirle.',
             side: 'top',
             align: 'center',
@@ -575,7 +575,7 @@ export const QUICK_NORMS_STEPS: DriveStep[] = [
     {
         element: '#tour-qn-add',
         popover: {
-            title: 'Aggiungi Norma',
+            title: 'Aggiungi norma',
             description: 'Parti da una ricerca o compila i campi a mano, dai un nome e salva: la ricerca resta a un click.',
             side: 'bottom',
             align: 'center',
@@ -584,7 +584,7 @@ export const QUICK_NORMS_STEPS: DriveStep[] = [
     {
         element: '#tour-quicknorms-item',
         popover: {
-            title: 'Usa Norma Rapida',
+            title: 'Usa norma rapida',
             description: 'Clicca per eseguire la ricerca. Il badge mostra quante volte l\'hai usata.',
             side: 'right',
             align: 'center',
