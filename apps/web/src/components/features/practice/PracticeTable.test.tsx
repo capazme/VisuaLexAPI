@@ -174,25 +174,35 @@ describe('PracticeTable: «Salva come dossier» (spec §7)', () => {
     expect(dossierService.addItem).toHaveBeenCalledTimes(2);
   });
 
-  it('«Aggiungi a un dossier…» lists the dossiers and adds to the picked one', async () => {
+  it('one article (LC28, the simple reading): no practice header; «Salva come dossier» sits in the act\'s «⋯»', async () => {
     const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().renamePractice(practiceId, 'Pratica');
+    render(table());
+    expect(screen.queryByRole('button', { name: 'Altre azioni per la pratica Pratica' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Azioni su / }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Salva come dossier' }));
+    expect(await screen.findByText('Salvato nel dossier «Pratica»: 1 articolo')).toBeInTheDocument();
+  });
+
+  it('«Aggiungi a un dossier…» lists the dossiers and adds to the picked one', async () => {
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Pratica' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).getByRole('button', { name: /Esistente/ }));
-    expect(await screen.findByText('Salvato nel dossier «Esistente»: 1 articolo')).toBeInTheDocument();
+    expect(await screen.findByText('Salvato nel dossier «Esistente»: 2 articoli')).toBeInTheDocument();
     expect(dossierService.create).not.toHaveBeenCalled();
   });
 
   it('the header\'s own button saves; the outcome sits in the toast band, outside the table', async () => {
-    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().renamePractice(practiceId, 'Appalti');
     render(table());
     const header = screen.getByRole('heading', { name: 'Appalti' }).closest('header') as HTMLElement;
     fireEvent.click(within(header).getByRole('button', { name: 'Salva come dossier' }));
-    const message = await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo');
+    const message = await screen.findByText('Salvato nel dossier «Appalti»: 2 articoli');
     const toast = message.closest('[role="alert"]') as HTMLElement;
     expect(toast.closest('[data-testid="practice-table"]')).toBeNull();
     expect(toast.className).toContain(Z_INDEX.toast);
@@ -202,7 +212,7 @@ describe('PracticeTable: «Salva come dossier» (spec §7)', () => {
   it('one save at a time: the button and the menu entries are disabled while it runs, a second click makes no second dossier', async () => {
     let finish: (value: unknown) => void = () => {};
     vi.mocked(dossierService.create).mockReturnValue(new Promise((resolve) => { finish = resolve; }) as never);
-    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().renamePractice(practiceId, 'Appalti');
     render(table());
     const button = screen.getByRole('button', { name: 'Salva come dossier' });
@@ -213,13 +223,13 @@ describe('PracticeTable: «Salva come dossier» (spec §7)', () => {
     expect(screen.getByRole('menuitem', { name: 'Salva come dossier' })).toBeDisabled();
     expect(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' })).toBeDisabled();
     await act(async () => { finish({ id: 'srv-d', name: 'x', created_at: '2026-10-12T00:00:00Z' }); });
-    expect(await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo')).toBeInTheDocument();
+    expect(await screen.findByText('Salvato nel dossier «Appalti»: 2 articoli')).toBeInTheDocument();
     expect(dossierService.create).toHaveBeenCalledTimes(1);
     expect(button).not.toBeDisabled();
   });
 
   it('«Aggiungi a un dossier…» is a modal dialog: the focus moves in, Tab stays in, Esc gives it back to «⋯»', async () => {
-    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());

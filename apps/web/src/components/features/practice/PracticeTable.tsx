@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { FolderPlus, MoreHorizontal, Pencil, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FolderPlus, MoreHorizontal, Pencil, Plus, X } from 'lucide-react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import type { ArticleData } from '../../../types';
@@ -12,6 +12,7 @@ import { closePracticeWithUndo } from './practiceUndo';
 import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
+import { SimpleReadingContext, isSimplePractice } from './simpleReading';
 import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
 
 export interface PracticeTableProps {
@@ -48,16 +49,23 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
     tryStartTour('practice');
   });
   if (!practice) return null;
+  const simple = layout === 'overview' && isSimplePractice(practice);
   return (
     // The frame's width (U1): its rows widen, the text they open stays at the reading measure (`.vlx-art`).
-    <div data-testid="practice-table" className="w-full space-y-3">
-      <PracticeHeader practice={practice} compact={layout === 'index'} />
-      <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
-      {isEmptyPractice(practice) ? (
-        <PracticeEmpty />
-      ) : (
-        <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} layout={layout} />
-      )}
+    <div
+      data-testid="practice-table"
+      // Lettura semplice (LC28): the article takes the room it needs, the measure; the whole frame only when its margin
+      // has notes or glosses to set beside the text (`AnnotationMargin` needs 52rem for its column).
+      className={cn('w-full space-y-3', simple && 'max-w-[44rem] has-[[data-margin-content]]:max-w-none')}
+    >
+      <PracticeHeader practice={practice} compact={layout === 'index'} simple={simple}>
+        <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
+        {isEmptyPractice(practice) ? (
+          <PracticeEmpty />
+        ) : (
+          <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} layout={layout} />
+        )}
+      </PracticeHeader>
     </div>
   );
 }
@@ -66,13 +74,34 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
 const INDEX_TITLE = 'font-serif text-[22px] font-medium leading-tight text-slate-900 dark:text-white';
 
 /** In the index (`compact`) the name is smaller and «Salva come dossier» is a 44 px icon beside «⋯». */
-function PracticeHeader({ practice, compact }: { practice: Practice; compact: boolean }) {
+function PracticeHeader({ practice, compact, simple, children }: { practice: Practice; compact: boolean; simple: boolean; children: ReactNode }) {
   const renamePractice = useAppStore((s) => s.renamePractice);
+  const createPractice = useAppStore((s) => s.createPractice);
   const [editing, setEditing] = useState(false);
   const countLine = practiceCountLine(practiceCounts(practice));
   const save = usePracticeSaveActions(practice.id);
+  // Lettura semplice (LC28): the practice's actions ride the act's «⋯»; its name stays for a screen reader.
+  const reading = useMemo(() => ({
+    simple,
+    practiceItems: simple ? [
+      ...save.items.map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item)),
+      { label: 'Nuova pratica', icon: Plus, onSelect: () => { createPractice('Nuova pratica', { activate: true }); } },
+      { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
+    ] : [],
+  }), [simple, save.items, createPractice, practice.id]);
+
+  if (simple) {
+    return (
+      <>
+        <h2 id="tour-practice-header" className="sr-only">{practice.label}</h2>
+        {save.overlay}
+        <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>
+      </>
+    );
+  }
 
   return (
+    <>
     <header
       id="tour-practice-header"
       data-pinned-head
@@ -130,5 +159,7 @@ function PracticeHeader({ practice, compact }: { practice: Practice; compact: bo
       </MenuButton>
       {save.overlay}
     </header>
+    <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>
+    </>
   );
 }

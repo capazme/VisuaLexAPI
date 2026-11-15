@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, LocateFixed, Plus, Send, X } from 'lucide-react';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../types';
 import { articleDiscussionService, type DiscussionAnchor } from '../../../services/articleDiscussionService';
@@ -149,6 +149,16 @@ export function ArticleDiscussionPanel({
 
   // Fetch only while the panel is shown.
   useEffect(() => { if (isOpen) void load(); }, [isOpen, load]);
+
+  // The focus goes into the side view when it opens and back to what opened it when it closes (Esc or «Chiudi»), or,
+  // if that is gone (the margin's card redrawn), stays where the page puts it (R-32).
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    panelRef.current?.focus({ preventScroll: true });
+    return () => { if (opener?.isConnected) opener.focus({ preventScroll: true }); };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -315,34 +325,39 @@ export function ArticleDiscussionPanel({
   };
 
   return createPortal(
+    // A side view, not a box over the text (Luca, 15-11: «sarebbe meglio averlo in visualizzazione laterale»): the
+    // window's right edge, its whole height, in from the right; the text stays where it is, in sight.
     <motion.section
-      drag
-      dragMomentum={false}
-      initial={{ opacity: 0, scale: 0.96, y: -8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+      ref={panelRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="article-discussions-title"
-      className={cn('fixed right-4 top-20 flex w-[min(36rem,calc(100vw-2rem))] max-h-[75vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900', Z_INDEX.structure)}
+      className={cn('fixed inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-slate-200 bg-card shadow-lg outline-none sm:w-[24rem] dark:border-slate-800', Z_INDEX.structure)}
     >
       <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <MessageCircle size={18} className="text-primary-500" />
-          <h3 id="article-discussions-title" className="font-semibold text-slate-900 dark:text-white">{heading}</h3>
-          {label && <span className="text-xs text-slate-400">{label}</span>}
+      {/* The title and its close on one line; the order and «Nuova glossa» under them. */}
+      <div className="mb-4 grid gap-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 id="article-discussions-title" className="inline font-serif text-xl leading-tight text-slate-900 dark:text-white">{heading}</h3>
+            {label && <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{label}</span>}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="-mr-2 -mt-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 md:min-h-0 md:min-w-0 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+            <X size={18} />
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className={cn('text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5', TOUCH)}>
+        <div className="flex items-center justify-between gap-2">
+          <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className={cn('text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-card px-2 py-1.5', TOUCH)}>
             <option value="recent">Recenti</option>
             <option value="active">Attive</option>
             <option value="popular">Più votate</option>
           </select>
           <button type="button" onClick={() => setComposerOpen(value => !value)} className={cn('inline-flex items-center gap-1.5 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700', TOUCH)}>
             <Plus size={14} /> Nuova glossa
-          </button>
-          <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 md:min-h-0 md:min-w-0 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-            <X size={18} />
           </button>
         </div>
       </div>

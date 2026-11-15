@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
+import { useSimpleReading } from './simpleReading';
 import { Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -32,6 +33,7 @@ export interface PracticeArticleRowProps {
 export function PracticeArticleRow({
   practiceId, actId, article, onCrossReference, onOpenStudyMode, annexSuggestion,
 }: PracticeArticleRowProps) {
+  const { simple } = useSimpleReading();
   const articleKey = practiceArticleKey(article);
   const rowKey = articleRowKey(practiceId, actId, articleKey);
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
@@ -76,6 +78,22 @@ export function PracticeArticleRow({
   // read alike, and the version, so two texts of one article neither.
   const named = shortNorm(norma)
     + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '');
+
+  // Lettura semplice (LC28): the article alone, its own heading in the text («Art. 530 / Sentenza di assoluzione») the
+  // only one; no row heading repeating it, no fold. The reading toolbar pins under the act's heading as in the table.
+  if (simple) {
+    return (
+      <div className="pt-2" style={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}>
+        {annexSuggestion}
+        <ArticleTabContent
+          data={article}
+          onCrossReferenceNavigate={onCrossReference}
+          onOpenStudyMode={onOpenStudyMode}
+          readingOrigin={readingOrigin}
+        />
+      </div>
+    );
+  }
 
   return (
     <PracticeRowShell
