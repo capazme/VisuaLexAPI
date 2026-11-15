@@ -209,7 +209,8 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
         type="button"
         disabled={busy}
         aria-busy={busy || undefined}
-        onClick={(event) => (missing > 0 ? setConfirm({ kind: 'consegna', origin: event.currentTarget }) : void handIn())}
+        // One attempt, no way back: the hand-in always asks first (LC12).
+        onClick={(event) => setConfirm({ kind: 'consegna', origin: event.currentTarget })}
         className={cn(LESSON_PRIMARY, 'disabled:opacity-70')}
       >
         {busy ? 'Consegno…' : 'Consegna'}
@@ -264,10 +265,10 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
         title={confirm?.kind === 'consegna' ? 'Consegni la prova?' : 'Esci dalla prova?'}
         message={
           confirm?.kind === 'consegna'
-            ? `${missing === 1 ? '1 domanda è senza risposta' : `${missing} domande sono senza risposta`}: conta come sbagliata. Dopo la consegna non si torna indietro.`
+            ? `${missing === 0 ? '' : `${missing === 1 ? '1 domanda è senza risposta' : `${missing} domande sono senza risposta`}: conta come sbagliata. `}Dopo la consegna non si torna indietro.`
             : 'La prova resta iniziata e la riprendi dal percorso, ma le scelte fatte e il parere scritto vanno persi.'
         }
-        confirmLabel={confirm?.kind === 'consegna' ? 'Consegna lo stesso' : 'Esci'}
+        confirmLabel={confirm?.kind === 'consegna' ? (missing === 0 ? 'Consegna' : 'Consegna lo stesso') : 'Esci'}
         cancelLabel="Continua la prova"
         emphasis="cancel"
         origin={confirm?.origin}

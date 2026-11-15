@@ -130,6 +130,7 @@ describe('the final exam from the web (LC9)', () => {
     expect(screen.getByText('Esame finale · 2 di 2 risposte')).toBeInTheDocument();
     post.mockResolvedValueOnce({ data: handedIn() });
     await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    await pressInDialog(await screen.findByRole('alertdialog'), 'Consegna');
     expect(post).toHaveBeenLastCalledWith(`${BASE}/consegna`, { risposte: [{ domandaId: 'q-1', scelta: 'a' }, { domandaId: 'q-2', scelta: 'b' }] });
     expect(await screen.findByRole('heading', { level: 1, name: 'Esame non superato' })).toHaveFocus();
     expect(screen.getByText(/50% in tutto/)).toBeInTheDocument();
@@ -154,6 +155,18 @@ describe('the final exam from the web (LC9)', () => {
     await waitFor(() => expect(post).toHaveBeenLastCalledWith(`${BASE}/consegna`, { risposte: [{ domandaId: 'q-1', scelta: 'a' }] }));
   });
 
+  it('asks before handing in with every question answered too, without speaking of missing answers (LC12)', async () => {
+    await startExam();
+    await userEvent.click(screen.getByRole('radio', { name: /Prima opzione 1/ }));
+    await userEvent.click(screen.getByRole('radio', { name: /Seconda opzione 2/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Consegni la prova?');
+    expect(dialog).not.toHaveTextContent('senza risposta');
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Continua la prova' })).toHaveFocus());
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps every choice on screen when the hand-in does not arrive, and hands in again', async () => {
     await startExam();
     await userEvent.click(screen.getByRole('radio', { name: /Prima opzione 1/ }));
@@ -161,11 +174,14 @@ describe('the final exam from the web (LC9)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     post.mockRejectedValueOnce({ status: undefined });
     await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    await pressInDialog(await screen.findByRole('alertdialog'), 'Consegna');
     expect(await screen.findByRole('alert')).toHaveTextContent('Non consegnato: riprova.');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull(), { timeout: 2000 });
     expect(screen.getByRole('radio', { name: /Prima opzione 1/ })).toBeChecked();
     expect(screen.getByRole('radio', { name: /Seconda opzione 2/ })).toBeChecked();
     post.mockResolvedValueOnce({ data: handedIn() });
     await userEvent.click(screen.getByRole('button', { name: 'Consegna' }));
+    await pressInDialog(await screen.findByRole('alertdialog'), 'Consegna');
     expect(await screen.findByRole('heading', { level: 1, name: 'Esame non superato' })).toBeInTheDocument();
     warn.mockRestore();
   });
