@@ -70,6 +70,8 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ kind: 'consegna' | 'esci'; origin: HTMLElement | null } | null>(null);
+  // Whether the attempt was started before, from the course page's exam state; null while that read travels.
+  const [started, setStarted] = useState<boolean | null>(null);
   const back = () => navigate(coursePath(id));
 
   const phase = !prova ? 'inizio' : prova.tentativo.consegnatoIl ? 'esito' : 'domande';
@@ -80,7 +82,7 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
 
   // Each phase opens with its heading focused, so a screen reader hears where it is.
   const heading = useRef<HTMLHeadingElement>(null);
-  useLayoutEffect(() => heading.current?.focus({ preventScroll: true }), [phase]);
+  useLayoutEffect(() => heading.current?.focus({ preventScroll: true }), [phase, started]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -117,6 +119,25 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
     }
   };
 
+  // The address follows the state: the rules with «Inizia» or «Riprendi la prova», or straight the result once handed in
+  // (`inizia` answers it then, writing nothing). A failed read falls back to the rules with «Inizia la prova».
+  useEffect(() => {
+    let live = true;
+    corsiService.get(id).then(
+      async ({ esame }) => {
+        const mine = esame.esameId === esameId;
+        if (mine && (esame.stato === 'superato' || esame.stato === 'non-superato')) await start();
+        if (live) setStarted(mine && esame.stato === 'in-corso');
+      },
+      () => live && setStarted(false),
+    );
+    return () => {
+      live = false;
+    };
+    // Read once per exam: `Exam` is keyed by course and exam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handIn = async () => {
     setConfirm(null);
     setBusy(true);
@@ -136,7 +157,9 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
   let bar: React.ReactNode;
   let line = 'Esame finale';
 
-  if (phase === 'inizio') {
+  if (phase === 'inizio' && started === null) {
+    middle = null;
+  } else if (phase === 'inizio') {
     middle = (
       <div className={cn(COLUMN, 'grid grid-cols-1 gap-5 px-4 pb-10 pt-4 md:pt-8')}>
         <h1 ref={heading} tabIndex={-1} className={TITLE}>
@@ -152,7 +175,7 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
     );
     bar = (
       <button type="button" onClick={() => void start()} disabled={busy} aria-busy={busy || undefined} className={cn(LESSON_PRIMARY, 'disabled:opacity-70')}>
-        {busy ? 'Inizio la prova…' : 'Inizia la prova'}
+        {busy ? 'Inizio la prova…' : started ? 'Riprendi la prova' : 'Inizia la prova'}
       </button>
     );
   } else if (phase === 'domande') {

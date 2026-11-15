@@ -11,8 +11,10 @@ import { apiClient } from '../../../../services/api';
 import { coursesSwitchStore } from './coursesSwitch';
 import { ExamSession } from './ExamSession';
 import type { DomandaEsame, ProvaEsame } from '../../../../types/corsi';
+import { examOf, page } from './__fixtures__/corsi';
 
 const post = vi.mocked(apiClient.post);
+const get = vi.mocked(apiClient.get);
 const BASE = '/lingo/corsi/corso-1/esami/e-1';
 
 function Where() {
@@ -196,5 +198,34 @@ describe('the final exam from the web (LC9)', () => {
     const dialog = await screen.findByRole('alertdialog');
     await pressInDialog(dialog, 'Esci');
     expect(await screen.findByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1');
+  });
+});
+
+describe('the exam\'s address follows the attempt\'s state (LC12)', () => {
+  it('offers «Inizia la prova» on an exam not started, read from the course page', async () => {
+    get.mockResolvedValueOnce({ data: page({ esame: examOf({ stato: 'aperto' }) }) });
+    renderExam();
+    expect(await screen.findByRole('button', { name: 'Inizia la prova' })).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/lingo/corsi/corso-1');
+    expect(screen.getByRole('heading', { level: 1, name: 'Esame finale' })).toHaveFocus();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('offers «Riprendi la prova» on an attempt started', async () => {
+    get.mockResolvedValueOnce({ data: page({ esame: examOf({ stato: 'in-corso' }) }) });
+    renderExam();
+    expect(await screen.findByRole('button', { name: 'Riprendi la prova' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Inizia la prova' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Esame finale' })).toHaveFocus();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('shows the result straight away on an exam handed in, without the rules', async () => {
+    get.mockResolvedValueOnce({ data: page({ esame: examOf({ stato: 'non-superato' }) }) });
+    post.mockResolvedValueOnce({ data: handedIn() });
+    renderExam();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Esame non superato' })).toHaveFocus();
+    expect(post).toHaveBeenCalledWith(`${BASE}/inizia`, {});
+    expect(screen.queryByText(/C’è un solo tentativo/)).toBeNull();
   });
 });
