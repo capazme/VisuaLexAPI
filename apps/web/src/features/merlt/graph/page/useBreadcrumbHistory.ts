@@ -29,7 +29,7 @@ function persist(entries: BreadcrumbEntry[]): void {
 
 /**
  * Session-scoped navigation history of graph centers (max 5). Backed by
- * sessionStorage so it survives a /grafo refresh but not a new tab/session.
+ * sessionStorage so it survives a /labs/grafo refresh but not a new tab/session.
  * Consecutive pushes of the same urn update the label in place rather than
  * duplicating, so re-centering on the current node is a no-op visually.
  */

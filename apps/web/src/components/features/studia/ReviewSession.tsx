@@ -29,7 +29,7 @@ import { useReviewSession, type ReviewSummary } from './useReviewSession';
 import { CoursesGate } from './corsi/CoursesGate';
 import { useCoursesSwitch } from './corsi/coursesSwitch';
 
-const HOME_PATH = '/studia/ripasso';
+const HOME_PATH = '/learn/ripasso';
 
 /** The lesson's column: the card and the header's row share its width (the bar's actions sit in a narrower one). */
 const COLUMN = 'mx-auto w-full max-w-3xl';
@@ -223,7 +223,7 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
 }
 
 /**
- * A review session (`/studia/ripasso/sessione?materia=&istituto=`, or `?corso=` for one course of «Percorsi»), drawn as the lesson (Gymnasium spec §5.4): at the top the
+ * A review session (`/learn/ripasso/sessione?materia=&istituto=`, or `?corso=` for one course of «Percorsi»), drawn as the lesson (Gymnasium spec §5.4): at the top the
  * close button and the progress bar, in the middle the card, at the foot the bar with the one action available. The
  * queue lives in `useReviewSession`, so opening and closing an anchor's article leaves it as it was. While a card is
  * on screen, closing (the button or Esc) asks before leaving — what was graded is already recorded; with no card

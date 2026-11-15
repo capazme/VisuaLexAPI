@@ -15,7 +15,7 @@ import { QUIET_BUTTON } from '../studia/progress/tokens';
  */
 export function OpusPage() {
   const { pathname } = useLocation();
-  const inTrash = pathname.startsWith('/opus/cestino');
+  const inTrash = pathname.startsWith('/work/cestino');
   return (
     <PageFrame
       // The view's name, from the one list of the pages' names (L-37).
@@ -24,7 +24,7 @@ export function OpusPage() {
       section="opus"
       className="h-full"
       action={!inTrash && (
-        <Link to="/opus/cestino" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5')}>
+        <Link to="/work/cestino" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5')}>
           <Trash2 size={15} aria-hidden />
           Cestino dei compiti
         </Link>

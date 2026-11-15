@@ -6,7 +6,7 @@ import type { AsyncSlice } from './useHubData';
 
 /**
  * Valida proposte card (§3.3). Shows the live count of proposals awaiting the
- * user's vote ("N proposte in attesa") → /merlt/valida. Zero is shown, not
+ * user's vote ("N proposte in attesa") → /labs/valida. Zero is shown, not
  * hidden. Requires `full` consent (canValidate): when not, the action says so
  * (S7b) — not an error.
  */
@@ -23,7 +23,7 @@ export function ValidateCard({ canValidate, consentGate = 'known', pendingCount 
   const action = !canValidate ? (
     gatedAction(consentGate, 'completo')
   ) : (
-    <HubAction to="/merlt/valida">{waiting ? 'Vota ora' : 'Apri la coda'}</HubAction>
+    <HubAction to="/labs/valida">{waiting ? 'Vota ora' : 'Apri la coda'}</HubAction>
   );
 
   return (

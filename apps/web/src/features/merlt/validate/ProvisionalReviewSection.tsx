@@ -11,7 +11,7 @@ export interface ProvisionalReviewSectionProps {
 
 /**
  * Slice C wave 2: the "doubtful provisional nodes" review section of
- * /merlt/valida. These are graph nodes the hygiene sweep quarantined (faded but
+ * /labs/valida. These are graph nodes the hygiene sweep quarantined (faded but
  * with human signal) instead of auto-pruning; a reviewer promotes (approve) or
  * discards (reject) the EXISTING node — there is no consensus queue here, the
  * decision applies immediately.

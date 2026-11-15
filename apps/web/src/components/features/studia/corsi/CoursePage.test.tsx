@@ -46,10 +46,10 @@ function Where() {
 
 function renderPage(id = 'corso-1') {
   return render(
-    <MemoryRouter initialEntries={[`/studia/percorsi/${id}`]}>
+    <MemoryRouter initialEntries={[`/learn/percorsi/${id}`]}>
       <Routes>
-        <Route path="/studia/percorsi/:id" element={<CoursePage />} />
-        <Route path="/studia/percorsi" element={<Where />} />
+        <Route path="/learn/percorsi/:id" element={<CoursePage />} />
+        <Route path="/learn/percorsi" element={<Where />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -103,9 +103,9 @@ describe('the course page', () => {
     renderPage();
     const modules = await screen.findByRole('region', { name: 'Moduli' });
     const rows = within(modules).getAllByRole('listitem');
-    expect(within(rows[0]).getByRole('link', { name: 'Rileggi il modulo 1, Titolo del modulo 1' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-1');
-    expect(within(rows[1]).getByRole('link', { name: 'Riprendi il modulo 2, Titolo del modulo 2' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-2');
-    expect(within(rows[2]).getByRole('link', { name: 'Apri il modulo 3, Titolo del modulo 3' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-3');
+    expect(within(rows[0]).getByRole('link', { name: 'Rileggi il modulo 1, Titolo del modulo 1' })).toHaveAttribute('href', '/learn/percorsi/corso-1/moduli/m-1');
+    expect(within(rows[1]).getByRole('link', { name: 'Riprendi il modulo 2, Titolo del modulo 2' })).toHaveAttribute('href', '/learn/percorsi/corso-1/moduli/m-2');
+    expect(within(rows[2]).getByRole('link', { name: 'Apri il modulo 3, Titolo del modulo 3' })).toHaveAttribute('href', '/learn/percorsi/corso-1/moduli/m-3');
   });
 
   it('deletes a module never opened to the trash, with «Annulla» restoring it', async () => {
@@ -280,7 +280,7 @@ describe('the course page', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Azioni del percorso' }));
     await user.click(screen.getByRole('menuitem', { name: /Elimina/ }));
-    expect(await screen.findByTestId('where')).toHaveTextContent('/studia/percorsi');
+    expect(await screen.findByTestId('where')).toHaveTextContent('/learn/percorsi');
     expect(lastMessage()).toBe('Percorso «Proprietà intellettuale: i segni distintivi» spostato nel cestino. Il dossier «Segni distintivi» resta in Dossier.');
     await undoNotification(notificationStore.getState().entries.at(-1)!.id);
     expect(trashService.restore).toHaveBeenCalledWith('trash-1');

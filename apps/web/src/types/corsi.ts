@@ -150,7 +150,7 @@ export interface CorsoCestinato {
   dossier: { id: string; name: string } | null;
 }
 
-// ─── A module's session (`/studia/percorsi/:id/moduli/:moduloId`, the web's pull request b) ─────────────────────────
+// ─── A module's session (`/learn/percorsi/:id/moduli/:moduloId`, the web's pull request b) ─────────────────────────
 // S2's `GET /lingo/corsi/:id/moduli/:moduloId`, `POST …/apri` and `POST …/risposte` (#375, «What S2 exposes»). The
 // quiz, the open question and the end are read here as the module carries them; pull request (c) draws them.
 

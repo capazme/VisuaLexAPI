@@ -165,19 +165,19 @@ beforeEach(() => {
 describe('GraphExplorerPage', () => {
   it('renders a not-available state when the feature flag is off', () => {
     isEnabledMock.mockReturnValue(false);
-    renderAt('/grafo');
+    renderAt('/labs/grafo');
     expect(screen.getByText(/non disponibile/i)).toBeInTheDocument();
   });
 
   it('shows the empty-state tagline when there is no urn in the query', () => {
-    renderAt('/grafo');
+    renderAt('/labs/grafo');
     expect(screen.getByText(/per iniziare/i)).toBeInTheDocument();
     expect(useArticleGraphMock).toHaveBeenCalledWith(null, expect.any(Number), expect.any(Number));
   });
 
   it('reads urn + depth from the query and fetches the graph', () => {
     setGraph({ status: 'loading' });
-    renderAt('/grafo?urn=urn%3Atest&depth=3');
+    renderAt('/labs/grafo?urn=urn%3Atest&depth=3');
     expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3, 50);
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
@@ -188,7 +188,7 @@ describe('GraphExplorerPage', () => {
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
       elements: { nodes: [{ id: 'a' }], edges: [] },
     });
-    renderAt('/grafo?urn=urn%3Atest&depth=1');
+    renderAt('/labs/grafo?urn=urn%3Atest&depth=1');
 
     expect(screen.getByRole('button', { name: '1' })).toHaveAttribute('aria-pressed', 'true');
 
@@ -203,7 +203,7 @@ describe('GraphExplorerPage', () => {
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
       elements: { nodes: [{ id: 'a' }], edges: [] },
     });
-    renderAt('/grafo?urn=urn%3Atest&depth=2');
+    renderAt('/labs/grafo?urn=urn%3Atest&depth=2');
 
     fireEvent.change(screen.getByRole('combobox', { name: /layout/i }), {
       target: { value: 'dagre' },
@@ -218,19 +218,19 @@ describe('GraphExplorerPage', () => {
   describe('payload diet defaults (Wave 2)', () => {
     it('defaults to depth 2 + limit 50 for an ARTICLE center', () => {
       setGraph({ status: 'loading' });
-      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Ax~art1453&type=Norma');
       expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 50);
     });
 
     it('defaults to depth 1 for a CONCEPT center (hairball mitigation)', () => {
       setGraph({ status: 'loading' });
-      renderAt('/grafo?urn=concetto-1&type=ConcettoGiuridico');
+      renderAt('/labs/grafo?urn=concetto-1&type=ConcettoGiuridico');
       expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 1, 50);
     });
 
     it('an explicit ?depth= overrides the concept default (URL-as-SoT)', () => {
       setGraph({ status: 'loading' });
-      renderAt('/grafo?urn=concetto-1&type=ConcettoGiuridico&depth=3');
+      renderAt('/labs/grafo?urn=concetto-1&type=ConcettoGiuridico&depth=3');
       expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 3, 50);
     });
   });
@@ -261,13 +261,13 @@ describe('GraphExplorerPage', () => {
     // The chip mounts inside the lazy-canvas Suspense block -> findBy* (async).
     it('shows "Mostro N di M relazioni" when the payload is truncated', async () => {
       truncatedGraph(42);
-      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Ax~art1453&type=Norma');
       expect(await screen.findByText('Mostro 1 di 42 relazioni')).toBeInTheDocument();
     });
 
     it('"Carica di più" bumps the limit to the next ladder step and refetches', async () => {
       truncatedGraph(42);
-      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Ax~art1453&type=Norma');
       fireEvent.click(await screen.findByRole('button', { name: /carica più relazioni/i }));
       // limit 50 → 100 (next ladder step); a new limit is a new SWR key → new fetch.
       expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 100);
@@ -283,7 +283,7 @@ describe('GraphExplorerPage', () => {
         },
         elements: { nodes: [{ id: 'root' }], edges: [] },
       });
-      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Ax~art1453&type=Norma');
       await screen.findByTestId('cytoscape'); // wait for the lazy canvas branch
       expect(screen.queryByText(/Mostro \d+ di/)).toBeNull();
     });
@@ -291,7 +291,7 @@ describe('GraphExplorerPage', () => {
 
   it('triggers ingestion and shows a building banner when the subgraph is empty', async () => {
     setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
-    renderAt('/grafo?urn=urn%3Anew&type=Norma');
+    renderAt('/labs/grafo?urn=urn%3Anew&type=Norma');
 
     await waitFor(() => expect(triggerIngestionMock).toHaveBeenCalledWith('urn:new'));
     expect(screen.getByText(/indicizzazione in corso/i)).toBeInTheDocument();
@@ -300,7 +300,7 @@ describe('GraphExplorerPage', () => {
   it('shows "non indicizzabile" with retry when ingestion finished but graph is still empty', () => {
     useIngestionJobMock.mockReturnValue({ status: 'completed', error: null, nodesCreated: 0 });
     setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
-    renderAt('/grafo?urn=urn%3Anew&type=Norma');
+    renderAt('/labs/grafo?urn=urn%3Anew&type=Norma');
     expect(screen.getByText(/non indicizzabile/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
   });
@@ -311,7 +311,7 @@ describe('GraphExplorerPage', () => {
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
       elements: { nodes: [{ id: 'a' }], edges: [] },
     });
-    renderAt('/grafo?urn=urn%3Atest');
+    renderAt('/labs/grafo?urn=urn%3Atest');
     // Breadcrumb nav present with the deeplinked urn as the (only) crumb.
     expect(screen.getByRole('navigation', { name: /cronologia grafo/i })).toBeInTheDocument();
   });
@@ -325,7 +325,7 @@ describe('GraphExplorerPage', () => {
       refetch,
     });
     useIngestionJobMock.mockReturnValue({ status: 'completed', error: null, nodesCreated: 0 });
-    renderAt('/grafo?urn=urn%3Anew&type=Norma');
+    renderAt('/labs/grafo?urn=urn%3Anew&type=Norma');
 
     triggerIngestionMock.mockClear();
     fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
@@ -339,7 +339,7 @@ describe('GraphExplorerPage', () => {
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A' }], edges: [] },
       elements: { nodes: [{ id: 'a' }], edges: [] },
     });
-    renderAt('/grafo?urn=urn:test');
+    renderAt('/labs/grafo?urn=urn:test');
     expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();
   });
 
@@ -350,7 +350,7 @@ describe('GraphExplorerPage', () => {
 
     it('shows the consent hint when the trigger is rejected with 403', async () => {
       triggerIngestionMock.mockRejectedValue({ status: 403, message: "consent_required" });
-      renderAt('/grafo?urn=urn%3Anew&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Anew&type=Norma');
 
       expect(await screen.findByText(/serve il consenso/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
@@ -359,7 +359,7 @@ describe('GraphExplorerPage', () => {
 
     it('shows the unreachable message when the trigger fails with a 5xx', async () => {
       triggerIngestionMock.mockRejectedValue({ response: { status: 503 } });
-      renderAt('/grafo?urn=urn%3Anew&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Anew&type=Norma');
 
       expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
@@ -372,7 +372,7 @@ describe('GraphExplorerPage', () => {
           ? { status: 'timeout', error: 'poll_budget_exhausted', nodesCreated: null }
           : { status: null, error: null, nodesCreated: null }
       );
-      renderAt('/grafo?urn=urn%3Anew&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Anew&type=Norma');
 
       expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
       expect(screen.queryByText(/indicizzazione in corso/i)).not.toBeInTheDocument();
@@ -391,7 +391,7 @@ describe('GraphExplorerPage', () => {
           ? { status: 'timeout', error: 'poll_budget_exhausted', nodesCreated: null }
           : { status: null, error: null, nodesCreated: null }
       );
-      renderAt('/grafo?urn=urn%3Anew&type=Norma');
+      renderAt('/labs/grafo?urn=urn%3Anew&type=Norma');
       expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
@@ -407,7 +407,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('does NOT trigger ingestion when the center is a concept', async () => {
-      renderAt('/grafo?urn=concetto%3Acolpa&type=ConcettoGiuridico');
+      renderAt('/labs/grafo?urn=concetto%3Acolpa&type=ConcettoGiuridico');
       // Give the debounce/effects a tick; ingestion must never fire for a concept.
       await waitFor(() =>
         expect(screen.getByText(/concetto non collegato/i)).toBeInTheDocument()
@@ -416,7 +416,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('shows the concept empty-state copy (no spinner, no "non indicizzabile")', () => {
-      renderAt('/grafo?urn=concetto%3Acolpa&type=ConcettoGiuridico');
+      renderAt('/labs/grafo?urn=concetto%3Acolpa&type=ConcettoGiuridico');
       expect(screen.getByText(/concetto non collegato/i)).toBeInTheDocument();
       expect(screen.queryByText(/indicizzazione in corso/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/non indicizzabile/i)).not.toBeInTheDocument();
@@ -425,7 +425,7 @@ describe('GraphExplorerPage', () => {
     it('classifies an article by the ~art urn marker even without a type param', async () => {
       // Deeplink with only the urn: the ~art marker must still route to the
       // article ingestion path (not the concept empty state).
-      renderAt('/grafo?urn=' + encodeURIComponent('urn:nir:stato:codice.civile~art2043'));
+      renderAt('/labs/grafo?urn=' + encodeURIComponent('urn:nir:stato:codice.civile~art2043'));
       await waitFor(() =>
         expect(triggerIngestionMock).toHaveBeenCalledWith('urn:nir:stato:codice.civile~art2043')
       );
@@ -483,7 +483,7 @@ describe('GraphExplorerPage', () => {
 
     it('mounts the header "Chiedi al grafo" field and forwards asks to useQaThread', () => {
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       // Two ask inputs share the label (header + column composer) — the header is
       // first in DOM order.
@@ -500,7 +500,7 @@ describe('GraphExplorerPage', () => {
 
     it('removing the seeded center from the basket sends an UNANCHORED ask (empty context)', () => {
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       // Remove the seeded center chip (the two instances share the page basket).
       fireEvent.click(screen.getAllByRole('button', { name: /dal contesto/i })[0]);
@@ -514,14 +514,14 @@ describe('GraphExplorerPage', () => {
     it('disables asking when consent is below basic (qaAskable=false)', () => {
       featuresMock.mockReturnValue(features({ qaAskable: false, canContribute: false }));
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       // The AskGraphField renders its inert consent hint instead of the input.
       expect(screen.getAllByText(/serve il consenso base/i).length).toBeGreaterThan(0);
     });
 
     it('consumes the QA-PREFILL location.state once and fires an ask', async () => {
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043', {
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043', {
         prefillQuery: 'Spiega la responsabilità aquiliana',
         articleUrn: 'urn:x~art2043',
         articleHeading: 'Art. 2043',
@@ -538,7 +538,7 @@ describe('GraphExplorerPage', () => {
     it('does NOT consume the QA-PREFILL when asking is locked (no silent drop)', async () => {
       featuresMock.mockReturnValue(features({ qaAskable: false, canContribute: false }));
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043', {
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043', {
         prefillQuery: 'Spiega la responsabilità aquiliana',
         articleUrn: 'urn:x~art2043',
         articleHeading: 'Art. 2043',
@@ -554,7 +554,7 @@ describe('GraphExplorerPage', () => {
     it('highlights source nodes present in the subgraph and lists absent ones as chips', () => {
       qaThreadState.turns = [successTurn()];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       // node-2043 (by node_id) + node-2059 (by urn) light up; urn:absent does not.
       const ids = lastCanvasProps.highlightNodeIds as ReadonlySet<string>;
@@ -567,7 +567,7 @@ describe('GraphExplorerPage', () => {
     it('hides jurisprudence by default once a deliberation is active', () => {
       qaThreadState.turns = [successTurn()];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       const hidden = lastCanvasProps.hiddenNodeTypes as ReadonlySet<string>;
       expect(hidden.has('AttoGiudiziario')).toBe(true);
@@ -579,7 +579,7 @@ describe('GraphExplorerPage', () => {
 
     it('does NOT hide jurisprudence when there is no deliberation (manual off default)', () => {
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       const hidden = lastCanvasProps.hiddenNodeTypes as ReadonlySet<string>;
       expect(hidden.has('AttoGiudiziario')).toBe(false);
       expect(
@@ -590,7 +590,7 @@ describe('GraphExplorerPage', () => {
     it('toggling the jurisprudence control overrides the derived default', () => {
       qaThreadState.turns = [successTurn()];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       // Default-on with a deliberation → click turns it OFF.
       fireEvent.click(screen.getByRole('button', { name: /nascondi giurisprudenza/i }));
       const hidden = lastCanvasProps.hiddenNodeTypes as ReadonlySet<string>;
@@ -611,7 +611,7 @@ describe('GraphExplorerPage', () => {
         },
       ]);
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       // Open the server history from the docked deliberation column.
       fireEvent.click(screen.getByRole('button', { name: /^cronologia$/i }));
@@ -626,7 +626,7 @@ describe('GraphExplorerPage', () => {
 
     it('a node click selects it and switches the column to the Nodo tab', () => {
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       // Drive the canvas onNodeClick prop directly (canvas is mocked); wrap in act
       // so the resulting setState (select + tab switch) flushes before asserting.
       act(() => {
@@ -688,7 +688,7 @@ describe('GraphExplorerPage', () => {
     it('injects canon nodes + a contrast arc onto the canvas from a deliberation', () => {
       qaThreadState.turns = [deliberationTurn()];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       const nodes = lastCanvasProps.nodes as Array<{ id: string }>;
       const edges = lastCanvasProps.edges as Array<{ id: string; source?: string }>;
@@ -704,7 +704,7 @@ describe('GraphExplorerPage', () => {
     it('sizes canon nodes by routing weight (weight carried onto the item data)', () => {
       qaThreadState.turns = [deliberationTurn()];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       const nodes = lastCanvasProps.nodes as Array<{ id: string; data?: { weight?: number } }>;
       const literal = nodes.find((n) => n.id === 'canon:literal');
       const principles = nodes.find((n) => n.id === 'canon:principles');
@@ -719,7 +719,7 @@ describe('GraphExplorerPage', () => {
         { id: 'turn-new', question: 'Nuova domanda', confirmed: {}, state: { status: 'loading' } } as QaTurnModel,
       ];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       const ids = (lastCanvasProps.nodes as Array<{ id: string }>).map((n) => n.id);
       // Only the real subgraph node remains — no lingering canon overlay.
@@ -749,7 +749,7 @@ describe('GraphExplorerPage', () => {
         } as QaTurnModel,
       ];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       const ids = (lastCanvasProps.nodes as Array<{ id: string }>).map((n) => n.id);
       expect(ids).toEqual(['node-2043']);
     });
@@ -757,7 +757,7 @@ describe('GraphExplorerPage', () => {
     it('an edge:click on a contrast arc selects it and switches the column to Nodo', () => {
       qaThreadState.turns = [deliberationTurn()];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       // The contrast-arc id emitted by the canvas for this canon pair.
       const edges = lastCanvasProps.edges as Array<{ id: string }>;
@@ -772,7 +772,7 @@ describe('GraphExplorerPage', () => {
     it('ignores an edge:click on a canon-anchor tether (structural, not inspectable)', () => {
       qaThreadState.turns = [deliberationTurn()];
       setPopulatedGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       const edges = lastCanvasProps.edges as Array<{ id: string }>;
       const anchorId = edges.find((e) => e.id.startsWith('canon:anchor:'))!.id;
       act(() => {
@@ -836,7 +836,7 @@ describe('GraphExplorerPage', () => {
     it('shows the steer on a selected relation and POSTs the latest trace_id + the edge relation type', () => {
       qaThreadState.turns = [settledTurn('trace-r')];
       setRelationGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       selectRelationEdge();
       const steer = screen.getByRole('button', { name: /privilegia questa relazione/i });
@@ -851,7 +851,7 @@ describe('GraphExplorerPage', () => {
     it('hides the steer when there is no deliberation yet (no trace to attach to)', () => {
       qaThreadState.turns = [];
       setRelationGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       selectRelationEdge();
       // The edge details open, but no steer and no upsell.
@@ -866,7 +866,7 @@ describe('GraphExplorerPage', () => {
         { id: 'turn-live', question: 'Nuova domanda', confirmed: {}, state: { status: 'loading' } } as QaTurnModel,
       ];
       setRelationGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       selectRelationEdge();
       expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
@@ -876,7 +876,7 @@ describe('GraphExplorerPage', () => {
       featuresMock.mockReturnValue(features({ canContribute: false, canValidate: false, consentLevel: 'basic' }));
       qaThreadState.turns = [settledTurn('trace-r')];
       setRelationGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       selectRelationEdge();
       expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
@@ -885,7 +885,7 @@ describe('GraphExplorerPage', () => {
     });
   });
 
-  describe('Loop β teaching channels + refine on /grafo (consent ladder D2)', () => {
+  describe('Loop β teaching channels + refine on /labs/grafo (consent ladder D2)', () => {
     function settled(traceId: string): QaTurnModel {
       return {
         id: `turn-${traceId}`,
@@ -919,7 +919,7 @@ describe('GraphExplorerPage', () => {
     it('full consent: the answer carries 👍/👎', () => {
       qaThreadState.turns = [settled('trace-a')];
       setOneNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       expect(screen.getByRole('button', { name: /risposta utile/i })).toBeInTheDocument();
     });
 
@@ -927,14 +927,14 @@ describe('GraphExplorerPage', () => {
       featuresMock.mockReturnValue(features({ canContribute: false, canValidate: false, consentLevel: 'basic' }));
       qaThreadState.turns = [settled('trace-a')];
       setOneNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
       expect(screen.getByText(/per valutare le risposte e le fonti serve il consenso completo/i)).toBeInTheDocument();
     });
 
     it('surfaces a failed teaching-channel request through the page Toast', () => {
       setOneNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       expect(qaThreadState.options?.onFeedbackError).toEqual(expect.any(Function));
       act(() => {
         qaThreadState.options?.onFeedbackError?.('Per inviare valutazioni serve il consenso completo.');
@@ -946,7 +946,7 @@ describe('GraphExplorerPage', () => {
       featuresMock.mockReturnValue(features({ canContribute: false, canValidate: false, consentLevel: 'basic' }));
       qaThreadState.turns = [settled('trace-a')];
       setOneNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       fireEvent.click(screen.getByRole('button', { name: /approfondisci questa risposta/i }));
       fireEvent.change(screen.getByRole('textbox', { name: /domanda di approfondimento/i }), {
         target: { value: 'E la prescrizione?' },
@@ -960,12 +960,12 @@ describe('GraphExplorerPage', () => {
       featuresMock.mockReturnValue(features({ qaAskable: false, canContribute: false }));
       qaThreadState.turns = [settled('trace-a')];
       setOneNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       expect(screen.queryByRole('button', { name: /approfondisci questa risposta/i })).not.toBeInTheDocument();
     });
   });
 
-  describe('Wave 1 — /grafo interaction overhaul (P1)', () => {
+  describe('Wave 1 — /labs/grafo interaction overhaul (P1)', () => {
     /** Two Norma nodes with distinct urns so recentering changes the center. */
     function setTwoNodeGraph(): void {
       setGraph({
@@ -1023,7 +1023,7 @@ describe('GraphExplorerPage', () => {
     it('a canon star click opens the Dibattito tab and expands that canon thesis (defect #5)', () => {
       qaThreadState.turns = [richTurn()];
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onNodeClick as (id: string) => void)('canon:literal');
@@ -1040,7 +1040,7 @@ describe('GraphExplorerPage', () => {
 
     it('Esc deselects the node and returns to the Dibattito tab (P1.7)', () => {
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       act(() => {
         (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
       });
@@ -1053,7 +1053,7 @@ describe('GraphExplorerPage', () => {
     it('pulses the Dibattito tab when a turn settles while on Nodo, cleared on open (defect #4)', () => {
       qaThreadState.turns = [loadingTurn()];
       setTwoNodeGraph();
-      const view = renderAt('/grafo?urn=urn%3Ax~art2043');
+      const view = renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       act(() => {
         (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
       });
@@ -1061,7 +1061,7 @@ describe('GraphExplorerPage', () => {
 
       // The turn settles while the user inspects the node.
       qaThreadState.turns = [richTurn()];
-      view.rerender(pageAt('/grafo?urn=urn%3Ax~art2043'));
+      view.rerender(pageAt('/labs/grafo?urn=urn%3Ax~art2043'));
       expect(screen.getByText('nuova risposta')).toBeInTheDocument();
 
       // Opening the Dibattito tab clears the pulse.
@@ -1072,7 +1072,7 @@ describe('GraphExplorerPage', () => {
     it('scopes the deliberation to its ask-time center: recenter hides the overlay, "Torna" restores it (defect #10)', () => {
       qaThreadState.turns = [richTurn()];
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       // Ask from the header → records the scope on art2043.
       const field = screen.getAllByLabelText('Chiedi al grafo', { selector: 'input' })[0];
@@ -1101,7 +1101,7 @@ describe('GraphExplorerPage', () => {
     it('"× evidenza fonti" dismisses the sources emphasis (P1.9)', () => {
       qaThreadState.turns = [richTurn()];
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       expect(lastCanvasProps.highlightNodeIds).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: /rimuovi evidenza fonti/i }));
@@ -1112,7 +1112,7 @@ describe('GraphExplorerPage', () => {
 
     it('"Adatta alla vista" calls the canvas fit handle (P1.7)', async () => {
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       await screen.findByTestId('cytoscape');
       fireEvent.click(screen.getByRole('button', { name: /adatta alla vista/i }));
       expect(canvasFitMock).toHaveBeenCalledTimes(1);
@@ -1121,7 +1121,7 @@ describe('GraphExplorerPage', () => {
     it('the load ErrorState offers "Riprova" wired to refetch (P1.11)', () => {
       const refetch = vi.fn();
       useArticleGraphMock.mockReturnValue({ status: 'error', error: new Error('boom'), refetch });
-      renderAt('/grafo?urn=urn%3Atest');
+      renderAt('/labs/grafo?urn=urn%3Atest');
       expect(screen.getByText(/errore nel caricamento del grafo/i)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
       expect(refetch).toHaveBeenCalledTimes(1);
@@ -1130,7 +1130,7 @@ describe('GraphExplorerPage', () => {
     it('blocks new asks while a turn is in flight (P1.10)', () => {
       qaThreadState.turns = [loadingTurn()];
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       const field = screen.getAllByLabelText('Chiedi al grafo', { selector: 'input' })[0];
       fireEvent.change(field, { target: { value: 'Altra domanda' } });
@@ -1154,7 +1154,7 @@ describe('GraphExplorerPage', () => {
 
     it("keeps the canvas mounted with a veil during 'revalidating' (no skeleton swap)", async () => {
       setGraph({ status: 'revalidating', ...oneNodeData() });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       // The previous graph stays live on canvas…
       expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();
@@ -1164,21 +1164,21 @@ describe('GraphExplorerPage', () => {
 
     it('shows no veil once the fetch settles (success)', async () => {
       setGraph({ status: 'success', ...oneNodeData() });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();
       expect(screen.queryByText(/aggiornamento del grafo/i)).not.toBeInTheDocument();
     });
 
     it('keeps the full skeleton strictly for the very first load (loading)', () => {
       setGraph({ status: 'loading' });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       expect(screen.getByRole('status')).toBeInTheDocument();
       expect(screen.queryByTestId('cytoscape')).not.toBeInTheDocument();
     });
 
     it('threads the computed centerNodeId into the canvas (fit discipline input)', async () => {
       setGraph({ status: 'success', ...oneNodeData() });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       await screen.findByTestId('cytoscape');
       expect(lastCanvasProps.centerNodeId).toBe('node-2043');
     });
@@ -1237,7 +1237,7 @@ describe('GraphExplorerPage', () => {
 
     it('threads the controlled selection into the canvas; Esc clears both brains', () => {
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       expect(lastCanvasProps.selectedNodeId).toBeNull();
 
       act(() => {
@@ -1267,7 +1267,7 @@ describe('GraphExplorerPage', () => {
           edges: [{ id: 'e1', source: 'node-2043', target: 'node-2059' }],
         },
       });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onEdgeClick as (id: string) => void)('e1');
@@ -1283,7 +1283,7 @@ describe('GraphExplorerPage', () => {
 
     it('a canvas background click clears selection AND the drawer', () => {
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
       act(() => {
         (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
       });
@@ -1299,7 +1299,7 @@ describe('GraphExplorerPage', () => {
     it('a source chip for an IN-GRAPH node focuses the camera + selects — no navigation', () => {
       qaThreadState.turns = [sourceTurn()];
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       fireEvent.click(screen.getByTitle(/centra il grafo su/i));
 
@@ -1315,7 +1315,7 @@ describe('GraphExplorerPage', () => {
     it('double-click EXPANDS in place: delta merges, center prop unchanged, no navigation', async () => {
       fetchNodeNeighborhoodMock.mockResolvedValue(expandDelta());
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
@@ -1337,7 +1337,7 @@ describe('GraphExplorerPage', () => {
       let resolveFetch!: (v: unknown) => void;
       fetchNodeNeighborhoodMock.mockReturnValue(new Promise((res) => { resolveFetch = res; }));
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
@@ -1353,7 +1353,7 @@ describe('GraphExplorerPage', () => {
     it('expanding the same node twice is a no-op with an Italian toast', async () => {
       fetchNodeNeighborhoodMock.mockResolvedValue(expandDelta());
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
@@ -1378,7 +1378,7 @@ describe('GraphExplorerPage', () => {
         data: { nodes: many, edges: [] },
         elements: { nodes: many.map((n) => ({ id: n.id })), edges: [] },
       });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onNodeDblClick as (id: string) => void)('n5');
@@ -1394,7 +1394,7 @@ describe('GraphExplorerPage', () => {
         edges: [],
       });
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
@@ -1411,7 +1411,7 @@ describe('GraphExplorerPage', () => {
     it('recentering via the drawer "Centra qui" resets the expansion (per-center delta)', async () => {
       fetchNodeNeighborhoodMock.mockResolvedValue(expandDelta());
       setTwoNodeGraph();
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       act(() => {
         (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
@@ -1463,7 +1463,7 @@ describe('GraphExplorerPage', () => {
         data: { nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }], edges: [] },
         elements: { nodes: [{ id: 'node-2043' }], edges: [] },
       });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       fireEvent.click(screen.getByRole('button', { name: /segui il ragionamento sul grafo/i }));
 
@@ -1481,7 +1481,7 @@ describe('GraphExplorerPage', () => {
         data: { nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }], edges: [] },
         elements: { nodes: [{ id: 'node-2043' }], edges: [] },
       });
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       fireEvent.click(screen.getByRole('button', { name: /segui il ragionamento sul grafo/i }));
       await waitFor(() => expect(screen.getByText(/passo 1\/1/i)).toBeInTheDocument());
@@ -1520,7 +1520,7 @@ describe('GraphExplorerPage', () => {
 
     it('renders the latest answer\'s sources as clickable chips when there is no urn', () => {
       qaThreadState.turns = [turnWithSources()];
-      renderAt('/grafo');
+      renderAt('/labs/grafo');
       const main = within(screen.getByRole('main'));
       expect(main.getByText(/per iniziare/i)).toBeInTheDocument();
       expect(main.getByRole('button', { name: /art\. 2043/i })).toBeInTheDocument();
@@ -1528,7 +1528,7 @@ describe('GraphExplorerPage', () => {
 
     it('clicking a chip centers the graph on that source (goToCenter)', () => {
       qaThreadState.turns = [turnWithSources()];
-      renderAt('/grafo');
+      renderAt('/labs/grafo');
       const main = within(screen.getByRole('main'));
       fireEvent.click(main.getByRole('button', { name: /art\. 2043/i }));
       // node-2043 is not in the (empty) current subgraph → treated as a urn/id
@@ -1537,7 +1537,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('falls back to the plain copy with no chips when there is no recent answer', () => {
-      renderAt('/grafo');
+      renderAt('/labs/grafo');
       const main = within(screen.getByRole('main'));
       expect(main.getByText(/per iniziare/i)).toBeInTheDocument();
       expect(main.queryByRole('button', { name: /art\./i })).not.toBeInTheDocument();
@@ -1575,7 +1575,7 @@ describe('GraphExplorerPage', () => {
           },
         },
       ];
-      renderAt('/grafo?urn=urn%3Ax~art2043');
+      renderAt('/labs/grafo?urn=urn%3Ax~art2043');
 
       const chip = screen.getByRole('button', { name: /art\. 2043.*fondativa/i }).closest('li')!;
       fireEvent.mouseEnter(chip);
@@ -1589,13 +1589,13 @@ describe('GraphExplorerPage', () => {
   // On a graph with a centre: on an empty one the column is a rail (S7b).
   describe('audit item 4 — draggable splitter between canvas and column', () => {
     it('renders the splitter at the default width', () => {
-      renderAt('/grafo?urn=urn%3Atest');
+      renderAt('/labs/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       expect(separator).toHaveAttribute('aria-valuenow', '400');
     });
 
     it('dragging the splitter left widens the column and persists the width', () => {
-      renderAt('/grafo?urn=urn%3Atest');
+      renderAt('/labs/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       const columnWrapper = separator.nextElementSibling as HTMLElement;
       expect(columnWrapper.style.width).toBe('400px');
@@ -1609,7 +1609,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('clamps the drag to COLUMN_WIDTH_MAX', () => {
-      renderAt('/grafo?urn=urn%3Atest');
+      renderAt('/labs/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       const columnWrapper = separator.nextElementSibling as HTMLElement;
 
@@ -1621,7 +1621,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('ArrowLeft/ArrowRight on the focused splitter resize by a fixed step', () => {
-      renderAt('/grafo?urn=urn%3Atest');
+      renderAt('/labs/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       const columnWrapper = separator.nextElementSibling as HTMLElement;
 
@@ -1634,7 +1634,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('hides the splitter when the column is collapsed', () => {
-      renderAt('/grafo?urn=urn%3Atest');
+      renderAt('/labs/grafo?urn=urn%3Atest');
       fireEvent.click(screen.getByRole('button', { name: /comprimi il pannello/i }));
       expect(screen.queryByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).not.toBeInTheDocument();
     });
@@ -1643,7 +1643,7 @@ describe('GraphExplorerPage', () => {
   // In the sections' frame, the search wide under the title, the column closed on an empty graph (S7b).
   describe('S7b — the frame and the column on an empty graph', () => {
     it('titles the page «Grafo» in the frame, with no icon, and puts the search wide under it', () => {
-      renderAt('/grafo');
+      renderAt('/labs/grafo');
       const title = screen.getByRole('heading', { level: 1, name: 'Grafo' });
       expect(title).toHaveClass('font-serif');
       expect(title.querySelector('svg')).toBeNull();
@@ -1657,7 +1657,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('keeps the column a rail on an empty graph, with the ask field in the header, and opens it by hand', () => {
-      renderAt('/grafo');
+      renderAt('/labs/grafo');
       expect(screen.queryByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).toBeNull();
       expect(screen.queryByRole('tab', { name: /dibattito/i })).toBeNull();
       // The one composer is the header's while the column is closed.
@@ -1667,7 +1667,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('opens the column once the graph has a centre', () => {
-      renderAt('/grafo?urn=urn%3Atest');
+      renderAt('/labs/grafo?urn=urn%3Atest');
       expect(screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /espandi il pannello del dibattito/i })).toBeNull();
     });

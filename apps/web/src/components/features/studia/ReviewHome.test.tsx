@@ -59,11 +59,11 @@ function Where() {
 
 function renderHome() {
   return render(
-    <MemoryRouter initialEntries={['/studia/ripasso']}>
+    <MemoryRouter initialEntries={['/learn/ripasso']}>
       <Routes>
-        <Route path="/studia/ripasso" element={<ReviewHome />} />
-        <Route path="/studia/ripasso/sessione" element={<Where />} />
-        <Route path="/studia/progressi" element={<Where />} />
+        <Route path="/learn/ripasso" element={<ReviewHome />} />
+        <Route path="/learn/ripasso/sessione" element={<Where />} />
+        <Route path="/learn/progressi" element={<Where />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -136,7 +136,7 @@ describe('ReviewHome', () => {
     const start = screen.getByRole('button', { name: 'Inizia il ripasso' });
     expect(start).toBeEnabled();
     await userEvent.setup().click(start);
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso/sessione');
     expect(screen.getByTestId('where').textContent).not.toContain('materia');
   });
 
@@ -165,14 +165,14 @@ describe('ReviewHome', () => {
     const band = await screen.findByRole('region', { name: 'I tuoi progressi' });
     const states = within(band).getByRole('list', { name: 'Le schede per stato' });
     expect(within(states).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['3 nuove', '5 in apprendimento', '2 consolidate']);
-    // The long calendar and the coming days live on /studia/progressi (G3): no sheet repeats them here.
+    // The long calendar and the coming days live on /learn/progressi (G3): no sheet repeats them here.
     expect(screen.queryByRole('heading', { name: 'Il tuo andamento' })).toBeNull();
     expect(within(band).queryByRole('button', { name: 'Il tuo mese' })).toBeNull();
     // A text link, not a button across the column (G8).
     const all = within(band).getByRole('link', { name: 'Tutti i progressi' });
     expect(all.className).not.toMatch(/\bw-full\b|xl:w-full/);
     await userEvent.setup().click(all);
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/progressi');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/progressi');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -203,7 +203,7 @@ describe('ReviewHome', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('DIRITTO_PENALE');
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Inizia il ripasso' }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione?materia=DIRITTO_PENALE');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso/sessione?materia=DIRITTO_PENALE');
     unmount();
 
     renderHome();
@@ -729,7 +729,7 @@ describe('ReviewHome', () => {
       expect(screen.queryByRole('button', { name: 'Inizia il ripasso' })).toBeNull();
       expect(screen.getByText('circa 2 minuti')).toBeInTheDocument();
       await userEvent.setup().click(screen.getByRole('button', { name: 'Continua il ripasso' }));
-      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
+      expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso/sessione');
       localStorage.removeItem('visualex.studia.festeggiato');
     });
 
@@ -758,7 +758,7 @@ describe('ReviewHome', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere i tuoi progressi.');
       expect(screen.getByText('Puoi ripassare lo stesso: il ripasso legge le sue schede.')).toBeInTheDocument();
       await userEvent.setup().click(screen.getByRole('button', { name: 'Inizia il ripasso' }));
-      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
+      expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso/sessione');
     });
 
     it('opens the study settings inside «I tuoi progressi», with no window, and closes them from the gear or with Esc (G6)', async () => {
@@ -873,7 +873,7 @@ describe('ReviewHome', () => {
         expect(within(stop).getAllByRole('button')[0]).toHaveClass('md:flex-1');
       }
       await userEvent.setup().click(within(stops[0]).getByRole('button', { name: 'Ripassa Diritto penale' }));
-      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione?materia=DIRITTO_PENALE');
+      expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso/sessione?materia=DIRITTO_PENALE');
     });
 
     it('lays the page in the order fixed: the day, the missions, the statistics, the subjects, the full list', async () => {
@@ -930,7 +930,7 @@ describe('ReviewHome', () => {
         'Ripassa Risoluzione per inadempimento: 3 da ripassare',
       ]);
       await user.click(within(institutes).getByRole('button', { name: /Risoluzione per inadempimento/ }));
-      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione?materia=DIRITTO_CIVILE&istituto=Risoluzione+per+inadempimento');
+      expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso/sessione?materia=DIRITTO_CIVILE&istituto=Risoluzione+per+inadempimento');
     });
 
     it('opens on the institutes of the subject remembered', async () => {
@@ -1179,7 +1179,7 @@ describe('ReviewHome', () => {
       await userEvent.setup().click(subjectChoice('Diritto penale'));
       await screen.findByText('2 da ripassare, 3 nuove');
       expect(localStorage.getItem(STORAGE_KEY)).toBe('DIRITTO_PENALE');
-      expect(screen.getByRole('link', { name: 'Tutti i progressi' })).toHaveAttribute('href', '/studia/progressi');
+      expect(screen.getByRole('link', { name: 'Tutti i progressi' })).toHaveAttribute('href', '/learn/progressi');
     });
 
     it('draws the current week, Monday to Sunday, with its seven letters', async () => {
@@ -1249,10 +1249,10 @@ describe('ReviewHome', () => {
       data.missioni = serverMissions({ convalida: { stato: 'vuota', progresso: { fatte: 1, di: 2 } } }, { validator: true });
       progress.mockResolvedValue(data);
       render(
-        <MemoryRouter initialEntries={['/studia/ripasso']}>
+        <MemoryRouter initialEntries={['/learn/ripasso']}>
           <Routes>
             <Route element={<Outlet context={{ validator: true }} />}>
-              <Route path="/studia/ripasso" element={<ReviewHome />} />
+              <Route path="/learn/ripasso" element={<ReviewHome />} />
             </Route>
           </Routes>
         </MemoryRouter>,

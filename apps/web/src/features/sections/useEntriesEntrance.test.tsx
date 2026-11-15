@@ -16,15 +16,15 @@ function Group({ section }: { section: SectionId }) {
         <>
           <div role="group" aria-label="Studia">
             <p>Studia</p>
-            <a href="/studia/ripasso">Oggi</a>
-            <a href="/studia/progressi">Progressi</a>
+            <a href="/learn/ripasso">Oggi</a>
+            <a href="/learn/progressi">Progressi</a>
             <a href="/dossier">Dossier</a>
           </div>
           <div aria-hidden />
           <div role="group" aria-label="Contribuisci">
             <p>Contribuisci</p>
-            <a href="/studia/schede">Le mie schede</a>
-            <a href="/studia/valida">Da validare</a>
+            <a href="/learn/schede">Le mie schede</a>
+            <a href="/learn/valida">Da validare</a>
           </div>
         </>
       ) : (

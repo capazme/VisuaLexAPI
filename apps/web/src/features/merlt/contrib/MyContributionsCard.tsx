@@ -8,7 +8,7 @@ import { fetchMyContribJobs, type MyContribJob } from './contribApi';
  *
  * Closes the contribution loop visually — ContribPage state used to live only
  * in `useState`, so a refresh wiped the in-flight document. Now the user can
- * always come back to /merlt and see their previous extractions, click any
+ * always come back to /labs and see their previous extractions, click any
  * completed one to re-open the candidates view.
  */
 
@@ -90,7 +90,7 @@ export function MyContributionsCard(): React.ReactElement {
         return (
           <li key={j.id}>
             {j.status === 'completed' ? (
-              <Link to={`/merlt/contribuisci?documentId=${encodeURIComponent(j.documentId)}`} className="block">
+              <Link to={`/labs/contribuisci?documentId=${encodeURIComponent(j.documentId)}`} className="block">
                 {inner}
               </Link>
             ) : (

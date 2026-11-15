@@ -35,10 +35,10 @@ describe('QaSourceChip', () => {
     expect(screen.getByText('provvisoria')).toBeInTheDocument();
   });
 
-  it('links the label to /grafo with the urn', () => {
+  it('links the label to /labs/grafo with the urn', () => {
     renderChip(seed);
     const link = screen.getByRole('link', { name: /art\. 1453/i });
-    expect(link.getAttribute('href')).toContain('/grafo?urn=');
+    expect(link.getAttribute('href')).toContain('/labs/grafo?urn=');
   });
 
   it('formatRetrievedUrn handles massime and live nodes', () => {

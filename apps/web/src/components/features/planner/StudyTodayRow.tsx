@@ -15,7 +15,7 @@ export function StudyTodayRow() {
   if (!isStudiaEnabled()) return null;
   return (
     <Link
-      to="/studia/ripasso"
+      to="/learn/ripasso"
       className={cn(
         'flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 hover:border-primary-300 hover:bg-primary-50/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary-700 dark:hover:bg-primary-900/20',
         FOCUS_RING,

@@ -16,7 +16,7 @@ import { setCoursesSwitch } from './coursesSwitch';
 import { useCourseRead } from './useCourseRead';
 import { useDeclaration } from './useDeclaration';
 
-/** «Percorsi» (`/studia/percorsi`, courses spec §6.3), behind the switch. */
+/** «Percorsi» (`/learn/percorsi`, courses spec §6.3), behind the switch. */
 export function CoursesView() {
   return (
     <CoursesGate>

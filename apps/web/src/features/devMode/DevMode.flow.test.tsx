@@ -34,12 +34,12 @@ beforeEach(async () => {
 describe('the development mode, end to end in the web', () => {
   it('turned on in Impostazioni, shows Grafo and opens the development page at once; off, it takes both away', async () => {
     render(
-      <MemoryRouter initialEntries={['/grafo']}>
+      <MemoryRouter initialEntries={['/labs/grafo']}>
         <Sidebar theme="light" isOpen closeMobile={vi.fn()} openSettings={vi.fn()} openKeyboardShortcuts={vi.fn()} toggleTheme={vi.fn()} serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }} />
         <SettingsModal isOpen onClose={vi.fn()} />
         <Routes>
           <Route path="/" element={<p>Pagina di ricerca</p>} />
-          <Route path="/grafo" element={<DevRoute><p>Pagina del grafo</p></DevRoute>} />
+          <Route path="/labs/grafo" element={<DevRoute><p>Pagina del grafo</p></DevRoute>} />
         </Routes>
       </MemoryRouter>,
     );

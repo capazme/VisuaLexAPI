@@ -64,8 +64,8 @@ export function LessonFrame({ children }: { children: ReactNode }) {
 
 /** Where a lesson loading goes back to: a course's module to its course, the review to Oggi. */
 function lessonHome(pathname: string): string {
-  const course = /^(\/studia\/percorsi\/[^/]+)\/moduli\//.exec(pathname);
-  return course ? course[1] : '/studia/ripasso';
+  const course = /^(\/learn\/percorsi\/[^/]+)\/moduli\//.exec(pathname);
+  return course ? course[1] : '/learn/ripasso';
 }
 
 /**
@@ -97,7 +97,7 @@ export function LessonLoading({ children }: { children?: ReactNode }) {
         <div aria-hidden className="h-3 flex-1 rounded-full bg-slate-200 dark:bg-slate-800" />
       </div>
       {children && <div className="mx-auto w-full max-w-3xl px-4 py-6">{children}</div>}
-      <p className="sr-only">{home === '/studia/ripasso' ? 'Carico il ripasso…' : 'Carico il modulo…'}</p>
+      <p className="sr-only">{home === '/learn/ripasso' ? 'Carico il ripasso…' : 'Carico il modulo…'}</p>
     </div>
   );
 }

@@ -199,7 +199,7 @@ export interface UseQaThreadOptions {
   /**
    * Receives Italian user-facing copy when a teaching-channel request (rate /
    * rateSrc / detailed / confirm) fails, so the owner can surface it (the
-   * /grafo page renders it through the shared Toast). Absent → the failure is
+   * /labs/grafo page renders it through the shared Toast). Absent → the failure is
    * only logged; the optimistic state is reverted either way.
    */
   onFeedbackError?: (message: string) => void;
@@ -254,7 +254,7 @@ export function useQaThread(options: UseQaThreadOptions = {}) {
   // Abort every in-flight turn on unmount, so a poll loop (up to ~11min per
   // the async progressive contract) doesn't keep hitting the BFF and calling
   // setTurns on an unmounted component after the user navigates away from
-  // /grafo. No setState here — just aborts, same as cancel().
+  // /labs/grafo. No setState here — just aborts, same as cancel().
   useEffect(
     () => () => {
       for (const c of Object.values(controllers.current)) c?.abort();

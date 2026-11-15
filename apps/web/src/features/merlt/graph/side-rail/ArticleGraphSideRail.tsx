@@ -149,9 +149,9 @@ export function ArticleGraphSideRail({
           articleUrn={articleUrn}
           onRetryIngestion={retryIngestion}
           onNavigateExplore={() =>
-            navigate(`/grafo?urn=${encodeURIComponent(articleUrn)}&depth=2`)
+            navigate(`/labs/grafo?urn=${encodeURIComponent(articleUrn)}&depth=2`)
           }
-          onNodeNavigate={(urn) => navigate(`/grafo?urn=${encodeURIComponent(urn)}&depth=2`)}
+          onNodeNavigate={(urn) => navigate(`/labs/grafo?urn=${encodeURIComponent(urn)}&depth=2`)}
         />
       </div>
     </>

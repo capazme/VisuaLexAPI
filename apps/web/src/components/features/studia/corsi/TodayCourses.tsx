@@ -50,7 +50,7 @@ function CourseToday({ course }: { course: CorsoDiOggi }) {
   const chevron = <ChevronRight aria-hidden size={18} className="shrink-0 text-slate-400" />;
   if (cards > 0) {
     return (
-      <Link to={`/studia/ripasso/sessione?corso=${encodeURIComponent(course.corso.id)}`} className={ROW}>
+      <Link to={`/learn/ripasso/sessione?corso=${encodeURIComponent(course.corso.id)}`} className={ROW}>
         {icon}
         <span className="grid min-w-0 grid-cols-1 gap-0.5">
           <span className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">

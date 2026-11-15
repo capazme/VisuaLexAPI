@@ -75,14 +75,14 @@ function Where() {
   return <p data-testid="where">{pathname + search}</p>;
 }
 
-function renderSession(cards: SchedaDiRipasso[], path = '/studia/ripasso/sessione') {
+function renderSession(cards: SchedaDiRipasso[], path = '/learn/ripasso/sessione') {
   session.mockResolvedValue({ conteggi: { dovute: cards.length, nuove: 0 }, cards });
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/" element={<Where />} />
-        <Route path="/studia/ripasso" element={<><p>Landing</p><Where /></>} />
-        <Route path="/studia/ripasso/sessione" element={<ReviewSession />} />
+        <Route path="/learn/ripasso" element={<><p>Landing</p><Where /></>} />
+        <Route path="/learn/ripasso/sessione" element={<ReviewSession />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -117,14 +117,14 @@ afterEach(() => {
 
 describe('the review session', () => {
   it('asks for the session of the subject in the address', async () => {
-    renderSession([card('a')], '/studia/ripasso/sessione?materia=DIRITTO_PENALE');
+    renderSession([card('a')], '/learn/ripasso/sessione?materia=DIRITTO_PENALE');
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith('DIRITTO_PENALE');
   });
 
   it('asks for the session of one institute of the subject, spelt as the road gave it (G5)', async () => {
     const istituto = 'Risoluzione per inadempimento (art. 1453 c.c.) & 50% «diffida»';
-    renderSession([card('a')], `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto })}`);
+    renderSession([card('a')], `/learn/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto })}`);
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith('DIRITTO_CIVILE', istituto);
   });
@@ -133,7 +133,7 @@ describe('the review session', () => {
     coursesSwitchStore.setState({ state: 'on' });
     const courseSession = vi.mocked(studiaService.courseSession);
     courseSession.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('a')] });
-    renderSession([], '/studia/ripasso/sessione?corso=corso-1');
+    renderSession([], '/learn/ripasso/sessione?corso=corso-1');
     await screen.findByText('Domanda a?');
     expect(courseSession).toHaveBeenCalledWith('corso-1');
     expect(session).not.toHaveBeenCalled();
@@ -146,27 +146,27 @@ describe('the review session', () => {
 
   it('reads no course while the courses\' switch is off, and goes back to Oggi', async () => {
     coursesSwitchStore.setState({ state: 'off' });
-    renderSession([card('a')], '/studia/ripasso/sessione?corso=corso-1');
+    renderSession([card('a')], '/learn/ripasso/sessione?corso=corso-1');
     expect(await screen.findByText('Landing')).toBeInTheDocument();
     expect(studiaService.courseSession).not.toHaveBeenCalled();
     expect(session).not.toHaveBeenCalled();
   });
 
   it('never reads a course together with a subject', async () => {
-    renderSession([card('a')], '/studia/ripasso/sessione?materia=DIRITTO_PENALE&corso=corso-1');
+    renderSession([card('a')], '/learn/ripasso/sessione?materia=DIRITTO_PENALE&corso=corso-1');
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith('DIRITTO_PENALE');
     expect(studiaService.courseSession).not.toHaveBeenCalled();
   });
 
   it('ignores an institute without its subject, which the server would refuse', async () => {
-    renderSession([card('a')], '/studia/ripasso/sessione?istituto=Mora');
+    renderSession([card('a')], '/learn/ripasso/sessione?istituto=Mora');
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith(undefined);
   });
 
   it('ignores a subject it does not know', async () => {
-    renderSession([card('a')], '/studia/ripasso/sessione?materia=toString');
+    renderSession([card('a')], '/learn/ripasso/sessione?materia=toString');
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith(undefined);
   });
@@ -582,8 +582,8 @@ describe('the review session', () => {
   it('offers a retry when the session cannot be read', async () => {
     session.mockRejectedValueOnce(new Error('down'));
     render(
-      <MemoryRouter initialEntries={['/studia/ripasso/sessione']}>
-        <Routes><Route path="/studia/ripasso/sessione" element={<ReviewSession />} /></Routes>
+      <MemoryRouter initialEntries={['/learn/ripasso/sessione']}>
+        <Routes><Route path="/learn/ripasso/sessione" element={<ReviewSession />} /></Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere le schede da ripassare.');
@@ -802,8 +802,8 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
     it('is full at the end, and an empty track before the queue is read', async () => {
       session.mockReturnValueOnce(new Promise(() => {}));
       const { unmount } = render(
-        <MemoryRouter initialEntries={['/studia/ripasso/sessione']}>
-          <Routes><Route path="/studia/ripasso/sessione" element={<ReviewSession />} /></Routes>
+        <MemoryRouter initialEntries={['/learn/ripasso/sessione']}>
+          <Routes><Route path="/learn/ripasso/sessione" element={<ReviewSession />} /></Routes>
         </MemoryRouter>,
       );
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
@@ -1009,10 +1009,10 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
     it('can be closed while the cards cannot be read', async () => {
       session.mockRejectedValueOnce(new Error('down'));
       render(
-        <MemoryRouter initialEntries={['/studia/ripasso/sessione']}>
+        <MemoryRouter initialEntries={['/learn/ripasso/sessione']}>
           <Routes>
-            <Route path="/studia/ripasso" element={<p>Landing</p>} />
-            <Route path="/studia/ripasso/sessione" element={<ReviewSession />} />
+            <Route path="/learn/ripasso" element={<p>Landing</p>} />
+            <Route path="/learn/ripasso/sessione" element={<ReviewSession />} />
           </Routes>
         </MemoryRouter>,
       );
@@ -1064,7 +1064,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
     });
 
     it('counts what is left in the institute of a session narrowed to one, not in its whole subject (G5)', async () => {
-      const path = `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
+      const path = `/learn/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
       // The subject still has cards, in another institute; «Mora» has none.
       progress.mockResolvedValue({ ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, dovute: 6, nuove: 2 } });
       percorso.mockResolvedValue([
@@ -1080,7 +1080,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
     });
 
     it('offers «Continua» when the institute itself still has cards due, and reads its session again', async () => {
-      const path = `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
+      const path = `/learn/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
       percorso.mockResolvedValue([{ materia: 'DIRITTO_CIVILE', istituto: 'Mora', nuove: 0, apprendimento: 3, consolidate: 0, dovute: 3 }]);
       renderSession([card('a')], path);
       await show();
@@ -1094,7 +1094,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       progress.mockImplementation(async (materia) =>
         materia === 'DIRITTO_PENALE' ? progressAnswer(3, false, 2) : { ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, nuove: 5 } },
       );
-      renderSession([card('a', { materia: 'DIRITTO_PENALE' })], '/studia/ripasso/sessione?materia=DIRITTO_PENALE');
+      renderSession([card('a', { materia: 'DIRITTO_PENALE' })], '/learn/ripasso/sessione?materia=DIRITTO_PENALE');
       await show();
       await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
       await screen.findByRole('img', { name: /Obiettivo di oggi/ });

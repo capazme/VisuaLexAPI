@@ -49,7 +49,7 @@ export function dueLabel(dovute: number): string {
 
 /** The session narrowed to one institute of a subject, the institute spelt as the read gave it (`GET /lingo/srs/sessione`). */
 export function instituteSessionPath(materia: Materia, istituto: string): string {
-  return `/studia/ripasso/sessione?${new URLSearchParams({ materia, istituto }).toString()}`;
+  return `/learn/ripasso/sessione?${new URLSearchParams({ materia, istituto }).toString()}`;
 }
 
 /**

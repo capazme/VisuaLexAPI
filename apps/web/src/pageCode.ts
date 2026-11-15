@@ -28,7 +28,7 @@ export function pageCodeFor(pathname: string): (() => Promise<unknown>) | null {
   if (under(pathname, '/rassegne')) return PAGE_CODE.rassegne;
   if (under(pathname, '/crediti')) return PAGE_CODE.credits;
   if (under(pathname, '/collega-app')) return PAGE_CODE.connectAiApp;
-  if (under(pathname, '/opus')) return PAGE_CODE.opus;
+  if (under(pathname, '/work')) return PAGE_CODE.opus;
   return null;
 }
 

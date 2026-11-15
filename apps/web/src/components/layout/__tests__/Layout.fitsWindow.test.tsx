@@ -49,7 +49,7 @@ describe('Layout — the document never scrolls', () => {
 // A page that grows past the window drew its bar and moved the centred column sideways by half of it.
 describe('Layout — the scrollbar moves nothing', () => {
   it('keeps the bar\'s room on a page that scrolls', () => {
-    const { container } = at('/studia/progressi');
+    const { container } = at('/learn/progressi');
     const scroller = container.querySelector('main .overflow-y-auto') as HTMLElement;
     expect(scroller).toHaveClass('[scrollbar-gutter:stable]');
   });

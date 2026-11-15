@@ -34,7 +34,7 @@ beforeEach(() => {
 
 describe('SectionSwitcher (spec S3)', () => {
   it('names the active section on its button', () => {
-    renderSwitcher('/studia/schede');
+    renderSwitcher('/learn/schede');
     expect(trigger()).toHaveAccessibleName('Sezione: Learn, cambia sezione');
     expect(trigger()).toHaveAttribute('aria-haspopup', 'menu');
   });
@@ -78,7 +78,7 @@ describe('SectionSwitcher (spec S3)', () => {
     const onChoose = renderSwitcher('/dossier');
     fireEvent.click(trigger());
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso');
     expect(onChoose).toHaveBeenCalledOnce();
     expect(trigger()).toHaveAccessibleName('Sezione: Learn, cambia sezione');
   });
@@ -93,7 +93,7 @@ describe('SectionSwitcher (spec S3)', () => {
     fireEvent.click(trigger());
     // No page draws Gymnasium's title here: the change keeps waiting for it (HOLD_MAX, then up to TITLE_WAIT).
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso');
     unmount();
     const looked = vi.spyOn(document, 'querySelector');
     try {
@@ -120,7 +120,7 @@ describe('SectionSwitcher (spec S3)', () => {
         <main>
           <Routes>
             <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
-            <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
+            <Route path="/learn/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
           </Routes>
         </main>
       </MemoryRouter>,
@@ -134,13 +134,13 @@ describe('SectionSwitcher (spec S3)', () => {
 
   it('chosen with the mouse, the new title takes the focus without its ring (T1)', async () => {
     render(
-      <MemoryRouter initialEntries={['/studia/ripasso']}>
+      <MemoryRouter initialEntries={['/learn/ripasso']}>
         <SectionSwitcher forumCount={0} />
         <main>
           <Routes>
-            <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
+            <Route path="/learn/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
             {/* Opus's home is the planner's «Oggi». */}
-            <Route path="/opus/oggi" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
+            <Route path="/work/oggi" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
           </Routes>
         </main>
       </MemoryRouter>,
@@ -160,10 +160,10 @@ describe('SectionSwitcher (spec S3)', () => {
     });
     Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
     try {
-      renderSwitcher('/studia/schede');
+      renderSwitcher('/learn/schede');
       fireEvent.click(trigger());
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }));
-      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
+      expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso');
       expect(start).not.toHaveBeenCalled();
 
       // Another section does ask for one.
@@ -229,7 +229,7 @@ describe('SectionSwitcher (spec S3)', () => {
   });
 
   describe('as a split button, where it has its name (S6)', () => {
-    function renderSplit(path = '/studia/schede', { forumCount = 0, inDrawer = false } = {}) {
+    function renderSplit(path = '/learn/schede', { forumCount = 0, inDrawer = false } = {}) {
       const onChoose = vi.fn();
       render(
         <MemoryRouter initialEntries={[path]}>
@@ -253,16 +253,16 @@ describe('SectionSwitcher (spec S3)', () => {
     });
 
     it("the left part goes to the section's home and opens no menu", () => {
-      const onChoose = renderSplit('/studia/schede');
+      const onChoose = renderSplit('/learn/schede');
       fireEvent.click(goHome(), { detail: 1 });
-      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
+      expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso');
       expect(screen.queryByRole('menu')).toBeNull();
       expect(onChoose).toHaveBeenCalledOnce();
     });
 
     it('names Academia with its article and the Forum\'s news on the arrow', () => {
       account.devMode = true;
-      renderSplit('/merlt', { forumCount: 2 });
+      renderSplit('/labs', { forumCount: 2 });
       expect(goHome()).toHaveAccessibleName('Vai a Labs: Assistente');
       expect(arrow()).toHaveAccessibleName('Cambia sezione, nuove attività nel Forum');
       expect(screen.getByTestId('forum-dot')).toBeInTheDocument();
@@ -293,7 +293,7 @@ describe('SectionSwitcher (spec S3)', () => {
       fireEvent.keyDown(arrow(), { key: 'ArrowDown' });
       fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }), { detail: 0 });
-      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
+      expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso');
       expect(arrow()).toHaveFocus();
       expect(screen.queryByRole('menu')).toBeNull();
     });

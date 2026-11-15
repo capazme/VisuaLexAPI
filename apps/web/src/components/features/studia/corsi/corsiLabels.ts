@@ -2,7 +2,7 @@ import type { CompetenzaPagina, CorsoInLista, Mancanze, StatoCorso, StatoModulo,
 
 /** «Percorsi»'s words (spec 2026-10-23 §4, §6): states, numbers and the sentences to copy into the assistant. */
 
-export const COURSES_PATH = '/studia/percorsi';
+export const COURSES_PATH = '/learn/percorsi';
 export const coursePath = (id: string) => `${COURSES_PATH}/${encodeURIComponent(id)}`;
 /** A module's session (§6.5), by the module's id: a correction shares its order with the module it supersedes. */
 export const modulePath = (id: string, moduloId: string) => `${coursePath(id)}/moduli/${encodeURIComponent(moduloId)}`;
