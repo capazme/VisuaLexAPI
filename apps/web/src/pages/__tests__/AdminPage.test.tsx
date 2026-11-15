@@ -32,6 +32,10 @@ vi.mock('../../components/features/admin/StudiaTextsAdmin', () => ({
   StudiaTextsAdmin: () => <div data-testid="studia-texts-admin">texts</div>,
 }));
 
+vi.mock('../../components/features/admin/CoursesSwitchAdmin', () => ({
+  CoursesSwitchAdmin: () => <div data-testid="courses-switch-admin">percorsi</div>,
+}));
+
 vi.mock('../../components/features/admin/StudiaSoglieAdmin', () => ({
   StudiaSoglieAdmin: () => <div data-testid="studia-soglie-admin">soglie</div>,
 }));
@@ -138,6 +142,7 @@ describe('AdminPage — VisuaLex Studia', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Testi di Learn' }));
     expect(screen.getByTestId('studia-texts-admin')).toBeInTheDocument();
     expect(screen.getByTestId('studia-soglie-admin')).toBeInTheDocument();
+    expect(screen.getByTestId('courses-switch-admin')).toBeInTheDocument();
   });
 
   const row = (id: string, username: string, validator: boolean) => ({

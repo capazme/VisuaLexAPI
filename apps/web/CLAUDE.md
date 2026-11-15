@@ -69,7 +69,9 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
   validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di Learn»
   tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
-  names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/learn/valida`
+  names the validators, and opens on «Percorsi» (`features/admin/CoursesSwitchAdmin`, LC9: the switch `lingo_courses`
+  read from `GET /admin/switches` and written with `PUT /admin/switches/lingo_courses { enabled }`, the state said in a
+  live region, a failed write in an alert, this tab's `coursesSwitch` set at once; only this switch has a page); both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/learn/valida`
   (`ValidationQueueView`), linked for validators only (`useAuth().isValidator`, from `lingo_validatore`
   on `/auth/me`; the server checks the flag on every call): `useValidationQueue` shows the proposed cards
   one at a time, oldest first, refilling when two are left; the primary anchor's article sits beside the
@@ -107,11 +109,27 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   sentence for the assistant, «Il programma finisce qui» beside a module's deletion (Q11, G-377: offered under the
   modules' heading once a module was deleted on the page and fewer count than planned, gone with «Annulla»;
   `PATCH { moduliPrevisti }` to the modules that count, confirmed; «così l’esame potrà aprirsi» only when modules are
-  all the course lacks, `closingOpensExam`), the exam's state (taking it is pull request d), the dossier's link and the menu (rename, export as
+  all the course lacks, `closingOpensExam`), the exam's state with «Inizia la prova» while `aperto` and «Riprendi la
+  prova» while `in-corso` (to the exam's session, below), the dossier's link and the menu (rename, export as
   JSON, the trash with the toast «Il dossier «X» resta in Dossier»). «Oggi»'s row (`TodayCourses`, in the day block's
   cell so the grid keeps its rows) offers a course's due cards first (`/learn/ripasso/sessione?corso=`, never with a
   subject; its end has «Torna a Oggi» alone) and then «Modulo del giorno: <titolo> · <percorso>», which opens the
   module's session, as each module's row does on the course page («Apri» not yet started, «Riprendi», «Rileggi»).
+  Under it «Simulazione d’esame» (`TodayExam`, LC9): one line per course whose `prossimo` in `GET /lingo/corsi` is
+  `{ tipo: 'esame' }` (every counting module done, an exam not handed in; `GET /oggi` does not carry the exam), with
+  «Inizia la prova» to the exam's session; nothing while the switch is off or none is open.
+  **The final exam** (LC9) is `/learn/percorsi/:id/esami/:esameId` — `ExamSession`, in `LessonFrame` as a module's
+  session (`isLesson`), behind the same gate. Its rules first (70% overall and 60% on every competence, one attempt, no
+  time limit, choices lost if one leaves); «Inizia la prova» posts `inizia {}` (S2: the same attempt when started before,
+  its result once handed in; the server's words on a 409). Then every item on one page as `RecallQuestion` in its choose
+  mode (`chosen`/`onChoose`: no «Rispondi», the choice lifted), and the opinion (`ESAME_APERTA`) in a text field that
+  never leaves the browser. «Consegna» asks first when items have no choice (`WireConfirm`, «Consegna lo stesso»), then
+  posts `consegna { risposte }` with the choices only; a failed hand-in says «Non consegnato: riprova.» (or the server's
+  words on a 4xx) and keeps every choice on screen — they are not stored, so a reload loses them. The result: «Esame
+  superato» or «non superato», the percentage, each competence with «sotto il 60%», the day a new exam can be asked for,
+  the graded items (the same `RecallQuestion`, «Senza risposta» for one left out), the opinion written beside the model
+  answer and its rubric's ticks (`aperta { spuntate }`, never scored). Each phase focuses its heading; closing or Esc with
+  choices made asks «Esci dalla prova?». The hand-in's `xp` is not drawn. Shapes in `types/corsi.ts` (`ProvaEsame`).
   **A module's session** (pull request b; §5 steps 1–4, §6.5, §10.3) is `/learn/percorsi/:id/moduli/:moduloId` — by the
   module's id, since a correction shares its order — `ModuleSession`, in `LessonFrame` as the review (`StudiaPage`'s
   `isLesson`; `LessonLoading` goes back to the course): the header says «Passo 4 di 11 · Richiamo» (`moduleSteps.ts`:

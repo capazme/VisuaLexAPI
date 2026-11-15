@@ -104,7 +104,13 @@ interface RecallQuestionProps {
   numero: number;
   totale: number;
   /** Sends the choice; rejects when it was not recorded, its message what follows «Non registrato: » («riprova.»). */
-  onAnswer: (scelta: Chiave) => Promise<void>;
+  onAnswer?: (scelta: Chiave) => Promise<void>;
+  /**
+   * The final exam's way (LC9): the choice is the caller's, lifted as it is made, with no «Rispondi»: the server grades
+   * every item at the hand-in. Once the item carries `risposta` it is drawn graded as a recall question is.
+   */
+  chosen?: Chiave | null;
+  onChoose?: (scelta: Chiave) => void;
 }
 
 /** «la b», «l’a», «l’e», «l’f»: the key as it is read aloud. */
@@ -116,7 +122,7 @@ const theKey = (chiave: Chiave) => (['a', 'e', 'f'].includes(chiave) ? `l’${ch
  * never decides «right» or «wrong» (§4): it shows what the server answered. A choice that did not arrive keeps the
  * choice and says «Non registrato: riprova».
  */
-export function RecallQuestion({ domanda, numero, totale, onAnswer }: RecallQuestionProps) {
+export function RecallQuestion({ domanda, numero, totale, onAnswer, chosen, onChoose }: RecallQuestionProps) {
   const name = useId();
   const [scelta, setScelta] = useState<Chiave | null>(domanda.risposta?.scelta ?? null);
   const [sending, setSending] = useState(false);
@@ -127,10 +133,10 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer }: RecallQues
   const [failed, setFailed] = useState<string | null>(null);
   const risposta = domanda.risposta;
   const answered = risposta !== null;
-  const shown = risposta?.scelta ?? scelta;
+  const shown = answered ? risposta.scelta : onChoose ? (chosen ?? null) : scelta;
 
   const send = async () => {
-    if (!scelta || sending || answered) return;
+    if (!scelta || sending || answered || !onAnswer) return;
     setSending(true);
     setFailed(null);
     try {
@@ -177,7 +183,7 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer }: RecallQues
                 value={opzione.chiave}
                 checked={shown === opzione.chiave}
                 disabled={answered || sending}
-                onChange={() => setScelta(opzione.chiave)}
+                onChange={() => (onChoose ? onChoose(opzione.chiave) : setScelta(opzione.chiave))}
                 className={cn('mt-1 h-5 w-5 accent-primary-800 dark:accent-primary-300', FOCUS_RING)}
               />
               <span className="min-w-0 break-words text-slate-900 dark:text-slate-100">
@@ -201,9 +207,9 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer }: RecallQues
       </div>
       {/* The outcome, said once it arrives (a question already answered when the page opens is not read out). */}
       <p aria-live="polite" className={cn('text-sm font-semibold', risposta?.corretto ? SUCCESS_TEXT : 'text-amber-800 dark:text-amber-300')}>
-        {risposta ? (risposta.corretto ? 'Giusto.' : `Non è giusto: la risposta giusta è ${theKey(risposta.corretta)}.`) : ''}
+        {risposta ? (risposta.corretto ? 'Giusto.' : `${risposta.scelta === null ? 'Senza risposta' : 'Non è giusto'}: la risposta giusta è ${theKey(risposta.corretta)}.`) : ''}
       </p>
-      {!answered && (
+      {!answered && !onChoose && (
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => void send()} disabled={!scelta || sending} aria-busy={sending || undefined} className={INK_BUTTON}>
             {failed !== null ? 'Riprova' : 'Rispondi'}

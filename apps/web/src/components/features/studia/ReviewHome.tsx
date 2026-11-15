@@ -16,6 +16,7 @@ import { useCelebratedToday } from './progress/useCelebratedToday';
 import { usePercorso } from './progress/usePercorso';
 import { useProgress } from './progress/useProgress';
 import { TodayCourses } from './corsi/TodayCourses';
+import { TodayExam } from './corsi/TodayExam';
 
 /**
  * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the sections' full-width frame, in the order the owner fixed — the
@@ -158,7 +159,7 @@ export function ReviewHome() {
     // owner fixed — missions, statistics, list — on every width; the grid places the right column.
     // One column of `minmax(0, 1fr)` below `xl` (two from it, `SPLIT`): an implicit track grows to its widest content.
     <section className={cn('relative grid grid-cols-1 gap-6 pb-8', SPLIT, lonely && LONELY_ROWS)}>
-      {/* The day block and, under it, the courses' row (courses spec §6.2): one cell, so the grid keeps its rows. */}
+      {/* The day block and, under it, the courses' row (courses spec §6.2) and the exam's (LC9): one cell, so the grid keeps its rows. */}
       <div className={cn('grid min-w-0 grid-cols-1 gap-4', LEFT)}>
         <DayBlock
           day={data}
@@ -177,6 +178,7 @@ export function ReviewHome() {
           goalRef={goalRef}
         />
         <TodayCourses />
+        <TodayExam />
       </div>
       <div className={cn('min-w-0 empty:hidden', LEFT)}>
         <TodayMissions

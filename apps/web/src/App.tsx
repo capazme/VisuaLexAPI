@@ -69,6 +69,9 @@ const CoursePage = lazy(() =>
 const ModuleSession = lazy(() =>
   import('./components/features/studia/corsi/ModuleSession').then(m => ({ default: m.ModuleSession })),
 );
+const ExamSession = lazy(() =>
+  import('./components/features/studia/corsi/ExamSession').then(m => ({ default: m.ExamSession })),
+);
 const ProgressPage = lazy(() =>
   import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
 );
@@ -250,6 +253,8 @@ function App() {
               <Route path="percorsi/:id" element={<Suspense fallback={null}><CoursePage /></Suspense>} />
               {/* A module's session (courses spec §6.5), the lesson's frame as the review's. */}
               <Route path="percorsi/:id/moduli/:moduloId" element={<Suspense fallback={<LessonLoading />}><ModuleSession /></Suspense>} />
+              {/* The course's final exam (LC9), in the same frame. */}
+              <Route path="percorsi/:id/esami/:esameId" element={<Suspense fallback={<LessonLoading />}><ExamSession /></Suspense>} />
               <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
