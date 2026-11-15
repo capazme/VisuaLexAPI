@@ -1,8 +1,10 @@
-// VisuaLex's mark: the open book (Lucide's BookOpen, the app's earlier logo), drawn as two strokes so
-// it can be traced. `index.html` repeats the same SVG for the splash shown before the app starts.
+// LexCraft's mark (D-136): the column-cursor, from the logo's icon. The name `BookMark` and the `vlx-book` classes
+// stay from VisuaLex's open book (D-120: the code keeps its names). Capital and base take `currentColor` (the action's
+// ink: dark ink in the light, paper in the dark), the shaft is stone (`index.css`), and the flutes are cut out of it,
+// so they show whatever paper the mark sits on. `index.html` and `public/favicon.svg` repeat the same shapes.
 interface BookMarkProps {
   size?: number;
-  /** Trace the strokes once (600 ms), then breathe while `breathe` is set. */
+  /** Rise once from the base (500 ms), then breathe while `breathe` is set. */
   draw?: boolean;
   breathe?: boolean;
   className?: string;
@@ -13,7 +15,7 @@ export function BookMark({ size = 48, draw = false, breathe = false, className, 
   const classes = ['vlx-book', draw && 'vlx-book-draw', breathe && 'vlx-book-breathe', className].filter(Boolean).join(' ');
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 100 100"
       width={size}
       height={size}
       className={classes}
@@ -21,8 +23,19 @@ export function BookMark({ size = 48, draw = false, breathe = false, className, 
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <path pathLength={100} d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
-      <path pathLength={100} d="M12 7v14" />
+      <g className="vlx-column">
+        <g transform="translate(50,50) scale(1.4930,0.7858)" fill="currentColor">
+          <rect x="-12.90" y="-53.45" width="25.80" height="3.85" />
+          <path d="M-11.87 -49.60 L11.87 -49.60 L6.00 -43.72 L-6.00 -43.72 Z" />
+          <path
+            className="vlx-column-shaft"
+            fillRule="evenodd"
+            d="M-6.00 -43.72 L6.00 -43.72 L7.50 45.17 L-7.50 45.17 Z M-2.74 -40.72 h1.49 v82.89 h-1.49 Z M1.26 -40.72 h1.49 v82.89 h-1.49 Z"
+          />
+          <rect x="-9.90" y="45.17" width="19.80" height="4.43" rx="2.01" />
+          <rect x="-13.90" y="49.60" width="27.80" height="3.85" />
+        </g>
+      </g>
     </svg>
   );
 }

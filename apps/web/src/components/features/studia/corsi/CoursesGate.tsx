@@ -26,7 +26,7 @@ export function CoursesGate({ children }: { children: ReactNode }) {
   }, [reads]);
   const read = settled === reads;
   if (state === 'on') return <>{children}</>;
-  if (state === 'off' && read) return <Navigate to="/studia/ripasso" replace />;
+  if (state === 'off' && read) return <Navigate to="/learn/ripasso" replace />;
   if (state === 'unknown' && read) {
     return (
       <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-slate-700 dark:text-slate-300">

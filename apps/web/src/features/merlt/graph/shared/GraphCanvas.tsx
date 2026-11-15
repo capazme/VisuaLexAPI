@@ -5,7 +5,7 @@ import { nodeStyleMapper, edgeStyleMapper, incidentEdgeIds } from './graphStyles
 import { canonRingPosition, isDeliberationElementId } from './graphDeliberation';
 
 /**
- * Shared G6 v5 graph canvas for both the article side rail and the /grafo page.
+ * Shared G6 v5 graph canvas for both the article side rail and the /labs/grafo page.
  *
  * Default export so consumers can code-split it via
  * `React.lazy(() => import('.../GraphCanvas'))` — @antv/g6 is heavy and must not

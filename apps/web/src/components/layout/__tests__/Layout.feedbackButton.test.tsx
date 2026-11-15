@@ -33,7 +33,7 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
   });
 
   // Below md it is the user menu's «Commenti» (M1).
-  it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione?materia=DIRITTO_CIVILE', '/studia/valida', '/studia/schede', '/dossier'])(
+  it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione?materia=DIRITTO_CIVILE', '/learn/valida', '/learn/schede', '/dossier'])(
     'shows it from md only on %s, left of «Tutto schermo», which Tab reaches after it',
     (path) => {
       at(path);
@@ -81,7 +81,7 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
   });
 
   // The services pill covered the foot of the page on a phone: it is the user menu's «Stato dei servizi» (S1).
-  it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione', '/studia/valida', '/dossier'])('draws no services pill on %s', (path) => {
+  it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione', '/learn/valida', '/dossier'])('draws no services pill on %s', (path) => {
     at(path);
     expect(screen.queryByText(/Servizi operativi|Controllo servizi/)).toBeNull();
   });

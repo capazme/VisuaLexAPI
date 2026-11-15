@@ -41,7 +41,7 @@ export type TourType = keyof typeof TOUR_KEYS;
 export const WELCOME_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Benvenuto in VisuaLex',
+            title: 'Benvenuto in LexCraft',
             description: 'Il tuo assistente per la consultazione di normativa italiana ed europea. Ti guideremo alla scoperta delle funzionalità principali.',
             side: 'over',
             align: 'center',
@@ -60,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Work o Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In Work trovi Oggi (con le schede Prossimi giorni e Lista d\'ingresso), Corpus (la ricerca, da cui si apre anche l\'analisi di un documento), i Dossier, e Atti e Anonimizzatore in arrivo. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
@@ -69,7 +69,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Inizia a Cercare',
-            description: 'Ricerca ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce. Prova subito!',
+            description: 'Ricerca (in Work si chiama Corpus) ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce. Prova subito!',
             side: 'right',
             align: 'start',
         }
@@ -97,7 +97,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Ricerca e Cmd+K',
-            description: 'Ricerca riporta al campo. Preferisci la tastiera? Cmd+K (Ctrl+K) apre la ricerca veloce da qualsiasi pagina, con filtri, alias e tutti gli atti.',
+            description: 'Ricerca (Corpus, in Work) riporta al campo. Preferisci la tastiera? Cmd+K (Ctrl+K) apre la ricerca veloce da qualsiasi pagina, con filtri, alias e tutti gli atti.',
             side: 'right',
             align: 'start',
         }
@@ -266,7 +266,7 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Dossier pubblici',
-            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di VisuaLex.',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di LexCraft.',
             side: 'over',
             align: 'center',
         }

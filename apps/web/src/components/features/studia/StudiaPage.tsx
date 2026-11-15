@@ -21,13 +21,13 @@ export interface StudiaOutletContext {
  * The view that shows the smaller strip over it: «Da validare». «Oggi» and «Progressi» draw their own, «Le mie schede»
  * none (G8: the streak and the goal were said there a third time), the session is a lesson of its own.
  */
-const underStrip = (pathname: string) => /^\/studia\/valida(\/|$)/.test(pathname);
+const underStrip = (pathname: string) => /^\/learn\/valida(\/|$)/.test(pathname);
 
 /** The views with an action beside the title, which they draw into the frame's slot. */
-const withAction = (pathname: string) => /^\/studia\/schede(\/|$)/.test(pathname);
+const withAction = (pathname: string) => /^\/learn\/schede(\/|$)/.test(pathname);
 
 /** The review session is the lesson, a screen of its own (Gymnasium spec §5.4), and so is a course's module (courses spec §6.5). */
-const isLesson = (pathname: string) => /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname) || /^\/studia\/percorsi\/[^/]+\/moduli\/[^/]+\/?$/.test(pathname);
+const isLesson = (pathname: string) => /^\/learn\/ripasso\/sessione(\/|$)/.test(pathname) || /^\/learn\/percorsi\/[^/]+\/moduli\/[^/]+\/?$/.test(pathname);
 
 /** The streak and the goal over «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
 function AreaStrip() {

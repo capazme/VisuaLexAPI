@@ -40,7 +40,7 @@ function answer(over: { reviews?: number; newcomer?: boolean; stati?: Progressi[
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/studia/progressi']}>
+    <MemoryRouter initialEntries={['/learn/progressi']}>
       <ProgressPage />
     </MemoryRouter>,
   );

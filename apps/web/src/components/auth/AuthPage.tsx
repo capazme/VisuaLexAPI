@@ -243,7 +243,7 @@ export function AuthPage() {
 
   if (entering) {
     return (
-      <div role="status" aria-label="Accesso a VisuaLex" className="fixed inset-0 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
+      <div role="status" aria-label="Accesso a LexCraft" className="fixed inset-0 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
         <BookMark size={56} draw />
       </div>
     );
@@ -265,7 +265,8 @@ export function AuthPage() {
         <div className="pb-6 pt-8 md:pt-[max(1.5rem,calc((100dvh-4rem-var(--login-card-h,32rem))/2))]">
           <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-start md:gap-16">
             {/* The title grows only from `lg`: between 768 and 1023 px the column beside the card is about
-                200-430 px, and «VisuaLex» at 68 px is 272 px wide. */}
+                200-430 px; «VisuaLex» at 68 px was 272 px wide, and «LexCraft», as many letters, is about as wide (not
+                measured in a browser). The ink's mask is in % of the word, so the pen ends on whatever word it writes. */}
             <header
               className={cn(
                 // On a computer as tall as the card on «Accedi», its content centred: the two on one middle line.
@@ -275,16 +276,16 @@ export function AuthPage() {
               )}
             >
               <BookMark size={44} className="vlx-ink-book text-primary-600 dark:text-primary-400" />
-              {/* One text, «VisuaLex», for the eye and for a reader; while the pen writes, a faint blurred copy of it,
+              {/* One text, the name, for the eye and for a reader; while the pen writes, a faint blurred copy of it,
                   hidden from a reader, runs ahead of the ink's mask (WebKit kerns no pair across two elements, so the
                   word is never split into letters). The cells' padding, taken back by the grid's margins, gives the
                   masks room for the glyphs' edges. */}
               <h1 className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]">
                 <span ref={inkRef} className="-mx-[0.05em] -my-[0.1em] inline-grid" onAnimationEnd={endInk}>
-                  <span className={cn(INK_CELL, !inked && (plainInk ? 'vlx-ink-plain' : 'vlx-ink-word'))}>VisuaLex</span>
+                  <span className={cn(INK_CELL, !inked && (plainInk ? 'vlx-ink-plain' : 'vlx-ink-word'))}>LexCraft</span>
                   {!inked && !plainInk && (
                     <span aria-hidden="true" className={cn(INK_CELL, 'vlx-ink-bleed select-none')}>
-                      VisuaLex
+                      LexCraft
                     </span>
                   )}
                 </span>

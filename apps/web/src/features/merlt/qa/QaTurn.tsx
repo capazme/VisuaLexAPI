@@ -263,7 +263,7 @@ export function QaTurn({
                 answer's live retrievals. Informational nudge — the EXPLICIT
                 per-source confirm is the "ricorda nel grafo" action on the
                 provisional QaSourceChips above (fresh nodes aren't in the
-                /merlt/valida review queue yet — that only holds quarantined
+                /labs/valida review queue yet — that only holds quarantined
                 doubtful nodes). */}
             {(a.provisional_candidates ?? 0) > 0 && (
               <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-300">

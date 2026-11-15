@@ -23,7 +23,7 @@ import { useCardSources } from './useCardSources';
 import { NO_FILTERS, useMyCards, type ActOption, type CardQuery, type FilterState } from './useMyCards';
 
 const SEARCH_DEBOUNCE_MS = 300;
-const LIST_PATH = '/studia/schede';
+const LIST_PATH = '/learn/schede';
 
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
@@ -152,7 +152,7 @@ function withActsOf(
 /**
  * «Le mie schede»: the user's cards by subject and institute, behind a sticky filter row, across the page's width as a
  * grid of tiles (G8); with a card selected, the list in one column and the card beside it (a phone shows one or the
- * other). The selection is the route: `/studia/schede/:id`. «+ Nuova scheda», beside the page's title (`StudiaPage`'s
+ * other). The selection is the route: `/learn/schede/:id`. «+ Nuova scheda», beside the page's title (`StudiaPage`'s
  * slot) and in the empty list, opens the form with no article — only while the sources answer (`useCardSources`).
  */
 export function MyCardsView() {

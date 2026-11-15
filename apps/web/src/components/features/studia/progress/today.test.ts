@@ -70,7 +70,7 @@ describe('the institutes of a subject (Gymnasium spec §5.2, G5)', () => {
   it('carries the institute to the session verbatim, whatever it holds', () => {
     const istituto = 'Contratto a favore del terzo (artt. 1411-1413) & 100% «patto»';
     const path = instituteSessionPath('DIRITTO_CIVILE', istituto);
-    expect(path.startsWith('/studia/ripasso/sessione?')).toBe(true);
+    expect(path.startsWith('/learn/ripasso/sessione?')).toBe(true);
     const params = new URLSearchParams(path.split('?')[1]);
     expect(params.get('materia')).toBe('DIRITTO_CIVILE');
     expect(params.get('istituto')).toBe(istituto);

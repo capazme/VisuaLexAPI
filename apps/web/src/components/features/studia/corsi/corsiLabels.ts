@@ -2,7 +2,7 @@ import type { CompetenzaPagina, CorsoInLista, Mancanze, StatoCorso, StatoModulo,
 
 /** «Percorsi»'s words (spec 2026-10-23 §4, §6): states, numbers and the sentences to copy into the assistant. */
 
-export const COURSES_PATH = '/studia/percorsi';
+export const COURSES_PATH = '/learn/percorsi';
 export const coursePath = (id: string) => `${COURSES_PATH}/${encodeURIComponent(id)}`;
 /** A module's session (§6.5), by the module's id: a correction shares its order with the module it supersedes. */
 export const modulePath = (id: string, moduloId: string) => `${coursePath(id)}/moduli/${encodeURIComponent(moduloId)}`;
@@ -110,21 +110,21 @@ export const closingOpensExam = (missing: Mancanze) => !missing.manca.esame && m
 
 /** The sentence to copy into the assistant to create a course (§6.3), with the goal left for the user to write. */
 export const CREATE_SENTENCE =
-  'Crea un percorso di studio in VisuaLex da questi materiali. Il mio obiettivo: … Tempo a disposizione: … al giorno.';
+  'Crea un percorso di studio in LexCraft da questi materiali. Il mio obiettivo: … Tempo a disposizione: … al giorno.';
 
 /** The sentence to copy into the assistant for a course «in preparazione» (§6.4). */
 export function completeSentence(titolo: string, m: Mancanze): string {
   const missing = missingLines(m);
   return missing.length > 0
-    ? `Completa il percorso «${titolo}» in VisuaLex: ${missing.join(', ')}.`
-    : `Completa il percorso «${titolo}» in VisuaLex.`;
+    ? `Completa il percorso «${titolo}» in LexCraft: ${missing.join(', ')}.`
+    : `Completa il percorso «${titolo}» in LexCraft.`;
 }
 
 /** The sentence to copy for a new final exam after a failed one (§4). */
 export function newExamSentence(titolo: string, under60: string[]): string {
   return under60.length > 0
-    ? `Scrivi un nuovo esame finale per il percorso «${titolo}» in VisuaLex, con domande diverse; insisti su ${under60.join(', ')}.`
-    : `Scrivi un nuovo esame finale per il percorso «${titolo}» in VisuaLex, con domande diverse.`;
+    ? `Scrivi un nuovo esame finale per il percorso «${titolo}» in LexCraft, con domande diverse; insisti su ${under60.join(', ')}.`
+    : `Scrivi un nuovo esame finale per il percorso «${titolo}» in LexCraft, con domande diverse.`;
 }
 
 /** The scope a connected application needs to create courses (§10.6). */

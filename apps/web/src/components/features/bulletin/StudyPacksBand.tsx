@@ -103,7 +103,7 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
     <section aria-labelledby="study-packs" aria-busy={packs === undefined || undefined} className="@container min-w-0 space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h2 id="study-packs" className="font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
-          Pronti da VisuaLex
+          Pronti da LexCraft
         </h2>
         <span className="text-sm text-slate-600 dark:text-slate-400">dossier di studio da aggiungere ai tuoi</span>
       </div>

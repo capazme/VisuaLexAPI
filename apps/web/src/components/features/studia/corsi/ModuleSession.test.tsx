@@ -51,10 +51,10 @@ function Where() {
 function renderSession(modulo: ModuloLezione = lesson()) {
   get.mockResolvedValue({ data: modulo });
   return render(
-    <MemoryRouter initialEntries={[`/studia/percorsi/corso-1/moduli/${modulo.id}`]}>
+    <MemoryRouter initialEntries={[`/learn/percorsi/corso-1/moduli/${modulo.id}`]}>
       <Routes>
-        <Route path="/studia/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
-        <Route path="/studia/percorsi/:id" element={<Where />} />
+        <Route path="/learn/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
+        <Route path="/learn/percorsi/:id" element={<Where />} />
         <Route path="/" element={<Where />} />
       </Routes>
     </MemoryRouter>,
@@ -168,16 +168,16 @@ describe('a module\'s start (§5, step 1; §6.4)', () => {
   it('says a module gone is gone, with the way back to the course', async () => {
     get.mockRejectedValue({ status: 404, data: { detail: 'Percorso non trovato.' } });
     render(
-      <MemoryRouter initialEntries={['/studia/percorsi/corso-1/moduli/m-9']}>
+      <MemoryRouter initialEntries={['/learn/percorsi/corso-1/moduli/m-9']}>
         <Routes>
-          <Route path="/studia/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
-          <Route path="/studia/percorsi/:id" element={<Where />} />
+          <Route path="/learn/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
+          <Route path="/learn/percorsi/:id" element={<Where />} />
         </Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByRole('alert')).toHaveTextContent('Questo modulo non c’è più');
     await userEvent.setup().click(screen.getByRole('button', { name: 'Torna al percorso' }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1');
   });
 });
 
@@ -391,7 +391,7 @@ describe('the review of #374', () => {
     const dialog = await screen.findByRole('alertdialog', { name: 'Interrompi il modulo?' });
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Interrompi' }).closest('[data-ready]')).not.toBeNull(), { timeout: 2000 });
     await user.click(within(dialog).getByRole('button', { name: 'Interrompi' }));
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1'));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1'));
     first.unmount();
     renderSession(lesson({ stato: 'in-corso' }));
     expect(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/)).toHaveValue('');
@@ -429,14 +429,14 @@ describe('the review of #374', () => {
     vi.mocked(loadAssistantFeatures).mockImplementation(async () => setCoursesSwitch(false));
     get.mockRejectedValue({ status: 404, data: { detail: 'Not found' } });
     render(
-      <MemoryRouter initialEntries={['/studia/percorsi/corso-1/moduli/m-3']}>
+      <MemoryRouter initialEntries={['/learn/percorsi/corso-1/moduli/m-3']}>
         <Routes>
-          <Route path="/studia/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
-          <Route path="/studia/ripasso" element={<p data-testid="where">/studia/ripasso</p>} />
+          <Route path="/learn/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
+          <Route path="/learn/ripasso" element={<p data-testid="where">/learn/ripasso</p>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByTestId('where')).toHaveTextContent('/studia/ripasso');
+    expect(await screen.findByTestId('where')).toHaveTextContent('/learn/ripasso');
     expect(screen.queryByText(/non c’è più/)).toBeNull();
     vi.mocked(loadAssistantFeatures).mockImplementation(async () => {});
   });
@@ -466,7 +466,7 @@ describe('the review of #374', () => {
     expect(closing.defaultPrevented).toBe(false);
     await user.click(screen.getByRole('button', { name: 'Torna al percorso' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1');
     expect(readWork('m-3')).toEqual({});
   });
 
@@ -632,7 +632,7 @@ describe('leaving (§6.5) and what reaches the server (§8)', () => {
     renderSession();
     await screen.findByRole('heading', { level: 1, name: 'Il marchio e i suoi impedimenti' });
     await user.keyboard('{Escape}');
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/percorsi/corso-1');
   });
 
   it('asks «Interrompi il modulo?» once something was written, and goes on when told to', async () => {

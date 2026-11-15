@@ -27,7 +27,7 @@ export interface AskMerltEntryProps {
  * while reading the norm (design §3.5). Follows the NER-row pattern: one
  * unobtrusive line at the end of the article body.
  *  - `qaAskable` (consent ≥ basic): a "Chiedi su questo articolo" button that
- *    navigates to /grafo (Slice 4 absorb, Decision A). It carries the QA-PREFILL
+ *    navigates to /labs/grafo (Slice 4 absorb, Decision A). It carries the QA-PREFILL
  *    CONTRACT ({ prefillQuery, articleUrn, articleHeading }) in location.state
  *    AND ?urn= in the query so the graph centers on the article on arrival.
  *  - MERL-T disabled / consent `none`: renders nothing. The consent is asked once, by the
@@ -61,7 +61,7 @@ export function AskMerltEntry({
                         navigate(
                             // ?urn= centers the graph on the article; location.state
                             // carries the QA-PREFILL CONTRACT for the ask field.
-                            articleUrn ? `/grafo?urn=${encodeURIComponent(articleUrn)}` : '/grafo',
+                            articleUrn ? `/labs/grafo?urn=${encodeURIComponent(articleUrn)}` : '/labs/grafo',
                             {
                                 state: { prefillQuery, articleUrn: articleUrn ?? '', articleHeading: heading },
                             },

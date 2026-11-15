@@ -96,7 +96,7 @@ describe('Layout — Cmd/Ctrl+F', () => {
     overlay.remove();
   });
 
-  it.each(['/dossier', '/forum', '/history', '/grafo'])('leaves the browser\'s own find alone on %s', (path) => {
+  it.each(['/dossier', '/forum', '/history', '/labs/grafo'])('leaves the browser\'s own find alone on %s', (path) => {
     render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
     const event = new KeyboardEvent('keydown', { key: 'f', metaKey: true, cancelable: true, bubbles: true });
     act(() => {

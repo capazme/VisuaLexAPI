@@ -26,7 +26,7 @@ import { coursesChanged, useCourseRead } from './useCourseRead';
 /** The longest title the server takes (`PATCH /lingo/corsi/:id`). */
 const TITLE_MAX = 200;
 
-/** The course page (`/studia/percorsi/:id`, courses spec §6.4), behind the switch. */
+/** The course page (`/learn/percorsi/:id`, courses spec §6.4), behind the switch. */
 export function CoursePage() {
   const { id = '' } = useParams();
   return (

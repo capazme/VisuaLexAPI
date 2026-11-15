@@ -307,9 +307,9 @@ describe('«Da validare», the queue', () => {
   it('tells someone who never was a validator that the section is theirs only', async () => {
     queue.mockRejectedValue(rejection(403));
     render(
-      <MemoryRouter initialEntries={['/studia/valida']}>
+      <MemoryRouter initialEntries={['/learn/valida']}>
         <Routes>
-          <Route path="/studia" element={<Outlet context={{ validator: false }} />}>
+          <Route path="/learn" element={<Outlet context={{ validator: false }} />}>
             <Route path="valida" element={<ValidationQueueView />} />
           </Route>
         </Routes>
@@ -323,9 +323,9 @@ describe('«Da validare», the queue', () => {
 
   it('reads the queue when the account could not be read, and lets the server decide', async () => {
     const area = (
-      <MemoryRouter initialEntries={['/studia/valida']}>
+      <MemoryRouter initialEntries={['/learn/valida']}>
         <Routes>
-          <Route path="/studia" element={<Outlet context={{ validator: null }} />}>
+          <Route path="/learn" element={<Outlet context={{ validator: null }} />}>
             <Route path="valida" element={<ValidationQueueView />} />
           </Route>
         </Routes>
@@ -345,9 +345,9 @@ describe('«Da validare», the queue', () => {
 
   it('waits for the account before reading the queue, and reads it for a validator', async () => {
     const area = (validator: boolean | undefined) => (
-      <MemoryRouter initialEntries={['/studia/valida']}>
+      <MemoryRouter initialEntries={['/learn/valida']}>
         <Routes>
-          <Route path="/studia" element={<Outlet context={{ validator }} />}>
+          <Route path="/learn" element={<Outlet context={{ validator }} />}>
             <Route path="valida" element={<ValidationQueueView />} />
           </Route>
         </Routes>

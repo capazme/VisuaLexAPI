@@ -13,15 +13,17 @@ export const ASSISTANT_PAGE = 'Assistente';
 export const GRAPH_PAGE = 'Grafo';
 
 const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
-  [/^\/opus\/oggi(\/|$)/, 'Oggi'],
-  [/^\/opus\/prossimi(\/|$)/, 'Prossimi giorni'],
-  [/^\/opus\/ingresso(\/|$)/, "Lista d'ingresso"],
-  [/^\/opus\/cestino(\/|$)/, 'Cestino dei compiti'],
-  [/^\/studia\/ripasso(\/|$)/, 'Oggi'],
-  [/^\/studia\/percorsi(\/|$)/, 'Percorsi'],
-  [/^\/studia\/progressi(\/|$)/, 'Progressi'],
-  [/^\/studia\/schede(\/|$)/, 'Le mie schede'],
-  [/^\/studia\/valida(\/|$)/, 'Da validare'],
+  [/^\/work\/oggi(\/|$)/, 'Oggi'],
+  [/^\/work\/prossimi(\/|$)/, 'Prossimi giorni'],
+  [/^\/work\/ingresso(\/|$)/, "Lista d'ingresso"],
+  [/^\/work\/cestino(\/|$)/, 'Cestino dei compiti'],
+  [/^\/work\/atti(\/|$)/, 'Atti'],
+  [/^\/work\/anonimizzatore(\/|$)/, 'Anonimizzatore'],
+  [/^\/learn\/ripasso(\/|$)/, 'Oggi'],
+  [/^\/learn\/percorsi(\/|$)/, 'Percorsi'],
+  [/^\/learn\/progressi(\/|$)/, 'Progressi'],
+  [/^\/learn\/schede(\/|$)/, 'Le mie schede'],
+  [/^\/learn\/valida(\/|$)/, 'Da validare'],
   [/^\/dossier(\/|$)/, DOSSIER_PAGE],
   [/^\/forum\/community(\/|$)/, COMMUNITY_PAGE],
   [/^\/forum\/?$/, PUBLIC_DOSSIERS_PAGE],
@@ -29,8 +31,8 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/documents(\/|$)/, 'Analizza documento'],
   [/^\/rassegne(\/|$)/, 'Rassegne'],
   [/^\/collega-app(\/|$)/, 'Collega un’app AI'],
-  [/^\/merlt\/?$/, ASSISTANT_PAGE],
-  [/^\/grafo(\/|$)/, GRAPH_PAGE],
+  [/^\/labs\/?$/, ASSISTANT_PAGE],
+  [/^\/labs\/grafo(\/|$)/, GRAPH_PAGE],
 ];
 
 /** The page's name for an address, or undefined for a page the list does not name. */

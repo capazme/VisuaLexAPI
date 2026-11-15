@@ -34,16 +34,16 @@ beforeEach(async () => {
 });
 
 describe('StudyPacksBand', () => {
-  it('lays every pack out in one row of cards that scrolls sideways, under «Pronti da VisuaLex» (S7a)', async () => {
+  it('lays every pack out in one row of cards that scrolls sideways, under «Pronti da LexCraft» (S7a)', async () => {
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
-    await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
-    const region = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    await screen.findByRole('list', { name: 'Pronti da LexCraft' });
+    const region = screen.getByRole('region', { name: 'Pronti da LexCraft' });
     const items = within(region).getAllByRole('listitem');
     expect(items).toHaveLength(STUDY_PACKS.length);
     expect(items[0].parentElement).toHaveClass('flex', 'overflow-x-auto', 'snap-x');
     expect(items[0]).toHaveClass('w-56', 'shrink-0', 'snap-start');
     // The row takes the focus itself, so the keyboard scrolls it past packs that hold no button.
-    const row = screen.getByRole('list', { name: 'Pronti da VisuaLex' });
+    const row = screen.getByRole('list', { name: 'Pronti da LexCraft' });
     expect(row).toHaveAttribute('tabindex', '0');
     expect(row).toHaveAttribute('id', 'pronti');
     // No «Mostra tutti»: the row holds them all.
@@ -52,9 +52,9 @@ describe('StudyPacksBand', () => {
 
   it('is a grid of cards of at least 20rem from three of them, by its own width, the row below (U1)', async () => {
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
-    const list = await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+    const list = await screen.findByRole('list', { name: 'Pronti da LexCraft' });
     // The band's own width decides (the sidebar and the full screen count), not the window's.
-    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toHaveClass('@container');
+    expect(screen.getByRole('region', { name: 'Pronti da LexCraft' })).toHaveClass('@container');
     expect(list).toHaveClass('@min-[61.5rem]:grid', CARD_GRID_COLUMNS, '@min-[61.5rem]:overflow-x-visible');
     expect(within(list).getAllByRole('listitem')[0]).toHaveClass('@min-[61.5rem]:w-auto');
   });
@@ -85,7 +85,7 @@ describe('StudyPacksBand', () => {
     } as unknown as typeof ResizeObserver;
     try {
       render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
-      const list = await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+      const list = await screen.findByRole('list', { name: 'Pronti da LexCraft' });
       await waitFor(() => expect(list).toHaveAttribute('tabindex', '-1'));
       list.focus();
       expect(list).toHaveFocus();
@@ -104,7 +104,7 @@ describe('StudyPacksBand', () => {
 
   it('follows the category filter', async () => {
     render(<StudyPacksBand category="penal" onAdded={vi.fn()} onError={vi.fn()} />);
-    await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+    await screen.findByRole('list', { name: 'Pronti da LexCraft' });
     const shown = within(screen.getByRole('region')).getAllByRole('listitem').length;
     expect(shown).toBe(STUDY_PACKS.filter((p) => p.category === 'penal').length);
   });
@@ -113,7 +113,7 @@ describe('StudyPacksBand', () => {
     const onAdded = vi.fn();
     const pack = STUDY_PACKS[0];
     render(<StudyPacksBand category="all" onAdded={onAdded} onError={vi.fn()} />);
-    await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+    await screen.findByRole('list', { name: 'Pronti da LexCraft' });
     fireEvent.click(screen.getByRole('button', { name: `Aggiungi «${pack.name}» ai miei dossier` }));
     await waitFor(() => expect(onAdded).toHaveBeenCalled());
     expect(service.importStudy).toHaveBeenCalledWith(packContent(pack), { addNotes: false, addHighlights: false });
@@ -123,7 +123,7 @@ describe('StudyPacksBand', () => {
     const pack = STUDY_PACKS[0];
     appStore.setState({ dossiers: pack.dossiers.map((d) => ({ ...d, kind: 'studio' as const })) });
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
-    await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
+    await screen.findByRole('list', { name: 'Pronti da LexCraft' });
     expect(screen.queryByRole('button', { name: `Aggiungi «${pack.name}» ai miei dossier` })).not.toBeInTheDocument();
     expect(screen.getAllByText('Già tra i tuoi dossier')).toHaveLength(1);
   });
@@ -131,8 +131,8 @@ describe('StudyPacksBand', () => {
   it('while the packs load, keeps their place: the heading and cards of their size, then the packs', async () => {
     load.held = true;
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
-    const region = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    expect(screen.getByRole('heading', { name: 'Pronti da LexCraft' })).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Pronti da LexCraft' });
     expect(region).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByRole('list')).toBeNull();
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
@@ -147,13 +147,13 @@ describe('StudyPacksBand', () => {
     expect(nameLines[0]).not.toHaveClass('@min-[61.5rem]:hidden');
     expect(nameLines[1]).toHaveClass('@min-[61.5rem]:hidden');
     load.release();
-    expect(await screen.findByRole('list', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).not.toHaveAttribute('aria-busy');
+    expect(await screen.findByRole('list', { name: 'Pronti da LexCraft' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Pronti da LexCraft' })).not.toHaveAttribute('aria-busy');
   });
 
   it('drawn again once they are loaded, shows the packs at once (back on the Forum)', () => {
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
-    expect(screen.getByRole('list', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Pronti da LexCraft' })).toBeInTheDocument();
   });
 
   it('leaves the band out when the packs cannot be loaded', async () => {

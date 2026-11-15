@@ -38,7 +38,7 @@ vi.mock('../../../pageCode', async (importOriginal) => ({
 import { Sidebar } from '../Sidebar';
 import { coursesSwitchStore } from '../../features/studia/corsi/coursesSwitch';
 
-function renderSidebar(path = '/merlt') {
+function renderSidebar(path = '/labs') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Sidebar
@@ -73,29 +73,29 @@ describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () =>
     const dossier = screen.getAllByRole('link', { name: 'Dossier' })[0];
     fireEvent.pointerEnter(dossier, { pointerType: 'mouse' });
     expect(prepared.paths).toEqual(['/dossier']);
-    fireEvent.pointerDown(screen.getByRole('link', { name: 'Analizza documento' }));
-    expect(prepared.paths).toEqual(['/dossier', '/documents']);
-    fireEvent.focus(screen.getByRole('link', { name: /Ricerca/ }));
-    expect(prepared.paths).toEqual(['/dossier', '/documents', '/']);
+    fireEvent.pointerDown(screen.getByRole('link', { name: 'Atti, in arrivo' }));
+    expect(prepared.paths).toEqual(['/dossier', '/work/atti']);
+    fireEvent.focus(screen.getByRole('link', { name: 'Corpus' }));
+    expect(prepared.paths).toEqual(['/dossier', '/work/atti', '/']);
   });
 });
 
 // The MERL-T entries are Academia's, a section offered only in the development mode (sections spec S6, S12).
 describe('Sidebar navigation (MERL-T single entry)', () => {
   it('development mode on → Academia holds "Assistente" (hub) plus "Grafo" (the deliberation surface)', () => {
-    // Slice 3 D1 had a single entry; Slice 4 Decision A (absorb) made /grafo
-    // the Q&A surface and points the sidebar at it too, the hub stays /merlt.
+    // Slice 3 D1 had a single entry; Slice 4 Decision A (absorb) made /labs/grafo
+    // the Q&A surface and points the sidebar at it too, the hub stays /labs.
     account.devMode = true;
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/documents', '/rassegne', '/merlt', '/grafo']);
+    expect(hrefs).toEqual(['/', '/documents', '/rassegne', '/labs', '/labs/grafo']);
     // exactly one hub entry
-    expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
+    expect(hrefs.filter((h) => h === '/labs')).toHaveLength(1);
   });
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar('/');
-    expect(navHrefs()).toEqual(['/', '/documents', '/rassegne', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier']);
+    expect(navHrefs()).toEqual(['/work/oggi', '/', '/dossier', '/work/atti', '/work/anonimizzatore']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -104,28 +104,28 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     renderSidebar();
     const hrefs = navHrefs();
     expect(hrefs).toEqual(['/', '/documents', '/rassegne']);
-    expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
+    expect(hrefs.some((h) => h.startsWith('/labs'))).toBe(false);
   });
 });
 
 // «Percorsi», second in «Studia», behind the switch `lingo_courses` (courses spec §6.1, §10.10).
 describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
   afterEach(() => coursesSwitchStore.setState({ state: 'unknown' }));
-  const studia = () => navHrefs().filter((h) => h.startsWith('/studia') || h === '/dossier');
+  const studia = () => navHrefs().filter((h) => h.startsWith('/learn') || h === '/dossier');
 
   it('is absent while the switch is off or not yet read', () => {
     for (const state of ['unknown', 'off'] as const) {
       coursesSwitchStore.setState({ state });
-      const { unmount } = renderSidebar('/studia/ripasso');
-      expect(studia()).toEqual(['/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
+      const { unmount } = renderSidebar('/learn/ripasso');
+      expect(studia()).toEqual(['/learn/ripasso', '/learn/progressi', '/dossier', '/learn/schede']);
       unmount();
     }
   });
 
   it('comes second, Oggi · Percorsi · Progressi · Dossier, once the switch is on', () => {
     coursesSwitchStore.setState({ state: 'on' });
-    renderSidebar('/studia/ripasso');
-    expect(studia()).toEqual(['/studia/ripasso', '/studia/percorsi', '/studia/progressi', '/dossier', '/studia/schede']);
+    renderSidebar('/learn/ripasso');
+    expect(studia()).toEqual(['/learn/ripasso', '/learn/percorsi', '/learn/progressi', '/dossier', '/learn/schede']);
     expect(screen.getByRole('link', { name: 'Percorsi' })).toBeInTheDocument();
   });
 });

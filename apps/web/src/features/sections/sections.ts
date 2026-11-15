@@ -18,9 +18,9 @@ export interface Section {
 }
 
 export const SECTIONS: readonly Section[] = [
-  { id: 'opus', name: 'Work', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/opus/oggi', homeName: 'Oggi' },
-  { id: 'gymnasium', name: 'Learn', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/studia/ripasso', homeName: 'Oggi' },
-  { id: 'academia', name: 'Labs', line: 'Grafo, feedback e validazione', icon: FlaskConical, home: '/merlt', homeName: 'Assistente' },
+  { id: 'opus', name: 'Work', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/work/oggi', homeName: 'Oggi' },
+  { id: 'gymnasium', name: 'Learn', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/learn/ripasso', homeName: 'Oggi' },
+  { id: 'academia', name: 'Labs', line: 'Grafo, feedback e validazione', icon: FlaskConical, home: '/labs', homeName: 'Assistente' },
   { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum', homeName: 'Dossier pubblici' },
 ];
 
@@ -73,9 +73,9 @@ const under = (pathname: string, root: string) => pathname === root || pathname.
 
 /** The section a page belongs to, or null for a Corpus page, which keeps the last section (S1). */
 export function sectionForPath(pathname: string): SectionId | null {
-  if (under(pathname, '/opus')) return 'opus';
-  if (under(pathname, '/studia')) return 'gymnasium';
+  if (under(pathname, '/work')) return 'opus';
+  if (under(pathname, '/learn')) return 'gymnasium';
   if (under(pathname, '/forum')) return 'forum';
-  if (under(pathname, '/merlt') || under(pathname, '/grafo')) return 'academia';
+  if (under(pathname, '/labs')) return 'academia';
   return null;
 }

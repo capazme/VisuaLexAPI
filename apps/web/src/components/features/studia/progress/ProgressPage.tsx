@@ -77,7 +77,7 @@ function SummarySkeleton() {
 }
 
 /**
- * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
+ * «Progressi», `/learn/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
  * full-width frame (G6) — the summary (the streak, today's goal, the level), the subject chips, «Il tuo andamento»
  * across the page (G7: the reviews as a line over 7 days, 30 days or six months, which replaced the calendar), «Le
  * schede per stato» and «I prossimi 14 giorni» side by side from `lg`, one column below (in full screen too: nothing

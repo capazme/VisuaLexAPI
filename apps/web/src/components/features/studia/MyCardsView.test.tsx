@@ -65,13 +65,13 @@ function Where() {
   return <p data-testid="where">{useLocation().pathname}</p>;
 }
 
-function renderView(path = '/studia/schede') {
+function renderView(path = '/learn/schede') {
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/" element={<Where />} />
-        <Route path="/studia/schede" element={<><MyCardsView /><Where /></>} />
-        <Route path="/studia/schede/:id" element={<><MyCardsView /><Where /></>} />
+        <Route path="/learn/schede" element={<><MyCardsView /><Where /></>} />
+        <Route path="/learn/schede/:id" element={<><MyCardsView /><Where /></>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -179,7 +179,7 @@ describe('«Le mie schede», the list', () => {
   });
 
   it('puts the list in one column beside the card once one is open (G8)', async () => {
-    renderView('/studia/schede/r1');
+    renderView('/learn/schede/r1');
     await screen.findByRole('article', { name: 'Scheda' });
     // One column: no columns declared at all, by breakpoint or by width.
     expect(screen.getByRole('link', { name: /Domanda r1\?/ }).closest('ul')!.className).not.toMatch(/grid-cols-/);
@@ -194,10 +194,10 @@ describe('«Le mie schede», the list', () => {
     document.body.append(slot);
     try {
       render(
-        <MemoryRouter initialEntries={['/studia/schede']}>
+        <MemoryRouter initialEntries={['/learn/schede']}>
           <Routes>
             <Route element={<Outlet context={{ validator: false, actionSlot: slot }} />}>
-              <Route path="/studia/schede" element={<MyCardsView />} />
+              <Route path="/learn/schede" element={<MyCardsView />} />
             </Route>
           </Routes>
         </MemoryRouter>,
@@ -375,7 +375,7 @@ describe('«Le mie schede», the act filter after a deletion', () => {
 
   it('stops offering the act whose only card was deleted', async () => {
     list.mockResolvedValue(page([CIVILE, LEGGE]));
-    renderView('/studia/schede/a1');
+    renderView('/learn/schede/a1');
     await screen.findByRole('combobox', { name: 'Atto' });
     expect(actValues()).toEqual(['', 'codice_civile', 'l_241_1990']);
     trash.mockResolvedValue({ trashId: 't1', moved: ['a1'], notFound: [], notDeletable: [] });
@@ -407,7 +407,7 @@ describe('«Le mie schede», the detail', () => {
   it('opens beside the list from a row, at its own address', async () => {
     renderView();
     await userEvent.setup().click(await screen.findByRole('link', { name: /Domanda r1\?/ }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     expect(within(detail).getByRole('heading', { level: 3, name: 'Domanda r1?' })).toBeInTheDocument();
     expect(within(detail).getByText('Risposta r1.')).toBeInTheDocument();
@@ -425,7 +425,7 @@ describe('«Le mie schede», the detail', () => {
     expect(screen.queryByRole('group', { name: 'Filtri' })).not.toBeInTheDocument();
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'Indietro' }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede');
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
     expect(await screen.findAllByRole('link')).toHaveLength(5);
   });
@@ -434,7 +434,7 @@ describe('«Le mie schede», the detail', () => {
     const rivedere = card('r1', { spiegazione: 'Perché la prestazione è corrispettiva.', stato: 'DA_RIVEDERE', origine: { clientName: 'Claude Code' } });
     list.mockResolvedValue(page([rivedere]));
     get.mockResolvedValue({ ...rivedere, approvazioni: 0, rilievi: [] });
-    renderView('/studia/schede/r1');
+    renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     expect(within(detail).getByText('Perché la prestazione è corrispettiva.')).toBeInTheDocument();
     expect(within(detail).getByText('scritta da Claude Code (applicazione collegata)')).toBeInTheDocument();
@@ -444,7 +444,7 @@ describe('«Le mie schede», the detail', () => {
 
   it('reads a card the list does not hold, from its address', async () => {
     get.mockResolvedValue(card('lontana', { domanda: 'Una scheda fuori elenco?' }));
-    renderView('/studia/schede/lontana');
+    renderView('/learn/schede/lontana');
     expect(await screen.findByRole('heading', { level: 3, name: 'Una scheda fuori elenco?' })).toBeInTheDocument();
     expect(get).toHaveBeenCalledTimes(1);
     expect(get).toHaveBeenCalledWith('lontana');
@@ -452,14 +452,14 @@ describe('«Le mie schede», the detail', () => {
 
   it('says when the card is not there', async () => {
     get.mockRejectedValue({ status: 404 });
-    renderView('/studia/schede/sparita');
+    renderView('/learn/schede/sparita');
     expect(await screen.findByText('Questa scheda non c’è più.')).toBeInTheDocument();
   });
 
   it('renders the text of a card as text, never as markup', async () => {
     const hostile = '<img src=x onerror=alert(1)>';
     list.mockResolvedValue(page([card('x1', { domanda: hostile, risposta: '<b>grassetto</b>', spiegazione: '<script>alert(1)</script>' })]));
-    renderView('/studia/schede/x1');
+    renderView('/learn/schede/x1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     expect(within(detail).getByText(hostile)).toBeInTheDocument();
     expect(within(detail).getByText('<b>grassetto</b>')).toBeInTheDocument();
@@ -472,18 +472,18 @@ describe('«Le mie schede», the detail', () => {
       { normaKey: 'l_241_1990', articleId: 'art_2', urn: LEGGE_URN, isPrimary: false },
       { normaKey: 'codice_civile', articleId: 'art_1453', urn: CIVILE_URN, isPrimary: true },
     ] })]));
-    renderView('/studia/schede/r1');
+    renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     // The primary anchor is the source line; the other one is listed under its own heading.
     expect(within(detail).getByRole('heading', { level: 4, name: 'Altre ancore' })).toBeInTheDocument();
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'art. 2, l. 7 agosto 1990, n. 241' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/');
-    expect(screen.getByTestId('where')).not.toHaveTextContent('/studia');
+    expect(screen.getByTestId('where')).not.toHaveTextContent('/learn');
     expect(appStore.getState().searchTrigger).toMatchObject({ act_type: 'legge', act_number: '241', date: '1990-08-07', article: '2' });
   });
 
   it('opens the primary anchor from the source line', async () => {
-    renderView('/studia/schede/r1');
+    renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'art. 1453 c.c.' }));
     expect(appStore.getState().searchTrigger).toMatchObject({ act_type: 'codice civile', article: '1453', version: 'vigente' });
@@ -495,7 +495,7 @@ describe('«Le mie schede», the actions a state allows', () => {
     list.mockResolvedValue(page([card('k', { stato })]));
     // A card past the drafts is completed from its own address (approvals and remarks).
     get.mockResolvedValue(card('k', { stato, approvazioni: 0, rilievi: [] }));
-    renderView('/studia/schede/k');
+    renderView('/learn/schede/k');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     return {
       edit: within(detail).queryByRole('button', { name: 'Modifica' }),
@@ -536,7 +536,7 @@ describe('«Le mie schede», delete', () => {
 
   /** Opens the card, then (`listAfter`) what the list answers once it is gone, then presses «Elimina». */
   const pressDelete = async (listAfter?: Scheda[]) => {
-    renderView('/studia/schede/r1');
+    renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     if (listAfter) list.mockResolvedValue(page(listAfter));
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
@@ -550,7 +550,7 @@ describe('«Le mie schede», delete', () => {
     await waitFor(() => expect(shown?.message).toBe('Scheda nel cestino'));
     // The row under the article must not go on counting it.
     expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede');
     await waitFor(() => expect(screen.queryByRole('link', { name: /Domanda r1\?/ })).not.toBeInTheDocument());
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
   });
@@ -583,7 +583,7 @@ describe('«Le mie schede», delete', () => {
     await pressDelete();
     expect(await screen.findByText(/non si può eliminare nello stato in cui si trova/)).toBeInTheDocument();
     expect(invalidateArticleCards).not.toHaveBeenCalled();
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede/r1');
     expect(shown).toBeNull();
   });
 
@@ -597,7 +597,7 @@ describe('«Le mie schede», delete', () => {
     trash.mockRejectedValue(new Error('down'));
     await pressDelete();
     expect(await screen.findByText('Non sono riuscito a spostare la scheda nel cestino. Riprova.')).toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
+    expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede/r1');
   });
 });
 
@@ -620,7 +620,7 @@ describe('«Le mie schede», a new card', () => {
     list.mockResolvedValue(page([created, ...FIVE]));
     await user.click(within(dialog).getByRole('button', { name: 'Salva' }));
     expect(vi.mocked(studiaService.create).mock.calls[0][0].ancore).toEqual([{ riferimento: 'art. 1455 c.c.', principale: true }]);
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/n1'));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede/n1'));
     await waitFor(() => expect(list).toHaveBeenCalled());
     expect(await screen.findByText('Scheda salvata')).toBeInTheDocument();
   });
@@ -649,7 +649,7 @@ describe('«Le mie schede», a new card', () => {
 
 describe('«Le mie schede», edit', () => {
   it('opens the form on the draft', async () => {
-    renderView('/studia/schede/r1');
+    renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'Modifica' }));
     const dialog = await screen.findByRole('dialog', { name: 'Modifica scheda' });
@@ -659,7 +659,7 @@ describe('«Le mie schede», edit', () => {
   it('reads the list again after a save, and shows the saved card', async () => {
     const saved = card('r1', { domanda: 'Domanda cambiata?' });
     vi.mocked(studiaService.update).mockResolvedValue({ outcome: 'updated', card: saved });
-    renderView('/studia/schede/r1');
+    renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     const user = userEvent.setup();
     await user.click(within(detail).getByRole('button', { name: 'Modifica' }));
@@ -681,7 +681,7 @@ describe('«Le mie schede», proposing and withdrawing', () => {
   it('proposes under the notice, says so, reads the list again and drops the reader\'s cached cards', async () => {
     const user = userEvent.setup();
     list.mockResolvedValue(page([draft]));
-    renderView('/studia/schede/d1');
+    renderView('/learn/schede/d1');
     propose.mockResolvedValueOnce({ richiedeTesto: notice });
     await user.click(await screen.findByRole('button', { name: 'Proponi alla comunità' }));
     await screen.findByRole('dialog', { name: 'Titolo inventato' });
@@ -706,7 +706,7 @@ describe('«Le mie schede», proposing and withdrawing', () => {
     const user = userEvent.setup();
     list.mockResolvedValue(page([proposed]));
     get.mockResolvedValue({ ...proposed, approvazioni: 1, rilievi: [] });
-    renderView('/studia/schede/d1');
+    renderView('/learn/schede/d1');
     await user.click(await screen.findByRole('button', { name: 'Ritira' }));
     withdraw.mockResolvedValue(draft);
     list.mockResolvedValue(page([draft]));
@@ -722,7 +722,7 @@ describe('«Le mie schede», proposing and withdrawing', () => {
       ...proposed, approvazioni: 1,
       rilievi: [{ giudizio: 'MIGLIORABILE', motivazione: 'Manca la diffida.', createdAt: '2026-10-06T09:00:00Z' }],
     });
-    renderView('/studia/schede/d1');
+    renderView('/learn/schede/d1');
     const section = await screen.findByRole('region', { name: 'Rilievi dei validatori' });
     expect(get).toHaveBeenCalledWith('d1');
     expect(within(section).getByText('Manca la diffida.')).toBeInTheDocument();
@@ -734,7 +734,7 @@ describe('«Le mie schede», proposing and withdrawing', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     list.mockResolvedValue(page([proposed]));
     get.mockRejectedValueOnce(new Error('down'));
-    renderView('/studia/schede/d1');
+    renderView('/learn/schede/d1');
     expect(await screen.findByText('Non ho potuto leggere i rilievi dei validatori.')).toBeInTheDocument();
     expect(logged).toHaveBeenCalledWith(expect.stringContaining('d1'), expect.any(Error));
     // The card itself is still there, as the list gave it.
@@ -756,18 +756,18 @@ describe('«Le mie schede», proposing and withdrawing', () => {
     const other = card('d2', { stato: 'PROPOSTA_COMMUNITY' });
     list.mockResolvedValue(page([proposed, other]));
     get.mockImplementation(async (id) => ({ ...(id === 'd1' ? proposed : other), approvazioni: 0, rilievi: [] }));
-    renderView('/studia/schede/d1');
+    renderView('/learn/schede/d1');
     await user.click(await screen.findByRole('button', { name: 'Ritira' }));
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
     // The route moves under the open dialog (the dialog hides the list from the accessibility tree).
     fireEvent.click(screen.getByText('Domanda d2?'));
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/d2'));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede/d2'));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
   });
 
   it('does not read a draft again: it has no votes', async () => {
     list.mockResolvedValue(page([draft]));
-    renderView('/studia/schede/d1');
+    renderView('/learn/schede/d1');
     await screen.findByRole('button', { name: 'Proponi alla comunità' });
     expect(get).not.toHaveBeenCalled();
   });

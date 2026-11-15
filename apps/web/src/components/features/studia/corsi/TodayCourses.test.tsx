@@ -39,14 +39,14 @@ describe('«Oggi»\'s row of the courses (§6.2)', () => {
     renderRow();
     const row = await screen.findByRole('link', { name: /Modulo del giorno: Il marchio di fatto/ });
     expect(row).toHaveTextContent('Modulo del giorno: Il marchio di fatto · Segni distintivi');
-    expect(row).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-4');
+    expect(row).toHaveAttribute('href', '/learn/percorsi/corso-1/moduli/m-4');
   });
 
   it('offers the course\'s due cards and its check cards first, as one count, the module after them', async () => {
     today.mockResolvedValue([{ corso: COURSE, modulo: { id: 'm-4', ordine: 4, titolo: 'Il marchio di fatto' }, schede: { dovute: 3, verifica: 2 } }]);
     renderRow();
     const row = await screen.findByRole('link', { name: /Ripassa 5 schede di «Segni distintivi»/ });
-    expect(row).toHaveAttribute('href', '/studia/ripasso/sessione?corso=corso-1');
+    expect(row).toHaveAttribute('href', '/learn/ripasso/sessione?corso=corso-1');
     expect(row).toHaveTextContent('Prima del modulo del giorno: Il marchio di fatto');
     // One row a course: the module is named after the cards, not offered as a second link before them.
     expect(screen.getAllByRole('link')).toHaveLength(1);

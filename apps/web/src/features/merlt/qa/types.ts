@@ -269,7 +269,7 @@ export interface QaTurnModel {
 
 /**
  * QA-PREFILL CONTRACT (Slice 3 §3.5, Slice 4 absorb): the in-article "Chiedi su
- * questo articolo" button navigates to `/grafo` with this in `location.state`
+ * questo articolo" button navigates to `/labs/grafo` with this in `location.state`
  * (plus `?urn=` to center the graph). GraphExplorerPage reads it once on mount
  * to prefill the ask field, then clears it so a manual reload does not re-prefill.
  */

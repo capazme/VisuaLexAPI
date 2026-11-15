@@ -19,10 +19,10 @@ function Where() {
 
 function renderStops(percorso: PercorsoState, onRetry = vi.fn()) {
   const view = render(
-    <MemoryRouter initialEntries={['/studia/ripasso']}>
+    <MemoryRouter initialEntries={['/learn/ripasso']}>
       <Routes>
-        <Route path="/studia/ripasso" element={<InstituteStops materia="DIRITTO_CIVILE" percorso={percorso} onRetry={onRetry} />} />
-        <Route path="/studia/ripasso/sessione" element={<Where />} />
+        <Route path="/learn/ripasso" element={<InstituteStops materia="DIRITTO_CIVILE" percorso={percorso} onRetry={onRetry} />} />
+        <Route path="/learn/ripasso/sessione" element={<Where />} />
       </Routes>
     </MemoryRouter>,
   );

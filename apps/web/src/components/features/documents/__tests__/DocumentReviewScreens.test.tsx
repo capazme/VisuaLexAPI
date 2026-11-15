@@ -210,7 +210,7 @@ describe('«Da completare» and the picker (#376 §5)', () => {
 });
 
 describe('«Riconosci solo nel browser» (#376 §6.3)', () => {
-  it('sends nothing, says so, and turns the links off until the user asks VisuaLex for this document', async () => {
+  it('sends nothing, says so, and turns the links off until the user asks LexCraft for this document', async () => {
     const { container } = render(<DocumentReviewPage />);
     const toggle = screen.getByRole('switch', { name: 'Riconosci solo nel browser' });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -219,18 +219,18 @@ describe('«Riconosci solo nel browser» (#376 §6.3)', () => {
     expect(screen.getByText(/^Tutto nel tuo browser/, { selector: 'p' })).toBeInTheDocument();
     await choose(container, BRIEF);
     expect(server.readOnServer).not.toHaveBeenCalled();
-    expect(screen.getByText('Trova le norme citate in un atto. Il riconoscimento è più limitato: VisuaLex non riceve nulla.')).toBeInTheDocument();
-    expect(screen.queryByText(/VisuaLex non risponde/)).toBeNull();
+    expect(screen.getByText('Trova le norme citate in un atto. Il riconoscimento è più limitato: LexCraft non riceve nulla.')).toBeInTheDocument();
+    expect(screen.queryByText(/LexCraft non risponde/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Prepara i link' })).toBeNull();
-    expect(screen.getByText(/Per inserire i link VisuaLex deve ricevere le norme citate \(non il testo\)/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Riconosci con VisuaLex questo documento' }));
+    expect(screen.getByText(/Per inserire i link LexCraft deve ricevere le norme citate \(non il testo\)/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Riconosci con LexCraft questo documento' }));
     await waitFor(() => expect(server.readOnServer).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('button', { name: 'Prepara i link' })).toBeInTheDocument();
   });
 });
 
 describe('«Riconosci solo nel browser», kept', () => {
-  it('stays on for the next document after «Riconosci con VisuaLex questo documento», and the picker asks nothing', async () => {
+  it('stays on for the next document after «Riconosci con LexCraft questo documento», and the picker asks nothing', async () => {
     const { container } = render(<DocumentReviewPage />);
     await userEvent.click(screen.getByRole('switch', { name: 'Riconosci solo nel browser' }));
     await choose(container, BRIEF);
@@ -241,7 +241,7 @@ describe('«Riconosci solo nel browser», kept', () => {
     expect(server.readOnServer).not.toHaveBeenCalled();
     expect(dialog).toHaveTextContent('leggo solo nel browser');
     await userEvent.keyboard('{Escape}');
-    await userEvent.click(screen.getByRole('button', { name: 'Riconosci con VisuaLex questo documento' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Riconosci con LexCraft questo documento' }));
     await waitFor(() => expect(server.readOnServer).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
     expect(await screen.findByRole('switch', { name: 'Riconosci solo nel browser' })).toHaveAttribute('aria-checked', 'true');
@@ -284,7 +284,7 @@ describe('the links (#391 §4.2, §5.2, §6.7)', () => {
     const { container } = render(<DocumentReviewPage />);
     await choose(container, BRIEF);
     expect(linkServer.fetchNormLinks).not.toHaveBeenCalled();
-    expect(screen.getByText(/Per i link, a VisuaLex arriva l’elenco delle norme citate \(per esempio «art\. 2043 c\.c\.»\), non il testo del documento\./)).toBeInTheDocument();
+    expect(screen.getByText(/Per i link, a LexCraft arriva l’elenco delle norme citate \(per esempio «art\. 2043 c\.c\.»\), non il testo del documento\./)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Prepara i link' }));
     await screen.findByText('4 citazioni avranno il link');
     const sent = linkServer.fetchNormLinks.mock.calls[0][0] as LinkNorm[];
