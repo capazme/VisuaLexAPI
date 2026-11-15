@@ -486,7 +486,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `PageFrame` is the frame of every section page — the layout's own frame with nothing narrower inside, the `h1` at the
   column's left edge in one size
   (`PAGE_TITLE`: EB Garamond, 28 px on a phone, 30 px from `md`) — the page's name, with its section's phrase over it,
-  small (`kicker`: «Learn · la tua palestra giuridica», `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
+  small (`kicker`: «Learn», the name alone since 15 Nov 2026, `PAGE_KICKER`, Inter `text-sm` slate 600; L-37, the owner,
   22 October 2026) —, the sentence under it (`line`, a short line:
   `max-w-prose`), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
   a header with an action pads its right side just enough to stay clear of `Layout`'s fixed full-screen button and
@@ -598,7 +598,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community». The sections'
   phrases (the owner's, 19 Oct 2026: «la tua palestra giuridica», «la tua officina giuridica», «il luogo del dibattito
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
-  `sectionKicker`'s «Work · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
+  `sectionKicker`'s «Work» (the name alone since 15 Nov 2026: the owner dropped the phrase over the titles), `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
   d'ingresso», «Cestino dei compiti», «Atti», «Anonimizzatore», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
   fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
@@ -645,7 +645,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
   services' dot), in the middle — as iOS's large titles (G8) — nothing while the page's `h1` is in sight under the bar
-  (it says the name already: no «Learn» over «Learn · la tua palestra giuridica»), the page's name in EB Garamond
+  (it says the name already: no second «Learn» over it), the page's name in EB Garamond
   once it has scrolled out, faded in over 150 ms (`motion-safe:` only), on every page (`usePageTitleInView`: an
   `IntersectionObserver` on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver`
   finding a title drawn later; a page with no `h1`, or a browser with no observer, has the name at once; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
@@ -1720,8 +1720,7 @@ one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the
 up to what the subject's read allows, never the rest of the subject), with «Torna a Oggi» a quiet link under it; else
 «Torna a Oggi» alone.
 
-**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/learn/ripasso`, titled «Oggi» under «Learn · la tua
-palestra giuridica» — L-37; the section switcher keeps «Learn»; spec
+**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/learn/ripasso`, titled «Oggi» under «Learn» — L-37; the section switcher keeps «Learn»; spec
 `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, as rewritten for G1b and G8, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
 `GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed

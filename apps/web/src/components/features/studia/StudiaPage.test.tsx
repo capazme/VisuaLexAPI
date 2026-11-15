@@ -89,7 +89,7 @@ describe('StudiaPage', () => {
   ])('titles %s with the page\'s name, «Gymnasium · la tua palestra giuridica» small over it (L-37)', (path, name) => {
     at(path);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(new RegExp(`^${name}$`));
-    expect(screen.getByText('Learn · la tua palestra giuridica')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleDescription('Learn');
   });
 
   it('gives «Le mie schede» a place for its action beside the title, and no other view', () => {
