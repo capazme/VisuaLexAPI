@@ -40,6 +40,22 @@ beforeEach(() => {
   withdraw.mockReset();
 });
 
+describe('CardDetail, «Elimina» asks first (#457)', () => {
+  it('opens a confirmation on «Annulla»; «Annulla» keeps the card, «Elimina» deletes it', async () => {
+    const onDelete = vi.fn();
+    render(<CardDetail card={card('BOZZA_PERSONALE')} onEdit={vi.fn()} onDelete={onDelete} onOpenAnchor={vi.fn()} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Eliminare la scheda?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Annulla' })).toHaveFocus());
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annulla' }));
+    expect(onDelete).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina' }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('CardDetail, the actions each state allows', () => {
   it('offers a draft Modifica, Proponi alla comunità and Elimina, and not Ritira', () => {
     renderDetail(card('BOZZA_PERSONALE'));

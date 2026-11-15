@@ -248,7 +248,8 @@ export function MyCardsView() {
     navigate(`${LIST_PATH}/${encodeURIComponent(savedId)}`);
   };
 
-  // No confirmation: the card goes to the trash for 30 days and the notification's «Annulla» takes it back out (K1a).
+  // Confirmed in `CardDetail` (#457); the card goes to the trash for 30 days and the notification's «Annulla» takes it
+  // back out (K1a).
   // One trash call per card: a double click on «Elimina» must not send a second one.
   const deleting = useRef<string | null>(null);
   const deleteCard = async (card: Scheda) => {

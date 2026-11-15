@@ -82,6 +82,7 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
   const [asked, setAsked] = useState<{ cardId: string; text: TestoDaAccettare } | null>(null);
   const notice = asked && asked.cardId === card.id ? asked.text : null;
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, setPending] = useState(false);
   // A second click before the first answer (the confirm button stays through the dialog's exit
   // animation) must not send a second request: state would still read idle in the same tick.
@@ -159,7 +160,7 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
             </button>
           )}
           {canDelete && (
-            <button type="button" onClick={onDelete} className={DANGER}>
+            <button type="button" onClick={() => setConfirmDelete(true)} className={DANGER}>
               Elimina
             </button>
           )}
@@ -254,6 +255,20 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
         focusCancel
         onConfirm={() => void withdraw()}
         onCancel={() => setConfirmWithdraw(false)}
+      />
+      {/* Asked first, the focus on «Annulla» (#457): a card was lost to a click meant to look where the focus went. */}
+      <ConfirmDialog
+        open={confirmDelete}
+        variant="danger"
+        title="Eliminare la scheda?"
+        message="La scheda va nel cestino: per 30 giorni la puoi ripristinare da lì."
+        confirmLabel="Elimina"
+        focusCancel
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDelete();
+        }}
+        onCancel={() => setConfirmDelete(false)}
       />
     </article>
   );

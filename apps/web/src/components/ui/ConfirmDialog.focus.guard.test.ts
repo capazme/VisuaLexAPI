@@ -13,6 +13,7 @@ const CANCEL_FIRST: [string, string][] = [
   ['components/features/bulletin/EditSuggestionDialog.tsx', 'Revocare questo item?'],
   ['components/features/bulletin/EditSuggestionDialog.tsx', 'Revocare ${pendingCount}'],
   ['components/features/studia/CardDetail.tsx', 'Ritirare la proposta?'],
+  ['components/features/studia/CardDetail.tsx', 'Eliminare la scheda?'],
   ['components/features/studia/corsi/CoursePage.tsx', 'Il programma finisce con'],
   ['components/features/studia/corsi/CoursePage.tsx', 'Ritirare il modulo'],
   ['components/features/search/discussionControls.tsx', 'Segnalare ai moderatori?'],
