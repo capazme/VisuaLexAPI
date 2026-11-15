@@ -380,7 +380,7 @@ export function AnnotationMargin({
     const escapeFrom = (entry: Entry) => signAt(textRootRef.current, entry.start, entry.end)?.focus({ preventScroll: true });
 
     return (
-        <div ref={wrapperRef} data-annotation-margin="" className={cn(active && 'vlx-glossed', className)}>
+        <div ref={wrapperRef} data-annotation-margin="" data-margin-content={entries.length > 0 ? '' : undefined} className={cn(active && 'vlx-glossed', className)}>
             <div className="vlx-glossed-grid">
                 <div className="min-w-0">{children}</div>
                 {active && (
