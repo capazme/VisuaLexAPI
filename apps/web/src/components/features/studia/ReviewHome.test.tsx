@@ -10,7 +10,7 @@ vi.mock('../../../services/studiaService', () => ({
 
 vi.mock('../../../services/corsiService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/corsiService')>()),
-  corsiService: { today: vi.fn(async () => []) },
+  corsiService: { today: vi.fn(async () => []), list: vi.fn(async () => []) },
 }));
 
 import { studiaService } from '../../../services/studiaService';
