@@ -116,7 +116,7 @@ describe('«Aggiungi al dossier» on a row of the Ricerca (LC59)', () => {
       <PracticeRowShell
         rowKey="p/act/2043" isOpen={false} onToggle={vi.fn()} name="art. 2043 c.c." removeName="art. 2043 c.c." onRemove={vi.fn()}
         header={<span>art. 2043 c.c.</span>}
-        dossier={{ inDossier: true, remove: vi.fn() }}
+        dossier={{ inDossier: true, remove: vi.fn(), important: false, toggleImportant: vi.fn() }}
       >
         <div />
       </PracticeRowShell>,
