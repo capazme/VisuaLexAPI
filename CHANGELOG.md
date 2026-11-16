@@ -12,6 +12,37 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-11-16
+
+The dossier gathers the case: its «Lettura» and «Atti» tabs, the act files encrypted on the server, the
+deadline from a notification; Work's new names, the two-page guide and the motto. One migration
+(pratica_files). Act files for testing only: no real client file until there is a backup off this host.
+
+### Dossier
+
+- A «Lettura» tab: the Corpus's reading on the dossier's own table (LC51, LC52, LC54); each row says
+  «Non nel dossier» when it is on the table only, and is added, removed and reordered from there (LC55).
+- An «Atti» tab (LC53): «Istruzioni per Claude», the case's files with their versions, uploaded or written
+  by Claude; the old act editor and Work's «Atti» entry go, `/work/atti` leads to the dossier.
+- The act files on the server (LC50): encrypted at rest with a key per file wrapped by PRATICA_FILES_KEY,
+  with versions, instructions and an access log; the volume is in the backup, the key never is.
+  Migration `20261116120000_pratica_files` (additions only, rollback written in #525).
+
+### Work
+
+- New names (LC48): «Ricerca» for the Corpus, «Scadenziario» for «Oggi» («Scadenze» in the bar),
+  «Pseudonimizzatore» for the Anonimizzatore, and «Grafo delle pratiche» «in arrivo».
+- «Analizza documento» marked «in sviluppo» and the Pseudonimizzatore «in arrivo» among Work's
+  document tools (LC47).
+- The deadline from the notification (LC44): appeal and cassation terms, the long term, the summer
+  suspension and national holidays, shown step by step and added to the dossier's tasks; «Calcolo
+  indicativo: verifica sempre il termine.»
+
+### Look
+
+- The first-visit guide in two pages instead of eleven tours; the motto «La legge è ancora uguale per
+  tutti».
+
 ## [1.28.0] - 2026-11-16
 
 Citations and the dossier's sources beside an act's text, the three ways for the AI drawn on the connect
