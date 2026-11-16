@@ -1804,3 +1804,11 @@
    counts that focus, given by the script after a focused menu entry, as visible, so `FOCUS_RING`'s `:focus-visible`
    alone would draw it. Unlayered, so it wins over the utilities; the attribute goes with the focus. */
 [data-pointer-focus]:focus { outline: none; box-shadow: none; }
+
+/* LC45: the pulse on the «three ways» drawing (connections/AiWaysDiagram) runs along a line, slowly, three times; nothing moves under
+   reduced motion, where the pulse is not drawn at all. `pathLength="100"` makes the dash a share of the line. */
+@keyframes vlx-pulse-run { to { stroke-dashoffset: -100; } }
+.vlx-pulse { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-pulse { display: inline; stroke-dasharray: 10 90; stroke-dashoffset: 10; animation: vlx-pulse-run 3600ms linear 3; }
+}

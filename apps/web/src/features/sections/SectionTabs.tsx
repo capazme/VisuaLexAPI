@@ -16,7 +16,8 @@ export function SectionTabs({ forumCount, onChoose, inDrawer = false }: { forumC
   const forumDot = forumCount > 0 && section !== 'forum';
 
   return (
-    // LC39: each tab as wide as its word, the room left shared (equal columns cut the bold «Forum» to «For…»).
+    // LC39: each tab as wide as its word, the room left shared (equal columns cut the bold «Forum» to «For…»); 4 px a
+    // side, so the four of a development account (Labs too) fit the 224 px bar with the text a size up.
     <div role="group" aria-label="Sezioni" className="flex w-full gap-0.5">
       {tabs.map((s) => {
         const active = s.id === section;
@@ -31,7 +32,7 @@ export function SectionTabs({ forumCount, onChoose, inDrawer = false }: { forumC
               onChoose?.();
             }}
             className={cn(
-              'relative h-[30px] flex-auto whitespace-nowrap rounded px-1.5 text-center text-[13px] transition-colors duration-100',
+              'relative h-[30px] flex-auto whitespace-nowrap rounded px-1 text-center text-[13px] transition-colors duration-100',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
               // 44 px on a touch screen, which the drawer is; the desktop bar keeps the prototype's 30.
               inDrawer && 'h-11',

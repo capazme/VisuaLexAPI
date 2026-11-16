@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const atti = vi.hoisted(() => ({
@@ -10,9 +10,17 @@ const atti = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 const dossiers = vi.hoisted(() => ({ getAll: vi.fn(), getById: vi.fn() }));
+// The sources behind «Citazioni»: the catalog and the readings, the norms' addresses, the decisions.
+const sources = vi.hoisted(() => ({ names: vi.fn(), links: vi.fn(), decision: vi.fn() }));
 
 vi.mock('../../../services/attiService', async (original) => ({ ...(await original<object>()), attiService: atti }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: dossiers }));
+vi.mock('../documents/documentServer', () => ({
+  fetchActNames: sources.names,
+  readOnServer: async () => ({ answers: new Map(), unanswered: [] }),
+}));
+vi.mock('../documents/documentLinkServer', () => ({ fetchNormLinks: sources.links }));
+vi.mock('../../../utils/decisionFetchCache', () => ({ fetchDecisionCached: sources.decision }));
 // «Analizza documento»'s reader has its own tests: here a file's «text» is its name's, and a PDF is refused.
 vi.mock('../documents/documentFile', () => ({
   readDocumentFile: async (file: File) =>
@@ -23,6 +31,8 @@ import { AttiListView } from './AttiListView';
 import { AttoEditor } from './AttoEditor';
 import { DossierAttiPanel } from './DossierAttiPanel';
 import { SAVE_DELAY_MS, changedOn } from './attiText';
+import { CHECK_DELAY_MS } from './useAttoCitazioni';
+import { normKey, type LinkAnswer } from '../documents/documentLinks';
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -59,10 +69,26 @@ const DOSSIER = {
   ],
 };
 
+const NORMATTIVA = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262~art2043';
+
+/** What `/fetch_norm_links` answers for every norm asked: the same answer. */
+const answerLinks = (answer: { reason: LinkAnswer['reason']; href?: string }) => async (norms: Parameters<typeof normKey>[0][]) => ({
+  answers: new Map(norms.map((norm) => [normKey(norm), { href: answer.href ?? null, reason: answer.reason }])),
+  unanswered: [],
+});
+
 beforeEach(() => {
   Object.values(atti).forEach((fn) => fn.mockReset());
   dossiers.getAll.mockResolvedValue([DOSSIER, { ...DOSSIER, id: 'd2', name: 'Studio', kind: 'studio', items: [] }]);
+  dossiers.getById.mockReset();
   dossiers.getById.mockResolvedValue(DOSSIER);
+  atti.list.mockResolvedValue([]);
+  // The catalog is silent: the browser reads the citations by itself.
+  sources.names.mockReset();
+  sources.names.mockRejectedValue(new Error('offline'));
+  sources.links.mockReset();
+  sources.decision.mockReset();
+  sources.links.mockImplementation(answerLinks({ reason: 'ok', href: NORMATTIVA }));
 });
 afterEach(() => vi.useRealTimers());
 
@@ -251,6 +277,117 @@ describe('AttoEditor', () => {
     expect(await screen.findByText('Testo di appello v3.txt')).toBeInTheDocument();
     fireEvent.blur(screen.getByLabelText('Titolo dell’atto'));
     await waitFor(() => expect(atti.update).toHaveBeenCalledWith('a1', expect.objectContaining({ testo: 'Testo di appello v3.txt' })));
+  });
+});
+
+describe('AttoEditor: «Citazioni»', () => {
+  const TESTO = 'Come previsto dall’art. 2043 c.c., il danno ingiusto va risarcito.';
+
+  it('shows a norm the source confirms as verified, with the source, and opens it as a search', async () => {
+    atti.get.mockResolvedValue({ ...ATTO, testo: TESTO });
+    renderAt('/work/atti/a1');
+    const region = await screen.findByRole('region', { name: 'Citazioni' });
+    await waitFor(() => expect(region).toHaveTextContent('Verificata alla fonte · Normattiva'));
+    expect(region).toHaveTextContent('2043');
+    expect(region).toHaveTextContent('1 citazione');
+    expect(sources.links).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(region).getByRole('button', { name: /2043/ }));
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
+  });
+
+  it('says a norm the source does not hold is not found, in words and not by colour alone', async () => {
+    sources.links.mockImplementation(answerLinks({ reason: 'article_missing' }));
+    atti.get.mockResolvedValue({ ...ATTO, testo: TESTO });
+    renderAt('/work/atti/a1');
+    const region = await screen.findByRole('region', { name: 'Citazioni' });
+    await waitFor(() => expect(region).toHaveTextContent('Non trovata alla fonte: controlla prima di usarla'));
+    expect(region).toHaveTextContent('1 citazione, 1 da controllare');
+    expect(region).not.toHaveTextContent('Verificata');
+  });
+
+  it('never calls a silent source «not found»', async () => {
+    sources.links.mockImplementation(answerLinks({ reason: 'source_unavailable' }));
+    atti.get.mockResolvedValue({ ...ATTO, testo: TESTO });
+    renderAt('/work/atti/a1');
+    const region = await screen.findByRole('region', { name: 'Citazioni' });
+    await waitFor(() => expect(region).toHaveTextContent('Non controllata: la fonte non ha risposto in tempo'));
+    expect(region).not.toHaveTextContent('Non trovata');
+  });
+
+  it('checks a decision at its source: found, then not found, each linking to the decision', async () => {
+    sources.decision
+      .mockResolvedValueOnce({ esito: 'trovata', fonte: { nome: 'Corte di cassazione' } })
+      .mockResolvedValueOnce({ esito: 'non_trovata', motivo: 'inesistente' });
+    atti.get.mockResolvedValue({ ...ATTO, testo: 'Cass. civ., sez. un., n. 34318/2023; Cass. civ., n. 99999/2023.' });
+    renderAt('/work/atti/a1');
+    const region = await screen.findByRole('region', { name: 'Citazioni' });
+    await waitFor(() => expect(region).toHaveTextContent('Verificata alla fonte · Corte di cassazione'));
+    await waitFor(() => expect(region).toHaveTextContent('Non trovata alla fonte'));
+    const links = within(region).getAllByRole('link');
+    expect(links).toHaveLength(2);
+    links.forEach((link) => expect(link.getAttribute('href')).toMatch(/^\/sentenze\//));
+  });
+
+  it('asks the source again only for what is new when the text changes', async () => {
+    atti.get.mockResolvedValue({ ...ATTO, testo: TESTO });
+    renderAt('/work/atti/a1');
+    const region = await screen.findByRole('region', { name: 'Citazioni' });
+    await waitFor(() => expect(region).toHaveTextContent('Verificata alla fonte'));
+    fireEvent.click(screen.getByRole('button', { name: 'Modifica il testo' }));
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByLabelText('Testo dell’atto'), { target: { value: `${TESTO} Una frase in più.` } });
+    // Nothing is asked before the pause.
+    await act(async () => {
+      vi.advanceTimersByTime(CHECK_DELAY_MS - 100);
+    });
+    expect(sources.names).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+    vi.useRealTimers();
+    await waitFor(() => expect(sources.names).toHaveBeenCalledTimes(2));
+    expect(sources.links).toHaveBeenCalledTimes(1);
+    expect(region).toHaveTextContent('Verificata alla fonte');
+  });
+
+  it('says there is nothing to check in a text with no citations', async () => {
+    atti.get.mockResolvedValue({ ...ATTO, testo: 'Primo motivo.' });
+    renderAt('/work/atti/a1');
+    const region = await screen.findByRole('region', { name: 'Citazioni' });
+    await waitFor(() => expect(region).toHaveTextContent('Nel testo non ci sono norme né sentenze citate.'));
+    expect(sources.links).not.toHaveBeenCalled();
+  });
+});
+
+describe('AttoEditor: «Fonti della pratica»', () => {
+  it('offers the practice’s sources in a sheet, with the kind of each, and «Cita» writes one in the text', async () => {
+    atti.get.mockResolvedValue({ ...ATTO, testo: 'Visto e considerato' });
+    atti.update.mockResolvedValue(ATTO);
+    atti.list.mockResolvedValue([ATTO, { ...ATTO, id: 'a2', titolo: 'Diffida', tipo: null, stato: 'finale' }]);
+    renderAt('/work/atti/a1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Modifica il testo' }));
+    const text = screen.getByLabelText('Testo dell’atto') as HTMLTextAreaElement;
+    text.setSelectionRange(5, 5);
+    fireEvent.click(screen.getByRole('button', { name: 'Fonti della pratica' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Fonti della pratica' });
+    expect(within(sheet).getByText('Norma')).toBeInTheDocument();
+    expect(within(sheet).getByText('Sentenza')).toBeInTheDocument();
+    expect(within(sheet).getByText('Nota')).toBeInTheDocument();
+    // The other acts of the practice, not this one.
+    expect(within(sheet).getByRole('link', { name: /Diffida/ })).toHaveAttribute('href', '/work/atti/a2');
+    expect(within(sheet).queryByRole('link', { name: /Atto di appello/ })).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Cita art. 2043 c.c.' }));
+    expect(text.value).toBe('Vistoart. 2043 c.c. e considerato');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Fonti della pratica' })).toBeNull());
+  });
+
+  it('has no sources column and no button for an act without a practice, but keeps «Citazioni»', async () => {
+    atti.get.mockResolvedValue({ ...ATTO, dossierId: null });
+    renderAt('/work/atti/a1');
+    expect(await screen.findByRole('region', { name: 'Citazioni' })).toBeInTheDocument();
+    expect(screen.queryByText('Fonti della pratica')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Fonti della pratica' })).toBeNull();
+    expect(dossiers.getById).not.toHaveBeenCalled();
   });
 });
 
