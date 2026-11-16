@@ -107,7 +107,7 @@ export function Scrivania() {
         </div>
 
         {/* The Corpus tools beside the search (LC8: Work's bar no longer lists them). */}
-        <nav aria-label="Altri strumenti del Corpus" className="mt-3 flex flex-wrap gap-x-5 gap-y-2 max-md:mt-2 max-md:gap-x-4">
+        <nav aria-label="Altri strumenti della Ricerca" className="mt-3 flex flex-wrap gap-x-5 gap-y-2 max-md:mt-2 max-md:gap-x-4">
           {[['/documents', 'Analizza un documento'], ['/rassegne', 'Rassegne']].map(([to, label]) => (
             <Link key={to} to={to} className={TOOL_LINK}>{label}</Link>
           ))}

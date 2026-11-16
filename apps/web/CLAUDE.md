@@ -38,7 +38,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
   entry chosen again, included).
   In the signed-in layout: `/` (search), `/dossier`, `/work` (the planner, below: `OpusPage`
-  over `oggi`, `prossimi`, `ingresso` and `cestino`; `/work` redirects to `oggi`),
+  over `scadenziario`, `prossimi`, `ingresso` and `cestino`; `/work` redirects to `scadenziario`; LC48: `/work/oggi` and
+  `/work/anonimizzatore` are old addresses, `MovedTo` sends them to `/work/scadenziario` and `/work/pseudonimizzatore`),
   `/learn` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
@@ -514,7 +515,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   since D-253. **From `lg` (LC21) nothing floats**: `TopBar` (`components/layout/TopBar.tsx`, 52 px, every page but the search page,
   the lesson and the full screen) draws the path («Work › Dossier › Pratica …», the page's `h1` as its last step on a page deeper
   than its list), the compact search (it opens the palette), «Novità in vX» (`ChangelogNotification inBar`), «Commenti» and
-  «Tutto schermo», in line; on the search page too, with «Work › Corpus» («Ricerca» in the other sections) and the
+  «Tutto schermo», in line; on the search page too, with «Work › Ricerca» (in every section, LC48) and the
   search field itself, compact (`SearchField compact`), in the search button's place; the practice's columns then take
   the 52 px bar off their height (`--search-bar-height: 3.25rem`). Below `lg` the search page keeps its own bar, the field. What follows holds below
   `lg` and in full screen: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
@@ -581,7 +582,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
   so a choice made with a pointer (the entry's click in `SectionSwitcher`, `detail` above 0) marks the title
-  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Oggi» —, the dossier list's
+  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Scadenziario» —, the dossier list's
   `h1` — `opus` or `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier
   pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
@@ -591,15 +592,18 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
   carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
-  section's, in a group named after it: Work's five entries (D-315, LC8), exactly, in this order, «Oggi» (the home, `/work/oggi`,
-  with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the
-  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, «Atti», then, after a hairline, in a group named «Strumenti sul documento» for a screen reader (LC47), «Analizza
-  documento» (`/documents`, `soon="dev"`: «in sviluppo», still a working link; Corpus is no longer lit there) and
-  «Anonimizzatore» `soon` (`NavItem`: «in arrivo» or «in sviluppo» under the word, 11 px, in the rail's hover label and in
-  the name, «Anonimizzatore, in arrivo»; `/work/anonimizzatore` is a plain page in Work's frame, `ComingSoon` in
-  `App.tsx`, saying it comes with the desktop app and works on the computer only, D-324). In the other sections «Analizza
+  section's, in a group named after it: Work's entries (D-315, LC8, LC48), exactly, in this order, «Scadenziario» (the home, `/work/scadenziario`,
+  with the count of overdue and today's tasks, named in words: «Scadenziario, 3 compiti per oggi o scaduti»), «Ricerca» (the
+  search, named «Ricerca» as in the other sections, with its id `#tour-nav-search` and its ⌘K), Dossier, «Atti», then, after a hairline, in a group named «Strumenti sul documento» for a screen reader (LC47), «Analizza
+  documento» (`/documents`, `soon="dev"`: «in sviluppo», still a working link; «Ricerca» is no longer lit there),
+  «Pseudonimizzatore» `soon` (`NavItem`: «in arrivo» or «in sviluppo» under the word, 11 px, in the rail's hover label and in
+  the name, «Pseudonimizzatore, in arrivo»; the bar writes `shortLabel` «Pseudonimizza», as the whole word is cut at the
+  larger text sizes; `/work/pseudonimizzatore` is a plain page in Work's frame, `ComingSoon` in
+  `App.tsx`, saying it comes with the desktop app and works on the computer only, D-324), and «Grafo delle pratiche» `soon`
+  (`/work/grafo-pratiche`, «Grafo pratiche» in the bar, the same kind of page: the knowledge graph of the user's practices,
+  coming with the desktop app, LC48). In the other sections «Analizza
   documento» stays a Corpus tool with no label. «Prossimi giorni» and «Lista d'ingresso»
-  are tabs of Work's page (`OpusPage`: «Oggi», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
+  are tabs of Work's page (`OpusPage`: «Scadenziario», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
   short word on a phone; on those three views and on the trash, its way back; the trash's link only on the three), «Analizza un documento» and «Rassegne» links
   of the search page's Scrivania, under the examples and drawn as them, underlined;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
@@ -612,15 +616,15 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
   `sectionKicker`'s «Work» (the name alone since 15 Nov 2026: the owner dropped the phrase over the titles), `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
-  d'ingresso», «Cestino dei compiti», «Atti», «Anonimizzatore», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
+  d'ingresso», «Cestino dei compiti», «Atti», «Pseudonimizzatore», «Grafo delle pratiche», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
   fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
-  laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
+  laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Scadenziario» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
   The active entry is marked by the logo's column (D-237, `BookMark` at 16 px, toga ink) in the 21 px between the bar's
   edge and the icon: 7.5 px left of the row (`-left-[7.5px]`), the column from 7.2 to 13.8 px of the bar, 7.2 px clear of
   the icon's box; the row has no `overflow-hidden`, which clipped it. One per section; it jumps from entry to entry, as the
   dash did (`layoutId` does not carry it, seen in the browser, #448). An entry is lit (background, column, `aria-current`)
-  on its address and on its `activeOn` ones: «Oggi» on `/work/prossimi`, `/work/ingresso`, `/work/cestino`, «Corpus» on
+  on its address and on its `activeOn` ones: «Scadenziario» on `/work/prossimi`, `/work/ingresso`, `/work/cestino`, «Ricerca» on
   `/documents` and `/rassegne` in Work, «Assistente» on `/labs/contribuisci` and `/labs/valida` (not on the graph's).
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Learn» and «Contribuisci»), the palette's
@@ -1032,7 +1036,7 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   sending and builds the input (a subtask's dossier is never sent: it is its parent's).
 - **The dossier's panel** (`DossierTasksPanel`, after the header of `DossierDetailView`): its open tasks and the quick
   add with the dossier fixed.
-- **The count** beside «Oggi» and on the switcher's Opus entry: the today view's length, set by `TodayView`'s read
+- **The count** beside «Scadenziario» and on the switcher's Opus entry: the today view's length, set by `TodayView`'s read
   and by `PlannerHost` every two minutes while the tab is visible and after every write.
 - **A new day**: every read stores the server's day (`plannerStore.today`); when one answers a different day (the
   count's, every two minutes) or the tab comes back into view, every view mounted reads again, and the quick add,
