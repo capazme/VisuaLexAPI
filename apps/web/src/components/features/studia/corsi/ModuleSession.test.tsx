@@ -16,7 +16,7 @@ vi.mock('../../dossier/DossierItemReader', () => ({
         {norma.tipo_atto} art. {norma.numero_articolo}
       </p>
       <button type="button" onClick={onOpenOnDashboard}>
-        Apri nel Corpus
+        Apri in Ricerca
       </button>
     </div>
   ),
@@ -348,13 +348,13 @@ describe('highlights and citations, further (§5 step 3, §6.5)', () => {
     expect(screen.queryByTestId('where')).toBeNull();
   });
 
-  it('asks before a reader\'s «Apri nel Corpus» takes the reader away from what was highlighted', async () => {
+  it('asks before a reader\'s «Apri in Ricerca» takes the reader away from what was highlighted', async () => {
     const user = await atReading();
     const word = screen.getByText(/distingue i prodotti/);
     select(word.firstChild!, 1, word.firstChild!, 9);
     await user.click(screen.getByRole('button', { name: 'Evidenziatore (giallo)' }));
     await user.click(screen.getByRole('button', { name: /l’art\. 7 c\.p\.i\./ }));
-    await user.click(screen.getByRole('button', { name: 'Apri nel Corpus' }));
+    await user.click(screen.getByRole('button', { name: 'Apri in Ricerca' }));
     const dialog = await screen.findByRole('alertdialog', { name: 'Interrompi il modulo?' });
     expect(dialog).toHaveTextContent('Le evidenziazioni si perdono.');
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Interrompi' }).closest('[data-ready]')).not.toBeNull(), { timeout: 2000 });

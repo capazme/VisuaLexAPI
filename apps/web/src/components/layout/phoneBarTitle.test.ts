@@ -3,7 +3,8 @@ import { phoneBarTitle } from './phoneBarTitle';
 
 describe('phoneBarTitle', () => {
   it.each([
-    ['/work/oggi', 'Oggi'],
+    ['/work/scadenziario', 'Scadenziario'],
+    ['/work/pseudonimizzatore', 'Pseudonimizzatore'],    ['/work/grafo-pratiche', 'Grafo delle pratiche'],
     ['/work/prossimi', 'Prossimi giorni'],
     ['/work/ingresso', "Lista d'ingresso"],
     ['/work/cestino', 'Cestino dei compiti'],

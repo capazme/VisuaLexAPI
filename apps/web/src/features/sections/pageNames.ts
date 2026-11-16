@@ -13,11 +13,12 @@ export const ASSISTANT_PAGE = 'Assistente';
 export const GRAPH_PAGE = 'Grafo';
 
 const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
-  [/^\/work\/oggi(\/|$)/, 'Oggi'],
+  [/^\/work\/scadenziario(\/|$)/, 'Scadenziario'],
   [/^\/work\/prossimi(\/|$)/, 'Prossimi giorni'],
   [/^\/work\/ingresso(\/|$)/, "Lista d'ingresso"],
   [/^\/work\/cestino(\/|$)/, 'Cestino dei compiti'],
-  [/^\/work\/anonimizzatore(\/|$)/, 'Anonimizzatore'],
+  [/^\/work\/pseudonimizzatore(\/|$)/, 'Pseudonimizzatore'],
+  [/^\/work\/grafo-pratiche(\/|$)/, 'Grafo delle pratiche'],
   [/^\/learn\/ripasso(\/|$)/, 'Oggi'],
   [/^\/learn\/percorsi(\/|$)/, 'Percorsi'],
   [/^\/learn\/progressi(\/|$)/, 'Progressi'],
