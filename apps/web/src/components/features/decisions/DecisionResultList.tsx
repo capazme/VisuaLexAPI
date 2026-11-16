@@ -10,6 +10,7 @@ import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import type { DecisionArchive, DecisionSearchHit, DecisionSearchQuery, SearchDecisionsAnswer } from '../../../types/decisions';
 import { Button } from '../../ui/Button';
+import { sentenzaFromDecision } from '../dossier/dossierUtils';
 import { CaseLawRow } from '../search/caseLaw/CaseLawRow';
 import { useCaseLawFilters, useReportCaseLawYears } from '../search/caseLaw/caseLawFiltersContext';
 import { applyCaseLawFilters } from '../search/caseLaw/caseLawFilter';
@@ -101,6 +102,7 @@ function Row({ hit, besideId, backEntry }: { hit: DecisionSearchHit; besideId?: 
       badges={[KIND_LABEL[hit.trovata]]}
       besideId={besideId}
       backEntry={backEntry}
+      dossierItem={sentenzaFromDecision(identita, attributi)}
     >
       {hit.frammento && <Fragment {...hit.frammento} />}
     </CaseLawRow>

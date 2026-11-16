@@ -1,5 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronDown, FolderPlus, MoreHorizontal, PanelRightOpen, X } from 'lucide-react';
+import { useAddToDossier, useHeldInLabel, type DossierTarget } from '../dossier/addFromResult';
+import { HeldInMark } from '../dossier/HeldInMark';
 import { cn } from '../../../lib/utils';
 import { MenuButton } from '../../ui/MenuButton';
 import { rowDossierItems, type RowDossier } from './inDossier';
@@ -36,6 +38,9 @@ export interface PracticeRowShellProps {
   /** In a dossier's «Lettura» (LC55): whether the row is in the dossier, and its commands, in a «⋯» with their names
    *  instead of the bare «Togli dal tavolo». Absent in the Corpus, which draws as before. */
   dossier?: RowDossier;
+  /** In the Corpus (LC59): what «Aggiungi al dossier» adds through the reader's popover, and the mark «Nel dossier
+   *  «X»» or «In 2 dossier». Ignored when `dossier` is set: a dossier's «Lettura» keeps its own commands. */
+  corpusItem?: DossierTarget;
   /** Mounted only while the row is open (and not shown beside). */
   children: ReactNode;
 }
@@ -60,11 +65,14 @@ const MENU_TRIGGER =
  * the header's: hovering the open text does not wash it. A closed row renders no children.
  */
 export function PracticeRowShell({
-  rowKey, isOpen: open, onToggle, name: shownName, removeName, onRemove, header, regionStyle, beside, dossier, children,
+  rowKey, isOpen: open, onToggle, name: shownName, removeName, onRemove, header, regionStyle, beside, dossier, corpusItem, children,
 }: PracticeRowShellProps) {
   const outside = dossier !== undefined && !dossier.inDossier;
+  const corpus = dossier ? undefined : corpusItem;
+  const heldIn = useHeldInLabel(corpus);
+  const adding = useAddToDossier(corpus);
   // The toggle's name replaces its content: it carries the mark's words.
-  const name = outside ? `${shownName}, non nel dossier` : shownName;
+  const name = outside ? `${shownName}, non nel dossier` : heldIn ? `${shownName}, ${heldIn.charAt(0).toLowerCase()}${heldIn.slice(1)}` : shownName;
   const regionId = `practice-row-${rowKey}`;
   // One subject, one mounted reading surface (T5): a row shown in a window folds, whatever its stored
   // state, and comes back as it was when the window closes. Its header then points at the window.
@@ -104,10 +112,17 @@ export function PracticeRowShell({
           />
           {header}
           {outside && <NotInDossier />}
+          {heldIn && <HeldInMark label={heldIn} />}
         </div>
         {/* Beside the mark on a computer; a phone has it in «⋯», where the row's name needs the width. */}
         {outside && dossier.add && (
           <button type="button" onClick={dossier.add} aria-label={`Aggiungi al dossier ${removeName}`} className={cn(ADD_BUTTON, 'hidden md:flex')}>
+            <FolderPlus size={14} aria-hidden />
+            Aggiungi al dossier
+          </button>
+        )}
+        {corpus && (
+          <button type="button" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi al dossier ${removeName}`} className={cn(ADD_BUTTON, 'hidden md:flex')}>
             <FolderPlus size={14} aria-hidden />
             Aggiungi al dossier
           </button>
@@ -143,17 +158,34 @@ export function PracticeRowShell({
             <MoreHorizontal size={16} aria-hidden />
           </MenuButton>
         ) : (
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={`Togli dal tavolo ${removeName}`}
-            title="Togli dal tavolo"
-            // On a phone its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
-            className={cn(ICON_BUTTON, '-mr-3 md:mr-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100')}
-          >
-            <X size={16} aria-hidden />
-          </button>
+          <>
+            {/* A phone has «Aggiungi al dossier» in the row's «⋯», with its name; the popover is then the bottom sheet. */}
+            {corpus && (
+              <MenuButton
+                label={`Azioni su ${removeName}`}
+                className="md:hidden"
+                triggerClassName={MENU_TRIGGER}
+                items={[
+                  { label: 'Aggiungi al dossier', icon: FolderPlus, onSelect: () => adding.open(null) },
+                  { label: 'Togli dal tavolo', icon: X, danger: true, onSelect: onRemove },
+                ]}
+              >
+                <MoreHorizontal size={16} aria-hidden />
+              </MenuButton>
+            )}
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={`Togli dal tavolo ${removeName}`}
+              title="Togli dal tavolo"
+              // On a phone its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
+              className={cn(ICON_BUTTON, '-mr-3 md:mr-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100', corpus && 'hidden md:flex')}
+            >
+              <X size={16} aria-hidden />
+            </button>
+          </>
         )}
+        {adding.popover}
       </div>
       {isOpen && (
         // Opacity only, 150 ms: a row opens tens of times a day, and a transform here would move the
