@@ -80,7 +80,7 @@ describe('DocumentReviewPage — before a document', () => {
     render(<DocumentReviewPage />);
     // «in sviluppo» beside the title, and the line that says what it means (LC47).
     expect(screen.getByRole('heading', { level: 1, name: 'Analizza documento in sviluppo' })).toHaveClass('font-serif');
-    expect(screen.getByText('Funziona già, ma è ancora in sviluppo: i risultati vanno controllati. Una versione che lavora solo sul tuo computer arriverà con l’app da scrivania.')).toBeInTheDocument();
+    expect(screen.getByText('Funziona già, ma è ancora in sviluppo: i risultati vanno controllati. Con l’app da scrivania arriverà una lettura più completa, con un modello di IA che gira sul tuo computer.')).toBeInTheDocument();
     expect(screen.getByText('Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.')).toBeInTheDocument();
     // Once (Luca, LC29: «è duplicato 2 volte, dai, su»): no badge, nothing in the box.
     expect(document.body.textContent?.match(/resta sul tuo computer/g)).toHaveLength(1);

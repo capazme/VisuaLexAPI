@@ -675,7 +675,7 @@ export function DocumentReviewPage() {
         : local
           ? 'Trova le norme citate in un atto, solo nel browser: LexCraft non riceve nulla.'
           : 'Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.'}
-        <span className="mt-1 block text-sm">Funziona già, ma è ancora in sviluppo: i risultati vanno controllati. Una versione che lavora solo sul tuo computer arriverà con l’app da scrivania.</span>
+        <span className="mt-1 block text-sm">Funziona già, ma è ancora in sviluppo: i risultati vanno controllati. Con l’app da scrivania arriverà una lettura più completa, con un modello di IA che gira sul tuo computer.</span>
       </>}
     >
       {fromAtto && (
