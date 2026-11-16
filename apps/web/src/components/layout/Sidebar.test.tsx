@@ -205,6 +205,19 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     unsubscribe();
   });
 
+  it.each(['wide', 'drawer'] as const)('Work: the bar writes «Scadenze», whole at every text size, and still names it «Scadenziario» (%s, LC48)', (layout) => {
+    // The owner, 16 Nov 2026: «"Scadenze" nella barra»: «Scadenziario» beside the count was cut at the large text sizes.
+    render(
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
+        <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const entry = screen.getByRole('link', { name: /^Scadenziario/ });
+    expect(entry.getAttribute('href')).toBe('/work/scadenziario');
+    expect(entry).toHaveTextContent(/Scadenze/);
+    expect(entry).not.toHaveTextContent(/Scadenziario/);
+  });
+
   it.each(['wide', 'drawer'] as const)('Work: «Analizza documento» says «in sviluppo» and the Pseudonimizzatore «in arrivo» under the word (%s, LC47)', (layout) => {
     render(
       <MemoryRouter initialEntries={['/work/scadenziario']}>

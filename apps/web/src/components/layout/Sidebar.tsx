@@ -582,7 +582,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               <>
                 {/* Scadenziario, Ricerca, Dossier, Atti, then the tools that are coming (D-315, LC47, LC48). «Prossimi
                     giorni» and «Lista d'ingresso» are tabs of Work's page (`OpusPage`), «Rassegne» a link of the search page (LC8). */}
-                <NavItem to="/work/scadenziario" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Scadenziario" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
+                <NavItem to="/work/scadenziario" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Scadenziario" shortLabel="Scadenze" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
                 {searchEntry('Ricerca', ['/rassegne'])}
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <NavItem to="/work/atti" icon={FileText} label="Atti" onClick={closeMobile} layout={layout} />

@@ -221,7 +221,7 @@ export function LearnPath({ percorso, materie, onRetry, onOpenCommunity }: Learn
             <span className="font-medium">{without.map((materia) => MATERIA_LABEL[materia]).join(', ')}</span>
             : nessuna scheda, per ora.
           </p>
-          <p className={cn('mt-1 text-sm', MUTED_TEXT)}>Scrivine una sotto un articolo della Ricerca, o accendi le schede della comunità.</p>
+          <p className={cn('mt-1 text-sm', MUTED_TEXT)}>Scrivine una sotto un articolo che apri in Ricerca, o accendi le schede della comunità.</p>
           <button type="button" onClick={onOpenCommunity} className={cn(QUIET_BUTTON, 'mt-1')}>
             Scegli le schede della comunità
           </button>
