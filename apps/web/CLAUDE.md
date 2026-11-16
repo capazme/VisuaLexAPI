@@ -594,7 +594,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Work's entries (D-315, LC8, LC48), exactly, in this order, «Scadenziario» (the home, `/work/scadenziario`,
   with the count of overdue and today's tasks, named in words: «Scadenziario, 3 compiti per oggi o scaduti»), «Ricerca» (the
-  search, named «Ricerca» as in the other sections, with its id `#tour-nav-search` and its ⌘K), Dossier, «Atti», then, after a hairline, in a group named «Strumenti sul documento» for a screen reader (LC47), «Analizza
+  search, named «Ricerca» as in the other sections, with its id `#tour-nav-search` and its ⌘K), Dossier (no «Atti» since LC53: the acts are the dossier's «Atti» tab; `/work/atti` leads to `/dossier`, `/work/atti/:id` to the act's dossier with `?vista=atti`, `OldAttoRedirect`), then, after a hairline, in a group named «Strumenti sul documento» for a screen reader (LC47), «Analizza
   documento» (`/documents`, `soon="dev"`: «in sviluppo», still a working link; «Ricerca» is no longer lit there),
   «Pseudonimizzatore» `soon` (`NavItem`: «in arrivo» or «in sviluppo» under the word, 11 px, in the rail's hover label and in
   the name, «Pseudonimizzatore, in arrivo»; the bar writes `shortLabel` «Pseudonimizza», as the whole word is cut at the
@@ -616,7 +616,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
   `sectionKicker`'s «Work» (the name alone since 15 Nov 2026: the owner dropped the phrase over the titles), `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
-  d'ingresso», «Cestino dei compiti», «Atti», «Pseudonimizzatore», «Grafo delle pratiche», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
+  d'ingresso», «Cestino dei compiti», «Pseudonimizzatore», «Grafo delle pratiche», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
   fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
   laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Scadenziario» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
@@ -2407,6 +2407,16 @@ a decision the text cites is sent there; a host with norms of its own (the dossi
 `citedNorms` (`holds`, `open(citation, link)`), and nothing is searched.
 
 ### Dossier
+
+**The «Atti» tab** (LC53, `components/features/atti/DossierAttiPanel.tsx`) is the case's: «Istruzioni per Claude»
+(`IstruzioniPerClaude`, Markdown with «Grassetto» and «Elenco», saved by itself after `SAVE_DELAY_MS`, the pending save
+flushed on unmount), «File» and «Carica un file» (`PraticaFilesPanel`, over LC50's `/api/dossiers/:id/files…` through
+`praticaFilesService`: originals the last changed first, versions under them, the case's trash with «Ripristina» and
+«Elimina», asked first; 25 MB checked before sending; the routes' ceilings reworded and a 503 said as «I file della
+pratica non sono attivi su questo server.», `praticaFilesError`). Before the first upload a notice (point 8 of the
+proposal, plus «È una prova: non caricare atti veri di clienti.»), remembered under `visualex.atti.avviso-visto` (a
+`user` key). The editor's old acts of the dossier, while `/api/atti` holds them, are listed above with «Scarica come
+Word» (`attoDocx.ts`: a DOCX built with the web's own ZIP writer).
 
 A dossier is where the articles needed for a task are aggregated and read.
 It is **di lavoro** (a practice: it may hold a client's data; the default, and what every older
