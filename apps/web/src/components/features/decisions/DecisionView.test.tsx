@@ -319,4 +319,20 @@ describe('DecisionView in a dossier\'s «Lettura» (LC55)', () => {
     expect(addToDossier).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Già presente in «Ricorso Rossi»')).toBeInTheDocument();
   });
+
+  it('«Aggiungi a questo dossier» is 14 px there, as the rows\' commands (the tests of 16-11); the Corpus keeps 12', async () => {
+    const { appStore } = await import('../../../store/useAppStore');
+    const { ReadingHostContext } = await import('../practice/readingHost');
+    appStore.setState({ dossiers: [{ id: 'dos-1', title: 'Ricorso Rossi', createdAt: '', items: [] }] });
+    const handlers = { onRetry: vi.fn(), onChooseCandidate: vi.fn(), onOpenPalette: vi.fn() };
+    const hosted = render(
+      <ReadingHostContext.Provider value={{ search: vi.fn(), dossier: { id: 'dos-1' } }}>
+        <DecisionView answer={FOUND} reference={REF} {...handlers} />
+      </ReadingHostContext.Provider>,
+    );
+    expect(screen.getByRole('button', { name: 'Aggiungi a questo dossier' })).toHaveClass('text-sm/5');
+    hosted.unmount();
+    render(<DecisionView answer={FOUND} reference={REF} {...handlers} />);
+    expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveClass('text-xs/5');
+  });
 });

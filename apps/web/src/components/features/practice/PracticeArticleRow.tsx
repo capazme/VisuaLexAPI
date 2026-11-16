@@ -92,6 +92,7 @@ export function PracticeArticleRow({
       onCrossReferenceNavigate={onCrossReference}
       onOpenStudyMode={onOpenStudyMode}
       readingOrigin={readingOrigin}
+      dossierItemId={dossier?.itemId}
     />
   );
 
