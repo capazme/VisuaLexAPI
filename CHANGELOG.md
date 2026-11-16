@@ -12,6 +12,17 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-11-16
+
+The sign-in page over an engraving, Progressi in stone and ink, a still column at start. Web only, no
+migration.
+
+### Look
+
+- The sign-in page over an engraved law library, faded at the edges (LC36); the sign-in flow unchanged.
+- Learn's «Progressi» in stone and ink with muted category hues; the splash's column stands still and
+  breathes; the credits' index marks the chosen entry with a stone tile (LC37).
+
 ## [1.24.0] - 2026-11-16
 
 LexCraft's engravings, Work's to-do list on a phone, the section's name beside the phone's menu. Web
