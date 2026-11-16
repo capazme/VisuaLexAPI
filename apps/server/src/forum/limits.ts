@@ -14,6 +14,9 @@ const COUNTERS = {
   reply: { env: 'FORUM_DAILY_REPLIES', fallback: 60, said: (n: number) => `Hai pubblicato ${n} risposte e commenti nelle ultime 24 ore: riprova più tardi.` },
   report: { env: 'FORUM_DAILY_REPORTS', fallback: 20, said: (n: number) => `Hai inviato ${n} segnalazioni nelle ultime 24 ore: riprova più tardi.` },
   edit: { env: 'FORUM_DAILY_EDITS', fallback: 60, said: (n: number) => `Hai fatto ${n} modifiche nelle ultime 24 ore: riprova più tardi.` },
+  // Votes up and down (spec 2026-11-14-forum-community-server-design §A): every vote request that is not
+  // refused counts, a change, a withdrawal or a repeat of the same vote too.
+  vote: { env: 'FORUM_DAILY_VOTES', fallback: 300, said: (n: number) => `Hai votato ${n} volte nelle ultime 24 ore: riprova più tardi.` },
 } as const;
 export type CommunityCounter = keyof typeof COUNTERS;
 

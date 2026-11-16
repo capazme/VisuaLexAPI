@@ -7,14 +7,25 @@ export const DELETED_AUTHOR = 'utente cancellato';
 
 type Author = { id: string; username: string } | null;
 
-/** A contribution outlives its author's account: the author is then null, and nobody's own. */
-export function userView(user: Author) {
-  return user ? { id: user.id, username: user.username } : { id: null, username: DELETED_AUTHOR };
+/** The personal scores of a page's authors (`forum/votes.ts` `personalScores`), by account id. */
+export type Scores = ReadonlyMap<string, number>;
+
+/**
+ * A contribution outlives its author's account: the author is then null, and nobody's own. `score` is
+ * the author's personal score (D-248), null without an author.
+ */
+export function userView(user: Author, scores: Scores) {
+  return user
+    ? { id: user.id, username: user.username, score: scores.get(user.id) ?? 0 }
+    : { id: null, username: DELETED_AUTHOR, score: null };
 }
 
+/** The place of a contribution shown without its author: emptied, or removed by moderation. */
+export const NO_AUTHOR = { id: null, username: '', score: null } as const;
+
 /** What its author emptied shows without the author's name (spec 2026-10-20 §5.5). */
-export function authorView(item: { deletedAt: Date | null; user: Author }) {
-  return item.deletedAt ? { id: null, username: '' } : userView(item.user);
+export function authorView(item: { deletedAt: Date | null; user: Author }, scores: Scores) {
+  return item.deletedAt ? NO_AUTHOR : userView(item.user, scores);
 }
 
 export function isOwn(authorId: string | null, userId: string) {

@@ -11,8 +11,9 @@ import { lockComment, lockThread } from '../forum/locks';
 import { notify } from '../forum/notify';
 import { logModeration } from '../forum/moderationLog';
 import {
-  ACCEPTED_SELECT, LISTED_THREAD, VISIBLE, acceptedId, authorView, isOwn, isVisible,
+  ACCEPTED_SELECT, LISTED_THREAD, VISIBLE, acceptedId, authorView, isOwn, isVisible, type Scores,
 } from '../forum/views';
+import { castVote, personalScores, voteSummaryOf } from '../forum/votes';
 
 export { parseItalian };
 
@@ -110,21 +111,20 @@ const reportSchema = z.object({
 function commentView(comment: {
   id: string; threadId: string; parentId: string | null; body: string; userId: string | null;
   isHidden: boolean; createdAt: Date; updatedAt: Date; user: { id: string; username: string } | null;
-  votes: { userId: string }[]; editedAt: Date | null; deletedAt: Date | null;
-}, userId: string) {
+  votes: { userId: string; value: number }[]; editedAt: Date | null; deletedAt: Date | null;
+}, userId: string, scores: Scores) {
   return {
     id: comment.id,
     threadId: comment.threadId,
     parentId: comment.parentId,
     body: comment.isHidden ? '[Contenuto rimosso]' : comment.body,
     isHidden: comment.isHidden,
-    user: authorView(comment),
+    user: authorView(comment, scores),
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
     editedAt: comment.editedAt,
     deleted: comment.deletedAt !== null,
-    voteCount: comment.votes.length,
-    userVoted: comment.votes.some(vote => vote.userId === userId),
+    ...voteSummaryOf(comment, userId),
     isOwner: isOwn(comment.userId, userId),
   };
 }
@@ -156,10 +156,10 @@ function threadView(thread: {
   materia: string | null;
   acceptedCommentId: string | null;
   acceptedComment: { isHidden: boolean; deletedAt: Date | null } | null;
-  votes: { userId: string }[];
+  votes: { userId: string; value: number }[];
   comments: Parameters<typeof commentView>[0][];
   userId: string | null;
-}, userId: string) {
+}, userId: string, scores: Scores) {
   return {
     id: thread.id,
     normaKey: thread.normaKey,
@@ -182,7 +182,7 @@ function threadView(thread: {
         },
     articleUrn: thread.articleUrn,
     textHash: thread.textHash,
-    user: authorView(thread),
+    user: authorView(thread, scores),
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
     lastActivityAt: thread.lastActivityAt,
@@ -191,10 +191,9 @@ function threadView(thread: {
     locked: thread.lockedAt !== null,
     materia: thread.materia,
     acceptedCommentId: acceptedId(thread),
-    voteCount: thread.votes.length,
-    userVoted: thread.votes.some(vote => vote.userId === userId),
+    ...voteSummaryOf(thread, userId),
     isOwner: isOwn(thread.userId, userId),
-    comments: thread.comments.map(comment => commentView(comment, userId)),
+    comments: thread.comments.map(comment => commentView(comment, userId, scores)),
   };
 }
 
@@ -245,7 +244,7 @@ export const listThreads = async (req: Request, res: Response) => {
       where,
       include: THREAD_INCLUDE,
       orderBy: sort === 'popular'
-        ? { votes: { _count: 'desc' } }
+        ? [{ score: 'desc' }, { createdAt: 'desc' }]
         : sort === 'active'
           ? { lastActivityAt: 'desc' }
           : { createdAt: 'desc' },
@@ -253,9 +252,10 @@ export const listThreads = async (req: Request, res: Response) => {
       take: limit,
     }),
   ]);
+  const scores = await personalScores(prisma, threads.flatMap(thread => [thread.userId, ...thread.comments.map(comment => comment.userId)]));
 
   res.json({
-    data: threads.map(thread => threadView(thread, req.user!.id)),
+    data: threads.map(thread => threadView(thread, req.user!.id, scores)),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 };
@@ -281,12 +281,14 @@ export const listPassages = async (req: Request, res: Response) => {
       textHash: true,
       createdAt: true,
       deletedAt: true,
+      userId: true,
       user: { select: { id: true, username: true } },
       _count: { select: { comments: { where: VISIBLE } } },
     },
     orderBy: { createdAt: 'asc' },
     take: 200,
   });
+  const scores = await personalScores(prisma, threads.map(thread => thread.userId));
 
   res.json({
     data: threads.map(thread => ({
@@ -302,7 +304,7 @@ export const listPassages = async (req: Request, res: Response) => {
       textHash: thread.textHash,
       commentCount: thread._count.comments,
       createdAt: thread.createdAt,
-      user: authorView(thread),
+      user: authorView(thread, scores),
     })),
   });
 };
@@ -340,7 +342,7 @@ export const createThread = async (req: Request, res: Response) => {
     },
     include: THREAD_INCLUDE,
   }));
-  res.status(201).json(threadView(thread, req.user!.id));
+  res.status(201).json(threadView(thread, req.user!.id, await personalScores(prisma, [thread.userId])));
 };
 
 /**
@@ -383,31 +385,21 @@ export const createComment = async (req: Request, res: Response) => {
     else if (thread.deletedAt === null) await notify(tx, { to: thread.userId, by: userId, kind: 'reply', threadId: thread.id, commentId: created.id });
     return created;
   }));
-  res.status(201).json(commentView(comment, userId));
+  res.status(201).json(commentView(comment, userId, await personalScores(prisma, [comment.userId])));
 };
 
-// Voting on one's own glossa or reply is still allowed while the reader's panel shows the button
-// (pending PR2c: a 403 «Non puoi votare un tuo contributo»).
+// The reader's panel's toggle of the up vote (spec 2026-11-14 §A): none → up, up → none, down → up. One's
+// own contribution is refused, as on `PUT …/vote`, with the code `own_contribution`.
+const toggleUp = (current: number) => (current === 1 ? 0 : 1);
+
 export const toggleThreadVote = async (req: Request, res: Response) => {
-  const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
-  if (!thread || !isVisible(thread)) throw new AppError(404, 'Glossa non trovata');
-  const existing = await prisma.articleThreadVote.findUnique({ where: { threadId_userId: { threadId: thread.id, userId: req.user!.id } } });
-  if (existing) await prisma.articleThreadVote.delete({ where: { id: existing.id } });
-  else await prisma.articleThreadVote.create({ data: { threadId: thread.id, userId: req.user!.id } });
-  const voteCount = await prisma.articleThreadVote.count({ where: { threadId: thread.id } });
-  res.json({ voted: !existing, voteCount });
+  const vote = await castVote('thread', req.params.threadId, req.user!.id, toggleUp);
+  res.json({ voted: vote.value === 1, voteCount: vote.upvotes });
 };
 
 export const toggleCommentVote = async (req: Request, res: Response) => {
-  const comment = await prisma.articleComment.findUnique({ where: { id: req.params.commentId }, include: { thread: { select: { isHidden: true } } } });
-  if (!comment || !isVisible(comment) || comment.thread.isHidden) throw new AppError(404, 'Risposta non trovata');
-  const existing = await prisma.articleCommentVote.findUnique({ where: { commentId_userId: { commentId: comment.id, userId: req.user!.id } } });
-  // A comment is a remark, not an answer: no new votes on it; its old ones stay counted (§5.3).
-  if (!existing && comment.parentId !== null) throw new AppError(400, 'Si vota una risposta, non un commento');
-  if (existing) await prisma.articleCommentVote.delete({ where: { id: existing.id } });
-  else await prisma.articleCommentVote.create({ data: { commentId: comment.id, userId: req.user!.id } });
-  const voteCount = await prisma.articleCommentVote.count({ where: { commentId: comment.id } });
-  res.json({ voted: !existing, voteCount });
+  const vote = await castVote('comment', req.params.commentId, req.user!.id, toggleUp);
+  res.json({ voted: vote.value === 1, voteCount: vote.upvotes });
 };
 
 /** What a report keeps of a glossa for the moderators (G-308): its title, if any, and its body. */

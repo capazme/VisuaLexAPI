@@ -519,8 +519,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
     exportUserCourses(userId),
     // The Community (spec 2026-10-20-forum-community-glosse-design §7.4): what the user voted, reported and
     // was told. A report's copy of the reported text and its closing (who, why) are the moderators' record.
-    prisma.articleThreadVote.findMany({ where: { userId }, select: { threadId: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
-    prisma.articleCommentVote.findMany({ where: { userId }, select: { commentId: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleThreadVote.findMany({ where: { userId }, select: { threadId: true, value: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleCommentVote.findMany({ where: { userId }, select: { commentId: true, value: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
     prisma.articleThreadReport.findMany({
       where: { userId },
       select: { threadId: true, reason: true, details: true, status: true, createdAt: true },

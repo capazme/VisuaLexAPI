@@ -20,7 +20,13 @@ export const PERSONAL_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'ARCHIVIATA
  *
  * The Community's glosse, replies and comments stay too, without an author («utente cancellato»,
  * G-307), and so do the replies others wrote under them: the foreign keys set `user_id` to NULL.
- * The person's votes and notifications go with the row; their reports stay without a reporter.
+ * The person's votes and notifications go with the row; their reports stay without a reporter. Every
+ * glossa and reply the deletion will write is locked first, in the Community's lock order (spec
+ * 2026-11-14-forum-community-server-design §A): the glosse, by id, then the replies and comments, by id.
+ * Those are the ones the person voted (each vote's trigger updates their score) and the ones the person
+ * wrote, locked or released (the foreign keys set the person to NULL on them). Left to the cascade, they
+ * would be locked in any order, a reply before its glossa, against a reply being written or voted that
+ * holds the glossa and waits for that reply.
  *
  * MERL-T keeps its own copy of what a consenting person did there: when the person ever gave
  * MERL-T a consent, the same transaction records an erasure request, which outlives the user
@@ -45,6 +51,18 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     await tx.$queryRaw`SELECT id FROM lingo_corsi WHERE autore_id = ${userId} ORDER BY id FOR UPDATE`;
     await tx.$queryRaw`SELECT id FROM lingo_cards WHERE autore_id = ${userId} ORDER BY id FOR UPDATE`;
     await tx.lingoCard.deleteMany({ where: { autoreId: userId, stato: { in: PERSONAL_STATES } } });
+    // The Community: every glossa the deletion writes, by id, then every reply and comment, by id;
+    // then the votes, whose trigger updates rows already locked; then the account, whose SET NULLs
+    // find their rows locked too.
+    await tx.$queryRaw`SELECT id FROM article_threads
+      WHERE id IN (SELECT thread_id FROM article_thread_votes WHERE user_id = ${userId})
+        OR user_id = ${userId} OR passage_released_by = ${userId} OR locked_by = ${userId}
+      ORDER BY id FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM article_comments
+      WHERE id IN (SELECT comment_id FROM article_comment_votes WHERE user_id = ${userId}) OR user_id = ${userId}
+      ORDER BY id FOR UPDATE`;
+    await tx.articleThreadVote.deleteMany({ where: { userId } });
+    await tx.articleCommentVote.deleteMany({ where: { userId } });
     await tx.user.delete({ where: { id: userId } });
   });
   if (merltErasure) await attemptMerltErasureNow(userId);
