@@ -1,3 +1,4 @@
+import type { IllustrationName } from '../../../ui/Illustration';
 import type { ConteggiStati, Materia, StatoGiorno } from '../../../../types/studia';
 
 /**
@@ -40,16 +41,29 @@ const SUBJECT_TOKEN: Record<Materia, string> = {
   DIRITTO_PROCESSUALE_PENALE: '--category-penal-procedure',
 };
 
+/** Each subject's engraved emblem (LC35): with its name, what tells the subjects apart (LC37), more than the hue. */
+export const SUBJECT_ART: Record<Materia, IllustrationName> = {
+  DIRITTO_CIVILE: 'materia-civile',
+  DIRITTO_PENALE: 'materia-penale',
+  DIRITTO_AMMINISTRATIVO: 'materia-amministrativo',
+  DIRITTO_PROCESSUALE_CIVILE: 'materia-proc-civile',
+  DIRITTO_PROCESSUALE_PENALE: 'materia-proc-penale',
+};
+
 /** The subject's hue as a CSS colour, for an inline style: it follows the theme through the variable. */
 export function subjectHue(materia: Materia): string {
   return `hsl(var(${SUBJECT_TOKEN[materia]}))`;
 }
 
-/** The three states, their names and their swatches: the bar here and the road's stops (Gymnasium spec §5.2). */
+/**
+ * The three states, their names and their swatches: the bar here and the road's stops (Gymnasium spec §5.2). One
+ * ordered scale, stone to ink (LC37, Luca: «Sti colori sgargianti sono un pugno all'occhio»): a card goes from new to
+ * consolidated, so its colour goes from light to dark, never orange, blue and green.
+ */
 export const CARD_STATES: { key: keyof ConteggiStati; label: string; swatch: string }[] = [
-  { key: 'nuove', label: 'Nuove', swatch: 'bg-amber-500 dark:bg-amber-400' },
-  { key: 'apprendimento', label: 'In apprendimento', swatch: 'bg-primary-500' },
-  { key: 'consolidate', label: 'Consolidate', swatch: 'bg-emerald-600 dark:bg-emerald-500' },
+  { key: 'nuove', label: 'Nuove', swatch: 'bg-ink-300 dark:bg-ink-700' },
+  { key: 'apprendimento', label: 'In apprendimento', swatch: 'bg-ink-500 dark:bg-ink-400' },
+  { key: 'consolidate', label: 'Consolidate', swatch: 'bg-ink-900 dark:bg-ink-100' },
 ];
 
 /** A day's state in words: the boxes are never read by their look alone. */

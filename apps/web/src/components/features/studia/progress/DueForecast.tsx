@@ -78,8 +78,9 @@ export function DueForecast({ prossimi, hue }: DueForecastProps) {
               </span>
             ))}
           </div>
-          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block h-auto w-full overflow-visible" aria-hidden>
-            <rect x={0} y={0} width={pitch} height={HEIGHT} rx={3} className="fill-amber-50 dark:fill-amber-400/10" />
+          {/* LC37: no tinted column behind today (it read as a tall bar); «oggi» in ink under it says which day it is. The
+              bars grow from the base once. */}
+          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="vlx-grow-y block h-auto w-full overflow-visible" aria-hidden>
             {lines.map((value) => (
               <line key={value} x1={0} x2={WIDTH} y1={y(value)} y2={y(value)} className="stroke-slate-200 dark:stroke-slate-700" strokeWidth={0.5} strokeDasharray="2 2" />
             ))}
@@ -99,7 +100,8 @@ export function DueForecast({ prossimi, hue }: DueForecastProps) {
                       height={Math.max(h, 1.5)}
                       rx={3}
                       className={cn(
-                        today ? 'fill-amber-600 dark:fill-amber-400' : hue === undefined && 'fill-primary-900 dark:fill-primary-300',
+                        // Today in ink, the days after a step lighter (LC37: no amber).
+                        today ? 'fill-ink-900 dark:fill-ink-100' : hue === undefined && 'fill-ink-500 dark:fill-ink-400',
                         selected === index && 'opacity-75',
                       )}
                       style={!today && hue !== undefined ? { fill: hue } : undefined}
@@ -129,7 +131,7 @@ export function DueForecast({ prossimi, hue }: DueForecastProps) {
               index % 2 === 0 ? (
                 <span
                   key={day.giorno}
-                  className={cn('absolute top-0 -translate-x-1/2 whitespace-nowrap', index === 0 && 'font-semibold text-amber-800 dark:text-amber-300')}
+                  className={cn('absolute top-0 -translate-x-1/2 whitespace-nowrap', index === 0 && 'font-semibold text-slate-900 dark:text-slate-50')}
                   style={{ left: share(index * pitch + pitch / 2, WIDTH) }}
                 >
                   {index === 0 ? 'oggi' : dayDate(day.giorno).getUTCDate()}
