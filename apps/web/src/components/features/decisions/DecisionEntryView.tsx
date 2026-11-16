@@ -4,7 +4,8 @@ import type { DecisionReference, FoundDecision } from '../../../types/decisions'
 import { addDecisionToHistory } from '../../../services/historyService';
 import { decisionKey, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
 import { isBoundPractice } from '../../../utils/practice';
-import { DecisionReadingSurface } from './DecisionReadingSurface';
+import { DecisionReadingSurface, type CitedNorms } from './DecisionReadingSurface';
+import { useTableCitedNorms } from '../practice/inDossier';
 import { DecisionDiscussionsWithoutText } from './DecisionDiscussionsWithoutText';
 import { DecisionView } from './DecisionView';
 import { useDecisionAnswer } from './useDecisionAnswer';
@@ -25,6 +26,10 @@ export interface DecisionAnswerBodyProps {
   needsRecord: (key: string) => boolean;
   /** The Cronologia was told `key`: kept on the holder. Stable. */
   onRecorded: (key: string) => void;
+  /** The dossier entry it is read as (D7b): what an application proposed on it. */
+  dossierItemId?: string;
+  /** The cited norms go to the host (the dossier, D7d). */
+  citedNorms?: CitedNorms;
 }
 
 /**
@@ -35,7 +40,7 @@ export interface DecisionAnswerBodyProps {
  * of one holder may be mounted, one hidden: only the copy on screen records and takes focus.
  */
 export function DecisionAnswerBody({
-  reference, hostId, hostBlockId, findHostId, focusId, onFound, needsRecord, onRecorded,
+  reference, hostId, hostBlockId, findHostId, focusId, onFound, needsRecord, onRecorded, dossierItemId, citedNorms,
 }: DecisionAnswerBodyProps) {
   const openPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const takeFocusRequest = useAppStore((s) => s.takeDecisionFocusRequest);
@@ -86,6 +91,8 @@ export function DecisionAnswerBody({
             hostTabId={hostId}
             hostBlockId={hostBlockId}
             findHostId={findHostId}
+            citedNorms={citedNorms}
+            dossierItemId={dossierItemId}
           />
         ) : undefined}
         noTextSlot={answer?.esito === 'trovata' ? (
@@ -105,6 +112,8 @@ export interface DecisionEntryViewProps {
   hostId: string;
   /** The id the find window knows it by when `hostId` is a window's: the window's practice (spec §6.6). */
   findHostId?: string;
+  /** In a dossier's «Lettura» (LC58): the dossier entry it is read as, for what an application proposed on it (D7b). */
+  dossierItemId?: string;
 }
 
 /**
@@ -114,7 +123,9 @@ export interface DecisionEntryViewProps {
  * focus); the Cronologia is told once per opening, the key kept on the entry (carry-over ruling 13).
  * The way back from a norm it cites names this entry, so it reveals the row or reopens the window.
  */
-export function DecisionEntryView({ practiceId, decisionId, reference, hostId, findHostId }: DecisionEntryViewProps) {
+export function DecisionEntryView({ practiceId, decisionId, reference, hostId, findHostId, dossierItemId }: DecisionEntryViewProps) {
+  // In a dossier's «Lettura» the norms it cites go to the table, as the dossier's own reader sends them to its norms (D7d).
+  const citedNorms = useTableCitedNorms(hostId);
   const setIdentity = useAppStore((s) => s.setDecisionEntryIdentity);
   const markRecorded = useAppStore((s) => s.markDecisionEntryRecorded);
 
@@ -142,6 +153,8 @@ export function DecisionEntryView({ practiceId, decisionId, reference, hostId, f
       onFound={onFound}
       needsRecord={needsRecord}
       onRecorded={onRecorded}
+      dossierItemId={dossierItemId}
+      citedNorms={citedNorms}
     />
   );
 }

@@ -1118,6 +1118,19 @@ as «Fonti»; an act only on the table writes nothing, and a reorder made in «F
 numbers are 14 px. The reader's dossier command
 (an article's, a decision's) reads «Aggiungi a questo dossier» and adds there without the popover. The re-sync stays
 additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, is unchanged.
+In the «Lettura» (LC58 c5) the dossier's own work is there too. A row of the dossier knows its entry (`RowDossier.itemId`;
+a window and the phone's reader through `useDossierItemId`) and gives it to `ArticleTabContent` and `DecisionEntryView`
+(`dossierItemId`): what an application proposed on it is drawn and acted on as in the dossier's readers (D7b,
+`useEntryProposals`, glosses, «Sposta», the lost lists), never in the reader's copies or exports. Under an article's
+text, «Note della pratica» lists the dossier's notes about any copy of it (`DossierNoteList`, shared with «Fonti»'s row).
+A row of the dossier's «⋯» has «Segna come importante» / «Rimuovi da importanti» (`updateDossierItemStatus`) and a starred
+row shows the star and says «importante» in its name; the simple reading, with no row «⋯», has the star over the text
+with its name («Segna come importante», pressed «Importante»). A decision's cited norms go through `useTableCitedNorms` (D7d):
+the preview knows the dossier's («Apri tra le norme», else «Apri nella Lettura»), a click puts the norm on the table,
+revealed or beside its window. «Aggiungi al dossier» from a row says «Aggiunto al dossier» («Aggiunta» for a
+decision); the dossier is read again on opening the tab and on every return of the window, without the page's 15 s
+window; the decision reader's «Aggiungi a questo dossier» is 14 px; the act's «⋯» draws no separator over its first
+command.
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
 browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
 with a logged warning «saved workspace too large to back up», when the value is over 1 000 000

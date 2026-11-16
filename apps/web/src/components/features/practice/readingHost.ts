@@ -13,9 +13,10 @@ export interface ReadingHost {
   search: (params: SearchParams) => void;
   /**
    * The dossier a bound table reads (LC55 c4): its rows say whether they are in it, and add to it or leave it. Absent in
-   * the Corpus, whose rows say nothing of a dossier. `onTrashChanged`: the page's trash, read again after a removal.
+   * the Corpus, whose rows say nothing of a dossier. `onTrashChanged`: the page's trash, read again after a removal;
+   * `showToast`: the page's message, after an add from a row (LC58).
    */
-  dossier?: { id: string; onTrashChanged?: () => void };
+  dossier?: { id: string; onTrashChanged?: () => void; showToast?: (message: string, type?: 'success' | 'error' | 'info') => void };
 }
 
 export const ReadingHostContext = createContext<ReadingHost | null>(null);

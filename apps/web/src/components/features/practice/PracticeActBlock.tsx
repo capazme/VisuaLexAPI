@@ -108,6 +108,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // dossier» (to the trash, with «Annulla»; the rows stay on the table): a removal from the table alone would come back
   // with the next re-sync.
   const { dossier: hostDossier, ids: dossierIds } = useActItemIds(act);
+  // A separator only under a command: on a computer a dossier's act has none above its removal (the tests of 16-11).
+  const commandsAbove = !toolsShown || !bound;
   const theme = useAppStore((s) => s.settings.theme);
   const { tryStartTour, hasSeenTour } = useTour({ theme: theme as 'light' | 'dark' });
   const tourAsked = useRef(false);
@@ -357,11 +359,11 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
               ...(bound ? [] : [{ label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !toolsShown }]),
               hostDossier && dossierIds.length > 0
                 ? {
-                  label: 'Togli dal dossier', icon: FolderMinus, danger: true, separatorBefore: true,
+                  label: 'Togli dal dossier', icon: FolderMinus, danger: true, separatorBefore: commandsAbove,
                   onSelect: () => removeItemsWithUndo(hostDossier.id, dossierIds, dossierIds.length === 1
                     ? 'Articolo tolto dal dossier' : `${dossierIds.length} articoli tolti dal dossier`, hostDossier.onTrashChanged),
                 }
-                : { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
+                : { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: commandsAbove, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
               ...practiceItems,
             ]}
           >

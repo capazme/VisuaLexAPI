@@ -54,6 +54,8 @@ export interface CitedNorms {
   holds: (citation: ParsedCitationData) => boolean;
   /** A click on a cited norm, with the link clicked; the preview's button, with none. */
   open: (citation: ParsedCitationData, link: HTMLElement | null) => void;
+  /** The preview's button for a norm the host does not hold; «Apri in Ricerca» when absent (the dossier's «Fonti»). */
+  elsewhere?: string;
 }
 
 export interface DecisionReadingSurfaceProps {
@@ -523,7 +525,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         position={preview.position}
         onClose={hidePreview}
         // In the dossier: «Apri tra le norme» for a norm it holds, else Dashboard, as the dossier's own buttons say.
-        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : 'Apri in Ricerca') : undefined}
+        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : citedNorms.elsewhere ?? 'Apri in Ricerca') : undefined}
         onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);
