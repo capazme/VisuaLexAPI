@@ -26,28 +26,20 @@ describe('the Scrivania on a phone', () => {
     expect(row).not.toHaveClass('flex-wrap');
     const pills = within(row).getAllByRole('button');
     expect(pills.map((p) => p.textContent)).toEqual(['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione']);
-    for (const pill of pills) expect(pill).toHaveClass('shrink-0', 'whitespace-nowrap', 'max-md:rounded-full', 'max-md:border', 'min-h-[44px]');
+    for (const pill of pills) expect(pill).toHaveClass('shrink-0', 'whitespace-nowrap', 'max-md:rounded-full', 'max-md:bg-ink-200/70', 'min-h-[44px]');
   });
 
-  it('keeps the page\'s 16 px margin and centres the block in the window under the search bar', () => {
+  it('keeps the page\'s 16 px margin and starts under the field, not centred in the window (LC38)', () => {
     const { container } = renderPage();
-    expect(container.firstElementChild).toHaveClass(
-      'max-md:w-auto', 'max-md:px-0', 'max-md:flex', 'max-md:flex-col', 'max-md:justify-center',
-      'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
-    );
+    expect(container.firstElementChild).toHaveClass('max-md:w-auto', 'max-md:px-0', 'max-md:pt-6');
+    expect(container.firstElementChild).not.toHaveClass('max-md:justify-center');
     // The reader's column has no padding below md since R3b: taking 16 px back would put the page on the screen's edges.
     expect(container.firstElementChild).not.toHaveClass('max-md:-mx-4');
   });
 
-  it('takes the same padding off in full screen, which draws no search bar and pads the page as ever (U1)', () => {
-    appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
-    try {
-      const { container } = renderPage();
-      expect(container.firstElementChild).toHaveClass('max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]');
-      expect(container.firstElementChild).not.toHaveClass('max-md:min-h-[calc(100dvh-6rem)]');
-    } finally {
-      appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
-    }
+  it('has no second way to the search on a phone: the field is right above (LC38)', () => {
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Inizia una ricerca' }).parentElement).toHaveClass('max-md:hidden');
   });
 });
 
