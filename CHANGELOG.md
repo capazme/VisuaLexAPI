@@ -12,6 +12,30 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-11-16
+
+Citations and the dossier's sources beside an act's text, the three ways for the AI drawn on the connect
+page, the column as the browser and phone icon, the section tabs whole in the bar. Web only, no migration.
+
+### Atti
+
+- «Citazioni» beside an act's text: the norms and decisions it cites, each with its state in words
+  (verified at the source, not found, ambiguous, not checked); a row opens the norm or the decision. The
+  dossier's sources on the left on a wide frame, «Cita» inserts at the caret (LC46). Not yet tried on a
+  phone: the «Vai alle citazioni» button.
+
+### Connections
+
+- On «Collega un'app AI», a drawing of the three ways to bring your AI: your subscription via MCP (today),
+  a model on the computer and your own key (marked «in arrivo»); a pause button, nothing moves under
+  reduced motion (LC45).
+
+### Look
+
+- The column as the browser's icon (.ico and PNG on a stone square), the iPhone's home-screen icon and the
+  manifest's 192 and 512 px icons (LC43): Safari no longer shows the old blue V.
+- The four section tabs and «Analizza» whole in the 224 px bar (LC41).
+
 ## [1.27.0] - 2026-11-16
 
 The search as an island at the top of every section, and Learn's day closed with a plate and a curl of
