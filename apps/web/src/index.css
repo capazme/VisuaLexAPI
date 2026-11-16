@@ -1432,6 +1432,13 @@
   .vlx-book-draw .vlx-column { animation: vlx-column-rise 500ms var(--ease-out) both; }
 }
 .vlx-book-breathe { animation: vlx-book-breathe 1.4s ease-in-out 700ms infinite alternate; }
+/* LC36: the sign-in page's library drifts, a breath over 40 s, back and forth; still under reduced motion. */
+@keyframes vlx-login-drift {
+  from { transform: scale(1.02) translate3d(-0.5%, 0, 0); }
+  to { transform: scale(1.06) translate3d(0.5%, -0.5%, 0); }
+}
+.vlx-login-library { animation: vlx-login-drift 40s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .vlx-login-library { animation: none; } }
 @keyframes vlx-column-rise { from { opacity: 0; transform: scaleY(0.6); } }
 @keyframes vlx-book-breathe { to { opacity: 0.4; } }
 
