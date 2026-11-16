@@ -10,11 +10,12 @@ import { hasNoNul } from '../lingo/noNul';
 import { prisma } from '../lib/prisma';
 import { provenanceFromRequest } from '../controllers/dossierController';
 import { readBlob, removeBlob, requireStore, writeBlob } from '../pratica/fileStore';
+import { EXTRACTABLE, extractText, textToDocx } from '../pratica/docText';
 
 /**
  * A case's act files and its instructions for Claude (LC50, server part; testing only, no real client files).
- * Mounted at `/api/dossiers`. The user's session only: none of these routes is in the delegated table, so an
- * exchanged MCP token gets the default-deny 403 (the MCP tools are part 3).
+ * Mounted at `/api/dossiers`. The user's session, and for three routes an exchanged MCP token too (LC56, below);
+ * every other route here is outside the delegated table, so a token gets the default-deny 403 there.
  *
  * - `GET    /:dossierId/files` — `{ files: [original + versioni[]], cestino: [] }`;
  * - `POST   /:dossierId/files` (multipart, field `file`) — 201 `{ file }`;
@@ -23,6 +24,13 @@ import { readBlob, removeBlob, requireStore, writeBlob } from '../pratica/fileSt
  * - `POST   /:dossierId/files/:fileId/trash` · `/restore` — `{ file }`; an original takes its versions with it;
  * - `DELETE /:dossierId/files/:fileId` — 204, only from the trash: the rows and the files on disk go;
  * - `GET|PUT /:dossierId/istruzioni { testo }` — `{ istruzioni }`.
+ *
+ * In the delegated table since LC56 (owner, 16 November 2026; testing only), each for the dossier's owner:
+ * - `GET  /:dossierId/contesto` — `{ istruzioni, files }`: the instructions and the live files, no trash;
+ * - `GET  /:dossierId/files/:fileId/text?parte=n` — `{ file, parte, parti, testo, motivo }`: the text extracted from
+ *   a DOCX, ODT or TXT, in parts; a PDF, DOC, RTF or image answers `testo: null` and says why;
+ * - `POST /:dossierId/files/atto { nome, testo, versioneDi? }` — 201 `{ file }`: the text made a DOCX and deposited as
+ *   a new file or a new version, as the uploads are (same ceilings, lock and log line); never over another file.
  *
  * Another user's dossier or file answers 404, never 403. Without the server key the file routes answer 503 (the
  * instructions hold no file and keep working). Each listing, download, deposit, trash, restore and deletion
@@ -35,6 +43,10 @@ export const MAX_CASE_BYTES = 500 * 1024 * 1024;
 export const MAX_USER_BYTES = 2 * 1024 * 1024 * 1024;
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 const MAX_ISTRUZIONI = 20_000;
+/** An act Claude deposits, in characters: its JSON stays well under the 2 MB the API parses. */
+export const MAX_ATTO_CHARS = 500_000;
+/** The text of a file goes out in parts of this many characters. */
+export const TEXT_PAGE = 50_000;
 
 // ─── What a file is, from its first bytes ────────────────────────────────────────────────────────────────
 
@@ -193,20 +205,21 @@ router.get('/:dossierId/files', files, wrap(async (req, res) => {
     select: PUBLIC,
   });
   await prisma.praticaFileAccesso.create({ data: logLine(req, 'elenco', null) });
-  const live = rows.filter((row) => !row.deletedAt);
-  res.json({
-    files: live.filter((row) => !row.versioneDi).map((original) => ({
-      ...serialize(original),
-      versioni: live.filter((v) => v.versioneDi === original.id).sort((a, b) => a.versione - b.versione).map(serialize),
-    })),
-    cestino: rows.filter((row) => row.deletedAt).map(serialize),
-  });
+  res.json({ files: originals(rows), cestino: rows.filter((row) => row.deletedAt).map(serialize) });
 }));
 
+/** The live files, each original with its versions in order. */
+const originals = (rows: PublicRow[]) => {
+  const live = rows.filter((row) => !row.deletedAt);
+  return live.filter((row) => !row.versioneDi).map((original) => ({
+    ...serialize(original),
+    versioni: live.filter((v) => v.versioneDi === original.id).sort((a, b) => a.versione - b.versione).map(serialize),
+  }));
+};
+
 /** Stores a file, or a new version of `baseId`'s group, under the ceilings, the user's lock held. */
-async function deposit(req: Request, res: Response, baseId?: string) {
+async function deposit(req: Request, res: Response, file: { buffer: Buffer; originalname: string; size: number } | undefined, baseId?: string) {
   const config = requireStore();
-  const file = req.file;
   if (!file) throw new AppError(400, 'Nessun file: va nel campo «file».');
   const mime = detectMime(file.buffer, file.originalname);
   if (!mime) throw new AppError(415, 'Formato non ammesso: PDF, DOCX, DOC, ODT, RTF, TXT, JPG o PNG, controllati sul contenuto.');
@@ -264,8 +277,8 @@ async function deposit(req: Request, res: Response, baseId?: string) {
   }
 }
 
-router.post('/:dossierId/files', uploads, wrap((req, res) => deposit(req, res)));
-router.post('/:dossierId/files/:fileId/versions', uploads, wrap((req, res) => deposit(req, res, req.params.fileId)));
+router.post('/:dossierId/files', uploads, wrap((req, res) => deposit(req, res, req.file)));
+router.post('/:dossierId/files/:fileId/versions', uploads, wrap((req, res) => deposit(req, res, req.file, req.params.fileId)));
 
 router.get('/:dossierId/files/:fileId/content', files, wrap(async (req, res) => {
   const config = requireStore();
@@ -325,6 +338,85 @@ router.delete('/:dossierId/files/:fileId', files, wrap(async (req, res) => {
     await removeBlob(config.dir, file).catch((error: unknown) => console.error('[pratica-files] removal failed:', error instanceof Error ? error.name : typeof error));
   }
   res.status(204).end();
+}));
+
+// ─── What an MCP token may do (LC56) ─────────────────────────────────────────────────────────────────────
+
+/** The case as Claude reads it first: the lawyer's instructions and the live files. One `elenco` line. */
+router.get('/:dossierId/contesto', [authenticate, ownDossier], wrap(async (req, res) => {
+  const { dossierId } = req.params;
+  const istruzioni = await prisma.praticaIstruzioni.findFirst({ where: { dossierId, userId: req.user!.id } });
+  const rows = await prisma.praticaFile.findMany({
+    where: { userId: req.user!.id, dossierId, deletedAt: null },
+    orderBy: [{ createdAt: 'asc' }, { versione: 'asc' }, { id: 'asc' }],
+    select: PUBLIC,
+  });
+  await prisma.praticaFileAccesso.create({ data: logLine(req, 'elenco', null) });
+  res.json({ istruzioni: serializeIstruzioni(istruzioni), files: originals(rows) });
+}));
+
+const KIND: Record<string, string> = {
+  'application/pdf': 'PDF', 'application/msword': 'DOC', 'application/rtf': 'RTF',
+};
+
+const parteQuery = z.coerce.number().int().min(1).max(10_000).default(1);
+
+/**
+ * The text of a live file, a part at a time, never its bytes. One `scaricamento` line per read, with the client
+ * (the log has no separate value for a text read; adding one is a schema change). Images and the formats without
+ * an extractor answer `testo: null` and say why.
+ */
+router.get('/:dossierId/files/:fileId/text', files, wrap(async (req, res) => {
+  const config = requireStore();
+  // The text of a client's act goes to the model only for a grant that consented to the texts' current words.
+  if (req.delegation && !req.delegation.readsActs) {
+    throw new AppError(403, "Per leggere i file della pratica l'applicazione va ricollegata: il permesso «Leggere i testi» ora comprende anche gli atti.");
+  }
+  const parte = parteQuery.parse(req.query.parte);
+  const row = await ownFile(req, { deletedAt: null });
+  let text: string | null = null;
+  let motivo: string | null = null;
+  if (row.mime.startsWith('image/')) motivo = "È un'immagine: il testo non si estrae.";
+  else if (!EXTRACTABLE.has(row.mime)) motivo = `Il testo di un file ${KIND[row.mime] ?? row.mime} non si estrae ancora: solo DOCX, ODT e TXT.`;
+  else {
+    text = extractText(await readBlob(config, row), row.mime);
+    if (text === null) motivo = 'Il file non si legge: è danneggiato o non è un documento valido.';
+  }
+  const parti = Math.max(1, Math.ceil((text?.length ?? 0) / TEXT_PAGE));
+  if (parte > parti) throw new AppError(400, `Il testo ha ${parti} ${parti === 1 ? 'parte' : 'parti'}.`);
+  await prisma.praticaFileAccesso.create({ data: logLine(req, 'scaricamento', row.id) });
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    file: { id: row.id, nome: row.nome, mime: row.mime, versione: row.versione, versioneDi: row.versioneDi, autore: row.autore },
+    parte,
+    parti,
+    testo: text === null ? null : text.slice((parte - 1) * TEXT_PAGE, parte * TEXT_PAGE),
+    motivo,
+  });
+}));
+
+// Plain text: new lines and tabs, nothing else below U+0020 (as the glosses route takes it).
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+const attoBody = z
+  .object({
+    nome: z.string().trim().min(1).max(200).refine((text) => !CONTROL.test(text), { message: 'Il nome contiene un carattere non valido.' }),
+    testo: z
+      .string()
+      .min(1, { message: "L'atto è vuoto." })
+      .max(MAX_ATTO_CHARS, { message: "L'atto è troppo lungo (al massimo 500.000 caratteri)." })
+      .refine((text) => !CONTROL.test(text), { message: 'Il testo contiene un carattere non valido.' }),
+    versioneDi: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+/** An act as text, made a DOCX and deposited as a new file or a new version: the original is never touched. */
+router.post('/:dossierId/files/atto', files, wrap(async (req, res) => {
+  const { nome, testo, versioneDi } = attoBody.parse(req.body);
+  const buffer = textToDocx(testo);
+  const originalname = `${cleanName(nome).replace(/\.docx$/i, '').slice(0, 250)}.docx`;
+  // `deposit` checks the type on the content, as it does for an upload.
+  await deposit(req, res, { buffer, originalname, size: buffer.length }, versioneDi);
 }));
 
 // ─── Instructions for Claude ─────────────────────────────────────────────────────────────────────────────

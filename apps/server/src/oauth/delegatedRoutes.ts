@@ -101,6 +101,13 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   { method: 'POST', path: '/lingo/corsi', scope: 'lingo:courses:write', weight: 2, counter: 'corso' },
   { method: 'POST', path: '/lingo/corsi/:id/moduli', scope: 'lingo:courses:write', weight: 3, counter: 'modulo' },
   { method: 'POST', path: '/lingo/corsi/:id/esami', scope: 'lingo:courses:write', weight: 3, counter: 'modulo' },
+  // LC56, a case's act files (owner, 16 November 2026, with the co-owner's review afterwards; testing only). Claude
+  // reads the instructions and the list of live files, the text extracted from a file (never its bytes, and only
+  // with the texts' consent: routes/praticaFiles.ts), and deposits an act as a new DOCX or a new version. Uploads,
+  // the raw file, trash, restore, deletion and writing the instructions stay the session's only.
+  { method: 'GET', path: '/dossiers/:id/contesto', scope: 'dossier:read', weight: 1 },
+  { method: 'GET', path: '/dossiers/:id/files/:id/text', scope: 'dossier:text', weight: 1, counter: 'text' },
+  { method: 'POST', path: '/dossiers/:id/files/atto', scope: 'dossier:write', weight: 3 },
 ];
 
 const SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;

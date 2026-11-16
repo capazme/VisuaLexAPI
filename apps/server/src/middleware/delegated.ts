@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import jwt from 'jsonwebtoken';
 import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible';
 import { prisma } from '../lib/prisma';
-import { DELETE_SCOPE, TEXT_CONSENT_VERSION, TEXT_SCOPE, oauthConfig } from '../oauth/config';
+import { DELETE_SCOPE, NOTES_CONSENT_VERSION, TEXT_CONSENT_VERSION, TEXT_SCOPE, oauthConfig } from '../oauth/config';
 import { ACTOR, delegationSecret } from '../oauth/delegationSecret';
 import { findDelegatedRoute, type DelegatedCounter } from '../oauth/delegatedRoutes';
 import type { DelegatedClaims } from '../oauth/exchange';
@@ -174,6 +174,8 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   let clientName: string | null = null;
   // Whether this call may receive the text of the user's notes (G-381 (b)): the token's scope and the grant's consent.
   let readsNotes = false;
+  // And the text of a case's acts (LC56): only under the words that name them.
+  let readsActs = false;
   try {
     const grant = await prisma.oAuthGrant.findUnique({
       where: { id: claims.grant },
@@ -190,7 +192,9 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     }
     user = grant.user;
     clientName = grant.client.clientName ?? null;
-    readsNotes = tokenScopes.includes(TEXT_SCOPE) && grant.scopes.includes(TEXT_SCOPE) && (grant.textConsentVersion ?? 0) >= TEXT_CONSENT_VERSION;
+    const texts = tokenScopes.includes(TEXT_SCOPE) && grant.scopes.includes(TEXT_SCOPE);
+    readsNotes = texts && (grant.textConsentVersion ?? 0) >= NOTES_CONSENT_VERSION;
+    readsActs = texts && (grant.textConsentVersion ?? 0) >= TEXT_CONSENT_VERSION;
   } catch (error) {
     console.error('delegatedAuth: could not read the grant:', error instanceof Error ? error.message : error);
     res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
@@ -250,6 +254,6 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   });
 
   req.user = user;
-  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: tokenScopes, clientName, readsNotes };
+  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: tokenScopes, clientName, readsNotes, readsActs };
   next();
 }
