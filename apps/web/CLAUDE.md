@@ -593,11 +593,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Work's five entries (D-315, LC8), exactly, in this order, «Oggi» (the home, `/work/oggi`,
   with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the
-  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» `soon` (since LC21 the web draws no «Anonimizzatore» entry: it is the desktop app's, D-324; its
-  address still answers) — as they were, «Atti» and
-  «Anonimizzatore» `soon` (`NavItem`: «in arrivo» under the word, 11 px, in the rail's hover label and in the name, «Atti, in
-  arrivo»; each opens a plain page, `/work/atti` and `/work/anonimizzatore`, two lines in Work's frame, `ComingSoon` in
-  `App.tsx`; the Anonimizzatore's says it will come in the desktop app, D-324). «Prossimi giorni» and «Lista d'ingresso»
+  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, «Atti», then, after a hairline, in a group named «Strumenti con l'IA» for a screen reader (LC47), «Analizza
+  documento» (`/documents`, `soon="dev"`: «in sviluppo», still a working link; Corpus is no longer lit there) and
+  «Anonimizzatore» `soon` (`NavItem`: «in arrivo» or «in sviluppo» under the word, 11 px, in the rail's hover label and in
+  the name, «Anonimizzatore, in arrivo»; `/work/anonimizzatore` is a plain page in Work's frame, `ComingSoon` in
+  `App.tsx`, saying it comes with the desktop app and works on the computer only, D-324). In the other sections «Analizza
+  documento» stays a Corpus tool with no label. «Prossimi giorni» and «Lista d'ingresso»
   are tabs of Work's page (`OpusPage`: «Oggi», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
   short word on a phone; on those three views and on the trash, its way back; the trash's link only on the three), «Analizza un documento» and «Rassegne» links
   of the search page's Scrivania, under the examples and drawn as them, underlined;

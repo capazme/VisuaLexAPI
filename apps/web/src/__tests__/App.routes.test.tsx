@@ -224,6 +224,17 @@ describe('App routing', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  it('says on the Anonimizzatore\'s page what it will do, «in arrivo» (LC47)', async () => {
+    renderAt('/work/anonimizzatore');
+    const page = await screen.findByTestId('opus-page');
+    for (const text of [
+      'in arrivo',
+      'Arriva con l\'app da scrivania di LexCraft.',
+      'Prima che un atto entri in una pratica, toglie dal documento i dati che identificano persone e società e li sostituisce con etichette. Così puoi lavorarci con l\'IA nel rispetto del GDPR e del segreto commerciale.',
+      'Funziona tutto sul tuo computer: il documento originale non esce mai.',
+    ]) expect(page).toContainElement(screen.getByText(text));
+  });
+
   it('loads «Crediti» with its route, public, outside the layout', async () => {
     renderAt('/crediti');
     expect(await screen.findByTestId('credits-page')).toBeInTheDocument();

@@ -97,7 +97,7 @@ function MovedTo({ from, to }: { from: string; to: string }) {
   return <Navigate to={{ pathname: to + pathname.slice(from.length), search, hash }} replace />;
 }
 
-/** A Work entry «in arrivo» (D-315): two lines under the frame's title (`OpusPage`, from `pageNames.ts`), no feature. */
+/** A Work entry «in arrivo» (D-315): a few lines under the frame's title (`OpusPage`, from `pageNames.ts`), no feature. */
 function ComingSoon({ children }: { children: ReactNode }) {
   return <div className="flex max-w-measure flex-col gap-2 text-sm text-slate-600 dark:text-slate-400">{children}</div>;
 }
@@ -168,10 +168,12 @@ function App() {
             {/* Atti: the user's acts and the editor of one, with the linked dossier's sources beside the text. */}
             <Route path="atti" element={<AttiListView />} />
             <Route path="atti/:id" element={<AttoEditor />} />
-            {/* D-324: the desktop app's. */}
+            {/* D-324: the desktop app's; announced in Work (LC47). */}
             <Route path="anonimizzatore" element={<ComingSoon>
-              <p>Toglierà da un documento i dati che identificano le persone, prima che tu lo condivida o lo analizzi.</p>
-              <p>È in arrivo e sarà disponibile nell'app da scrivania, non in questa versione web.</p>
+              <p className="text-xs font-medium">in arrivo</p>
+              <p>Arriva con l'app da scrivania di LexCraft.</p>
+              <p>Prima che un atto entri in una pratica, toglie dal documento i dati che identificano persone e società e li sostituisce con etichette. Così puoi lavorarci con l'IA nel rispetto del GDPR e del segreto commerciale.</p>
+              <p>Funziona tutto sul tuo computer: il documento originale non esce mai.</p>
             </ComingSoon>} />
           </Route>
           <Route path="history" element={<HistoryView />} />
