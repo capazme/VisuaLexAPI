@@ -352,7 +352,7 @@ describe('CommandPalette — the field and the steps', () => {
     const crumb = screen.getByRole('button', { name: 'Torna indietro: Codice civile' });
     expect(crumb).toHaveTextContent('Codice civile');
     await user.click(crumb);
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
   });
 
   it('goes back a step with Backspace on the empty field it opens with, from the keyboard alone (R2, Bill)', async () => {
@@ -360,12 +360,12 @@ describe('CommandPalette — the field and the steps', () => {
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     // «Codice penale», Enter: the article's field, empty, has the focus.
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'codice penale{Enter}');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'codice penale{Enter}');
     const box = await screen.findByRole('textbox', { name: "Numero dell'articolo" });
     await waitFor(() => expect(box).toHaveFocus());
     expect(box).toHaveValue('');
     await user.keyboard('{Backspace}');
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
   });
 
   it('a held Backspace stops at an empty field, and the date gives way to the number first (R2)', async () => {
@@ -532,7 +532,7 @@ describe('CommandPalette — the keys', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     // still on the first step: Enter did not reach cmdk's list (no act in the field's crumb)
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Torna indietro/ })).toBeNull();
   });
 

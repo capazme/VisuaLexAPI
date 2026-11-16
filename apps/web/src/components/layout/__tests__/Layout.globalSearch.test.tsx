@@ -35,7 +35,8 @@ import { DecisionAddress } from '../../features/decisions/DecisionAddress';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
 
-const PALETTE_BOX = 'Atto o citazione, es. art 2043 cc';
+// The palette's box: its placeholder is shorter on a phone (jsdom's width), so its start.
+const PALETTE_BOX = /^Atto o citazione/;
 
 /** The layout over a few pages; each page says which it is, so a test sees where the reader is. */
 function at(path: string) {

@@ -955,7 +955,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               }}
               enterKeyHint="search"
               aria-describedby="command-palette-help"
-              placeholder="Atto o citazione, es. art 2043 cc"
+              // On a phone the example would be cut at «art 20» (consultant 16-11): the words alone.
+              placeholder={isDesktop ? 'Atto o citazione, es. art 2043 cc' : 'Atto o citazione'}
               // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
               // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
               className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-500 dark:placeholder:text-ink-400"
