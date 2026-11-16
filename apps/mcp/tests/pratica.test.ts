@@ -81,7 +81,7 @@ describe('omnilex_leggi_pratica', () => {
   it('gives the instructions first, then the sources, the notes and the files with their ids, as text', async () => {
     const client = await connect();
     const out = text(await client.callTool({ name: 'omnilex_leggi_pratica', arguments: { dossier: 'Rossi c. Bianchi' } }));
-    const order = ['ISTRUZIONI', 'Cita solo la Cassazione', 'FONTI (1)', '[i1] norm · art. 2043 c.c.', 'NOTE (1)', '[i2] nota su art. 2043 c.c. (di Claude Code): "Il danno è provato."', 'FILE DEGLI ATTI (1)', '[f1] v1 "Citazione.pdf" · PDF · avvocato', '  - [f2] v2 "Citazione v2.docx" · DOCX · Claude (Claude Code)'];
+    const order = ['ISTRUZIONI', 'Cita solo la Cassazione', 'FONTI (1)', '[i1] norm · art. 2043 c.c.', 'NOTE (1)', '[i2] nota su art. 2043 c.c. (di "Claude Code"): "Il danno è provato."', 'FILE DEGLI ATTI (1)', '[f1] v1 "Citazione.pdf" · PDF · avvocato', '  - [f2] v2 "Citazione v2.docx" · DOCX · Claude ("Claude Code")'];
     const positions = order.map((s) => out.indexOf(s));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
