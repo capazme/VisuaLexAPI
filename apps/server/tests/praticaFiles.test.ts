@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, existsSync, readdirSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
+import { delegated } from './delegatedHelper';
 import { deleteUserAccount } from '../src/lingo/deleteUserAccount';
 import { sweepExpiredTrash } from '../src/trash/trash';
 import { readPraticaFileContent } from '../src/pratica/fileStore';
@@ -174,6 +175,16 @@ describe('Pratica files', () => {
     expect((await request(app).get('/api/dossiers/x/files')).status).toBe(401);
   });
 
+  it('refuses an exchanged MCP token on the file and instruction routes (default deny, 403)', async () => {
+    const { user, dossier } = await setup('pf-mcp');
+    const token = await delegated(user, 'dossier:read dossier:write');
+    const base = `/api/dossiers/${dossier.id}`;
+    expect((await request(app).get(`${base}/files`).set(token)).status).toBe(403);
+    expect((await request(app).post(`${base}/files`).set(token).attach('file', PDF, 'a.pdf')).status).toBe(403);
+    expect((await request(app).get(`${base}/istruzioni`).set(token)).status).toBe(403);
+    expect(await prisma.praticaFile.count()).toBe(0);
+  });
+
   it('answers 503 on every file route when the key is missing or not 32 bytes', async () => {
     const { user, dossier } = await setup('pf-503');
     delete process.env.PRATICA_FILES_KEY;
@@ -293,6 +304,7 @@ describe('Pratica files', () => {
     expect(filesOnDisk()).toEqual([]);
     expect(await prisma.praticaFile.count()).toBe(0);
     expect(await prisma.praticaIstruzioni.count()).toBe(0);
+    expect(await prisma.praticaFileAccesso.count({ where: { fileId: id, azione: 'cancellazione' } })).toBe(1);
   });
 
   it('removes the files of a dossier whose trash entry expires', async () => {

@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 
@@ -99,29 +100,42 @@ export async function removeBlob(dir: string, row: { id: string; userId: string;
 const removalDir = () => (process.env.PRATICA_FILES_DIR ? path.resolve(process.env.PRATICA_FILES_DIR) : null);
 
 /**
- * A dossier gone for good (its trash entry emptied or swept): its files' rows, its instructions and its directory.
- * Skipped when a live dossier holds the id (it was restored meanwhile). Called after the trash's own write.
+ * A dossier gone for good (its trash entry emptied or swept), inside the transaction that deletes the entry: its
+ * files' rows (with their wrapped keys), its instructions, and one `cancellazione` line per file. Nothing when a
+ * live dossier holds the id. Returns whether there is a directory to remove after the commit.
  */
-export async function removeDossierFiles(userId: string, dossierId: string): Promise<void> {
-  if (await prisma.dossier.findFirst({ where: { id: dossierId }, select: { id: true } })) return;
-  await prisma.$transaction([
-    prisma.praticaFile.deleteMany({ where: { userId, dossierId } }),
-    prisma.praticaIstruzioni.deleteMany({ where: { userId, dossierId } }),
-  ]);
-  const dir = removalDir();
-  if (dir) await rm(dossierDir(dir, userId, dossierId), { recursive: true, force: true });
+export async function deleteDossierFileRows(tx: Prisma.TransactionClient, userId: string, dossierId: string): Promise<boolean> {
+  if (await tx.dossier.findFirst({ where: { id: dossierId }, select: { id: true } })) return false;
+  const files = await tx.praticaFile.findMany({ where: { userId, dossierId }, select: { id: true } });
+  await tx.praticaFile.deleteMany({ where: { userId, dossierId } });
+  await tx.praticaIstruzioni.deleteMany({ where: { userId, dossierId } });
+  await tx.praticaFileAccesso.createMany({ data: files.map((f) => ({ userId, dossierId, fileId: f.id, azione: 'cancellazione' as const })) });
+  return true;
 }
 
-/** An account gone: its directory (the rows went with the user's cascade). */
+const logRemovalFailure = (error: unknown) =>
+  console.error(`[pratica-files] removal from disk failed: ${error instanceof Error ? error.name : typeof error}`);
+
+/**
+ * After the commit, best-effort: a directory left by a failure holds only blobs whose wrapped keys are gone with
+ * their rows, so nothing in it can be decrypted. The kind of error is logged, never a path.
+ */
+export async function removeDossierDir(userId: string, dossierId: string): Promise<void> {
+  const dir = removalDir();
+  if (dir) await rm(dossierDir(dir, userId, dossierId), { recursive: true, force: true }).catch(logRemovalFailure);
+}
+
+/** An account gone: its directory (the rows went with the user's cascade). Best-effort, as above. */
 export async function removeUserFiles(userId: string): Promise<void> {
   const dir = removalDir();
-  if (dir) await rm(userDir(dir, userId), { recursive: true, force: true });
+  if (dir) await rm(userDir(dir, userId), { recursive: true, force: true }).catch(logRemovalFailure);
 }
 
 /**
  * The decrypted content of a live file of the user's, for internal use only: no route calls it. It is here for
  * the MCP part (LC50 part 3), whose tools will read the text extracted from a file, never the raw file; the
  * extraction will start from this. 404 when the file is not the user's, in the trash, or its dossier is gone.
+ * It writes no access-log line: its future caller must write a `scaricamento` line with the client (MCP).
  */
 export async function readPraticaFileContent(userId: string, fileId: string): Promise<Buffer> {
   const config = requireStore();
