@@ -143,7 +143,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
     <>
       <section aria-labelledby={filesHeading} className="flex flex-col gap-3">
         <h3 id={filesHeading} className={headingClass}>File</h3>
-        {actionError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{actionError}</p>}
+        {actionError && <p role="alert" className="text-[15px] text-red-700 dark:text-red-400">{actionError}</p>}
         <p role="status" className="text-sm text-slate-600 empty:hidden dark:text-slate-400">{done}</p>
         {listError ? (
           listError.off ? (
@@ -244,7 +244,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
             }}
           />
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400">Fino a 25 MB per file. PDF, Word, ODT, RTF, TXT, JPG, PNG.</p>
+        <p className="text-[15px] text-slate-600 dark:text-slate-400">Fino a 25 MB per file. PDF, Word, ODT, RTF, TXT, JPG, PNG.</p>
       </section>
 
       <ConfirmDialog

@@ -88,7 +88,7 @@ export function IstruzioniPerClaude({ dossierId, headingClass }: { dossierId: st
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
       <h3 id={headingId} className={headingClass}>Istruzioni per Claude</h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400">Claude le legge per prime quando lavora su questa pratica.</p>
+      <p className="text-[15px] text-slate-600 dark:text-slate-400">Claude le legge per prime quando lavora su questa pratica.</p>
       {loadError ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
           {loadError}
@@ -113,9 +113,9 @@ export function IstruzioniPerClaude({ dossierId, headingClass }: { dossierId: st
             maxLength={MAX_ISTRUZIONI}
             rows={6}
             placeholder="Per esempio: cosa fare, quali fonti citare, con quali atti coordinarsi."
-            className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 font-mono text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-100"
+            className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-base leading-relaxed text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-100"
           />
-          {saveError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{saveError}</p>}
+          {saveError && <p role="alert" className="text-[15px] text-red-700 dark:text-red-400">{saveError}</p>}
         </>
       )}
     </section>
