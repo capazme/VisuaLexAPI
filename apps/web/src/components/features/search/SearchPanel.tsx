@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
@@ -31,6 +31,7 @@ import { PracticeNotice, type PracticeStreaming } from '../practice/PracticePart
 import { ReadingRow } from '../practice/ReadingRow';
 import { PracticeBar } from '../practice/PracticeBar';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
+import { ReadingHostContext, type ReadingHost } from '../practice/readingHost';
 import { dur, ease } from '../../../lib/motion';
 import { closeNotification, notify } from '../../ui/notifications/notifications';
 
@@ -93,11 +94,12 @@ export function SearchPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total?: number } | null>(null);
   const {
-    searchTrigger, clearSearchTrigger,
+    searchTrigger, triggerSearch, clearSearchTrigger,
     searchQueue, drainNextSearch,
     pendingDecision, drainPendingDecision,
   } = useAppStore(useShallow(s => ({
     searchTrigger: s.searchTrigger,
+    triggerSearch: s.triggerSearch,
     clearSearchTrigger: s.clearSearchTrigger,
     searchQueue: s.searchQueue,
     drainNextSearch: s.drainNextSearch,
@@ -624,6 +626,8 @@ export function SearchPanel() {
     }
   };
 
+  const readingHost = useMemo<ReadingHost>(() => ({ search: triggerSearch }), [triggerSearch]);
+
   const hasTabs = practiceCount > 0;
   const practiceStreaming: PracticeStreaming | null = loadingProgress && streamingPracticeId
     ? { practiceId: streamingPracticeId, ...loadingProgress }
@@ -644,6 +648,8 @@ export function SearchPanel() {
           gotcha 26). */}
       {/* Mounted over both layouts: a notice not yet closed survives a change of breakpoint. */}
       <PracticeNotice />
+      {/* The reading's host (LC52 c2): its search gestures are the Corpus's search, drained above, as before. */}
+      <ReadingHostContext.Provider value={readingHost}>
       {isDesktop ? (
         <>
           {/* The practices' tabs, over the columns (LC21). */}
@@ -660,6 +666,7 @@ export function SearchPanel() {
       ) : (
         <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
       )}
+      </ReadingHostContext.Provider>
 
       {/* «Scrivania»: the page with no practice open (spec 2026-10-18-redesign-inchiostro §5.3.2). */}
       {!hasTabs && !isLoading && <Scrivania />}

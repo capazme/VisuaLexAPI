@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { corpusPractices, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
+import { corpusPractices, isBoundPractice, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { Modal } from '../../ui/Modal';
 import { MenuButton } from '../../ui/MenuButton';
 import { PracticeColumn } from './PracticeColumn';
@@ -14,6 +14,7 @@ import { fromPracticePair, practicePair, scrollParentOf } from './practiceView';
 import { closePracticeWithUndo } from './practiceUndo';
 import { usePracticeSaveActions, type PracticeSaveActions } from './usePracticeSaveActions';
 import { SimpleReadingContext, isSimplePractice } from './simpleReading';
+import { useHostedPractice } from './readingHost';
 
 const SIMPLE_ON_PHONE = { simple: true, practiceItems: [] };
 const NOT_SIMPLE = { simple: false, practiceItems: [] };
@@ -22,9 +23,20 @@ export interface PracticePhoneViewProps {
   onViewPdf: (urn: string) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => void;
   streaming: PracticeStreaming | null;
+  /** The practice to show (LC52 c2: a dossier's bound table); without it, the Corpus's active one. */
+  practiceId?: string;
 }
 
 const NEW_PRACTICE_LABEL = 'Nuova pratica';
+
+/** A pending reveal wins over the saved scroll: any of the Corpus's for a Corpus practice, as before; across the line
+ *  between a bound table and the Corpus, never (LC52 c2: one's reveal is not the other's). */
+function revealWaits(practiceId: string): boolean {
+  const { pendingReveal, practices } = appStore.getState();
+  if (!pendingReveal) return false;
+  const bound = (id: string) => practices.some((p) => p.id === id && isBoundPractice(p));
+  return pendingReveal.practiceId === practiceId || bound(pendingReveal.practiceId) === bound(practiceId);
+}
 
 /** How long the column's scroll position is asked for again while its content arrives. */
 const SETTLE_MS = 3000;
@@ -42,12 +54,12 @@ const USER_SCROLL = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
  * back and the find window all name the same practice on both breakpoints. The migration's notice is
  * `SearchPanel`'s, over both layouts.
  */
-export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: PracticePhoneViewProps) {
+export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, practiceId }: PracticePhoneViewProps) {
   const practices = useAppStore(useShallow((s) => corpusPractices(s.practices).map(practicePair)));
-  const activePracticeId = useAppStore((s) => s.activePracticeId);
-  const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
-  // The reader is drawn for the practice on screen only: one whose practice is not the active one is stale.
-  const readerOpen = useAppStore((s) => s.phoneReader !== null && s.phoneReader.practiceId === s.activePracticeId &&
+  const practice = useHostedPractice(practiceId);
+  const shownId = practice?.id ?? null;
+  // The reader is drawn for the practice on screen only: one whose practice is another is not this view's.
+  const readerOpen = useAppStore((s) => s.phoneReader !== null && s.phoneReader.practiceId === shownId &&
     s.practices.some((p) => p.id === s.phoneReader?.practiceId));
   const [listing, setListing] = useState(false);
   // The save's picker and toast belong to the view, not to the column the reader replaces: an outcome
@@ -64,9 +76,9 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
   const rootRef = useRef<HTMLDivElement>(null);
   const lastTop = useRef<{ practiceId: string | null; top: number }>({ practiceId: null, top: 0 });
   const restore = useRef<string | null>(null);
-  const shownPractice = useRef(activePracticeId);
+  const shownPractice = useRef(shownId);
   // (declared before the effect that reads it: layout effects run in order)
-  useLayoutEffect(() => { shownPractice.current = activePracticeId; });
+  useLayoutEffect(() => { shownPractice.current = shownId; });
   useLayoutEffect(() => {
     if (readerOpen) {
       restore.current = shownPractice.current;
@@ -80,7 +92,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
     if (restore.current !== null) {
       const kept = restore.current;
       restore.current = null;
-      if (kept === shownPractice.current && lastTop.current.practiceId === kept && !appStore.getState().pendingReveal) {
+      if (kept === shownPractice.current && lastTop.current.practiceId === kept && !revealWaits(kept)) {
         const target = lastTop.current.top;
         const observer = new ResizeObserver(() => apply());
         const timer = setTimeout(() => stop(true), SETTLE_MS);
@@ -95,7 +107,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
           if (record) lastTop.current = { practiceId: kept, top: scroller!.scrollTop };
         }
         function apply() {
-          if (appStore.getState().pendingReveal) return stop(true);
+          if (revealWaits(kept)) return stop(true);
           if (scroller!.scrollTop < target - 1) scroller!.scrollTop = target;
           if (Math.abs(scroller!.scrollTop - target) <= 1) stop(true);
         }
@@ -116,12 +128,12 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
     };
   }, [readerOpen]);
 
-  if (list.length === 0) return null;
+  if (practiceId !== undefined ? !practice : list.length === 0) return null;
   // The save's picker and toast are one stable sibling of whichever branch is drawn: opening the
   // reader does not remount the picker.
   return (
     <>
-      {readerOpen ? <ReadingFullScreen onCrossReference={onCrossReference} /> : (
+      {readerOpen ? <ReadingFullScreen onCrossReference={onCrossReference} practiceId={shownId ?? undefined} /> : (
         <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
           {/* One line under the search page's field (R3: the text first): the practice's name as a drop-down — a tap
               lists the practices, to switch or start one —, its count under it, «Salva come dossier» and «⋯». */}

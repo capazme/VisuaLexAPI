@@ -10,6 +10,7 @@ import { DecisionEntryView } from '../decisions/DecisionEntryView';
 import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
 import { subjectOf, titleOf, type Subject } from './practiceView';
 import { closePracticeWindow } from './practiceSwitch';
+import { useRowText } from './useRowText';
 
 /** The bar of practices floats over the results area (`fixed bottom-6`): a window's scrolling body
  *  keeps the same bottom padding as the column (spec §3.4). */
@@ -98,6 +99,7 @@ interface ReadingWindowBodyProps extends Omit<ReadingWindowProps, 'clearTopRight
 export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }: ReadingWindowBodyProps) {
   const articleKey = besideRef.kind === 'article' ? besideRef.articleKey : '';
   const actId = subject?.kind === 'article' ? subject.actId : '';
+  useRowText(practiceId, actId, subject?.kind === 'article' ? subject.article : undefined, true);
   const readingOrigin = useMemo(
     () => ({ tabId: besideRef.id, blockId: actId, articleKey }),
     [besideRef.id, actId, articleKey],

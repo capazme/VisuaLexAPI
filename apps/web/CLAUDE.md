@@ -1091,6 +1091,11 @@ A practice with a `dossierId` (LC51: a reading table bound to a dossier, built b
 without text until `setPracticeArticleText`, re-synced additively by `resyncDossierPractice`) is the session's: `partialize`
 leaves it out (`corpusPractices`), `sanitizePractices` drops one found saved, it is never the active practice, and
 `isBoundPractice` keeps it out of the bar, the moves, «Salva come dossier», the closings, «Annulla» and «Tutte le pratiche».
+The reading containers (`PracticeTable`, `ReadingRow`, `PracticePhoneView`, `ReadingFullScreen`) take an optional
+`practiceId` (LC52 c2; `useHostedPractice`, default the Corpus's active one), and the reader's search gestures go to
+`ReadingHostContext` (`practice/readingHost.ts`; `SearchPanel` provides the store's `triggerSearch`, no host falls back
+to it). A bound row read without text loads it once (`useRowText`). The phone's reader and a pending reveal never act
+across the line between a bound table and the Corpus (`readerGivesWay`, `revealWaits`).
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
 browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
 with a logged warning «saved workspace too large to back up», when the value is over 1 000 000

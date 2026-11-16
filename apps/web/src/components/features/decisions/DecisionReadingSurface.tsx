@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
+import { useReadingSearch } from '../practice/readingHost';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { useCitationLinks } from '../../../hooks/useCitationLinks';
 import { useDecisionLinks } from '../../../hooks/useDecisionLinks';
@@ -288,6 +289,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     setToast({ message: 'Passaggi chiave nascosti: li riaccendi da «Passaggi chiave» nella barra', type: 'info' });
   };
 
+  // A cited norm goes to whoever hosts the reading (LC52 c2); without a host, the store's search.
+  const search = useReadingSearch(triggerSearch);
+
   const origin = useMemo<ReadingBackEntry | undefined>(
     () => hostTabId ? { tabId: hostTabId, blockId: hostBlockId ?? hostTabId, articleId: '', label } : undefined,
     [hostTabId, hostBlockId, label],
@@ -295,7 +299,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
 
   const openCitation = useCallback((citation: ParsedCitationData, link: HTMLElement | null = null) => {
     if (citedNorms) return citedNorms.open(citation, link);
-    triggerSearch({
+    search({
       act_type: citation.act_type,
       act_number: citation.act_number || '',
       date: citation.date || '',
@@ -304,7 +308,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       ...(hostTabId ? { besideId: hostTabId } : {}),
     });
     onLeave?.();
-  }, [triggerSearch, hostTabId, onLeave, citedNorms]);
+  }, [search, hostTabId, onLeave, citedNorms]);
 
   const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin, onOpened: onLeave });
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });

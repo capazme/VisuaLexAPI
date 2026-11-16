@@ -13,6 +13,7 @@ import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
 import { SimpleReadingContext, isSimplePractice } from './simpleReading';
+import { useHostedPractice } from './readingHost';
 import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
 
 export interface PracticeTableProps {
@@ -23,21 +24,23 @@ export interface PracticeTableProps {
   layout: 'overview' | 'index';
   /** Mounted but hidden (the rail's overlay, closed): it asks for no tour, whose steps would point at nothing drawn. */
   concealed?: boolean;
+  /** The practice to show (LC52 c2: a dossier's bound table); without it, the Corpus's active one. */
+  practiceId?: string;
 }
 
 /**
- * The active practice's table on the desktop (spec §3): its header (name, count line, «Salva come
+ * A practice's table on the desktop — the one given, else the Corpus's active one — (spec §3): its header (name, count line, «Salva come
  * dossier», «⋯»), the streaming bar of a search landing in it, then its column — the overview's grid, or the index of
  * the reading view, where the header is compact. An empty practice says so. Topic searches are windows beside it
  * (`ReadingRow`, T8); the phone's table keeps its band. (The migration's notice is `SearchPanel`'s, over both layouts.)
  */
-export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, concealed = false }: PracticeTableProps) {
-  const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
+export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, concealed = false, practiceId }: PracticeTableProps) {
+  const practice = useHostedPractice(practiceId);
   const theme = useAppStore((s) => s.settings.theme);
   // The tour of the table, once; when it is done the act's follows (`PracticeActBlock`).
   const { tryStartTour } = useTour({ theme: theme as 'light' | 'dark', onComplete: (type) => {
     // the act's tour follows, when the practice has an act to show in the overview (its steps are the panel's)
-    const held = appStore.getState().practices.find((p) => p.id === appStore.getState().activePracticeId);
+    const held = appStore.getState().practices.find((p) => p.id === (practiceId ?? appStore.getState().activePracticeId));
     if (type === 'practice' && held && held.acts.length > 0 && held.beside.length === 0) tryStartTour('practiceAct');
   } });
   // Asked once: `tryStartTour` is a new function on every render, so the effect cannot key on it.
