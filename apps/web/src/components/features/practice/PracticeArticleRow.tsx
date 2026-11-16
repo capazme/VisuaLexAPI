@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useSimpleReading } from './simpleReading';
-import { useRowText } from './useRowText';
+import { retryRowText, useRowText } from './useRowText';
+import { RowTextStatus } from './RowTextStatus';
 import { Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -38,7 +39,7 @@ export function PracticeArticleRow({
   const articleKey = practiceArticleKey(article);
   const rowKey = articleRowKey(practiceId, actId, articleKey);
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
-  useRowText(practiceId, actId, article, simple || isOpen);
+  const textState = useRowText(practiceId, actId, article, simple || isOpen);
   // Among the quick norms (R3b): its toggle is an entry of the reader's «⋯», so the row says it, open or folded, by the
   // reader's own rule (`isQuickNorm`, so the two never disagree) — for the text in force only: a quick norm opens that one.
   const quickParams = useMemo(() => quickNormParamsOf(article.norma_data), [article.norma_data]);
@@ -81,18 +82,23 @@ export function PracticeArticleRow({
   const named = shortNorm(norma)
     + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '');
 
+  // A bound row's text still coming, or failed (LC54): said in its place, never an empty reader.
+  const reader = textState ? <RowTextStatus state={textState} onRetry={() => retryRowText(practiceId, actId, article)} /> : (
+    <ArticleTabContent
+      data={article}
+      onCrossReferenceNavigate={onCrossReference}
+      onOpenStudyMode={onOpenStudyMode}
+      readingOrigin={readingOrigin}
+    />
+  );
+
   // Lettura semplice (LC28): the article alone, its own heading in the text («Art. 530 / Sentenza di assoluzione») the
   // only one; no row heading repeating it, no fold. The reading toolbar pins under the act's heading as in the table.
   if (simple) {
     return (
       <div className="pt-2" style={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}>
         {annexSuggestion}
-        <ArticleTabContent
-          data={article}
-          onCrossReferenceNavigate={onCrossReference}
-          onOpenStudyMode={onOpenStudyMode}
-          readingOrigin={readingOrigin}
-        />
+        {reader}
       </div>
     );
   }
@@ -134,12 +140,7 @@ export function PracticeArticleRow({
       regionStyle={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}
     >
       {annexSuggestion}
-      <ArticleTabContent
-        data={article}
-        onCrossReferenceNavigate={onCrossReference}
-        onOpenStudyMode={onOpenStudyMode}
-        readingOrigin={readingOrigin}
-      />
+      {reader}
     </PracticeRowShell>
   );
 }

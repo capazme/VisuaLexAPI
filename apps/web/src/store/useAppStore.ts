@@ -1289,6 +1289,8 @@ const appStore = createStore<AppState>()(
                         loaded as ArticleData & { brocardi_info?: unknown; brocardi_error?: unknown };
                     void _asked; void _info; void _error;
                     act.articles[at] = { ...text, norma_data: act.articles[at].norma_data };
+                    // An act a dossier gave no URN takes the one its text came with, as a search's act does (LC54).
+                    if (!act.norma.urn && loaded.norma_data?.url) act.norma.urn = loaded.norma_data.url;
                 });
             },
 
@@ -3156,6 +3158,8 @@ function syncFromDossier(practice: Practice, dossier: Dossier): void {
         void _text;
         const act: Norma = { tipo_atto: norma_data.tipo_atto, data: norma_data.data, numero_atto: norma_data.numero_atto };
         if (norma_data.tipo_atto_reale) act.tipo_atto_reale = norma_data.tipo_atto_reale;
+        // The act's URN, as a search gives it (an article's): its «Struttura» and «PDF» need it (LC54).
+        if (norma_data.urn) act.urn = norma_data.urn;
         practice.acts = addArticles(practice.acts, act, [{ norma_data }], uuidv4).acts;
     }
     mergeKnownDecisions(practice, dossier.items.flatMap((item) => (item.type === 'sentenza' ? [item.data] : [])));

@@ -3,6 +3,7 @@ import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { DecisionReference, FoundDecision } from '../../../types/decisions';
 import { addDecisionToHistory } from '../../../services/historyService';
 import { decisionKey, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
+import { isBoundPractice } from '../../../utils/practice';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionDiscussionsWithoutText } from './DecisionDiscussionsWithoutText';
 import { DecisionView } from './DecisionView';
@@ -123,7 +124,10 @@ export function DecisionEntryView({ practiceId, decisionId, reference, hostId, f
       formatDecisionShort({ ...answer.identita, sezione }));
   }, [setIdentity, practiceId, decisionId]);
   const needsRecord = useCallback((key: string) => {
-    const entry = appStore.getState().practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === decisionId);
+    const practice = appStore.getState().practices.find((p) => p.id === practiceId);
+    // A decision read in a dossier's «Lettura» (a bound table) is not the Cronologia's, as in the dossier's own reader (LC54).
+    if (!practice || isBoundPractice(practice)) return false;
+    const entry = practice.decisions.find((d) => d.id === decisionId);
     return Boolean(entry) && entry?.historyRecordedKey !== key;
   }, [practiceId, decisionId]);
   const onRecorded = useCallback((key: string) => markRecorded(practiceId, decisionId, key), [markRecorded, practiceId, decisionId]);

@@ -394,6 +394,20 @@ describe('DecisionEntryView — the Cronologia (once per opening, carry-over rul
     expect(e.entry()?.historyRecordedKey).toBeUndefined();
   });
 
+  it('records nothing for a decision read in a dossier\'s «Lettura» (a bound table, LC54 §16 answer 5)', async () => {
+    fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
+    const practiceId = s().openDossierPractice({
+      id: 'dos-1', title: 'Ricorso', createdAt: '',
+      items: [{ id: 's-1', addedAt: '', type: 'sentenza', data: { ...CIVILE, sezione: '3', etichetta: 'Cass. civ. 99999/2024' } }],
+    });
+    const decisionId = practiceOf(practiceId)!.decisions[0].id;
+    render(entryView({ practiceId, decisionId }, CIVILE));
+    await screen.findByText(/Sez\. III civile/);
+    await act(async () => {});
+    expect(addDecisionToHistory).not.toHaveBeenCalled();
+    expect(practiceOf(practiceId)!.decisions[0].historyRecordedKey).toBeUndefined();
+  });
+
   it('records nothing for an answer that is not a found decision', async () => {
     fetchDecision.mockResolvedValue(AMBIGUOUS);
     const e = openEntry(AMBIGUA_REF);

@@ -58,6 +58,8 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
   const practices = useAppStore(useShallow((s) => corpusPractices(s.practices).map(practicePair)));
   const practice = useHostedPractice(practiceId);
   const shownId = practice?.id ?? null;
+  // A dossier's table (LC54): the dossier's page names it; no list of practices, no «Salva come dossier».
+  const bound = practice !== undefined && isBoundPractice(practice);
   // The reader is drawn for the practice on screen only: one whose practice is another is not this view's.
   const readerOpen = useAppStore((s) => s.phoneReader !== null && s.phoneReader.practiceId === shownId &&
     s.practices.some((p) => p.id === s.phoneReader?.practiceId));
@@ -137,7 +139,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
         <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
           {/* One line under the search page's field (R3: the text first): the practice's name as a drop-down — a tap
               lists the practices, to switch or start one —, its count under it, «Salva come dossier» and «⋯». */}
-          {practice && <PhonePracticeHead practice={practice} save={save} onList={() => setListing(true)} />}
+          {practice && !bound && <PhonePracticeHead practice={practice} save={save} onList={() => setListing(true)} />}
           {practice && (
             // At the layout's 16 px from the edges (R3b): no step of its own.
             <div className="space-y-4 pb-4 pt-2">
@@ -153,10 +155,10 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
               )}
             </div>
           )}
-          <PracticeList isOpen={listing} onClose={() => setListing(false)} />
+          {!bound && <PracticeList isOpen={listing} onClose={() => setListing(false)} />}
         </div>
       )}
-      {save.overlay}
+      {!bound && save.overlay}
     </>
   );
 }
