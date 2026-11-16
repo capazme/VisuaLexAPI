@@ -97,7 +97,8 @@ afterEach(() => {
 describe('the containers take their practice (LC52 c2)', () => {
   it('PracticeTable shows the practice it is given, rows and all, not the active one; without one, the active', () => {
     const first = render(<PracticeTable {...handlers} layout="overview" practiceId={bound} />);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Legata al dossier');
+    // A bound table draws no practice header (LC54 c3: the dossier's page names it).
+    expect(screen.queryByRole('heading', { level: 2, name: 'Legata al dossier' })).toBeNull();
     expect(screen.getByRole('region', { name: BOUND_ACT })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: CORPUS_ACT })).toBeNull();
     first.unmount();
@@ -121,8 +122,8 @@ describe('the containers take their practice (LC52 c2)', () => {
     const windows = screen.getAllByTestId('reading-row-window');
     expect(windows).toHaveLength(1);
     expect(windows[0]).toHaveTextContent('Testo legato 5');
-    expect(screen.getByTestId('reading-row-table')).toHaveTextContent('Legata al dossier');
-    expect(screen.getByTestId('reading-row-table')).not.toHaveTextContent('Del Corpus');
+    expect(screen.getByTestId('reading-row-table')).toHaveTextContent(BOUND_ACT);
+    expect(screen.getByTestId('reading-row-table')).not.toHaveTextContent(CORPUS_ACT);
   });
 
   it('PracticePhoneView shows the given practice\'s column, also when it is the only one and not active', () => {

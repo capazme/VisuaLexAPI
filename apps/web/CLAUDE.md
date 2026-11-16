@@ -1096,6 +1096,15 @@ The reading containers (`PracticeTable`, `ReadingRow`, `PracticePhoneView`, `Rea
 `ReadingHostContext` (`practice/readingHost.ts`; `SearchPanel` provides the store's `triggerSearch`, no host falls back
 to it). A bound row read without text loads it once (`useRowText`). The phone's reader and a pending reveal never act
 across the line between a bound table and the Corpus (`readerGivesWay`, `revealWaits`).
+The dossier's «Lettura» tab (LC54 c3, `dossier/DossierReadingView`, `?vista=lettura`, mounted only once chosen) builds
+and re-syncs its table with `openDossierPractice` on every change of the page's dossier, and hosts the reading: a search
+gesture fetches its article as Ricerca does and puts it on the bound table, revealed or beside its window, never in the
+dossier (a failure leaves the row with its error); a norm of the same act and the PDF go through `practice/hostGestures.ts`,
+which `SearchPanel` shares. A bound table draws no practice header, «Salva come dossier», practice actions, «Sposta in
+un'altra pratica», tours or room for the bar (`isBoundPractice` inside the containers); its act takes a URN from the
+dossier item or from its first loaded text; a bound row without text says «Carico il testo…», after a failure «Non
+riesco a leggere il testo.» with «Riprova» (`RowTextStatus`, `retryRowText`); a decision read there is not recorded in
+the Cronologia (`DecisionEntryView`).
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
 browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
 with a logged warning «saved workspace too large to back up», when the value is over 1 000 000

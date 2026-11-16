@@ -29,7 +29,7 @@ import { formatNormaMeta } from '../../../utils/normaMeta';
 import { actHeading, shortAct } from '../../../utils/sources';
 import { READ_ONLY_REASON, describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
 import { filterLoadedIdsForAnnex } from '../../../utils/articleIds';
-import { corpusPractices, findPracticeArticle, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
+import { corpusPractices, findPracticeArticle, isBoundPractice, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
 
 export interface PracticeActBlockProps {
   practiceId: string;
@@ -100,12 +100,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // The act's tour, on the practice's first act and once the table's own tour has been seen (when it
   // is done it hands over to this one, `PracticeTable`). Asked once: `tryStartTour` is new each render.
   const isFirstAct = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts[0]?.id === act.id);
+  // A dossier's table (LC54): no tour of the practice, and no other practice to move an act to.
+  const bound = useAppStore((s) => s.practices.some((p) => p.id === practiceId && isBoundPractice(p)));
   const theme = useAppStore((s) => s.settings.theme);
   const { tryStartTour, hasSeenTour } = useTour({ theme: theme as 'light' | 'dark' });
   const tourAsked = useRef(false);
   useEffect(() => {
     // Not from the index: its steps point at the panel's tools, its index line and a row's «Apri accanto».
-    if (!isFirstAct || isIndex || tourAsked.current || !hasSeenTour('practice')) return;
+    if (!isFirstAct || isIndex || bound || tourAsked.current || !hasSeenTour('practice')) return;
     tourAsked.current = true;
     tryStartTour('practiceAct');
   });
@@ -346,7 +348,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   { label: 'Esporta PDF della norma', icon: FileDown, onSelect: () => onViewPdf(act.norma.urn as string) },
                 ] : []),
               ]),
-              { label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !toolsShown },
+              ...(bound ? [] : [{ label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !toolsShown }]),
               { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
               ...practiceItems,
             ]}

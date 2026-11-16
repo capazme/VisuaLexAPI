@@ -13,6 +13,7 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { actHeading } from '../../../utils/sources';
+import { isBoundPractice } from '../../../utils/practice';
 import { OVERVIEW_GRID } from './besideLayout';
 import { PracticeActBlock } from './PracticeActBlock';
 import { PracticeDecisionsSection } from './PracticeDecisionsSection';
@@ -98,7 +99,8 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
       ref={columnRef}
       data-testid="practice-column"
       data-layout={layout}
-      className={cn(GAP[layout], 'pb-[calc(var(--practice-bar-height,3.75rem)+2.25rem)]')}
+      // A dossier's table (LC54) has no bar under it.
+      className={cn(GAP[layout], !isBoundPractice(practice) && 'pb-[calc(var(--practice-bar-height,3.75rem)+2.25rem)]')}
     >
       <DndContext
         sensors={sensors}

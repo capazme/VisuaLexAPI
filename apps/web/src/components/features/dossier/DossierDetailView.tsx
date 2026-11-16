@@ -60,12 +60,15 @@ import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import { DossierAttiPanel } from '../atti/DossierAttiPanel';
+import { DossierReadingView } from './DossierReadingView';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
 import { DeadlineCard } from '../../../features/deadlines/DeadlineCard';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { scrollParentOf } from '../practice/practiceView';
 
 const VIEW_PANEL = 'dossier-view';
+const VISTE = ['lettura', 'atti'] as const;
+type DossierView = 'fonti' | 'lettura' | 'atti' | 'compiti';
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { kindLabel } from './dossierKinds';
@@ -120,14 +123,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // `?vista=atti`: the way back from an act lands on the dossier's acts.
   const viewTop = useRef<HTMLDivElement>(null);
   /** A new view starts under the tabs: scrolled past them, the scroller goes back to where they stick; above, it stays. */
-  const chooseView = (next: 'fonti' | 'atti' | 'compiti') => {
+  const chooseView = (next: DossierView) => {
     const mark = viewTop.current;
     const scroller = mark ? scrollParentOf(mark) : null;
     const stuckAt = mark && scroller ? mark.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop : null;
     setView(next);
     if (scroller && stuckAt !== null && scroller.scrollTop > stuckAt) scroller.scrollTop = stuckAt;
   };
-  const [view, setView] = useState<'fonti' | 'atti' | 'compiti'>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
+  // `?vista=lettura` (LC54) opens on the reading.
+  const [view, setView] = useState<DossierView>(() => VISTE.find((v) => v === new URLSearchParams(window.location.search).get('vista')) ?? 'fonti');
   const [attiCount, setAttiCount] = useState<number | null>(null);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -692,10 +696,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         {/* LC27 (Luca, 15 Nov): the tabs stay at the top while the view scrolls, and a change of view starts the new
             one right under them, in place — no jump to the page's top, no scrolling to it. */}
         <div ref={viewTop} aria-hidden />
-        <div className="sticky top-0 z-10 -mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950">
+        {/* In «Lettura» the act's own head sticks at the top while reading (#529, Papiniano): the tabs scroll away there,
+            or the two sticky heads overlap and the tabs vanish under it. */}
+        <div className={cn('-mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950', view !== 'lettura' && 'sticky top-0 z-10')}>
         <SegmentedTabs
           tabs={[
             { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
+            { id: 'lettura', label: 'Lettura' },
             { id: 'atti', label: 'Atti', extra: attiCount === null ? undefined : <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{attiCount}</span> },
             { id: 'compiti', label: 'Compiti' },
           ]}
@@ -704,7 +711,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           label="Viste del dossier"
           panelId={VIEW_PANEL}
           className="w-fit max-w-full"
-          tabClassName="gap-2 px-4"
+          // Four tabs whole on a 390 px phone (LC54): less padding below `sm`.
+          tabClassName="gap-1.5 px-2.5 sm:gap-2 sm:px-4"
         />
         </div>
         <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`} className="min-h-[calc(100dvh-8rem)]">
@@ -712,6 +720,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           {dossier.kind !== 'studio' && <DeadlineCard dossierId={dossier.id} />}
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
+        {/* Mounted only once chosen: opening it builds the dossier's reading table (LC54). */}
+        {view === 'lettura' && <DossierReadingView dossier={dossier} showToast={showToast} />}
         <div hidden={view !== 'atti'}>
           <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
         </div>
