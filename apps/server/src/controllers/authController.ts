@@ -439,7 +439,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications, atti, forumProfile, forumProfileReports] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications, atti, forumProfile, forumProfileReports, forumSubjectRoles, forumValidations, forumAppeals] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -552,6 +552,17 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.forumProfileReport.findMany({
       where: { userId }, select: { profileId: true, details: true, status: true, createdAt: true }, orderBy: { createdAt: 'asc' },
     }),
+    // The communities (spec 2026-11-14 §C): the person's roles, the validations they gave, their appeals;
+    // never who appointed them or who decided an appeal.
+    prisma.forumSubjectRole.findMany({ where: { userId }, select: { materia: true, role: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.forumValidation.findMany({
+      where: { validatorId: userId }, select: { threadId: true, commentId: true, materia: true, createdAt: true }, orderBy: { createdAt: 'asc' },
+    }),
+    prisma.forumAppeal.findMany({
+      where: { userId },
+      select: { targetKind: true, targetId: true, text: true, status: true, createdAt: true, decidedAt: true, decisionNote: true },
+      orderBy: { createdAt: 'asc' },
+    }),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
   const others = await othersIn([
@@ -593,6 +604,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       threads: threads.map(({ passageReleasedById: _releasedBy, lockedById: _lockedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
       comments: comments.map(({ acceptedIn, ...comment }) => ({ ...comment, accepted: acceptedIn.length > 0 })),
       threadVotes, commentVotes, threadReports, commentReports, forumNotifications, forumProfile, forumProfileReports,
+      forumSubjectRoles, forumValidations, forumAppeals,
       lingoCards: lingoCards.map(({ competenze, ...card }) => ({ ...card, competenze: competenze.map((c) => c.competenza.codice) })),
       lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),

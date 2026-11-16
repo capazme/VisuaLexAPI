@@ -46,6 +46,13 @@ model User {
   forumProfile           ForumProfile?
   forumProfileReports    ForumProfileReport[]      @relation("ForumProfileReporter")
   resolvedProfileReports ForumProfileReport[]      @relation("ForumProfileReportResolvedBy")
+  // The Forum's communities (spec §C): the person's roles per subject, the ones they appointed, the
+  // validations they gave, their appeals and the ones they decided.
+  forumSubjectRoles      ForumSubjectRole[]        @relation("ForumSubjectRoleHolder")
+  appointedSubjectRoles  ForumSubjectRole[]        @relation("ForumSubjectRoleAppointedBy")
+  forumValidations       ForumValidation[]
+  forumAppeals           ForumAppeal[]             @relation("ForumAppealAuthor")
+  decidedForumAppeals    ForumAppeal[]             @relation("ForumAppealDecidedBy")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
@@ -655,6 +662,8 @@ model ArticleThread {
   isHidden    Boolean  @default(false) @map("is_hidden")
   // The category a moderator chose when hiding it (the report reasons' closed list, a CHECK); null when visible.
   hiddenReason        String?       @map("hidden_reason")
+  // When it was last hidden, cleared when shown again: an appeal belongs to one hiding (spec 2026-11-14 §C).
+  hiddenAt            DateTime?     @map("hidden_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   // Set at creation and by a new reply or comment, by nothing else: `updatedAt` moves on every update.
@@ -682,6 +691,7 @@ model ArticleThread {
   comments   ArticleComment[]
   votes      ArticleThreadVote[]
   notifications     ForumNotification[]
+  validations       ForumValidation[]
 
   @@index([normaKey, articleId, createdAt])
   @@index([userId])
@@ -706,6 +716,7 @@ model ArticleComment {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   hiddenReason  String?   @map("hidden_reason")
+  hiddenAt      DateTime? @map("hidden_at")
   editedAt      DateTime? @map("edited_at")
   // Emptied by its author while something visible hangs on it: body is '' (a CHECK).
   deletedAt     DateTime? @map("deleted_at")
@@ -721,6 +732,7 @@ model ArticleComment {
   licenceText   LingoTestoVersione? @relation("ArticleCommentLicence", fields: [licenceTextId], references: [id], onDelete: Restrict)
   acceptedIn    ArticleThread[]     @relation("ArticleThreadAccepted")
   notifications ForumNotification[]
+  validations   ForumValidation[]
 
   @@index([threadId, createdAt])
   @@index([parentId])
@@ -847,6 +859,8 @@ model ForumModerationLog {
   targetKind String   @map("target_kind")
   targetId   String   @map("target_id")
   reason     String?
+  // The subject of an appointment of a subject's moderator or validator (spec 2026-11-14 §C).
+  materia    LingoMateria?
   createdAt  DateTime @default(now()) @map("created_at")
 
   actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
@@ -879,6 +893,70 @@ model ForumProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("forum_profiles")
+}
+
+// A subject's moderator or validator (spec 2026-11-14-forum-community-server-design §C, D-267), appointed by
+// an owner on the record. Goes with the account.
+model ForumSubjectRole {
+  userId       String       @map("user_id")
+  materia      LingoMateria
+  role         String
+  appointedBy  String?      @map("appointed_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  user      User  @relation("ForumSubjectRoleHolder", fields: [userId], references: [id], onDelete: Cascade)
+  appointer User? @relation("ForumSubjectRoleAppointedBy", fields: [appointedBy], references: [id], onDelete: SetNull)
+
+  @@id([userId, materia, role])
+  @@index([materia, role])
+  @@index([appointedBy])
+  @@map("forum_subject_roles")
+}
+
+// One validator's validation of a glossa or a reply (exactly one, a CHECK), in the subject it was given in.
+// Goes with the item; outlives the validator's account, unnamed, and still counts (§C).
+model ForumValidation {
+  id          String       @id @default(uuid())
+  threadId    String?      @map("thread_id")
+  commentId   String?      @map("comment_id")
+  validatorId String?      @map("validator_id")
+  materia     LingoMateria
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  thread    ArticleThread?  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  comment   ArticleComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  validator User?           @relation(fields: [validatorId], references: [id], onDelete: SetNull)
+
+  @@unique([threadId, validatorId])
+  @@unique([commentId, validatorId])
+  @@index([validatorId])
+  @@map("forum_validations")
+}
+
+// The author's appeal to the owners against a hiding (D-267), once per hiding. The item by a plain id, as
+// the reports name theirs; at most one pending per item (the migration's index).
+model ForumAppeal {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  targetKind   String    @map("target_kind")
+  targetId     String    @map("target_id")
+  threadId     String    @map("thread_id")
+  text         String
+  status       String    @default("pending")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  decidedById  String?   @map("decided_by")
+  decidedAt    DateTime? @map("decided_at")
+  decisionNote String?   @map("decision_note")
+
+  user      User  @relation("ForumAppealAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("ForumAppealDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([targetKind, targetId])
+  @@index([status])
+  @@index([threadId])
+  @@index([decidedById])
+  @@map("forum_appeals")
 }
 
 // A report «non è chi dice di essere» on a profile (G-479), read by the owners alone. The profile by a
@@ -1591,6 +1669,8 @@ model LingoCreditoXp {
 enum LingoImpostazioneChiave {
   SOGLIA_APPROVAZIONI
   SOGLIA_ERRATE
+  // The Forum's validations that make a glossa or a reply «validata» (spec 2026-11-14 §C, G-478).
+  FORUM_SOGLIA_VALIDAZIONI
 }
 
 model LingoImpostazione {

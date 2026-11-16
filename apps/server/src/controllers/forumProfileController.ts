@@ -12,7 +12,8 @@ import { readRoles } from '../forum/roles';
 import { maybeSweepCommunity } from '../forum/sweep';
 import { MESSAGES, isReservedPseudonym, profileSchema } from '../forum/profiles';
 import { personalScores } from '../forum/votes';
-import { profileFace } from '../forum/views';
+import { decisionLabel, profileFace } from '../forum/views';
+import { readThreshold, validatedContributionsOf } from '../forum/validation';
 import { parsePaging } from './articleDiscussionController';
 
 // The Forum's minimal profile (spec docs/superpowers/specs/2026-11-14-forum-community-server-design.md §B;
@@ -42,13 +43,19 @@ function ownView(profile: ForumProfile | null) {
   };
 }
 
+/** A person's roles in the communities (§C): public, as validators and moderators are named (P-012). */
+function rolesOf(db: Pick<Tx, 'forumSubjectRole'>, userId: string) {
+  return db.forumSubjectRole.findMany({ where: { userId }, select: { materia: true, role: true }, orderBy: [{ materia: 'asc' }, { role: 'asc' }] });
+}
+
 /** One's own profile, and what one may do now (§B). */
 async function ownAnswer(db: Tx | typeof prisma, userId: string) {
-  const [profile, required, scores, contributions] = await Promise.all([
+  const [profile, required, scores, contributions, roles] = await Promise.all([
     db.forumProfile.findUnique({ where: { userId } }),
     isSwitchOn('forum_identity', db),
     personalScores(db, [userId]),
     standing(db, userId),
+    rolesOf(db, userId),
   ]);
   const withdrawn = Boolean(profile?.nameWithdrawnAt);
   return {
@@ -58,6 +65,7 @@ async function ownAnswer(db: Tx | typeof prisma, userId: string) {
     canSign: !withdrawn && profile?.identity !== 'pseudonym' && (!required || profile?.identity === 'real_name'),
     score: scores.get(userId) ?? 0,
     contributions,
+    roles,
     nameWithdrawn: profile?.nameWithdrawnAt ? { at: profile.nameWithdrawnAt, reason: profile.nameWithdrawnReason } : null,
   };
 }
@@ -93,6 +101,12 @@ export const putOwnProfile = async (req: Request, res: Response) => {
             OR EXISTS (SELECT 1 FROM users WHERE lower(username) = lower(${data.pseudonym}) AND id <> ${userId}) AS taken`;
       if (taken.taken) throw new AppError(409, MESSAGES.taken);
       if (current?.identity !== 'pseudonym') {
+        // A validator signs with the real name (D-246), and so did every validation given (§C).
+        const [held, given] = await Promise.all([
+          tx.forumSubjectRole.count({ where: { userId, role: 'validator' } }),
+          tx.forumValidation.count({ where: { validatorId: userId } }),
+        ]);
+        if (held + given > 0) throw new AppError(409, 'Sei validatore o hai validato con il tuo nome: non puoi passare a uno pseudonimo');
         const { glosse, risposte } = await standing(tx, userId);
         if (glosse + risposte > 0) throw new AppError(409, MESSAGES.otherName);
         renewId = current !== null;
@@ -125,8 +139,42 @@ export const putOwnProfile = async (req: Request, res: Response) => {
 export const getPublicProfile = async (req: Request, res: Response) => {
   const profile = await prisma.forumProfile.findUnique({ where: { id: req.params.profileId } });
   if (!profile) throw new AppError(404, MESSAGES.notFound);
-  const scores = await personalScores(prisma, [profile.userId]);
-  res.json({ id: profile.id, ...profileFace(profile), materie: profile.materie, score: scores.get(profile.userId) ?? 0 });
+  const [scores, roles, validated] = await Promise.all([
+    personalScores(prisma, [profile.userId]),
+    rolesOf(prisma, profile.userId),
+    readThreshold(prisma).then(threshold => validatedContributionsOf(prisma, profile.userId, threshold)),
+  ]);
+  res.json({
+    id: profile.id, ...profileFace(profile), materie: profile.materie, score: scores.get(profile.userId) ?? 0,
+    roles, validatedCount: validated.length,
+  });
+};
+
+/**
+ * A person's validated contributions (D-249, §C): their visible glosse and replies at the threshold,
+ * newest first, each with its glossa's title and anchor, the subject, when it reached the threshold and how
+ * many validations it has.
+ */
+export const listValidatedContributions = async (req: Request, res: Response) => {
+  const { page, limit } = parsePaging(req.query);
+  const profile = await prisma.forumProfile.findUnique({ where: { id: req.params.profileId }, select: { userId: true } });
+  if (!profile) throw new AppError(404, MESSAGES.notFound);
+  const rows = await validatedContributionsOf(prisma, profile.userId, await readThreshold(prisma));
+  res.json({
+    data: rows.slice((page - 1) * limit, page * limit).map(row => ({
+      kind: row.kind,
+      threadId: row.threadId,
+      commentId: row.commentId,
+      title: row.title,
+      materia: row.materia,
+      normaKey: row.normaKey,
+      articleLabel: row.articleLabel,
+      decisionLabel: decisionLabel(row),
+      validatedAt: row.validatedAt,
+      count: row.count,
+    })),
+    pagination: { page, limit, total: rows.length, pages: Math.ceil(rows.length / limit) },
+  });
 };
 
 const reportSchema = z.object({
