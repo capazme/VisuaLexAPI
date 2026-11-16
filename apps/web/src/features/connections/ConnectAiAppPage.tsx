@@ -5,6 +5,7 @@ import { getErrorMessage } from '../../utils/errors';
 import { connectionsService, type ConnectionInfo } from './connectionsService';
 import { ConnectedAppsSection } from './ConnectedAppsSection';
 import { CopyableCode } from './CopyableCode';
+import { AiWaysDiagram } from './AiWaysDiagram';
 import { PageFrame } from '../../components/layout/PageFrame';
 import { AI_TOOLS, UNSUPPORTED_CLIENTS, aiClients, type AiClient } from './aiClients';
 import {
@@ -210,6 +211,8 @@ export function ConnectAiAppPage() {
           norme, sentenze, note e schede di studio, con il tuo account. Il collegamento usa il protocollo MCP: copi
           l’indirizzo nell’app, accedi a LexCraft e scegli tu i permessi.
         </p>
+
+        <AiWaysDiagram />
 
         <nav aria-label="Le due parti della pagina" className="space-y-2">
           <p className="text-sm text-slate-600 dark:text-slate-300">
