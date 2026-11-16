@@ -46,7 +46,7 @@ beforeEach(() => {
   env.stub.apiOverride = (method, path, body) => {
     if (method === 'GET' && path === '/dossiers/d1/contesto') return [200, CONTESTO];
     if (method === 'GET' && path === '/dossiers/d1/files/f2/text') return [200, { file: CONTESTO.files[0].versioni[0], parte: 1, parti: 2, testo: 'Atto di citazione…', motivo: null }];
-    if (method === 'GET' && path === '/dossiers/d1/files/f1/text') return [200, { file: CONTESTO.files[0], parte: 1, parti: 1, testo: null, motivo: 'Il testo di un file PDF non si estrae ancora: solo DOCX, ODT e TXT.' }];
+    if (method === 'GET' && path === '/dossiers/d1/files/f1/text') return [200, { file: CONTESTO.files[0], parte: 1, parti: 1, testo: null, motivo: 'Testo non estraibile: il PDF è protetto da password.' }];
     if (method === 'GET' && path === '/dossiers/d1/files/zz/text') return [404, { detail: 'File non trovato.' }];
     if (method === 'POST' && path === '/dossiers/d1/files/atto') {
       const { nome, versioneDi } = body as { nome: string; versioneDi?: string };
@@ -106,7 +106,7 @@ describe('omnilex_leggi_file_pratica', () => {
     expect(docx).toContain('Parte 1 di 2');
     expect(docx).toContain('Atto di citazione…');
     const pdf = text(await client.callTool({ name: 'omnilex_leggi_file_pratica', arguments: { dossier: 'd1', file: 'f1' } }));
-    expect(pdf).toMatch(/PDF non si estrae/);
+    expect(pdf).toMatch(/Testo non estraibile: il PDF è protetto da password\./);
     const missing = await client.callTool({ name: 'omnilex_leggi_file_pratica', arguments: { dossier: 'd1', file: 'zz' } });
     expect(missing.isError).toBe(true);
     expect(text(missing)).toMatch(/il file non è in questa pratica/);

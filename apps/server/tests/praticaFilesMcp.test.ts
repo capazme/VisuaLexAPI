@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,7 +7,7 @@ import { crc32, deflateRawSync } from 'node:zlib';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
 import { delegatedToken } from './oauth/oauthHelpers';
 import { readPraticaFileContent } from '../src/pratica/fileStore';
-import { extractText } from '../src/pratica/docText';
+import { extractText, pdfText } from '../src/pratica/docText';
 
 /**
  * LC56: what an exchanged MCP token may do with a case's act files: read the instructions and the file list, read
@@ -66,7 +66,43 @@ const DOCX = zip([
       '</w:body></w:document>',
   ],
 ]);
-const PDF = Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\n%%EOF\n');
+const PDF = Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\n%%EOF\n'); // starts like a PDF, has no pages: a broken one
+
+/**
+ * A PDF written here, xref offsets and all: one page per entry, its text set in Helvetica on two lines, or no text
+ * at all (null, as a scan without OCR has none). `encrypt` adds a Standard security handler whose user password
+ * is not the empty one, so the file opens only with a password.
+ */
+function pdf(pages: (string | null)[], { encrypt = false } = {}): Buffer {
+  const objects: string[] = [];
+  const add = (body: string) => objects.push(body);
+  add('<< /Type /Catalog /Pages 2 0 R >>');
+  add(''); // the page tree, written once the pages have their numbers
+  add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+  const kids: number[] = [];
+  for (const page of pages) {
+    const lines = page === null ? [] : page.split('\n');
+    const stream = lines.length
+      ? `BT /F1 12 Tf 72 720 Td 14 TL ${lines.map((l) => `(${l.replace(/[()\\]/g, '\\$&')}) Tj T*`).join(' ')} ET`
+      : '';
+    add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${objects.length} 0 R >>`);
+    kids.push(objects.length);
+  }
+  objects[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(' ')}] /Count ${kids.length} >>`;
+  if (encrypt) add(`<< /Filter /Standard /V 1 /R 2 /O <${'ab'.repeat(32)}> /U <${'cd'.repeat(32)}> /P -4 >>`);
+  let out = '%PDF-1.4\n';
+  const offsets = objects.map((body, i) => {
+    const at = Buffer.byteLength(out, 'latin1');
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+    return at;
+  });
+  const xref = Buffer.byteLength(out, 'latin1');
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
+  const id = `<${'01'.repeat(16)}>`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${encrypt ? ` /Encrypt ${objects.length} 0 R /ID [${id} ${id}]` : ''} >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const TXT = Buffer.from('Memoria difensiva\n\nPrimo motivo.');
 
@@ -141,19 +177,25 @@ describe('Pratica files through an MCP token (LC56)', () => {
     expect(extractText(odt, 'application/vnd.oasis.opendocument.text')).toBe('Ricorso\nPrimo  motivo\te\nsecondo <fine>');
   });
 
-  it('says a PDF and an image have no text extracted here, and still logs the read', async () => {
+  it('reads a PDF page by page; says why a broken PDF or an image gives no text, and logs only a text given out', async () => {
     const { user, dossier, base } = await setup('mcp-pdf');
-    const pdf = (await upload(user, dossier.id, PDF, 'Sentenza.pdf')).body.file;
+    const good = (await upload(user, dossier.id, pdf(['Atto di citazione', 'Art. 2043 c.c.']), 'Citazione.pdf')).body.file;
+    const broken = (await upload(user, dossier.id, PDF, 'Sentenza.pdf')).body.file;
     const png = (await upload(user, dossier.id, PNG, 'Scansione.png')).body.file;
     const token = await mcp(user);
-    const a = await request(app).get(`${base}/files/${pdf.id}/text`).set(token);
+    const read = await request(app).get(`${base}/files/${good.id}/text`).set(token);
+    expect(read.status).toBe(200);
+    expect(read.body).toMatchObject({ testo: '[pagina 1]\nAtto di citazione\n\n[pagina 2]\nArt. 2043 c.c.', motivo: null, parti: 1 });
+    const a = await request(app).get(`${base}/files/${broken.id}/text`).set(token);
     expect(a.status).toBe(200);
     expect(a.body.testo).toBeNull();
-    expect(a.body.motivo).toMatch(/PDF/);
+    expect(a.body.motivo).toMatch(/^Testo non estraibile: /);
     const b = await request(app).get(`${base}/files/${png.id}/text`).set(token);
     expect(b.body.testo).toBeNull();
     expect(b.body.motivo).toMatch(/immagine/);
-    expect(await prisma.praticaFileAccesso.count({ where: { azione: 'scaricamento' } })).toBe(2);
+    // A read that gives out no text writes no line (Papiniano on #531).
+    const lines = await prisma.praticaFileAccesso.findMany({ where: { azione: 'scaricamento' } });
+    expect(lines.map((l) => l.fileId)).toEqual([good.id]);
   });
 
   it('gives a long text in parts', async () => {
@@ -266,5 +308,43 @@ describe('Pratica files through an MCP token (LC56)', () => {
     expect((await request(app).get(`${base}/istruzioni`).set(token)).status).toBe(403);
     expect(await prisma.praticaFile.findUnique({ where: { id: file.id } })).toMatchObject({ deletedAt: null });
     expect(await prisma.praticaIstruzioni.count()).toBe(0);
+  });
+});
+
+describe('The text of a PDF (LC57)', () => {
+  // Nothing goes to the network: no font, no CMap, no worker fetched.
+  const fetchSpy = vi.fn(() => { throw new Error('no network'); });
+  beforeEach(() => { vi.stubGlobal('fetch', fetchSpy); });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('gives the text page by page, each page headed', async () => {
+    const text = await pdfText(pdf(['Tribunale di Roma\nSentenza n. 1', 'Per questi motivi']));
+    expect(text).toEqual({ text: '[pagina 1]\nTribunale di Roma\nSentenza n. 1\n\n[pagina 2]\nPer questi motivi', motivo: null });
+  });
+
+  it('says a PDF of images only is a scan', async () => {
+    expect(await pdfText(pdf([null, null]))).toEqual({ text: null, motivo: 'Il PDF non contiene testo: è una scansione.' });
+  });
+
+  it('says why a broken or an encrypted PDF gives no text, without throwing', async () => {
+    expect(await pdfText(PDF)).toEqual({ text: null, motivo: expect.stringMatching(/^Testo non estraibile: .*danneggiato/) });
+    expect(await pdfText(Buffer.from('non sono un PDF'))).toEqual({ text: null, motivo: expect.stringMatching(/^Testo non estraibile: /) });
+    expect(await pdfText(pdf(['segreto'], { encrypt: true }))).toEqual({ text: null, motivo: 'Testo non estraibile: il PDF è protetto da password.' });
+  });
+
+  it('stops at 500 pages and says so at the top', async () => {
+    const pages = Array.from({ length: 501 }, (_, i) => `Pagina ${i + 1}`);
+    const { text } = await pdfText(pdf(pages));
+    expect(text).toMatch(/^\[testo parziale: il PDF ha 501 pagine, lette le prime 500\]\n\n\[pagina 1\]\nPagina 1\n/);
+    expect(text).toContain('[pagina 500]\nPagina 500');
+    expect(text).not.toContain('Pagina 501');
+  });
+
+  it('stops when the time is up and gives what it read', async () => {
+    const { text } = await pdfText(pdf(['Uno', 'Due']), { pages: 500, ms: 0 });
+    expect(text).toMatch(/^\[testo parziale: tempo scaduto, lette 0 pagine su 2\]/);
   });
 });
