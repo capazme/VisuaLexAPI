@@ -9,6 +9,7 @@ import { ArticleTabContent } from '../search/ArticleTabContent';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
 import { subjectOf, titleOf, type Subject } from './practiceView';
+import { useDossierItemId } from './inDossier';
 import { closePracticeWindow } from './practiceSwitch';
 import { retryRowText, useRowText } from './useRowText';
 import { RowTextStatus } from './RowTextStatus';
@@ -101,6 +102,9 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
   const articleKey = besideRef.kind === 'article' ? besideRef.articleKey : '';
   const actId = subject?.kind === 'article' ? subject.actId : '';
   const textState = useRowText(practiceId, actId, subject?.kind === 'article' ? subject.article : undefined, true);
+  // In a dossier's «Lettura» (LC58): the entry read, for what an application proposed on it and its notes.
+  const dossierItemId = useDossierItemId(practiceId, subject?.kind === 'article' ? { norma: subject.article.norma_data }
+    : subject?.kind === 'decision' ? { decisionId: subject.decisionId } : undefined);
   const readingOrigin = useMemo(
     () => ({ tabId: besideRef.id, blockId: actId, articleKey }),
     [besideRef.id, actId, articleKey],
@@ -125,6 +129,7 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
         readingOrigin={readingOrigin}
         findHostId={practiceId}
         variant="beside"
+        dossierItemId={dossierItemId}
       />
     );
   }
@@ -136,6 +141,7 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
         reference={subject.reference}
         hostId={besideRef.id}
         findHostId={practiceId}
+        dossierItemId={dossierItemId}
       />
     );
   }

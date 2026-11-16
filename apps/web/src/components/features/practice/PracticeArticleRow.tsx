@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useSimpleReading } from './simpleReading';
 import { retryRowText, useRowText } from './useRowText';
 import { RowTextStatus } from './RowTextStatus';
-import { Zap } from 'lucide-react';
+import { Star, Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { ArticleTabContent } from '../search/ArticleTabContent';
@@ -49,6 +49,8 @@ export function PracticeArticleRow({
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
   // In a dossier's «Lettura» (LC55): in the dossier or not; undefined in the Corpus.
   const dossier = useArticleInDossier(article.norma_data);
+  // In the Corpus (LC59): «Aggiungi al dossier» through the reader's popover, and the dossiers that hold it.
+  const corpusItem = useMemo(() => ({ norma: article.norma_data }), [article.norma_data]);
   const closeBeside = useAppStore((s) => s.closeBeside);
   const openPhoneReader = useAppStore((s) => s.openPhoneReader);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
@@ -92,6 +94,7 @@ export function PracticeArticleRow({
       onCrossReferenceNavigate={onCrossReference}
       onOpenStudyMode={onOpenStudyMode}
       readingOrigin={readingOrigin}
+      dossierItemId={dossier?.itemId}
     />
   );
 
@@ -115,6 +118,20 @@ export function PracticeArticleRow({
             )}
           </p>
         )}
+        {/* No row «⋯» here: the star stands over the text with its name (LC58), as the act's commands do. */}
+        {dossier?.inDossier && (
+          <p className="mb-2 text-sm">
+            <button
+              type="button"
+              aria-pressed={dossier.important}
+              onClick={dossier.toggleImportant}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 font-medium text-slate-700 hover:bg-amber-50 md:min-h-0 md:py-0.5 dark:text-slate-200 dark:hover:bg-amber-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <Star size={14} aria-hidden className={dossier.important ? 'fill-amber-400 text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'} />
+              {dossier.important ? 'Importante' : 'Segna come importante'}
+            </button>
+          </p>
+        )}
         {annexSuggestion}
         {reader}
       </div>
@@ -132,6 +149,7 @@ export function PracticeArticleRow({
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
       beside={beside}
       dossier={dossier}
+      corpusItem={corpusItem}
       header={(
         <>
           <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">

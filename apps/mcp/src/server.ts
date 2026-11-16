@@ -14,6 +14,7 @@ import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier
 import { CARD_TOOL_SCOPES, COURSE_CARD_SCOPE, registerCardTools } from './tools/cards.js';
 import { COURSE_SCHEMA_TEXT, COURSE_TOOL_SCOPES, registerCourseTools } from './tools/courses.js';
 import { GLOSS_TOOL_SCOPES, registerGlossTools, registerTextTool } from './tools/glosses.js';
+import { PRATICA_TOOL_SCOPES, registerPraticaTools } from './tools/pratica.js';
 import { readFeatures } from './features.js';
 
 /** Hostnames always accepted besides the endpoint's: the health check calls the loopback. */
@@ -77,7 +78,7 @@ function scopesNeeded(message: unknown): string[] {
   if (!message || typeof message !== 'object') return [];
   const { method, params } = message as { method?: unknown; params?: { name?: unknown; arguments?: { modulo?: unknown } } };
   if (method !== 'tools/call' || typeof params?.name !== 'string') return [];
-  const scopes = TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? COURSE_TOOL_SCOPES[params.name] ?? [];
+  const scopes = TOOL_SCOPES[params.name] ?? PRATICA_TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? COURSE_TOOL_SCOPES[params.name] ?? [];
   // Cards tied to a course's module write into the course: a token without its scope is asked to step up here.
   if (params.name === 'lingolex_salva_card' && params.arguments?.modulo !== undefined) return [...scopes, COURSE_CARD_SCOPE];
   return scopes;
@@ -215,6 +216,7 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
         // courses (Percorsi, M1), whose tools and card parameters are listed only then.
         const features = await readFeatures(config);
         registerDossierTools(server, config, runner, { articleParts: features.articleParts });
+        registerPraticaTools(server, config, runner);
         registerCardTools(server, config, runner, features.courses ? COURSE_SCHEMA_TEXT : undefined);
         // An entry's text, always (G-372).
         registerTextTool(server, config, runner);

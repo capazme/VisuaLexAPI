@@ -74,8 +74,29 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
   // Builds the table, or re-syncs the one already open (`openDossierPractice` calls `resyncDossierPractice` then).
   useEffect(() => { appStore.getState().openDossierPractice(dossier); }, [dossier]);
 
+  // The tests of 16-11: an item removed in another window kept its row unmarked until the page's poll (its focus read
+  // waits 15 s). Here the dossier is read on opening the tab and every time the window comes back, with no wait; the
+  // focus and the visibility of one return are one read.
+  useEffect(() => {
+    let last = 0;
+    const read = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 1000) return;
+      last = Date.now();
+      void appStore.getState().refreshDossier(dossier.id, { quiet: true });
+    };
+    read();
+    window.addEventListener('focus', read);
+    document.addEventListener('visibilitychange', read);
+    return () => {
+      window.removeEventListener('focus', read);
+      document.removeEventListener('visibilitychange', read);
+    };
+  }, [dossier.id]);
+
   const trashChanged = useRef(onTrashChanged);
   useEffect(() => { trashChanged.current = onTrashChanged; }, [onTrashChanged]);
+  const toast = useRef(showToast);
+  useEffect(() => { toast.current = showToast; }, [showToast]);
 
   const [pending, setPending] = useState(0);
   const host = useMemo<ReadingHost>(() => ({
@@ -85,7 +106,7 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
       void putOnTable(practiceId, params).finally(() => setPending((n) => n - 1));
     },
     // Through a ref: the page's callback is new at each render, and a new host would redraw the whole reading.
-    dossier: { id: dossier.id, onTrashChanged: () => trashChanged.current?.() },
+    dossier: { id: dossier.id, onTrashChanged: () => trashChanged.current?.(), showToast: (message, type) => toast.current(message, type) },
   }), [practiceId, dossier.id]);
 
   const onCrossReference = useCallback((articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => {

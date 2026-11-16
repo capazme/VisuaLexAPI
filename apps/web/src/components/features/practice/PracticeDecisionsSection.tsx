@@ -7,7 +7,7 @@ import { besideRefFor, decisionOrder, decisionRowKey, decisionWindowId, type Pra
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
 import { PracticeDecisionEntry } from './PracticeIndexEntry';
-import { useDecisionInDossier } from './inDossier';
+import { decisionEntrySentenza, useDecisionInDossier } from './inDossier';
 import { PRACTICE_VT, openPracticeWindow, practiceTransitionName } from './practiceSwitch';
 import type { PracticeLayout } from './PracticeColumn';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
@@ -84,6 +84,11 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeDecision = useAppStore((s) => s.removePracticeDecision);
   const dossier = useDecisionInDossier(entry);
+  // In the Corpus (LC59): a decision never identified has nothing a dossier could keep.
+  const corpusItem = useMemo(() => {
+    const sentenza = decisionEntrySentenza(entry);
+    return sentenza ? { sentenza } : undefined;
+  }, [entry]);
   const closeBeside = useAppStore((s) => s.closeBeside);
   const openPhoneReader = useAppStore((s) => s.openPhoneReader);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
@@ -114,6 +119,7 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
       onRemove={() => removePracticeDecision(practiceId, entry.id)}
       beside={beside}
       dossier={dossier}
+      corpusItem={corpusItem}
       header={(
         <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">
           <span className="font-medium text-slate-900 dark:text-white">{entry.label}</span>
@@ -122,7 +128,7 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
       )}
       regionStyle={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}
     >
-      <DecisionEntryView practiceId={practiceId} decisionId={entry.id} reference={entry.reference} hostId={practiceId} />
+      <DecisionEntryView practiceId={practiceId} decisionId={entry.id} reference={entry.reference} hostId={practiceId} dossierItemId={dossier?.itemId} />
     </PracticeRowShell>
   );
 }

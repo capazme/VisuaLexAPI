@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from '../helpers';
 import { authorizeQuery, connectedTokens, pkcePair, tokenExchange } from './oauthHelpers';
-import { TEXT_CONSENT_VERSION } from '../../src/oauth/config';
+import { NOTES_CONSENT_VERSION, TEXT_CONSENT_VERSION } from '../../src/oauth/config';
 
 // G-381 (b): the text of the user's notes reaches a connected application only through a token with `dossier:text`
 // whose grant was approved with the words that name the notes («… e le tue note», version 1). The migration gave that
@@ -87,7 +87,7 @@ describe('the text of the user’s notes, for a connected application', () => {
   it('keeps a grant with an older consent version out of the notes, until the user connects again', async () => {
     const { api, clientId } = await connection('dossier:read dossier:text', 'dossier:read dossier:text');
     // As a grant approved with words older than today's would be.
-    await prisma.oAuthGrant.updateMany({ where: { userId: alice.id }, data: { textConsentVersion: TEXT_CONSENT_VERSION - 1 } });
+    await prisma.oAuthGrant.updateMany({ where: { userId: alice.id }, data: { textConsentVersion: NOTES_CONSENT_VERSION - 1 } });
     expect(await contents(api)).toEqual({ norm: NORM, note: null });
 
     // The user connects the same application again and approves the texts on today's consent page.
