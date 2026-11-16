@@ -4,14 +4,17 @@ import { ArrowLeft, Copy, Download, FileUp, MoreHorizontal, Pencil, Trash2 } fro
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { MenuButton } from '../../ui/MenuButton';
+import { Sheet } from '../../ui/Sheet';
 import { notify } from '../../ui/notifications/notifications';
 import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 import { cn } from '../../../lib/utils';
 import { FIELD_TEXT, FOCUS_RING } from '../../../constants/interactions';
 import { dossierService, type DossierApi } from '../../../services/dossierService';
 import { readDocumentFile } from '../documents/documentFile';
-import { ATTO_FILE_ACCEPT, SAVE_DELAY_MS, citationOf, noteTextOf } from './attiText';
-import { ATTO_TIPI, MAX_TESTO, attiError, attiService, type Atto, type AttoStato } from '../../../services/attiService';
+import { ATTO_FILE_ACCEPT, SAVE_DELAY_MS } from './attiText';
+import { AttoCitazioni } from './AttoCitazioni';
+import { AttoFonti } from './AttoFonti';
+import { ATTO_TIPI, MAX_TESTO, attiError, attiService, type Atto, type AttoStato, type AttoSummary } from '../../../services/attiService';
 
 
 type Draft = Pick<Atto, 'titolo' | 'tipo' | 'testo' | 'stato' | 'dossierId'>;
@@ -30,8 +33,10 @@ const SHEET_TEXT = 'mx-auto block w-full max-w-measure px-6 py-8 font-serif text
 /**
  * An act of a dossier (`/work/atti/:id`), to read first (Luca, 15-11: the act is written in Word or WordCraft, LexCraft is
  * where it is read and checked): the title, one quiet line with kind · dossier · state, the text as a sheet in the reading
- * serif (its bar: «Modifica il testo», «Analizza l’atto»), and beside it from `lg` the dossier's norms and decisions and
- * its notes (LC29, Luca: no form dump). «Modifica il testo» opens the text to a correction, which saves itself
+ * serif (its bar: «Modifica il testo», «Analizza l’atto»), and beside it, from `@3xl`, «Citazioni»: the norms and
+ * decisions the text cites, each checked at its source (LC46). With a dossier, its sources, notes and other acts stand
+ * in a column on the left once the frame holds three columns (`@[62rem]`, so the text keeps its width); below, «Fonti
+ * della pratica» opens them in a sheet (LC29, Luca: no form dump). «Modifica il testo» opens the text to a correction, which saves itself
  * `SAVE_DELAY_MS` after the last change («Cita» then writes a source where the cursor is). Title, kind, dossier and state
  * save the same way. The rare actions sit in the «⋯» menu: a new version from its file (after a confirmation), copy,
  * download, and «Elimina l’atto», red there only, which asks first.
@@ -43,8 +48,12 @@ export function AttoEditor() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>({ kind: 'saved', at: new Date() });
   const [dossiers, setDossiers] = useState<DossierApi[]>([]);
-  const [sources, setSources] = useState<DossierApi['items']>([]);
-  const [notes, setNotes] = useState<DossierApi['items']>([]);
+  const [items, setItems] = useState<DossierApi['items']>([]);
+  const [siblings, setSiblings] = useState<AttoSummary[]>([]);
+  const [fontiOpen, setFontiOpen] = useState(false);
+  const fontiButton = useRef<HTMLButtonElement>(null);
+  // Where the focus goes as the sources' sheet closes: its button, or the text after a «Cita».
+  const sheetReturn = useRef<HTMLElement | null>(null);
   const [editing, setEditing] = useState(false);
   const [newVersion, setNewVersion] = useState<{ name: string; text: string } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -76,7 +85,7 @@ export function AttoEditor() {
     };
   }, [id]);
 
-  // The linked dossier's sources (its norms and decisions) and its notes, in the dossier's order.
+  // The linked dossier's entries (norms, decisions, notes) in its order, and its other acts.
   const dossierId = draft?.dossierId ?? null;
   useEffect(() => {
     let alive = true;
@@ -84,20 +93,16 @@ export function AttoEditor() {
     if (!dossierId) return undefined;
     dossierService
       .getById(dossierId)
-      .then((dossier) => {
-        if (!alive) return;
-        setSources(dossier.items.filter((item) => item.item_type === 'norm' || item.item_type === 'sentenza'));
-        setNotes(dossier.items.filter((item) => item.item_type === 'note' && noteTextOf(item)));
-      })
-      .catch(() => {
-        if (!alive) return;
-        setSources([]);
-        setNotes([]);
-      });
+      .then((dossier) => alive && setItems(dossier.items))
+      .catch(() => alive && setItems([]));
+    attiService
+      .list(dossierId)
+      .then((list) => alive && setSiblings(list.filter((atto) => atto.id !== id)))
+      .catch(() => alive && setSiblings([]));
     return () => {
       alive = false;
     };
-  }, [dossierId]);
+  }, [dossierId, id]);
 
   const flush = useCallback(async () => {
     window.clearTimeout(timer.current);
@@ -311,81 +316,108 @@ export function AttoEditor() {
       {deleteError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{deleteError}</p>}
       {fileError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{fileError}</p>}
 
-      <div className={cn('grid grid-cols-1 gap-6 lg:gap-10', draft.dossierId ? 'lg:grid-cols-[minmax(0,48rem)_16rem]' : 'max-w-[48rem]')}>
-        {/* The sheet: its bar on top (correct the text, analyse it), then the text in the reading serif. */}
-        <div className="flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-slate-200 bg-card shadow-sm has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-primary-500 dark:border-slate-800">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-2 py-1.5 dark:border-slate-800">
-            <Button variant="quiet" size="sm" icon={<Pencil size={15} aria-hidden />} onClick={() => setEditing((now) => !now)} aria-pressed={editing}>
-              {editing ? 'Fine modifica' : 'Modifica il testo'}
-            </Button>
-            {/* «Analizza documento» in the act's flow (Luca, 15-11): the citations found, linked to their norms and decisions. */}
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!draft.testo.trim()}
-              onClick={() => {
-                void flush();
-                navigate('/documents', { state: { atto: { id, titolo: draft.titolo, testo: draft.testo } } });
-              }}
-            >
-              Analizza l’atto
-            </Button>
-          </div>
-          {editing ? (<>
-            <label className="sr-only" htmlFor="atto-testo">Testo dell’atto</label>
-            <textarea
-              id="atto-testo"
-              ref={textRef}
-              value={draft.testo}
-              onChange={(e) => change({ testo: e.target.value })}
-              onBlur={() => void flush()}
-              maxLength={MAX_TESTO}
-              placeholder="Scrivi qui il testo dell’atto."
-              className={cn(SHEET_TEXT, 'min-h-[60vh] resize-none bg-transparent [field-sizing:content] placeholder:text-slate-500 focus-visible:outline-none')}
-            />
-            {near && <p className="border-t border-slate-200 px-4 py-2 text-xs text-amber-800 dark:border-slate-800 dark:text-amber-300">{draft.testo.length.toLocaleString('it-IT')} caratteri su {MAX_TESTO.toLocaleString('it-IT')}.</p>}
-          </>) : (
-            <article aria-label="Testo dell’atto" className={cn(SHEET_TEXT, 'min-h-[40vh]')}>
-              {draft.testo.trim()
-                // As written, line for line: the same lines as in «Modifica il testo», so the switch moves nothing.
-                ? <div className="whitespace-pre-wrap">{draft.testo}</div>
-                : <p className="text-slate-600 dark:text-slate-400">L’atto non ha ancora un testo. Scrivilo con «Modifica il testo», o caricane una versione dal file con il menu ⋯.</p>}
-            </article>
+      {/* Container queries, not the window's: the frame stops at 66 rem, so the window says little of the room the columns have. */}
+      <div className="@container">
+        <div className={cn('grid grid-cols-1 gap-6 @3xl:grid-cols-[minmax(0,48rem)_15rem] @3xl:gap-10', draft.dossierId && '@[62rem]:grid-cols-[13rem_minmax(0,48rem)_15rem] @[62rem]:gap-8')}>
+          {draft.dossierId && (
+            <aside aria-labelledby="atto-fonti" className="hidden flex-col gap-3 @[62rem]:sticky @[62rem]:top-4 @[62rem]:flex @[62rem]:self-start">
+              <h2 id="atto-fonti" className="text-sm font-medium text-slate-700 dark:text-slate-300">Fonti della pratica</h2>
+              <AttoFonti items={items} atti={siblings} editing={editing} onCite={cite} />
+              <Link to={`/dossier?dossier=${encodeURIComponent(draft.dossierId)}`} className={cn('mt-1 w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100', FOCUS_RING)}>Apri il dossier</Link>
+            </aside>
           )}
+          {/* The sheet: its bar on top (correct the text, the practice's sources, analyse it), then the text in the reading serif. */}
+          <div className="flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-slate-200 bg-card shadow-sm has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-primary-500 dark:border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-2 py-1.5 dark:border-slate-800">
+              <div className="flex flex-wrap items-center gap-1">
+                <Button variant="quiet" size="sm" icon={<Pencil size={15} aria-hidden />} onClick={() => setEditing((now) => !now)} aria-pressed={editing}>
+                  {editing ? 'Fine modifica' : 'Modifica il testo'}
+                </Button>
+                {/* Where the column does not fit, the same sources open in a sheet. */}
+                {draft.dossierId && (
+                  <Button
+                    ref={fontiButton}
+                    variant="quiet"
+                    size="sm"
+                    className="@[62rem]:hidden"
+                    onClick={() => {
+                      sheetReturn.current = fontiButton.current;
+                      setFontiOpen(true);
+                    }}
+                  >
+                    Fonti della pratica
+                  </Button>
+                )}
+                {/* Where «Citazioni» sits under the whole text (Papiniano: on a phone it is far away), a way to it. */}
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  className="@3xl:hidden"
+                  onClick={() => {
+                    const heading = document.getElementById('atto-citazioni');
+                    heading?.scrollIntoView({ block: 'start' });
+                    heading?.focus({ preventScroll: true });
+                  }}
+                >
+                  Vai alle citazioni
+                </Button>
+              </div>
+              {/* «Analizza documento» in the act's flow (Luca, 15-11): the citations found, linked to their norms and decisions. */}
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!draft.testo.trim()}
+                onClick={() => {
+                  void flush();
+                  navigate('/documents', { state: { atto: { id, titolo: draft.titolo, testo: draft.testo } } });
+                }}
+              >
+                Analizza l’atto
+              </Button>
+            </div>
+            {editing ? (<>
+              <label className="sr-only" htmlFor="atto-testo">Testo dell’atto</label>
+              <textarea
+                id="atto-testo"
+                ref={textRef}
+                value={draft.testo}
+                onChange={(e) => change({ testo: e.target.value })}
+                onBlur={() => void flush()}
+                maxLength={MAX_TESTO}
+                placeholder="Scrivi qui il testo dell’atto."
+                className={cn(SHEET_TEXT, 'min-h-[60vh] resize-none bg-transparent [field-sizing:content] placeholder:text-slate-500 focus-visible:outline-none')}
+              />
+              {near && <p className="border-t border-slate-200 px-4 py-2 text-xs text-amber-800 dark:border-slate-800 dark:text-amber-300">{draft.testo.length.toLocaleString('it-IT')} caratteri su {MAX_TESTO.toLocaleString('it-IT')}.</p>}
+            </>) : (
+              <article aria-label="Testo dell’atto" className={cn(SHEET_TEXT, 'min-h-[40vh]')}>
+                {draft.testo.trim()
+                  // As written, line for line: the same lines as in «Modifica il testo», so the switch moves nothing.
+                  ? <div className="whitespace-pre-wrap">{draft.testo}</div>
+                  : <p className="text-slate-600 dark:text-slate-400">L’atto non ha ancora un testo. Scrivilo con «Modifica il testo», o caricane una versione dal file con il menu ⋯.</p>}
+              </article>
+            )}
+          </div>
+          <AttoCitazioni testo={draft.testo} className="@3xl:sticky @3xl:top-4 @3xl:max-h-[calc(100dvh-2rem)] @3xl:self-start @3xl:overflow-y-auto" />
         </div>
-        {draft.dossierId && (
-          <aside aria-labelledby="atto-fonti" className="flex flex-col gap-3 lg:sticky lg:top-4 lg:self-start">
-            <h2 id="atto-fonti" className="text-sm font-medium text-slate-700 dark:text-slate-300">Fonti del dossier</h2>
-            {sources.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-slate-400">Il dossier non ha ancora norme né sentenze.</p>
-            ) : (
-              <ul className="-mt-1 flex flex-col">
-                {sources.map((item) => (
-                  <li key={item.id} className="flex min-h-9 items-center gap-2 border-b border-slate-200/70 py-1 last:border-b-0 dark:border-slate-800">
-                    <span className="min-w-0 flex-1 truncate font-serif text-[15px] text-slate-800 dark:text-slate-200" title={citationOf(item)}>{citationOf(item)}</span>
-                    {editing && <button type="button" onClick={() => cite(citationOf(item))} aria-label={`Cita ${citationOf(item)}`} className={cn('min-h-11 shrink-0 rounded-md px-3 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:px-2 md:py-1 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}>
-                      Cita
-                    </button>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {notes.length > 0 && (
-              <>
-                <h2 className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">Note del dossier</h2>
-                <ul className="flex flex-col gap-3">
-                  {notes.map((item) => (
-                    <li key={item.id} className="whitespace-pre-wrap border-l-2 border-slate-200 pl-3 font-serif text-[15px] leading-snug text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                      {noteTextOf(item)}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            <Link to={`/dossier?dossier=${encodeURIComponent(draft.dossierId)}`} className={cn('mt-1 w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100', FOCUS_RING)}>Apri il dossier</Link>
-          </aside>
-        )}
       </div>
+      {fontiOpen && draft.dossierId && (
+        <Sheet title="Fonti della pratica" onClose={() => setFontiOpen(false)} closeOnEscape closeOnBackdrop returnFocusRef={sheetReturn}>
+          <div className="flex flex-col gap-3 overflow-y-auto px-4 py-3">
+            <AttoFonti
+              items={items}
+              atti={siblings}
+              editing={editing}
+              onCite={(text) => {
+                // The focus goes back to the text, where the source was written.
+                sheetReturn.current = textRef.current;
+                setFontiOpen(false);
+                cite(text);
+              }}
+            />
+            <Link to={`/dossier?dossier=${encodeURIComponent(draft.dossierId)}`} className={cn('w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100', FOCUS_RING)}>Apri il dossier</Link>
+          </div>
+        </Sheet>
+      )}
 
       <ConfirmDialog
         open={newVersion !== null}
