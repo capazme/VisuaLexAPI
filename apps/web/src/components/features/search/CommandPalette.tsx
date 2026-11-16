@@ -811,7 +811,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   }, [isOpen, isDesktop]);
   // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
   // (the field) when it closes. Placed only when the field is there.
-  const { refs, floatingStyles, context } = useFloating({
+  const { refs, floatingStyles, context, update } = useFloating({
     open: isOpen,
     elements: { reference: anchor },
     placement: isIsland ? 'bottom' : 'bottom-start',
@@ -827,14 +827,20 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         padding: 16,
         apply({ rects, availableHeight, elements }) {
           elements.floating.style.width = isIsland ? `${islandWidth}px` : `${rects.reference.width}px`;
-          // On a phone what the keyboard leaves (the visual viewport), from the pill down.
-          const room = !isDesktop && shownHeight ? shownHeight - rects.reference.y - 8 : availableHeight;
+          // On a phone what the keyboard leaves (the visual viewport), from the pill down. Read here, not from the
+          // render: floating-ui keeps the first `apply` (same source text), so a captured height would stay stale.
+          const shown = isDesktop ? null : viewportHeight();
+          const room = shown ? shown - rects.reference.y - 8 : availableHeight;
           elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(isDesktop ? 320 : 200, room))}px`);
         },
       }),
     ],
     whileElementsMounted: autoUpdate,
   });
+  // The keyboard opening or closing changes only the visual viewport, which autoUpdate does not watch.
+  useEffect(() => {
+    if (shownHeight !== null) update();
+  }, [shownHeight, update]);
   // The field gone while the menu is open (another page, Focus mode): what `size` wrote on the box goes with it, or
   // the panel hung at the top would keep the field's width and height.
   useLayoutEffect(() => {
