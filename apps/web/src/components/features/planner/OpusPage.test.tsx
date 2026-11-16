@@ -38,7 +38,7 @@ describe('Work\'s page', () => {
     expect(screen.queryByRole('link', { name: 'Cestino dei compiti' })).toBeNull();
   });
 
-  it.each(['/work/atti', '/work/pseudonimizzatore', '/work/grafo-pratiche'])('on %s shows neither the tabs nor the trash', (path) => {
+  it.each(['/work/pseudonimizzatore', '/work/grafo-pratiche'])('on %s shows neither the tabs nor the trash', (path) => {
     renderAt(path);
     expect(screen.queryByRole('navigation', { name: 'Viste di Work' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Cestino dei compiti' })).toBeNull();

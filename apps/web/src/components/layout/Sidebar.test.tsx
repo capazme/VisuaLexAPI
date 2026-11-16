@@ -17,9 +17,9 @@ import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
-/** Work's six entries (D-315, LC47): Scadenziario, Ricerca, Dossier, Atti, then the two features with an AI model behind them,
+/** Work's entries (D-315, LC47; no «Atti» since LC53, the dossier's tab): Scadenziario, Ricerca, Dossier, then the two features with an AI model behind them,
  *  «Analizza documento» and the Pseudonimizzatore. The planner's other two views are tabs of Work's page. */
-const OPUS_HREFS = ['/work/scadenziario', '/', '/dossier', '/work/atti', '/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche'];
+const OPUS_HREFS = ['/work/scadenziario', '/', '/dossier', '/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -178,12 +178,12 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Work: exactly Scadenziario, Ricerca, Dossier, Atti, then «Analizza documento» and the Pseudonimizzatore, in this order (LC47)', () => {
+  it('Work: exactly Scadenziario, Ricerca, Dossier, then «Analizza documento» and the Pseudonimizzatore, in this order (LC47)', () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Scadenziario', 'Ricerca', 'Dossier', 'Atti', 'Analizza documento, in sviluppo', 'Pseudonimizzatore, in arrivo', 'Grafo delle pratiche, in arrivo']);
+    expect(names).toEqual(['Scadenziario', 'Ricerca', 'Dossier', 'Analizza documento, in sviluppo', 'Pseudonimizzatore, in arrivo', 'Grafo delle pratiche, in arrivo']);
     // The two apart, in a group named for a screen reader, with no heading written over them.
     const tools = within(opus).getByRole('group', { name: "Strumenti sul documento" });
     expect(within(tools).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche']);
@@ -257,15 +257,13 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Work: «Atti» is a full entry since Luca\'s decision of 15 November (no «in arrivo»), and opens its page', () => {
+  it('Work: no «Atti» entry since LC53 (the acts are the dossier\'s tab)', () => {
     render(
       <MemoryRouter initialEntries={['/work/scadenziario']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const acts = screen.getByRole('link', { name: 'Atti' });
-    expect(acts).toHaveAttribute('href', '/work/atti');
-    expect(acts).toHaveTextContent(/^Atti$/);
+    expect(screen.queryByRole('link', { name: 'Atti' })).toBeNull();
   });
 
   // LC27 (Luca, 15 Nov: «la mini colonnina … va tolta»): no sliding column in any layout; the active entry is its tile.
@@ -361,7 +359,6 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
       </MemoryRouter>,
     );
     expect(within(document.getElementById('tour-sidebar')!).getAllByText('in arrivo')).toHaveLength(2);
-    expect(screen.getByRole('link', { name: 'Atti' })).toHaveTextContent(/^Atti$/);
   });
 
   it('counts the overdue and today\'s tasks beside «Scadenziario», and says it in words (row 16)', () => {
