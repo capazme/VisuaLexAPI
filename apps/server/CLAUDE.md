@@ -574,7 +574,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   identity, qualification, subjects, score: nothing else). **A pseudonym never relabels what others read
   under another name**: refused (409) while any glossa, reply or comment not emptied stands under the real
   name or the username; leaving the real name renews the public id; unique against pseudonyms and usernames
-  without regard to case (an index on `lower(pseudonym)`); reserved words. A pseudonym never signs a glossa;
+  without regard to case (an index on `lower(pseudonym)`; the check is an exact `lower() =`, never Prisma's
+  case-blind `equals`, an ILIKE where `_` is a wildcard); never one's own username (the published dossiers
+  show it); Latin letters only, in a real name too (no lookalike letter of another alphabet), counted in
+  characters as the CHECKs count them; reserved words. A pseudonym never signs a glossa;
   the app switch **`forum_identity`** (off) makes a glossa need the real name and a reply any profile.
   `requireWriter` runs inside each create and edit, after the glossa's and the reply's locks, holding the
   account row for share; `PUT` holds it for update, so no write lands between the check and a change of name.
