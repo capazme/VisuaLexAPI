@@ -8,8 +8,8 @@ import '@testing-library/jest-dom'
 // going to fail anyway, so a generous one costs nothing on a green run.
 configure({ asyncUtilTimeout: 5000 })
 
-// The tours are driver.js overlays started a moment after a component mounts: none runs under test.
-// A test of the tours themselves mocks `useTour` (or the module) in its own file, which wins.
+// The first-run guide opens over the page on a first visit: none opens under test.
+// The guide's own test takes the real `useTour` back in its file, which wins.
 vi.mock('../hooks/useTour', () => ({
   useTour: () => ({
     startTour: vi.fn(), prepareTour: vi.fn(), stopTour: vi.fn(), resetTour: vi.fn(), resetAndStartTour: vi.fn(),
