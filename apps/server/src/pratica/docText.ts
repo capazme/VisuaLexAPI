@@ -1,11 +1,12 @@
 import { crc32, inflateRawSync } from 'node:zlib';
 
 /**
- * Text in and out of a case's act files (LC56), with Node's own zlib: no package reads or writes DOCX, ODT or PDF
- * in this server, and none was added.
+ * Text in and out of a case's act files (LC56), with Node's own zlib for DOCX and ODT, and Mozilla's pdfjs-dist
+ * for PDF (LC57, the one package added).
  *
- * - `extractText`: the text of a DOCX (`word/document.xml`), an ODT (`content.xml`) or a TXT. PDF, DOC and RTF are
- *   left out (a PDF reader would be a new dependency): the caller says so. Footnotes, headers and comments too.
+ * - `extractText`: the text of a DOCX (`word/document.xml`), an ODT (`content.xml`) or a TXT. DOC and RTF are
+ *   left out: the caller says so. Footnotes, headers and comments too.
+ * - `pdfText`: the text of a PDF, page by page.
  * - `textToDocx`: a plain DOCX from plain text or simple Markdown: a line is a paragraph, `#` lines are bold
  *   headings, `**…**` is bold. Nothing else of Markdown (lists, links, tables stay as typed).
  */
@@ -81,6 +82,8 @@ function odtText(xml: string): string {
   );
 }
 
+const tidy = (text: string) => text.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+
 /**
  * The text of a file, or null when it cannot be read (a damaged package, a part too large). Throws for a type
  * not in `EXTRACTABLE`: the caller checks first.
@@ -98,7 +101,58 @@ export function extractText(content: Buffer, mime: string): string | null {
     if (error instanceof Error && error.message.startsWith('no text extraction')) throw error;
     return null;
   }
-  return text.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return tidy(text);
+}
+
+export const PDF_MIME = 'application/pdf';
+
+/**
+ * The text of a PDF, each page under «[pagina N]», or null and the reason in Italian (encrypted, damaged, a scan).
+ * Never throws. Past `pages` pages or `ms` milliseconds it gives what it read, with a first line that says so.
+ * Node build, no worker thread, nothing fetched: no font, CMap, ICC profile or wasm decoder is loaded, none is
+ * needed for text. No OCR.
+ */
+export async function pdfText(content: Buffer, limits = { pages: 500, ms: 20_000 }): Promise<{ text: string | null; motivo: string | null }> {
+  const deadline = Date.now() + limits.ms;
+  // An ES module: tsc makes this a require(), which Node 22.12+ and 24 load.
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const task = getDocument({
+    data: new Uint8Array(content),
+    disableFontFace: true,
+    useSystemFonts: false,
+    useWorkerFetch: false,
+    disableAutoFetch: true,
+    disableStream: true,
+    enableXfa: false,
+    verbosity: 0,
+  });
+  try {
+    const doc = await task.promise;
+    const total = doc.numPages;
+    const pages: string[] = [];
+    let chars = 0;
+    let note = total > limits.pages ? `[testo parziale: il PDF ha ${total} pagine, lette le prime ${limits.pages}]` : '';
+    for (let n = 1; n <= Math.min(total, limits.pages); n++) {
+      // shortcut: the clock is checked between pages, so one page that spins the CPU is not cut; a worker thread
+      // with a hard kill would be, if a real file ever does it.
+      if (Date.now() >= deadline) {
+        note = `[testo parziale: tempo scaduto, lette ${n - 1} pagine su ${total}]`;
+        break;
+      }
+      const items = (await (await doc.getPage(n)).getTextContent()).items;
+      const text = items.map((item) => ('str' in item ? item.str + (item.hasEOL ? '\n' : '') : '')).join('');
+      chars += text.trim().length;
+      pages.push(`[pagina ${n}]\n${tidy(text)}`);
+    }
+    if (!chars && !note) return { text: null, motivo: 'Il PDF non contiene testo: è una scansione.' };
+    return { text: tidy([note, ...pages].filter(Boolean).join('\n\n')), motivo: null };
+  } catch (error) {
+    const name = error instanceof Error ? error.name : '';
+    if (name === 'PasswordException') return { text: null, motivo: 'Testo non estraibile: il PDF è protetto da password.' };
+    return { text: null, motivo: 'Testo non estraibile: il PDF è danneggiato o non è un PDF valido.' };
+  } finally {
+    await task.destroy().catch(() => undefined);
+  }
 }
 
 // ─── Writing ─────────────────────────────────────────────────────────────────────────────────────────────

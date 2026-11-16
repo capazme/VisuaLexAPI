@@ -10,7 +10,7 @@ import { hasNoNul } from '../lingo/noNul';
 import { prisma } from '../lib/prisma';
 import { provenanceFromRequest } from '../controllers/dossierController';
 import { readBlob, removeBlob, requireStore, writeBlob } from '../pratica/fileStore';
-import { EXTRACTABLE, extractText, textToDocx } from '../pratica/docText';
+import { EXTRACTABLE, PDF_MIME, extractText, pdfText, textToDocx } from '../pratica/docText';
 
 /**
  * A case's act files and its instructions for Claude (LC50, server part; testing only, no real client files).
@@ -28,7 +28,7 @@ import { EXTRACTABLE, extractText, textToDocx } from '../pratica/docText';
  * In the delegated table since LC56 (owner, 16 November 2026; testing only), each for the dossier's owner:
  * - `GET  /:dossierId/contesto` — `{ istruzioni, files }`: the instructions and the live files, no trash;
  * - `GET  /:dossierId/files/:fileId/text?parte=n` — `{ file, parte, parti, testo, motivo }`: the text extracted from
- *   a DOCX, ODT or TXT, in parts; a PDF, DOC, RTF or image answers `testo: null` and says why;
+ *   a PDF (LC57), DOCX, ODT or TXT, in parts; a DOC, RTF, image or scan answers `testo: null` and says why;
  * - `POST /:dossierId/files/atto { nome, testo, versioneDi? }` — 201 `{ file }`: the text made a DOCX and deposited as
  *   a new file or a new version, as the uploads are (same ceilings, lock and log line); never over another file.
  *
@@ -362,9 +362,9 @@ const KIND: Record<string, string> = {
 const parteQuery = z.coerce.number().int().min(1).max(10_000).default(1);
 
 /**
- * The text of a live file, a part at a time, never its bytes. One `scaricamento` line per read, with the client
- * (the log has no separate value for a text read; adding one is a schema change). Images and the formats without
- * an extractor answer `testo: null` and say why.
+ * The text of a live file, a part at a time, never its bytes. One `scaricamento` line per read that gives out text,
+ * with the client (the log has no separate value for a text read; adding one is a schema change). Images, scans,
+ * damaged files and the formats without an extractor answer `testo: null`, say why and write no line (LC57).
  */
 router.get('/:dossierId/files/:fileId/text', files, wrap(async (req, res) => {
   const config = requireStore();
@@ -377,14 +377,15 @@ router.get('/:dossierId/files/:fileId/text', files, wrap(async (req, res) => {
   let text: string | null = null;
   let motivo: string | null = null;
   if (row.mime.startsWith('image/')) motivo = "È un'immagine: il testo non si estrae.";
-  else if (!EXTRACTABLE.has(row.mime)) motivo = `Il testo di un file ${KIND[row.mime] ?? row.mime} non si estrae ancora: solo DOCX, ODT e TXT.`;
+  else if (row.mime === PDF_MIME) ({ text, motivo } = await pdfText(await readBlob(config, row)));
+  else if (!EXTRACTABLE.has(row.mime)) motivo = `Il testo di un file ${KIND[row.mime] ?? row.mime} non si estrae ancora: solo PDF, DOCX, ODT e TXT.`;
   else {
     text = extractText(await readBlob(config, row), row.mime);
     if (text === null) motivo = 'Il file non si legge: è danneggiato o non è un documento valido.';
   }
   const parti = Math.max(1, Math.ceil((text?.length ?? 0) / TEXT_PAGE));
   if (parte > parti) throw new AppError(400, `Il testo ha ${parti} ${parti === 1 ? 'parte' : 'parti'}.`);
-  await prisma.praticaFileAccesso.create({ data: logLine(req, 'scaricamento', row.id) });
+  if (text !== null) await prisma.praticaFileAccesso.create({ data: logLine(req, 'scaricamento', row.id) });
   res.set('Cache-Control', 'no-store');
   res.json({
     file: { id: row.id, nome: row.nome, mime: row.mime, versione: row.versione, versioneDi: row.versioneDi, autore: row.autore },
