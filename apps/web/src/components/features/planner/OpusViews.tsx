@@ -162,14 +162,17 @@ function GroupingMenu({ value, onChange }: { value: Grouping; onChange: (value: 
   return (
     <MenuButton
       label={`Raggruppa: ${label}`}
-      triggerClassName={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 px-2 font-normal no-underline hover:no-underline hover:bg-slate-100 dark:hover:bg-slate-800')}
+      triggerClassName={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 px-2 max-md:w-11 max-md:justify-end max-md:px-0 max-md:hover:bg-transparent font-normal no-underline hover:no-underline hover:bg-slate-100 dark:hover:bg-slate-800')}
       items={(['date', 'dossier'] as const).map((choice) => ({
         label: choice === 'date' ? 'Per data' : 'Per dossier',
         checked: choice === value,
         onSelect: () => onChange(choice),
       }))}
     >
-      <ListFilter size={15} aria-hidden />
+      {/* On a phone a framed square, as the trash beside the title (LC38). */}
+      <span className="inline-flex items-center max-md:size-9 max-md:justify-center max-md:rounded-lg max-md:border max-md:border-slate-300 dark:max-md:border-slate-700">
+        <ListFilter size={15} aria-hidden />
+      </span>
       <span className="max-md:sr-only">Raggruppa: {label}</span>
     </MenuButton>
   );
