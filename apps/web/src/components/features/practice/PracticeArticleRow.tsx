@@ -49,6 +49,8 @@ export function PracticeArticleRow({
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
   // In a dossier's «Lettura» (LC55): in the dossier or not; undefined in the Corpus.
   const dossier = useArticleInDossier(article.norma_data);
+  // In the Corpus (LC59): «Aggiungi al dossier» through the reader's popover, and the dossiers that hold it.
+  const corpusItem = useMemo(() => ({ norma: article.norma_data }), [article.norma_data]);
   const closeBeside = useAppStore((s) => s.closeBeside);
   const openPhoneReader = useAppStore((s) => s.openPhoneReader);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
@@ -147,6 +149,7 @@ export function PracticeArticleRow({
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
       beside={beside}
       dossier={dossier}
+      corpusItem={corpusItem}
       header={(
         <>
           <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">

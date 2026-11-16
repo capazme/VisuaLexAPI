@@ -1117,7 +1117,14 @@ as «Fonti»; an act only on the table writes nothing, and a reorder made in «F
 «Apri tutto in Ricerca» moves into the header's «⋯» as «Apri anche in Ricerca», and «Apri accanto» and the act's article
 numbers are 14 px. The reader's dossier command
 (an article's, a decision's) reads «Aggiungi a questo dossier» and adds there without the popover. The re-sync stays
-additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, is unchanged.
+additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, keeps none of
+this; there (LC59) every article and identified decision row (`PracticeRowShell`'s `corpusItem`) and every hit of case law
+our reader opens (`CaseLawRow`'s `dossierItem`: the Cassazione's hits, the Union's judgments; wherever drawn, a dossier's
+«Lettura» included, where it too opens the popover) says «Aggiungi al dossier» and opens the reader's `AddToDossierPopover`, nothing saved before a dossier is chosen (`dossier/addFromResult.tsx`); a row
+held says «Nel dossier «X»» or «In 2 dossier» by the popover's own rules (`dossierContainsArticle`, version included). On a
+phone a table row has it in its «⋯» with «Togli dal tavolo» (the popover is then the bottom sheet); a hit of case law, which
+has no «⋯», keeps the named button at every width. Massimario passages add nothing: a dossier holds no massima. The
+index entries of the reading view are not marked: the window they open beside has the reader's command.
 In the «Lettura» (LC58 c5) the dossier's own work is there too. A row of the dossier knows its entry (`RowDossier.itemId`;
 a window and the phone's reader through `useDossierItemId`) and gives it to `ArticleTabContent` and `DecisionEntryView`
 (`dossierItemId`): what an application proposed on it is drawn and acted on as in the dossier's readers (D7b,

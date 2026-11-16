@@ -73,14 +73,19 @@ export function useArticleInDossier(norma: NormaVisitata): RowDossier | undefine
   );
 }
 
+/** A decision of the table as a dossier keeps it, as «Salva come dossier» adds it; undefined while never identified. */
+export function decisionEntrySentenza(entry: PracticeDecision): DossierSentenzaData | undefined {
+  return entry.identified ? sentenzaFromDecision(
+    identityOf(entry.reference),
+    { sezione: entry.sezione ?? entry.reference.sezione, tipo: entry.tipo, data_deposito: entry.depositDate },
+  ) : undefined;
+}
+
 /** A decision row in a dossier's «Lettura»; undefined in the Corpus. Added as «Salva come dossier» adds it. */
 export function useDecisionInDossier(entry: PracticeDecision): RowDossier | undefined {
   return useRowDossier(
     (d) => decisionItemIds(d, entry),
-    entry.identified ? (dossierId) => appStore.getState().addToDossier(dossierId, sentenzaFromDecision(
-      identityOf(entry.reference),
-      { sezione: entry.sezione ?? entry.reference.sezione, tipo: entry.tipo, data_deposito: entry.depositDate },
-    ), 'sentenza') : undefined,
+    entry.identified ? (dossierId) => appStore.getState().addToDossier(dossierId, decisionEntrySentenza(entry)!, 'sentenza') : undefined,
     'Sentenza tolta dal dossier',
     'Aggiunta al dossier',
   );
