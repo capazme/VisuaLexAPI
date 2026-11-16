@@ -1,10 +1,11 @@
+import { Illustration } from '../../../ui/Illustration';
 import { cn } from '../../../../lib/utils';
 import { CARD_GRID_COLUMNS } from '../../../layout/frame';
 import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { formatCount, percent, totalCards } from './layout';
 import { orderStops, stopStates } from './today';
-import { CARD_STATES, FOCUS_RING, INK_BORDER, MUTED_TEXT, subjectHue } from './tokens';
+import { CARD_STATES, FOCUS_RING, INK_BORDER, MUTED_TEXT, SUBJECT_ART } from './tokens';
 
 export interface SubjectProgressProps {
   materie: Progressi['materie'];
@@ -45,7 +46,8 @@ export function SubjectProgress({ materie, selected, onSelect }: SubjectProgress
             >
               <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(row.materia) }} />
+                  {/* LC37: the subject's emblem, not a coloured dot. */}
+                  <Illustration name={SUBJECT_ART[row.materia]} className="h-8 w-8" />
                   {MATERIA_LABEL[row.materia]}
                 </span>
                 <span className={cn('text-xs tabular-nums', MUTED_TEXT)}>
@@ -53,11 +55,14 @@ export function SubjectProgress({ materie, selected, onSelect }: SubjectProgress
                 </span>
               </span>
               {/* The words under it say the same: the bar is their picture. */}
-              <span aria-hidden className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                {CARD_STATES.filter((state) => row[state.key] > 0).map((state) => (
-                  <span key={state.key} className={cn('min-w-1 basis-0', state.swatch)} style={{ flexGrow: row[state.key] }} />
-                ))}
-              </span>
+              {/* No card: no empty bar, the words say it (LC37). The bar grows in once, from the left. */}
+              {total > 0 && (
+                <span aria-hidden className="vlx-grow-x flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  {CARD_STATES.filter((state) => row[state.key] > 0).map((state) => (
+                    <span key={state.key} className={cn('min-w-1 basis-0', state.swatch)} style={{ flexGrow: row[state.key] }} />
+                  ))}
+                </span>
+              )}
               {total > 0 && <span className="text-sm tabular-nums text-slate-700 dark:text-slate-200">{stopStates(row)}</span>}
               <span className={cn('text-xs tabular-nums', MUTED_TEXT)}>{reviews(row.ripassi30)}</span>
             </button>

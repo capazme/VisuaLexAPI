@@ -58,6 +58,15 @@ function enter(go: () => void) {
 }
 
 
+const LIBRARY_URL = `url(${import.meta.env.BASE_URL}illustrations/login-sfondo.webp)`;
+/** The library's plate as a mask: its shape only, the colour the theme's ink; the wide plate cropped to the window. */
+const LIBRARY: CSSProperties = {
+  maskImage: LIBRARY_URL, WebkitMaskImage: LIBRARY_URL,
+  maskSize: 'cover', WebkitMaskSize: 'cover',
+  maskPosition: 'center bottom', WebkitMaskPosition: 'center bottom',
+  maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
+};
+
 export function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -219,7 +228,7 @@ export function AuthPage() {
   if (entering) {
     return (
       <div role="status" aria-label="Accesso a LexCraft" className="fixed inset-0 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
-        <BookMark size={56} draw />
+        <BookMark size={56} breathe />
       </div>
     );
   }
@@ -233,7 +242,11 @@ export function AuthPage() {
       // The card's height on «Accedi», by which the page centres it (A1c); until measured, about what it is.
       style={centreHeight ? ({ '--login-card-h': `${centreHeight}px` } as CSSProperties) : undefined}
     >
-      <div className="grid min-h-full grid-rows-[1fr_auto] px-4 md:px-10">
+      {/* LC36 (Luca, 16 Nov: «uno sfondo semi animato per la login page»): his engraving of a law library behind the
+          page, in the theme's ink, light but present, drifting very slowly (still under reduced motion); its middle is empty, where
+          the wordmark and the card sit, and the card stays opaque over it. */}
+      <div aria-hidden data-testid="login-library" className="vlx-login-library pointer-events-none fixed inset-0 bg-slate-800 opacity-[0.3] dark:bg-slate-100 dark:opacity-[0.18]" style={LIBRARY} />
+      <div className="relative grid min-h-full grid-rows-[1fr_auto] px-4 md:px-10">
         {/* On a computer the card's top sits where the card on «Accedi» is centred above «Crediti» (its height and
             the foot's 4 rem): «Registrati», and a form that grows (an error, the password's strength), grow
             downwards, the tabs never move, and the colophon, centred against the card on «Accedi», holds still. */}

@@ -6,20 +6,12 @@ import type { Materia, Progressi, TappaIstituto } from '../../../../types/studia
 import { BookMark } from '../../../ui/BookMark';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { dueLabel, instituteSessionPath, orderInstitutes } from './today';
-import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, QUIET_BUTTON, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
+import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, QUIET_BUTTON, SECONDARY_BUTTON, TILE, SUBJECT_ART, subjectHue } from './tokens';
 import type { PercorsoState } from './usePercorso';
-import { Illustration, type IllustrationName } from '../../../ui/Illustration';
+import { Illustration } from '../../../ui/Illustration';
 
 /** The stops drawn before «Mostra tutti»: a subject may hold hundreds of institutes. */
 export const PATH_STOPS_SHOWN = 6;
-
-const SUBJECT_ART: Record<Materia, IllustrationName> = {
-  DIRITTO_CIVILE: 'materia-civile',
-  DIRITTO_PENALE: 'materia-penale',
-  DIRITTO_AMMINISTRATIVO: 'materia-amministrativo',
-  DIRITTO_PROCESSUALE_CIVILE: 'materia-proc-civile',
-  DIRITTO_PROCESSUALE_PENALE: 'materia-proc-penale',
-};
 
 const subjectPath = (materia: Materia) => `/learn/ripasso/sessione?materia=${materia}`;
 
