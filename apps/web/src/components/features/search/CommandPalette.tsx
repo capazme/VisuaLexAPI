@@ -162,9 +162,6 @@ const PANEL_RADIUS = 16;
 /** The growth: about 280 ms opening, 200 ms closing (the brief's), on the app's curves; no bounce. */
 const GROW_S = 0.28;
 const SHRINK_S = 0.2;
-/** The island's (LC40): a little longer, with a slight overshoot as it settles, as the phone's island widens. */
-const ISLAND_GROW_S = 0.42;
-const ISLAND_CURVE = 'cubic-bezier(0.34, 1.32, 0.64, 1)';
 /** The groups entering: the first four, 30 ms apart, from when the panel is half grown. */
 const GROUPS_ENTERING = 4;
 const GROUP_STAGGER_MS = 30;
@@ -187,7 +184,83 @@ const noHeight = () => null;
  * shows; the content fades in as it grows. Closing, the same way back (`usePresence`); opened again meanwhile, it grows
  * back from where the closing was. Under reduced motion it only fades.
  */
-function PanelGrowth({ still, fromHeight, fromSides, fromRadius = FIELD_RADIUS, className, children }: { still: boolean; fromHeight: number; fromSides?: { left: number; right: number }; fromRadius?: number; className: string; children: ReactNode }) {
+/**
+ * The island (LC40; the anti-slop review of 16 Nov, Luca: «AI slop sia nella fluidità di apertura che di chiusura»): two
+ * layers. The shape — the card's ground, edge, corners and shadow — changes from the pill into the panel; the content
+ * sits over it and is never cut: hidden until the shape is nearly there, then it fades in whole. Opening: the shape
+ * 300 ms, an ease-out with no overshoot; the content from 85 % of it, 120 ms. Closing: the content goes first (80 ms),
+ * then the shape goes back onto the pill's rectangle and corners (180 ms, an ease-in), where the pill is again. The
+ * shadow is the shape's from the first frame. Under reduced motion only a fade.
+ */
+const ISLAND_OPEN_MS = 300;
+const ISLAND_CONTENT_MS = 120;
+const ISLAND_CONTENT_AT = 0.85;
+const ISLAND_HIDE_MS = 80;
+const ISLAND_CLOSE_MS = 180;
+const ISLAND_OPEN_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const ISLAND_CLOSE_CURVE = 'cubic-bezier(0.4, 0, 1, 1)';
+
+function IslandGrowth({ still, from, className, children }: { still: boolean; from: { left: number; right: number; height: number; radius: number }; className: string; children: ReactNode }) {
+  const shapeRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isPresent, safeToRemove] = usePresence();
+  const remove = useRef(safeToRemove);
+  useEffect(() => {
+    remove.current = safeToRemove;
+  });
+  const asPill = { left: `${from.left}px`, right: `${from.right}px`, bottom: `calc(100% - ${from.height}px)`, borderRadius: `${from.radius}px` };
+  const asPanel = { left: '0px', right: '0px', bottom: '0px', borderRadius: `${PANEL_RADIUS}px` };
+
+  useLayoutEffect(() => {
+    const shape = shapeRef.current;
+    const content = contentRef.current;
+    if (!isPresent || !shape || !content || typeof shape.animate !== 'function') return undefined;
+    if (still) {
+      const fade = [shape, content].map((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur.pop * 1000 }));
+      return () => fade.forEach((animation) => animation.cancel());
+    }
+    const grow = shape.animate([asPill, asPanel], { duration: ISLAND_OPEN_MS, easing: ISLAND_OPEN_CURVE, fill: 'backwards' });
+    const show = content.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ISLAND_CONTENT_MS, delay: ISLAND_OPEN_MS * ISLAND_CONTENT_AT, easing: 'ease-out', fill: 'backwards' });
+    return () => {
+      grow.cancel();
+      show.cancel();
+    };
+    // Once per opening: the panel's own re-renders do not grow it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the pill's place is read as it opens
+  }, [still, isPresent]);
+
+  useEffect(() => {
+    if (isPresent) return;
+    const shape = shapeRef.current;
+    const content = contentRef.current;
+    if (!shape || !content || typeof shape.animate !== 'function') {
+      remove.current?.();
+      return;
+    }
+    shape.style.pointerEvents = 'none';
+    content.style.pointerEvents = 'none';
+    if (still) {
+      const fade = [shape, content].map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' }));
+      fade[0].onfinish = () => remove.current?.();
+      return;
+    }
+    content.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ISLAND_HIDE_MS, easing: 'ease-in', fill: 'forwards' });
+    const back = shape.animate([asPanel, asPill], { duration: ISLAND_CLOSE_MS, delay: ISLAND_HIDE_MS, easing: ISLAND_CLOSE_CURVE, fill: 'forwards' });
+    back.onfinish = () => remove.current?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- closing once, from where it is
+  }, [isPresent, still]);
+
+  return (
+    <div className={cn(className, 'relative overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent')}>
+      <div ref={shapeRef} aria-hidden data-island-shape="" className="pointer-events-none absolute inset-0 border border-ink-200 bg-card shadow-lg dark:border-ink-700 dark:bg-ink-900" style={{ borderRadius: PANEL_RADIUS }} />
+      <div ref={contentRef} data-island-content="" className="relative flex min-h-0 flex-1 flex-col overflow-hidden" style={{ borderRadius: PANEL_RADIUS }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isPresent, safeToRemove] = usePresence();
   // `safeToRemove` is a new function at every render: kept here, it does not start the closing again (one closing,
@@ -203,13 +276,9 @@ function PanelGrowth({ still, fromHeight, fromSides, fromRadius = FIELD_RADIUS, 
   const opening = useRef(false);
   // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
   // after it mounts, so it is never measured here. One template, so the two ends interpolate.
-  // LC40, the island: from a pill narrower than the panel, its sides are hidden too — as much as the panel reaches past
-  // the pill on each side, measured as it opens (on a phone the pill is not under the panel's middle) — so it grows out
-  // of the pill in both directions.
-  const clipFor = (share: number, px: number, left: number, right: number, radius: number) =>
-    `inset(0px ${right}px calc(${share}% - ${px}px) ${left}px round ${radius}px)`;
-  const asField = clipFor(100, fromHeight, fromSides?.left ?? 0, fromSides?.right ?? 0, fromRadius);
-  const asPanel = clipFor(0, 0, 0, 0, PANEL_RADIUS);
+  const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
+  const asField = clipFor(100, fromHeight, FIELD_RADIUS);
+  const asPanel = clipFor(0, 0, PANEL_RADIUS);
   const curve = `cubic-bezier(${ease.out.join(', ')})`;
   // Web Animations with no fill: once over, nothing holds the clip (the shadow outside it shows), and a closing
   // interrupted by a new opening starts from where it was. (A DOM without them, a test's, draws the panel at once.)
@@ -265,9 +334,7 @@ function PanelGrowth({ still, fromHeight, fromSides, fromRadius = FIELD_RADIUS, 
             { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
           ))
         : [];
-      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], fromSides
-        ? { duration: ISLAND_GROW_S * 1000, easing: ISLAND_CURVE }
-        : { duration: GROW_S * 1000, easing: curve });
+      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
       // Grown, the clip goes: the card's own shadow shows.
       grow.onfinish = () => {
         el.style.clipPath = '';
@@ -1351,17 +1418,25 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   return (
     <FloatingPortal>
-      {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while
-          open, so the mark goes with the click that closes, not with the panel's fade. */}
-      {isOpen && (
-        <div
-          data-find-overlay=""
-          aria-hidden
-          // `touch-none`: a drag on it does not scroll the page under it (iOS).
-          className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
-          onClick={onClose}
-        />
-      )}
+      {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while open, so the
+          mark goes with the click that closes, not with the veil's fade. */}
+      {isOpen && <span data-find-overlay="" hidden />}
+      {/* LC40: the veil rises and falls with the island's shape, not at once. */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="command-palette-veil"
+            data-palette-veil=""
+            aria-hidden
+            initial={still ? false : { opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
+            exit={{ opacity: 0, transition: { duration: 0.26, ease: [0.4, 0, 1, 1] } }}
+            // `touch-none`: a drag on it does not scroll the page under it (iOS).
+            className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
+            onClick={onClose}
+          />
+        )}
+      </AnimatePresence>
       {/* Outside the presence, so the focus goes back as the palette closes, not once its fade is over. */}
       <FloatingFocusManager
         context={context}
@@ -1400,9 +1475,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           >
             {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
                 lists scroll inside it past that. */}
-            <PanelGrowth still={still} fromHeight={growFrom} fromSides={growFromSides} fromRadius={isIsland ? growFrom / 2 : FIELD_RADIUS} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
-              {content}
-            </PanelGrowth>
+            {isIsland && growFromSides ? (
+              <IslandGrowth still={still} from={{ ...growFromSides, height: growFrom, radius: growFrom / 2 }} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col">
+                {content}
+              </IslandGrowth>
+            ) : (
+              <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
+                {content}
+              </PanelGrowth>
+            )}
           </div>
         )}
       </AnimatePresence>

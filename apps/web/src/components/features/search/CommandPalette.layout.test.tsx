@@ -159,11 +159,11 @@ describe('CommandPalette — growing out of the field (R2)', () => {
     }
   });
 
-  it('grows out of the top bar\'s pill as an island: its width and round ends first, then the panel (LC40)', async () => {
+  it('grows out of the top bar\'s pill as an island: the shape changes, the content is never cut and fades in at the end (LC40)', async () => {
     asDesktop(true);
-    const asked: Keyframe[][] = [];
-    const animateSpy = vi.fn(function (this: HTMLElement, keyframes: Keyframe[]) {
-      asked.push(keyframes);
+    const asked: { keyframes: Keyframe[]; options: KeyframeAnimationOptions; el: HTMLElement }[] = [];
+    const animateSpy = vi.fn(function (this: HTMLElement, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
+      asked.push({ keyframes, options, el: this });
       return { cancel: vi.fn(), onfinish: null, playState: 'running' } as unknown as Animation;
     });
     Object.defineProperty(HTMLElement.prototype, 'animate', { value: animateSpy, configurable: true, writable: true });
@@ -177,11 +177,22 @@ describe('CommandPalette — growing out of the field (R2)', () => {
       pill.getBoundingClientRect = () => ({ left: 336, top: 10, width: 352, height: 32, right: 688, bottom: 42, x: 336, y: 10, toJSON: () => ({}) }) as DOMRect;
       document.body.append(pill);
       render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-      const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
-      // The pill's shape: its height, its width within the panel, its round ends.
-      const ISLAND = 'inset(0px 208px calc(100% - 32px) 208px round 16px)';
-      expect(panel.style.clipPath).toBe(ISLAND);
-      await waitFor(() => expect(asked).toContainEqual([{ clipPath: ISLAND }, { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' }]));
+      const dialog = screen.getByRole('dialog', { name: 'Menu di ricerca' });
+      const shape = dialog.querySelector<HTMLElement>('[data-island-shape]')!;
+      const content = dialog.querySelector<HTMLElement>('[data-island-content]')!;
+      // Nothing clips the content: only the shape moves, from the pill's rectangle and round ends to the panel.
+      expect(content.style.clipPath).toBe('');
+      const grow = asked.find((a) => a.el === shape)!;
+      expect(grow.keyframes).toEqual([
+        { left: '208px', right: '208px', bottom: 'calc(100% - 32px)', borderRadius: '16px' },
+        { left: '0px', right: '0px', bottom: '0px', borderRadius: '16px' },
+      ]);
+      expect(grow.options).toMatchObject({ duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+      // The content whole, in one fade, near the shape's end; no groups coming one by one.
+      const show = asked.find((a) => a.el === content)!;
+      expect(show.keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+      expect(show.options).toMatchObject({ duration: 120, delay: 255 });
+      expect(asked.filter((a) => a.el.hasAttribute('cmdk-group'))).toEqual([]);
       pill.remove();
     } finally {
       Reflect.deleteProperty(HTMLElement.prototype, 'animate');
