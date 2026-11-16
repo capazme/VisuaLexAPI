@@ -123,9 +123,9 @@ function useGroupInView(): [string, (id: string) => void] {
   return [current, hold];
 }
 
-// The bar the place being read gets: under it on a phone, down its edge from 1024 px.
+// LC37: the place being read is a stone tile, as the sidebar's active row; no bar beside it (the anti-slop review).
 const INDEX_LINK = cn(
-  'flex min-h-[44px] items-center whitespace-nowrap rounded-md border-transparent px-3 text-sm transition-colors max-lg:rounded-b-none max-lg:border-b-2 lg:whitespace-normal lg:border-l-2',
+  'flex min-h-[44px] items-center whitespace-nowrap rounded-md px-3 text-sm transition-colors lg:whitespace-normal',
   FOCUS_RING,
 );
 
@@ -149,10 +149,9 @@ function PageIndex({ current }: { current: string }) {
                 aria-current={here ? 'location' : undefined}
                 className={cn(
                   INDEX_LINK,
-                  // Marked by more than a tint: the weight and the bar (the attribution's), under it on a phone, down its edge
-                  // from 1024 px.
+                  // Marked by more than a tint: the tile and the weight.
                   here
-                    ? 'border-primary-600 bg-primary-50 font-semibold text-primary-800 dark:border-primary-400 dark:bg-primary-950/50 dark:text-primary-200'
+                    ? 'bg-ink-300/70 font-semibold text-slate-900 dark:bg-ink-700/60 dark:text-slate-50'
                     : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                 )}
               >
