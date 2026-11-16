@@ -6,7 +6,6 @@ import { formatDayLong } from './layout';
 import { DAY_STATE_LABEL, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from './tokens';
 import { spring } from '../../../../lib/motion';
 import { useStreakGrowth } from './seenProgress';
-import { StreakTally } from './StreakTally';
 import { Illustration } from '../../../ui/Illustration';
 
 export interface StreakBadgeProps {
@@ -41,26 +40,28 @@ export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compac
   if (compact) {
     return (
       // An image, not a group: every child is hidden, and a group with nothing in it may be skipped.
+      // LC39 (the anti-slop review): one line, «1 giorno di fila · record 1», the lamp small; no tally, no large digit.
       <div className="flex min-w-0 items-center gap-2" role="img" aria-label={name}>
-        {/* LC35: the streak is the lamp kept lit, an engraving, where the «§» disc was. */}
-        <Illustration name="learn-serie" className="h-12 w-12" />
-        <div aria-hidden className="min-w-0 leading-tight">
-          <span className="flex items-end gap-2">
-            <motion.span
-              key={`${attuale}-${pop}`}
-              initial={grew && !reduce ? { scale: 1.35 } : false}
-              animate={{ scale: 1 }}
-              transition={spring.gentle}
-              className={cn('inline-block origin-left font-serif text-xl font-bold leading-none tabular-nums', INK_TEXT)}
-            >
-              {attuale}
-            </motion.span>
-            {!dense && <StreakTally count={attuale} grew={grewSince} />}
-          </span>
-          {!dense && (
-            <p className={cn('text-xs', MUTED_TEXT)}>{firstDay ? 'Il primo giorno comincia oggi' : `${attuale === 1 ? 'giorno' : 'giorni'} di fila · record ${record}`}</p>
+        <Illustration name="learn-serie" className="h-8 w-8" />
+        <p aria-hidden className="min-w-0 text-sm leading-tight text-slate-700 dark:text-slate-200">
+          {firstDay ? (
+            'Il primo giorno comincia oggi'
+          ) : (
+            <>
+              <motion.span
+                key={`${attuale}-${pop}`}
+                initial={grew && !reduce ? { scale: 1.35 } : false}
+                animate={{ scale: 1 }}
+                transition={spring.gentle}
+                className={cn('inline-block origin-left font-semibold tabular-nums', INK_TEXT)}
+              >
+                {attuale}
+              </motion.span>
+              {` ${attuale === 1 ? 'giorno' : 'giorni'} di fila`}
+              {!dense && <span className={MUTED_TEXT}>{` · record ${record}`}</span>}
+            </>
           )}
-        </div>
+        </p>
       </div>
     );
   }
@@ -80,7 +81,6 @@ export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compac
             >
               {attuale}
             </motion.span>
-            <StreakTally count={attuale} grew={grewSince} />
           </span>
           <p className={cn('text-xs', MUTED_TEXT)}>
             {firstDay ? 'Il primo giorno comincia oggi' : `${attuale === 1 ? 'giorno' : 'giorni'} di fila · record ${record}`}

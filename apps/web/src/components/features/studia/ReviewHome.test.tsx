@@ -374,8 +374,6 @@ describe('ReviewHome', () => {
       expect(dayBlock()).toContainElement(mark);
       expect(mark.closest('li')).toBeNull();
       expect(within(mark).getByRole('img', { name: 'Obiettivo raggiunto' })).toBeInTheDocument();
-      // The streak's day under the plate, once; the date is the line under it, not twice (LC39).
-      expect(mark.nextElementSibling).toHaveTextContent('5 giorni di fila');
       // Written now, once.
       expect(mark).toHaveClass('vlx-plate-in');
       expect(screen.queryByTestId('goal-stamp')).toBeNull();
@@ -1093,12 +1091,12 @@ describe('the motions of «Oggi» (S2, G8)', () => {
     expect(today().getByText('Impara 5 schede nuove')).not.toHaveClass('vlx-mission-inking');
   });
 
-  it('draws the new tally mark for what grew since this browser drew it, and no landing ring: the goal is the mission\'s (G8)', async () => {
+  it('draws the streak as one line, no tally marks (LC39), and no landing goal: the goal is the mission\'s (G8)', async () => {
     localStorage.setItem(SEEN, JSON.stringify({ serie: 3, giorno: '2026-10-19', ripassi: 7, missioni: [] }));
     progress.mockResolvedValue(answer(10, 8, { ripassi: 9 }, 4));
     renderHome();
-    const tally = await screen.findByTestId('streak-tally');
-    expect(tally).toHaveAttribute('data-marks', '4');
+    await screen.findByRole('img', { name: /^Serie: 4 giorni di fila/ });
+    expect(screen.queryByTestId('streak-tally')).toBeNull();
     expect(screen.queryByTestId('goal-count-landing')).toBeNull();
     expect(screen.queryByRole('img', { name: /^Obiettivo di oggi/ })).toBeNull();
   });

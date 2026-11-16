@@ -25,7 +25,7 @@ export interface SmokeRiseProps {
  * day's plate shows just put out, and fades, about 2.6 s, in the theme's ink. Same contract as the confetti it replaces:
  * `onStart` at once (the day is marked celebrated), `onDone` when it is over; under reduced motion nothing is drawn and
  * both are called at once. Placed over the parent (absolutely, no pointer events), from `originRef`'s plate: the wick
- * sits at about a quarter of its width, near its middle.
+ * sits on the lamp's spout, at its right.
  */
 export function SmokeRise({ originRef, onStart, onDone }: SmokeRiseProps) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -46,10 +46,10 @@ export function SmokeRise({ originRef, onStart, onDone }: SmokeRiseProps) {
       done.current?.();
       return undefined;
     }
-    // Its foot at the wick: about a quarter across the plate, near its middle.
-    const width = Math.max(24, from.width * 0.12);
-    smoke.style.left = `${from.left - box.left + from.width * 0.28 - width / 2}px`;
-    smoke.style.top = `${from.top - box.top + from.height * 0.42 - width * (360 / 110)}px`;
+    // Its foot at the wick, on the lamp's spout: six sevenths across the plate, a third down.
+    const width = Math.max(18, from.width * 0.16);
+    smoke.style.left = `${from.left - box.left + from.width * 0.865 - width / 2}px`;
+    smoke.style.top = `${from.top - box.top + from.height * 0.33 - width * (360 / 110)}px`;
     smoke.style.width = `${width}px`;
     smoke.classList.add('vlx-smoke-rise');
     const timer = window.setTimeout(() => done.current?.(), 2600);
@@ -99,7 +99,7 @@ export function SessionCelebration({ serie, mark, onStart, onDone }: SessionCele
     <div data-testid="session-celebration" className={cn('pointer-events-none absolute inset-x-0 top-0 flex justify-center', Z_INDEX.dropdown)}>
       <div className={cn(TILE, 'relative flex w-full max-w-md items-center justify-center gap-3 overflow-hidden px-3 py-1.5 shadow-lg')}>
         {/* LC39: no confetti; the day's plate, small, comes in beside the words. */}
-        {mark && <Illustration name="learn-giorno-chiuso" className="vlx-plate-in relative aspect-[720/567] w-12" />}
+        {mark && <Illustration name="learn-giorno-chiuso" className="vlx-plate-in relative aspect-[480/284] w-12" />}
         {/* Its words beside it at every width now that the mark is small (the stamp left them no room under 400 px). */}
         <p className={cn('relative font-serif text-sm font-semibold leading-tight', INK_TEXT)} aria-hidden>
           {/* On a phone the streak alone: one line keeps the notice clear of the card. */}
