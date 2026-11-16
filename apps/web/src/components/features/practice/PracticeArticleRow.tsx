@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { useSimpleReading } from './simpleReading';
+import { useRowText } from './useRowText';
 import { Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -37,6 +38,7 @@ export function PracticeArticleRow({
   const articleKey = practiceArticleKey(article);
   const rowKey = articleRowKey(practiceId, actId, articleKey);
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
+  useRowText(practiceId, actId, article, simple || isOpen);
   // Among the quick norms (R3b): its toggle is an entry of the reader's «⋯», so the row says it, open or folded, by the
   // reader's own rule (`isQuickNorm`, so the two never disagree) — for the text in force only: a quick norm opens that one.
   const quickParams = useMemo(() => quickNormParamsOf(article.norma_data), [article.norma_data]);

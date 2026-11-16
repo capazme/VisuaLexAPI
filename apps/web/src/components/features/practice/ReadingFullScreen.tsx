@@ -9,6 +9,8 @@ import { subjectOf, titleOf } from './practiceView';
 export interface ReadingFullScreenProps {
   /** A norm cited in the reader's text: `askerId` is the reader's subject id, as a window's. */
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => void;
+  /** Only the reader of this practice is drawn (LC52 c2); without it, whichever practice the reader names. */
+  practiceId?: string;
 }
 
 /**
@@ -19,8 +21,8 @@ export interface ReadingFullScreenProps {
  * field, the phone's bar with the menu button beside it; the column is not mounted under it (gotcha 26),
  * so one subject has one reading surface.
  */
-export function ReadingFullScreen({ onCrossReference }: ReadingFullScreenProps) {
-  const reader = useAppStore((s) => s.phoneReader);
+export function ReadingFullScreen({ onCrossReference, practiceId }: ReadingFullScreenProps) {
+  const reader = useAppStore((s) => (practiceId === undefined || s.phoneReader?.practiceId === practiceId ? s.phoneReader : null));
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.phoneReader?.practiceId));
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
   if (!reader) return null;

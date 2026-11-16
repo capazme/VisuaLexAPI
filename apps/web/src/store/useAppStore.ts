@@ -1010,7 +1010,7 @@ const appStore = createStore<AppState>()(
                     state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
                     activate(state, id);
                     // The index is the act's drawer, in the column: the phone's reader gives way to it.
-                    state.phoneReader = null;
+                    readerGivesWay(state, id);
                     state.structureWindow.blockId = actId;
                 });
                 return actId;
@@ -3100,8 +3100,18 @@ function foldedBy(state: AppState, practiceId: string, subject: PracticeSubject)
  *  coming on screen takes the reader off, in the same update (T19). */
 function activate(state: AppState, practiceId: string): void {
     if (isBound(state, practiceId)) return;
-    if (state.phoneReader && state.phoneReader.practiceId !== practiceId) state.phoneReader = null;
+    if (state.phoneReader && state.phoneReader.practiceId !== practiceId) readerGivesWay(state, practiceId);
     state.activePracticeId = practiceId;
+}
+
+/** The phone's reader gives way to `practiceId` when it is that practice's, or when both are the Corpus's (T19). A bound
+ *  table's reader and the Corpus's never close each other (LC52 c2). */
+function readerGivesWay(state: AppState, practiceId: string): void {
+    const reader = state.phoneReader;
+    if (!reader) return;
+    if (reader.practiceId === practiceId || (!isBound(state, reader.practiceId) && !isBound(state, practiceId))) {
+        state.phoneReader = null;
+    }
 }
 
 /** A practice comes on screen without touching the phone's reader; a bound table never does (LC51). */
@@ -3162,7 +3172,7 @@ function revealRow(state: AppState, practiceId: string, actId: string, articleKe
     delete state.practiceRows[rowKey];
     state.practiceRows[rowKey] = true;
     // A row is revealed in the table: the phone's reader, which replaces the column, gives way.
-    state.phoneReader = null;
+    readerGivesWay(state, practiceId);
     const window_ = foldedBy(state, practiceId, { kind: 'article', actId, articleKey });
     if (window_) state.windowFocusRequest = window_;
     else state.pendingReveal = { practiceId, rowKey };
@@ -3249,8 +3259,11 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
     if (!isDesktopViewport()) {
         // A phone has no windows: a subject read beside is read in the full-screen reader, and a row of
         // the table is revealed with the reader closed (T19).
-        state.phoneReader = entry.place === 'beside' ? { practiceId: practice.id, ref: besideRefFor(subject) } : null;
-        if (entry.place === 'beside') return;
+        if (entry.place === 'beside') {
+            state.phoneReader = { practiceId: practice.id, ref: besideRefFor(subject) };
+            return;
+        }
+        readerGivesWay(state, practice.id);
     }
     if (entry.place === 'beside') {
         const ref = besideRefFor(subject);
@@ -3268,7 +3281,7 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
 function revealDecisionRow(state: AppState, practiceId: string, decisionId: string): void {
     const rowKey = decisionRowKey(practiceId, decisionId);
     state.practiceRows[rowKey] = true;
-    state.phoneReader = null;
+    readerGivesWay(state, practiceId);
     const window_ = foldedBy(state, practiceId, { kind: 'decision', decisionId });
     if (window_) state.windowFocusRequest = window_;
     else state.pendingReveal = { practiceId, rowKey };
