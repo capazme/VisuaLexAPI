@@ -27,7 +27,7 @@ const VIEWS = [
 export function OpusPage() {
   const { pathname } = useLocation();
   // The trash's link belongs to the three views; the tabs to them and to the trash, as its way back (#448). Neither on
-  // Atti and Anonimizzatore.
+  // the Anonimizzatore.
   const inView = VIEWS.some((view) => pathname.startsWith(view.to));
   const inTrash = pathname.startsWith('/work/cestino');
   const viewTop = useRef<HTMLDivElement>(null);
@@ -48,8 +48,6 @@ export function OpusPage() {
       className="h-full"
       // On a phone the trash is an icon beside the title (LC33, after Todoist: the title, then the list).
       actionBeside
-      // An act's page: its own title is the one in sight (LC29), not «Atti» over it.
-      titleHidden={/^\/work\/atti\/./.test(pathname)}
       action={inView && (
         // On a phone a small framed button with the icon (LC38, Luca: «senza scritta. Basta ci metti il pulsante»): its frame
         // drawn 36 px inside the 44 px link, named «Cestino dei compiti»; from md the words in full.

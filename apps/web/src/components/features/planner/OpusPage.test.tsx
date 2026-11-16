@@ -38,7 +38,7 @@ describe('Work\'s page', () => {
     expect(screen.queryByRole('link', { name: 'Cestino dei compiti' })).toBeNull();
   });
 
-  it.each(['/work/atti', '/work/anonimizzatore'])('on %s shows neither the tabs nor the trash', (path) => {
+  it.each(['/work/anonimizzatore'])('on %s shows neither the tabs nor the trash', (path) => {
     renderAt(path);
     expect(screen.queryByRole('navigation', { name: 'Viste di Work' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Cestino dei compiti' })).toBeNull();

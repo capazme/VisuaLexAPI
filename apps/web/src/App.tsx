@@ -7,6 +7,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ConnectPage } from './features/connections/ConnectPage';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
+import { OldAttoRedirect } from './components/features/atti/OldAttoRedirect';
 import { isStudiaEnabled } from './features/studia/featureFlag';
 import { DevRoute } from './features/devMode/DevRoute';
 import { buttonClassName } from './components/ui/buttonStyles';
@@ -31,8 +32,6 @@ const ConnectAiAppPage = lazy(() => PAGE_CODE.connectAiApp().then(m => ({ defaul
 const OpusPage = lazy(() => PAGE_CODE.opus().then(([m]) => ({ default: m.OpusPage })));
 // Loaded with Opus's frame (`PAGE_CODE.opus`): by the time a view renders, its module is there.
 const TodayView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TodayView })));
-const AttiListView = lazy(() => PAGE_CODE.opus().then(([, , m]) => ({ default: m.AttiListView })));
-const AttoEditor = lazy(() => PAGE_CODE.opus().then(([, , , m]) => ({ default: m.AttoEditor })));
 const UpcomingView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.UpcomingView })));
 const InboxView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.InboxView })));
 const TaskTrashView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TaskTrashView })));
@@ -165,9 +164,6 @@ function App() {
             <Route path="prossimi" element={<UpcomingView />} />
             <Route path="ingresso" element={<InboxView />} />
             <Route path="cestino" element={<TaskTrashView />} />
-            {/* Atti: the user's acts and the editor of one, with the linked dossier's sources beside the text. */}
-            <Route path="atti" element={<AttiListView />} />
-            <Route path="atti/:id" element={<AttoEditor />} />
             {/* D-324: the desktop app's; announced in Work (LC47). */}
             <Route path="anonimizzatore" element={<ComingSoon>
               <p className="text-xs font-medium">in arrivo</p>
@@ -177,6 +173,9 @@ function App() {
               <p>I dati con le etichette restano dati personali per il GDPR: l'Anonimizzatore riduce il rischio, non sostituisce le altre cautele.</p>
             </ComingSoon>} />
           </Route>
+          {/* LC53: the act editor is gone; its addresses lead to the act's dossier («Atti» tab), else to the dossiers. */}
+          <Route path="work/atti" element={<Navigate to="/dossier" replace />} />
+          <Route path="work/atti/:id" element={<OldAttoRedirect />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentsRedirect />} />
           {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» with one discussion at its own. */}

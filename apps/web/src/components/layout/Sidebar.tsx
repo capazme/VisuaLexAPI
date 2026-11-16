@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, FileText, EyeOff, type LucideIcon } from 'lucide-react';
+import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, EyeOff, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -585,7 +585,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 <NavItem to="/work/oggi" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
                 {searchEntry('Corpus', ['/rassegne'])}
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
-                <NavItem to="/work/atti" icon={FileText} label="Atti" onClick={closeMobile} layout={layout} />
                 <div aria-hidden className={cn("h-px bg-slate-200 dark:bg-slate-700", layout === 'rail' ? "mx-auto w-6" : "my-1.5 w-full")} />
                 <NavGroup name="Strumenti sul documento" layout={layout}>
                   <NavItem to="/documents" icon={FileSearch} label="Analizza documento" shortLabel="Analizza" soon="dev" onClick={closeMobile} layout={layout} />

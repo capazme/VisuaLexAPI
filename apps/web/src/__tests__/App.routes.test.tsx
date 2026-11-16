@@ -39,8 +39,7 @@ vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div /> }));
 // Loaded with their route (P1, `pageCode.ts`): vi.mock intercepts the dynamic import() too.
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div data-testid="dossier-page" /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div data-testid="history-page" /> }));
-vi.mock('../components/features/atti/AttiListView', () => ({ AttiListView: () => <div data-testid="atti-list" /> }));
-vi.mock('../components/features/atti/AttoEditor', () => ({ AttoEditor: () => <div data-testid="atto-editor" /> }));
+vi.mock('../components/features/atti/OldAttoRedirect', () => ({ OldAttoRedirect: () => <div data-testid="old-atto" /> }));
 vi.mock('../components/features/documents/DocumentReviewPage', () => ({ DocumentReviewPage: () => <div data-testid="documents-page" /> }));
 vi.mock('../features/connections/ConnectAiAppPage', () => ({ ConnectAiAppPage: () => <div data-testid="connect-ai-app-page" /> }));
 vi.mock('../pages/CreditsPage', () => ({ CreditsPage: () => <div data-testid="credits-page" /> }));
@@ -204,14 +203,17 @@ describe('App routing', () => {
     expect(screen.getByTestId('opus-page')).toBeInTheDocument();
   });
 
-  // Atti: the list and an act's editor, in Work's frame.
-  it.each([
-    ['/work/atti', 'atti-list'],
-    ['/work/atti/42', 'atto-editor'],
-  ])('opens %s in Opus’s frame', async (path, testId) => {
-    renderAt(path);
-    expect(await screen.findByTestId(testId)).toBeInTheDocument();
-    expect(screen.getByTestId('opus-page')).toContainElement(screen.getByTestId(testId));
+  // LC53: the act editor is gone; its list leads to the dossiers, an act to its redirect (tested in atti.test.tsx).
+  it('/work/atti leads to the dossiers, outside Opus’s frame', async () => {
+    renderAt('/work/atti');
+    expect(await screen.findByTestId('dossier-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/dossier');
+  });
+
+  it('/work/atti/42 goes to the act\'s redirect', async () => {
+    renderAt('/work/atti/42');
+    expect(await screen.findByTestId('old-atto')).toBeInTheDocument();
+    expect(screen.queryByTestId('opus-page')).toBeNull();
   });
 
   // D-324: the Anonimizzatore is the desktop app's: a plain page in Work's frame, no feature behind it.
