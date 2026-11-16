@@ -1,4 +1,5 @@
-import { FolderMinus, FolderPlus, X } from 'lucide-react';
+import { FolderMinus, FolderPlus, Star, X } from 'lucide-react';
+import { useContext, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
@@ -9,7 +10,9 @@ import { dossierItemOrder, layoutDossier } from '../dossier/dossierLayout';
 import { dossierContainsDecision, sentenzaFromDecision } from '../dossier/dossierUtils';
 import { removeItemsWithUndo } from '../dossier/removeItemsWithUndo';
 import { dossierArticleKey } from './practiceDossierItems';
-import { useHostDossier } from './readingHost';
+import { ReadingHostContext, useHostDossier } from './readingHost';
+import { citedArticleOf } from '../dossier/citedNorm';
+import type { CitedNorms } from '../decisions/DecisionReadingSurface';
 
 /**
  * «Nel dossier» or not (LC55 c4), read from the dossier itself, never stored on the table: a row added here, removed
@@ -32,20 +35,31 @@ export function decisionItemIds(dossier: Dossier | undefined, entry: PracticeDec
 /** What a row of a dossier's «Lettura» says and does about the dossier. */
 export interface RowDossier {
   inDossier: boolean;
+  /** The dossier entry read in the row (LC58): what an application proposed on it (D7b), its notes. */
+  itemId?: string;
+  /** Starred in the dossier («importante», as «Fonti»'s star). */
+  important: boolean;
   /** «Aggiungi al dossier»; absent for what cannot be added (a decision never identified). */
   add?: () => void;
   /** «Togli dal dossier»: to the trash, with «Annulla»; the row stays on the table. */
   remove: () => void;
+  /** «Segna come importante» / «Rimuovi da importanti», on the entry read. */
+  toggleImportant: () => void;
 }
 
-function useRowDossier(find: (d: Dossier | undefined) => string[], add: ((dossierId: string) => void) | undefined, removed: string): RowDossier | undefined {
+function useRowDossier(find: (d: Dossier | undefined) => string[], add: ((dossierId: string) => void) | undefined, removed: string, added: string): RowDossier | undefined {
   const host = useHostDossier();
   const ids = useAppStore(useShallow((s) => (host ? find(s.dossiers.find((d) => d.id === host.id)) : [])));
+  const important = useAppStore((s) => ids.length > 0 && host !== undefined
+    && s.dossiers.find((d) => d.id === host.id)?.items.find((i) => i.id === ids[0])?.status === 'important');
   if (!host) return undefined;
   return {
     inDossier: ids.length > 0,
-    ...(add ? { add: () => add(host.id) } : {}),
+    ...(ids.length > 0 ? { itemId: ids[0] } : {}),
+    important,
+    ...(add ? { add: () => { add(host.id); host.showToast?.(added, 'success'); } } : {}),
     remove: () => removeItemsWithUndo(host.id, ids, removed, host.onTrashChanged),
+    toggleImportant: () => appStore.getState().updateDossierItemStatus(host.id, ids[0], important ? 'unread' : 'important'),
   };
 }
 
@@ -55,6 +69,7 @@ export function useArticleInDossier(norma: NormaVisitata): RowDossier | undefine
     (d) => articleItemIds(d, norma),
     (dossierId) => appStore.getState().addToDossier(dossierId, norma, 'norma'),
     'Articolo tolto dal dossier',
+    'Aggiunto al dossier',
   );
 }
 
@@ -72,7 +87,42 @@ export function useDecisionInDossier(entry: PracticeDecision): RowDossier | unde
     (d) => decisionItemIds(d, entry),
     entry.identified ? (dossierId) => appStore.getState().addToDossier(dossierId, decisionEntrySentenza(entry)!, 'sentenza') : undefined,
     'Sentenza tolta dal dossier',
+    'Aggiunta al dossier',
   );
+}
+
+/**
+ * The dossier entry a window or the phone's reader reads (LC58): an article's or a decision's, or undefined (the Corpus,
+ * a text only on the table). The rows have it from their `RowDossier`.
+ */
+export function useDossierItemId(practiceId: string, read: { norma: NormaVisitata } | { decisionId: string } | undefined): string | undefined {
+  const host = useHostDossier();
+  return useAppStore((s) => {
+    const dossier = host && read ? s.dossiers.find((d) => d.id === host.id) : undefined;
+    if (!dossier || !read) return undefined;
+    if ('norma' in read) return articleItemIds(dossier, read.norma)[0];
+    const entry = s.practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === read.decisionId);
+    return entry ? decisionItemIds(dossier, entry)[0] : undefined;
+  });
+}
+
+/**
+ * The norms a decision cites, in a dossier's «Lettura» (D7d, LC58), as the dossier's own reader has them: the preview
+ * says whether the dossier holds the norm, and a click puts it on the table, revealed or beside the window it came from
+ * (`besideId`), never in the dossier: one the dossier does not hold reads «Non nel dossier». Undefined in the Corpus.
+ */
+export function useTableCitedNorms(besideId: string): CitedNorms | undefined {
+  const host = useContext(ReadingHostContext);
+  const dossierId = host?.dossier?.id;
+  const items = useAppStore((s) => (dossierId ? s.dossiers.find((d) => d.id === dossierId)?.items : undefined));
+  return useMemo(() => (host && items ? {
+    holds: (citation) => citedArticleOf(items, citation) !== null,
+    open: (citation) => host.search({
+      act_type: citation.act_type, act_number: citation.act_number || '', date: citation.date || '', article: citation.article,
+      version: 'vigente', besideId,
+    }),
+    elsewhere: 'Apri nella Lettura',
+  } : undefined), [host, items, besideId]);
 }
 
 /** The dossier's items for an act's articles on the table: what «Togli dal dossier» on the act sends to the trash. */
@@ -85,10 +135,15 @@ export function useActItemIds(act: PracticeAct): { dossier: ReturnType<typeof us
   return { dossier, ids };
 }
 
-/** A row's «⋯» in a dossier's «Lettura», every command with its name: a row of the dossier leaves it (never just the
- *  table, or the re-sync would bring it back); a row on the table only can join it or leave the table. */
+/** A row's «⋯» in a dossier's «Lettura», every command with its name: a row of the dossier takes the star or leaves it
+ *  (never just the table, or the re-sync would bring it back); a row on the table only can join it or leave the table. */
 export function rowDossierItems(row: RowDossier, removeFromTable: () => void): MenuItem[] {
-  if (row.inDossier) return [{ label: 'Togli dal dossier', icon: FolderMinus, danger: true, onSelect: row.remove }];
+  if (row.inDossier) {
+    return [
+      { label: row.important ? 'Rimuovi da importanti' : 'Segna come importante', icon: Star, onSelect: row.toggleImportant },
+      { label: 'Togli dal dossier', icon: FolderMinus, danger: true, separatorBefore: true, onSelect: row.remove },
+    ];
+  }
   return [
     ...(row.add ? [{ label: 'Aggiungi al dossier', icon: FolderPlus, onSelect: row.add }] : []),
     { label: 'Togli dal tavolo', icon: X, danger: true, onSelect: removeFromTable },

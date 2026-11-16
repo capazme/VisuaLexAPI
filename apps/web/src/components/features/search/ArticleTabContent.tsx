@@ -1,11 +1,19 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, useId } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { CaseLawSection } from './CaseLawSection';
 import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
 import { useHostDossier, useReadingSearch } from '../practice/readingHost';
-import { addToThisDossier } from '../practice/inDossier';
+import { addToThisDossier, articleItemIds } from '../practice/inDossier';
+import { DossierNoteList } from '../dossier/DossierNoteList';
+import { removeItemsWithUndo } from '../dossier/removeItemsWithUndo';
+import { useEntryProposals } from '../../../hooks/useEntryProposals';
+import { useGlossPassage } from '../../../hooks/useGlossPassage';
+import { isGloss } from '../../../utils/aiReview';
+import { GLOSS_WORDS } from '../../../constants/glossWords';
+import { MoveProposalBar } from './MoveProposalBar';
+import { LostGlossesList, LostProposalsList } from './LostProposalsList';
 import { useShallow } from 'zustand/react/shallow';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { ArticleCardsRow, type ArticleCardsHandle } from '../studia/ArticleCardsRow';
@@ -49,8 +57,8 @@ import { buildArticleXrefNerPayload } from './articleXrefNer';
 import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
-import { blockStarts, describeBlock, groupAnnotationsByBlock, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
-import type { Annotation, Highlight } from '../../../types';
+import { blockStarts, describeBlock, groupAnnotationsByBlock, highlightsWithoutSign, isProposal as isProposalMark, type LocatedThread } from '../../../utils/articleAnnotations';
+import type { Annotation, DossierItem, Highlight } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { citeNorm, shortNorm } from '../../../utils/sources';
 import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/annotationExport';
@@ -83,6 +91,8 @@ import {
 const NO_HIGHLIGHTS: Highlight[] = [];
 const NO_ANNOTATIONS: Annotation[] = [];
 const NO_THREADS: LocatedThread[] = [];
+type NoteItem = Extract<DossierItem, { type: 'note' }>;
+const NO_NOTES: NoteItem[] = [];
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -115,9 +125,14 @@ interface ArticleTabContentProps {
      * the Studia row, «Chiedi a MERL-T» or the graph rail. Only the siblings of the text root change.
      */
     variant?: 'row' | 'beside';
+    /**
+     * In a dossier's «Lettura» (LC58): the dossier entry this text is read as. What an application proposed on it is
+     * drawn and acted on here (D7b), as in the dossier's own reader; never in the reader's copies or exports.
+     */
+    dossierItemId?: string;
 }
 
-export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId, findHostId, variant = 'row' }: ArticleTabContentProps) {
+export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId, findHostId, variant = 'row', dossierItemId }: ArticleTabContentProps) {
     const isBeside = variant === 'beside';
     const { article_text, norma_data, url, versionInfo } = data;
     // Flattened to scalars so the citation listener effect below depends on
@@ -162,6 +177,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const search = useReadingSearch(triggerSearch);
     // In a dossier's «Lettura» (LC55) the dossier command adds to that dossier, without the popover's choice.
     const hostDossier = useHostDossier();
+    const practiceNotesId = useId();
+    // The dossier's notes about this article, whichever copy of it they are about (LC58, §14).
+    const practiceNotes = useAppStore(useShallow((s) => {
+        const dossier = hostDossier ? s.dossiers.find((d) => d.id === hostDossier.id) : undefined;
+        if (!dossier) return NO_NOTES;
+        const ids = new Set(articleItemIds(dossier, norma_data));
+        return dossier.items.filter((i): i is NoteItem => i.type === 'note' && !!i.aboutItemId && ids.has(i.aboutItemId));
+    }));
 
     const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
     // State (not ref) so the popover re-reads the anchor when the button
@@ -728,7 +751,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // and happens after.
     const structure = useMemo(() => parseArticleStructure(article_text || ''), [article_text]);
     // A past text carries none of the reader's marks (see `display`).
-    const shownHighlights = readOnly ? NO_HIGHLIGHTS : articleHighlights;
+    // What an application proposed on the dossier entry (D7b): drawn with the reader's marks, never in their copies or
+    // exports (`allPanelHighlights`). Its glosses (D8) are counted on the signs and shown beside the text, never drawn in it.
+    const {
+        highlights: proposalHighlights, glosses, glossAnchors, actions: proposalActions, moving, saveMove, cancelMove,
+    } = useEntryProposals(dossierItemId, itemKey, uniqueArticleId, readOnly);
+    const withProposals = useMemo(
+        () => (proposalHighlights.length ? [...articleHighlights, ...proposalHighlights] : articleHighlights),
+        [articleHighlights, proposalHighlights],
+    );
+    const shownHighlights = readOnly ? NO_HIGHLIGHTS : withProposals;
     const shownAnnotations = readOnly ? NO_ANNOTATIONS : itemAnnotations;
     const shownThreads = readOnly ? NO_THREADS : locatedThreads;
     const markedHtml = useArticleMarkers({
@@ -739,12 +771,24 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         signs: !readOnly,
         threads: shownThreads,
         focusedThreadId: readOnly ? null : focusedThreadId,
+        glosses: glossAnchors,
     });
     // What each block's sign counts, for the popover it opens (the renderer
     // derives the signs from the same inputs, through the same module).
     const blockGroups = useMemo(
-        () => groupAnnotationsByBlock(article_text || '', structure, shownHighlights, shownAnnotations, shownThreads),
-        [article_text, structure, shownHighlights, shownAnnotations, shownThreads],
+        () => groupAnnotationsByBlock(article_text || '', structure, shownHighlights, shownAnnotations, shownThreads, glossAnchors),
+        [article_text, structure, shownHighlights, shownAnnotations, shownThreads, glossAnchors],
+    );
+    // A gloss whose words are in no block, and a proposal whose words no longer land: listed under the text, with their
+    // actions (D7b), as in the dossier's reader.
+    const lostGlosses = useMemo(() => {
+        if (glosses.length === 0) return glosses;
+        const shown = new Set(blockGroups.flatMap((g) => g.glosses.map((a) => a.id)));
+        return glosses.filter((g) => !shown.has(g.id));
+    }, [glosses, blockGroups]);
+    const lostProposals = useMemo(
+        () => highlightsWithoutSign(proposalHighlights, blockGroups).filter(isProposalMark),
+        [proposalHighlights, blockGroups],
     );
     // Highlights no sign can reach — those of a sub-section no longer shown (Brocardi's, D-078),
     // and those whose text changed — keep a list of their own, so they can still be removed.
@@ -771,6 +815,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // block's first card there, else to the block's sheet; a note's wavy words to its card, else to that sheet.
     const marginRef = useRef<AnnotationMarginHandle>(null);
     const [marginShown, setMarginShown] = useState(false);
+    const { shownId: shownGlossId, show: showGloss, hide: hideGloss } = useGlossPassage(textRootRef, plainArticle, glossAnchors, processedContent);
+    const showGlossPassage = useCallback(
+        (id: string, show: boolean) => (show ? showGloss(id) : hideGloss(id)),
+        [showGloss, hideGloss],
+    );
     const sheetOpen = useSignTarget({ openBlock, blockAll, group: openGroup, marginShown, marginRef, closeBlock, openBlockAt });
     const openNoteBeside = useNoteOpener(marginRef, openBlockAt);
     useInlineNoteAnchors(contentRef, itemAnnotations, openNoteBeside);
@@ -923,6 +972,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onOpenThread={discussion.openThread}
                     textHash={textHash}
                     onWideChange={setMarginShown}
+                    glosses={glosses}
+                    glossActions={proposalActions}
+                    shownGlossId={shownGlossId}
+                    onShowGlossPassage={showGlossPassage}
                 >
                     <ArticleBody
                         contentRef={contentRef}
@@ -940,8 +993,23 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                             : undefined}
                         updatesOpen={updatesOpen}
                         copyOnly={readOnly}
+                        selectionPopup={!moving}
                     />
                 </AnnotationMargin>
+            )}
+
+            {moving && (
+                <MoveProposalBar
+                    key={moving.id}
+                    textRootRef={textRootRef}
+                    proposalId={moving.id}
+                    startOffset={moving.startOffset}
+                    text={moving.text}
+                    onSave={saveMove}
+                    onCancel={cancelMove}
+                    label={isGloss(moving) ? GLOSS_WORDS.moveTitle : undefined}
+                    focusAfter={isGloss(moving) ? () => marginRef.current?.focus([`gloss:${moving.id}`]) ?? false : undefined}
+                />
             )}
 
             {!discussion.open && (
@@ -949,6 +1017,19 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             )}
 
             <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
+            {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
+            {proposalActions && <LostGlossesList glosses={lostGlosses} actions={proposalActions} />}
+
+            {/* §14: the article shows the dossier's notes about it, under its text (LC58), as «Fonti» lists them. */}
+            {hostDossier && practiceNotes.length > 0 && (
+                <section aria-labelledby={practiceNotesId} className="mt-4 space-y-1.5">
+                    <h4 id={practiceNotesId} className="text-sm font-semibold text-slate-800 dark:text-slate-200">Note della pratica</h4>
+                    <DossierNoteList
+                        notes={practiceNotes}
+                        onRemoveNote={(note) => removeItemsWithUndo(hostDossier.id, [note.id], 'Elemento rimosso', hostDossier.onTrashChanged)}
+                    />
+                </section>
+            )}
 
             {openNote && structure.notes[openNote.id] && (
                 <UpdateNotePopover
@@ -972,6 +1053,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onUpdateNote={updateAnnotation}
                     onRemoveNote={removeAnnotation}
                     onRemoveHighlight={removeHighlight}
+                    proposalActions={proposalActions}
+                    glosses={glosses}
+                    shownGlossId={shownGlossId}
+                    onShowGlossPassage={showGlossPassage}
                 />
             )}
 

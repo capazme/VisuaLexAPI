@@ -46,7 +46,7 @@ const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.conten
 const json = (result: Awaited<ReturnType<Client['callTool']>>) => JSON.parse(text(result));
 
 describe('the tool list', () => {
-  it('has the nine dossier tools, the five card tools and the entry’s text, the read-only ones marked, and only the three deletions destructive', async () => {
+  it('has the nine dossier tools, the three case tools, the five card tools and the entry’s text, the read-only ones marked, and only the three deletions destructive', async () => {
     const { tools } = await client.listTools();
     // In registration order, the same in every session: a client that caches the list sees no change.
     expect(tools.map((t) => t.name)).toEqual([
@@ -59,6 +59,10 @@ describe('the tool list', () => {
       'omnilex_elimina_voci_dossier',
       'omnilex_elimina_dossier',
       'omnilex_stato_account',
+      // The case (LC56): read whole, a file's text, an act deposited (pratica.test.ts).
+      'omnilex_leggi_pratica',
+      'omnilex_leggi_file_pratica',
+      'omnilex_deposita_atto',
       'lingolex_schema_card',
       'lingolex_salva_card',
       'lingolex_le_mie_card',
@@ -72,7 +76,7 @@ describe('the tool list', () => {
     expect(destructive).toEqual(['lingolex_elimina_card', 'omnilex_elimina_dossier', 'omnilex_elimina_voci_dossier']);
     for (const tool of tools) expect(tool.name).not.toMatch(/spost|modific|aggiorn|update|move/);
     const readOnly = tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort();
-    expect(readOnly).toEqual(['lingolex_le_mie_card', 'lingolex_leggi_card', 'lingolex_schema_card', 'omnilex_elenca_dossier', 'omnilex_leggi_dossier', 'omnilex_leggi_testo_voce', 'omnilex_stato_account']);
+    expect(readOnly).toEqual(['lingolex_le_mie_card', 'lingolex_leggi_card', 'lingolex_schema_card', 'omnilex_elenca_dossier', 'omnilex_leggi_dossier', 'omnilex_leggi_file_pratica', 'omnilex_leggi_pratica', 'omnilex_leggi_testo_voce', 'omnilex_stato_account']);
   });
 
   it('says what the server is for at initialize, in under 600 characters, and that sources are read elsewhere', () => {

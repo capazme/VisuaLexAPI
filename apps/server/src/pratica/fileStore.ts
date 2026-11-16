@@ -141,10 +141,9 @@ export async function removeUserFiles(userId: string): Promise<void> {
 }
 
 /**
- * The decrypted content of a live file of the user's, for internal use only: no route calls it. It is here for
- * the MCP part (LC50 part 3), whose tools will read the text extracted from a file, never the raw file; the
- * extraction will start from this. 404 when the file is not the user's, in the trash, or its dossier is gone.
- * It writes no access-log line: its future caller must write a `scaricamento` line with the client (MCP).
+ * The decrypted content of a live file of the user's, for internal use only: no route calls it (the MCP's text
+ * route, LC56, reads through `ownFile` and `readBlob`, which also check the dossier in the path). 404 when the file
+ * is not the user's, in the trash, or its dossier is gone. It writes no access-log line: a caller must.
  */
 export async function readPraticaFileContent(userId: string, fileId: string): Promise<Buffer> {
   const config = requireStore();

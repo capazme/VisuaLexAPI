@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { ChevronDown, FolderPlus, MoreHorizontal, PanelRightOpen, X } from 'lucide-react';
+import { ChevronDown, FolderPlus, MoreHorizontal, PanelRightOpen, Star, X } from 'lucide-react';
 import { useAddToDossier, useHeldInLabel, type DossierTarget } from '../dossier/addFromResult';
 import { HeldInMark } from '../dossier/HeldInMark';
 import { cn } from '../../../lib/utils';
@@ -68,11 +68,16 @@ export function PracticeRowShell({
   rowKey, isOpen: open, onToggle, name: shownName, removeName, onRemove, header, regionStyle, beside, dossier, corpusItem, children,
 }: PracticeRowShellProps) {
   const outside = dossier !== undefined && !dossier.inDossier;
+  const starred = dossier?.important === true;
   const corpus = dossier ? undefined : corpusItem;
   const heldIn = useHeldInLabel(corpus);
   const adding = useAddToDossier(corpus);
-  // The toggle's name replaces its content: it carries the mark's words.
-  const name = outside ? `${shownName}, non nel dossier` : heldIn ? `${shownName}, ${heldIn.charAt(0).toLowerCase()}${heldIn.slice(1)}` : shownName;
+  // The toggle's name replaces its content: it carries the mark's words, and the star's (LC58).
+  const name = outside
+    ? `${shownName}, non nel dossier`
+    : starred
+      ? `${shownName}, importante`
+      : heldIn ? `${shownName}, ${heldIn.charAt(0).toLowerCase()}${heldIn.slice(1)}` : shownName;
   const regionId = `practice-row-${rowKey}`;
   // One subject, one mounted reading surface (T5): a row shown in a window folds, whatever its stored
   // state, and comes back as it was when the window closes. Its header then points at the window.
@@ -112,6 +117,11 @@ export function PracticeRowShell({
             className={cn('flex-shrink-0 text-slate-400 transition-transform', !isOpen && '-rotate-90')}
           />
           {header}
+          {starred && (
+            <span aria-hidden title="Importante" className="flex-shrink-0 text-amber-600 dark:text-amber-400">
+              <Star size={14} aria-hidden className="fill-amber-400" />
+            </span>
+          )}
           {outside && <NotInDossier />}
         </div>
         {/* Beside the mark on a computer; a phone has it in «⋯», where the row's name needs the width. */}
