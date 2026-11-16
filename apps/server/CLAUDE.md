@@ -915,7 +915,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   assigned to a deleted account loses its assignee.
 - **A case's act files** (LC50, server part; testing only, no real client files until the volume has a
   backup off the host). `routes/praticaFiles.ts`, mounted at `/api/dossiers` before the dossier routes;
-  the user's session only (no entry in the delegated table). `GET /:dossierId/files` (originals with
+  the user's session, except the three LC56 routes below. `GET /:dossierId/files` (originals with
   `versioni`, and `cestino`), `POST /:dossierId/files` and `/:dossierId/files/:fileId/versions` (multipart
   `file`; 25 MB a file, 500 MB a case, 2 GB a user, the trash counted; PDF, DOCX, DOC, ODT, RTF, TXT,
   JPG, PNG, the extension agreeing with the first bytes, 415 otherwise; 413 over a ceiling),
@@ -933,8 +933,18 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   foreign key to the file). No table has a foreign key to `dossiers`: a dossier in the trash keeps its
   files (unreachable, the owner check finds no dossier) and gets them back on restore;
   `purgeTrashEntry` and `sweepExpiredTrash` remove them (`removeDossierFiles`), and `deleteUserAccount`
-  removes the user's directory after its transaction. `readPraticaFileContent` is the internal reader
-  the MCP's text extraction (part 3) will start from; no route calls it. `tests/praticaFiles.test.ts`.
+  removes the user's directory after its transaction. `readPraticaFileContent` is an internal reader no
+  route calls. `tests/praticaFiles.test.ts`.
+  **For an exchanged MCP token** (LC56, owner, 16 November 2026, the co-owner's review afterwards; testing only),
+  three rows of the delegated table, owner only (404 otherwise): `GET /:dossierId/contesto` (`dossier:read`; the
+  instructions and the live files, no trash, an `elenco` line), `GET /:dossierId/files/:fileId/text?parte=n`
+  (`dossier:text` and the grant's current texts consent, else 403; the text extracted in parts of 50,000 characters,
+  a `scaricamento` line with the client; PDF, DOC, RTF and images answer `testo: null` and a `motivo`), `POST
+  /:dossierId/files/atto { nome, testo ≤ 500,000, versioneDi? }` (`dossier:write`; the text made a DOCX and stored
+  through the uploads' own `deposit`: ceilings, lock, `autore: claude`, the client, a `deposito` line; a version
+  beside the original, never over it). The raw file, uploads, trash, restore, deletion and the instructions' writing
+  stay 403 to a token. `pratica/docText.ts`: text out of DOCX (`word/document.xml`), ODT (`content.xml`) and TXT,
+  and a minimal DOCX in, with `node:zlib` only (no package reads PDF here). `tests/praticaFilesMcp.test.ts`.
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
