@@ -61,7 +61,9 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     try {
       render(row(practiceId, actId, CC_2043));
       expect(screen.getByRole('button', { name: /^Aggiungi al dossier art\. 2043/ })).toBeInTheDocument();
-      expect(screen.getByText('Nel dossier «Sinistro Rossi»')).toBeInTheDocument();
+      const mark = screen.getByText('Nel dossier «Sinistro Rossi»');
+      // Under the name, not beside it in the toggle: a narrow column never cuts the row's name for it (#536).
+      expect(screen.getByRole('button', { name: /^(Espandi|Comprimi) art\. 2043/ })).not.toContainElement(mark);
     } finally {
       appStore.setState({ dossiers: [] });
     }

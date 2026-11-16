@@ -84,7 +84,8 @@ export function PracticeRowShell({
       // Read by the overview's strip of decisions (U2): an open row takes the strip's width.
       data-row-open={isOpen || undefined}
       // Clear of the act's sticky heading (`--practice-head`, set by the act block) when scrolled into view.
-      className="group scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-lg py-1 md:pl-2 md:pr-1"
+      // `@container`: a narrow column (the overview's decisions, a phone) keeps the row's name whole (LC59, #536).
+      className="group @container scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-lg py-1 md:pl-2 md:pr-1"
     >
       <div className="flex items-center gap-1 rounded-lg transition-colors hover:bg-slate-50 md:gap-2 dark:hover:bg-slate-800/60">
         {/* The toggle wraps only text: the remove button stays outside it (gotcha 22). */}
@@ -112,7 +113,6 @@ export function PracticeRowShell({
           />
           {header}
           {outside && <NotInDossier />}
-          {heldIn && <HeldInMark label={heldIn} />}
         </div>
         {/* Beside the mark on a computer; a phone has it in «⋯», where the row's name needs the width. */}
         {outside && dossier.add && (
@@ -122,9 +122,10 @@ export function PracticeRowShell({
           </button>
         )}
         {corpus && (
-          <button type="button" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi al dossier ${removeName}`} className={cn(ADD_BUTTON, 'hidden md:flex')}>
+          <button type="button" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi al dossier ${removeName}`} title="Aggiungi al dossier" className={cn(ADD_BUTTON, 'hidden md:flex')}>
             <FolderPlus size={14} aria-hidden />
-            Aggiungi al dossier
+            {/* Icon only in a narrow column: the row's name is never the one cut. */}
+            <span className="hidden @[40rem]:inline">Aggiungi al dossier</span>
           </button>
         )}
         {beside && (folded ? (
@@ -187,6 +188,12 @@ export function PracticeRowShell({
         )}
         {adding.popover}
       </div>
+      {/* The mark goes under the name, never beside it: the row's name is never the one cut (#536). */}
+      {heldIn && (
+        <div className="flex pl-7 md:pl-8">
+          <HeldInMark label={heldIn} className="max-w-full" />
+        </div>
+      )}
       {isOpen && (
         // Opacity only, 150 ms: a row opens tens of times a day, and a transform here would move the
         // reader's sticky toolbar and fixed popovers while it plays (gotchas 22, 26).
