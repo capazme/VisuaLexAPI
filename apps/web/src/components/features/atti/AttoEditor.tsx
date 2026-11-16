@@ -348,6 +348,19 @@ export function AttoEditor() {
                     Fonti della pratica
                   </Button>
                 )}
+                {/* Where «Citazioni» sits under the whole text (Papiniano: on a phone it is far away), a way to it. */}
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  className="@3xl:hidden"
+                  onClick={() => {
+                    const heading = document.getElementById('atto-citazioni');
+                    heading?.scrollIntoView({ block: 'start' });
+                    heading?.focus({ preventScroll: true });
+                  }}
+                >
+                  Vai alle citazioni
+                </Button>
               </div>
               {/* «Analizza documento» in the act's flow (Luca, 15-11): the citations found, linked to their norms and decisions. */}
               <Button

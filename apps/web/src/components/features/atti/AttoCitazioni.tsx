@@ -56,7 +56,7 @@ export function AttoCitazioni({ testo, className }: { testo: string; className?:
   const attention = checks.filter((c) => c.verdict === 'attention').length;
   return (
     <section aria-labelledby="atto-citazioni" className={cn('flex flex-col gap-2', className)}>
-      <h2 id="atto-citazioni" className="text-sm font-medium text-slate-700 dark:text-slate-300">Citazioni</h2>
+      <h2 id="atto-citazioni" tabIndex={-1} className="text-sm font-medium focus:outline-none text-slate-700 dark:text-slate-300">Citazioni</h2>
       {failed ? (
         <p role="alert" className="text-sm text-slate-700 dark:text-slate-300">Non è stato possibile leggere le citazioni del testo. Riprova a modificarlo o riapri l’atto.</p>
       ) : !ready ? (
@@ -68,7 +68,7 @@ export function AttoCitazioni({ testo, className }: { testo: string; className?:
           <p className="text-sm text-slate-600 dark:text-slate-400">
             {checks.length === 1 ? '1 citazione' : `${checks.length} citazioni`}{attention > 0 ? `, ${attention} da controllare` : ''}
           </p>
-          <ul className="-mx-2 flex flex-col">
+          <ul className="flex flex-col">
             {checks.map((check) => {
               const { target } = check;
               return (

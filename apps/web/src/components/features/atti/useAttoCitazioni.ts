@@ -65,7 +65,7 @@ function decisionSaid(answer: FetchDecisionAnswer | undefined, over: boolean): S
   if (!answer) return over ? { verdict: 'unchecked', words: `Non controllata: più di ${MAX_DECISION_CHECKS} sentenze per volta` } : { verdict: 'checking', words: 'Controllo alla fonte…' };
   switch (answer.esito) {
     case 'trovata':
-      return { verdict: 'verified', words: `Verificata alla fonte · ${answer.fonte.nome}` };
+      return { verdict: 'verified', words: `Verificata alla fonte · ${answer.fonte.nome.replace(' — ', ', ')}` };
     case 'ambigua':
       return { verdict: 'attention', words: 'Più sentenze corrispondono', detail: 'Controlla quale è citata.' };
     case 'non_trovata':
