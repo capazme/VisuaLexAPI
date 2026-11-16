@@ -17,8 +17,8 @@ describe('AddNoteModal — saving', () => {
     const onClose = vi.fn();
     render(<AddNoteModal onClose={onClose} onSave={async () => false} />);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Una nota lunga e preziosa' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Aggiungi alla pratica' })).not.toBeDisabled());
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox')).toHaveValue('Una nota lunga e preziosa');
   });

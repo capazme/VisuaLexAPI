@@ -274,12 +274,12 @@ describe('the old act addresses (LC53)', () => {
   it('an act with a dossier leads to that dossier\'s «Atti» tab', async () => {
     atti.get.mockResolvedValue({ id: 'a1', dossierId: 'd1' });
     renderAt('/work/atti/a1');
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dossier?dossier=d1&vista=atti'));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/pratiche?dossier=d1&vista=atti'));
   });
 
   it('an act without one, or one that cannot be read, leads to the dossiers', async () => {
     atti.get.mockResolvedValue({ id: 'a1', dossierId: null });
     renderAt('/work/atti/a1');
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/dossier$/));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/pratiche$/));
   });
 });

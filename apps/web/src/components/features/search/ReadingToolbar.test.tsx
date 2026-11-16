@@ -103,25 +103,25 @@ describe('ReadingToolbar — one line beside the text', () => {
 });
 
 describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)', () => {
-    it('on a computer: «Note», «Evidenziazioni», the highlighter, the note tool, «Al dossier» and «⋯»', () => {
+    it('on a computer: «Note», «Evidenziazioni», the highlighter, the note tool, «Alla pratica» and «⋯»', () => {
         const { container } = setup({ notesCount: 2, highlightsCount: 3 });
         const names = within(desktopRow(container)).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent);
         expect(names).toEqual([
             'Note, 2', 'Evidenziazioni, 3', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
-            'Strumento nota (nota personale)', 'Tipo di nota', 'Al dossier', 'Altre azioni sull’articolo',
+            'Strumento nota (nota personale)', 'Tipo di nota', 'Alla pratica', 'Altre azioni sull’articolo',
         ]);
         // The count is seen beside the word.
         expect(within(desktopRow(container)).getByRole('button', { name: 'Note, 2' })).toHaveTextContent('Note2');
     });
 
-    it('on a phone: the highlighter\'s toggle, «Al dossier» (icons, named) and «⋯», 44 px each', () => {
+    it('on a phone: the highlighter\'s toggle, «Alla pratica» (icons, named) and «⋯», 44 px each', () => {
         const { container } = setup();
         const buttons = within(phoneRow(container)).getAllByRole('button');
         expect(buttons[0]).toHaveTextContent('');
         // Close together, the last one's target reaching into the page's margin: the status keeps one line at 320 (R3b).
         expect(phoneRow(container)).toHaveClass('-mr-3');
         expect(phoneRow(container)).not.toHaveClass('gap-1');
-        expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Evidenziatore (giallo)', 'Al dossier', 'Altre azioni sull’articolo']);
+        expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Evidenziatore (giallo)', 'Alla pratica', 'Altre azioni sull’articolo']);
         buttons.forEach((b) => expect(b).toHaveClass('min-h-[44px]', 'min-w-[44px]'));
     });
 
@@ -131,7 +131,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
             const { container } = setup();
             const buttons = within(phoneRow(container)).getAllByRole('button');
             expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual([
-                'Evidenziatore (giallo)', 'Strumento nota (nota personale)', 'Al dossier', 'Altre azioni sull’articolo',
+                'Evidenziatore (giallo)', 'Strumento nota (nota personale)', 'Alla pratica', 'Altre azioni sull’articolo',
             ]);
             fireEvent.click(within(phoneRow(container)).getByRole('button', { name: 'Strumento nota (nota personale)' }));
             expect(appStore.getState().readingTool).toBeNull();
@@ -208,7 +208,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         const row = desktopRow(props.container);
         fireEvent.click(within(row).getByRole('button', { name: 'Note' }));
         fireEvent.click(within(row).getByRole('button', { name: 'Evidenziazioni' }));
-        fireEvent.click(within(row).getByRole('button', { name: 'Al dossier' }));
+        fireEvent.click(within(row).getByRole('button', { name: 'Alla pratica' }));
         expect(props.onToggleNotes).toHaveBeenCalledTimes(1);
         expect(props.onToggleHighlightsPeek).toHaveBeenCalledTimes(1);
         expect(props.onOpenDossier).toHaveBeenCalledTimes(1);
@@ -243,7 +243,7 @@ describe('ReadingToolbar — a past text is a reading', () => {
 
     it('leaves the reading tools alone', () => {
         const { container } = setup({ lockedReason: READ_ONLY_REASON });
-        screen.getAllByRole('button', { name: 'Al dossier' }).forEach((button) => expect(button).toBeEnabled());
+        screen.getAllByRole('button', { name: 'Alla pratica' }).forEach((button) => expect(button).toBeEnabled());
         const menu = openMore(desktopRow(container));
         for (const name of ['Copia', 'Condividi link', 'Testo alla data…', 'Confronta con…']) {
             expect(within(menu).getByRole('menuitem', { name })).toBeEnabled();
@@ -267,7 +267,7 @@ describe('ReadingToolbar — there is no article to copy or save', () => {
     it('switches off copying and the dossier', () => {
         const reason = 'Non disponibile: l’articolo non esisteva a quella data';
         const { container } = setup({ copyLockedReason: reason });
-        screen.getAllByRole('button', { name: 'Al dossier' }).forEach((button) => {
+        screen.getAllByRole('button', { name: 'Alla pratica' }).forEach((button) => {
             expect(button).toBeDisabled();
             expect(button.title).toContain(reason);
         });

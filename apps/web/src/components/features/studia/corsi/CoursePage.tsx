@@ -85,7 +85,7 @@ function Course({ id }: { id: string }) {
   const fail = (error: unknown, fallback: string) => notify({ type: 'error', message: corsiErrorDetail(error, fallback), duration: 5000 });
 
   const trashCourse = () => {
-    const kept = data.dossier ? ` Il dossier «${data.dossier.name}» resta in Dossier.` : '';
+    const kept = data.dossier ? ` La pratica «${data.dossier.name}» resta in Pratiche.` : '';
     showUndoToast({
       action: async () => {
         try {
@@ -219,7 +219,7 @@ function Course({ id }: { id: string }) {
 
       <section aria-labelledby="corso-dossier" className="grid grid-cols-1 gap-3">
         <h3 id="corso-dossier" className={BLOCK_HEADING}>
-          Dossier del percorso
+          Pratica del percorso
         </h3>
         <DossierLink dossier={data.dossier} />
         <p className={cn('text-sm', MUTED_TEXT)}>

@@ -138,12 +138,12 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
               ))}
               {showDossier && task.dossierId && (
                 <Link
-                  to={`/dossier?dossier=${encodeURIComponent(task.dossierId)}`}
+                  to={`/pratiche?dossier=${encodeURIComponent(task.dossierId)}`}
                   // At the line's right end; 44 px tall for a finger, laid over the gaps where a pointer is precise.
                   className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%]', FOCUS_RING)}
                 >
-                  <span className="sr-only">Dossier: </span>
-                  <span className="truncate">{dossierTitle ?? 'Dossier'}</span>
+                  <span className="sr-only">Pratica: </span>
+                  <span className="truncate">{dossierTitle ?? 'Pratica'}</span>
                   <Folder size={12} aria-hidden className="shrink-0" />
                 </Link>
               )}

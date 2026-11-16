@@ -270,7 +270,7 @@ export const importStudyDossiersRoute = async (req: Request, res: Response) => {
   const data = importStudySchema.parse(req.body);
   if (JSON.stringify(data.content ?? null).length > 1024 * 1024) throw new AppError(400, 'Il contenuto supera la dimensione massima (1 MB).');
   const { content, refused } = readableContent(data.content);
-  if (content.dossiers.length === 0) throw new AppError(400, 'Nessun dossier leggibile da aggiungere.');
+  if (content.dossiers.length === 0) throw new AppError(400, 'Nessuna pratica leggibile da aggiungere.');
   await spendStudyImport(req.user!.id);
   const report = await importStudyDossiers(req.user!.id, content, {
     addNotes: data.addNotes,
@@ -341,7 +341,7 @@ export const addDossierItem = async (req: Request, res: Response) => {
  */
 async function assertArticleOfDossier(dossierId: string, itemId: string): Promise<void> {
   const article = await prisma.dossierItem.findFirst({ where: { id: itemId, dossierId, itemType: 'norm' } });
-  if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questo dossier.');
+  if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questa pratica.');
 }
 
 export const MAX_NOTE_LENGTH = 4000;

@@ -29,7 +29,7 @@ function summary(draft: TaskDraft, today: string, dossierTitle: string | undefin
   parts.push(draft.plannedDate ? `Per ${shortDay(draft.plannedDate, today).toLowerCase()}` : 'Senza data');
   if (draft.dueDate) parts.push(`termine finale ${shortDay(draft.dueDate, today).toLowerCase()}`);
   if (draft.priority < 4) parts.push(`priorità ${PRIORITY_LABEL[draft.priority].toLowerCase()}`);
-  parts.push(draft.dossierId ? `nel dossier «${dossierTitle ?? '…'}»` : "nella lista d'ingresso");
+  parts.push(draft.dossierId ? `nella pratica «${dossierTitle ?? '…'}»` : "nella lista d'ingresso");
   return parts.join(' · ');
 }
 

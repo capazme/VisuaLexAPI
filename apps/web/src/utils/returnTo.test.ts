@@ -53,14 +53,14 @@ describe('the return address', () => {
     expect(authPageTab('/register')).toBe('register');
     expect(authPageTab('/%52egister')).toBe('register');
     expect(authPageTab('/registered')).toBeNull();
-    expect(authPageTab('/dossier')).toBeNull();
+    expect(authPageTab('/pratiche')).toBeNull();
     expect(authPageTab('/%E0%A4%A')).toBeNull(); // a malformed escape is read raw
     expect(isLoginPage('/register')).toBe(true);
     expect(isLoginPage('/')).toBe(false);
   });
 
   it('forgets the stash on request', () => {
-    stashReturnTo('/dossier');
+    stashReturnTo('/pratiche');
     forgetReturnTo();
     expect(takeReturnTo()).toBeNull();
   });

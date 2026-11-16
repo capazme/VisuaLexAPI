@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, ChevronDown, FileDown, FolderInput, FolderMinus, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, FileDown, FolderMinus, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useShallow } from 'zustand/react/shallow';
@@ -11,7 +11,6 @@ import { useSimpleReading } from './simpleReading';
 import { removePracticeActWithUndo } from './practiceUndo';
 import { useActItemIds } from './inDossier';
 import { removeItemsWithUndo } from '../dossier/removeItemsWithUndo';
-import { Modal } from '../../ui/Modal';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIDDEN_SCROLLBAR } from '../../../constants/interactions';
 import { TreeViewPanel } from '../search/TreeViewPanel';
@@ -22,16 +21,15 @@ import { shownAnnex } from '../dossier/dossierLayout';
 import { PracticeArticleRow } from './PracticeArticleRow';
 import { PracticeArticleEntry } from './PracticeIndexEntry';
 import type { PracticeLayout } from './PracticeColumn';
-import { fromPracticePair, practicePair } from './practiceView';
 import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useTour } from '../../../hooks/useTour';
 import { formatNormaMeta } from '../../../utils/normaMeta';
-import { actHeading, shortAct } from '../../../utils/sources';
+import { actHeading } from '../../../utils/sources';
 import { READ_ONLY_REASON, describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
 import { filterLoadedIdsForAnnex } from '../../../utils/articleIds';
-import { corpusPractices, findPracticeArticle, isBoundPractice, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
+import { findPracticeArticle, isBoundPractice, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
 
 export interface PracticeActBlockProps {
   practiceId: string;
@@ -70,22 +68,15 @@ function chipLabel(article: ArticleData): string {
 export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference, layout }: PracticeActBlockProps) {
   const {
     toggleActCollapse, revealPracticeArticle, revealPracticeRow, addArticlesToPractice,
-    moveActToPractice, openStructureWindow, closeStructureWindow,
+    openStructureWindow, closeStructureWindow,
   } = useAppStore(useShallow((s) => ({
     toggleActCollapse: s.toggleActCollapse,
     revealPracticeArticle: s.revealPracticeArticle,
     revealPracticeRow: s.revealPracticeRow,
     addArticlesToPractice: s.addArticlesToPractice,
-    moveActToPractice: s.moveActToPractice,
     openStructureWindow: s.openStructureWindow,
     closeStructureWindow: s.closeStructureWindow,
   })));
-  // Only what the move dialog lists, and only while it is open: a stream into another practice does
-  // not re-render every act's rows. `useShallow` compares the pairs' fields.
-  const [moveOpen, setMoveOpen] = useState(false);
-  const moveTargets = useAppStore(useShallow((s) => (moveOpen
-    ? corpusPractices(s.practices).filter((p) => p.id !== practiceId).map(practicePair)
-    : [])));
   const isStructureWindowOpen = useAppStore((s) => s.structureWindow.blockId === act.id);
   // The act's open rows, oldest first: a reveal moves its row to the end (`revealRow`).
   const prefix = `${practiceId}/${act.id}/`;
@@ -108,8 +99,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // dossier» (to the trash, with «Annulla»; the rows stay on the table): a removal from the table alone would come back
   // with the next re-sync.
   const { dossier: hostDossier, ids: dossierIds } = useActItemIds(act);
-  // A separator only under a command: on a computer a dossier's act has none above its removal (the tests of 16-11).
-  const commandsAbove = !toolsShown || !bound;
+  // A separator only under a command: on a computer an act has none above its removal (the tests of 16-11; LC60: the
+  // Ricerca's act lost «Sposta in un'altra pratica»).
+  const commandsAbove = !toolsShown;
   const theme = useAppStore((s) => s.settings.theme);
   const { tryStartTour, hasSeenTour } = useTour({ theme: theme as 'light' | 'dark' });
   const tourAsked = useRef(false);
@@ -201,11 +193,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     if (!isLocked(article)) setStudyKey(practiceArticleKey(article as ArticleData));
   };
 
-  const others = moveTargets.map(fromPracticePair);
-  const moveTo = (target: string | { newLabel: string }) => {
-    setMoveOpen(false);
-    moveActToPractice(act.id, practiceId, target);
-  };
   const annexes = treeMetadata?.annexes && treeMetadata.annexes.length > 1 ? treeMetadata.annexes : null;
   const showNavigation = (allArticleIds && allArticleIds.length > 1) || act.articles.length > 1;
 
@@ -356,12 +343,11 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   { label: 'Esporta PDF della norma', icon: FileDown, onSelect: () => onViewPdf(act.norma.urn as string) },
                 ] : []),
               ]),
-              ...(bound ? [] : [{ label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !toolsShown }]),
               hostDossier && dossierIds.length > 0
                 ? {
-                  label: 'Togli dal dossier', icon: FolderMinus, danger: true, separatorBefore: commandsAbove,
+                  label: 'Togli dalla pratica', icon: FolderMinus, danger: true, separatorBefore: commandsAbove,
                   onSelect: () => removeItemsWithUndo(hostDossier.id, dossierIds, dossierIds.length === 1
-                    ? 'Articolo tolto dal dossier' : `${dossierIds.length} articoli tolti dal dossier`, hostDossier.onTrashChanged),
+                    ? 'Articolo tolto dalla pratica' : `${dossierIds.length} articoli tolti dalla pratica`, hostDossier.onTrashChanged),
                 }
                 : { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: commandsAbove, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
               ...practiceItems,
@@ -524,38 +510,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
       />
 
 
-      <Modal
-        isOpen={moveOpen}
-        onClose={() => setMoveOpen(false)}
-        size="sm"
-        title="Sposta in un'altra pratica"
-        description={`«${heading}» passa con i suoi articoli nella pratica scelta.`}
-      >
-        <ul className="space-y-1">
-          {others.map((p) => (
-            <li key={p.id}>
-              <button
-                type="button"
-                onClick={() => moveTo(p.id)}
-                className="flex min-h-[44px] w-full items-center rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-100 md:min-h-0 md:py-2 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                {p.label}
-              </button>
-            </li>
-          ))}
-          <li>
-            <button
-              type="button"
-              // A new practice named after the act, as a search names one (T11), made and moved into in one write; this table stays on screen.
-              onClick={() => moveTo({ newLabel: shortAct(act.norma) })}
-              className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-primary-700 hover:bg-primary-50 md:min-h-0 md:py-2 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <Plus size={14} aria-hidden />
-              Nuova pratica
-            </button>
-          </li>
-        </ul>
-      </Modal>
 
       {/* Mounted only with an article in hand: StudyMode dereferences it, and an act opened from the
           index has none until the first pick. */}

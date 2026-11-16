@@ -58,7 +58,7 @@ const lost: Proposal = { ...proposal('g2', 'parole che non ci sono'), startOffse
 const items: DossierItem[] = [
   { id: 'a1', addedAt: '', type: 'norma', data: norma },
   { id: 'nt1', addedAt: '2026-11-10T09:00:00Z', type: 'note', data: 'Da citare nel ricorso, punto 2.', aboutItemId: 'a1' },
-  { id: 'nt2', addedAt: '', type: 'note', data: 'Una nota libera del dossier.' },
+  { id: 'nt2', addedAt: '', type: 'note', data: 'Una nota libera della pratica.' },
 ];
 
 function lettura(dossierItemId: string | undefined) {
@@ -114,7 +114,7 @@ describe('ArticleTabContent in a dossier\'s «Lettura»: «Note della pratica» 
     lettura('a1');
     const notes = screen.getByRole('region', { name: 'Note della pratica' });
     expect(within(notes).getByText('Da citare nel ricorso, punto 2.')).toBeInTheDocument();
-    expect(within(notes).queryByText('Una nota libera del dossier.')).toBeNull();
+    expect(within(notes).queryByText('Una nota libera della pratica.')).toBeNull();
   });
 
   it('none outside a dossier\'s «Lettura»', () => {

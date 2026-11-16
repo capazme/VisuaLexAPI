@@ -76,7 +76,7 @@ export function aiClients(mcpUrl: string): AiClient[] {
         { text: 'Premi «Connetti»: si apre LexCraft; controlla i permessi e premi «Autorizza».' },
       ],
       limits: [
-        'Claude non mostra ancora il modulo di conferma: ogni eliminazione viene rifiutata. Leggere, creare dossier e aggiungere norme, sentenze, note e schede funziona.',
+        'Claude non mostra ancora il modulo di conferma: ogni eliminazione viene rifiutata. Leggere, creare pratiche e aggiungere norme, sentenze, note e schede funziona.',
         'Il collegamento parte dai server di Anthropic, non dal tuo computer: funziona solo se questo LexCraft è raggiungibile da internet. Se non lo è, l’accesso non si completa: usa un’app da terminale o chiedi all’amministratore.',
         'Piano Free: un solo connettore personalizzato. Piani Team ed Enterprise: lo aggiunge il proprietario dell’organizzazione.',
       ],
@@ -155,11 +155,11 @@ export const UNSUPPORTED_CLIENTS: { name: string; reason: string }[] = [
 
 /** The tools a connected application gets, in the words a user reads. */
 export const AI_TOOLS: { name: string; what: string }[] = [
-  { name: 'Dossier', what: 'elencare e leggere i tuoi dossier, crearne di nuovi' },
-  { name: 'Norme', what: 'aggiungere a un dossier da 1 a 50 norme scritte a parole, verificate sulle fonti' },
-  { name: 'Sentenze', what: 'aggiungere a un dossier da 1 a 10 sentenze, verificate sulle fonti' },
-  { name: 'Note', what: 'aggiungere una nota a un dossier o a un suo articolo (solo aggiungere, mai modificare)' },
+  { name: 'Pratica', what: 'elencare e leggere le tue pratiche, crearne di nuovi' },
+  { name: 'Norme', what: 'aggiungere a una pratica da 1 a 50 norme scritte a parole, verificate sulle fonti' },
+  { name: 'Sentenze', what: 'aggiungere a una pratica da 1 a 10 sentenze, verificate sulle fonti' },
+  { name: 'Note', what: 'aggiungere una nota a una pratica o a un suo articolo (solo aggiungere, mai modificare)' },
   { name: 'Schede di studio', what: 'leggere le tue schede e crearne di nuove, sempre come tue bozze' },
   { name: 'Account', what: 'vedere quanto resta della quota giornaliera' },
-  { name: 'Eliminare', what: 'dossier, voci e schede, solo con il permesso e la tua conferma (vedi sotto)' },
+  { name: 'Eliminare', what: 'pratiche, voci e schede, solo con il permesso e la tua conferma (vedi sotto)' },
 ];

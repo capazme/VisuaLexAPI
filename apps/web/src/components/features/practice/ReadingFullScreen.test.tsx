@@ -164,7 +164,7 @@ describe('ReadingFullScreen (spec §8, T19)', () => {
     s().openPhoneReader(practiceId, articleRef);
     draw();
     act(() => { s().removePracticeArticle(practiceId, articleRef.kind === 'article' ? articleRef.actId : '', articleRef.kind === 'article' ? articleRef.articleKey : ''); });
-    expect(within(reader()).getByText('Questo testo non è più sul tavolo della pratica.')).toBeInTheDocument();
+    expect(within(reader()).getByText('Questo testo non è più sul tavolo.')).toBeInTheDocument();
     fireEvent.click(within(reader()).getByRole('button', { name: 'Pratica' }));
     expect(s().phoneReader).toBeNull();
   });

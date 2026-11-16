@@ -132,11 +132,11 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
   return (
     <div className="space-y-3">
       {/* §14: nothing goes away without saying so. What a gesture puts on the table is not the dossier's (c4 adds it). */}
-      <p className="text-sm text-slate-600 dark:text-slate-400">Quello che apri leggendo resta qui finché non lo aggiungi al dossier.</p>
+      <p className="text-sm text-slate-600 dark:text-slate-400">Quello che apri leggendo resta qui finché non lo aggiungi alla pratica.</p>
       {pending > 0 && <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Carico il testo…</p>}
       {practiceId && (empty ? (
         <p className="rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
-          Questo dossier non ha ancora norme o sentenze da leggere.
+          Questa pratica non ha ancora norme o sentenze da leggere.
         </p>
       ) : (
         <ReadingHostContext.Provider value={host}>

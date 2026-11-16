@@ -26,7 +26,7 @@ import { pageName } from '../../../features/sections/pageNames';
 // A page whose code arrives when the test says, and one whose code cannot be had.
 const arrival = vi.hoisted(() => ({ open: () => {} }));
 const Waiting = lazy(() => new Promise<{ default: () => ReactElement }>((resolve) => {
-  arrival.open = () => resolve({ default: () => <h1>Dossier</h1> });
+  arrival.open = () => resolve({ default: () => <h1>Pratiche</h1> });
 }));
 const Missing = lazy(() => Promise.reject(new Error('Failed to fetch dynamically imported module')));
 
@@ -34,7 +34,7 @@ const at = (path: string) => render(
   <MemoryRouter initialEntries={[path]}>
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route path="dossier" element={<Waiting />} />
+        <Route path="pratiche" element={<Waiting />} />
         <Route path="history" element={<Missing />} />
       </Route>
     </Routes>
@@ -64,11 +64,11 @@ describe('Layout — the page loaded with its route', () => {
     }) as unknown as MediaQueryList);
     // An observer that has not answered yet: what the bar reads while the page is on its way.
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
-    at('/dossier');
+    at('/pratiche');
     expect(screen.getByTestId('layout-content')).toBeEmptyDOMElement();
-    expect(screen.queryByText('Dossier')).toBeNull();
+    expect(screen.queryByText('Pratiche')).toBeNull();
     await act(async () => { arrival.open(); });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Dossier' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pratiche' })).toBeInTheDocument();
   });
 
   it('names the page in the phone’s bar when, after the wait, its place draws no title (the error)', async () => {

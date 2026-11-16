@@ -19,7 +19,7 @@ import { plannerStore } from '../features/planner/plannerStore';
 
 /** Work's entries (D-315, LC47; no «Atti» since LC53, the dossier's tab): Scadenziario, Ricerca, Dossier, then the two features with an AI model behind them,
  *  «Analizza documento» and the Pseudonimizzatore. The planner's other two views are tabs of Work's page. */
-const OPUS_HREFS = ['/work/scadenziario', '/', '/dossier', '/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche'];
+const OPUS_HREFS = ['/work/scadenziario', '/', '/pratiche', '/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -183,7 +183,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Scadenziario', 'Ricerca', 'Dossier', 'Analizza documento, in sviluppo', 'Pseudonimizzatore, in arrivo', 'Grafo delle pratiche, in arrivo']);
+    expect(names).toEqual(['Scadenziario', 'Ricerca', 'Pratiche', 'Analizza documento, in sviluppo', 'Pseudonimizzatore, in arrivo', 'Grafo delle pratiche, in arrivo']);
     // The two apart, in a group named for a screen reader, with no heading written over them.
     const tools = within(opus).getByRole('group', { name: "Strumenti sul documento" });
     expect(within(tools).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche']);
@@ -195,10 +195,10 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it('Work: «Ricerca» leads to the search with the cursor in its field, and carries the id the tours point at', () => {
     const field = vi.fn();
     const unsubscribe = subscribeSearchField(field);
-    renderSidebar('/dossier');
+    renderSidebar('/pratiche');
     const corpus = screen.getByRole('link', { name: 'Ricerca' });
     expect(document.getElementById('tour-nav-search')).toBe(corpus);
-    expect(document.getElementById('tour-nav-dossier')).toBe(screen.getByRole('link', { name: 'Dossier' }));
+    expect(document.getElementById('tour-nav-dossier')).toBe(screen.getByRole('link', { name: 'Pratiche' }));
     fireEvent.click(corpus);
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
     expect(field).toHaveBeenCalledWith({ focus: true });
@@ -377,23 +377,23 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
 
   it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
     renderSidebar('/learn/schede');
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/dossier', '/learn/schede']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/pratiche', '/learn/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
     // One group reads «Learn» (LC4: the section's, its first heading's entries straight inside it), «Contribuisci» within.
     const section = screen.getByRole('group', { name: 'Learn' });
-    expect(within(section).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier', 'Le mie schede']);
+    expect(within(section).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Pratiche', 'Le mie schede']);
     expect(section).toContainElement(screen.getByRole('group', { name: 'Contribuisci' }));
     cleanupAndRender('/learn/schede', () => { account.isValidator = true; });
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/dossier', '/learn/schede', '/learn/valida']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/pratiche', '/learn/schede', '/learn/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
     expect(within(contribute).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Le mie schede', 'Da validare']);
     // The tours still find the dossiers.
-    expect(document.getElementById('tour-nav-dossier')).toBe(screen.getByRole('link', { name: 'Dossier' }));
+    expect(document.getElementById('tour-nav-dossier')).toBe(screen.getByRole('link', { name: 'Pratiche' }));
   });
 
   it('keeps the section on a Corpus page after it', () => {
     sectionStore.setState({ section: 'gymnasium' });
-    renderSidebar('/dossier');
+    renderSidebar('/pratiche');
     expect(screen.getByRole('group', { name: 'Learn' })).toBeInTheDocument();
   });
 
@@ -499,7 +499,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
 
 describe('Sidebar — Cronologia in the user menu (the owner, 13 Oct 2026)', () => {
   it('is not in the navigation: it is an entry of the user menu, after Impostazioni, that opens the history', () => {
-    renderSidebar('/dossier');
+    renderSidebar('/pratiche');
     expect(screen.queryByRole('link', { name: /Cronologia/ })).toBeNull();
     openUserMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Cronologia' }));
@@ -858,10 +858,10 @@ describe('Sidebar — it fits a low window', () => {
 
   it('draws a hover label outside the scrolling navigation and the aside, and removes it on leave', async () => {
     renderSidebar();
-    const link = screen.getByRole('link', { name: 'Dossier' });
+    const link = screen.getByRole('link', { name: 'Pratiche' });
     pointerOver(link, MOUSE);
     const tooltip = document.body.querySelector('[data-sidebar-tooltip]') as HTMLElement;
-    expect(tooltip).toHaveTextContent('Dossier');
+    expect(tooltip).toHaveTextContent('Pratiche');
     expect(document.getElementById('tour-sidebar')).not.toContainElement(tooltip);
     expect(screen.getByRole('complementary')).not.toContainElement(tooltip);
     expect(tooltip).toHaveClass('fixed', 'z-[1400]');
@@ -872,7 +872,7 @@ describe('Sidebar — it fits a low window', () => {
 
 // A label that stays on screen after a tap, or over a dialog opened by the click, is worse than none.
 describe.each([
-  ['a link', () => screen.getByRole('link', { name: 'Dossier' })],
+  ['a link', () => screen.getByRole('link', { name: 'Pratiche' })],
 ])('Sidebar — when the label of %s shows', (_name, control) => {
   it('for a mouse pointer over it, not for a touch', () => {
     renderSidebar();
@@ -964,7 +964,7 @@ describe('Sidebar — the words', () => {
   });
 
   it('writes no section name over its entries (it is on the tab above), only the other headings, as «Contribuisci»', () => {
-    renderLayout('wide', '/dossier');
+    renderLayout('wide', '/pratiche');
     expect(within(screen.getByRole('group', { name: 'Work' })).queryByText('Work')).toBeNull();
     cleanup();
     renderLayout('wide', '/forum');
@@ -1045,7 +1045,7 @@ describe('Sidebar — the words', () => {
 
   it('shows no hover label where the word is written', () => {
     renderLayout('wide');
-    pointerOver(screen.getByRole('link', { name: 'Dossier' }), MOUSE);
+    pointerOver(screen.getByRole('link', { name: 'Pratiche' }), MOUSE);
     expect(label()).toBeNull();
   });
 

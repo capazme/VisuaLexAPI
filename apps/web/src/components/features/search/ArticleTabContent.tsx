@@ -897,7 +897,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onOpenDossier={hostDossier
                     ? () => addToThisDossier(hostDossier.id, { norma: norma_data }, showToast)
                     : () => setDossierPopoverOpen(true)}
-                dossierLabel={hostDossier ? 'Aggiungi a questo dossier' : undefined}
+                dossierLabel={hostDossier ? 'Aggiungi a questa pratica' : undefined}
                 dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
                 onCopyLink={handleCopyLink}

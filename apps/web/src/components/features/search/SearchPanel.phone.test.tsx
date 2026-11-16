@@ -9,7 +9,6 @@ vi.mock('./TreeViewPanel', () => ({ TreeViewPanel: () => null }));
 vi.mock('../workspace/ArticleNavigation', () => ({ ArticleNavigation: () => null }));
 vi.mock('../workspace/LazyStudyMode', () => ({ LazyStudyMode: () => null }));
 vi.mock('../practice/ReadingRow', () => ({ ReadingRow: () => <div data-testid="desktop-row" /> }));
-vi.mock('../practice/PracticeBar', () => ({ PracticeBar: () => null }));
 vi.mock('../decisions/DecisionEntryView', () => ({
   DecisionEntryView: ({ reference }: { reference: { numero: number } }) => <div data-testid="decision-reader">n. {reference.numero}</div>,
 }));

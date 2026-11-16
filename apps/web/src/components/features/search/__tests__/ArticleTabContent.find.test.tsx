@@ -149,7 +149,7 @@ describe('ArticleTabContent — «Cerca nel testo» opens the find window', () =
     const window_ = screen.getByRole('search');
     expect(window_.closest('.glass-toolbar')).toBeNull();
     expect(findSays()).toBe('Chiudi la ricerca nel testo');
-    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questo tavolo' })).toHaveAttribute('aria-pressed', 'true');
     typeQuery('puo');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
     expect(drawn('vlx-find-current')).toBe(1);
@@ -166,7 +166,7 @@ describe('ArticleTabContent — «Cerca nel testo» opens the find window', () =
     showInTab(article({ article_text: ACCENTED.text }));
     // each of the two words is on the page, outside the text root
     expect(screen.getByText('Giurisprudenza')).toBeInTheDocument();
-    expect(document.body.textContent).toContain('Al dossier');
+    expect(document.body.textContent).toContain('Alla pratica');
     toggleFind();
     for (const word of ['Giurisprudenza', 'dossier']) {
       typeQuery(word);
@@ -228,7 +228,7 @@ describe('ArticleTabContent — «Cerca nel testo» opens the find window', () =
 
   it('leaves the other tools where they are', () => {
     show(article());
-    for (const name of [/^Note/, /^Evidenziazioni/, 'Al dossier', 'Altre azioni sull’articolo']) {
+    for (const name of [/^Note/, /^Evidenziazioni/, 'Alla pratica', 'Altre azioni sull’articolo']) {
       expect(screen.getAllByRole('button', { name }).length).toBeGreaterThan(0);
     }
   });

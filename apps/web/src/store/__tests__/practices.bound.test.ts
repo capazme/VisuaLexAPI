@@ -61,6 +61,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   window.matchMedia = savedMatchMedia;
+  appStore.setState({ corpusPracticesPending: false });
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -68,7 +69,7 @@ afterEach(() => {
 describe('a dossier builds a bound table (LC51 c1)', () => {
   it('one practice carrying the dossier id, named after it, the articles in their acts without text, the decisions closed', () => {
     const withText = norma('7');
-    (withText.data as { article_text?: string }).article_text = 'Testo salvato nel dossier';
+    (withText.data as { article_text?: string }).article_text = 'Testo salvato nella pratica';
     const id = s().openDossierPractice(dossier([norma('5'), withText, sentenza, { id: 'x', addedAt: '', type: 'note', data: 'nota' }]));
     const bound = practice(id);
     expect(isBoundPractice(bound)).toBe(true);
@@ -96,7 +97,7 @@ describe('a dossier builds a bound table (LC51 c1)', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('opening the same dossier again finds its table: one per dossier', () => {
+  it('opening the same dossier again finds its table: one per pratica', () => {
     const first = s().openDossierPractice(dossier([norma('5')]));
     const again = s().openDossierPractice(dossier([norma('5')]));
     expect(again).toBe(first);
@@ -254,7 +255,9 @@ describe('a bound table never becomes the Corpus active practice', () => {
 });
 
 describe('a bound table is never saved in the browser', () => {
-  it('partialize leaves it out; the Corpus practices and the active one stay', () => {
+  // LC60: the Corpus practices are saved only while they wait for the riquadro (`corpusPracticesPending`).
+  it('partialize leaves it out; the Corpus practices waiting for the riquadro and the active one stay', () => {
+    appStore.setState({ corpusPracticesPending: true });
     const corpusId = s().createPractice('Corpus');
     s().openDossierPractice(dossier([norma('5'), sentenza]));
     const saved = options().partialize(s());
@@ -275,6 +278,7 @@ describe('a bound table is never saved in the browser', () => {
   });
 
   it('the store as written to the browser holds nothing of it, and a reload brings none back', async () => {
+    appStore.setState({ corpusPracticesPending: true });
     const corpusId = s().createPractice('Corpus');
     s().openDossierPractice(dossier([norma('5'), sentenza]));
     const raw = localStorage.getItem(options().name);
@@ -296,6 +300,7 @@ describe('a bound table is never saved in the browser', () => {
   });
 
   it('a session end parks the Corpus practices only', () => {
+    appStore.setState({ corpusPracticesPending: true });
     const corpusId = s().createPractice('Corpus');
     s().openDossierPractice(dossier([norma('5')]));
     // the browser as the store leaves it: its saved value is what `partialize` gives

@@ -8,7 +8,7 @@ import react from '@vitejs/plugin-react'
  * `pageCode.test.ts` keeps this list in step with `PAGE_CODE` and `pageCodeFor`.
  */
 export const ROUTE_PAGES: ReadonlyArray<readonly [string, readonly string[]]> = [
-  ['/dossier', ['src/components/features/dossier/DossierPage.tsx']],
+  ['/pratiche', ['src/components/features/dossier/DossierPage.tsx']],
   ['/history', ['src/components/features/history/HistoryView.tsx']],
   ['/forum/community', ['src/components/features/bulletin/ForumCommunityPage.tsx']],
   ['/forum', ['src/components/features/bulletin/BulletinBoardPage.tsx']],

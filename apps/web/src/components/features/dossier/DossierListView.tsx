@@ -6,25 +6,21 @@ import {
   MoreHorizontal,
   Edit2,
   Trash2,
-  ExternalLink,
   Upload,
   BookOpen,
   Plus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { appStore, useAppStore } from '../../../store/useAppStore';
+import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, importToastType, searchParamsFromGroup,
-  tabLabelForGroup, validateImportedDossier, type ImportCheck, type NormaGroup,
+  formatTimestampLong, computeItemCounts, decisionCitationOf, importReport, importToastType, validateImportedDossier, type ImportCheck,
 } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
-import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
-import { searchesIntoOnePractice } from './openInPractice';
 import type { Dossier, DossierKind } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { sectionOfDossierKind, useDossierKind } from '../../../features/sections/useSection';
@@ -59,7 +55,7 @@ type SortBy = 'date' | 'name' | 'items';
 const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
-  const { dossiers, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
+  const { dossiers, updateDossier, importDossier } = useAppStore();
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,7 +70,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
-  const [openPickerGroups, setOpenPickerGroups] = useState<{ dossier: Dossier; groups: NormaGroup[] } | null>(null);
   const [importing, setImporting] = useState<ImportCheck | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -134,54 +129,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     return result;
   }, [dossiers, searchQuery, selectedCategory, sectionKind, sortBy]);
 
-  // Open-on-dashboard: 0 norms → its decisions alone (D7a), else noop; 1 norm → direct, >1 → picker modal.
-  const handleQuickOpen = (dossier: Dossier) => {
-    const groups = computeNormaGroups(dossier.items);
-    if (groups.length === 0) {
-      if (dossier.items.some((i) => i.type === 'sentenza')) {
-        // One practice holding them, no search to run, as from the dossier's page.
-        searchesIntoOnePractice(dossier, [], true);
-        navigate('/');
-        return;
-      }
-      showToast('Questo dossier non contiene articoli né sentenze da aprire', 'info');
-      return;
-    }
-    if (groups.length === 1) {
-      // A dossier of one group is opened whole, its decisions too, as from its page (spec §5.1,
-      // T17); the picker's single group below brings none.
-      openAllGroupsOnDashboard(dossier, groups);
-      return;
-    }
-    setOpenPickerGroups({ dossier, groups });
-  };
-
-  const openGroupOnDashboard = (dossier: Dossier, group: NormaGroup) => {
-    // Pre-create the practice so we never merge into an orphan with the same label (gotcha 15): one
-    // practice named after the dossier, active; one group picked brings no decision.
-    const tabLabel = tabLabelForGroup(dossier.title, group);
-    const tabId = appStore.getState().createPractice(dossier.title, { custom: true, activate: true });
-    navigate('/');
-    // A group above the API's ceiling comes in pages, queued one after the other.
-    const pages = searchParamsFromGroup(group).map((params) => ({ ...params, tabLabel, targetPracticeId: tabId }));
-    if (pages.length === 1) triggerSearch(pages[0]);
-    else triggerMultiSearch(pages);
-  };
-
-  const openAllGroupsOnDashboard = (dossier: Dossier, groups: NormaGroup[]) => {
-    if (groups.length === 0) return;
-    // Create the practice up front and thread its id to the searches so SearchPanel's direct-merge
-    // path writes every group into it: ONE practice for every group, and the dossier's decisions,
-    // unread (T17).
-    const paramsList = searchesIntoOnePractice(dossier, groups, true);
-    navigate('/');
-    triggerMultiSearch(paramsList);
-  };
-
   const handleUpdateDossier = (title: string, description: string, tags: string[], kind: DossierKind) => {
     if (editingDossier) {
       updateDossier(editingDossier.id, { title, description, tags, kind });
-      showToast('Dossier aggiornato', 'success');
+      showToast('Pratica aggiornata', 'success');
     }
   };
 
@@ -199,8 +150,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     const hasOverlay =
       isModalOpen ||
       editingDossier !== null ||
-      importing !== null ||
-      openPickerGroups !== null;
+      importing !== null;
 
     const onKey = (e: KeyboardEvent) => {
       if (hasOverlay) return;
@@ -225,7 +175,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isModalOpen, editingDossier, importing, openPickerGroups]);
+  }, [isModalOpen, editingDossier, importing]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -251,7 +201,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     setImporting(null);
     const outcome = await importDossier(dossier);
     if (!outcome) {
-      showToast('Impossibile importare il dossier: errore server', 'error');
+      showToast('Impossibile importare la pratica: errore server', 'error');
       return;
     }
     const lost = outcome.failed + discarded.length;
@@ -285,7 +235,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             onClick={triggerFileImport}
             className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             title="Importa da file JSON (i)"
-            aria-label="Importa dossier da file JSON"
+            aria-label="Importa una pratica da file JSON"
             aria-keyshortcuts="i"
           >
             <Upload size={18} /> Importa
@@ -294,16 +244,16 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
             className="flex-1 md:flex-none dossier-create-button bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-            title="Nuovo dossier (n)"
+            title="Nuova pratica (n)"
             aria-keyshortcuts="n"
           >
-            <FolderPlus size={20} /> Nuovo dossier
+            <FolderPlus size={20} /> Nuova pratica
           </button>
         </>
       ) : (
         <>
           <MenuButton
-            label="Altre azioni sui dossier"
+            label="Altre azioni sulle pratiche"
             items={[
               { label: 'Importa da file JSON', icon: Upload, onSelect: triggerFileImport },
               ...(trashCount > 0 && onOpenTrash ? [{ label: `Cestino (${trashCount})`, icon: Trash2, onSelect: onOpenTrash }] : []),
@@ -315,7 +265,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <button
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
-            aria-label="Nuovo dossier"
+            aria-label="Nuova pratica"
             className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <Plus size={22} aria-hidden />
@@ -343,8 +293,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca nei dossier…"
-            aria-label="Cerca nei dossier"
+            placeholder="Cerca nelle pratiche…"
+            aria-label="Cerca nelle pratiche"
             aria-keyshortcuts="/"
             className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           />
@@ -354,7 +304,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             id="tour-dossier-sort"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortBy)}
-            aria-label="Ordina i dossier"
+            aria-label="Ordina le pratiche"
             className={cn(LIST_MENU, 'md:flex-none')}
           >
             <option value="date">Ordina per data</option>
@@ -392,16 +342,16 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               {/* LC35: the empty folder, an engraving. */}
               <Illustration name="dossier-vuoti" className="mb-5 h-28 w-28" />
               <h2 id="dossier-list-empty" className="font-serif text-[22px] font-normal leading-tight text-slate-900 dark:text-slate-50">
-                {sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
+                {sectionKind ? `Nessuna ${kindLabel(sectionKind).toLowerCase()}` : 'Nessuna pratica creata'}
               </h2>
               <p className="mt-3 text-slate-700 dark:text-slate-300">
-                Un dossier raccoglie le norme, le sentenze e le note di una pratica o di un tema di studio.
+                Una pratica raccoglie le norme, le sentenze e le note di un caso o di un tema di studio.
               </p>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">Crea il primo, o parti da un dossier di studio pronto.</p>
+              <p className="mt-2 text-slate-600 dark:text-slate-400">Crea la prima, o parti da una pratica di studio pronta.</p>
               <div className="mt-8 flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <button type="button" onClick={() => setIsModalOpen(true)} className={cn(HEADER_PRIMARY, 'justify-center sm:whitespace-nowrap')}>
                   <FolderPlus size={18} aria-hidden />
-                  Crea il tuo primo dossier
+                  Crea la tua prima pratica
                 </button>
                 {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12), after the
                     community's dossiers since S7a: the address takes the reader to their strip. */}
@@ -414,8 +364,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           )
         ) : (
           filteredDossiers.map((dossier, idx) => {
-            // An article or a decision to open (D7a: a dossier of decisions alone opens too).
-            const canOpen = dossier.items.some((i) => i.type === 'norma' || i.type === 'sentenza');
             const counts = computeItemCounts(dossier.items);
             // The acts it holds, named as the dossier names them (spec §10).
             const acts = actsSummary(layoutDossier(dossier.items));
@@ -427,7 +375,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 id={idx === 0 ? 'tour-dossier-card' : undefined}
                 role="button"
                 tabIndex={0}
-                aria-label={`Apri dossier ${dossier.title}`}
+                aria-label={`Apri la pratica ${dossier.title}`}
                 onClick={() => onSelect(dossier.id)}
                 onKeyDown={(e) => {
                   if (e.target !== e.currentTarget) return;
@@ -449,21 +397,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     {dossier.title}
                   </h2>
                   <div id={idx === 0 ? 'tour-dossier-card-actions' : undefined} className="-mr-2 -mt-1 flex shrink-0 items-center">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleQuickOpen(dossier); }}
-                      disabled={!canOpen}
-                      title={canOpen ? 'Apri in Ricerca' : 'Niente da aprire'}
-                      aria-label={`Apri ${dossier.title} in Ricerca`}
-                      className={cn(ICON_BUTTON, 'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent')}
-                    >
-                      <ExternalLink size={16} aria-hidden />
-                    </button>
                     <MenuButton
                       label={`Azioni su ${dossier.title}`}
                       triggerClassName={ICON_BUTTON}
                       items={[
-                        { label: 'Apri in Ricerca', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !canOpen },
                         { label: 'Rinomina / Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
                         { label: 'Elimina', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => deleteDossierWithUndo(dossier, onTrashChanged) },
                       ]}
@@ -528,7 +465,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       </span>
                     )}
                   </p>
-                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Creato il {formatTimestampLong(dossier.createdAt)}</p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Creata il {formatTimestampLong(dossier.createdAt)}</p>
                 </div>
               </div>
             );
@@ -543,23 +480,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           dossier={editingDossier}
           onClose={() => setEditingDossier(null)}
           onSave={handleUpdateDossier}
-        />
-      )}
-
-      {openPickerGroups && (
-        <OpenOnDashboardPicker
-          groups={openPickerGroups.groups}
-          onPick={(group) => {
-            const ctx = openPickerGroups;
-            setOpenPickerGroups(null);
-            openGroupOnDashboard(ctx.dossier, group);
-          }}
-          onPickAll={() => {
-            const ctx = openPickerGroups;
-            setOpenPickerGroups(null);
-            openAllGroupsOnDashboard(ctx.dossier, ctx.groups);
-          }}
-          onClose={() => setOpenPickerGroups(null)}
         />
       )}
 

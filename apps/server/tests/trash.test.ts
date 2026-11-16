@@ -69,7 +69,7 @@ describe('the trash', () => {
     const late = await addItem(dossierId, { itemType: 'norm', title: 'legge', content: law('9') });
     const refused = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId], taskCount: 0 });
     expect(refused.status).toBe(409);
-    expect(refused.body.detail).toBe('Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+    expect(refused.body.detail).toBe('La pratica è cambiata dopo la conferma: nulla è stato eliminato.');
     expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(4);
     expect(await prisma.trashEntry.count()).toBe(0);
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({})).status).toBe(400);
@@ -230,7 +230,7 @@ describe('the trash', () => {
     const entry = (await request(app).get('/api/trash').set(authHeader(alice))).body.find((e: { kind: string }) => e.kind === 'DOSSIER_ITEMS');
     const asked = await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({});
     expect(asked.status).toBe(409);
-    expect(asked.body.detail).toBe('Il dossier non esiste più: scegli dove ripristinare.');
+    expect(asked.body.detail).toBe('La pratica non esiste più: scegli dove ripristinare.');
     const bob = await createTestUser('trash-bob');
     const bobs = (await request(app).post('/api/dossiers').set(authHeader(bob)).send({ name: 'Di Bob' })).body.id;
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({ targetDossierId: bobs })).status).toBe(404);
@@ -312,7 +312,7 @@ describe('the trash', () => {
       await tx.dossier.delete({ where: { id: dossierId } });
     }, entry.id);
     expect(res.status).toBe(409);
-    expect(res.body.detail).toBe('Il dossier non esiste più: scegli dove ripristinare.');
+    expect(res.body.detail).toBe('La pratica non esiste più: scegli dove ripristinare.');
     expect(await prisma.trashEntry.findUnique({ where: { id: entry.id } })).not.toBeNull();
   });
 

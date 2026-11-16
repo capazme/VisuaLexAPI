@@ -68,7 +68,7 @@ function Section({ decisions, onRemove = vi.fn(), onToggleImportant = vi.fn(), s
 function Where() { return <span data-testid="where">{useLocation().pathname}</span>; }
 
 const renderSection = (decisions: SentenzaItem[], handlers: Handlers = {}) => render(
-  <MemoryRouter initialEntries={['/dossier']}>
+  <MemoryRouter initialEntries={['/pratiche']}>
     <Where />
     <Routes><Route path="*" element={<Section decisions={decisions} {...handlers} />} /></Routes>
   </MemoryRouter>,
@@ -180,7 +180,7 @@ describe('DossierDecisionsSection (D7a)', () => {
     await screen.findByRole('alert');
     for (let i = 0; i < 3; i += 1) {
       rerender(
-        <MemoryRouter initialEntries={['/dossier']}>
+        <MemoryRouter initialEntries={['/pratiche']}>
           <Where />
           <Routes><Route path="*" element={<Section decisions={[{ ...cass }]} />} /></Routes>
         </MemoryRouter>,
@@ -228,7 +228,7 @@ describe('DossierDecisionsSection (D7a)', () => {
     fetchDecision.mockResolvedValue(found({ motivazione: MOTIVAZIONE }));
     assistantProposalsStore.setState({ enabled: true, byItem: {} });
     render(
-      <MemoryRouter initialEntries={['/dossier']}>
+      <MemoryRouter initialEntries={['/pratiche']}>
         <CurrentDossierContext.Provider value="d1"><Section decisions={[cass]} /></CurrentDossierContext.Provider>
       </MemoryRouter>,
     );
@@ -241,7 +241,7 @@ describe('DossierDecisionsSection (D7a)', () => {
   it('removes a decision as the other rows do', () => {
     const onRemove = vi.fn();
     renderSection([cass], { onRemove });
-    fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CASS} dal dossier` }));
+    fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CASS} dalla pratica` }));
     expect(onRemove).toHaveBeenCalledWith(cass);
   });
 

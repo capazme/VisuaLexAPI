@@ -77,7 +77,7 @@ describe('«Oggi»', () => {
     expect(within(overdue).getByText('DPO')).toBeInTheDocument();
     expect(within(overdue).getByText(/Termine finale ieri · scaduto da 1 giorno/)).toBeInTheDocument();
     expect(within(overdue).getByText('Urgente')).toBeInTheDocument();
-    expect(within(overdue).getByRole('link', { name: /Ricorso Rossi/ })).toHaveAttribute('href', '/dossier?dossier=d1');
+    expect(within(overdue).getByRole('link', { name: /Ricorso Rossi/ })).toHaveAttribute('href', '/pratiche?dossier=d1');
     // The count is still overdue plus today: every task the view lists.
     expect(plannerStore.getState().todayCount).toBe(3);
     expect(service.list).toHaveBeenCalledWith('today', undefined);
@@ -116,7 +116,7 @@ describe('«Oggi»', () => {
     const riprendi = await screen.findByRole('region', { name: 'Riprendi' });
     // The three most recent, the newest first.
     expect(within(riprendi).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '/dossier?dossier=d', '/dossier?dossier=c', '/dossier?dossier=b',
+      '/pratiche?dossier=d', '/pratiche?dossier=c', '/pratiche?dossier=b',
     ]);
     expect(screen.getByRole('link', { name: /Vedi i prossimi giorni/ })).toHaveAttribute('href', '/work/prossimi');
     expect(service.list).toHaveBeenCalledTimes(1);
@@ -323,7 +323,7 @@ describe('«Oggi» in groups', () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY, dossierId: 'd1' })]));
     renderAt(<TodayView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Raggruppa: per data' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Per dossier' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Per pratica' }));
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Ricorso Rossi, 1 compito', "Lista d'ingresso, 1 compito"]);
     expect(localStorage.getItem('visualex-opus-today-grouping')).toBe('dossier');
     localStorage.removeItem('visualex-opus-today-grouping');

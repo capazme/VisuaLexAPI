@@ -48,7 +48,7 @@ describe('practiceUndo (K1a)', () => {
     closeAllPracticesWithUndo();
     expect(s().practices).toEqual([]);
     await settle();
-    expect(shown!.message).toBe('2 pratiche chiuse');
+    expect(shown!.message).toBe('2 tavoli chiusi');
     await shown!.onUndo();
     expect(s().practices.map((p) => p.id)).toEqual([a, b]);
     expect(s().activePracticeId).toBe(a);
@@ -104,7 +104,7 @@ describe('practiceUndo (K1a)', () => {
     await settle();
     await removal.onUndo();
     const messages = notificationStore.getState().entries.map((e) => e.message);
-    expect(messages).toContain('Non ripristinabile: la pratica «Pratica» è stata chiusa.');
+    expect(messages).toContain('Non ripristinabile: «Pratica» è stato chiuso.');
     expect(messages).not.toContain('Ripristinato');
     // The practice's own «Annulla» still brings it back, without the act (it was taken off before).
     await shown!.onUndo();

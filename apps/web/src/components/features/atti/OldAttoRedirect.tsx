@@ -14,8 +14,8 @@ export function OldAttoRedirect() {
     attiService
       .get(id)
       .then(
-        (atto) => (atto.dossierId ? `/dossier?dossier=${encodeURIComponent(atto.dossierId)}&vista=atti` : '/dossier'),
-        () => '/dossier',
+        (atto) => (atto.dossierId ? `/pratiche?dossier=${encodeURIComponent(atto.dossierId)}&vista=atti` : '/pratiche'),
+        () => '/pratiche',
       )
       .then((next) => alive && setTo(next));
     return () => {

@@ -117,7 +117,7 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
   );
 
   if (!subject) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Questo testo non è più sul tavolo della pratica.</p>;
+    return <p className="text-sm text-slate-500 dark:text-slate-400">Questo testo non è più sul tavolo.</p>;
   }
   if (subject.kind === 'article') {
     const { article } = subject;

@@ -27,7 +27,7 @@ export const DELEGATED_COUNTERS: Record<DelegatedCounter, number> = {
 };
 
 const COUNTER_WORDS: Record<DelegatedCounter, string> = {
-  dossier_create: 'dossier creati',
+  dossier_create: 'pratiche create',
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',

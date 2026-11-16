@@ -78,7 +78,7 @@ const NO_ARTICLE = '';
 function labelOf(item: DossierItem): string {
   if (item.type === 'norma') return item.citation ?? shortNorm(item.data);
   if (item.type === 'sentenza') return decisionCitationOf(item.data);
-  return 'Nota del dossier';
+  return 'Nota della pratica';
 }
 
 /** The key a dossier's article or decision is marked under, for the overlap with other dossiers. */

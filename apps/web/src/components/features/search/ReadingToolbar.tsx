@@ -204,12 +204,12 @@ export function ReadingToolbar({
             type="button"
             onClick={onOpenDossier}
             className={ACTION}
-            aria-label={phone ? (dossierLabel ?? 'Al dossier') : undefined}
-            title={tip(dossierLabel ?? 'Aggiungi l’articolo a un dossier', copyLockedReason)}
+            aria-label={phone ? (dossierLabel ?? 'Alla pratica') : undefined}
+            title={tip(dossierLabel ?? 'Aggiungi l’articolo a una pratica', copyLockedReason)}
             {...lock(copyLockedReason)}
         >
             <FolderPlus size={phone ? 18 : 16} aria-hidden />
-            {!phone && (dossierLabel ?? 'Al dossier')}
+            {!phone && (dossierLabel ?? 'Alla pratica')}
         </button>
     );
 

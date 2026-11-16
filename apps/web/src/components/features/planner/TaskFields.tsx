@@ -32,11 +32,11 @@ export function TaskFields({ draft, onChange, withText = false, dossierLocked = 
   const byTitle = [...dossiers].sort((a, b) => a.title.localeCompare(b.title, 'it'));
   const groups = studia
     ? [
-        { label: 'Dossier di lavoro', items: byTitle.filter((d) => d.kind !== 'studio') },
-        { label: 'Dossier di studio', items: byTitle.filter((d) => d.kind === 'studio') },
+        { label: 'Pratica di lavoro', items: byTitle.filter((d) => d.kind !== 'studio') },
+        { label: 'Pratica di studio', items: byTitle.filter((d) => d.kind === 'studio') },
       ].filter((g) => g.items.length > 0)
     : [{ label: '', items: byTitle }];
-  const lockedTitle = dossierLocked && draft.dossierId ? dossiers.find((d) => d.id === draft.dossierId)?.title ?? 'Dossier' : null;
+  const lockedTitle = dossierLocked && draft.dossierId ? dossiers.find((d) => d.id === draft.dossierId)?.title ?? 'Pratica' : null;
 
   return (
     <div className="grid grid-cols-1 gap-4">
@@ -136,7 +136,7 @@ export function TaskFields({ draft, onChange, withText = false, dossierLocked = 
         </div>
 
         <div className="grid gap-1.5">
-          <label htmlFor={`${id}-dossier`} className={FIELD_LABEL}>Dossier</label>
+          <label htmlFor={`${id}-dossier`} className={FIELD_LABEL}>Pratica</label>
           {lockedTitle !== null ? (
             <input id={`${id}-dossier`} value={lockedTitle} readOnly disabled className={FIELD} />
           ) : (

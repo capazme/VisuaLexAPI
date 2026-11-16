@@ -204,7 +204,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                 <div className="flex items-center gap-2 min-w-0">
                     <Folder size={16} className="text-primary-500 shrink-0" />
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                        Aggiungi a dossier
+                        Aggiungi a una pratica
                     </h3>
                 </div>
                 <button
@@ -225,7 +225,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Cerca dossier…"
+                            placeholder="Cerca una pratica…"
                             className="w-full pl-8 pr-2.5 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
                     </div>
@@ -235,7 +235,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 min-h-[80px]">
                 {visible.length === 0 ? (
                     <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-6">
-                        {dossiers.length === 0 ? 'Nessun dossier presente.' : 'Nessun dossier corrisponde alla ricerca.'}
+                        {dossiers.length === 0 ? 'Nessuna pratica presente.' : 'Nessuna pratica corrisponde alla ricerca.'}
                     </p>
                 ) : (
                     visible.map((d) => {
@@ -285,17 +285,17 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                         )}
                     >
-                        <FolderPlus size={16} /> Nuovo dossier…
+                        <FolderPlus size={16} /> Nuova pratica…
                     </button>
                 ) : (
-                    <form aria-label="Crea dossier" onSubmit={handleCreate} className="flex gap-2">
+                    <form aria-label="Crea una pratica" onSubmit={handleCreate} className="flex gap-2">
                         <input
                             type="text"
                             autoFocus
                             value={newTitle}
                             onChange={(e) => setNewTitle(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Escape') setCreating(false); }}
-                            placeholder="Nome del dossier…"
+                            placeholder="Nome della pratica…"
                             className="flex-1 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
                         <button

@@ -113,7 +113,7 @@ export function PracticeArticleRow({
                 onClick={dossier.add}
                 className="inline-flex min-h-[44px] items-center rounded-md px-2 font-medium text-primary-700 hover:bg-primary-50 md:min-h-0 md:py-0.5 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
-                Aggiungi al dossier
+                Aggiungi alla pratica
               </button>
             )}
           </p>

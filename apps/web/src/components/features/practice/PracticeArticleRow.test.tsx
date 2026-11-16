@@ -53,15 +53,15 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     expect(screen.queryByText(/All\./)).toBeNull();
   });
 
-  it('in the Ricerca it says «Aggiungi al dossier» and which dossier holds it (LC59)', () => {
+  it('in the Ricerca it says «Aggiungi alla pratica» and which dossier holds it (LC59)', () => {
     const { practiceId, actId } = setUp([CC_2043]);
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Sinistro Rossi', createdAt: '2026-11-01T00:00:00Z', items: [
       { id: 'i1', type: 'norma', data: CC_2043.norma_data, addedAt: '2026-11-02T00:00:00Z' },
     ] }] });
     try {
       render(row(practiceId, actId, CC_2043));
-      expect(screen.getByRole('button', { name: /^Aggiungi al dossier art\. 2043/ })).toBeInTheDocument();
-      const mark = screen.getByText('Nel dossier «Sinistro Rossi»');
+      expect(screen.getByRole('button', { name: /^Aggiungi alla pratica art\. 2043/ })).toBeInTheDocument();
+      const mark = screen.getByText('Nella pratica «Sinistro Rossi»');
       // Under the name, not beside it in the toggle: a narrow column never cuts the row's name for it (#536).
       expect(screen.getByRole('button', { name: /^(Espandi|Comprimi) art\. 2043/ })).not.toContainElement(mark);
     } finally {

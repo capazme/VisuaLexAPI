@@ -49,7 +49,7 @@ const handlers = { onViewPdf: vi.fn(), onCrossReference: vi.fn(), streaming: nul
 const CORPUS_ACT = 'l. 7 agosto 1990, n. 241';
 const BOUND_ACT = 'l. 8 marzo 2017, n. 24';
 const DOSSIER: Dossier = {
-  id: 'dos-1', title: 'Legata al dossier', createdAt: '',
+  id: 'dos-1', title: 'Legata alla pratica', createdAt: '',
   items: [
     { id: 'n5', addedAt: '', type: 'norma', data: { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08', numero_articolo: '5' } },
     { id: 'n7', addedAt: '', type: 'norma', data: { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08', numero_articolo: '7' } },
@@ -98,7 +98,7 @@ describe('the containers take their practice (LC52 c2)', () => {
   it('PracticeTable shows the practice it is given, rows and all, not the active one; without one, the active', () => {
     const first = render(<PracticeTable {...handlers} layout="overview" practiceId={bound} />);
     // A bound table draws no practice header (LC54 c3: the dossier's page names it).
-    expect(screen.queryByRole('heading', { level: 2, name: 'Legata al dossier' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Legata alla pratica' })).toBeNull();
     expect(screen.getByRole('region', { name: BOUND_ACT })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: CORPUS_ACT })).toBeNull();
     first.unmount();

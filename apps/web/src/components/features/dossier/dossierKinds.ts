@@ -8,4 +8,4 @@ export const DOSSIER_KINDS: ReadonlyArray<{ kind: DossierKind; label: string; hi
 ];
 
 /** «Dossier di lavoro» / «Dossier di studio»: a dossier with no kind is di lavoro. */
-export const kindLabel = (kind: DossierKind | undefined): string => (kind === 'studio' ? 'Dossier di studio' : 'Dossier di lavoro');
+export const kindLabel = (kind: DossierKind | undefined): string => (kind === 'studio' ? 'Pratica di studio' : 'Pratica di lavoro');

@@ -155,7 +155,7 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       const p = await proposal(alice.id, itemId);
       const other = (await request(app).post('/api/dossiers').set(authHeader(bob)).send({ name: 'Altro' })).body.id;
       const bobItem = (await request(app).post(`/api/dossiers/${other}/items`).set(authHeader(bob)).send({ itemType: 'norm', title: 'x', content: NORM })).body.id;
-      expect((await request(app).get(`${base()}/proposals`).set(authHeader(bob))).body.detail).toBe('Dossier non trovato');
+      expect((await request(app).get(`${base()}/proposals`).set(authHeader(bob))).body.detail).toBe('Pratica non trovata');
       expect((await request(app).put(`${base()}/proposals/${p.id}/state`).set(authHeader(bob)).send({ state: 'validated' })).status).toBe(404);
       expect((await request(app).delete(`${base()}/proposals/${p.id}`).set(authHeader(bob))).status).toBe(404);
       // Bob's own entry, Alice's proposal id: not his.

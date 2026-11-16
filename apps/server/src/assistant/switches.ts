@@ -10,7 +10,7 @@ export const APP_SWITCHES = {
   // D7b: the web app's side of what an assistant proposed (its saved passages, its glosses, its notes), validated
   // by hand. Off: the web's proposal routes answer 404 and dossier answers carry no state. Since D8 no application
   // proposes coloured passages any more: the saved ones stay, readable here.
-  assistant_passages: 'Proposte e note dell’IA nel dossier, da validare a mano (D7b).',
+  assistant_passages: 'Proposte e note dell’IA nella pratica, da validare a mano (D7b).',
   // D8: the connected application's side of glosses. Off: the delegated route that proposes them answers 404 and
   // the MCP does not list `omnilex_glossa_voce` (an entry's text is behind no switch). The route also needs
   // `assistant_passages`, the web app's side where the user validates them. Switch this on only once the web shows

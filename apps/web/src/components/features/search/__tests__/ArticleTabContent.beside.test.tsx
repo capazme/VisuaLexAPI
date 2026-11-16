@@ -126,7 +126,7 @@ describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
     fireEvent.click(within(openMore(desktopRow(container))).getByRole('menuitem', { name: 'Cerca nel testo' }));
     expect(screen.getByRole('search')).toBeInTheDocument();
     expect(entries(openMore(desktopRow(container)))).toContain('Chiudi la ricerca nel testo');
-    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questo tavolo' })).toHaveAttribute('aria-pressed', 'true');
     // Registered under the practice, not under the window's own id.
     expect(findRootsFor(PRACTICE)).toHaveLength(1);
     expect(findRootsFor(WINDOW)).toHaveLength(0);
@@ -170,7 +170,7 @@ describe('ArticleTabContent variant="row" — everything as today', () => {
     devMode.mockReturnValue(true);
     const { container } = show('row', article(), vi.fn());
     const desktop = labels(desktopRow(container));
-    expect(desktop).toEqual(expect.arrayContaining(['Note', 'Al dossier', 'Altre azioni sull’articolo']));
+    expect(desktop).toEqual(expect.arrayContaining(['Note', 'Alla pratica', 'Altre azioni sull’articolo']));
     expect(entries(openMore(desktopRow(container)))).toEqual(expect.arrayContaining(['Aggiungi alle norme rapide', 'Esporta…', 'Testo alla data…']));
     // Study Mode: the act's «Studio» on a computer; the phone's «⋯» has it too.
     const phone = container.querySelector('div.flex.md\\:hidden') as HTMLElement;

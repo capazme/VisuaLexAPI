@@ -87,7 +87,7 @@ describe('ConnectedAppsSection', () => {
     listConnectedApps.mockResolvedValue([APP]);
     setCanDelete.mockResolvedValue(undefined);
     render(<ConnectedAppsSection />);
-    const toggle = await screen.findByRole('switch', { name: /può eliminare dossier, voci e schede/i });
+    const toggle = await screen.findByRole('switch', { name: /può eliminare pratiche, voci e schede/i });
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
     await waitFor(() => expect(setCanDelete).toHaveBeenCalledWith('grant-1', true));

@@ -156,22 +156,22 @@ describe('a window gives its reader the entry too (useDossierItemId)', () => {
 });
 
 describe('fixes from the tests of 16-11', () => {
-  it('«Aggiungi al dossier» from a row says «Aggiunto al dossier»', () => {
+  it('«Aggiungi alla pratica» from a row says «Aggiunto alla pratica»', () => {
     svc.addItem.mockReturnValue(new Promise(() => {}));
     render(<Page />);
     arrive();
-    fireEvent.click(within(rowEl('241', '3')).getByRole('button', { name: /^Aggiungi al dossier/ }));
-    expect(toast).toHaveBeenCalledWith('Aggiunto al dossier', 'success');
+    fireEvent.click(within(rowEl('241', '3')).getByRole('button', { name: /^Aggiungi alla pratica/ }));
+    expect(toast).toHaveBeenCalledWith('Aggiunto alla pratica', 'success');
   });
 
-  it('a decision added from its row says «Aggiunta al dossier»', () => {
+  it('a decision added from its row says «Aggiunta alla pratica»', () => {
     svc.addItem.mockReturnValue(new Promise(() => {}));
     render(<Page />);
     act(() => { s().addKnownDecisions(bound().id, [{ corte: 'cassazione', archivio: 'civile' as const, numero: 100, anno: 2023 }]); });
     const outside = bound().decisions.find((d) => d.label.includes('100'))!;
     const el = document.querySelector<HTMLElement>(`[data-practice-row="${decisionRowKey(bound().id, outside.id)}"]`)!;
-    fireEvent.click(within(el).getByRole('button', { name: /^Aggiungi al dossier/ }));
-    expect(toast).toHaveBeenCalledWith('Aggiunta al dossier', 'success');
+    fireEvent.click(within(el).getByRole('button', { name: /^Aggiungi alla pratica/ }));
+    expect(toast).toHaveBeenCalledWith('Aggiunta alla pratica', 'success');
   });
 
   it('the dossier is read again when the tab opens, and each time the window comes back, not only on the poll', () => {

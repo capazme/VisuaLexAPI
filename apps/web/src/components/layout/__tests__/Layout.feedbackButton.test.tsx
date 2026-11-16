@@ -36,7 +36,7 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
   });
 
   // Below md it is the user menu's «Commenti» (M1).
-  it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione?materia=DIRITTO_CIVILE', '/learn/valida', '/learn/schede', '/dossier'])(
+  it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione?materia=DIRITTO_CIVILE', '/learn/valida', '/learn/schede', '/pratiche'])(
     'shows it from md only on %s, left of «Tutto schermo», which Tab reaches after it',
     (path) => {
       at(path);
@@ -47,14 +47,14 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
   );
 
   it("sits in the bar's right end between md and lg, as «Tutto schermo», and at the window's top right in full screen", async () => {
-    at('/dossier');
+    at('/pratiche');
     expect(screen.getByTestId('feedback')).toHaveClass('max-lg:right-14');
     cleanup();
     const { appStore } = await import('../../../store/useAppStore');
     const before = appStore.getState().settings;
     appStore.setState({ settings: { ...before, focusMode: true } });
     try {
-      at('/dossier');
+      at('/pratiche');
       expect(screen.getByTestId('feedback')).not.toHaveClass('max-lg:right-14');
       // The top rows keep clear of both buttons from md, which draws no bar in full screen.
       expect(screen.getByTestId('layout-content')).toHaveClass('md:[--focus-button-room:11rem]');
@@ -65,7 +65,7 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
 
   // LC21: from lg it sits in the top bar (or the search page's bar), so no top row keeps room for it outside full screen.
   it('asks no room of the top rows outside full screen; the search page\'s field ends before the controls', () => {
-    at('/dossier');
+    at('/pratiche');
     expect(screen.getByTestId('layout-content').className).not.toMatch(/--focus-button-room/);
     cleanup();
     at('/');
@@ -74,18 +74,18 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
   });
 
   it("leaves the page's foot its own padding: nothing floats there any more", () => {
-    at('/dossier');
+    at('/pratiche');
     expect(screen.getByTestId('layout-content').className).not.toMatch(/page-foot/);
   });
 
   it('is not drawn for someone signed out', () => {
     auth.isAuthenticated = false;
-    at('/dossier');
+    at('/pratiche');
     expect(screen.queryByTestId('feedback')).toBeNull();
   });
 
   // The services pill covered the foot of the page on a phone: it is the user menu's «Stato dei servizi» (S1).
-  it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione', '/learn/valida', '/dossier'])('draws no services pill on %s', (path) => {
+  it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione', '/learn/valida', '/pratiche'])('draws no services pill on %s', (path) => {
     at(path);
     expect(screen.queryByText(/Servizi operativi|Controllo servizi/)).toBeNull();
   });
@@ -103,7 +103,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
   });
 
-  it.each(['/dossier', '/work/scadenziario', '/forum', '/learn/schede'])('draws the bar on %s, with the path, the search and the three controls, none floating', (path) => {
+  it.each(['/pratiche', '/work/scadenziario', '/forum', '/learn/schede'])('draws the bar on %s, with the path, the search and the three controls, none floating', (path) => {
     at(path);
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toBeInTheDocument();
@@ -121,14 +121,14 @@ describe('Layout — the top bar from lg (LC21)', () => {
 
   it('opens the command palette from the bar\'s search', () => {
     appStore.setState({ commandPaletteOpen: false });
-    at('/dossier');
+    at('/pratiche');
     fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: /Norma, sentenza o tema/ }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
     appStore.setState({ commandPaletteOpen: false });
   });
 
   it('opens full screen from the bar', () => {
-    at('/dossier');
+    at('/pratiche');
     fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: 'Tutto schermo' }));
     expect(appStore.getState().settings.focusMode).toBe(true);
   });
@@ -155,7 +155,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
   // LC27 (Luca, 15 Nov: «il passaggio a full screen è veramente brutto»): the bar stays in full screen, its controls in it.
   it('keeps the bar in full screen, with its controls in it and «Tutto schermo» pressed', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
-    at('/dossier');
+    at('/pratiche');
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
     expect(within(bar).getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'true');
@@ -166,7 +166,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
 
 describe('Layout — below lg the controls float as before', () => {
   it('draws no top bar, and the news floats', () => {
-    at('/dossier');
+    at('/pratiche');
     expect(screen.queryByTestId('top-bar')).toBeNull();
     expect(screen.getByTestId('feedback')).toHaveClass('fixed');
     expect(screen.getByTestId('news-floating')).toBeInTheDocument();

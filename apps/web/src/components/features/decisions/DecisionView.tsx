@@ -152,7 +152,7 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
             ? addToThisDossier(hostDossier.id, { sentenza: sentenzaFromDecision(answer.identita, answer.attributi) }, onToast, 'Aggiunta')
             : setDossierAnchor(e.currentTarget))}
         >
-          {hostDossier ? 'Aggiungi a questo dossier' : 'Aggiungi al dossier'}
+          {hostDossier ? 'Aggiungi a questa pratica' : 'Aggiungi alla pratica'}
         </Button>
         {sourceUrl && (
           <a

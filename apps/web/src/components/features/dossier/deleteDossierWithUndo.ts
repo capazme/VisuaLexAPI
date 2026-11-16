@@ -3,7 +3,7 @@ import { trashService } from '../../../services/trashService';
 import { appStore } from '../../../store/useAppStore';
 
 /** The toast after a dossier is deleted: where it went, and «Annulla». */
-export const deletedDossierMessage = (title: string) => `Dossier «${title}» spostato nel cestino`;
+export const deletedDossierMessage = (title: string) => `Pratica «${title}» spostata nel cestino`;
 
 /**
  * Deletes a dossier from the web app: the server moves it to the trash for 30 days

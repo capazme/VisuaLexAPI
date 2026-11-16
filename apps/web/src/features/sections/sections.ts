@@ -18,7 +18,7 @@ export interface Section {
 }
 
 export const SECTIONS: readonly Section[] = [
-  { id: 'opus', name: 'Work', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/work/scadenziario', homeName: 'Scadenziario' },
+  { id: 'opus', name: 'Work', line: 'Pratiche di lavoro e strumenti per la professione', icon: Briefcase, home: '/work/scadenziario', homeName: 'Scadenziario' },
   { id: 'gymnasium', name: 'Learn', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/learn/ripasso', homeName: 'Oggi' },
   { id: 'academia', name: 'Labs', line: 'Grafo, feedback e validazione', icon: FlaskConical, home: '/labs', homeName: 'Assistente' },
   { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum', homeName: 'Dossier pubblici' },

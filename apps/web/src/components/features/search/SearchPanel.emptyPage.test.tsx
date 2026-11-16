@@ -3,7 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../practice/ReadingRow', () => ({ ReadingRow: () => null }));
-vi.mock('../practice/PracticeBar', () => ({ PracticeBar: () => null }));
 vi.mock('../practice/PracticePhoneView', () => ({ PracticePhoneView: () => null }));
 vi.mock('./ReadingBackControl', () => ({ ReadingBackControl: () => null }));
 

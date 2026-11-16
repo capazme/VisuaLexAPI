@@ -26,13 +26,13 @@ function renderPopup(openLabel?: string) {
 describe('CitationPreviewPopup — the open button', () => {
   it('opens the norm in the practice by default', () => {
     const onOpenCitation = renderPopup();
-    fireEvent.click(screen.getByRole('button', { name: 'Apri nella pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apri sul tavolo' }));
     expect(onOpenCitation).toHaveBeenCalledExactlyOnceWith(citation);
   });
 
   it('says the host’s words when the host opens the norm itself (the dossier’s own norms, D7d)', () => {
     const onOpenCitation = renderPopup('Apri tra le norme');
-    expect(screen.queryByRole('button', { name: 'Apri nella pratica' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Apri sul tavolo' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Apri tra le norme' }));
     expect(onOpenCitation).toHaveBeenCalledExactlyOnceWith(citation);
   });
