@@ -89,12 +89,16 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
                 </span>
               )}
               {due && task.dueDate && (
-                <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold', DEADLINE_TONE[due.tone])}>
+                // On a phone the deadline is a short word in its colour, no box (LC33, after Todoist's red date).
+                <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold max-md:border-transparent! max-md:bg-transparent! max-md:px-0 max-md:py-0', DEADLINE_TONE[due.tone])}>
                   <Hourglass size={12} aria-hidden />
-                  <span>
+                  <span className="max-md:sr-only">
                     {due.tone === 'today'
                       ? `Termine finale: scade oggi${time(task.dueTime)}`
                       : `Termine finale ${shortDay(task.dueDate, today).toLowerCase()}${time(task.dueTime)} · ${due.text}`}
+                  </span>
+                  <span aria-hidden className="md:hidden">
+                    {due.tone === 'today' ? `Scade oggi${time(task.dueTime)}` : `Termine ${shortDay(task.dueDate, today).toLowerCase()}${time(task.dueTime)}`}
                   </span>
                 </span>
               )}

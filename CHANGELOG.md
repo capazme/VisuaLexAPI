@@ -12,6 +12,27 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-11-16
+
+LexCraft's engravings, Work's to-do list on a phone, the section's name beside the phone's menu. Web
+only, no migration.
+
+### Look
+
+- LexCraft's engravings (LC35): 15 plates in one ink, drawn in the theme's colour (warm black on the
+  paper, chalk on the dark), in Learn (the day, the streak, the level, the done seal, the subjects) and on
+  the empty lists of Work, the dossiers and the Forum.
+
+### Phone
+
+- Work's to-do list on a phone (LC33): rows to tick and swipe, a quick add at the foot.
+- The section's name beside the menu in the top bar, not over the page's title (LC34).
+
+### Development
+
+- Two local-only Vite configs that came in by mistake are gone (`apps/web/vite.lc29.config.ts`,
+  `vite.lc30.config.ts`).
+
 ## [1.23.0] - 2026-11-16
 
 The sign-in page, a light depth, a simpler reading of one article, plainer «Analizza documento» and act

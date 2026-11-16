@@ -8,9 +8,18 @@ import { MATERIA_LABEL } from '../studiaLabels';
 import { dueLabel, instituteSessionPath, orderInstitutes } from './today';
 import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, QUIET_BUTTON, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
 import type { PercorsoState } from './usePercorso';
+import { Illustration, type IllustrationName } from '../../../ui/Illustration';
 
 /** The stops drawn before «Mostra tutti»: a subject may hold hundreds of institutes. */
 export const PATH_STOPS_SHOWN = 6;
+
+const SUBJECT_ART: Record<Materia, IllustrationName> = {
+  DIRITTO_CIVILE: 'materia-civile',
+  DIRITTO_PENALE: 'materia-penale',
+  DIRITTO_AMMINISTRATIVO: 'materia-amministrativo',
+  DIRITTO_PROCESSUALE_CIVILE: 'materia-proc-civile',
+  DIRITTO_PROCESSUALE_PENALE: 'materia-proc-penale',
+};
 
 const subjectPath = (materia: Materia) => `/learn/ripasso/sessione?materia=${materia}`;
 
@@ -71,6 +80,9 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
   return (
     <section aria-labelledby={headingId} className={cn(TILE, 'overflow-hidden')}>
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+        <div className="flex min-w-0 items-center gap-3">
+        {/* LC35: the subject's emblem, an engraving; its colour stays on the dot by the name. */}
+        <Illustration name={SUBJECT_ART[materia]} className="h-12 w-12" />
         <div className="min-w-0">
           <h3 id={headingId} className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
             <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(materia) }} />
@@ -80,6 +92,7 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
             {cards === 1 ? '1 scheda' : `${cards} schede`} · {stops.length === 1 ? '1 istituto' : `${stops.length} istituti`}
             {due > 0 && ` · ${dueLabel(due).toLowerCase()}`}
           </p>
+        </div>
         </div>
         <button type="button" onClick={() => navigate(subjectPath(materia))} className={cn(SECONDARY_BUTTON, 'shrink-0')}>
           Ripassa<span className="sr-only"> {label}</span>

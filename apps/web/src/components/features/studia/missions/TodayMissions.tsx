@@ -8,6 +8,7 @@ import { BLOCK_HEADING, MUTED_TEXT, QUIET_BUTTON, TILE } from '../progress/token
 import { MISSION_INK_MS, MissionRow } from './MissionMark';
 import { missionOrder, missionSummary, todayMissions, type Mission } from './missions';
 import { useFreshMissions } from '../progress/seenProgress';
+import { Illustration } from '../../../ui/Illustration';
 
 export interface TodayMissionsProps {
   /** The whole day's answer: the missions are the day's. Null before the first one, or when it could not be read. */
@@ -75,7 +76,9 @@ export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel }:
           Le missioni di oggi
         </h2>
         {summary && summary.of > 0 && (
-          <p className="text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200">
+          <p className="flex items-center gap-2 text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200">
+            {/* LC35: every mission done, the seal on the day, an engraving. */}
+            {summary.done === summary.of && <Illustration name="learn-missione" className="h-9 w-9" />}
             {`${summary.done} di ${summary.of}`}
             <span className="sr-only"> compiute</span>
           </p>

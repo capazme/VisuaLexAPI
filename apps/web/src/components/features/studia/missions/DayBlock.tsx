@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi, TappaIstituto } from '../../../../types/studia';
 import { estimateLabel } from '../studiaLabels';
-import { GoalMark } from '../progress/GoalMark';
 import { formatDate, formatDayLong } from '../progress/layout';
 import { goalMissionDone } from './missions';
 import { nextDayLine, subjectsPhrase, todaySentence, todayState, todaySubjects } from '../progress/today';
 import { FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, SECONDARY_BUTTON, TILE } from '../progress/tokens';
+import { GoalMark } from '../progress/GoalMark';
+import { Illustration, type IllustrationName } from '../../../ui/Illustration';
 
 export interface DayBlockProps {
   /** The whole day's answer: the date, the goal met, whether there is any card at all. */
@@ -90,6 +91,7 @@ export function DayBlock({
   const from = !materia && action ? todaySubjects(action.materie, stops, action.oggi.nuove) : null;
   const detail = state === 'todo' ? [estimateLabel(cards), from && subjectsPhrase(from)].filter(Boolean).join(' · ') : '';
 
+  const art: IllustrationName | null = state === 'todo' ? 'learn-ripasso' : state === 'done' ? 'learn-fatto-oggi' : state === 'empty' ? 'learn-schede-vuote' : null;
   return (
     <section
       ref={block}
@@ -100,9 +102,12 @@ export function DayBlock({
       className={cn(
         TILE,
         'relative grid justify-items-stretch gap-3 p-5 md:justify-items-start md:p-7',
-        goal && 'md:pr-44',
+        (goal || art) && 'md:pr-44',
       )}
     >
+      {/* LC35: an engraving at the block's right from md, what the day holds: the open book and its cards, the empty
+          drawer. The day done has its own, with the goal's words (below). */}
+      {!goal && art && <Illustration name={art} className="absolute right-4 top-4 h-16 w-16 md:right-7 md:top-1/2 md:h-32 md:w-32 md:-translate-y-1/2" />}
       <h2 id="studia-giorno" className="sr-only">
         Il ripasso di oggi
       </h2>

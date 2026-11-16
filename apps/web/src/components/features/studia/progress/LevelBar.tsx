@@ -7,6 +7,7 @@ import { useXpGrowth } from './seenProgress';
 import { INK_BG, INK_TEXT, MUTED_TEXT } from './tokens';
 import { XpGain } from './XpGain';
 import { useMountedFrame } from './xpGains';
+import { Illustration } from '../../../ui/Illustration';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -25,8 +26,11 @@ export function LevelBar({ livello, className }: { livello: XpLivello; className
   const share = livello.perIlProssimo > 0 ? Math.min(1, livello.nelLivello / livello.perIlProssimo) : 0;
   return (
     <div data-testid="level-bar" className={cn('grid gap-2', className)}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        {/* Keyed by the level: one reached while the page is open is pressed in too. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        {/* LC35: the level beside its laurel, an engraving. Keyed by the level: one reached while the page is open is
+            pressed in too. */}
+        <span className="flex items-center gap-2">
+        <Illustration name="learn-livello" className="h-11 w-11" />
         <motion.p
           key={livello.livello}
           initial={levelUp && !reduce ? { scale: 1.5, opacity: 0 } : false}
@@ -36,6 +40,7 @@ export function LevelBar({ livello, className }: { livello: XpLivello; className
         >
           Livello {formatCount(livello.livello)}
         </motion.p>
+        </span>
         <div className="flex items-center gap-2">
           <XpGain gain={gain !== null ? { id: livello.totale, punti: gain } : null} />
           {livello.oggi > 0 && (

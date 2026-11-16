@@ -1,5 +1,6 @@
 import { cn } from '../../../lib/utils';
 import { SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { Illustration, type IllustrationName } from '../../ui/Illustration';
 
 const MUTED_TEXT = 'text-slate-600 dark:text-slate-400';
 
@@ -31,9 +32,10 @@ export function TaskViewError({ onRetry }: { onRetry: () => void }) {
 }
 
 /** Nothing to show: the sentence and, when it helps, what to do. */
-export function TaskViewEmpty({ title, line }: { title: string; line?: string }) {
+export function TaskViewEmpty({ title, line, art }: { title: string; line?: string; art?: IllustrationName }) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center dark:border-slate-700">
+      {art && <Illustration name={art} className="mx-auto mb-4 h-24 w-24" />}
       <p className="font-serif text-lg text-slate-900 dark:text-slate-50">{title}</p>
       {line && <p className={cn('mt-1 text-sm', MUTED_TEXT)}>{line}</p>}
     </div>
