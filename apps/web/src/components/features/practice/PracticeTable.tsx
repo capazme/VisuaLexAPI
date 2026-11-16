@@ -6,7 +6,7 @@ import type { ArticleData } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
 import { PAGE_TITLE } from '../../layout/PageFrame';
 import { cn } from '../../../lib/utils';
-import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
+import { isBoundPractice, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { isEmptyPractice } from './practiceView';
 import { closePracticeWithUndo } from './practiceUndo';
 import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
@@ -46,8 +46,10 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
   // Asked once: `tryStartTour` is a new function on every render, so the effect cannot key on it.
   const tourAsked = useRef(false);
   const drawn = practice !== undefined;
+  // A dossier's table (LC54) is not a practice of the Corpus: none of the practice's tours.
+  const bound = practice !== undefined && isBoundPractice(practice);
   useEffect(() => {
-    if (!drawn || concealed || tourAsked.current) return;
+    if (!drawn || concealed || bound || tourAsked.current) return;
     tourAsked.current = true;
     tryStartTour('practice');
   });
@@ -76,22 +78,26 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
 /** The index's title (U2): the act headings' serif, a step larger than theirs, so the name fits a 320 px column. */
 const INDEX_TITLE = 'font-serif text-[22px] font-medium leading-tight text-slate-900 dark:text-white';
 
-/** In the index (`compact`) the name is smaller and «Salva come dossier» is a 44 px icon beside «⋯». */
+/** In the index (`compact`) the name is smaller and «Salva come dossier» is a 44 px icon beside «⋯». A dossier's table
+ *  (LC54) draws none of it: the dossier's page already names it, and its name, count and actions are the Corpus's. */
 function PracticeHeader({ practice, compact, simple, children }: { practice: Practice; compact: boolean; simple: boolean; children: ReactNode }) {
   const renamePractice = useAppStore((s) => s.renamePractice);
   const createPractice = useAppStore((s) => s.createPractice);
   const [editing, setEditing] = useState(false);
   const countLine = practiceCountLine(practiceCounts(practice));
   const save = usePracticeSaveActions(practice.id);
+  const bound = isBoundPractice(practice);
   // Lettura semplice (LC28): the practice's actions ride the act's «⋯»; its name stays for a screen reader.
   const reading = useMemo(() => ({
     simple,
-    practiceItems: simple ? [
+    practiceItems: simple && !bound ? [
       ...save.items.map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item)),
       { label: 'Nuova pratica', icon: Plus, onSelect: () => { createPractice('Nuova pratica', { activate: true }); } },
       { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
     ] : [],
-  }), [simple, save.items, createPractice, practice.id]);
+  }), [simple, bound, save.items, createPractice, practice.id]);
+
+  if (bound) return <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>;
 
   if (simple) {
     return (

@@ -68,6 +68,8 @@ vi.mock('../../../services/dossierService', () => ({
   },
 }));
 
+// The «Lettura» tab's own view (its tests: `DossierReadingView.test.tsx`): here, only when it is mounted.
+vi.mock('./DossierReadingView', () => ({ DossierReadingView: ({ dossier: shown }: { dossier: { id: string } }) => <div data-testid="lettura">{shown.id}</div> }));
 vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn(async () => ({ dossierId: 'd1' })) } }));
 
 import { appStore } from '../../../store/useAppStore';
@@ -672,5 +674,31 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     const search = screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' });
     expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
     expect(search).not.toHaveClass('text-base');
+  });
+});
+
+describe('DossierDetailView — the «Lettura» tab (LC54 c3)', () => {
+  afterEach(() => { window.history.replaceState(null, '', '/'); });
+
+  it('offers four views in order: Fonti, Lettura, Atti, Compiti; the narrow padding keeps them whole on a phone', () => {
+    renderView();
+    const tabs = within(screen.getByRole('tablist', { name: 'Viste del dossier' })).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Lettura', 'Atti', 'Compiti']);
+    for (const tab of tabs) expect(tab).toHaveClass('px-2.5', 'sm:px-4');
+  });
+
+  it('mounts the reading only once it is chosen, with the page\'s dossier', () => {
+    renderView();
+    expect(screen.queryByTestId('lettura')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('lettura')).toHaveTextContent('d1');
+  });
+
+  it('opens on the reading with `?vista=lettura`', () => {
+    window.history.replaceState(null, '', '/dossier?dossier=d1&vista=lettura');
+    renderView();
+    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('lettura')).toBeInTheDocument();
   });
 });
