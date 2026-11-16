@@ -6,7 +6,7 @@ describe('AiWaysDiagram', () => {
   it('names the three ways and says «in arrivo» only for the two not built yet', () => {
     render(<AiWaysDiagram />);
     const name = screen.getByRole('img').getAttribute('aria-label') ?? '';
-    expect(name).toContain('il tuo abbonamento, via mcp;');
+    expect(name).toContain('il tuo abbonamento, via MCP;');
     expect(name).toContain('un modello sul computer (in arrivo)');
     expect(name).toContain('la tua chiave (in arrivo)');
     expect(name.match(/in arrivo/g)).toHaveLength(2);

@@ -25,7 +25,7 @@ const LAYOUT: Record<string, { x: number; y: number; w: number; line: string }> 
   key: { x: 280, y: 200, w: 180, line: 'M370 200 L268 148' },
 };
 
-const summary = `Tre vie per usare l’IA che hai già con LexCraft: ${WAYS.map((w) => `${w.label.toLowerCase()}${w.soon ? ' (in arrivo)' : ''}`).join('; ')}.`;
+const summary = `Tre vie per usare l’IA che hai già con LexCraft: ${WAYS.map((w) => `${w.label[0].toLowerCase()}${w.label.slice(1)}${w.soon ? ' (in arrivo)' : ''}`).join('; ')}.`;
 
 /**
  * The «three ways» drawing: LexCraft in the middle, one line to each way the user can bring their AI. Ink and stone
@@ -41,7 +41,6 @@ export function AiWaysDiagram() {
       <div role="img" aria-label={summary}>
       <svg viewBox="0 0 480 300" className="mx-auto hidden w-full max-w-xl md:block" aria-hidden>
         <circle cx="240" cy="132" r="64" fill="none" className="stroke-slate-300/60 dark:stroke-slate-600/60" strokeWidth="1" />
-        <circle cx="240" cy="132" r="120" fill="none" className="stroke-slate-300/60 dark:stroke-slate-600/60" strokeWidth="1" />
         {WAYS.map((way) => (
           <path
             key={way.id}
