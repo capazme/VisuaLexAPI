@@ -92,7 +92,7 @@ export function WelcomeGuide() {
                 </button>
               ))}
             </div>
-            <p className="mt-6 text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-6 text-sm text-slate-600 dark:text-slate-400 [@media(pointer:coarse)]:hidden">
               Da qualunque pagina,{' '}
               <kbd className="rounded border border-slate-300 px-1.5 py-0.5 font-mono text-xs dark:border-slate-700">{PALETTE_SHORTCUT}</kbd>{' '}
               apre la ricerca.
