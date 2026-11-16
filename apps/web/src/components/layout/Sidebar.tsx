@@ -52,6 +52,8 @@ interface NavItemProps {
   to: string;
   icon: React.ElementType;
   label: string;
+  /** The word shown in the bar where `label` would be cut (Luca 16-11: «Analizza docum…»); the name stays `label`. */
+  shortLabel?: string;
   onClick?: () => void;
   id?: string;
   badgeCount?: number;
@@ -177,7 +179,7 @@ function useSidebarLabel() {
   return { shown, hide, handlers };
 }
 
-function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, hint, soon, activeOn, layout, end }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, shortLabel, onClick, id, badgeCount, badgeLabel, hint, soon, activeOn, layout, end }: NavItemProps) {
   const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
@@ -251,7 +253,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
                 isActive ? "font-semibold text-slate-900 dark:text-slate-50" : "font-medium text-slate-800 dark:text-slate-300"
               )}
             >
-              {label}
+              {shortLabel ?? label}
               {/* Under the name, not beside it: beside, it cut «Anonimizzatore» in the 224 px bar (#448). */}
               {soon && <span className={cn("block text-[11px] font-medium leading-none", SIDEBAR_SMALL_TEXT)}>in arrivo</span>}
             </span>
@@ -545,7 +547,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {section !== 'opus' && (
           <>
             {searchEntry('Ricerca')}
-            <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
+            <NavItem to="/documents" icon={FileSearch} label="Analizza documento" shortLabel="Analizza" onClick={closeMobile} layout={layout} />
             <NavItem to="/rassegne" icon={Library} label="Rassegne" onClick={closeMobile} layout={layout} />
           </>
         )}
