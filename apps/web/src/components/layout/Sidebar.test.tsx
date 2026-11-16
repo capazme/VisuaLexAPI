@@ -883,9 +883,9 @@ describe('Sidebar — the words', () => {
 
   it.each(['wide', 'drawer'] as const)('writes each entry beside its icon (%s), with the same names and ids', (layout) => {
     renderLayout(layout, '/forum');
-    for (const name of ['Ricerca', 'Analizza documento']) {
-      expect(screen.getByRole('link', { name })).toHaveTextContent(name);
-    }
+    expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveTextContent('Ricerca');
+    // «Analizza documento» would be cut in the 224 px bar: the word «Analizza», the name whole (it starts with it).
+    expect(screen.getByRole('link', { name: 'Analizza documento' })).toHaveTextContent(/^Analizza$/);
     expect(document.getElementById('tour-nav-search')).toBe(screen.getByRole('link', { name: 'Ricerca' }));
     // The count rides the name and sits at the end of the row.
     const forum = screen.getByRole('link', { name: 'Dossier pubblici, 3 notifiche' });
