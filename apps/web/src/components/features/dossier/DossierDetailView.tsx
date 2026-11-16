@@ -696,7 +696,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         {/* LC27 (Luca, 15 Nov): the tabs stay at the top while the view scrolls, and a change of view starts the new
             one right under them, in place — no jump to the page's top, no scrolling to it. */}
         <div ref={viewTop} aria-hidden />
-        <div className="sticky top-0 z-10 -mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950">
+        {/* In «Lettura» the act's own head sticks at the top while reading (#529, Papiniano): the tabs scroll away there,
+            or the two sticky heads overlap and the tabs vanish under it. */}
+        <div className={cn('-mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950', view !== 'lettura' && 'sticky top-0 z-10')}>
         <SegmentedTabs
           tabs={[
             { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
