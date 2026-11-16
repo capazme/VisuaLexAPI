@@ -7,6 +7,7 @@ import { citeStoredItem } from '../norms/decisionCitation';
 import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 import { countingModules } from '../lingo/courses';
 import { LIMITS } from '../schemas/lingo/corso';
+import { removeDossierFiles } from '../pratica/fileStore';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
@@ -136,7 +137,13 @@ let lastSweep = 0;
 
 /** Removes the entries past their 30 days; returns how many. */
 export async function sweepExpiredTrash(now: Date = new Date()): Promise<number> {
+  // An expired entry can no longer be restored: the dossiers among them take their case files (LC50) with them.
+  const dossiers = await prisma.trashEntry.findMany({ where: { expiresAt: { lt: now }, kind: 'DOSSIER' }, select: { userId: true, dossierId: true } });
   const { count } = await prisma.trashEntry.deleteMany({ where: { expiresAt: { lt: now } } });
+  for (const { userId, dossierId } of dossiers) {
+    // One failure must not stop the trash routes that await the sweep; the kind only, never a path.
+    if (dossierId) await removeDossierFiles(userId, dossierId).catch((error: unknown) => console.error(`Case files removal failed: ${error instanceof Error ? error.name : typeof error}`));
+  }
   return count;
 }
 
@@ -716,8 +723,11 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
 
 /** Empties one trash entry now. */
 export async function purgeTrashEntry(userId: string, trashId: string): Promise<void> {
+  const entry = await prisma.trashEntry.findFirst({ where: { id: trashId, userId }, select: { kind: true, dossierId: true } });
   const { count } = await prisma.trashEntry.deleteMany({ where: { id: trashId, userId, ...(await reachableKinds()) } });
   if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+  // A whole dossier gone for good takes its case files (LC50) off the disk; a restore that won the race left count 0.
+  if (entry?.kind === 'DOSSIER' && entry.dossierId) await removeDossierFiles(userId, entry.dossierId);
 }
 
 // ─── Gymnasium's courses (Percorsi, A1; spec 2026-10-23 §10.9) ───────────────────────────────────────────────
