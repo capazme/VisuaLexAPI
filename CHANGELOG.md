@@ -12,6 +12,27 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-11-17
+
+Claude works on a case's acts through MCP: it reads the case and its files, PDFs included, and deposits an
+act as a Word file; the «Lettura» shows the dossier's own work under the article; «Aggiungi al dossier»
+from the Ricerca. No migration; one new server dependency (pdfjs-dist). Act files for testing only.
+
+### Claude and the acts (MCP)
+
+- New tools for a case (LC56): read the case (instructions first, then its files), read a file's text in
+  parts, deposit an act as DOCX, or a new version beside the original. Owner only; every other route stays
+  closed to MCP tokens.
+- The «Leggere i testi» permission names the acts and the personal data they contain (consent version 2):
+  an application connected before keeps reading notes and must be reconnected to read acts.
+- The text of PDFs (LC57), with pdfjs-dist 6.5.438; a damaged PDF answers with the reason.
+
+### Dossier
+
+- In «Lettura», under each article, the dossier's own work: its notes and the proposals of the connected
+  applications, and the norms a decision cites (LC58).
+- «Aggiungi al dossier» from every result of the Ricerca (LC59).
+
 ## [1.29.0] - 2026-11-16
 
 The dossier gathers the case: its «Lettura» and «Atti» tabs, the act files encrypted on the server, the
