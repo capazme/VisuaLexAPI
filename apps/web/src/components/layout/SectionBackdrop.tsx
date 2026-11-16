@@ -8,10 +8,10 @@ import type { SectionId } from '../../features/sections/sections';
  * behind text, a card or a button; Learn's «Oggi», already full, has none.
  */
 const PLATES: Record<SectionId, { file: string; width: number; ratio: number; fadeRight: boolean }> = {
-  opus: { file: 'sfondo-work', width: 360, ratio: 306 / 390, fadeRight: true },
-  gymnasium: { file: 'sfondo-learn', width: 560, ratio: 308 / 649, fadeRight: true },
-  forum: { file: 'sfondo-forum', width: 560, ratio: 294 / 637, fadeRight: false },
-  academia: { file: 'sfondo-labs', width: 560, ratio: 294 / 625, fadeRight: false },
+  opus: { file: 'sfondo-work', width: 420, ratio: 929 / 966, fadeRight: false },
+  gymnasium: { file: 'sfondo-learn', width: 560, ratio: 296 / 630, fadeRight: true },
+  forum: { file: 'sfondo-forum', width: 560, ratio: 290 / 619, fadeRight: false },
+  academia: { file: 'sfondo-labs', width: 560, ratio: 289 / 588, fadeRight: false },
 };
 
 /** A plate shorter than this would be a smudge, not a scene. */
@@ -52,7 +52,7 @@ export function SectionBackdrop({ section, pathname, scroller }: { section: Sect
   const height = Math.min(tallest, room);
   const width = Math.round(height / plate.ratio);
   const url = `url(${import.meta.env.BASE_URL}illustrations/${plate.file}.webp)`;
-  // Work's and Learn's scenes are cut at the right: the cut fades into the paper (no new files needed).
+  // A scene cut at the right (the provisional cuts): the cut fades into the paper (no new files needed).
   const masks = plate.fadeRight ? `${url}, linear-gradient(to left, transparent, #000 15%)` : url;
   const style: CSSProperties = {
     width,
