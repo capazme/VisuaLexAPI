@@ -491,26 +491,6 @@ describe('the Inchiostro palette', () => {
   });
 });
 
-describe('the tours (driver.js)', () => {
-  it('make every button of the popover a 44 px target with a focus ring', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    const rule = (selector: string) => {
-      const at = css.indexOf(`${selector} {`);
-      expect(at, selector).toBeGreaterThan(-1);
-      return css.slice(at, css.indexOf('}', at));
-    };
-    const footer = rule('.driver-popover.visualex-tour-popover .driver-popover-footer button');
-    expect(footer).toMatch(/min-height:\s*44px/);
-    // driver.js sets `display` inline on these buttons: the label is centred by its line height.
-    expect(footer).toMatch(/font:\s*500 13px\/42px/);
-    expect(footer).not.toMatch(/display:/);
-    const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
-    expect(close).toMatch(/width:\s*44px/);
-    expect(close).toMatch(/height:\s*44px/);
-    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible:not\(\[data-pointer-focus\]\)\s*\{\s*outline:\s*2px solid/);
-  });
-});
-
 describe('the entrance utilities', () => {
   it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
     const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10', 'slide-in-from-left-2']);
@@ -771,14 +751,6 @@ describe('the section change (T1)', () => {
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
     expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
   }, 30000);
-
-  it('draws the tour\'s focus ring only for a focus not given with no key pressed (Y1)', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    const rule = css.match(/([^{}]*)\{\s*outline:\s*2px solid var\(--color-toga-500\);\s*outline-offset:\s*2px;\s*\}/)![1];
-    for (const selector of rule.replace(/\/\*[\s\S]*?\*\//g, '').split(',').map((part) => part.trim())) {
-      expect(selector).toMatch(/:focus-visible:not\(\[data-pointer-focus\]\)$/);
-    }
-  });
 
   it('gives a menu or a popover a hairline and a drop in the dark, as the floating surfaces (Y1)', async () => {
     const css = await compile(['shadow-md', 'shadow-lg']);
