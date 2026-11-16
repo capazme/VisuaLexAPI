@@ -152,3 +152,22 @@ describe('ArticleTabContent — the search gestures go to the host (LC52 c2)', (
     expect(hostSearch).not.toHaveBeenCalled();
   });
 });
+
+describe('ArticleTabContent in a dossier\'s «Lettura» (LC55)', () => {
+  it('the dossier command reads «Aggiungi a questo dossier» and adds the article to that dossier, without the popover', async () => {
+    const addToDossier = vi.fn();
+    appStore.setState({ dossiers: [{ id: 'dos-1', title: 'Ricorso Rossi', createdAt: '', items: [] }], addToDossier });
+    render(
+      <MemoryRouter>
+        <ReadingHostContext.Provider value={{ search: hostSearch, dossier: { id: 'dos-1' } }}>
+          <ArticleTabContent data={article(CURRENT)} />
+        </ReadingHostContext.Provider>
+      </MemoryRouter>,
+    );
+    const command = screen.getAllByRole('button', { name: /Aggiungi a questo dossier/ });
+    fireEvent.click(command[command.length - 1]);
+    expect(addToDossier).toHaveBeenCalledWith('dos-1', expect.objectContaining({ numero_articolo: '1284' }), 'norma');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await screen.findByText('Aggiunto a «Ricorso Rossi»')).toBeInTheDocument();
+  });
+});

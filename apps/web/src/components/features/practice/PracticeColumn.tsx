@@ -17,6 +17,8 @@ import { isBoundPractice } from '../../../utils/practice';
 import { OVERVIEW_GRID } from './besideLayout';
 import { PracticeActBlock } from './PracticeActBlock';
 import { PracticeDecisionsSection } from './PracticeDecisionsSection';
+import { writeActOrder } from './inDossier';
+import { useHostDossier } from './readingHost';
 
 /**
  * How the column draws the practice (U2): the phone's column (its acts one under the other, as R3 left it), the
@@ -46,6 +48,7 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
   const practice = useAppStore((s) => s.practices.find((p) => p.id === practiceId));
   const reorderActs = useAppStore((s) => s.reorderActs);
   const takeReveal = useAppStore((s) => s.takeReveal);
+  const hostDossier = useHostDossier();
   const revealKey = useAppStore((s) => (s.pendingReveal?.practiceId === practiceId ? s.pendingReveal.rowKey : null));
   const columnRef = useRef<HTMLDivElement>(null);
   const isIndex = layout === 'index';
@@ -88,6 +91,8 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
     reorderActs(practiceId, actIds.indexOf(String(active.id)), actIds.indexOf(String(over.id)));
+    // A dossier's «Lettura» (LC55): the dossier takes the order too, as «Fonti» writes it.
+    if (hostDossier) writeActOrder(hostDossier.id, practiceId);
   };
 
   return (

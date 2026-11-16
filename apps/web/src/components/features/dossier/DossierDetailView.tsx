@@ -719,7 +719,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
         {/* Mounted only once chosen: opening it builds the dossier's reading table (LC54). */}
-        {view === 'lettura' && <DossierReadingView dossier={dossier} showToast={showToast} />}
+        {view === 'lettura' && <DossierReadingView dossier={dossier} showToast={showToast} onTrashChanged={trashChanged} />}
         <div hidden={view !== 'atti'}>
           <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
         </div>
