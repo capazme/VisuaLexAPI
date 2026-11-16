@@ -11,6 +11,11 @@ import { isBoundPractice, type Practice } from '../../../utils/practice';
  */
 export interface ReadingHost {
   search: (params: SearchParams) => void;
+  /**
+   * The dossier a bound table reads (LC55 c4): its rows say whether they are in it, and add to it or leave it. Absent in
+   * the Corpus, whose rows say nothing of a dossier. `onTrashChanged`: the page's trash, read again after a removal.
+   */
+  dossier?: { id: string; onTrashChanged?: () => void };
 }
 
 export const ReadingHostContext = createContext<ReadingHost | null>(null);
@@ -18,6 +23,11 @@ export const ReadingHostContext = createContext<ReadingHost | null>(null);
 /** The host's search; without a host, `fallback` (the store's `triggerSearch` the reader already holds). */
 export function useReadingSearch(fallback: (params: SearchParams) => void): (params: SearchParams) => void {
   return useContext(ReadingHostContext)?.search ?? fallback;
+}
+
+/** The dossier the reading's host writes to (LC55), or undefined outside a dossier's «Lettura». */
+export function useHostDossier(): ReadingHost['dossier'] {
+  return useContext(ReadingHostContext)?.dossier;
 }
 
 /** The practice a reading container shows: `practiceId`'s when given (none if it is not open), else the Corpus's active one. */

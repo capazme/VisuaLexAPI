@@ -587,15 +587,18 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const rowButton = cn(HEADER_BUTTON, 'whitespace-nowrap');
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={handleOpenAllOnDashboard}
-        disabled={!hasNormaItems && !hasDecisions}
-        className={rowPrimary}
-      >
-        <ExternalLink size={16} aria-hidden />
-        <span>Apri tutto<span className="hidden sm:inline"> in Ricerca</span></span>
-      </button>
+      {/* In «Lettura» the dossier is already read here: Ricerca is a second door, kept in «⋯» (LC55). */}
+      {view !== 'lettura' && (
+        <button
+          type="button"
+          onClick={handleOpenAllOnDashboard}
+          disabled={!hasNormaItems && !hasDecisions}
+          className={rowPrimary}
+        >
+          <ExternalLink size={16} aria-hidden />
+          <span>Apri tutto<span className="hidden sm:inline"> in Ricerca</span></span>
+        </button>
+      )}
       <MenuButton
         label="Aggiungi"
         align="left"
@@ -628,6 +631,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         label="Altre azioni"
         triggerClassName={HEADER_ICON_BUTTON}
         items={[
+          ...(view === 'lettura' ? [{ label: 'Apri anche in Ricerca', icon: ExternalLink, onSelect: handleOpenAllOnDashboard, disabled: !hasNormaItems && !hasDecisions }] : []),
           { label: 'Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
           { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
           { label: showBulkActions ? 'Annulla selezione' : 'Seleziona elementi', icon: CheckSquare, onSelect: () => { setShowBulkActions((v) => !v); clearSelection(); } },
@@ -721,7 +725,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
         {/* Mounted only once chosen: opening it builds the dossier's reading table (LC54). */}
-        {view === 'lettura' && <DossierReadingView dossier={dossier} showToast={showToast} />}
+        {view === 'lettura' && <DossierReadingView dossier={dossier} showToast={showToast} onTrashChanged={trashChanged} />}
         <div hidden={view !== 'atti'}>
           <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
         </div>

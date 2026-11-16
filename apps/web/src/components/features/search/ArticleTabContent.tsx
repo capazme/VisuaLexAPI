@@ -4,7 +4,8 @@ import { CaseLawSection } from './CaseLawSection';
 import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
-import { useReadingSearch } from '../practice/readingHost';
+import { useHostDossier, useReadingSearch } from '../practice/readingHost';
+import { addToThisDossier } from '../practice/inDossier';
 import { useShallow } from 'zustand/react/shallow';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { ArticleCardsRow, type ArticleCardsHandle } from '../studia/ArticleCardsRow';
@@ -159,6 +160,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // The search gestures go to whoever hosts the reading (LC52 c2); without a host, the store's search.
     const search = useReadingSearch(triggerSearch);
+    // In a dossier's «Lettura» (LC55) the dossier command adds to that dossier, without the popover's choice.
+    const hostDossier = useHostDossier();
 
     const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
     // State (not ref) so the popover re-reads the anchor when the button
@@ -842,7 +845,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onOpenStudyMode={isBeside ? undefined : onOpenStudyMode}
                 compact={isBeside}
                 onOpenCopyModal={() => setShowCopyModal(true)}
-                onOpenDossier={() => setDossierPopoverOpen(true)}
+                onOpenDossier={hostDossier
+                    ? () => addToThisDossier(hostDossier.id, { norma: norma_data }, showToast)
+                    : () => setDossierPopoverOpen(true)}
+                dossierLabel={hostDossier ? 'Aggiungi a questo dossier' : undefined}
                 dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
                 onCopyLink={handleCopyLink}

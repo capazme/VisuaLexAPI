@@ -10,7 +10,8 @@ import { articleLabel } from '../dossier/dossierLayout';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
 import { shortNorm } from '../../../utils/sources';
-import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
+import { NotInDossier, PracticeRowShell, type RowBeside } from './PracticeRowShell';
+import { useArticleInDossier } from './inDossier';
 import { articleRowKey, articleWindowId, besideRefFor, practiceArticleKey } from '../../../utils/practice';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { quickNormParamsOf } from '../../../utils/quickNormParams';
@@ -46,6 +47,8 @@ export function PracticeArticleRow({
   const isQuick = useAppStore((s) => s.quickNorms.length > 0 && !historicalItemLabel(article.norma_data) && s.isQuickNorm(quickParams));
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
+  // In a dossier's «Lettura» (LC55): in the dossier or not; undefined in the Corpus.
+  const dossier = useArticleInDossier(article.norma_data);
   const closeBeside = useAppStore((s) => s.closeBeside);
   const openPhoneReader = useAppStore((s) => s.openPhoneReader);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
@@ -97,6 +100,21 @@ export function PracticeArticleRow({
   if (simple) {
     return (
       <div className="pt-2" style={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}>
+        {/* No row heading here: the mark and «Aggiungi al dossier» stand over the text; «Togli…» is the act's «⋯». */}
+        {dossier && !dossier.inDossier && (
+          <p className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+            <NotInDossier />
+            {dossier.add && (
+              <button
+                type="button"
+                onClick={dossier.add}
+                className="inline-flex min-h-[44px] items-center rounded-md px-2 font-medium text-primary-700 hover:bg-primary-50 md:min-h-0 md:py-0.5 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                Aggiungi al dossier
+              </button>
+            )}
+          </p>
+        )}
         {annexSuggestion}
         {reader}
       </div>
@@ -113,6 +131,7 @@ export function PracticeArticleRow({
       removeName={named}
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
       beside={beside}
+      dossier={dossier}
       header={(
         <>
           <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">

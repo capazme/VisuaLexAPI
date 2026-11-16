@@ -138,9 +138,10 @@ describe('what is the Corpus practice\'s is not drawn in the dossier', () => {
     expect(screen.queryByRole('heading', { level: 2, name: 'Ricorso Rossi' })).toBeNull();
     // the practice's header (its name and its count line), on screen or for a screen reader
     expect(document.getElementById('tour-practice-header')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     for (const label of PRACTICE_ONLY) expect(screen.queryByText(label)).toBeNull();
-    expect(screen.getByRole('menuitem', { name: /Rimuovi l'atto/ })).toBeInTheDocument();
+    // An act of the dossier leaves it rather than the table (LC55 c4).
+    expect(screen.getByRole('menuitem', { name: 'Togli dal dossier' })).toBeInTheDocument();
     expect(h.tours).not.toHaveBeenCalled();
     expect(screen.getByTestId('practice-column').className).not.toContain('practice-bar-height');
   });

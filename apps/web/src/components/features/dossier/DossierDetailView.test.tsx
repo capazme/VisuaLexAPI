@@ -711,4 +711,14 @@ describe('DossierDetailView — the «Lettura» tab (LC54 c3)', () => {
     fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
     expect(bar()).toHaveClass('sticky');
   });
+  it('in «Lettura» «Apri tutto in Ricerca» leaves the header for «⋯», as «Apri anche in Ricerca» (LC55)', () => {
+    renderView();
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(screen.queryByRole('button', { name: 'Apri tutto in Ricerca' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    expect(screen.getByRole('menuitem', { name: 'Apri anche in Ricerca' })).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(screen.getByRole('button', { name: 'Apri tutto in Ricerca' })).toBeInTheDocument();
+  });
 });
