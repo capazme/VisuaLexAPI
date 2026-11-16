@@ -175,13 +175,32 @@ describe('Pratica files through an MCP token (LC56)', () => {
     const res = await request(app).get(`${base}/files/${file.id}/text`).set(await mcp(user, 'dossier:read dossier:write'));
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('insufficient_scope');
-    // A grant approved before the texts' current consent words reads no file either.
+  });
+
+  it('reads an act’s text only for a grant approved with the words that name the acts (version 2); version 1 keeps the notes', async () => {
+    const { user, dossier, base } = await setup('mcp-consenso');
+    const file = (await upload(user, dossier.id, TXT, 'a.txt')).body.file;
+    await prisma.dossierItem.create({ data: { dossierId: dossier.id, itemType: 'note', title: 'Nota', content: 'Il cliente ha ricevuto la diffida.', position: 0 } });
     const token = await mcp(user);
-    await prisma.oAuthGrant.updateMany({ where: { userId: user.id }, data: { textConsentVersion: 0 } });
+    // A fresh approval records today's words.
+    expect((await prisma.oAuthGrant.findFirstOrThrow({ where: { userId: user.id } })).textConsentVersion).toBe(2);
+    expect((await request(app).get(`${base}/files/${file.id}/text`).set(token)).body.testo).toBe('Memoria difensiva\n\nPrimo motivo.');
+
+    // A grant approved with the words of version 1 («… e le tue note»).
+    await prisma.oAuthGrant.updateMany({ where: { userId: user.id }, data: { textConsentVersion: 1 } });
     const old = await request(app).get(`${base}/files/${file.id}/text`).set(token);
     expect(old.status).toBe(403);
-    expect(old.body.detail).toMatch(/Leggere i testi/);
-    expect(await prisma.praticaFileAccesso.count({ where: { azione: 'scaricamento' } })).toBe(0);
+    expect(old.body.detail).toBe('Per leggere i file della pratica l\'applicazione va ricollegata: il permesso «Leggere i testi» ora comprende anche gli atti.');
+    expect(await prisma.praticaFileAccesso.count({ where: { azione: 'scaricamento' } })).toBe(1);
+    // Its notes still read.
+    const read = await request(app).get(`/api/dossiers/${dossier.id}`).set(token);
+    expect(read.body.items.find((i: { item_type: string }) => i.item_type === 'note').content).toBe('Il cliente ha ricevuto la diffida.');
+  });
+
+  it('shows the texts’ permission on the consent screen with the words that name the acts', async () => {
+    const res = await request(app).get('/api/oauth/connection').set(authHeader(await createTestUser('mcp-parole')));
+    const label = res.body.scopes.find((s: { scope: string }) => s.scope === 'dossier:text').label;
+    expect(label).toBe('Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, le tue note e il testo degli atti che carichi nelle pratiche: il testo arriva al fornitore dell’applicazione collegata');
   });
 
   it('deposits a new act as a DOCX written by Claude, and a version that leaves the original intact', async () => {

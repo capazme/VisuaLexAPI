@@ -11,7 +11,7 @@ export const SCOPE_LABELS: Record<string, string> = {
   'dossier:write':
     'Creare dossier, aggiungervi norme e note e glossarne i passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
   'dossier:text':
-    'Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, e le tue note: il testo arriva al fornitore dell’applicazione collegata',
+    'Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, le tue note e il testo degli atti che carichi nelle pratiche: il testo arriva al fornitore dell’applicazione collegata',
   'lingo:cards:read': 'Leggere le tue schede di studio',
   'lingo:cards:write': 'Creare schede di studio, sempre come tue bozze personali',
   // Percorsi (A1, spec 2026-10-23 §10.6): they join this one consent (G-372), worded as the spec proposes.
