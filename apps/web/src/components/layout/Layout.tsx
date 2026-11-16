@@ -1,3 +1,4 @@
+import { SectionBackdrop } from './SectionBackdrop';
 import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -476,6 +477,9 @@ export function Layout() {
             <SearchField />
           </div>
         )}
+
+        {/* The section's scene in the empty bottom right of a short page (Luca 16-11): under everything, from lg. */}
+        {lgUp && !settings.focusMode && <SectionBackdrop section={activeSection.id} pathname={pathname} scroller={scroller} />}
 
         {/* Content Area. `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the
             sidebar, the floating buttons and the search bar stay still. */}
