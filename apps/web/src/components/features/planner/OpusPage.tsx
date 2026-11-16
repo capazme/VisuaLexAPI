@@ -51,13 +51,12 @@ export function OpusPage() {
       // An act's page: its own title is the one in sight (LC29), not «Atti» over it.
       titleHidden={/^\/work\/atti\/./.test(pathname)}
       action={inView && (
-        // On a phone a small button of its own, «Cestino», not a bare icon (LC38, Luca): its frame drawn 36 px inside the
-        // 44 px link; from md the words in full.
+        // On a phone a small framed button with the icon (LC38, Luca: «senza scritta. Basta ci metti il pulsante»): its frame
+        // drawn 36 px inside the 44 px link, named «Cestino dei compiti»; from md the words in full.
         <Link to="/work/cestino" aria-label="Cestino dei compiti" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center max-md:px-0 max-md:no-underline')}>
-          <span className="inline-flex items-center gap-1.5 max-md:rounded-lg max-md:border max-md:border-slate-300 max-md:px-3 max-md:py-1.5 dark:max-md:border-slate-700">
+          <span className="inline-flex items-center gap-1.5 max-md:size-9 max-md:justify-center max-md:rounded-lg max-md:border max-md:border-slate-300 dark:max-md:border-slate-700">
             <Trash2 size={15} aria-hidden />
             <span aria-hidden className="max-md:hidden">Cestino dei compiti</span>
-            <span aria-hidden className="md:hidden">Cestino</span>
           </span>
         </Link>
       )}
