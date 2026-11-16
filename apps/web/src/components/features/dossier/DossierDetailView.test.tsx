@@ -701,4 +701,14 @@ describe('DossierDetailView — the «Lettura» tab (LC54 c3)', () => {
     expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('lettura')).toBeInTheDocument();
   });
+
+  it('keeps the tabs at the top in the other views, and lets them scroll away in «Lettura», where the act\'s head sticks (#529)', () => {
+    renderView();
+    const bar = () => screen.getByRole('tablist', { name: 'Viste del dossier' }).closest('div.-mx-2');
+    expect(bar()).toHaveClass('sticky');
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(bar()).not.toHaveClass('sticky');
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(bar()).toHaveClass('sticky');
+  });
 });
