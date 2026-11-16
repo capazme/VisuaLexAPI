@@ -683,7 +683,7 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await show();
     await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
     const notice = await screen.findByTestId('session-celebration');
-    expect(within(notice).getByTestId('goal-mark')).toBeInTheDocument();
+    expect(notice.querySelector('[data-illustration="learn-giorno-chiuso"]')).not.toBeNull();
     expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
   });
 
@@ -700,7 +700,7 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
     const notice = await screen.findByTestId('session-celebration');
     expect(within(notice).getByText('Serie di 3 giorni')).toBeInTheDocument();
-    expect(within(notice).queryByTestId('goal-mark')).toBeNull();
+    expect(notice.querySelector('[data-illustration="learn-giorno-chiuso"]')).toBeNull();
     // Not celebrated for this browser: «Oggi» writes the mark, the first time, once the mission is done.
     expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
   });
@@ -727,7 +727,7 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
     const notice = await screen.findByTestId('session-celebration');
     // The goal's mark, small, beside the words (G9): the red stamp is gone.
-    expect(within(notice).getByTestId('goal-mark')).toBeInTheDocument();
+    expect(notice.querySelector('[data-illustration="learn-giorno-chiuso"]')).not.toBeNull();
     expect(within(notice).queryByTestId('goal-stamp')).toBeNull();
     expect(notice.className).toContain('absolute');
     expect(notice.className).not.toContain('fixed');

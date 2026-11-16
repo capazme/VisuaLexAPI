@@ -1,9 +1,8 @@
+import { Illustration } from '../../../ui/Illustration';
 import { useEffect, useRef, type RefObject } from 'react';
 import { Z_INDEX } from '../../../../constants/zIndex';
 import { cn } from '../../../../lib/utils';
-import { FRAMES, fade, spawn, step, stepsAt } from './confetti';
-import { GoalMark } from './GoalMark';
-import { INK_TEXT, SUCCESS_TEXT, TILE } from './tokens';
+import { INK_TEXT, TILE } from './tokens';
 
 /** How long the session's notice stays: decision 6, «gone in under 1.5 seconds». */
 export const SESSION_NOTICE_MS = 1500;
@@ -12,92 +11,56 @@ function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-/** The colours of the confetti, read from the theme through classes: ink, red, primary, green, amber. */
-const PALETTE = [INK_TEXT, 'text-red-700 dark:text-red-400', 'text-primary-500', SUCCESS_TEXT, 'text-amber-500 dark:text-amber-400'];
-
-export interface ConfettiBurstProps {
-  /** The element the confetti start from (its centre); the canvas's left third when absent. */
+export interface SmokeRiseProps {
+  /** The day's plate, whose lamp the smoke leaves. */
   originRef?: RefObject<HTMLElement | null>;
-  /** Called as the burst begins (also under reduced motion): the day is marked celebrated at once. */
+  /** Called as the smoke begins (also under reduced motion): the day is marked celebrated at once. */
   onStart?: () => void;
-  /** Called once when the burst is over, at once under reduced motion or without a canvas. */
+  /** Called once when the smoke is gone, at once under reduced motion or with nothing measured. */
   onDone?: () => void;
 }
 
-/** The burst's animation, by elapsed time: the same 1.5 s on a 60 Hz and a 120 Hz screen. */
-
 /**
- * Confetti of «§» and «✓» over the parent (absolutely placed, no pointer events), about 1.5 s, once
- * (Studia progress spec §6.1). Nothing is drawn under reduced motion.
+ * The day closed (LC39, Luca: «ci sono i coriandoli bruttissimi»): once, a thin curl of smoke rises from the lamp the
+ * day's plate shows just put out, and fades, about 2.6 s, in the theme's ink. Same contract as the confetti it replaces:
+ * `onStart` at once (the day is marked celebrated), `onDone` when it is over; under reduced motion nothing is drawn and
+ * both are called at once. Placed over the parent (absolutely, no pointer events), from `originRef`'s plate: the wick
+ * sits at about a quarter of its width, near its middle.
  */
-export function ConfettiBurst({ originRef, onStart, onDone }: ConfettiBurstProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const paletteRef = useRef<HTMLSpanElement>(null);
+export function SmokeRise({ originRef, onStart, onDone }: SmokeRiseProps) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const smokeRef = useRef<HTMLDivElement>(null);
   const started = useRef(onStart);
   const done = useRef(onDone);
   useEffect(() => {
     started.current = onStart;
     done.current = onDone;
   }, [onStart, onDone]);
-
   useEffect(() => {
     started.current?.();
-    const canvas = canvasRef.current;
-    if (!canvas || prefersReducedMotion()) {
-      done.current?.();
-      return;
-    }
-    const box = canvas.getBoundingClientRect();
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.round(box.width * ratio));
-    canvas.height = Math.max(1, Math.round(box.height * ratio));
-    const context = canvas.getContext('2d');
-    if (!context) {
-      done.current?.();
-      return;
-    }
-    context.scale(ratio, ratio);
-    const palette = Array.from(paletteRef.current?.children ?? []).map((el) => getComputedStyle(el).color);
+    const smoke = smokeRef.current;
+    const box = boxRef.current?.getBoundingClientRect();
     const from = originRef?.current?.getBoundingClientRect();
-    const origin = from ? { x: from.left - box.left + from.width / 2, y: from.top - box.top + from.height / 2 } : { x: box.width / 3, y: box.height / 2 };
-
-    let particles = spawn(origin, palette);
-    let frame = 0;
-    let request = 0;
-    let start: number | null = null;
-    const draw = (now: number) => {
-      start ??= now;
-      for (const due = stepsAt(now - start); frame < due; frame += 1) particles = step(particles);
-      context.clearRect(0, 0, box.width, box.height);
-      context.globalAlpha = fade(frame);
-      for (const p of particles) {
-        context.save();
-        context.translate(p.x, p.y);
-        context.rotate(p.rotation);
-        context.fillStyle = p.color;
-        context.font = `bold ${Math.round(p.size * 2.4)}px Georgia, serif`;
-        context.fillText(p.glyph, -p.size, p.size);
-        context.restore();
-      }
-      if (frame < FRAMES) request = requestAnimationFrame(draw);
-      else {
-        context.clearRect(0, 0, box.width, box.height);
-        done.current?.();
-      }
-    };
-    request = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(request);
+    // No layout (nothing measured): nothing to draw from, the day closes at once.
+    if (prefersReducedMotion() || !smoke || !box || !from || !from.width) {
+      done.current?.();
+      return undefined;
+    }
+    // Its foot at the wick: about a quarter across the plate, near its middle.
+    const width = Math.max(24, from.width * 0.12);
+    smoke.style.left = `${from.left - box.left + from.width * 0.28 - width / 2}px`;
+    smoke.style.top = `${from.top - box.top + from.height * 0.42 - width * (360 / 110)}px`;
+    smoke.style.width = `${width}px`;
+    smoke.classList.add('vlx-smoke-rise');
+    const timer = window.setTimeout(() => done.current?.(), 2600);
+    return () => window.clearTimeout(timer);
   }, [originRef]);
-
   return (
-    <>
-      <canvas ref={canvasRef} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" />
-      <span ref={paletteRef} aria-hidden className="hidden">
-        {PALETTE.map((colour) => (
-          <span key={colour} className={colour} />
-        ))}
-      </span>
-    </>
+    <div ref={boxRef} aria-hidden data-testid="smoke-rise" className="pointer-events-none absolute inset-0 overflow-visible">
+      <div ref={smokeRef} className="absolute opacity-0">
+        <Illustration name="learn-fumo" className="aspect-[110/360] w-full" />
+      </div>
+    </div>
   );
 }
 
@@ -135,9 +98,8 @@ export function SessionCelebration({ serie, mark, onStart, onDone }: SessionCele
   return (
     <div data-testid="session-celebration" className={cn('pointer-events-none absolute inset-x-0 top-0 flex justify-center', Z_INDEX.dropdown)}>
       <div className={cn(TILE, 'relative flex w-full max-w-md items-center justify-center gap-3 overflow-hidden px-3 py-1.5 shadow-lg')}>
-        {/* The confetti first, so the mark and the words are drawn over them. */}
-        <ConfettiBurst />
-        {mark && <GoalMark size={32} draw className={cn('relative', INK_TEXT)} />}
+        {/* LC39: no confetti; the day's plate, small, comes in beside the words. */}
+        {mark && <Illustration name="learn-giorno-chiuso" className="vlx-plate-in relative aspect-[720/567] w-12" />}
         {/* Its words beside it at every width now that the mark is small (the stamp left them no room under 400 px). */}
         <p className={cn('relative font-serif text-sm font-semibold leading-tight', INK_TEXT)} aria-hidden>
           {/* On a phone the streak alone: one line keeps the notice clear of the card. */}

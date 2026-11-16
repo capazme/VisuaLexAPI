@@ -27,11 +27,6 @@ const savePreferences = vi.mocked(studiaService.savePreferences);
 
 const STORAGE_KEY = 'visualex.studia.ripasso.materia';
 
-/** A 2D context that draws nothing, so a burst runs its course in jsdom. */
-function fakeContext(): CanvasRenderingContext2D {
-  const noop = () => {};
-  return { scale: noop, clearRect: noop, save: noop, restore: noop, translate: noop, rotate: noop, fillText: noop, globalAlpha: 1, fillStyle: '', font: '' } as unknown as CanvasRenderingContext2D;
-}
 
 /** A dashboard answer: `dovute` and `nuove` today, the goal's state, a little history. */
 function answer(dovute: number, nuove: number, over: Partial<Progressi['oggi']> = {}, serie = 4): Progressi {
@@ -102,6 +97,11 @@ async function changeASetting(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: /^Schede della comunità · / }));
   await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
 }
+
+/** The smoke over the day closed (LC39), while it rises. */
+const smoke = (root: Element) => root.querySelector('[data-testid="smoke-rise"]');
+/** jsdom measures nothing: a box to rise from, so the smoke runs its 2.6 s. */
+const withLayout = () => vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, width: 200, height: 150, right: 200, bottom: 150, toJSON: () => ({}) } as DOMRect);
 
 describe('ReviewHome', () => {
   it('shows the day\'s module of a course under the day block once «Percorsi» is on, and reads no course before (§6.2)', async () => {
@@ -366,17 +366,18 @@ describe('ReviewHome', () => {
 
     it('plays once when the goal was met today, writes the goal\'s mark in the day block, and remembers the day', async () => {
       // A burst that runs its 1.5 s: with no canvas it ends at once, and the writing with it, before it can be read.
-      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      withLayout();
       progress.mockResolvedValue(met());
       renderHome();
-      const mark = await screen.findByTestId('goal-mark');
+      const mark = await screen.findByTestId('goal-plate');
       // In the day block (G9), never in the missions' rows; its date and day as words beside it.
       expect(dayBlock()).toContainElement(mark);
       expect(mark.closest('li')).toBeNull();
-      expect(within(dayBlock()).getByRole('img', { name: 'Obiettivo raggiunto' })).toBe(mark);
-      expect(mark.nextElementSibling).toHaveTextContent('19 ottobre 2026 · giorno 5');
+      expect(within(mark).getByRole('img', { name: 'Obiettivo raggiunto' })).toBeInTheDocument();
+      // The streak's day under the plate, once; the date is the line under it, not twice (LC39).
+      expect(mark.nextElementSibling).toHaveTextContent('5 giorni di fila');
       // Written now, once.
-      expect(mark).toHaveClass('vlx-goal-mark-draw');
+      expect(mark).toHaveClass('vlx-plate-in');
       expect(screen.queryByTestId('goal-stamp')).toBeNull();
       await waitFor(() => expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19'));
     });
@@ -385,8 +386,8 @@ describe('ReviewHome', () => {
       localStorage.setItem(CELEBRATED_KEY, '2026-10-19');
       progress.mockResolvedValue(met());
       const { container } = renderHome();
-      expect(await screen.findByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(await screen.findByTestId('goal-plate')).not.toHaveClass('vlx-plate-in');
+      expect(smoke(container)).toBeNull();
     });
 
     // As the server sends it: the queue finished with no review counts the day, and leaves the goal's mission empty.
@@ -397,8 +398,8 @@ describe('ReviewHome', () => {
       });
       const { container } = renderHome();
       await screen.findByRole('region', { name: 'Le missioni di oggi' });
-      expect(screen.queryByTestId('goal-mark')).toBeNull();
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(screen.queryByTestId('goal-plate')).toBeNull();
+      expect(smoke(container)).toBeNull();
       expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
     });
 
@@ -410,50 +411,50 @@ describe('ReviewHome', () => {
       });
       const { container } = renderHome();
       await screen.findByRole('region', { name: 'Le missioni di oggi' });
-      expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByTestId('goal-plate')).toBeNull();
       expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
       expect(screen.getByText('Ancora 5 ripassi per tenere viva la serie.')).toBeInTheDocument();
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(smoke(container)).toBeNull();
       expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
     });
 
     it('writes the mark once: when the burst is over the writing goes, and a new read does not bring it back', async () => {
-      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      withLayout();
       progress.mockResolvedValue(met());
       const { container } = renderHome();
-      expect(await screen.findByTestId('goal-mark')).toHaveClass('vlx-goal-mark-draw');
-      await waitFor(() => expect(container.querySelector('canvas')).toBeNull(), { timeout: 3000 });
-      expect(screen.getByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
+      expect(await screen.findByTestId('goal-plate')).toHaveClass('vlx-plate-in');
+      await waitFor(() => expect(smoke(container)).toBeNull(), { timeout: 4500 });
+      expect(screen.getByTestId('goal-plate')).not.toHaveClass('vlx-plate-in');
       // A new read (a setting changed): the mark stays whole.
       await changeASetting(userEvent.setup());
       await waitFor(() => expect(progress).toHaveBeenCalledTimes(2));
-      expect(screen.getByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(screen.getByTestId('goal-plate')).not.toHaveClass('vlx-plate-in');
+      expect(smoke(container)).toBeNull();
     });
 
     it('marks the day as the burst begins, so leaving halfway does not replay it', async () => {
-      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      withLayout();
       progress.mockResolvedValue(met());
       const { container, unmount } = renderHome();
-      await screen.findByTestId('goal-mark');
-      expect(container.querySelector('canvas')).not.toBeNull();
+      await screen.findByTestId('goal-plate');
+      expect(smoke(container)).not.toBeNull();
       // The day is written by the burst's mount effect, which React runs just after the canvas is in the page:
       // waited for, not read at once (a loaded machine reads between the two). The burst is still on (1.5 s).
       await waitFor(() => expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19'));
-      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(smoke(container)).not.toBeNull();
       unmount();
 
       const again = renderHome();
-      expect(await screen.findByTestId('goal-mark')).toBeInTheDocument();
-      expect(again.container.querySelector('canvas')).toBeNull();
+      expect(await screen.findByTestId('goal-plate')).toBeInTheDocument();
+      expect(smoke(again.container)).toBeNull();
     });
 
     it('keeps the burst through a new read (a setting changed halfway), and takes the canvas away after 1.5 s', async () => {
-      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      withLayout();
       progress.mockResolvedValue(met());
       const { container } = renderHome();
-      await screen.findByTestId('goal-mark');
-      const canvas = container.querySelector('canvas');
+      await screen.findByTestId('goal-plate');
+      const canvas = smoke(container);
       expect(canvas).not.toBeNull();
       // In a box of its own at the top of the section, out of the flow.
       const box = canvas!.parentElement!;
@@ -463,8 +464,8 @@ describe('ReviewHome', () => {
       expect(box.parentElement).toHaveClass('relative');
       await changeASetting(userEvent.setup({ delay: null }));
       await waitFor(() => expect(progress).toHaveBeenCalledTimes(2));
-      expect(container.querySelector('canvas')).toBe(canvas);
-      await waitFor(() => expect(container.querySelector('canvas')).toBeNull(), { timeout: 3000 });
+      expect(smoke(container)).toBe(canvas);
+      await waitFor(() => expect(smoke(container)).toBeNull(), { timeout: 4500 });
     });
 
     it('moves nothing under reduced motion: no canvas, the mark whole, the day still marked', async () => {
@@ -476,9 +477,8 @@ describe('ReviewHome', () => {
       try {
         progress.mockResolvedValue(met());
         const { container } = renderHome();
-        await screen.findByTestId('goal-mark');
-        await waitFor(() => expect(container.querySelector('canvas')).toBeNull());
-        expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalled();
+        await screen.findByTestId('goal-plate');
+        await waitFor(() => expect(smoke(container)).toBeNull());
         expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
       } finally {
         window.matchMedia = original;
@@ -489,7 +489,7 @@ describe('ReviewHome', () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
       await screen.findByText('3 da ripassare');
-      expect(screen.queryByTestId('goal-mark')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('goal-plate')).not.toBeInTheDocument();
     });
 
     // G9, the case on Luca's screen: day 3 of the streak, nothing due, nothing new. The server counts the day with the
@@ -506,9 +506,9 @@ describe('ReviewHome', () => {
       expect(within(missions).getByText('Hai finito le schede del giorno: il giorno conta. Serie: 3 giorni.')).not.toHaveClass('sr-only');
       expect(within(missions).getByText('Oggi non c\'è nulla da ripassare')).toBeInTheDocument();
       expect(within(missions).queryByText(/0 di 0/)).toBeNull();
-      expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByTestId('goal-plate')).toBeNull();
       expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(smoke(container)).toBeNull();
       expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
     });
 
@@ -521,9 +521,9 @@ describe('ReviewHome', () => {
       const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
       expect(within(missions).getByText('Il giorno conta per la serie; per i punti della missione servono 10 ripassi.')).not.toHaveClass('sr-only');
       // No mark, no burst, nothing celebrated: the goal's mission is still open.
-      expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByTestId('goal-plate')).toBeNull();
       expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(smoke(container)).toBeNull();
       expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
     });
   });
@@ -613,7 +613,7 @@ describe('ReviewHome', () => {
       progress.mockResolvedValue({ ...answer(4, 2, { ripassi: 12, raggiunto: true }, 5), missioni: serverMissions({ obiettivo: { stato: 'fatta', progresso: { fatte: 10, di: 10 } } }) });
       renderHome();
       expect(await screen.findByRole('button', { name: 'Continua il ripasso' })).toBeEnabled();
-      expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByTestId('goal-mark')).toBeInTheDocument();
+      expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByTestId('goal-plate')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Inizia il ripasso' })).toBeNull();
       expect(screen.getByText('circa 2 minuti')).toBeInTheDocument();
       await userEvent.setup().click(screen.getByRole('button', { name: 'Continua il ripasso' }));
@@ -894,8 +894,8 @@ describe('ReviewHome', () => {
       expect(within(rows[0]).queryByRole('button')).toBeNull();
       expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByRole('button', { name: 'Continua il ripasso' })).toBeInTheDocument();
       // The goal's mark is the day block's (G9), never the row's: its line is read under it.
-      expect(within(rows[2]).queryByTestId('goal-mark')).toBeNull();
-      expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByTestId('goal-mark')).toBeInTheDocument();
+      expect(within(rows[2]).queryByTestId('goal-plate')).toBeNull();
+      expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByTestId('goal-plate')).toBeInTheDocument();
       localStorage.removeItem('visualex.studia.festeggiato');
     });
 
@@ -1078,7 +1078,7 @@ describe('the motions of «Oggi» (S2, G8)', () => {
     expect(order()).toEqual(['dovute', 'nuove', 'obiettivo']);
     const title = today().getByText('Impara 5 schede nuove');
     expect(title).toHaveClass('vlx-mission-inking');
-    await waitFor(() => expect(order()).toEqual(['dovute', 'obiettivo', 'nuove']), { timeout: 3000 });
+    await waitFor(() => expect(order()).toEqual(['dovute', 'obiettivo', 'nuove']), { timeout: 4500 });
     expect(today().getByText('Impara 5 schede nuove')).toHaveClass('vlx-mission-done');
     expect(JSON.parse(localStorage.getItem(SEEN)!).missioni).toEqual(['nuove']);
   });

@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi, TappaIstituto } from '../../../../types/studia';
 import { estimateLabel } from '../studiaLabels';
-import { formatDate, formatDayLong } from '../progress/layout';
+import { formatDayLong } from '../progress/layout';
 import { goalMissionDone } from './missions';
 import { nextDayLine, subjectsPhrase, todaySentence, todayState, todaySubjects } from '../progress/today';
 import { FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, SECONDARY_BUTTON, TILE } from '../progress/tokens';
-import { GoalMark } from '../progress/GoalMark';
 import { Illustration, type IllustrationName } from '../../../ui/Illustration';
 
 export interface DayBlockProps {
@@ -91,7 +90,7 @@ export function DayBlock({
   const from = !materia && action ? todaySubjects(action.materie, stops, action.oggi.nuove) : null;
   const detail = state === 'todo' ? [estimateLabel(cards), from && subjectsPhrase(from)].filter(Boolean).join(' · ') : '';
 
-  const art: IllustrationName | null = state === 'todo' ? 'learn-ripasso' : state === 'done' ? 'learn-fatto-oggi' : state === 'empty' ? 'learn-schede-vuote' : null;
+  const art: IllustrationName | null = state === 'todo' ? 'learn-ripasso' : state === 'done' ? 'learn-giorno-chiuso' : state === 'empty' ? 'learn-schede-vuote' : null;
   return (
     <section
       ref={block}
@@ -102,29 +101,25 @@ export function DayBlock({
       className={cn(
         TILE,
         'relative grid justify-items-stretch gap-3 p-5 md:justify-items-start md:p-7',
-        (goal || art) && 'md:pr-44',
+        goal ? 'md:pr-72' : art && (state === 'done' ? 'md:pr-64' : 'md:pr-44'),
       )}
     >
       {/* LC35: an engraving at the block's right from md, what the day holds: the open book and its cards, the empty
           drawer. The day done has its own, with the goal's words (below). */}
-      {!goal && art && <Illustration name={art} className="absolute right-4 top-4 h-16 w-16 md:right-7 md:top-1/2 md:h-32 md:w-32 md:-translate-y-1/2" />}
+      {!goal && art && <Illustration name={art} className={cn('absolute right-4 top-4 md:right-7 md:top-1/2 md:-translate-y-1/2', art === 'learn-giorno-chiuso' ? 'aspect-[720/567] w-24 md:w-52' : 'h-16 w-16 md:h-32 md:w-32')} />}
       <h2 id="studia-giorno" className="sr-only">
         Il ripasso di oggi
       </h2>
       {goal && (
-        // The goal's mark (G9): on a phone first, over the date's line, 72 px with its words beside it, never beside the
-        // large line; from `md` at the block's right, 96 px over its words, in the room that side had empty. As wide as
-        // its content on a phone, so the confetti start from it, not the card's middle.
-        <div
-          ref={goalRef}
-          className="flex w-max max-w-full items-center gap-3 md:absolute md:right-7 md:top-1/2 md:w-36 md:-translate-y-1/2 md:flex-col md:gap-2 md:text-center"
-        >
-          <GoalMark size={96} draw={drawGoal} label="Obiettivo raggiunto" className={cn('h-[72px] w-[72px] md:h-24 md:w-24', INK_TEXT)} />
-          {/* «23 ottobre 2026 · giorno 3» on one line beside it; from `md` the date over the day, under it. */}
+        // The day closed (LC39, Luca: the drawn tick and its confetti out): the plate of the lamp just put out, the
+        // closed book and its laurel; under it the streak's day, once (the date is the line under, not twice). On a
+        // phone first, its width; from `md` at the block's right. `goalRef`: the smoke rises from its lamp.
+        <div className="flex flex-col items-start gap-1 md:absolute md:right-7 md:top-1/2 md:w-56 md:-translate-y-1/2 md:items-center">
+          <div ref={goalRef} data-testid="goal-plate" className={cn('w-48 md:w-56', drawGoal && 'vlx-plate-in')}>
+            <Illustration name="learn-giorno-chiuso" label="Obiettivo raggiunto" className="aspect-[720/567] w-full" />
+          </div>
           <p className={cn('text-sm font-medium tabular-nums', MUTED_TEXT)}>
-            <span className="md:block">{formatDate(goal.oggi.giorno)}</span>
-            <span className="md:hidden"> · </span>
-            <span className="md:block">giorno {goal.serie.attuale}</span>
+            {goal.serie.attuale === 1 ? 'Il primo giorno di fila' : `${goal.serie.attuale} giorni di fila`}
           </p>
         </div>
       )}
