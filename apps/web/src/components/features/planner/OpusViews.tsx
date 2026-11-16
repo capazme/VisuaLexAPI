@@ -262,7 +262,7 @@ export function TodayView() {
   return (
     <ViewFrame
       view="today"
-      heading="Oggi"
+      heading="Scadenziario"
       line={(today) => longDay(today, today)}
       defaults={(day) => ({ plannedDate: day })}
       options={<GroupingMenu value={grouping} onChange={choose} />}

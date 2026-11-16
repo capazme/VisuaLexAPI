@@ -11,14 +11,14 @@ import { FOCUS_RING } from '../../../constants/interactions';
 /** The planner's three views, tabs of the page since Work's bar lists only its five entries (D-315, LC8): the short
  *  word on a phone, as the Forum's tabs, so the three share a 320 px row. */
 const VIEWS = [
-  { to: '/work/oggi', label: 'Oggi', short: 'Oggi', icon: CalendarCheck },
+  { to: '/work/scadenziario', label: 'Scadenziario', short: 'Scadenziario', icon: CalendarCheck },
   { to: '/work/prossimi', label: 'Prossimi giorni', short: 'Prossimi', icon: CalendarDays },
   { to: '/work/ingresso', label: "Lista d'ingresso", short: 'Ingresso', icon: Inbox },
 ];
 
 /**
  * Opus's page (the planner, wave 1): the view's name as the title, the section's phrase over it (L-37), over its views —
- * «Oggi» (Opus's home), «Prossimi giorni», «Lista d'ingresso» — which are the page's tabs (LC8; the sidebar has «Oggi»
+ * «Scadenziario» (Opus's home), «Prossimi giorni», «Lista d'ingresso» — which are the page's tabs (LC8; the sidebar has «Scadenziario»
  * among Work's five entries); «Dossier» stays an entry of Work. In the sections' frame (`PageFrame`, W2), its title the one the
  * section switcher focuses (T1); the views take the frame's width, the lists' rows with room for the dossier at their
  * right end (P2b). The tasks' trash is a view of its
@@ -27,7 +27,7 @@ const VIEWS = [
 export function OpusPage() {
   const { pathname } = useLocation();
   // The trash's link belongs to the three views; the tabs to them and to the trash, as its way back (#448). Neither on
-  // Atti and Anonimizzatore.
+  // Atti and the tools that are coming.
   const inView = VIEWS.some((view) => pathname.startsWith(view.to));
   const inTrash = pathname.startsWith('/work/cestino');
   const viewTop = useRef<HTMLDivElement>(null);
@@ -42,7 +42,7 @@ export function OpusPage() {
   return (
     <PageFrame
       // The view's name, from the one list of the pages' names (L-37).
-      title={pageName(pathname) ?? 'Oggi'}
+      title={pageName(pathname) ?? 'Scadenziario'}
       kicker="opus"
       section="opus"
       className="h-full"

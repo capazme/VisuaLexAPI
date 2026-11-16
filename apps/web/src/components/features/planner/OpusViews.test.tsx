@@ -57,7 +57,7 @@ describe('«Oggi»', () => {
     let resolve!: (value: unknown) => void;
     service.list.mockReturnValue(new Promise((r) => (resolve = r)));
     renderAt(<TodayView />);
-    expect(screen.getByRole('heading', { level: 2, name: 'Oggi' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Scadenziario' })).toBeInTheDocument();
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
     await act(async () =>
       resolve(
@@ -245,7 +245,7 @@ describe('«Oggi»', () => {
     expect(screen.getByRole('checkbox', { name: /Compito b/ })).toHaveFocus();
     service.list.mockResolvedValue(answer([]));
     fireEvent.click(screen.getByRole('checkbox', { name: /Compito b/ }));
-    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Oggi' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Scadenziario' })).toHaveFocus());
   });
 
   it('moves between the rows with the arrows', async () => {

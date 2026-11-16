@@ -523,7 +523,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         position={preview.position}
         onClose={hidePreview}
         // In the dossier: «Apri tra le norme» for a norm it holds, else Dashboard, as the dossier's own buttons say.
-        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : 'Apri nel Corpus') : undefined}
+        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : 'Apri in Ricerca') : undefined}
         onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);

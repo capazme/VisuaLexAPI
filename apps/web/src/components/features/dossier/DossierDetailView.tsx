@@ -590,7 +590,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         className={rowPrimary}
       >
         <ExternalLink size={16} aria-hidden />
-        <span>Apri tutto<span className="hidden sm:inline"> nel Corpus</span></span>
+        <span>Apri tutto<span className="hidden sm:inline"> in Ricerca</span></span>
       </button>
       <MenuButton
         label="Aggiungi"

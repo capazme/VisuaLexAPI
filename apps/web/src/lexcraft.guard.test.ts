@@ -49,6 +49,16 @@ describe('the name LexCraft on screen', () => {
     expect(stale).toEqual([]);
   });
 
+  // LC48: Work's search is «Ricerca» and the tool «Pseudonimizzatore» (it pseudonymises, it does not anonymise). The Labs
+  // graph keeps «Corpus» as a node type.
+  it('no line outside a comment writes «Corpus» or «Anonimizzatore», but the Labs graph\'s node type', () => {
+    const graph = join('features', 'merlt', 'graph', 'page', 'NodeDetailsDrawer.tsx');
+    const found = sources(src).map((file) => relative(src, file)).filter((file) => file !== graph)
+      .flatMap((file) => codeLines(readFileSync(join(src, file), 'utf8'))
+        .filter(([, line]) => /\bCorpus\b|Anonimizzator/.test(line)).map(([n]) => `${file}:${n}`));
+    expect(found).toEqual([]);
+  });
+
   it('the page\'s title, its description, the splash and the installed app say LexCraft', () => {
     // Comments cut by splitting, not by a regex replace: CodeQL reads that as an incomplete HTML sanitizer.
     const html = readFileSync(join(src, '..', 'index.html'), 'utf8')

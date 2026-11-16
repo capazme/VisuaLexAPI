@@ -158,14 +158,14 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
     const choice = screen.getByRole('dialog', { name: /art\. 2043 .* non è in questo dossier\./ });
     expect(appStore.getState().searchTrigger).toBeNull();
-    await waitFor(() => expect(within(choice).getByRole('button', { name: 'Apri nel Corpus' })).toHaveFocus());
+    await waitFor(() => expect(within(choice).getByRole('button', { name: 'Apri in Ricerca' })).toHaveFocus());
     expect(within(choice).getByRole('button', { name: 'Aggiungi al dossier' })).toBeInTheDocument();
   });
 
-  it('«Apri nel Corpus» searches its text in force there, as before', () => {
+  it('«Apri in Ricerca» searches its text in force there, as before', () => {
     const text = renderView();
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
-    fireEvent.click(screen.getByRole('button', { name: 'Apri nel Corpus' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apri in Ricerca' }));
     expect(appStore.getState().searchTrigger).toEqual({ act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' });
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
@@ -185,23 +185,23 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
     const text = renderView();
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
     // the dialog's own first focus, then the keyboard's on «Aggiungi al dossier»
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Apri nel Corpus' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apri in Ricerca' })).toHaveFocus());
     const add = screen.getByRole('button', { name: 'Aggiungi al dossier' });
     add.focus();
     fireEvent.click(add);
     // read: the button says so and keeps the focus
     expect(screen.getByRole('button', { name: 'Cerco la norma…' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'Cerco la norma…' })).toHaveFocus();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere la norma citata: riprova, o aprila nel Corpus.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere la norma citata: riprova, o aprila in Ricerca.');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveAttribute('aria-disabled', 'false'));
     expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveFocus();
-    expect(screen.getByRole('button', { name: 'Apri nel Corpus' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apri in Ricerca' })).toBeInTheDocument();
   });
 
   it('closes on Escape', () => {
     const text = renderView();
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Apri nel Corpus' }), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Apri in Ricerca' }), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
