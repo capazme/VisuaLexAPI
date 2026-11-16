@@ -4,6 +4,7 @@ import type { ToastProps } from '../../ui/Toast';
 import { dossierContainsDecision } from '../dossier/dossierUtils';
 import { discardEmptyDossier } from '../dossier/deleteDossierWithUndo';
 import { dossierHoldsArticle, practiceDossierItems } from './practiceDossierItems';
+import { isBoundPractice } from '../../../utils/practice';
 
 export interface SaveNotice {
   message: string;
@@ -85,7 +86,8 @@ async function saveOnce(
   setNotice: (notice: SaveNotice | null) => void,
 ): Promise<void> {
   const practice = appStore.getState().practices.find((p) => p.id === practiceId);
-  if (!practice) return;
+  // A bound table is its dossier already: «Salva come dossier» is the Corpus's.
+  if (!practice || isBoundPractice(practice)) return;
   const { norms, decisions, unidentified } = practiceDossierItems(practice);
   const unidentifiedText = unidentified > 0
     ? `${plural(unidentified, 'sentenza non identificata non è stata', 'sentenze non identificate non sono state')} salvat${unidentified === 1 ? 'a' : 'e'}`

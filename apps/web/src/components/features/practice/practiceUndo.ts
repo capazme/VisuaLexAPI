@@ -1,6 +1,7 @@
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { notify } from '../../ui/notifications/notifications';
 import { appStore } from '../../../store/useAppStore';
+import { isBoundPractice } from '../../../utils/practice';
 
 /**
  * Closing a practice, all of them, or taking an act off the table, with «Annulla» instead of a confirmation (K1a): the
@@ -25,7 +26,7 @@ const rowsUnder = (prefix: string) =>
 export function closePracticeWithUndo(practiceId: string): void {
   const state = appStore.getState();
   const practice = state.practices.find((p) => p.id === practiceId);
-  if (!practice) return;
+  if (!practice || isBoundPractice(practice)) return;
   const at = state.practices.indexOf(practice);
   const rows = rowsUnder(`${practiceId}/`);
   const wasActive = state.activePracticeId === practiceId;
@@ -41,16 +42,18 @@ export function closePracticeWithUndo(practiceId: string): void {
 }
 
 export function closeAllPracticesWithUndo(): void {
-  const { practices, practiceRows, activePracticeId } = appStore.getState();
-  if (practices.length === 0) return;
+  const { practiceRows, activePracticeId } = appStore.getState();
+  // «Chiudi tutte» closes the Corpus's practices; each keeps its index in the whole list, where «Annulla» puts it back.
+  const closing = appStore.getState().practices.flatMap((practice, index) => (isBoundPractice(practice) ? [] : [{ practice, index }]));
+  if (closing.length === 0) return;
   void showUndoToast({
     action: () => appStore.getState().closeAllPractices(),
     undo: () => {
-      if (!appStore.getState().reopenPractices(practices.map((practice, index) => ({ practice, index })), { ...practiceRows }, activePracticeId)) {
+      if (!appStore.getState().reopenPractices(closing, { ...practiceRows }, activePracticeId)) {
         notRestorable('Non ripristinabile: le pratiche sono già sul tavolo.');
       }
     },
-    message: practices.length === 1 ? 'Pratica chiusa' : `${practices.length} pratiche chiuse`,
+    message: closing.length === 1 ? 'Pratica chiusa' : `${closing.length} pratiche chiuse`,
   });
 }
 

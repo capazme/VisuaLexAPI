@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
+import { corpusPractices, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { Modal } from '../../ui/Modal';
 import { MenuButton } from '../../ui/MenuButton';
 import { PracticeColumn } from './PracticeColumn';
@@ -43,7 +43,7 @@ const USER_SCROLL = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
  * `SearchPanel`'s, over both layouts.
  */
 export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: PracticePhoneViewProps) {
-  const practices = useAppStore(useShallow((s) => s.practices.map(practicePair)));
+  const practices = useAppStore(useShallow((s) => corpusPractices(s.practices).map(practicePair)));
   const activePracticeId = useAppStore((s) => s.activePracticeId);
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
   // The reader is drawn for the practice on screen only: one whose practice is not the active one is stale.
@@ -201,7 +201,7 @@ function PhonePracticeHead({ practice, save, onList }: { practice: Practice; sav
 /** A tap on the practice's name: every practice to switch to, each with «⋯» (Rinomina, Chiudi la
  *  pratica — the bar's chip actions, the same confirmation), and «+ Nuova pratica» (spec §8). */
 function PracticeList({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const practices = useAppStore((s) => s.practices);
+  const practices = corpusPractices(useAppStore((s) => s.practices));
   const createPractice = useAppStore((s) => s.createPractice);
   const [editingId, setEditingId] = useState<string | null>(null);
   const row =

@@ -29,7 +29,7 @@ import { formatNormaMeta } from '../../../utils/normaMeta';
 import { actHeading, shortAct } from '../../../utils/sources';
 import { READ_ONLY_REASON, describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
 import { filterLoadedIdsForAnnex } from '../../../utils/articleIds';
-import { findPracticeArticle, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
+import { corpusPractices, findPracticeArticle, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
 
 export interface PracticeActBlockProps {
   practiceId: string;
@@ -82,7 +82,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // not re-render every act's rows. `useShallow` compares the pairs' fields.
   const [moveOpen, setMoveOpen] = useState(false);
   const moveTargets = useAppStore(useShallow((s) => (moveOpen
-    ? s.practices.filter((p) => p.id !== practiceId).map(practicePair)
+    ? corpusPractices(s.practices).filter((p) => p.id !== practiceId).map(practicePair)
     : [])));
   const isStructureWindowOpen = useAppStore((s) => s.structureWindow.blockId === act.id);
   // The act's open rows, oldest first: a reveal moves its row to the end (`revealRow`).
