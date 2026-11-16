@@ -4,7 +4,7 @@ import { ChevronRight, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { FOCUS_RING } from '../../constants/interactions';
 import { pageName } from '../../features/sections/pageNames';
-import { PALETTE_SHORTCUT } from '../../utils/searchFieldControl';
+import { PALETTE_SHORTCUT, SEARCH_ISLAND_ID } from '../../utils/searchFieldControl';
 import type { Section } from '../../features/sections/sections';
 
 /**
@@ -48,8 +48,9 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
   const leaf = deeper && heading && heading !== page ? heading : null;
 
   return (
-    <div data-testid="top-bar" className="hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:flex dark:border-slate-800">
-      <nav aria-label="Percorso" className="min-w-0 flex-1">
+    <div data-testid="top-bar" className="relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:flex dark:border-slate-800">
+      {/* The path keeps clear of the centred search (LC40): half the bar less half the pill and a gap. */}
+      <nav aria-label="Percorso" className="min-w-0 flex-1 pr-[calc(11rem+1rem)] [max-width:calc(50%)]">
         <ol className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] text-slate-600 dark:text-slate-400">
           <li className="shrink-0">
             <Link to={section.home} className={cn('rounded-sm hover:text-slate-900 dark:hover:text-slate-100', FOCUS_RING)}>
@@ -74,7 +75,12 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
           )}
         </ol>
       </nav>
+      {/* LC40 (Luca: «in alto devo avere centrale la barra di ricerca … effetto espansione Dynamic Island»): the search in
+          the bar's middle, on every page; the menu grows out of it (`CommandPalette`). */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
       {field ?? <button
+        id={SEARCH_ISLAND_ID}
+        data-compact=""
         type="button"
         // As the phone's bar: focused first (Safari does not focus a clicked button), so the menu gives the focus back here.
         onClick={(event) => {
@@ -83,7 +89,7 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         }}
         aria-keyshortcuts="Meta+K Control+K"
         className={cn(
-          'flex h-8 w-[22rem] items-center gap-2 rounded-lg border border-slate-200 bg-card pl-3 pr-2 text-[13px] text-slate-600 transition-colors',
+          'flex h-8 w-[22rem] items-center gap-2 rounded-full border border-slate-200 bg-card pl-3 pr-2 text-[13px] text-slate-600 transition-colors',
           'hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600',
           FOCUS_RING,
         )}
@@ -92,6 +98,8 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         <span>Norma, sentenza o tema</span>
         <kbd aria-hidden className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 font-mono text-[11px] text-slate-500 dark:border-slate-700">{PALETTE_SHORTCUT}</kbd>
       </button>}
+      </div>
+      <span className="flex-1" aria-hidden />
       {actions}
     </div>
   );

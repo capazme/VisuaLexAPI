@@ -98,7 +98,7 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
           className={cn(
             // The field's type size (`FIELD_TEXT`, 16 px at least on a phone, «piccolo» included), as the box it opens.
             compact
-              ? 'relative flex h-8 w-full min-w-0 items-center rounded-lg border border-slate-200 bg-card pl-9 pr-2 text-left text-[13px]'
+              ? 'relative flex h-8 w-full min-w-0 items-center rounded-full border border-slate-200 bg-card pl-9 pr-2 text-left text-[13px]'
               : cn('relative flex h-11 w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-left shadow-sm', FIELD_TEXT),
             'dark:border-slate-700 dark:bg-slate-900',
             'cursor-text hover:border-slate-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:hover:border-slate-600',

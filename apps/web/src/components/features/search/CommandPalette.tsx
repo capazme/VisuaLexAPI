@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Command, useCommandState } from 'cmdk';
-import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
+import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, shift, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
@@ -16,7 +16,7 @@ import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
-import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
+import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
@@ -162,6 +162,9 @@ const PANEL_RADIUS = 16;
 /** The growth: about 280 ms opening, 200 ms closing (the brief's), on the app's curves; no bounce. */
 const GROW_S = 0.28;
 const SHRINK_S = 0.2;
+/** The island's (LC40): a little longer, with a slight overshoot as it settles, as the phone's island widens. */
+const ISLAND_GROW_S = 0.42;
+const ISLAND_CURVE = 'cubic-bezier(0.34, 1.32, 0.64, 1)';
 /** The groups entering: the first four, 30 ms apart, from when the panel is half grown. */
 const GROUPS_ENTERING = 4;
 const GROUP_STAGGER_MS = 30;
@@ -184,7 +187,7 @@ const noHeight = () => null;
  * shows; the content fades in as it grows. Closing, the same way back (`usePresence`); opened again meanwhile, it grows
  * back from where the closing was. Under reduced motion it only fades.
  */
-function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
+function PanelGrowth({ still, fromHeight, fromWidth, fromRadius = FIELD_RADIUS, className, children }: { still: boolean; fromHeight: number; fromWidth?: number; fromRadius?: number; className: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isPresent, safeToRemove] = usePresence();
   // `safeToRemove` is a new function at every render: kept here, it does not start the closing again (one closing,
@@ -200,9 +203,12 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
   const opening = useRef(false);
   // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
   // after it mounts, so it is never measured here. One template, so the two ends interpolate.
-  const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
-  const asField = clipFor(100, fromHeight, FIELD_RADIUS);
-  const asPanel = clipFor(0, 0, PANEL_RADIUS);
+  // LC40, the island: from a pill narrower than the panel, the sides are hidden too, half of what the panel has more on
+  // each (the panel centred on it), so it grows out of the pill in both directions.
+  const clipFor = (share: number, px: number, side: number, sidePx: number, radius: number) =>
+    `inset(0px calc(${side}% - ${sidePx}px) calc(${share}% - ${px}px) calc(${side}% - ${sidePx}px) round ${radius}px)`;
+  const asField = fromWidth ? clipFor(100, fromHeight, 50, fromWidth / 2, fromRadius) : clipFor(100, fromHeight, 0, 0, fromRadius);
+  const asPanel = clipFor(0, 0, 0, 0, PANEL_RADIUS);
   const curve = `cubic-bezier(${ease.out.join(', ')})`;
   // Web Animations with no fill: once over, nothing holds the clip (the shadow outside it shows), and a closing
   // interrupted by a new opening starts from where it was. (A DOM without them, a test's, draws the panel at once.)
@@ -258,7 +264,9 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
             { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
           ))
         : [];
-      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
+      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], fromWidth
+        ? { duration: ISLAND_GROW_S * 1000, easing: ISLAND_CURVE }
+        : { duration: GROW_S * 1000, easing: curve });
       // Grown, the clip goes: the card's own shadow shows.
       grow.onfinish = () => {
         el.style.clipPath = '';
@@ -693,9 +701,18 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
   // The top bar's compact field (LC21) is no field to grow from (Luca, 15 Nov: the menu was as narrow as it): the menu
   // then hangs at the top, centred and wide, as from every other page — one menu, one place.
-  const anchor = field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
+  // LC40 (Luca, 16 Nov: «effetto espansione Dynamic Island … in qualsiasi scheda»): the top bar's pill — the search
+  // page's compact field, or the bar's button on every other page — is an island: the menu grows out of it, wide, centred
+  // on it, its top on the pill's. The search page's own large field (Corpus, below lg) stays a field it drops from.
+  const island = isOpen && isDesktop
+    ? (field?.isConnected && field.hasAttribute('data-compact') ? field : document.getElementById(SEARCH_ISLAND_ID))
+    : null;
+  const anchor = island?.isConnected ? island : field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
+  const isIsland = anchor !== null && anchor === island;
   // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
   const growFrom = anchor?.offsetHeight || 44;
+  // From the island its width too, and its round ends.
+  const growFromWidth = isIsland ? anchor.offsetWidth : undefined;
   // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
   // did both).
   const watchViewport = isOpen && !isDesktop;
@@ -717,17 +734,19 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     elements: { reference: anchor },
-    placement: 'bottom-start',
+    placement: isIsland ? 'bottom' : 'bottom-start',
     strategy: 'fixed',
     middleware: [
       // Its top on the field's: the panel's own box takes the field's place.
       offset(({ rects }) => -rects.reference.height),
-      // As wide as the field; as tall as what it holds, up to the height it always had (Bill: one row is not a
-      // 640 px panel), the window allowing.
+      // The island's panel, wider than the pill, stays in the window.
+      ...(isIsland ? [shift({ padding: 16 })] : []),
+      // As wide as the field (from the island: the menu's own width, 768 px, the window allowing); as tall as what it
+      // holds, up to the height it always had (Bill: one row is not a 640 px panel), the window allowing.
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
-          elements.floating.style.width = `${rects.reference.width}px`;
+          elements.floating.style.width = isIsland ? `${Math.min(768, window.innerWidth - 32)}px` : `${rects.reference.width}px`;
           elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`);
         },
       }),
@@ -1366,7 +1385,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           >
             {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
                 lists scroll inside it past that. */}
-            <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
+            <PanelGrowth still={still} fromHeight={growFrom} fromWidth={growFromWidth} fromRadius={isIsland ? growFrom / 2 : FIELD_RADIUS} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
               {content}
             </PanelGrowth>
           </div>
