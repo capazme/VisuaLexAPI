@@ -34,7 +34,9 @@ CMD ["npx", "prisma", "migrate", "deploy"]
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# pdfjs-dist (LC57) pulls in @napi-rs/canvas as an optional dependency, ~28 MB of native binaries used only to draw
+# pages: the server reads their text and never loads it, so it is removed here and nothing else optional is dropped.
+RUN npm ci --omit=dev && rm -rf node_modules/@napi-rs/canvas node_modules/@napi-rs/canvas-* && npm cache clean --force
 # The generated client is not a dependency: it comes from the build stage.
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/dist ./dist
