@@ -171,9 +171,10 @@ function App() {
             {/* D-324: the desktop app's; announced in Work (LC47). */}
             <Route path="anonimizzatore" element={<ComingSoon>
               <p className="text-xs font-medium">in arrivo</p>
-              <p>Arriva con l'app da scrivania di LexCraft.</p>
-              <p>Prima che un atto entri in una pratica, toglie dal documento i dati che identificano persone e società e li sostituisce con etichette. Così puoi lavorarci con l'IA nel rispetto del GDPR e del segreto commerciale.</p>
-              <p>Funziona tutto sul tuo computer: il documento originale non esce mai.</p>
+              <p>Arriverà con l'app da scrivania di LexCraft.</p>
+              <p>Prima che un atto entri in una pratica, toglierà i nomi di persone e società e li sostituirà con etichette: all'IA arriveranno meno dati personali e meno informazioni riservate.</p>
+              <p>Funzionerà tutto sul tuo computer: il documento originale non uscirà mai.</p>
+              <p>I dati con le etichette restano dati personali per il GDPR: l'Anonimizzatore riduce il rischio, non sostituisce le altre cautele.</p>
             </ComingSoon>} />
           </Route>
           <Route path="history" element={<HistoryView />} />

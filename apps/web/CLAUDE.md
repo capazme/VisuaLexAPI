@@ -593,7 +593,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
   section's, in a group named after it: Work's five entries (D-315, LC8), exactly, in this order, «Oggi» (the home, `/work/oggi`,
   with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the
-  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, «Atti», then, after a hairline, in a group named «Strumenti con l'IA» for a screen reader (LC47), «Analizza
+  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, «Atti», then, after a hairline, in a group named «Strumenti sul documento» for a screen reader (LC47), «Analizza
   documento» (`/documents`, `soon="dev"`: «in sviluppo», still a working link; Corpus is no longer lit there) and
   «Anonimizzatore» `soon` (`NavItem`: «in arrivo» or «in sviluppo» under the word, 11 px, in the rail's hover label and in
   the name, «Anonimizzatore, in arrivo»; `/work/anonimizzatore` is a plain page in Work's frame, `ComingSoon` in

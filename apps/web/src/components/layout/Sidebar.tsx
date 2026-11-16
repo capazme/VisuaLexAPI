@@ -587,7 +587,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <NavItem to="/work/atti" icon={FileText} label="Atti" onClick={closeMobile} layout={layout} />
                 <div aria-hidden className={cn("h-px bg-slate-200 dark:bg-slate-700", layout === 'rail' ? "mx-auto w-6" : "my-1.5 w-full")} />
-                <NavGroup name="Strumenti con l'IA" layout={layout}>
+                <NavGroup name="Strumenti sul documento" layout={layout}>
                   <NavItem to="/documents" icon={FileSearch} label="Analizza documento" shortLabel="Analizza" soon="dev" onClick={closeMobile} layout={layout} />
                   {/* The desktop app's (D-324): announced on the web, its page says what it will do. */}
                   <NavItem to="/work/anonimizzatore" icon={EyeOff} label="Anonimizzatore" soon onClick={closeMobile} layout={layout} />

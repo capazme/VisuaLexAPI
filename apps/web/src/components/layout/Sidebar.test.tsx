@@ -185,9 +185,9 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
     expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti', 'Analizza documento, in sviluppo', 'Anonimizzatore, in arrivo']);
     // The two apart, in a group named for a screen reader, with no heading written over them.
-    const tools = within(opus).getByRole('group', { name: "Strumenti con l'IA" });
+    const tools = within(opus).getByRole('group', { name: "Strumenti sul documento" });
     expect(within(tools).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/documents', '/work/anonimizzatore']);
-    expect(screen.queryByText("Strumenti con l'IA")).toBeNull();
+    expect(screen.queryByText("Strumenti sul documento")).toBeNull();
     // Corpus is Work's way to the search: no «Ricerca» above it.
     expect(screen.queryByRole('link', { name: 'Ricerca' })).toBeNull();
   });
