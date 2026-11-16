@@ -242,7 +242,7 @@ describe('Pratica files through an MCP token (LC56)', () => {
   it('shows the texts’ permission on the consent screen with the words that name the acts', async () => {
     const res = await request(app).get('/api/oauth/connection').set(authHeader(await createTestUser('mcp-parole')));
     const label = res.body.scopes.find((s: { scope: string }) => s.scope === 'dossier:text').label;
-    expect(label).toBe('Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, le tue note e il testo degli atti che carichi nelle pratiche: il testo arriva al fornitore dell’applicazione collegata');
+    expect(label).toBe('Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, le tue note e il testo degli atti delle tue pratiche, con i dati personali che contengono: il testo arriva al fornitore dell’applicazione collegata');
   });
 
   it('deposits a new act as a DOCX written by Claude, and a version that leaves the original intact', async () => {

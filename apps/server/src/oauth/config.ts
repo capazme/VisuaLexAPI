@@ -20,7 +20,7 @@ export type Scope = (typeof SCOPES)[number];
  * The version of the words of `dossier:text` on the consent page (`SCOPE_LABELS`), stored on a grant when the user
  * approves a request for that scope (`oauth_grants.text_consent_version`). 1: «… e le tue note» (G-381 (b)); the
  * migration gave 1 to the grants that already held the scope (G-385: no active users yet). 2: «… le tue note e il
- * testo degli atti che carichi nelle pratiche» (LC56, 16 November 2026). A grant under 1 does not receive the text of
+ * testo degli atti delle tue pratiche, con i dati personali che contengono» (LC56, 16 November 2026; words by Brandeis). A grant under 1 does not receive the text of
  * the user's notes, a grant under 2 the text of a case's acts, until the user connects again.
  * Change the words in a way that widens what leaves, and this number goes up with them.
  */

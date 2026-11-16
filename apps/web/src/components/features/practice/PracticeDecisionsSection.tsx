@@ -122,7 +122,7 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
       )}
       regionStyle={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}
     >
-      <DecisionEntryView practiceId={practiceId} decisionId={entry.id} reference={entry.reference} hostId={practiceId} />
+      <DecisionEntryView practiceId={practiceId} decisionId={entry.id} reference={entry.reference} hostId={practiceId} dossierItemId={dossier?.itemId} />
     </PracticeRowShell>
   );
 }

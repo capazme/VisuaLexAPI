@@ -251,7 +251,7 @@ export function ConnectAiAppPage() {
                 Dati personali e app AI
               </h2>
               <p>
-                Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci, le tue note, il testo degli atti che carichi nelle pratiche, le tue schede e i tuoi percorsi di studio, e li
+                Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci, le tue note, il testo degli atti delle tue pratiche, le tue schede e i tuoi percorsi di studio, e li
                 passa al servizio di intelligenza artificiale che usa. Non scrivere lì dati personali dei clienti, oppure collega
                 solo app AI di cui ti fidi.
               </p>
