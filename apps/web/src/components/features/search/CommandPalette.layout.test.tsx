@@ -173,11 +173,13 @@ describe('CommandPalette — growing out of the field (R2)', () => {
       pill.setAttribute('data-compact', '');
       Object.defineProperty(pill, 'offsetHeight', { value: 32 });
       Object.defineProperty(pill, 'offsetWidth', { value: 352 });
+      // The pill in the bar's middle of a 1024 px window: the 768 px panel reaches 208 px past it on each side.
+      pill.getBoundingClientRect = () => ({ left: 336, top: 10, width: 352, height: 32, right: 688, bottom: 42, x: 336, y: 10, toJSON: () => ({}) }) as DOMRect;
       document.body.append(pill);
       render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
       const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
-      // The pill's shape: its height, its width centred on the panel, its round ends.
-      const ISLAND = 'inset(0px calc(50% - 176px) calc(100% - 32px) calc(50% - 176px) round 16px)';
+      // The pill's shape: its height, its width within the panel, its round ends.
+      const ISLAND = 'inset(0px 208px calc(100% - 32px) 208px round 16px)';
       expect(panel.style.clipPath).toBe(ISLAND);
       await waitFor(() => expect(asked).toContainEqual([{ clipPath: ISLAND }, { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' }]));
       pill.remove();
