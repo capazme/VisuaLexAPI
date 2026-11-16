@@ -1284,10 +1284,11 @@ const appStore = createStore<AppState>()(
                     const at = act ? act.articles.findIndex((a) => practiceArticleKey(a) === articleKey) : -1;
                     if (!act || at < 0) return;
                     // The row keeps its own `norma_data`: its key, and so its open row and its windows, do not move.
+                    // The rest is the load's alone: an earlier failed load leaves no `error` behind.
                     const { norma_data: _asked, brocardi_info: _info, brocardi_error: _error, ...text } =
                         loaded as ArticleData & { brocardi_info?: unknown; brocardi_error?: unknown };
                     void _asked; void _info; void _error;
-                    act.articles[at] = { ...act.articles[at], ...text };
+                    act.articles[at] = { ...text, norma_data: act.articles[at].norma_data };
                 });
             },
 
@@ -3145,7 +3146,6 @@ function syncFromDossier(practice: Practice, dossier: Dossier): void {
         void _text;
         const act: Norma = { tipo_atto: norma_data.tipo_atto, data: norma_data.data, numero_atto: norma_data.numero_atto };
         if (norma_data.tipo_atto_reale) act.tipo_atto_reale = norma_data.tipo_atto_reale;
-        if (norma_data.url) act.urn = norma_data.url;
         practice.acts = addArticles(practice.acts, act, [{ norma_data }], uuidv4).acts;
     }
     mergeKnownDecisions(practice, dossier.items.flatMap((item) => (item.type === 'sentenza' ? [item.data] : [])));

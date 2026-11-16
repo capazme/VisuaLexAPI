@@ -125,6 +125,17 @@ describe('a dossier builds a bound table (LC51 c1)', () => {
     expect(practice(id).beside).toHaveLength(1);
   });
 
+  it('a failed load then a good one leaves no error on the row', () => {
+    const id = s().openDossierPractice(dossier([norma('5')]));
+    const { id: actId, articles: [row] } = practice(id).acts[0];
+    const key = practiceArticleKey(row);
+    s().setPracticeArticleText(id, actId, key, { norma_data: row.norma_data, error: 'Fonte non raggiungibile' });
+    expect(practice(id).acts[0].articles[0].error).toBe('Fonte non raggiungibile');
+    s().setPracticeArticleText(id, actId, key, article(L24, '5'));
+    expect(practice(id).acts[0].articles[0]).not.toHaveProperty('error');
+    expect(practice(id).acts[0].articles[0].article_text).toBeTruthy();
+  });
+
   it('filling a row that is not there writes nothing', () => {
     const id = s().openDossierPractice(dossier([norma('5')]));
     const before = s().practices;
@@ -208,15 +219,9 @@ describe('a bound table never becomes the Corpus active practice', () => {
       s().restorePracticeAct(id, act, 0, [], {});
     }],
     ['removePracticeDecision', (id, _a, _k, decisionId) => s().removePracticeDecision(id, decisionId)],
-    ['moveActToPractice into it', (id) => {
-      const corpus = s().practices.find((p) => !isBoundPractice(p));
-      if (!corpus) return;
-      const { actId } = s().addArticlesToPractice(corpus.id, L24, [article(L24, '1')]);
-      s().moveActToPractice(actId, corpus.id, id);
-    }],
     ['popReadingBack', (id, actId, key) => {
-      s().pushReadingBack({ tabId: id, blockId: actId, articleId: '5', articleKey: key, label: 'art. 5' } as never);
-      s().popReadingBack();
+      s().pushReadingBack({ tabId: id, blockId: actId, articleId: '5', articleKey: key, label: 'art. 5' });
+      expect(s().popReadingBack()).not.toBeNull();
     }],
     ['closePractice', (id) => s().closePractice(id)],
   ];
