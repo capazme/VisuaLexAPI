@@ -369,8 +369,8 @@ const parteQuery = z.coerce.number().int().min(1).max(10_000).default(1);
 router.get('/:dossierId/files/:fileId/text', files, wrap(async (req, res) => {
   const config = requireStore();
   // The text of a client's act goes to the model only for a grant that consented to the texts' current words.
-  if (req.delegation && !req.delegation.readsNotes) {
-    throw new AppError(403, "Per leggere i file della pratica l'applicazione va ricollegata concedendo «Leggere i testi».");
+  if (req.delegation && !req.delegation.readsActs) {
+    throw new AppError(403, "Per leggere i file della pratica l'applicazione va ricollegata: il permesso «Leggere i testi» ora comprende anche gli atti.");
   }
   const parte = parteQuery.parse(req.query.parte);
   const row = await ownFile(req, { deletedAt: null });

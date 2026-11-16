@@ -65,6 +65,7 @@ export async function callApi<T>(
   scope: string,
   path: string,
   init: { method?: 'GET' | 'POST'; body?: unknown; /** What a 404 means for this call, when not "no such dossier". */ notFound?: string;
+    /** Pass a 403's reason on: the route's own Italian words say what to do. */ forbiddenSays?: boolean;
     /** What a call that got no answer means, when not "try again" (a deletion that may have happened). */ unreachable?: string;
     /**
      * A 409 is a rule of the data's state (an exam already open, a programme complete, a limit reached), not a change
@@ -94,6 +95,8 @@ export async function callApi<T>(
     case 401:
       throw new ToolError('Il collegamento con VisuaLex è stato revocato o è scaduto: ricollega l’applicazione.');
     case 403:
+      // A route that says what the user can do (reconnect for the acts' text, LC56) is relayed in its words.
+      if (init.forbiddenSays && typeof body.detail === 'string') throw new ToolError(body.detail);
       throw new ToolError('VisuaLex non consente questa operazione alle applicazioni collegate.');
     case 404:
       throw new ToolError(init.notFound ?? 'Non trovato: il dossier non esiste o non è tuo.');
@@ -123,7 +126,7 @@ export async function callApi<T>(
     case 413:
     case 415:
       // A file or a case over its ceiling: the server says which, in Italian.
-      throw new ToolError(typeof body.detail === 'string' ? body.detail : 'Il file supera i limiti di VisuaLex.');
+      throw new ToolError(typeof body.detail === 'string' ? body.detail : 'Il file supera i limiti di LexCraft.');
     case 502:
     case 504:
       // A gateway in front of the server gave up: the server may still be at it.

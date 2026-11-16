@@ -209,10 +209,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `assistant_note_versions` is for the second cut (the
   versions an assistant replaced); nothing writes it yet. The scope `dossier:text` is worded on the
   consent page and in «Applicazioni collegate» (`SCOPE_LABELS`): the texts of norms and decisions and, since G-381 (b)
-  (owners, 29 October 2026), the user's notes. **A note's content reaches a connected application only** through a token
+  (owners, 29 October 2026), the user's notes, and since LC56 (16 November 2026) the text of the acts uploaded to a
+  case. **A note's content reaches a connected application only** through a token
   with `dossier:text` whose grant was approved with those words: approving a request for `dossier:text` stores
-  `TEXT_CONSENT_VERSION` (`oauth/config.ts`, now 1) on the grant (`oauth_grants.text_consent_version`), `delegatedAuth`
-  reads it live into `req.delegation.readsNotes`, and `serializeItem` answers a note's `content` null otherwise (a
+  `TEXT_CONSENT_VERSION` (`oauth/config.ts`, now 2) on the grant (`oauth_grants.text_consent_version`), `delegatedAuth`
+  reads it live into `req.delegation.readsNotes` (version ≥ 1, `NOTES_CONSENT_VERSION`) and `readsActs` (≥ 2: the
+  act text route answers a lower one 403 «… va ricollegata: il permesso «Leggere i testi» ora comprende anche gli
+  atti.»), and `serializeItem` answers a note's `content` null otherwise (a
   norm's or a decision's never). The migration gave version 1 to the grants that already held `dossier:text` (G-385,
   owners, 29 October 2026: no active users yet); widening the words means raising the version, and a grant with a lower
   one reads no note until the user connects again. A grant made before `dossier:text` existed has it only
@@ -938,7 +941,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   **For an exchanged MCP token** (LC56, owner, 16 November 2026, the co-owner's review afterwards; testing only),
   three rows of the delegated table, owner only (404 otherwise): `GET /:dossierId/contesto` (`dossier:read`; the
   instructions and the live files, no trash, an `elenco` line), `GET /:dossierId/files/:fileId/text?parte=n`
-  (`dossier:text` and the grant's current texts consent, else 403; the text extracted in parts of 50,000 characters,
+  (`dossier:text` and a grant approved with consent words version 2, else 403; the text extracted in parts of 50,000 characters,
   a `scaricamento` line with the client; PDF, DOC, RTF and images answer `testo: null` and a `motivo`), `POST
   /:dossierId/files/atto { nome, testo ≤ 500,000, versioneDi? }` (`dossier:write`; the text made a DOCX and stored
   through the uploads' own `deposit`: ceilings, lock, `autore: claude`, the client, a `deposito` line; a version

@@ -125,7 +125,7 @@ export function registerPraticaTools(server: McpServer, config: McpConfig, run: 
           caller,
           TEXT_SCOPE,
           `/dossiers/${encodeURIComponent(found.id)}/files/${encodeURIComponent(file)}/text?parte=${parte ?? 1}`,
-          { notFound: FILE_NOT_FOUND },
+          { notFound: FILE_NOT_FOUND, forbiddenSays: true },
         );
         const head = `File ${JSON.stringify(answer.file.nome)} [${answer.file.id}], v${answer.file.versione}, ${KIND[answer.file.mime] ?? answer.file.mime}, di ${by(answer.file)}.`;
         if (answer.testo === null) return text(`${head} ${answer.motivo ?? 'Nessun testo.'}`);

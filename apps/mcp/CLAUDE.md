@@ -103,7 +103,7 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   (owner, 14 October 2026, question 189). `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
   `created_by`) and which article a note is about (`nota_su`). Only when the caller's token holds `dossier:text`
-  («Leggere i testi», whose consent words say «e le tue note»: G-381 (b), owners, 29 October 2026) it also gives each
+  («Leggere i testi», whose consent words name «le tue note» since G-381 (b), owners, 29 October 2026, and the acts of a case since LC56, version 2) it also gives each
   note's text (`testo`), its first 500 characters with `troncata: true` when cut (never inside a surrogate pair), and one
   note whole with `nota_intera` (refused without the scope, or for an id that is not a note of the dossier). The
   server is the gate: the dossier is then read with a token exchanged for `dossier:read dossier:text`, and the server

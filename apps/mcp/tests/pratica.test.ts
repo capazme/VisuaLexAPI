@@ -12,6 +12,7 @@ beforeAll(async () => {
 afterAll(async () => env.close());
 
 const ALL = 'dossier:read dossier:write dossier:text';
+const OLD_CONSENT = "Per leggere i file della pratica l'applicazione va ricollegata: il permesso «Leggere i testi» ora comprende anche gli atti.";
 const CONTESTO = {
   istruzioni: { testo: 'Cita solo la Cassazione. Coordina con la comparsa.', updatedAt: '2026-11-16T10:00:00.000Z' },
   files: [
@@ -48,6 +49,7 @@ beforeEach(() => {
     if (method === 'GET' && path === '/dossiers/d1/files/f2/text') return [200, { file: CONTESTO.files[0].versioni[0], parte: 1, parti: 2, testo: 'Atto di citazione…', motivo: null }];
     if (method === 'GET' && path === '/dossiers/d1/files/f1/text') return [200, { file: CONTESTO.files[0], parte: 1, parti: 1, testo: null, motivo: 'Testo non estraibile: il PDF è protetto da password.' }];
     if (method === 'GET' && path === '/dossiers/d1/files/zz/text') return [404, { detail: 'File non trovato.' }];
+    if (method === 'GET' && path === '/dossiers/d1/files/v1/text') return [403, { detail: OLD_CONSENT }];
     if (method === 'POST' && path === '/dossiers/d1/files/atto') {
       const { nome, versioneDi } = body as { nome: string; versioneDi?: string };
       if (nome === 'grande') return [413, { detail: 'La pratica supera 500 MB di file (cestino compreso).' }];
@@ -111,6 +113,14 @@ describe('omnilex_leggi_file_pratica', () => {
     expect(missing.isError).toBe(true);
     expect(text(missing)).toMatch(/il file non è in questa pratica/);
     expect(env.stub.exchanges.filter((e) => e.scope === 'dossier:text')).toHaveLength(3);
+    await client.close();
+  });
+
+  it('relays the server’s reason when the grant’s consent predates the acts', async () => {
+    const client = await connect();
+    const old = await client.callTool({ name: 'omnilex_leggi_file_pratica', arguments: { dossier: 'd1', file: 'v1' } });
+    expect(old.isError).toBe(true);
+    expect(text(old)).toBe(OLD_CONSENT);
     await client.close();
   });
 
