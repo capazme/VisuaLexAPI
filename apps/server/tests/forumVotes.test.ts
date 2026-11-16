@@ -22,6 +22,9 @@ describe('votes up and down', () => {
   });
 
   const as = (user: TestUser) => authHeader(user);
+  // An author without a Forum profile, as every view names them (spec 2026-11-14 §B): no public id.
+  const asUsername = (user: TestUser, score: number) =>
+    ({ id: null, name: user.username, identity: 'username', qualification: null, score, username: user.username });
   async function glossa(author: TestUser, title = 'Inadempimento di scarsa importanza') {
     const res = await request(app).post('/api/article-discussions').set(as(author)).send({ ...ARTICLE, title, body: 'Quando la risoluzione è esclusa?' });
     expect(res.status, JSON.stringify(res.body)).toBe(201);
@@ -289,28 +292,28 @@ describe('votes up and down', () => {
       await prisma.articleThread.update({ where: { id: hidden }, data: { isHidden: true } });
 
       const page = await request(app).get(`/api/article-discussions/${threadId}`).set(as(dario));
-      expect(page.body.user).toEqual({ id: alice.id, username: alice.username, score: 3 });
-      expect(page.body.replies[0].user).toEqual({ id: bob.id, username: bob.username, score: 1 });
+      expect(page.body.user).toEqual(asUsername(alice, 3));
+      expect(page.body.replies[0].user).toEqual(asUsername(bob, 1));
       const feed = await request(app).get('/api/article-discussions/feed').set(as(dario));
-      expect(feed.body.data[0].user).toEqual({ id: alice.id, username: alice.username, score: 3 });
+      expect(feed.body.data[0].user).toEqual(asUsername(alice, 3));
 
       // Under a hidden glossa, a reply counts for nobody.
       await prisma.articleThread.update({ where: { id: threadId }, data: { isHidden: true } });
       await prisma.articleThread.update({ where: { id: hidden }, data: { isHidden: false } });
       const again = await request(app).get(`/api/article-discussions/${hidden}`).set(as(dario));
-      expect(again.body.user).toEqual({ id: alice.id, username: alice.username, score: 1 });
+      expect(again.body.user).toEqual(asUsername(alice, 1));
 
       // Bob empties his voted reply (Alice's comment hangs on it): its votes stop counting for him.
       await prisma.articleThread.update({ where: { id: threadId }, data: { isHidden: false } });
       expect((await request(app).delete(`/api/article-discussion-comments/${replyId}`).set(as(bob))).body).toEqual({ outcome: 'emptied' });
       const bobReply = await answer(bob, hidden, 'Bob risponde ancora');
       const emptied = await request(app).get(`/api/article-discussions/${hidden}`).set(as(dario));
-      expect(emptied.body.replies.find((r: { id: string }) => r.id === bobReply).user).toEqual({ id: bob.id, username: bob.username, score: 0 });
+      expect(emptied.body.replies.find((r: { id: string }) => r.id === bobReply).user).toEqual(asUsername(bob, 0));
 
       // Bob's account goes: his reply stays, anonymous, with no score.
       await request(app).delete('/api/auth/account').set(as(bob)).send({ password: 'test-password', confirmation: 'ELIMINA ACCOUNT' });
       const after = await request(app).get(`/api/article-discussions/${hidden}`).set(as(dario));
-      expect(after.body.replies.find((r: { id: string }) => r.id === bobReply).user).toEqual({ id: null, username: 'utente cancellato', score: null });
+      expect(after.body.replies.find((r: { id: string }) => r.id === bobReply).user).toEqual({ id: null, name: 'utente cancellato', identity: 'deleted', qualification: null, score: null, username: 'utente cancellato' });
     });
 
     it('puts each vote’s value in the export', async () => {

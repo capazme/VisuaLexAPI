@@ -162,7 +162,7 @@ describe('the Community’s data', () => {
       const readRecently = await notification(daysAgo(10));
       const unread = await notification(null);
 
-      expect(await sweepCommunity(now)).toEqual({ reportCopies: 2, notifications: 1 });
+      expect(await sweepCommunity(now)).toEqual({ reportCopies: 2, notifications: 1, profileReportDetails: 0 });
 
       const copy = async (id: string) => (await prisma.articleThreadReport.findUniqueOrThrow({ where: { id } })).reportedText;
       expect(await copy(old.id)).toBeNull();

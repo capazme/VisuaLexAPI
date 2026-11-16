@@ -11,9 +11,10 @@ import { lockComment, lockThread } from '../forum/locks';
 import { notify } from '../forum/notify';
 import { logModeration } from '../forum/moderationLog';
 import {
-  ACCEPTED_SELECT, LISTED_THREAD, VISIBLE, acceptedId, authorView, isOwn, isVisible, type Scores,
+  ACCEPTED_SELECT, LISTED_THREAD, VISIBLE, acceptedId, authorView, isOwn, isVisible, type Authors,
 } from '../forum/views';
-import { castVote, personalScores, voteSummaryOf } from '../forum/votes';
+import { castVote, voteSummaryOf } from '../forum/votes';
+import { readAuthors, requireWriter } from '../forum/profiles';
 
 export { parseItalian };
 
@@ -112,14 +113,14 @@ function commentView(comment: {
   id: string; threadId: string; parentId: string | null; body: string; userId: string | null;
   isHidden: boolean; createdAt: Date; updatedAt: Date; user: { id: string; username: string } | null;
   votes: { userId: string; value: number }[]; editedAt: Date | null; deletedAt: Date | null;
-}, userId: string, scores: Scores) {
+}, userId: string, authors: Authors) {
   return {
     id: comment.id,
     threadId: comment.threadId,
     parentId: comment.parentId,
     body: comment.isHidden ? '[Contenuto rimosso]' : comment.body,
     isHidden: comment.isHidden,
-    user: authorView(comment, scores),
+    user: authorView(comment, authors),
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
     editedAt: comment.editedAt,
@@ -159,7 +160,7 @@ function threadView(thread: {
   votes: { userId: string; value: number }[];
   comments: Parameters<typeof commentView>[0][];
   userId: string | null;
-}, userId: string, scores: Scores) {
+}, userId: string, authors: Authors) {
   return {
     id: thread.id,
     normaKey: thread.normaKey,
@@ -182,7 +183,7 @@ function threadView(thread: {
         },
     articleUrn: thread.articleUrn,
     textHash: thread.textHash,
-    user: authorView(thread, scores),
+    user: authorView(thread, authors),
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
     lastActivityAt: thread.lastActivityAt,
@@ -193,7 +194,7 @@ function threadView(thread: {
     acceptedCommentId: acceptedId(thread),
     ...voteSummaryOf(thread, userId),
     isOwner: isOwn(thread.userId, userId),
-    comments: thread.comments.map(comment => commentView(comment, userId, scores)),
+    comments: thread.comments.map(comment => commentView(comment, userId, authors)),
   };
 }
 
@@ -252,10 +253,10 @@ export const listThreads = async (req: Request, res: Response) => {
       take: limit,
     }),
   ]);
-  const scores = await personalScores(prisma, threads.flatMap(thread => [thread.userId, ...thread.comments.map(comment => comment.userId)]));
+  const authors = await readAuthors(prisma, threads.flatMap(thread => [thread.userId, ...thread.comments.map(comment => comment.userId)]));
 
   res.json({
-    data: threads.map(thread => threadView(thread, req.user!.id, scores)),
+    data: threads.map(thread => threadView(thread, req.user!.id, authors)),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 };
@@ -288,7 +289,7 @@ export const listPassages = async (req: Request, res: Response) => {
     orderBy: { createdAt: 'asc' },
     take: 200,
   });
-  const scores = await personalScores(prisma, threads.map(thread => thread.userId));
+  const authors = await readAuthors(prisma, threads.map(thread => thread.userId));
 
   res.json({
     data: threads.map(thread => ({
@@ -304,7 +305,7 @@ export const listPassages = async (req: Request, res: Response) => {
       textHash: thread.textHash,
       commentCount: thread._count.comments,
       createdAt: thread.createdAt,
-      user: authorView(thread, scores),
+      user: authorView(thread, authors),
     })),
   });
 };
@@ -321,7 +322,10 @@ export const createThread = async (req: Request, res: Response) => {
   }
   await maybeSweepCommunity();
   // No licence check yet (pending PR2c): `licence_text_id` stays null, like the rows written before the text.
-  const thread = await withDailyLimit('glossa', req.user!.id, () => prisma.articleThread.create({
+  // The glossa is signed (D-246): the profile is checked in the write's transaction (spec 2026-11-14 §B).
+  const thread = await withDailyLimit('glossa', req.user!.id, () => prisma.$transaction(async (tx) => {
+    await requireWriter(tx, req.user!.id, 'glossa');
+    return tx.articleThread.create({
     data: {
       targetKind: kind,
       decisionKey: kind === 'decision' ? data.normaKey : null,
@@ -341,8 +345,9 @@ export const createThread = async (req: Request, res: Response) => {
       userId: req.user!.id,
     },
     include: THREAD_INCLUDE,
+    });
   }));
-  res.status(201).json(threadView(thread, req.user!.id, await personalScores(prisma, [thread.userId])));
+  res.status(201).json(threadView(thread, req.user!.id, await readAuthors(prisma, [thread.userId])));
 };
 
 /**
@@ -373,6 +378,8 @@ export const createComment = async (req: Request, res: Response) => {
       if (data.body.length > COMMENT_MAX) throw new AppError(400, `Un commento può avere al massimo ${COMMENT_MAX} caratteri`);
       parent = found;
     }
+    // After the locks on the glossa and the reply (spec 2026-11-14 §B).
+    await requireWriter(tx, userId, 'reply');
 
     const created = await tx.articleComment.create({
       data: { threadId: thread.id, parentId: data.parentId ?? null, body: data.body, userId },
@@ -385,7 +392,7 @@ export const createComment = async (req: Request, res: Response) => {
     else if (thread.deletedAt === null) await notify(tx, { to: thread.userId, by: userId, kind: 'reply', threadId: thread.id, commentId: created.id });
     return created;
   }));
-  res.status(201).json(commentView(comment, userId, await personalScores(prisma, [comment.userId])));
+  res.status(201).json(commentView(comment, userId, await readAuthors(prisma, [comment.userId])));
 };
 
 // The reader's panel's toggle of the up vote (spec 2026-11-14 §A): none → up, up → none, down → up. One's

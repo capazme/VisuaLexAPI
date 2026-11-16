@@ -41,6 +41,11 @@ model User {
   resolvedCommentReports ArticleCommentReport[]    @relation("ArticleCommentReportResolvedBy")
   forumNotifications     ForumNotification[]
   forumModerationActs    ForumModerationLog[]
+  // The Forum's profile (spec 2026-11-14-forum-community-server-design §B), the reports «non è chi dice di
+  // essere» the person made, and those an owner closed.
+  forumProfile           ForumProfile?
+  forumProfileReports    ForumProfileReport[]      @relation("ForumProfileReporter")
+  resolvedProfileReports ForumProfileReport[]      @relation("ForumProfileReportResolvedBy")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
@@ -850,6 +855,54 @@ model ForumModerationLog {
   @@index([targetKind, targetId])
   @@index([createdAt])
   @@map("forum_moderation_log")
+}
+
+// The Forum's minimal profile (spec 2026-11-14-forum-community-server-design §B, D-246, D-247, D-249): under
+// the real name or under a pseudonym, never both (G-477); the qualification and the real name declared
+// (D-247, G-479). `id` is the person's public id in the Forum, never the account's, renewed when the
+// profile moves to a pseudonym. The CHECKs and the case-blind unique pseudonym are in the migration.
+model ForumProfile {
+  id                  String         @id @default(uuid())
+  userId              String         @unique @map("user_id")
+  identity            String
+  realName            String?        @map("real_name")
+  pseudonym           String?
+  qualification       String
+  materie             LingoMateria[] @default([])
+  // Set together by an owner who confirms a report «non è chi dice di essere» (G-479), cleared when the
+  // name is given back.
+  nameWithdrawnAt     DateTime?      @map("name_withdrawn_at")
+  nameWithdrawnReason String?        @map("name_withdrawn_reason")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("forum_profiles")
+}
+
+// A report «non è chi dice di essere» on a profile (G-479), read by the owners alone. The profile by a
+// plain id, as the Community's reports name their item; the reporter becomes null with their account.
+model ForumProfileReport {
+  id             String    @id @default(uuid())
+  profileId      String    @map("profile_id")
+  userId         String?   @map("user_id")
+  details        String?
+  status         String    @default("pending")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  resolvedById   String?   @map("resolved_by")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note")
+
+  user       User? @relation("ForumProfileReporter", fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("ForumProfileReportResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([profileId])
+  @@index([status])
+  @@index([userId])
+  @@index([resolvedById])
+  @@index([resolvedAt])
+  @@map("forum_profile_reports")
 }
 
 // ============================================
