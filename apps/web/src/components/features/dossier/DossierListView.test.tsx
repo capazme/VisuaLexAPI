@@ -28,7 +28,7 @@ const dossier = (data: NormaVisitata[]): Dossier => ({
 function open(items: NormaVisitata[]) {
   appStore.setState({ dossiers: [dossier(items)], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
   render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-  fireEvent.click(screen.getByRole('button', { name: 'Apri Pratica Rossi nel Corpus' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Apri Pratica Rossi in Ricerca' }));
 }
 
 beforeEach(() => {
@@ -45,7 +45,7 @@ describe('DossierListView — the quick-open of a card', () => {
     ] };
     appStore.setState({ dossiers: [decisions], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    const button = screen.getByRole('button', { name: 'Apri Pratica Rossi nel Corpus' });
+    const button = screen.getByRole('button', { name: 'Apri Pratica Rossi in Ricerca' });
     expect(button).toBeEnabled();
     fireEvent.click(button);
     const { practices, searchTrigger, searchQueue } = appStore.getState();
@@ -394,7 +394,7 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     // Said as it is seen: the spaces round «·» are in the text.
     expect(line).toHaveTextContent(/^1 fonte · 1 articolo · 1 nota$/);
     expect(within(card).getByText('Creato il 1 agosto 2026')).toBeInTheDocument();
-    for (const name of ['Apri Pratica Rossi nel Corpus', 'Azioni su Pratica Rossi']) {
+    for (const name of ['Apri Pratica Rossi in Ricerca', 'Azioni su Pratica Rossi']) {
       const control = within(card).getByRole('button', { name });
       expect(control).toHaveClass('min-h-[44px]', 'min-w-[44px]');
       expect(control.className).not.toMatch(/opacity-0/);

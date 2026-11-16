@@ -57,7 +57,7 @@ interface NavItemProps {
   onClick?: () => void;
   id?: string;
   badgeCount?: number;
-  /** What the count counts, for the name: «Oggi, 3 compiti per oggi o scaduti». Without it, «N notifiche». */
+  /** What the count counts, for the name: «Scadenziario, 3 compiti per oggi o scaduti». Without it, «N notifiche». */
   badgeLabel?: string;
   /** Active on its own address only, not under it: «Dossier pubblici» (`/forum`) beside «Community» (`/forum/community`). */
   end?: boolean;
@@ -66,8 +66,8 @@ interface NavItemProps {
   /** A feature on its way (D-315): «in arrivo» under the word, in the hover label and in the name. `'dev'` (LC47): it
    *  works but is still being built, «in sviluppo» in the same three places; the entry still leads to its page. */
   soon?: boolean | 'dev';
-  /** Other addresses (and those under them) where the entry is lit, so the bar says where one is: «Oggi» on the
-   *  planner's other views, «Corpus» on the Corpus tools, «Assistente» on the hub's pages (#448). */
+  /** Other addresses (and those under them) where the entry is lit, so the bar says where one is: «Scadenziario» on the
+   *  planner's other views, «Ricerca» on the Corpus tools, «Assistente» on the hub's pages (#448). */
   activeOn?: string[];
   layout: SidebarLayout;
 }
@@ -346,7 +346,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const { section, active } = useSection();
   const sectionEntries = useEntriesEntrance(section);
   const { count: forumNotifications } = useForumNotifications(!!user);
-  // Overdue plus today's tasks (`PlannerHost` reads them): beside «Oggi» in Opus.
+  // Overdue plus today's tasks (`PlannerHost` reads them): beside «Scadenziario» in Opus.
   const todayCount = plannerStore((s) => s.todayCount) ?? 0;
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
@@ -383,7 +383,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     focusSearchField({ focus: true }, { wait: true });
     closeMobile();
   };
-  // The search: «Ricerca» over every section but Work, «Corpus» among Work's entries (D-315).
+  // The search: «Ricerca» over every section but Work, and among Work's entries (D-315, LC48).
   const searchEntry = (label: string, activeOn?: string[]) => (
     <NavItem to="/" activeOn={activeOn} icon={Search} label={label} hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
   );
@@ -544,7 +544,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         id="tour-sidebar"
         className={cn("min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1", words ? "px-3 py-2 gap-0.5" : "px-2.5 py-4 gap-3 md:gap-2")}
       >
-        {/* Corpus's entries over the other sections' (sections spec S6). In Work the search is Work's own «Corpus» (D-315), and
+        {/* Corpus's entries over the other sections' (sections spec S6). In Work the search is Work's own «Ricerca» (D-315, LC48), and
             the two tools are links of the search page (`Scrivania`, LC8). */}
         {section !== 'opus' && (
           <>
@@ -580,17 +580,20 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             )}
             {section === 'opus' && (
               <>
-                {/* Oggi, Corpus, Dossier, Atti, then the two features with an AI model behind them (D-315, LC47). «Prossimi
+                {/* Scadenziario, Ricerca, Dossier, Atti, then the tools that are coming (D-315, LC47, LC48). «Prossimi
                     giorni» and «Lista d'ingresso» are tabs of Work's page (`OpusPage`), «Rassegne» a link of the search page (LC8). */}
-                <NavItem to="/work/oggi" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
-                {searchEntry('Corpus', ['/rassegne'])}
+                <NavItem to="/work/scadenziario" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Scadenziario" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
+                {searchEntry('Ricerca', ['/rassegne'])}
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <NavItem to="/work/atti" icon={FileText} label="Atti" onClick={closeMobile} layout={layout} />
                 <div aria-hidden className={cn("h-px bg-slate-200 dark:bg-slate-700", layout === 'rail' ? "mx-auto w-6" : "my-1.5 w-full")} />
                 <NavGroup name="Strumenti sul documento" layout={layout}>
                   <NavItem to="/documents" icon={FileSearch} label="Analizza documento" shortLabel="Analizza" soon="dev" onClick={closeMobile} layout={layout} />
                   {/* The desktop app's (D-324): announced on the web, its page says what it will do. */}
-                  <NavItem to="/work/anonimizzatore" icon={EyeOff} label="Anonimizzatore" soon onClick={closeMobile} layout={layout} />
+                  {/* «Pseudonimizza» in the bar: the whole word is cut at the larger text sizes (LC48). */}
+                  <NavItem to="/work/pseudonimizzatore" icon={EyeOff} label="Pseudonimizzatore" shortLabel="Pseudonimizza" soon onClick={closeMobile} layout={layout} />
+                  {/* The knowledge graph of the user's practices, the desktop app's too (LC48). */}
+                  <NavItem to="/work/grafo-pratiche" icon={Network} label="Grafo delle pratiche" shortLabel="Grafo pratiche" soon onClick={closeMobile} layout={layout} />
                 </NavGroup>
               </>
             )}

@@ -60,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione principale',
-            description: 'In Work trovi Oggi (con le schede Prossimi giorni e Lista d\'ingresso), Corpus (la ricerca, da cui si apre anche l\'analisi di un documento), i Dossier e gli Atti, dove scrivi un atto con le fonti del suo dossier accanto. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In Work trovi lo Scadenziario (con le schede Prossimi giorni e Lista d\'ingresso), la Ricerca (da cui si apre anche l\'analisi di un documento), i Dossier e gli Atti, dove scrivi un atto con le fonti del suo dossier accanto. Nelle altre sezioni trovi in cima la Ricerca e l\'analisi di un documento, e sotto gli strumenti della sezione, come Oggi e Le mie schede in Learn. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
@@ -69,7 +69,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Inizia a cercare',
-            description: 'Ricerca (in Work si chiama Corpus) ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce.',
+            description: 'Ricerca ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce.',
             side: 'right',
             align: 'start',
         }
@@ -97,7 +97,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Ricerca e Cmd+K',
-            description: 'Ricerca (Corpus, in Work) riporta al campo. Preferisci la tastiera? Cmd+K (Ctrl+K) apre la ricerca veloce da qualsiasi pagina, con filtri, alias e tutti gli atti.',
+            description: 'Ricerca riporta al campo. Preferisci la tastiera? Cmd+K (Ctrl+K) apre la ricerca veloce da qualsiasi pagina, con filtri, alias e tutti gli atti.',
             side: 'right',
             align: 'start',
         }
@@ -187,7 +187,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card-actions',
         popover: {
             title: 'Azioni rapide sulla scheda',
-            description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier nel Corpus senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
+            description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier in Ricerca senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
             side: 'left',
             align: 'center',
         }

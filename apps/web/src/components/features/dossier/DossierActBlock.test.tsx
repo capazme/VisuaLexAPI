@@ -59,7 +59,7 @@ describe('DossierActBlock', () => {
     expect(screen.getByRole('heading', { name: `${L247} 1 articolo` })).toHaveClass('flex-wrap', '@2xl:flex-nowrap');
     for (const words of ['Apri tutto', 'Articoli']) expect(screen.getByText(words)).toHaveClass('hidden', 'lg:@2xl:inline');
     // The names stay whole for a screen reader.
-    expect(screen.getByRole('button', { name: `Apri tutto ${L247} nel Corpus` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Apri tutto ${L247} in Ricerca` })).toBeInTheDocument();
   });
 
   it('keeps the count on the name\'s line while narrow, a screen reader hearing it once (the left column at 1024 px)', () => {
@@ -96,7 +96,7 @@ describe('DossierActBlock', () => {
 
   it('opens the act, adds articles, and removes the act from its menu', () => {
     const props = renderBlock([item('3')]);
-    fireEvent.click(screen.getByRole('button', { name: `Apri tutto ${L247} nel Corpus` }));
+    fireEvent.click(screen.getByRole('button', { name: `Apri tutto ${L247} in Ricerca` }));
     fireEvent.click(screen.getByRole('button', { name: `Aggiungi articoli di ${L247}` }));
     fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
     fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dal dossier" }));

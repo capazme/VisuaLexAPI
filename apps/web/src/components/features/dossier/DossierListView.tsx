@@ -453,8 +453,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleQuickOpen(dossier); }}
                       disabled={!canOpen}
-                      title={canOpen ? 'Apri nel Corpus' : 'Niente da aprire'}
-                      aria-label={`Apri ${dossier.title} nel Corpus`}
+                      title={canOpen ? 'Apri in Ricerca' : 'Niente da aprire'}
+                      aria-label={`Apri ${dossier.title} in Ricerca`}
                       className={cn(ICON_BUTTON, 'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent')}
                     >
                       <ExternalLink size={16} aria-hidden />
@@ -463,7 +463,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       label={`Azioni su ${dossier.title}`}
                       triggerClassName={ICON_BUTTON}
                       items={[
-                        { label: 'Apri nel Corpus', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !canOpen },
+                        { label: 'Apri in Ricerca', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !canOpen },
                         { label: 'Rinomina / Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
                         { label: 'Elimina', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => deleteDossierWithUndo(dossier, onTrashChanged) },
                       ]}

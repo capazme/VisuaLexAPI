@@ -24,7 +24,7 @@ function usePageHeading(scroller: HTMLElement | null, resetKey: string): string 
   return heading;
 }
 
-/** The first segment of an address that names a list: `/dossier/42` → `/dossier`, `/work/oggi` → `/work/oggi`. */
+/** The first segment of an address that names a list: `/dossier/42` → `/dossier`, `/work/atti/7` → `/work/atti`. */
 function listOf(pathname: string): string {
   const parts = pathname.split('/').filter(Boolean);
   return parts[0] === 'work' || parts[0] === 'learn' || parts[0] === 'labs' ? `/${parts.slice(0, 2).join('/')}` : `/${parts[0] ?? ''}`;
@@ -38,8 +38,8 @@ function listOf(pathname: string): string {
  * keeps its own bar, its field.
  */
 export function TopBar({ section, pathname, search = '', scroller, actions, onSearch, field }: { section: Section; pathname: string; search?: string; scroller: HTMLElement | null; actions: ReactNode; onSearch: () => void; field?: ReactNode }) {
-  // The search page is Work's «Corpus» and the other sections' «Ricerca», as the sidebar names it.
-  const page = pathname === '/' ? (section.id === 'opus' ? 'Corpus' : 'Ricerca') : pageName(pathname);
+  // The search page is «Ricerca» in every section, as the sidebar names it (LC48).
+  const page = pathname === '/' ? 'Ricerca' : pageName(pathname);
   const list = listOf(pathname);
   // Deeper than its list: a further segment, or a query that opens one item of it (`/dossier?dossier=…`).
   // Never on the search page, whose `h1` is the desk's greeting or a practice's name, not a step of the path.
