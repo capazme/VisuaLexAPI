@@ -5,7 +5,7 @@ import { DayBlock } from './missions/DayBlock';
 import { MissionList } from './missions/MissionList';
 import { TodayMissions } from './missions/TodayMissions';
 import { goalMissionDone } from './missions/missions';
-import { ConfettiBurst } from './progress/Celebration';
+import { SmokeRise } from './progress/Celebration';
 import { STUDY_SETTINGS_PANEL, StatsBand } from './progress/StatsBand';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { usePercorso } from './progress/usePercorso';
@@ -160,10 +160,10 @@ export function ReviewHome() {
           <MissionList data={data} loading={loading && data === null} />
         </div>
       </div>
-      {/* The confetti start from the goal's mark, in the day block, and fall over the page's first rows, out of the flow. */}
+      {/* LC39: no confetti; a curl of smoke leaves the lamp on the day's plate, in the day block, out of the flow. */}
       {celebrate && data && (
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[32rem]">
-          <ConfettiBurst originRef={goalRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
+          <SmokeRise originRef={goalRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         </div>
       )}
     </section>
