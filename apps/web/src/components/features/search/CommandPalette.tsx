@@ -205,8 +205,10 @@ function PanelGrowth({ still, fromHeight, fromWidth, fromRadius = FIELD_RADIUS, 
   // after it mounts, so it is never measured here. One template, so the two ends interpolate.
   // LC40, the island: from a pill narrower than the panel, the sides are hidden too, half of what the panel has more on
   // each (the panel centred on it), so it grows out of the pill in both directions.
-  const clipFor = (share: number, px: number, side: number, sidePx: number, radius: number) =>
-    `inset(0px calc(${side}% - ${sidePx}px) calc(${share}% - ${px}px) calc(${side}% - ${sidePx}px) round ${radius}px)`;
+  const clipFor = (share: number, px: number, side: number, sidePx: number, radius: number) => {
+    const sides = side === 0 && sidePx === 0 ? '0px' : `calc(${side}% - ${sidePx}px)`;
+    return `inset(0px ${sides} calc(${share}% - ${px}px) ${sides} round ${radius}px)`;
+  };
   const asField = fromWidth ? clipFor(100, fromHeight, 50, fromWidth / 2, fromRadius) : clipFor(100, fromHeight, 0, 0, fromRadius);
   const asPanel = clipFor(0, 0, 0, 0, PANEL_RADIUS);
   const curve = `cubic-bezier(${ease.out.join(', ')})`;

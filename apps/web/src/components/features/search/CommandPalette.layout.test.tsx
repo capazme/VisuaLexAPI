@@ -14,7 +14,7 @@ vi.mock('framer-motion', async (importOriginal) => ({
 
 import { CommandPalette } from './CommandPalette';
 import { appStore } from '../../../store/useAppStore';
-import { SEARCH_FIELD_FORM_ID } from '../../../utils/searchFieldControl';
+import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID } from '../../../utils/searchFieldControl';
 import type { CustomAlias, QuickNorm } from '../../../types';
 
 /**
@@ -154,6 +154,33 @@ describe('CommandPalette — growing out of the field (R2)', () => {
         { clipPath: 'inset(0px 0px calc(100% - 44px) 0px round 12px)' },
         { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' },
       ]));
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+    }
+  });
+
+  it('grows out of the top bar\'s pill as an island: its width and round ends first, then the panel (LC40)', async () => {
+    asDesktop(true);
+    const asked: Keyframe[][] = [];
+    const animateSpy = vi.fn(function (this: HTMLElement, keyframes: Keyframe[]) {
+      asked.push(keyframes);
+      return { cancel: vi.fn(), onfinish: null, playState: 'running' } as unknown as Animation;
+    });
+    Object.defineProperty(HTMLElement.prototype, 'animate', { value: animateSpy, configurable: true, writable: true });
+    try {
+      const pill = document.createElement('button');
+      pill.id = SEARCH_ISLAND_ID;
+      pill.setAttribute('data-compact', '');
+      Object.defineProperty(pill, 'offsetHeight', { value: 32 });
+      Object.defineProperty(pill, 'offsetWidth', { value: 352 });
+      document.body.append(pill);
+      render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+      const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
+      // The pill's shape: its height, its width centred on the panel, its round ends.
+      const ISLAND = 'inset(0px calc(50% - 176px) calc(100% - 32px) calc(50% - 176px) round 16px)';
+      expect(panel.style.clipPath).toBe(ISLAND);
+      await waitFor(() => expect(asked).toContainEqual([{ clipPath: ISLAND }, { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' }]));
+      pill.remove();
     } finally {
       Reflect.deleteProperty(HTMLElement.prototype, 'animate');
     }
