@@ -56,7 +56,7 @@ export function WelcomeGuide() {
         {page === 0 ? (
           <>
             <LexCraftLogo className="h-auto w-[180px]" />
-            <p className="mt-1.5 font-serif text-[17px] italic text-slate-600 dark:text-slate-300">La legge è davvero uguale per tutti</p>
+            <p className="mt-1.5 font-serif text-[17px] italic text-slate-600 dark:text-slate-300">La legge è ancora uguale per tutti</p>
             <h2 id={TITLE_ID} ref={title} tabIndex={-1} className="mt-8 font-serif text-[26px] leading-tight text-slate-900 focus:outline-none dark:text-slate-50">
               Le norme, le sentenze e il tuo lavoro sopra.
             </h2>
