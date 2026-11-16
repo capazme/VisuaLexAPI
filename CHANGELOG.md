@@ -12,6 +12,44 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-11-16
+
+LexCraft's engravings, Work's to-do list on a phone, the section's name beside the phone's menu. Web
+only, no migration.
+
+### Look
+
+- LexCraft's engravings (LC35): 15 plates in one ink, drawn in the theme's colour (warm black on the
+  paper, chalk on the dark), in Learn (the day, the streak, the level, the done seal, the subjects) and on
+  the empty lists of Work, the dossiers and the Forum.
+
+### Phone
+
+- Work's to-do list on a phone (LC33): rows to tick and swipe, a quick add at the foot.
+- The section's name beside the menu in the top bar, not over the page's title (LC34).
+
+### Development
+
+- Two local-only Vite configs that came in by mistake are gone (`apps/web/vite.lc29.config.ts`,
+  `vite.lc30.config.ts`).
+
+## [1.23.0] - 2026-11-16
+
+The sign-in page, a light depth, a simpler reading of one article, plainer «Analizza documento» and act
+editor. Web only, no migration.
+
+### Look
+
+- The sign-in page's layout (LC31); the sign-in flow unchanged.
+- A light depth across fields, cards and bands; an empty «Oggi» in Work says what to do next (LC30).
+- The anti-slop review's small notes in the command palette, the sidebar and the tour (LC32).
+
+### Reading
+
+- One article in a practice is read simply, with the glosses and discussions in a side view (LC28).
+- «Analizza documento» and the act editor plainer: a quieter drop zone and paste box, no placeholder
+  dash in «Tipo» (LC29).
+
 ## [1.22.0] - 2026-11-15
 
 Corrections to what the 1.21.0 showed: one search width, a cleaner full screen, tabs that keep their

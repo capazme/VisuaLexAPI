@@ -1439,6 +1439,13 @@
   .vlx-grow-y { transform-origin: center bottom; animation: vlx-grow-y 700ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 }
 @keyframes vlx-book-breathe { to { opacity: 0.3; } }
+/* LC36: the sign-in page's library drifts, a breath over 40 s, back and forth; still under reduced motion. */
+@keyframes vlx-login-drift {
+  from { transform: scale(1.02) translate3d(-0.5%, 0, 0); }
+  to { transform: scale(1.06) translate3d(0.5%, -0.5%, 0); }
+}
+.vlx-login-library { animation: vlx-login-drift 40s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .vlx-login-library { animation: none; } }
 
 /* LexCraft's logo (D-136, D-201; `ui/LexCraftLogo`), variant 1 of the design file «05 Animazione di avvio.html», «Va e
    torna, resta pietra»: its timings and curves, `transform` and `clip-path` only, CSS so it stays smooth while the app
