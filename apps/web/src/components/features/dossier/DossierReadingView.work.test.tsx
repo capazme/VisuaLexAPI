@@ -105,6 +105,18 @@ describe('the star («importante») in «Lettura»', () => {
   });
 });
 
+describe('the star in the simple reading (one article alone, no row «⋯»)', () => {
+  it('stands over the text with its name, and writes the status', () => {
+    appStore.setState({ dossiers: [dossierOf([norma('7')])] });
+    render(<Page />);
+    const first = bound().acts[0];
+    act(() => { s().setPracticeArticleText(bound().id, first.id, practiceArticleKey(first.articles[0]), { ...first.articles[0], article_text: 'Art. 7\nTesto.' }); });
+    fireEvent.click(screen.getByRole('button', { name: 'Segna come importante' }));
+    expect(s().dossiers[0].items[0].status).toBe('important');
+    expect(screen.getByRole('button', { name: 'Importante' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
 describe('the readers know the dossier entry they read (D7b, the notes)', () => {
   it('an article row of the dossier gives its entry to the reader; one only on the table gives none', () => {
     render(<Page />);
@@ -125,6 +137,21 @@ describe('the readers know the dossier entry they read (D7b, the notes)', () => 
     render(<Page />);
     act(() => { s().setRowOpen(decisionRowKey(bound().id, bound().decisions[0].id), true); });
     expect(within(decisionEl()).getByTestId('decision-reader')).toHaveAttribute('data-item', 's1');
+  });
+});
+
+describe('a window gives its reader the entry too (useDossierItemId)', () => {
+  it('an article and a decision of the dossier read beside', () => {
+    render(<Page />);
+    const first = bound().acts[0];
+    const key = practiceArticleKey(first.articles[0]);
+    act(() => {
+      s().setPracticeArticleText(bound().id, first.id, key, { ...first.articles[0], article_text: 'Art. 5\nTesto.' });
+      s().openBeside(bound().id, { id: 'w-art', kind: 'article', actId: first.id, articleKey: key });
+    });
+    expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-item'))).toContain('n24-5');
+    act(() => { s().openBeside(bound().id, { id: 'w-dec', kind: 'decision', decisionId: bound().decisions[0].id }); });
+    expect(screen.getAllByTestId('decision-reader').map((r) => r.getAttribute('data-item'))).toContain('s1');
   });
 });
 

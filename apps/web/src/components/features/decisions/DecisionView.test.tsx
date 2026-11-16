@@ -331,6 +331,7 @@ describe('DecisionView in a dossier\'s «Lettura» (LC55)', () => {
       </ReadingHostContext.Provider>,
     );
     expect(screen.getByRole('button', { name: 'Aggiungi a questo dossier' })).toHaveClass('text-sm/5');
+    expect(screen.getByRole('button', { name: 'Aggiungi a questo dossier' })).not.toHaveClass('text-xs/5');
     hosted.unmount();
     render(<DecisionView answer={FOUND} reference={REF} {...handlers} />);
     expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveClass('text-xs/5');

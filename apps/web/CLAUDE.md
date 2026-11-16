@@ -1124,7 +1124,8 @@ a window and the phone's reader through `useDossierItemId`) and gives it to `Art
 `useEntryProposals`, glosses, «Sposta», the lost lists), never in the reader's copies or exports. Under an article's
 text, «Note della pratica» lists the dossier's notes about any copy of it (`DossierNoteList`, shared with «Fonti»'s row).
 A row of the dossier's «⋯» has «Segna come importante» / «Rimuovi da importanti» (`updateDossierItemStatus`) and a starred
-row shows the star and says «importante» in its name. A decision's cited norms go through `useTableCitedNorms` (D7d):
+row shows the star and says «importante» in its name; the simple reading, with no row «⋯», has the star over the text
+with its name («Segna come importante», pressed «Importante»). A decision's cited norms go through `useTableCitedNorms` (D7d):
 the preview knows the dossier's («Apri tra le norme», else «Apri nella Lettura»), a click puts the norm on the table,
 revealed or beside its window. «Aggiungi al dossier» from a row says «Aggiunto al dossier» («Aggiunta» for a
 decision); the dossier is read again on opening the tab and on every return of the window, without the page's 15 s

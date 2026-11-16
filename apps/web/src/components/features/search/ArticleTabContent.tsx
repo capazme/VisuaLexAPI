@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, useId } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { CaseLawSection } from './CaseLawSection';
 import { ExternalLink } from 'lucide-react';
@@ -177,6 +177,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const search = useReadingSearch(triggerSearch);
     // In a dossier's «Lettura» (LC55) the dossier command adds to that dossier, without the popover's choice.
     const hostDossier = useHostDossier();
+    const practiceNotesId = useId();
     // The dossier's notes about this article, whichever copy of it they are about (LC58, §14).
     const practiceNotes = useAppStore(useShallow((s) => {
         const dossier = hostDossier ? s.dossiers.find((d) => d.id === hostDossier.id) : undefined;
@@ -1021,8 +1022,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
             {/* §14: the article shows the dossier's notes about it, under its text (LC58), as «Fonti» lists them. */}
             {hostDossier && practiceNotes.length > 0 && (
-                <section aria-labelledby={`practice-notes-${uniqueArticleId}`} className="mt-4 space-y-1.5">
-                    <h4 id={`practice-notes-${uniqueArticleId}`} className="text-sm font-semibold text-slate-800 dark:text-slate-200">Note della pratica</h4>
+                <section aria-labelledby={practiceNotesId} className="mt-4 space-y-1.5">
+                    <h4 id={practiceNotesId} className="text-sm font-semibold text-slate-800 dark:text-slate-200">Note della pratica</h4>
                     <DossierNoteList
                         notes={practiceNotes}
                         onRemoveNote={(note) => removeItemsWithUndo(hostDossier.id, [note.id], 'Elemento rimosso', hostDossier.onTrashChanged)}
