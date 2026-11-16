@@ -120,6 +120,10 @@ export async function callApi<T>(
       const detail = typeof body.detail === 'string' ? body.detail.replace(/\.$/, '') : 'controlla i dati inviati';
       throw new ToolError(`Richiesta non valida: ${detail}.`);
     }
+    case 413:
+    case 415:
+      // A file or a case over its ceiling: the server says which, in Italian.
+      throw new ToolError(typeof body.detail === 'string' ? body.detail : 'Il file supera i limiti di VisuaLex.');
     case 502:
     case 504:
       // A gateway in front of the server gave up: the server may still be at it.

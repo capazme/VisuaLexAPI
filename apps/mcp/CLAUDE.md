@@ -89,7 +89,13 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   plain-text notes up to 4,000 characters each, in a dossier or about one of its articles with
   `voce`, the entry's id; one request per note, one refused and the others go on, answered `{ entrate: [{ nota, id,
   nota_su }], non_entrate?: [{ nota, motivo }] }`, and an error when every note was refused for the same reason;
-  the single `testo`/`voce` form is gone (D8 S1); add-only), `omnilex_stato_account`. A dossier has a kind, `tipo` in the tools:
+  the single `testo`/`voce` form is gone (D8 S1); add-only), `omnilex_stato_account`; and the case's three
+  (`src/tools/pratica.ts`, LC56, listed right after them, always): `omnilex_leggi_pratica` (one call, as text: the
+  lawyer's instructions for Claude first, then sources, notes [their text under `dossier:text`, as
+  `omnilex_leggi_dossier`] and the act files with their ids and versions; `GET /dossiers` and `…/contesto`),
+  `omnilex_leggi_file_pratica` (`dossier:text`: a file's extracted text, a part at a time, or why there is none) and
+  `omnilex_deposita_atto` (`dossier:write`: text or simple Markdown made a DOCX by the server, new or, with
+  `versione_di`, a new version beside the original). No tool writes the instructions. A dossier has a kind, `tipo` in the tools:
   `omnilex_crea_dossier` takes `lavoro` (a practice, the default) or `studio` (a topic
   studied), and `omnilex_elenca_dossier` / `omnilex_leggi_dossier` say it (an older server's
   answer without one reads as `lavoro`). No tool publishes to the Forum: publishing makes data
