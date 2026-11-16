@@ -25,7 +25,7 @@ import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 import { isDesktopViewport, useIsDesktop } from '../../../hooks/useIsDesktop';
-import { besideRefFor, findPracticeArticle, practiceArticleKey } from '../../../utils/practice';
+import { besideRefFor, corpusPractices, findPracticeArticle, practiceArticleKey } from '../../../utils/practice';
 import { actKeyOf } from '../dossier/dossierLayout';
 import { PracticeNotice, type PracticeStreaming } from '../practice/PracticeParts';
 import { ReadingRow } from '../practice/ReadingRow';
@@ -113,7 +113,7 @@ export function SearchPanel() {
   // One layout per breakpoint (T4, gotcha 26); the practice the current search lands in (its first
   // result decides, the rest follow it); the rows it created.
   const isDesktop = useIsDesktop();
-  const practiceCount = useAppStore((s) => s.practices.length);
+  const practiceCount = useAppStore((s) => corpusPractices(s.practices).length);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
   const streamingPracticeRef = useRef<string | null>(null);
   const [streamingPracticeId, setStreamingPracticeId] = useState<string | null>(null);

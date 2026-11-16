@@ -14,7 +14,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { versionTabSuffix } from '../../../utils/versionDisplay';
-import { practiceArticleKey } from '../../../utils/practice';
+import { corpusPractices, practiceArticleKey } from '../../../utils/practice';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useDialogFocus } from '../../ui/useDialogFocus';
 import { FOCUS_RING } from '../../../constants/interactions';
@@ -59,7 +59,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
   const [version, setVersion] = useState<'vigente' | 'originale' | 'data'>('vigente');
   const [versionDate, setVersionDate] = useState('');
 
-  const practices = useAppStore((s) => s.practices);
+  const practices = corpusPractices(useAppStore((s) => s.practices));
 
   // Smart citation parsing (same as CommandPalette)
   const parsedCitation = useMemo(() => {

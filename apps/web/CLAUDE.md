@@ -1087,6 +1087,10 @@ they are, inert: no code writes or reads them, a saved quick norm or link still 
 and the Python API ignores it. `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
 `set`. `clearUserData` empties the practices.
+A practice with a `dossierId` (LC51: a reading table bound to a dossier, built by `openDossierPractice`, its articles
+without text until `setPracticeArticleText`, re-synced additively by `resyncDossierPractice`) is the session's: `partialize`
+leaves it out (`corpusPractices`), `sanitizePractices` drops one found saved, it is never the active practice, and
+`isBoundPractice` keeps it out of the bar, the moves, «Salva come dossier», the closings, «Annulla» and «Tutte le pratiche».
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
 browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
 with a logged warning «saved workspace too large to back up», when the value is over 1 000 000
