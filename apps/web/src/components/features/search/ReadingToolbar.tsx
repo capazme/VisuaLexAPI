@@ -52,6 +52,9 @@ export interface ReadingToolbarProps {
     onOpenStudyMode?: () => void;
     onOpenCopyModal: () => void;
     onOpenDossier: () => void;
+    /** The dossier command's words; default «Al dossier» (a popover to choose one). «Aggiungi a questo dossier» in a
+     *  dossier's «Lettura» (LC55). */
+    dossierLabel?: string;
     onShareLink: () => void;
     /** «Copia link Normattiva» (the source's address, for a filing's hyperlinks); absent when the norm holds none. */
     onCopyLink?: () => void;
@@ -110,6 +113,7 @@ export function ReadingToolbar({
     onOpenStudyMode,
     onOpenCopyModal,
     onOpenDossier,
+    dossierLabel,
     onShareLink,
     onCopyLink,
     onOpenAdvancedExport,
@@ -200,12 +204,12 @@ export function ReadingToolbar({
             type="button"
             onClick={onOpenDossier}
             className={ACTION}
-            aria-label={phone ? 'Al dossier' : undefined}
-            title={tip('Aggiungi l’articolo a un dossier', copyLockedReason)}
+            aria-label={phone ? (dossierLabel ?? 'Al dossier') : undefined}
+            title={tip(dossierLabel ?? 'Aggiungi l’articolo a un dossier', copyLockedReason)}
             {...lock(copyLockedReason)}
         >
             <FolderPlus size={phone ? 18 : 16} aria-hidden />
-            {!phone && 'Al dossier'}
+            {!phone && (dossierLabel ?? 'Al dossier')}
         </button>
     );
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { ArticleData, Dossier, Norma, NormaVisitata, SearchParams } from '../../../types';
@@ -52,6 +52,8 @@ async function putOnTable(practiceId: string, params: SearchParams): Promise<voi
 interface Props {
   dossier: Dossier;
   showToast: (message: string, type?: ToastType) => void;
+  /** The page's trash, read again after «Togli dal dossier» (as «Fonti» does). */
+  onTrashChanged?: () => void;
 }
 
 /**
@@ -59,9 +61,10 @@ interface Props {
  * full-screen reader on a phone — on the dossier's own bound table (`openDossierPractice`, session only, never the
  * Corpus's active practice). Built when the tab opens, re-synced each time the page's dossier changes (`refreshDossier`,
  * an item added here or by Claude). The page hosts the reading: its search gestures, its PDF and a norm of the same act
- * stay here. Nothing it does writes into the dossier.
+ * stay here. Reading writes nothing into the dossier: only «Aggiungi al dossier», «Togli dal dossier» and the acts' order
+ * do (LC55 c4, the host's `dossier`; each row says whether it is in it, `practice/inDossier.ts`).
  */
-export function DossierReadingView({ dossier, showToast }: Props) {
+export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props) {
   const isDesktop = useIsDesktop();
   const practiceId = useAppStore((s) => s.practices.find((p) => p.dossierId === dossier.id)?.id);
   const empty = useAppStore((s) => {
@@ -71,6 +74,9 @@ export function DossierReadingView({ dossier, showToast }: Props) {
   // Builds the table, or re-syncs the one already open (`openDossierPractice` calls `resyncDossierPractice` then).
   useEffect(() => { appStore.getState().openDossierPractice(dossier); }, [dossier]);
 
+  const trashChanged = useRef(onTrashChanged);
+  useEffect(() => { trashChanged.current = onTrashChanged; }, [onTrashChanged]);
+
   const [pending, setPending] = useState(0);
   const host = useMemo<ReadingHost>(() => ({
     search: (params) => {
@@ -78,7 +84,9 @@ export function DossierReadingView({ dossier, showToast }: Props) {
       setPending((n) => n + 1);
       void putOnTable(practiceId, params).finally(() => setPending((n) => n - 1));
     },
-  }), [practiceId]);
+    // Through a ref: the page's callback is new at each render, and a new host would redraw the whole reading.
+    dossier: { id: dossier.id, onTrashChanged: () => trashChanged.current?.() },
+  }), [practiceId, dossier.id]);
 
   const onCrossReference = useCallback((articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => {
     const table = appStore.getState().practices.find((p) => p.id === practiceId);

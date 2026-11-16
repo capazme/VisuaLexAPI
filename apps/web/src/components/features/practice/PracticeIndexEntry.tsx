@@ -1,5 +1,8 @@
 import { useMemo, type ReactNode } from 'react';
-import { PanelRightOpen, X } from 'lucide-react';
+import { MoreHorizontal, PanelRightOpen, X } from 'lucide-react';
+import { MenuButton } from '../../ui/MenuButton';
+import { rowDossierItems, useArticleInDossier, useDecisionInDossier, type RowDossier } from './inDossier';
+import { NotInDossier } from './PracticeRowShell';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -14,6 +17,9 @@ import { articleLabel } from '../dossier/dossierLayout';
 const REMOVE_BUTTON =
   'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20';
 
+const MENU_TRIGGER =
+  'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100';
+
 interface IndexEntryProps {
   /** A window shows the subject: the entry is marked, and a press takes the focus to that window. */
   shown: boolean;
@@ -25,6 +31,8 @@ interface IndexEntryProps {
   /** After «Togli dal tavolo», in the remove button's name. */
   removeName: string;
   onRemove: () => void;
+  /** In a dossier's «Lettura» (LC55): the mark, and the commands in a «⋯» with their names. */
+  dossier?: RowDossier;
 }
 
 /**
@@ -33,7 +41,8 @@ interface IndexEntryProps {
  * reader, in words («Vai alla finestra: …, aperto accanto») — never by colour alone; not `aria-current`, which would say
  * it twice and call two entries «current» with two windows open.
  */
-function IndexEntry({ shown, onOpen, label, title, removeName, onRemove }: IndexEntryProps) {
+function IndexEntry({ shown, onOpen, label, title, removeName, onRemove, dossier }: IndexEntryProps) {
+  const outside = dossier !== undefined && !dossier.inDossier;
   return (
     <li className="group flex items-center gap-1">
       <button
@@ -49,6 +58,12 @@ function IndexEntry({ shown, onOpen, label, title, removeName, onRemove }: Index
       >
         <span className="sr-only">{shown ? 'Vai alla finestra: ' : 'Apri accanto: '}</span>
         <span className="min-w-0 flex-1 truncate">{label}</span>
+        {outside && (
+          <>
+            <span className="sr-only">, </span>
+            <NotInDossier />
+          </>
+        )}
         {shown && (
           <>
             <PanelRightOpen size={14} aria-hidden className="flex-shrink-0 text-slate-500 dark:text-slate-400" />
@@ -56,15 +71,21 @@ function IndexEntry({ shown, onOpen, label, title, removeName, onRemove }: Index
           </>
         )}
       </button>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Togli dal tavolo ${removeName}`}
-        title="Togli dal tavolo"
-        className={REMOVE_BUTTON}
-      >
-        <X size={14} aria-hidden />
-      </button>
+      {dossier ? (
+        <MenuButton label={`Azioni su ${removeName}`} triggerClassName={MENU_TRIGGER} items={rowDossierItems(dossier, onRemove)}>
+          <MoreHorizontal size={14} aria-hidden />
+        </MenuButton>
+      ) : (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Togli dal tavolo ${removeName}`}
+          title="Togli dal tavolo"
+          className={REMOVE_BUTTON}
+        >
+          <X size={14} aria-hidden />
+        </button>
+      )}
     </li>
   );
 }
@@ -76,6 +97,7 @@ export function PracticeArticleEntry({ practiceId, actId, article }: { practiceI
   const shown = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === windowId) === true);
   const openBeside = useAppStore((s) => s.openBeside);
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
+  const dossier = useArticleInDossier(article.norma_data);
   const text = article.article_text || '';
   // From the article's own text, as its row: no request.
   const rubrica = useMemo(() => (text ? getRubricText(text, parseArticleStructure(text)) : null), [text]);
@@ -97,6 +119,7 @@ export function PracticeArticleEntry({ practiceId, actId, article }: { practiceI
       title={rubrica ? `${number} · ${rubrica}` : number}
       removeName={shortNorm(norma) + (pastWords ? `, ${pastWords}` : '')}
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
+      dossier={dossier}
     />
   );
 }
@@ -107,6 +130,7 @@ export function PracticeDecisionEntry({ practiceId, entry }: { practiceId: strin
   const shown = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === windowId) === true);
   const openBeside = useAppStore((s) => s.openBeside);
   const removePracticeDecision = useAppStore((s) => s.removePracticeDecision);
+  const dossier = useDecisionInDossier(entry);
   const deposit = formatDecisionDeposit({ tipo: entry.tipo, data_deposito: entry.depositDate });
   return (
     <IndexEntry
@@ -116,6 +140,7 @@ export function PracticeDecisionEntry({ practiceId, entry }: { practiceId: strin
       title={entry.label + (deposit ? ` · ${deposit}` : '')}
       removeName={entry.label}
       onRemove={() => removePracticeDecision(practiceId, entry.id)}
+      dossier={dossier}
     />
   );
 }

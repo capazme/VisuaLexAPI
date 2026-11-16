@@ -1105,6 +1105,19 @@ un'altra pratica», tours or room for the bar (`isBoundPractice` inside the cont
 dossier item or from its first loaded text; a bound row without text says «Carico il testo…», after a failure «Non
 riesco a leggere il testo.» with «Riprova» (`RowTextStatus`, `retryRowText`); a decision read there is not recorded in
 the Cronologia (`DecisionEntryView`).
+In the «Lettura» (LC55 c4) the host carries the dossier (`ReadingHost.dossier`, `useHostDossier`) and every row, index
+entry and decision says whether it is in it, read from the store's dossier and never stored on the table
+(`practice/inDossier.ts`: an article by `dossierArticleKey`, a decision by `decisionKey`): nothing for what is, the word
+«Non nel dossier» for what is not. A row's «⋯» names its commands: «Togli dal dossier» (`removeItemsWithUndo`, the trash
+with «Annulla»; the row stays, marked) on a dossier row, «Aggiungi al dossier» (`addToDossier` with the row's own
+`norma_data`, as the reader's popover) and «Togli dal tavolo» on one that is not; on a computer «Aggiungi al dossier»
+also stands beside the mark. The act's «Rimuovi l'atto» becomes «Togli dal dossier» when it holds dossier articles;
+dragging an act of the dossier writes that one move on the dossier's own order (`writeActOrder`, `setDossierItemOrder`
+as «Fonti»; an act only on the table writes nothing, and a reorder made in «Fonti» meanwhile is kept). In «Lettura»
+«Apri tutto in Ricerca» moves into the header's «⋯» as «Apri anche in Ricerca», and «Apri accanto» and the act's article
+numbers are 14 px. The reader's dossier command
+(an article's, a decision's) reads «Aggiungi a questo dossier» and adds there without the popover. The re-sync stays
+additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, is unchanged.
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
 browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
 with a logged warning «saved workspace too large to back up», when the value is over 1 000 000

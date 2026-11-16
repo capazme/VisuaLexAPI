@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, ChevronDown, FileDown, FolderInput, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, FileDown, FolderInput, FolderMinus, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,6 +9,8 @@ import type { ArticleData, Norma } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
 import { useSimpleReading } from './simpleReading';
 import { removePracticeActWithUndo } from './practiceUndo';
+import { useActItemIds } from './inDossier';
+import { removeItemsWithUndo } from '../dossier/removeItemsWithUndo';
 import { Modal } from '../../ui/Modal';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIDDEN_SCROLLBAR } from '../../../constants/interactions';
@@ -102,6 +104,10 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   const isFirstAct = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts[0]?.id === act.id);
   // A dossier's table (LC54): no tour of the practice, and no other practice to move an act to.
   const bound = useAppStore((s) => s.practices.some((p) => p.id === practiceId && isBoundPractice(p)));
+  // In a dossier's «Lettura» (LC55): the act's articles in the dossier. With some, «Rimuovi l'atto» becomes «Togli dal
+  // dossier» (to the trash, with «Annulla»; the rows stay on the table): a removal from the table alone would come back
+  // with the next re-sync.
+  const { dossier: hostDossier, ids: dossierIds } = useActItemIds(act);
   const theme = useAppStore((s) => s.settings.theme);
   const { tryStartTour, hasSeenTour } = useTour({ theme: theme as 'light' | 'dark' });
   const tourAsked = useRef(false);
@@ -349,7 +355,13 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 ] : []),
               ]),
               ...(bound ? [] : [{ label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true), separatorBefore: !toolsShown }]),
-              { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
+              hostDossier && dossierIds.length > 0
+                ? {
+                  label: 'Togli dal dossier', icon: FolderMinus, danger: true, separatorBefore: true,
+                  onSelect: () => removeItemsWithUndo(hostDossier.id, dossierIds, dossierIds.length === 1
+                    ? 'Articolo tolto dal dossier' : `${dossierIds.length} articoli tolti dal dossier`, hostDossier.onTrashChanged),
+                }
+                : { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
               ...practiceItems,
             ]}
           >
@@ -403,7 +415,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                           onClick={() => revealPracticeRow(practiceId, act.id, key)}
                           aria-current={openKeys.includes(key) ? 'true' : undefined}
                           className={cn(
-                            'min-h-[44px] rounded-md px-2 text-xs font-medium transition-colors md:min-h-0 md:py-0.5',
+                            'min-h-[44px] rounded-md px-2 font-medium transition-colors md:min-h-0 md:py-0.5',
+                            // 14 px in a dossier's «Lettura» (LC55); the Corpus keeps its 12.
+                            hostDossier ? 'text-sm' : 'text-xs',
                             // Inset: the row scrolls sideways on a phone and would clip a ring drawn outside the chip.
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
                             openKeys.includes(key)
