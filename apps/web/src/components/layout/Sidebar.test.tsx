@@ -17,9 +17,9 @@ import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
-/** Work's four entries (D-315, LC21): Oggi, Corpus, Dossier, Atti. The planner's other two views are tabs of Work's page,
- *  the Corpus tools links of the search page (LC8); the Anonimizzatore is the desktop app's, with no entry on the web. */
-const OPUS_HREFS = ['/work/oggi', '/', '/dossier', '/work/atti'];
+/** Work's six entries (D-315, LC47): Oggi, Corpus, Dossier, Atti, then the two features with an AI model behind them,
+ *  «Analizza documento» and the Anonimizzatore. The planner's other two views are tabs of Work's page. */
+const OPUS_HREFS = ['/work/oggi', '/', '/dossier', '/work/atti', '/documents', '/work/anonimizzatore'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -178,13 +178,16 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Work: exactly Oggi, Corpus, Dossier and Atti, in this order (D-315); no «Anonimizzatore» on the web (LC21)', () => {
+  it('Work: exactly Oggi, Corpus, Dossier, Atti, then «Analizza documento» and the Anonimizzatore, in this order (LC47)', () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti']);
-    expect(screen.queryByRole('link', { name: /Anonimizzatore/ })).toBeNull();
+    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti', 'Analizza documento, in sviluppo', 'Anonimizzatore, in arrivo']);
+    // The two apart, in a group named for a screen reader, with no heading written over them.
+    const tools = within(opus).getByRole('group', { name: "Strumenti sul documento" });
+    expect(within(tools).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/documents', '/work/anonimizzatore']);
+    expect(screen.queryByText("Strumenti sul documento")).toBeNull();
     // Corpus is Work's way to the search: no «Ricerca» above it.
     expect(screen.queryByRole('link', { name: 'Ricerca' })).toBeNull();
   });
@@ -200,6 +203,44 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
     expect(field).toHaveBeenCalledWith({ focus: true });
     unsubscribe();
+  });
+
+  it.each(['wide', 'drawer'] as const)('Work: «Analizza documento» says «in sviluppo» and the Anonimizzatore «in arrivo» under the word (%s, LC47)', (layout) => {
+    render(
+      <MemoryRouter initialEntries={['/work/oggi']}>
+        <Where />
+        <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const review = screen.getByRole('link', { name: 'Analizza documento, in sviluppo' });
+    expect(review).toHaveTextContent(/^Analizzain sviluppo$/);
+    expect(screen.getByRole('link', { name: 'Anonimizzatore, in arrivo' })).toHaveTextContent(/^Anonimizzatorein arrivo$/);
+    // «in sviluppo» is still a working entry: it leads to the page.
+    fireEvent.click(review);
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/documents$/);
+  });
+
+  it('Work, in the rail: the hover label says «in sviluppo» (LC47)', () => {
+    render(
+      <MemoryRouter initialEntries={['/work/oggi']}>
+        <Sidebar theme="light" isOpen layout="rail" serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    pointerOver(screen.getByRole('link', { name: 'Analizza documento, in sviluppo' }), MOUSE);
+    expect(document.body.querySelector('[data-sidebar-tooltip]')).toHaveTextContent(/Analizza documento.*in sviluppo/);
+  });
+
+  it('Elsewhere «Analizza documento» stays a Corpus tool, with no label (LC47)', () => {
+    for (const path of ['/learn/ripasso', '/forum']) {
+      const { unmount } = render(
+        <MemoryRouter initialEntries={[path]}>
+          <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('link', { name: 'Analizza documento' })).toHaveTextContent(/^Analizza$/);
+      expect(screen.queryByText('in sviluppo')).toBeNull();
+      unmount();
+    }
   });
 
   it('Work: «Atti» is a full entry since Luca\'s decision of 15 November (no «in arrivo»), and opens its page', () => {
@@ -247,11 +288,14 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
       expect(today, path).toHaveClass('bg-primary-50');
       cleanup();
     }
-    for (const path of ['/documents', '/rassegne']) {
-      renderSidebar(path);
-      expect(screen.getByRole('link', { name: 'Corpus' }), path).toHaveAttribute('aria-current', 'true');
-      cleanup();
-    }
+    renderSidebar('/rassegne');
+    expect(screen.getByRole('link', { name: 'Corpus' })).toHaveAttribute('aria-current', 'true');
+    cleanup();
+    // «Analizza documento» has its own entry in Work (LC47): lit there, «Corpus» not.
+    renderSidebar('/documents');
+    expect(screen.getByRole('link', { name: 'Corpus' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Analizza documento, in sviluppo' })).toHaveAttribute('aria-current', 'page');
+    cleanup();
     // Elsewhere nothing changes: «Ricerca» is not lit on «Analizza documento», which is.
     sectionStore.setState({ section: 'forum' });
     renderSidebar('/documents');
@@ -296,13 +340,14 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByRole('group', { name: 'Forum' })).toHaveClass('border-t');
   });
 
-  it('writes «in arrivo» under no Work entry', () => {
+  it('writes «in arrivo» under no Work entry but the Anonimizzatore (LC47)', () => {
     render(
       <MemoryRouter initialEntries={['/work/oggi']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    expect(within(document.getElementById('tour-sidebar')!).queryByText('in arrivo')).toBeNull();
+    expect(within(document.getElementById('tour-sidebar')!).getAllByText('in arrivo')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Atti' })).toHaveTextContent(/^Atti$/);
   });
 
   it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
