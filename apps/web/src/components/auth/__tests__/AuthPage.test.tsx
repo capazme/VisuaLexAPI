@@ -275,7 +275,7 @@ describe('AuthPage: two tabs on one page', () => {
     const colophon = screen.getByRole('banner');
     expect(colophon.parentElement!).toHaveClass('mx-auto', 'max-w-[420px]', 'flex-col');
     expect(colophon).toHaveClass('items-center', 'text-center', 'gap-3');
-    expect(colophon).toHaveTextContent('La legge è davvero uguale per tutti');
+    expect(colophon).toHaveTextContent('La legge è ancora uguale per tutti');
     expect(colophon.nextElementSibling).toBe(screen.getByRole('main'));
   });
 

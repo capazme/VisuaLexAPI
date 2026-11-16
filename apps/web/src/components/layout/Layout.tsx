@@ -23,6 +23,7 @@ import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 import { closeCompare, forgetCompareOpened, useCompare, useCompareOpened } from '../../hooks/useCompare';
 import { useTour } from '../../hooks/useTour';
+import { WelcomeGuide } from '../../features/welcome/WelcomeGuide';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
 import { useServiceHealth } from '../../hooks/useServiceHealth';
@@ -515,6 +516,7 @@ export function Layout() {
       </main>
 
       <SettingsModal isOpen={settingsDialog.open} section={settingsDialog.section} onClose={closeSettings} onRestartTour={resetAndStartTour} />
+      <WelcomeGuide />
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />

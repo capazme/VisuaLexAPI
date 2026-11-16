@@ -60,7 +60,7 @@ describe('SettingsModal — «Modalità sviluppo»', () => {
         <SettingsModal isOpen onClose={vi.fn()} onRestartTour={vi.fn()} />
       </MemoryRouter>,
     );
-    for (const name of [/Chiaro/, /Scuro/, /Ricomincia il tour guidato/, /Pannello Admin/]) {
+    for (const name of [/Chiaro/, /Scuro/, /Rivedi la guida iniziale/, /Pannello Admin/]) {
       expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'md:min-h-0');
     }
     const sizes = screen.getByRole('group', { name: 'Dimensione testo' }).querySelectorAll('button');
