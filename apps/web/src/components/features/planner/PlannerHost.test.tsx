@@ -69,7 +69,7 @@ describe('«c», the quick add from anywhere', () => {
 
   it('proposes today on «Oggi», and says when the new task is not in the view', async () => {
     service.create.mockResolvedValue(task('n', { plannedDate: '2026-10-30' }));
-    host('/work/oggi');
+    host('/work/scadenziario');
     await waitFor(() => expect(plannerStore.getState().today).toBe(TODAY));
     fireEvent.keyDown(window, { key: 'c' });
     const dialog = await screen.findByRole('dialog');

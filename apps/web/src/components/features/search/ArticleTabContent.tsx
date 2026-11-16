@@ -4,6 +4,8 @@ import { CaseLawSection } from './CaseLawSection';
 import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
+import { useHostDossier, useReadingSearch } from '../practice/readingHost';
+import { addToThisDossier } from '../practice/inDossier';
 import { useShallow } from 'zustand/react/shallow';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { ArticleCardsRow, type ArticleCardsHandle } from '../studia/ArticleCardsRow';
@@ -155,6 +157,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         isQuickNorm: s.isQuickNorm,
         bookmarks: s.bookmarks,
     })));
+
+    // The search gestures go to whoever hosts the reading (LC52 c2); without a host, the store's search.
+    const search = useReadingSearch(triggerSearch);
+    // In a dossier's «Lettura» (LC55) the dossier command adds to that dossier, without the popover's choice.
+    const hostDossier = useHostDossier();
 
     const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
     // State (not ref) so the popover re-reads the anchor when the button
@@ -590,14 +597,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 console.error('NER implicit feedback failed:', err);
             });
         }
-        triggerSearch({
+        search({
             act_type: citation.act_type,
             act_number: citation.act_number || '',
             date: citation.date || '',
             article: citation.article,
             version: 'vigente',
         });
-    }, [norma_data.urn, article_text, canContribute, triggerSearch]);
+    }, [norma_data.urn, article_text, canContribute, search]);
 
     // Loop β #2: forward one NER correction/confirmation for the previewed
     // citation (surface=article_xref — the highest-volume capture surface).
@@ -681,20 +688,20 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             choice.kind === 'original' ? 'Ricerca del testo originale' : `Ricerca del testo al ${formatDateForDisplay(choice.date)}`,
             'info',
         );
-        triggerSearch(buildTextAtDateParams(norma_data, choice));
+        search(buildTextAtDateParams(norma_data, choice));
     };
 
     const handleBannerAction = async (action: BannerAction) => {
         switch (action) {
             case 'go_current':
-                triggerSearch(quickNormParams);
+                search(quickNormParams);
                 break;
             case 'pick_date':
                 setShowVersionInput(true);
                 break;
             case 'open_next_day':
                 if (display.banner?.nextDay) {
-                    triggerSearch(buildTextAtDateParams(norma_data, { kind: 'date', date: display.banner.nextDay }));
+                    search(buildTextAtDateParams(norma_data, { kind: 'date', date: display.banner.nextDay }));
                 }
                 break;
             case 'copy_link':
@@ -785,7 +792,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             onCrossReferenceNavigate?.(parsed.article, norma_data);
         } else {
             // Open in new search
-            triggerSearch({
+            search({
                 act_type: parsed.act_type,
                 act_number: parsed.act_number || '',
                 date: parsed.date || '',
@@ -793,7 +800,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 version: 'vigente',
             });
         }
-    }, [onCrossReferenceNavigate, norma_data, triggerSearch]);
+    }, [onCrossReferenceNavigate, norma_data, search]);
     const decisionLinks = useDecisionLinks({ besideId: originTabId ?? tabId, origin: citationOrigin });
     useCitationLinks(contentRef, {
         onOpen: onCrossReferenceNavigate ? openCitation : undefined,
@@ -838,7 +845,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onOpenStudyMode={isBeside ? undefined : onOpenStudyMode}
                 compact={isBeside}
                 onOpenCopyModal={() => setShowCopyModal(true)}
-                onOpenDossier={() => setDossierPopoverOpen(true)}
+                onOpenDossier={hostDossier
+                    ? () => addToThisDossier(hostDossier.id, { norma: norma_data }, showToast)
+                    : () => setDossierPopoverOpen(true)}
+                dossierLabel={hostDossier ? 'Aggiungi a questo dossier' : undefined}
                 dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
                 onCopyLink={handleCopyLink}

@@ -10,6 +10,8 @@ import { DecisionEntryView } from '../decisions/DecisionEntryView';
 import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
 import { subjectOf, titleOf, type Subject } from './practiceView';
 import { closePracticeWindow } from './practiceSwitch';
+import { retryRowText, useRowText } from './useRowText';
+import { RowTextStatus } from './RowTextStatus';
 
 /** The bar of practices floats over the results area (`fixed bottom-6`): a window's scrolling body
  *  keeps the same bottom padding as the column (spec §3.4). */
@@ -98,6 +100,7 @@ interface ReadingWindowBodyProps extends Omit<ReadingWindowProps, 'clearTopRight
 export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }: ReadingWindowBodyProps) {
   const articleKey = besideRef.kind === 'article' ? besideRef.articleKey : '';
   const actId = subject?.kind === 'article' ? subject.actId : '';
+  const textState = useRowText(practiceId, actId, subject?.kind === 'article' ? subject.article : undefined, true);
   const readingOrigin = useMemo(
     () => ({ tabId: besideRef.id, blockId: actId, articleKey }),
     [besideRef.id, actId, articleKey],
@@ -113,6 +116,8 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
     return <p className="text-sm text-slate-500 dark:text-slate-400">Questo testo non è più sul tavolo della pratica.</p>;
   }
   if (subject.kind === 'article') {
+    const { article } = subject;
+    if (textState) return <RowTextStatus state={textState} onRetry={() => retryRowText(practiceId, actId, article)} />;
     return (
       <ArticleTabContent
         data={subject.article}

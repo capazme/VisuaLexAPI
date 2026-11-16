@@ -7,6 +7,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ConnectPage } from './features/connections/ConnectPage';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
+import { OldAttoRedirect } from './components/features/atti/OldAttoRedirect';
 import { isStudiaEnabled } from './features/studia/featureFlag';
 import { DevRoute } from './features/devMode/DevRoute';
 import { buttonClassName } from './components/ui/buttonStyles';
@@ -31,8 +32,6 @@ const ConnectAiAppPage = lazy(() => PAGE_CODE.connectAiApp().then(m => ({ defaul
 const OpusPage = lazy(() => PAGE_CODE.opus().then(([m]) => ({ default: m.OpusPage })));
 // Loaded with Opus's frame (`PAGE_CODE.opus`): by the time a view renders, its module is there.
 const TodayView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TodayView })));
-const AttiListView = lazy(() => PAGE_CODE.opus().then(([, , m]) => ({ default: m.AttiListView })));
-const AttoEditor = lazy(() => PAGE_CODE.opus().then(([, , , m]) => ({ default: m.AttoEditor })));
 const UpcomingView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.UpcomingView })));
 const InboxView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.InboxView })));
 const TaskTrashView = lazy(() => PAGE_CODE.opus().then(([, m]) => ({ default: m.TaskTrashView })));
@@ -97,7 +96,7 @@ function MovedTo({ from, to }: { from: string; to: string }) {
   return <Navigate to={{ pathname: to + pathname.slice(from.length), search, hash }} replace />;
 }
 
-/** A Work entry «in arrivo» (D-315): two lines under the frame's title (`OpusPage`, from `pageNames.ts`), no feature. */
+/** A Work entry «in arrivo» (D-315): a few lines under the frame's title (`OpusPage`, from `pageNames.ts`), no feature. */
 function ComingSoon({ children }: { children: ReactNode }) {
   return <div className="flex max-w-measure flex-col gap-2 text-sm text-slate-600 dark:text-slate-400">{children}</div>;
 }
@@ -158,22 +157,32 @@ function App() {
         >
           <Route index element={<SearchPage />} />
           <Route path="dossier" element={<DossierPage />} />
-          {/* Work's planner (Opus, wave 1): «Oggi» is the section's home; «Dossier» stays at /dossier. */}
+          {/* Work's planner (Opus, wave 1): «Scadenziario» is the section's home; «Dossier» stays at /dossier. */}
           <Route path="work" element={<OpusPage />}>
-            <Route index element={<Navigate to="oggi" replace />} />
-            <Route path="oggi" element={<TodayView />} />
+            <Route index element={<Navigate to="scadenziario" replace />} />
+            <Route path="scadenziario" element={<TodayView />} />
             <Route path="prossimi" element={<UpcomingView />} />
             <Route path="ingresso" element={<InboxView />} />
             <Route path="cestino" element={<TaskTrashView />} />
-            {/* Atti: the user's acts and the editor of one, with the linked dossier's sources beside the text. */}
-            <Route path="atti" element={<AttiListView />} />
-            <Route path="atti/:id" element={<AttoEditor />} />
-            {/* D-324: the desktop app's. */}
-            <Route path="anonimizzatore" element={<ComingSoon>
-              <p>Toglierà da un documento i dati che identificano le persone, prima che tu lo condivida o lo analizzi.</p>
-              <p>È in arrivo e sarà disponibile nell'app da scrivania, non in questa versione web.</p>
+            {/* D-324: the desktop app's; announced in Work (LC47). */}
+            <Route path="pseudonimizzatore" element={<ComingSoon>
+              <p className="text-xs font-medium">in arrivo</p>
+              <p>Arriverà con l'app da scrivania di LexCraft.</p>
+              <p>Prima che un atto entri in una pratica, toglierà i nomi di persone e società e li sostituirà con etichette: all'IA arriveranno meno dati personali e meno informazioni riservate.</p>
+              <p>Funzionerà tutto sul tuo computer: il documento originale non uscirà mai.</p>
+              <p>I dati con le etichette restano dati personali per il GDPR: lo Pseudonimizzatore riduce il rischio, non sostituisce le altre cautele.</p>
+            </ComingSoon>} />
+            {/* The knowledge graph of the user's practices, the desktop app's too; announced in Work (LC48). */}
+            <Route path="grafo-pratiche" element={<ComingSoon>
+              <p className="text-xs font-medium">in arrivo</p>
+              <p>Arriverà con l'app da scrivania di LexCraft.</p>
+              <p>Mostrerà come le tue pratiche si collegano attraverso le norme, le sentenze e le massime che usi: per esempio, in quali pratiche hai già citato un articolo e con quali argomenti.</p>
+              <p>Lo vedrai solo tu, e collegherà le pratiche attraverso le fonti, non attraverso i nomi dei clienti.</p>
             </ComingSoon>} />
           </Route>
+          {/* LC53: the act editor is gone; its addresses lead to the act's dossier («Atti» tab), else to the dossiers. */}
+          <Route path="work/atti" element={<Navigate to="/dossier" replace />} />
+          <Route path="work/atti/:id" element={<OldAttoRedirect />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentsRedirect />} />
           {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» with one discussion at its own. */}
@@ -187,6 +196,9 @@ function App() {
           {/* The old addresses (D-235): no guard of their own, the new address keeps it. The more specific first:
               /merlt/qa and /merlt/chiedi go to the graph. */}
           <Route path="opus/*" element={<MovedTo from="/opus" to="/work" />} />
+          {/* LC48: Work's «Oggi» is «Scadenziario», the «Anonimizzatore» the «Pseudonimizzatore». */}
+          <Route path="work/oggi/*" element={<MovedTo from="/work/oggi" to="/work/scadenziario" />} />
+          <Route path="work/anonimizzatore/*" element={<MovedTo from="/work/anonimizzatore" to="/work/pseudonimizzatore" />} />
           <Route path="studia/*" element={<MovedTo from="/studia" to="/learn" />} />
           <Route path="merlt/qa" element={<MovedTo from="/merlt/qa" to="/labs/grafo" />} />
           <Route path="merlt/chiedi" element={<MovedTo from="/merlt/chiedi" to="/labs/grafo" />} />

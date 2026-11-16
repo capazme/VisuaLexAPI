@@ -17,9 +17,9 @@ import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
-/** Work's four entries (D-315, LC21): Oggi, Corpus, Dossier, Atti. The planner's other two views are tabs of Work's page,
- *  the Corpus tools links of the search page (LC8); the Anonimizzatore is the desktop app's, with no entry on the web. */
-const OPUS_HREFS = ['/work/oggi', '/', '/dossier', '/work/atti'];
+/** Work's entries (D-315, LC47; no «Atti» since LC53, the dossier's tab): Scadenziario, Ricerca, Dossier, then the two features with an AI model behind them,
+ *  «Analizza documento» and the Pseudonimizzatore. The planner's other two views are tabs of Work's page. */
+const OPUS_HREFS = ['/work/scadenziario', '/', '/dossier', '/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -166,7 +166,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     vi.unstubAllEnvs();
   });
 
-  it('starts every section but Work with the Corpus entries, «Ricerca» and «Analizza documento» (Work has them under «Corpus»)', () => {
+  it('starts every section but Work with the Corpus entries, «Ricerca» and «Analizza documento» (Work has its own «Ricerca»)', () => {
     for (const path of ['/learn/ripasso', '/forum']) {
       const { unmount } = render(
         <MemoryRouter initialEntries={[path]}>
@@ -178,22 +178,25 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Work: exactly Oggi, Corpus, Dossier and Atti, in this order (D-315); no «Anonimizzatore» on the web (LC21)', () => {
+  it('Work: exactly Scadenziario, Ricerca, Dossier, then «Analizza documento» and the Pseudonimizzatore, in this order (LC47)', () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Oggi', 'Corpus', 'Dossier', 'Atti']);
-    expect(screen.queryByRole('link', { name: /Anonimizzatore/ })).toBeNull();
-    // Corpus is Work's way to the search: no «Ricerca» above it.
-    expect(screen.queryByRole('link', { name: 'Ricerca' })).toBeNull();
+    expect(names).toEqual(['Scadenziario', 'Ricerca', 'Dossier', 'Analizza documento, in sviluppo', 'Pseudonimizzatore, in arrivo', 'Grafo delle pratiche, in arrivo']);
+    // The two apart, in a group named for a screen reader, with no heading written over them.
+    const tools = within(opus).getByRole('group', { name: "Strumenti sul documento" });
+    expect(within(tools).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche']);
+    expect(screen.queryByText("Strumenti sul documento")).toBeNull();
+    // Work's way to the search is its own «Ricerca», once.
+    expect(screen.getAllByRole('link', { name: 'Ricerca' })).toHaveLength(1);
   });
 
-  it('Work: «Corpus» leads to the search with the cursor in its field, and carries the id the tours point at', () => {
+  it('Work: «Ricerca» leads to the search with the cursor in its field, and carries the id the tours point at', () => {
     const field = vi.fn();
     const unsubscribe = subscribeSearchField(field);
     renderSidebar('/dossier');
-    const corpus = screen.getByRole('link', { name: 'Corpus' });
+    const corpus = screen.getByRole('link', { name: 'Ricerca' });
     expect(document.getElementById('tour-nav-search')).toBe(corpus);
     expect(document.getElementById('tour-nav-dossier')).toBe(screen.getByRole('link', { name: 'Dossier' }));
     fireEvent.click(corpus);
@@ -202,25 +205,75 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     unsubscribe();
   });
 
-  it('Work: «Atti» is a full entry since Luca\'s decision of 15 November (no «in arrivo»), and opens its page', () => {
+  it.each(['wide', 'drawer'] as const)('Work: the bar writes «Scadenze», whole at every text size, and still names it «Scadenziario» (%s, LC48)', (layout) => {
+    // The owner, 16 Nov 2026: «"Scadenze" nella barra»: «Scadenziario» beside the count was cut at the large text sizes.
     render(
-      <MemoryRouter initialEntries={['/work/oggi']}>
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
+        <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const entry = screen.getByRole('link', { name: /^Scadenziario/ });
+    expect(entry.getAttribute('href')).toBe('/work/scadenziario');
+    expect(entry).toHaveTextContent(/Scadenze/);
+    expect(entry).not.toHaveTextContent(/Scadenziario/);
+  });
+
+  it.each(['wide', 'drawer'] as const)('Work: «Analizza documento» says «in sviluppo» and the Pseudonimizzatore «in arrivo» under the word (%s, LC47)', (layout) => {
+    render(
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
+        <Where />
+        <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    const review = screen.getByRole('link', { name: 'Analizza documento, in sviluppo' });
+    expect(review).toHaveTextContent(/^Analizzain sviluppo$/);
+    expect(screen.getByRole('link', { name: 'Pseudonimizzatore, in arrivo' })).toHaveTextContent(/^Pseudonimizzain arrivo$/);
+    expect(screen.getByRole('link', { name: 'Grafo delle pratiche, in arrivo' })).toHaveTextContent(/^Grafo pratichein arrivo$/);
+    // «in sviluppo» is still a working entry: it leads to the page.
+    fireEvent.click(review);
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/documents$/);
+  });
+
+  it('Work, in the rail: the hover label says «in sviluppo» (LC47)', () => {
+    render(
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
+        <Sidebar theme="light" isOpen layout="rail" serviceHealth={serviceHealth} {...handlers} />
+      </MemoryRouter>,
+    );
+    pointerOver(screen.getByRole('link', { name: 'Analizza documento, in sviluppo' }), MOUSE);
+    expect(document.body.querySelector('[data-sidebar-tooltip]')).toHaveTextContent(/Analizza documento.*in sviluppo/);
+  });
+
+  it('Elsewhere «Analizza documento» stays a Corpus tool, with no label (LC47)', () => {
+    for (const path of ['/learn/ripasso', '/forum']) {
+      const { unmount } = render(
+        <MemoryRouter initialEntries={[path]}>
+          <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('link', { name: 'Analizza documento' })).toHaveTextContent(/^Analizza$/);
+      expect(screen.queryByText('in sviluppo')).toBeNull();
+      unmount();
+    }
+  });
+
+  it('Work: no «Atti» entry since LC53 (the acts are the dossier\'s tab)', () => {
+    render(
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const acts = screen.getByRole('link', { name: 'Atti' });
-    expect(acts).toHaveAttribute('href', '/work/atti');
-    expect(acts).toHaveTextContent(/^Atti$/);
+    expect(screen.queryByRole('link', { name: 'Atti' })).toBeNull();
   });
 
   // LC27 (Luca, 15 Nov: «la mini colonnina … va tolta»): no sliding column in any layout; the active entry is its tile.
   it.each(['rail', 'wide'] as const)('marks the active entry with its tile alone, no column (%s)', (layout) => {
     render(
-      <MemoryRouter initialEntries={['/work/oggi']}>
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
         <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const today = screen.getByRole('link', { name: 'Oggi' });
+    const today = screen.getByRole('link', { name: 'Scadenziario' });
     expect(today).toHaveClass('bg-primary-50');
     expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(0);
   });
@@ -228,30 +281,33 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   // LC21: with words the active row is its tile alone; the sliding column is the rail's.
   it.each(['wide', 'drawer'] as const)('draws no column with words (%s): the active row is marked by its tile', (layout) => {
     render(
-      <MemoryRouter initialEntries={['/work/oggi']}>
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
         <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const today = screen.getByRole('link', { name: 'Oggi' });
+    const today = screen.getByRole('link', { name: 'Scadenziario' });
     expect(today).toHaveAttribute('aria-current', 'page');
     expect(today).toHaveClass('bg-primary-50');
     expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(0);
   });
 
-  it('keeps «Oggi» lit on the planner\'s other views and the trash, «Corpus» on the Corpus tools, in Work', () => {
+  it('keeps «Scadenziario» lit on the planner\'s other views and the trash, «Ricerca» on the search tools, in Work', () => {
     for (const path of ['/work/prossimi', '/work/ingresso', '/work/cestino']) {
       renderSidebar(path);
-      const today = screen.getByRole('link', { name: 'Oggi' });
+      const today = screen.getByRole('link', { name: 'Scadenziario' });
       // Lit for a page of its own, not its address: «true», so a screen reader says «current page» once, on the tab (#448).
       expect(today, path).toHaveAttribute('aria-current', 'true');
       expect(today, path).toHaveClass('bg-primary-50');
       cleanup();
     }
-    for (const path of ['/documents', '/rassegne']) {
-      renderSidebar(path);
-      expect(screen.getByRole('link', { name: 'Corpus' }), path).toHaveAttribute('aria-current', 'true');
-      cleanup();
-    }
+    renderSidebar('/rassegne');
+    expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('aria-current', 'true');
+    cleanup();
+    // «Analizza documento» has its own entry in Work (LC47): lit there, «Ricerca» not.
+    renderSidebar('/documents');
+    expect(screen.getByRole('link', { name: 'Ricerca' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Analizza documento, in sviluppo' })).toHaveAttribute('aria-current', 'page');
+    cleanup();
     // Elsewhere nothing changes: «Ricerca» is not lit on «Analizza documento», which is.
     sectionStore.setState({ section: 'forum' });
     renderSidebar('/documents');
@@ -260,11 +316,11 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   });
 
   it('says «page» only on the entry\'s own address, «true» when it is lit for a page under it or of its own', () => {
-    renderSidebar('/work/oggi');
-    expect(screen.getByRole('link', { name: 'Oggi' })).toHaveAttribute('aria-current', 'page');
+    renderSidebar('/work/scadenziario');
+    expect(screen.getByRole('link', { name: 'Scadenziario' })).toHaveAttribute('aria-current', 'page');
     cleanup();
     renderSidebar('/work/prossimi');
-    expect(screen.getByRole('link', { name: 'Oggi' })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('link', { name: 'Scadenziario' })).toHaveAttribute('aria-current', 'true');
     cleanup();
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/learn/schede/42');
@@ -276,7 +332,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   it('is one Tab stop per entry, and one for the avatar: nothing focusable inside them', () => {
     for (const layout of ['wide', 'rail', 'drawer'] as const) {
       render(
-        <MemoryRouter initialEntries={['/work/oggi']}>
+        <MemoryRouter initialEntries={['/work/scadenziario']}>
           <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
         </MemoryRouter>,
       );
@@ -289,31 +345,31 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   });
 
   it('draws no lone rule over Work\'s entries, where the Corpus ones were', () => {
-    renderSidebar('/work/oggi');
+    renderSidebar('/work/scadenziario');
     expect(screen.getByRole('group', { name: 'Work' })).not.toHaveClass('border-t');
     cleanup();
     renderSidebar('/forum');
     expect(screen.getByRole('group', { name: 'Forum' })).toHaveClass('border-t');
   });
 
-  it('writes «in arrivo» under no Work entry', () => {
+  it('writes «in arrivo» under no Work entry but the Pseudonimizzatore and the Grafo delle pratiche (LC47, LC48)', () => {
     render(
-      <MemoryRouter initialEntries={['/work/oggi']}>
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
         <Sidebar theme="light" isOpen layout="wide" serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    expect(within(document.getElementById('tour-sidebar')!).queryByText('in arrivo')).toBeNull();
+    expect(within(document.getElementById('tour-sidebar')!).getAllByText('in arrivo')).toHaveLength(2);
   });
 
-  it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
+  it('counts the overdue and today\'s tasks beside «Scadenziario», and says it in words (row 16)', () => {
     plannerStore.setState({ todayCount: 3 });
     try {
-      renderSidebar('/work/oggi');
-      const today = screen.getByRole('link', { name: 'Oggi, 3 compiti per oggi o scaduti' });
+      renderSidebar('/work/scadenziario');
+      const today = screen.getByRole('link', { name: 'Scadenziario, 3 compiti per oggi o scaduti' });
       expect(today).toHaveAttribute('aria-current', 'page');
       expect(today).toHaveTextContent('3');
-      cleanupAndRender('/work/oggi', () => plannerStore.setState({ todayCount: 0 }));
-      expect(screen.getByRole('link', { name: 'Oggi' })).not.toHaveTextContent(/\d/);
+      cleanupAndRender('/work/scadenziario', () => plannerStore.setState({ todayCount: 0 }));
+      expect(screen.getByRole('link', { name: 'Scadenziario' })).not.toHaveTextContent(/\d/);
     } finally {
       plannerStore.setState({ todayCount: null });
     }
@@ -373,7 +429,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
     expect(hrefs()).toEqual(OPUS_HREFS);
-    expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^(Grafo|Assistente)$/ })).toBeNull();
   });
 
   it('Academia follows the MERL-T flags: only «Assistente» with the graph off, nothing with MERL-T off', () => {
@@ -950,10 +1006,10 @@ describe('Sidebar — the words', () => {
 
   it('offers Labs as a fourth tab in the development mode only, and a tab goes to its section\'s home', () => {
     account.devMode = true;
-    renderLayout('drawer', '/work/oggi');
+    renderLayout('drawer', '/work/scadenziario');
     const tabs = screen.getByRole('group', { name: 'Sezioni' });
     expect(within(tabs).getAllByRole('button').map((b) => b.textContent)).toEqual(['Work', 'Learn', 'Forum', 'Labs']);
-    expect(within(tabs).getByRole('button', { name: 'Vai a Work: Oggi' })).toHaveAttribute('aria-current', 'true');
+    expect(within(tabs).getByRole('button', { name: 'Vai a Work: Scadenziario' })).toHaveAttribute('aria-current', 'true');
     // 44 px in the drawer, a touch target.
     expect(within(tabs).getByRole('button', { name: 'Labs' })).toHaveClass('h-11');
     fireEvent.click(within(tabs).getByRole('button', { name: 'Learn' }));

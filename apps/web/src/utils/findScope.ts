@@ -17,7 +17,7 @@ import { decisionKey, identityOf } from './decisionLinks';
 import { isAdminCourt } from './adminCourts';
 import { decisionProjection } from './decisionRender';
 import { peekDecision } from './decisionFetchCache';
-import { decisionOrder, practiceArticleKey, type Practice, type PracticeDecision } from './practice';
+import { corpusPractices, decisionOrder, practiceArticleKey, type Practice, type PracticeDecision } from './practice';
 
 export type FindScope = 'tab' | 'all';
 
@@ -121,7 +121,8 @@ export function findTargetsInScope(
   // «Questa pratica» is the active one, «Tutte le pratiche» every practice in the bar's order. The
   // phone draws the same column, so it leaves nothing out.
   const practices = state.practices ?? [];
-  const inScope = scope === 'tab' ? practices.filter((p) => p.id === frontTabId) : practices;
+  // a table bound to a dossier is not one of the Corpus's (LC51)
+  const inScope = scope === 'tab' ? practices.filter((p) => p.id === frontTabId) : corpusPractices(practices);
   return inScope.flatMap((p) => targetsOfPractice(p, scope === 'all'));
 }
 

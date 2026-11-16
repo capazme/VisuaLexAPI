@@ -9,7 +9,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # The variables Compose interpolates infra/compose.yml with: stack name, ports.
 ENV_FILE = REPO_ROOT / "infra" / ".env"
 DEFAULT_DATABASES = ("visualex_platform", "merlt")
-DEFAULT_VOLUMES = ("merlt_uploads", "merlt_checkpoints", "merlt_ner_models")
+# pratica_files: a case's act files (LC50), encrypted; useless without PRATICA_FILES_KEY, which is never in a backup.
+DEFAULT_VOLUMES = ("merlt_uploads", "merlt_checkpoints", "merlt_ner_models", "pratica_files")
 # Owner role of each database in the stack (infra/postgres/init).
 DB_OWNERS = {"visualex_platform": "visualex", "visualex_test": "visualex", "merlt": "merlt"}
 

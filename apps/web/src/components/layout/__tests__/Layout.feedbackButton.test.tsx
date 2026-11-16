@@ -103,7 +103,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
   });
 
-  it.each(['/dossier', '/work/oggi', '/forum', '/learn/schede'])('draws the bar on %s, with the path, the search and the three controls, none floating', (path) => {
+  it.each(['/dossier', '/work/scadenziario', '/forum', '/learn/schede'])('draws the bar on %s, with the path, the search and the three controls, none floating', (path) => {
     at(path);
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toBeInTheDocument();
@@ -133,11 +133,11 @@ describe('Layout — the top bar from lg (LC21)', () => {
     expect(appStore.getState().settings.focusMode).toBe(true);
   });
 
-  it('on the search page draws the top bar too, with the path «Work › Corpus» and the field, compact, in the search\'s place (anti-slop FAIL, 15 Nov)', () => {
+  it('on the search page draws the top bar too, with the path «Work › Ricerca» and the field, compact, in the search\'s place (anti-slop FAIL, 15 Nov)', () => {
     at('/');
     expect(screen.queryByTestId('search-bar')).toBeNull();
     const bar = screen.getByTestId('top-bar');
-    expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toHaveTextContent('WorkCorpus');
+    expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toHaveTextContent('WorkRicerca');
     expect(within(bar).getByRole('search', { name: 'Ricerca' })).toBeInTheDocument();
     expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
     expect(within(bar).getByRole('button', { name: 'Tutto schermo' })).toBeInTheDocument();

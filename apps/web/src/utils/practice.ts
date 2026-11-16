@@ -26,6 +26,19 @@ export interface Practice {
   decisions: PracticeDecision[];
   /** The light windows beside the table on the desktop, oldest first, at most two (D10, T14). */
   beside: BesideRef[];
+  /** A reading table bound to this dossier (LC51): built from it for the session, never saved in the browser,
+   *  never the Corpus's active practice. Absent on every Corpus practice. */
+  dossierId?: string;
+}
+
+/** The one test every exclusion of a bound table goes through (LC51): the bar, persistence, the moves, the closings. */
+export function isBoundPractice(practice: Pick<Practice, 'dossierId'>): boolean {
+  return practice.dossierId !== undefined;
+}
+
+/** The practices the Corpus lists, in order: the same array when none is bound, so selectors stay stable. */
+export function corpusPractices(practices: Practice[]): Practice[] {
+  return practices.some(isBoundPractice) ? practices.filter((p) => !isBoundPractice(p)) : practices;
 }
 
 export interface PracticeAct {
@@ -537,6 +550,10 @@ export function sanitizePractices(raw: unknown): { practices: Practice[]; droppe
     if (!isObject(entry) || !isText(entry.id) || entry.id === '' || !isText(entry.label) ||
       !Array.isArray(entry.acts) || !Array.isArray(entry.decisions) || !Array.isArray(entry.beside)) {
       dropped.push(`practice #${index}: no id, no label, or not lists of acts, decisions and windows (${shapeOf(entry)})`);
+      return;
+    }
+    if (isBoundPractice(entry as Pick<Practice, 'dossierId'>)) {
+      dropped.push(`practice #${index}: bound to the dossier ${String(entry.dossierId)}, never saved`);
       return;
     }
     if (practices.some((p) => p.id === entry.id)) {

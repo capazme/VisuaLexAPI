@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
@@ -20,35 +20,21 @@ import { matchesSearchFilters } from '../../../utils/searchFilters';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
 import { Scrivania } from './Scrivania';
 import { BookMark } from '../../ui/BookMark';
-import { deriveVersionInfo, requestIsHistorical } from '../../../utils/versionDisplay';
+import { deriveVersionInfo } from '../../../utils/versionDisplay';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
-import { isDesktopViewport, useIsDesktop } from '../../../hooks/useIsDesktop';
-import { besideRefFor, findPracticeArticle, practiceArticleKey } from '../../../utils/practice';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { besideRefFor, corpusPractices, practiceArticleKey } from '../../../utils/practice';
 import { actKeyOf } from '../dossier/dossierLayout';
 import { PracticeNotice, type PracticeStreaming } from '../practice/PracticeParts';
 import { ReadingRow } from '../practice/ReadingRow';
 import { PracticeBar } from '../practice/PracticeBar';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
+import { ReadingHostContext, type ReadingHost } from '../practice/readingHost';
+import { askerPracticeOf, crossReferenceParams, fetchActPdfUrl, openFromAsker, revealHeldCitation } from '../practice/hostGestures';
 import { dur, ease } from '../../../lib/motion';
 import { closeNotification, notify } from '../../ui/notifications/notifications';
-
-/** The practice whose light window or, on a phone, full-screen reader `askerId` names: where a norm
- *  cited in its text is searched and opened. */
-function askerPracticeOf(askerId: string | undefined) {
-  if (!askerId) return undefined;
-  const { practices, phoneReader } = appStore.getState();
-  return practices.find((p) => p.beside.some((b) => b.id === askerId)) ??
-    (phoneReader?.ref.id === askerId ? practices.find((p) => p.id === phoneReader.practiceId) : undefined);
-}
-
-/** A subject opened from a light window or from the phone's reader: beside the window, or in the reader. */
-function openFromAsker(practiceId: string, ref: ReturnType<typeof besideRefFor>, askerId: string): void {
-  const { openBeside, openPhoneReader } = appStore.getState();
-  if (isDesktopViewport()) openBeside(practiceId, ref, askerId);
-  else openPhoneReader(practiceId, ref);
-}
 
 /** A row a search added to a practice (it was not there before): the annex auto-switch removes
  *  the stray rows of the first search, and only those (spec §5.2). */
@@ -93,11 +79,12 @@ export function SearchPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total?: number } | null>(null);
   const {
-    searchTrigger, clearSearchTrigger,
+    searchTrigger, triggerSearch, clearSearchTrigger,
     searchQueue, drainNextSearch,
     pendingDecision, drainPendingDecision,
   } = useAppStore(useShallow(s => ({
     searchTrigger: s.searchTrigger,
+    triggerSearch: s.triggerSearch,
     clearSearchTrigger: s.clearSearchTrigger,
     searchQueue: s.searchQueue,
     drainNextSearch: s.drainNextSearch,
@@ -113,7 +100,7 @@ export function SearchPanel() {
   // One layout per breakpoint (T4, gotcha 26); the practice the current search lands in (its first
   // result decides, the rest follow it); the rows it created.
   const isDesktop = useIsDesktop();
-  const practiceCount = useAppStore((s) => s.practices.length);
+  const practiceCount = useAppStore((s) => corpusPractices(s.practices).length);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
   const streamingPracticeRef = useRef<string | null>(null);
   const [streamingPracticeId, setStreamingPracticeId] = useState<string | null>(null);
@@ -569,36 +556,13 @@ export function SearchPanel() {
   }, [searchTrigger, registerSearch]);
 
   const handleCrossReferenceNavigate = useCallback((articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => {
-    const params: SearchParams = {
-      act_type: normaData.tipo_atto,
-      act_number: normaData.numero_atto || '',
-      date: normaData.data || '',
-      article: articleNumber,
-      version: (normaData.versione as 'vigente' | 'originale') || 'vigente',
-      version_date: normaData.data_versione || '',
-      annex: normaData.allegato || undefined  // Preserve annex when navigating via cross-reference
-    };
-    // The text in force of an article of the same act already on the table is revealed,
-    // not searched again (T2); a past text of it never stands in for it, so without its row the text
-    // in force is loaded as a new row. A past text's jump asks for its own version, so it searches.
-    // Cited from a light window (`askerId`), the row opens beside that window instead of being
-    // revealed in the table (spec §4.5), and a search it needs starts from the window.
-    if (!requestIsHistorical(normaData)) {
-      const { practices, activePracticeId, revealPracticeRow } = appStore.getState();
-      const askerPractice = askerPracticeOf(askerId);
-      const practice = askerPractice ?? practices.find((p) => p.id === activePracticeId);
-      const act = practice?.acts.find((a) => a.key === actKeyOf(normaData));
-      const articleId = normaData.allegato ? `all${normaData.allegato}:${articleNumber}` : articleNumber;
-      const inForce = act && findPracticeArticle(
-        { ...act, articles: act.articles.filter((a) => !requestIsHistorical(a.norma_data)) }, articleId);
-      if (practice && act && inForce) {
-        if (askerPractice && askerId) {
-          openFromAsker(practice.id, besideRefFor({ kind: 'article', actId: act.id, articleKey: practiceArticleKey(inForce) }), askerId);
-          return;
-        }
-        if (revealPracticeRow(practice.id, act.id, practiceArticleKey(inForce))) return;
-      }
-    }
+    const params = crossReferenceParams(articleNumber, normaData);
+    // An article of the same act already on the table is revealed, or opened beside the window that cited it
+    // (`revealHeldCitation`); otherwise searched, a search a window needs starting from the window.
+    const askerPractice = askerPracticeOf(askerId);
+    const { practices, activePracticeId } = appStore.getState();
+    const practice = askerPractice ?? practices.find((p) => p.id === activePracticeId);
+    if (practice && revealHeldCitation(practice, articleNumber, normaData, askerPractice ? askerId : undefined)) return;
     handleSearch(askerId ? { ...params, besideId: askerId } : params);
   }, [handleSearch]);
 
@@ -606,23 +570,15 @@ export function SearchPanel() {
   const handleViewPdf = async (urn: string) => {
     setPdfState({ isOpen: true, url: null, isLoading: true });
     try {
-      const response = await legalFetch('/export_pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urn })
-      });
-
-      if (!response.ok) throw new Error('Errore generazione PDF');
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      setPdfState({ isOpen: true, url, isLoading: false });
+      setPdfState({ isOpen: true, url: await fetchActPdfUrl(urn), isLoading: false });
     } catch (e) {
       console.error(e);
       setPdfState({ isOpen: false, url: null, isLoading: false });
       setError("Impossibile caricare il PDF.");
     }
   };
+
+  const readingHost = useMemo<ReadingHost>(() => ({ search: triggerSearch }), [triggerSearch]);
 
   const hasTabs = practiceCount > 0;
   const practiceStreaming: PracticeStreaming | null = loadingProgress && streamingPracticeId
@@ -644,6 +600,8 @@ export function SearchPanel() {
           gotcha 26). */}
       {/* Mounted over both layouts: a notice not yet closed survives a change of breakpoint. */}
       <PracticeNotice />
+      {/* The reading's host (LC52 c2): its search gestures are the Corpus's search, drained above, as before. */}
+      <ReadingHostContext.Provider value={readingHost}>
       {isDesktop ? (
         <>
           {/* The practices' tabs, over the columns (LC21). */}
@@ -660,6 +618,7 @@ export function SearchPanel() {
       ) : (
         <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
       )}
+      </ReadingHostContext.Provider>
 
       {/* «Scrivania»: the page with no practice open (spec 2026-10-18-redesign-inchiostro §5.3.2). */}
       {!hasTabs && !isLoading && <Scrivania />}

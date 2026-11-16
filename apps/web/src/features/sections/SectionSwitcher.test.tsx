@@ -154,7 +154,7 @@ describe('SectionSwitcher (spec S3)', () => {
           <Routes>
             <Route path="/learn/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
             {/* Opus's home is the planner's «Oggi». */}
-            <Route path="/work/oggi" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
+            <Route path="/work/scadenziario" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
           </Routes>
         </main>
       </MemoryRouter>,

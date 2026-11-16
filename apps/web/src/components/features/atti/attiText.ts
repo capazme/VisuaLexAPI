@@ -1,6 +1,4 @@
-import type { DossierApi } from '../../../services/dossierService';
-
-/** How long the editor waits after the last keystroke before it saves. */
+/** How long the instructions wait after the last keystroke before they save. */
 export const SAVE_DELAY_MS = 800;
 
 /** «15 novembre» this year, «15 novembre 2025» before. */
@@ -10,20 +8,29 @@ export function changedOn(iso: string, now = new Date()): string {
   return date.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', ...(sameYear ? {} : { year: 'numeric' }) });
 }
 
-/** What «Cita» writes for an entry of the dossier: the server's citation of a norm, else the entry's title. */
-export function citationOf(item: DossierApi['items'][number]): string {
-  return (item.citation ?? item.title).trim();
+/** «250 KB», «1,2 MB». */
+export function weight(bytes: number): string {
+  if (bytes < 1000 * 1000) return `${Math.max(1, Math.round(bytes / 1000))} KB`;
+  return `${(bytes / 1000 / 1000).toLocaleString('it-IT', { maximumFractionDigits: 1 })} MB`;
 }
 
-/** A dossier note's text: the app stores a note's content as the string itself. */
-export function noteTextOf(item: DossierApi['items'][number]): string {
-  return typeof item.content === 'string' ? item.content.trim() : '';
+const KINDS: Record<string, string> = {
+  'application/pdf': 'PDF',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+  'application/msword': 'Word',
+  'application/vnd.oasis.opendocument.text': 'ODT',
+  'application/rtf': 'RTF',
+  'text/plain': 'TXT',
+  'image/jpeg': 'JPG',
+  'image/png': 'PNG',
+};
+
+/** The file's kind in a word, from the type the server read in its content. */
+export function kindOf(mime: string): string {
+  return KINDS[mime] ?? 'File';
 }
 
-/** The act's title from a file's name: «Atto di appello v3.docx» → «Atto di appello v3». */
-export function titleFromFileName(name: string): string {
-  return name.replace(/\.[^.]+$/, '').trim().slice(0, 300) || 'Atto';
+/** A file name from an act's title: no characters a file system refuses. */
+export function fileNameOf(title: string, extension: string): string {
+  return `${title.trim().replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 100).trim() || 'atto'}.${extension}`;
 }
-
-/** The files an act is loaded from: what «Analizza documento» reads in the browser, the PDF aside. */
-export const ATTO_FILE_ACCEPT = '.docx,.txt,.md,.markdown,.html,.htm';

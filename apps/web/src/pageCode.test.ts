@@ -33,7 +33,7 @@ describe('the pages loaded with their route (P1)', () => {
     expect(pageCodeFor('/rassegne')).toBe(PAGE_CODE.rassegne);
     expect(pageCodeFor('/crediti')).toBe(PAGE_CODE.credits);
     expect(pageCodeFor('/collega-app')).toBe(PAGE_CODE.connectAiApp);
-    expect(pageCodeFor('/work/oggi')).toBe(PAGE_CODE.opus);
+    expect(pageCodeFor('/work/scadenziario')).toBe(PAGE_CODE.opus);
     // Ricerca and the sign-in page are in the first chunk; Gymnasium and Academia have their own.
     expect(pageCodeFor('/')).toBeNull();
     expect(pageCodeFor('/login')).toBeNull();

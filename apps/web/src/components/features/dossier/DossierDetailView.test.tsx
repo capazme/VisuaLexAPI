@@ -68,6 +68,8 @@ vi.mock('../../../services/dossierService', () => ({
   },
 }));
 
+// The «Lettura» tab's own view (its tests: `DossierReadingView.test.tsx`): here, only when it is mounted.
+vi.mock('./DossierReadingView', () => ({ DossierReadingView: ({ dossier: shown }: { dossier: { id: string } }) => <div data-testid="lettura">{shown.id}</div> }));
 vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn(async () => ({ dossierId: 'd1' })) } }));
 
 import { appStore } from '../../../store/useAppStore';
@@ -159,7 +161,7 @@ describe('DossierDetailView — the page by act', () => {
 
   it('has three actions and a menu in its header, and no selection bar until asked', () => {
     renderView();
-    expect(screen.getByRole('button', { name: 'Apri tutto nel Corpus' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apri tutto in Ricerca' })).toBeInTheDocument();
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-haspopup', 'menu');
     }
@@ -602,7 +604,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
 
   it('draws the header\'s actions in one row under the title, every one 44 px', () => {
     renderView();
-    const open = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
+    const open = screen.getByRole('button', { name: 'Apri tutto in Ricerca' });
     const row = open.parentElement!;
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) expect(row).toContainElement(screen.getByRole('button', { name }));
     // Under the title, not beside it: a long name would be squeezed.
@@ -617,7 +619,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     const title = 'Ransomware EVST – pagamento del riscatto e fondi pubblici, profili di responsabilità';
     renderView({ ...dossier, title, description: 'Richiesta di riscatto ricevuta il 3 ottobre' });
     const heading = screen.getByRole('heading', { level: 1, name: title });
-    const open = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
+    const open = screen.getByRole('button', { name: 'Apri tutto in Ricerca' });
     const row = open.parentElement!;
     // Nothing beside the title: the header holds only the section's phrase, the title and the description.
     expect(heading.closest('header')!.querySelector('button')).toBeNull();
@@ -625,7 +627,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(screen.getByText(/creato il/).compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The row wraps as a row when the window is narrow, never a label inside its button.
     expect(row).toHaveClass('flex-wrap');
-    const buttons = ['Apri tutto nel Corpus', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
+    const buttons = ['Apri tutto in Ricerca', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
     for (const button of buttons) expect(button).toHaveClass('whitespace-nowrap');
     expect(row.lastElementChild).toContainElement(screen.getByRole('button', { name: 'Altre azioni' }));
   });
@@ -672,5 +674,51 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     const search = screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' });
     expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
     expect(search).not.toHaveClass('text-base');
+  });
+});
+
+describe('DossierDetailView — the «Lettura» tab (LC54 c3)', () => {
+  afterEach(() => { window.history.replaceState(null, '', '/'); });
+
+  it('offers four views in order: Fonti, Lettura, Atti, Compiti; the narrow padding keeps them whole on a phone', () => {
+    renderView();
+    const tabs = within(screen.getByRole('tablist', { name: 'Viste del dossier' })).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Lettura', 'Atti', 'Compiti']);
+    for (const tab of tabs) expect(tab).toHaveClass('px-2.5', 'sm:px-4');
+  });
+
+  it('mounts the reading only once it is chosen, with the page\'s dossier', () => {
+    renderView();
+    expect(screen.queryByTestId('lettura')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('lettura')).toHaveTextContent('d1');
+  });
+
+  it('opens on the reading with `?vista=lettura`', () => {
+    window.history.replaceState(null, '', '/dossier?dossier=d1&vista=lettura');
+    renderView();
+    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('lettura')).toBeInTheDocument();
+  });
+
+  it('keeps the tabs at the top in the other views, and lets them scroll away in «Lettura», where the act\'s head sticks (#529)', () => {
+    renderView();
+    const bar = () => screen.getByRole('tablist', { name: 'Viste del dossier' }).closest('div.-mx-2');
+    expect(bar()).toHaveClass('sticky');
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(bar()).not.toHaveClass('sticky');
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(bar()).toHaveClass('sticky');
+  });
+  it('in «Lettura» «Apri tutto in Ricerca» leaves the header for «⋯», as «Apri anche in Ricerca» (LC55)', () => {
+    renderView();
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(screen.queryByRole('button', { name: 'Apri tutto in Ricerca' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    expect(screen.getByRole('menuitem', { name: 'Apri anche in Ricerca' })).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(screen.getByRole('button', { name: 'Apri tutto in Ricerca' })).toBeInTheDocument();
   });
 });

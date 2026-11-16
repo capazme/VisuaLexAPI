@@ -1,6 +1,7 @@
 import type { LingoCardStato } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { attemptMerltErasureNow, everConsented, requestMerltErasure } from '../services/merlt/userData';
+import { removeUserFiles } from '../pratica/fileStore';
 
 /**
  * The states in which a card belongs to its author alone. A draft was never
@@ -47,5 +48,7 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     await tx.lingoCard.deleteMany({ where: { autoreId: userId, stato: { in: PERSONAL_STATES } } });
     await tx.user.delete({ where: { id: userId } });
   });
+  // The case files' rows went with the user's cascade; their encrypted files leave the disk now (LC50).
+  await removeUserFiles(userId);
   if (merltErasure) await attemptMerltErasureNow(userId);
 }

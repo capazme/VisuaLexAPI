@@ -113,7 +113,7 @@ export function CitedNormChoice({ citation, link, onClose, onOpenOnDashboard, sh
             </p>
             <button type="button" onClick={() => onOpenOnDashboard(citation)} className={CHOICE}>
               <ExternalLink size={16} aria-hidden className="shrink-0" />
-              Apri nel Corpus
+              Apri in Ricerca
             </button>
             {/* `aria-disabled`, not `disabled`, while the norm is read: the focus stays on the button. */}
             <button type="button" onClick={() => void addToDossier()} aria-disabled={reading} aria-busy={reading} className={CHOICE}>
@@ -122,7 +122,7 @@ export function CitedNormChoice({ citation, link, onClose, onOpenOnDashboard, sh
             </button>
             {failed && (
               <p role="alert" className="px-2 pt-1 text-[13px] leading-snug text-red-700 dark:text-red-300">
-                Non riesco a leggere la norma citata: riprova, o aprila nel Corpus.
+                Non riesco a leggere la norma citata: riprova, o aprila in Ricerca.
               </p>
             )}
           </div>

@@ -39,8 +39,7 @@ vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div /> }));
 // Loaded with their route (P1, `pageCode.ts`): vi.mock intercepts the dynamic import() too.
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div data-testid="dossier-page" /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div data-testid="history-page" /> }));
-vi.mock('../components/features/atti/AttiListView', () => ({ AttiListView: () => <div data-testid="atti-list" /> }));
-vi.mock('../components/features/atti/AttoEditor', () => ({ AttoEditor: () => <div data-testid="atto-editor" /> }));
+vi.mock('../components/features/atti/OldAttoRedirect', () => ({ OldAttoRedirect: () => <div data-testid="old-atto" /> }));
 vi.mock('../components/features/documents/DocumentReviewPage', () => ({ DocumentReviewPage: () => <div data-testid="documents-page" /> }));
 vi.mock('../features/connections/ConnectAiAppPage', () => ({ ConnectAiAppPage: () => <div data-testid="connect-ai-app-page" /> }));
 vi.mock('../pages/CreditsPage', () => ({ CreditsPage: () => <div data-testid="credits-page" /> }));
@@ -49,7 +48,7 @@ vi.mock('../components/features/planner/OpusPage', async () => {
   return { OpusPage: () => <div data-testid="opus-page"><Outlet /></div> };
 });
 vi.mock('../components/features/planner/OpusViews', () => ({
-  TodayView: () => <h2>Oggi</h2>,
+  TodayView: () => <h2>Scadenziario</h2>,
   UpcomingView: () => <h2>Prossimi giorni</h2>,
   InboxView: () => <h2>Lista d’ingresso</h2>,
   TaskTrashView: () => <h2>Cestino</h2>,
@@ -187,11 +186,11 @@ describe('App routing', () => {
     expect(screen.getByTestId('layout')).toBeInTheDocument();
   });
 
-  it('opens Opus at «Oggi», its frame and its view loaded together', async () => {
+  it('opens Opus at «Scadenziario», its frame and its view loaded together', async () => {
     renderAt('/work');
-    expect(await screen.findByRole('heading', { name: 'Oggi' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Scadenziario' })).toBeInTheDocument();
     expect(screen.getByTestId('opus-page')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/work/oggi');
+    expect(window.location.pathname).toBe('/work/scadenziario');
   });
 
   it.each([
@@ -204,24 +203,51 @@ describe('App routing', () => {
     expect(screen.getByTestId('opus-page')).toBeInTheDocument();
   });
 
-  // Atti: the list and an act's editor, in Work's frame.
-  it.each([
-    ['/work/atti', 'atti-list'],
-    ['/work/atti/42', 'atto-editor'],
-  ])('opens %s in Opus’s frame', async (path, testId) => {
-    renderAt(path);
-    expect(await screen.findByTestId(testId)).toBeInTheDocument();
-    expect(screen.getByTestId('opus-page')).toContainElement(screen.getByTestId(testId));
+  // LC53: the act editor is gone; its list leads to the dossiers, an act to its redirect (tested in atti.test.tsx).
+  it('/work/atti leads to the dossiers, outside Opus’s frame', async () => {
+    renderAt('/work/atti');
+    expect(await screen.findByTestId('dossier-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/dossier');
   });
 
-  // D-324: the Anonimizzatore is the desktop app's: a plain page in Work's frame, no feature behind it.
+  it('/work/atti/42 goes to the act\'s redirect', async () => {
+    renderAt('/work/atti/42');
+    expect(await screen.findByTestId('old-atto')).toBeInTheDocument();
+    expect(screen.queryByTestId('opus-page')).toBeNull();
+  });
+
+  // D-324: the Pseudonimizzatore is the desktop app's: a plain page in Work's frame, no feature behind it.
   it.each([
-    ['/work/anonimizzatore', /app da scrivania/],
+    ['/work/pseudonimizzatore', /app da scrivania/],
+    ['/work/grafo-pratiche', /app da scrivania/],
   ])('opens %s in Opus’s frame, saying what is coming', async (path, text) => {
     renderAt(path);
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.getByTestId('opus-page')).toContainElement(screen.getByText(text));
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('says on the Pseudonimizzatore\'s page what it will do, «in arrivo» (LC47)', async () => {
+    renderAt('/work/pseudonimizzatore');
+    const page = await screen.findByTestId('opus-page');
+    for (const text of [
+      'in arrivo',
+      'Arriverà con l\'app da scrivania di LexCraft.',
+      'Prima che un atto entri in una pratica, toglierà i nomi di persone e società e li sostituirà con etichette: all\'IA arriveranno meno dati personali e meno informazioni riservate.',
+      'Funzionerà tutto sul tuo computer: il documento originale non uscirà mai.',
+      'I dati con le etichette restano dati personali per il GDPR: lo Pseudonimizzatore riduce il rischio, non sostituisce le altre cautele.',
+    ]) expect(page).toContainElement(screen.getByText(text));
+  });
+
+  it('says on the Grafo delle pratiche\'s page what it will do, «in arrivo» (LC48)', async () => {
+    renderAt('/work/grafo-pratiche');
+    const page = await screen.findByTestId('opus-page');
+    for (const text of [
+      'in arrivo',
+      'Arriverà con l\'app da scrivania di LexCraft.',
+      'Mostrerà come le tue pratiche si collegano attraverso le norme, le sentenze e le massime che usi: per esempio, in quali pratiche hai già citato un articolo e con quali argomenti.',
+      'Lo vedrai solo tu, e collegherà le pratiche attraverso le fonti, non attraverso i nomi dei clienti.',
+    ]) expect(page).toContainElement(screen.getByText(text));
   });
 
   it('loads «Crediti» with its route, public, outside the layout', async () => {
@@ -350,7 +376,9 @@ describe('App routing — Studia', () => {
 // writes) lands on the new one, keeping the rest of the path, the query and the anchor, and replacing itself.
 describe('App routing — old addresses', () => {
   it.each([
-    ['/opus', '/work/oggi', '', '', { heading: 'Oggi' }],
+    ['/opus', '/work/scadenziario', '', '', { heading: 'Scadenziario' }],
+    ['/work/oggi?vista=2#t1', '/work/scadenziario', '?vista=2', '#t1', { heading: 'Scadenziario' }],
+    ['/work/anonimizzatore?x=1#y', '/work/pseudonimizzatore', '?x=1', '#y', { testId: 'opus-page' }],
     ['/opus/prossimi?vista=2#t1', '/work/prossimi', '?vista=2', '#t1', { heading: 'Prossimi giorni' }],
     ['/opus/cestino', '/work/cestino', '', '', { heading: 'Cestino' }],
     ['/studia', '/learn/ripasso', '', '', { heading: 'Ripasso di oggi' }],

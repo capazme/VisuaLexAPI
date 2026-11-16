@@ -30,7 +30,7 @@ describe('sectionForPath (spec S1)', () => {
     ['/labs/valida', 'academia'],
     ['/labs/grafo', 'academia'],
     ['/work', 'opus'],
-    ['/work/oggi', 'opus'],
+    ['/work/scadenziario', 'opus'],
     ['/work/cestino', 'opus'],
   ])('%s belongs to %s', (path, section) => expect(sectionForPath(path)).toBe(section));
 
@@ -109,6 +109,6 @@ describe('useSection', () => {
     expect(result.current.pathname).toBe('/learn/ripasso');
     act(() => result.current.chooseSection('opus'));
     // Opus opens on its planner's «Oggi» (P1b); the dossiers stay a Corpus page at /dossier.
-    expect(result.current.pathname).toBe('/work/oggi');
+    expect(result.current.pathname).toBe('/work/scadenziario');
   });
 });
