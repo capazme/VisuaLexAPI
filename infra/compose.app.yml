@@ -77,6 +77,13 @@ services:
       MERLT_API_URL: "http://merlt-api:8000"
       MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:?MERLT_INTERNAL_SECRET is not set in infra/.env (./start.sh --prod creates it)}"
       MERLT_API_KEY: "${MERLT_API_KEY:-}"
+      # A case's act files (LC50), encrypted at rest in their own volume (below). Their key,
+      # PRATICA_FILES_KEY (32 bytes, base64: `openssl rand -base64 32`), lives in
+      # apps/server/.env with the server's other secrets, and is deliberately NOT listed
+      # here: an `environment:` entry would override env_file. Without it the server
+      # starts and the file routes answer 503. Testing only: no real client files until
+      # the volume has a backup off this host.
+      PRATICA_FILES_DIR: /app/pratica-files
     depends_on:
       migrate: {condition: service_completed_successfully}
       postgres: {condition: service_healthy}
@@ -85,6 +92,8 @@ services:
       # The MERL-T dead-letter log (NDJSON, a file a day, kept 7 days, 50 MB at
       # most): the failed tracking events' identifiers, no personal data.
       - server_logs:/app/logs
+      # The encrypted case files: named by id, never by their name; not in scripts/backup.sh yet.
+      - pratica_files:/app/pratica-files
     read_only: true
     tmpfs:
       - /tmp
@@ -154,3 +163,4 @@ services:
 
 volumes:
   server_logs: {name: "${VISUALEX_STACK:-visualex}_server_logs"}
+  pratica_files: {name: "${VISUALEX_STACK:-visualex}_pratica_files"}

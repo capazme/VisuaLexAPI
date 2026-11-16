@@ -7,6 +7,7 @@ import { citeStoredItem } from '../norms/decisionCitation';
 import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 import { countingModules } from '../lingo/courses';
 import { LIMITS } from '../schemas/lingo/corso';
+import { deleteDossierFileRows, removeDossierDir } from '../pratica/fileStore';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
@@ -136,7 +137,18 @@ let lastSweep = 0;
 
 /** Removes the entries past their 30 days; returns how many. */
 export async function sweepExpiredTrash(now: Date = new Date()): Promise<number> {
-  const { count } = await prisma.trashEntry.deleteMany({ where: { expiresAt: { lt: now } } });
+  // An expired entry can no longer be restored: the dossiers among them take their case files (LC50) with them.
+  // Their rows (and wrapped keys) go in the entries' transaction; the directories after the commit, best-effort.
+  const { count, gone } = await prisma.$transaction(async (tx) => {
+    const dossiers = await tx.trashEntry.findMany({ where: { expiresAt: { lt: now }, kind: 'DOSSIER' }, select: { userId: true, dossierId: true } });
+    const { count } = await tx.trashEntry.deleteMany({ where: { expiresAt: { lt: now } } });
+    const gone: { userId: string; dossierId: string }[] = [];
+    for (const { userId, dossierId } of dossiers) {
+      if (dossierId && (await deleteDossierFileRows(tx, userId, dossierId))) gone.push({ userId, dossierId });
+    }
+    return { count, gone };
+  });
+  for (const { userId, dossierId } of gone) await removeDossierDir(userId, dossierId);
   return count;
 }
 
@@ -716,8 +728,17 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
 
 /** Empties one trash entry now. */
 export async function purgeTrashEntry(userId: string, trashId: string): Promise<void> {
-  const { count } = await prisma.trashEntry.deleteMany({ where: { id: trashId, userId, ...(await reachableKinds()) } });
-  if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+  const kinds = await reachableKinds();
+  // A whole dossier gone for good takes its case files (LC50): their rows in the same transaction as the entry
+  // (a restore that won the race leaves nothing to delete, a 404), their directory after the commit.
+  const dossierId = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.trashEntry.findFirst({ where: { id: trashId, userId, ...kinds }, select: { kind: true, dossierId: true } });
+    const { count } = await tx.trashEntry.deleteMany({ where: { id: trashId, userId, ...kinds } });
+    if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+    if (claimed?.kind !== 'DOSSIER' || !claimed.dossierId) return null;
+    return (await deleteDossierFileRows(tx, userId, claimed.dossierId)) ? claimed.dossierId : null;
+  });
+  if (dossierId) await removeDossierDir(userId, dossierId);
 }
 
 // ─── Gymnasium's courses (Percorsi, A1; spec 2026-10-23 §10.9) ───────────────────────────────────────────────

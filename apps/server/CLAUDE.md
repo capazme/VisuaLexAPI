@@ -913,6 +913,28 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (days 'YYYY-MM-DD', times 'HH:MM'), never `assigneeId` (another person's id from wave 4) — the
   export's rule, no other person's id, name or text. They cascade with the account, and a task
   assigned to a deleted account loses its assignee.
+- **A case's act files** (LC50, server part; testing only, no real client files until the volume has a
+  backup off the host). `routes/praticaFiles.ts`, mounted at `/api/dossiers` before the dossier routes;
+  the user's session only (no entry in the delegated table). `GET /:dossierId/files` (originals with
+  `versioni`, and `cestino`), `POST /:dossierId/files` and `/:dossierId/files/:fileId/versions` (multipart
+  `file`; 25 MB a file, 500 MB a case, 2 GB a user, the trash counted; PDF, DOCX, DOC, ODT, RTF, TXT,
+  JPG, PNG, the extension agreeing with the first bytes, 415 otherwise; 413 over a ceiling),
+  `GET /:dossierId/files/:fileId/content`, `POST …/trash` and `…/restore` (an original takes its
+  versions), `DELETE /:dossierId/files/:fileId` (only from the trash: rows and disk), `GET|PUT
+  /:dossierId/istruzioni { testo }` (Markdown, at most 20,000 characters). Another user's dossier or file
+  is a 404. `pratica/fileStore.ts`: AES-256-GCM, a random key per file wrapped with `PRATICA_FILES_KEY`
+  (32 bytes, base64), the file id as AAD of both; the blob at
+  `PRATICA_FILES_DIR/<userId>/<dossierId>/<fileId>`, the wrapped key in `pratica_files.chiave_cifrata`.
+  Both read per call: without a valid key the file routes answer 503 (the instructions still work).
+  A download is decrypted whole and its tag verified before a byte goes out; a tag that fails (the key
+  changed: there is no rotation) is a 500 that says so. `scripts/datakit` backs up the `pratica_files`
+  volume with the others; the key is never in a backup. `pratica_file_accessi`
+  logs each listing, download, deposit, trash, restore and deletion (user, client, file, time; no
+  foreign key to the file). No table has a foreign key to `dossiers`: a dossier in the trash keeps its
+  files (unreachable, the owner check finds no dossier) and gets them back on restore;
+  `purgeTrashEntry` and `sweepExpiredTrash` remove them (`removeDossierFiles`), and `deleteUserAccount`
+  removes the user's directory after its transaction. `readPraticaFileContent` is the internal reader
+  the MCP's text extraction (part 3) will start from; no route calls it. `tests/praticaFiles.test.ts`.
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
@@ -1054,6 +1076,8 @@ volume and the root filesystem is read-only.
 saved-norm watcher (see the Node backend section); all three have defaults.
 `SCRAPE_QUOTA_POINTS` / `SCRAPE_QUOTA_WINDOW_SECONDS` / `SCRAPE_IP_POINTS` (defaults
 300, 60, 1200) size the quota behind `GET /api/auth/verify`.
+`PRATICA_FILES_KEY` (32 bytes, base64; `openssl rand -base64 32`) and `PRATICA_FILES_DIR` drive a
+case's act files (no default for either: without them the file routes answer 503).
 `OAUTH_*` configure the authorization server (see `.env.example`);
 `tests/setup.ts` lifts its per-address limits for the suite and sets a test
 `OAUTH_MCP_CLIENT_SECRET`.

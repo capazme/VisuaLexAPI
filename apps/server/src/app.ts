@@ -38,6 +38,7 @@ import lingoSrsRoutes from './routes/lingoSrs';
 import lingoCorsiRoutes from './routes/lingoCorsi';
 import taskRoutes from './routes/tasks';
 import attiRoutes from './routes/atti';
+import praticaFilesRoutes from './routes/praticaFiles';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -157,6 +158,8 @@ app.use('/api/lingo/corsi', lingoCorsiRoutes);
 app.use('/api/tasks', taskRoutes);
 // The acts (Atti, draft for Alfred and Guglielmo), same reason.
 app.use('/api/atti', attiRoutes);
+// A case's act files and instructions (LC50): its own paths under /api/dossiers, before the dossier routes.
+app.use('/api/dossiers', praticaFilesRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 // The runtime switches' administration (GET /features is mounted above, before the limiters).
