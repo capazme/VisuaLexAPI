@@ -19,9 +19,14 @@ describe('GoalRing', () => {
   it('names today’s goal, and says when it is reached', () => {
     const { rerender } = render(<GoalRing ripassi={6} obiettivo={10} raggiunto={false} />);
     expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 6 di 10 ripassi' })).toBeInTheDocument();
-    expect(screen.getByText('di 10 ripassi')).toBeInTheDocument();
+    // LC39: a line and an ink bar at the true share, never full before the goal.
+    expect(screen.getByText(/su 10/)).toBeInTheDocument();
+    expect(screen.getByTestId('goal-arc')).toHaveStyle({ width: '0%' });
     rerender(<GoalRing ripassi={3} obiettivo={10} raggiunto />);
     expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 3 di 10 ripassi, raggiunto' })).toBeInTheDocument();
+    // Reached (the day counts, as the missions read it): the line says so, no count to contradict it, the bar full.
+    expect(screen.getByText('Obiettivo di oggi raggiunto')).toBeInTheDocument();
+    expect(screen.queryByText(/su 10/)).toBeNull();
   });
 });
 

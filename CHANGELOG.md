@@ -12,6 +12,24 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-11-16
+
+The search as an island at the top of every section, and Learn's day closed with a plate and a curl of
+smoke. Web only, no migration.
+
+### Search
+
+- On a wide screen the search is a round pill at the middle of the top bar, in every section; the
+  menu grows out of it and closes back into it (LC40). On a phone the field's placeholder drops the
+  example, which was cut.
+
+### Learn
+
+- The day's goal met: Luca's plate in place of the drawn tick, and a curl of smoke rising once from
+  its lamp in place of the confetti (none under reduced motion); the session's end notice with the
+  small plate (LC39).
+- The section tabs as wide as their word, so «Forum» is whole.
+
 ## [1.26.0] - 2026-11-16
 
 The Corpus desk at a phone's scale, and Work's trash as a small button. Web only, no migration.

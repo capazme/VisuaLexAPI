@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Command, useCommandState } from 'cmdk';
-import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
+import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, shift, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
@@ -16,7 +16,7 @@ import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
-import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
+import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
@@ -184,6 +184,82 @@ const noHeight = () => null;
  * shows; the content fades in as it grows. Closing, the same way back (`usePresence`); opened again meanwhile, it grows
  * back from where the closing was. Under reduced motion it only fades.
  */
+/**
+ * The island (LC40; the anti-slop review of 16 Nov, Luca: «AI slop sia nella fluidità di apertura che di chiusura»): two
+ * layers. The shape — the card's ground, edge, corners and shadow — changes from the pill into the panel; the content
+ * sits over it and is never cut: hidden until the shape is nearly there, then it fades in whole. Opening: the shape
+ * 300 ms, an ease-out with no overshoot; the content from 85 % of it, 120 ms. Closing: the content goes first (80 ms),
+ * then the shape goes back onto the pill's rectangle and corners (180 ms, an ease-in), where the pill is again. The
+ * shadow is the shape's from the first frame. Under reduced motion only a fade.
+ */
+const ISLAND_OPEN_MS = 300;
+const ISLAND_CONTENT_MS = 120;
+const ISLAND_CONTENT_AT = 0.85;
+const ISLAND_HIDE_MS = 80;
+const ISLAND_CLOSE_MS = 180;
+const ISLAND_OPEN_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const ISLAND_CLOSE_CURVE = 'cubic-bezier(0.4, 0, 1, 1)';
+
+function IslandGrowth({ still, from, className, children }: { still: boolean; from: { left: number; right: number; height: number; radius: number }; className: string; children: ReactNode }) {
+  const shapeRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isPresent, safeToRemove] = usePresence();
+  const remove = useRef(safeToRemove);
+  useEffect(() => {
+    remove.current = safeToRemove;
+  });
+  const asPill = { left: `${from.left}px`, right: `${from.right}px`, bottom: `calc(100% - ${from.height}px)`, borderRadius: `${from.radius}px` };
+  const asPanel = { left: '0px', right: '0px', bottom: '0px', borderRadius: `${PANEL_RADIUS}px` };
+
+  useLayoutEffect(() => {
+    const shape = shapeRef.current;
+    const content = contentRef.current;
+    if (!isPresent || !shape || !content || typeof shape.animate !== 'function') return undefined;
+    if (still) {
+      const fade = [shape, content].map((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur.pop * 1000 }));
+      return () => fade.forEach((animation) => animation.cancel());
+    }
+    const grow = shape.animate([asPill, asPanel], { duration: ISLAND_OPEN_MS, easing: ISLAND_OPEN_CURVE, fill: 'backwards' });
+    const show = content.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ISLAND_CONTENT_MS, delay: ISLAND_OPEN_MS * ISLAND_CONTENT_AT, easing: 'ease-out', fill: 'backwards' });
+    return () => {
+      grow.cancel();
+      show.cancel();
+    };
+    // Once per opening: the panel's own re-renders do not grow it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the pill's place is read as it opens
+  }, [still, isPresent]);
+
+  useEffect(() => {
+    if (isPresent) return;
+    const shape = shapeRef.current;
+    const content = contentRef.current;
+    if (!shape || !content || typeof shape.animate !== 'function') {
+      remove.current?.();
+      return;
+    }
+    shape.style.pointerEvents = 'none';
+    content.style.pointerEvents = 'none';
+    if (still) {
+      const fade = [shape, content].map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' }));
+      fade[0].onfinish = () => remove.current?.();
+      return;
+    }
+    content.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ISLAND_HIDE_MS, easing: 'ease-in', fill: 'forwards' });
+    const back = shape.animate([asPanel, asPill], { duration: ISLAND_CLOSE_MS, delay: ISLAND_HIDE_MS, easing: ISLAND_CLOSE_CURVE, fill: 'forwards' });
+    back.onfinish = () => remove.current?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- closing once, from where it is
+  }, [isPresent, still]);
+
+  return (
+    <div className={cn(className, 'relative overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent')}>
+      <div ref={shapeRef} aria-hidden data-island-shape="" className="pointer-events-none absolute inset-0 border border-ink-200 bg-card shadow-lg dark:border-ink-700 dark:bg-ink-900" style={{ borderRadius: PANEL_RADIUS }} />
+      <div ref={contentRef} data-island-content="" className="relative flex min-h-0 flex-1 flex-col overflow-hidden" style={{ borderRadius: PANEL_RADIUS }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isPresent, safeToRemove] = usePresence();
@@ -693,9 +769,30 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
   // The top bar's compact field (LC21) is no field to grow from (Luca, 15 Nov: the menu was as narrow as it): the menu
   // then hangs at the top, centred and wide, as from every other page — one menu, one place.
-  const anchor = field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
+  // LC40 (Luca, 16 Nov: «effetto espansione Dynamic Island … in qualsiasi scheda»): the top bar's pill — the search
+  // page's compact field, or the bar's button on every other page — is an island: the menu grows out of it, wide, centred
+  // on it, its top on the pill's. The search page's own large field (Corpus, below lg) stays a field it drops from.
+  // On a phone too (Luca, 16 Nov: «Sì, anche lì»): the bar's «Cerca» pill.
+  const island = !isOpen
+    ? null
+    : isDesktop && field?.isConnected && field.hasAttribute('data-compact')
+      ? field
+      : document.getElementById(SEARCH_ISLAND_ID);
+  const anchor = island?.isConnected ? island : field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
+  const isIsland = anchor !== null && anchor === island;
   // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
   const growFrom = anchor?.offsetHeight || 44;
+  // From the island its width too, and its round ends: how far the panel (768 px, the window allowing, centred on the
+  // pill and kept 16 px inside the window) reaches past the pill on each side.
+  const islandWidth = Math.min(768, (typeof window === 'undefined' ? 1024 : window.innerWidth) - 32);
+  const growFromSides = (() => {
+    if (!isIsland) return undefined;
+    const pill = anchor.getBoundingClientRect();
+    const width = pill.width || anchor.offsetWidth;
+    const centre = pill.left + width / 2;
+    const left = Math.min(Math.max(centre - islandWidth / 2, 16), window.innerWidth - 16 - islandWidth);
+    return { left: Math.max(0, pill.left - left), right: Math.max(0, left + islandWidth - (pill.left + width)) };
+  })();
   // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
   // did both).
   const watchViewport = isOpen && !isDesktop;
@@ -714,26 +811,36 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   }, [isOpen, isDesktop]);
   // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
   // (the field) when it closes. Placed only when the field is there.
-  const { refs, floatingStyles, context } = useFloating({
+  const { refs, floatingStyles, context, update } = useFloating({
     open: isOpen,
     elements: { reference: anchor },
-    placement: 'bottom-start',
+    placement: isIsland ? 'bottom' : 'bottom-start',
     strategy: 'fixed',
     middleware: [
       // Its top on the field's: the panel's own box takes the field's place.
       offset(({ rects }) => -rects.reference.height),
-      // As wide as the field; as tall as what it holds, up to the height it always had (Bill: one row is not a
-      // 640 px panel), the window allowing.
+      // The island's panel, wider than the pill, stays in the window.
+      ...(isIsland ? [shift({ padding: 16 })] : []),
+      // As wide as the field (from the island: the menu's own width, 768 px, the window allowing); as tall as what it
+      // holds, up to the height it always had (Bill: one row is not a 640 px panel), the window allowing.
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
-          elements.floating.style.width = `${rects.reference.width}px`;
-          elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`);
+          elements.floating.style.width = isIsland ? `${islandWidth}px` : `${rects.reference.width}px`;
+          // On a phone what the keyboard leaves (the visual viewport), from the pill down. Read here, not from the
+          // render: floating-ui keeps the first `apply` (same source text), so a captured height would stay stale.
+          const shown = isDesktop ? null : viewportHeight();
+          const room = shown ? shown - rects.reference.y - 8 : availableHeight;
+          elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(isDesktop ? 320 : 200, room))}px`);
         },
       }),
     ],
     whileElementsMounted: autoUpdate,
   });
+  // The keyboard opening or closing changes only the visual viewport, which autoUpdate does not watch.
+  useEffect(() => {
+    if (shownHeight !== null) update();
+  }, [shownHeight, update]);
   // The field gone while the menu is open (another page, Focus mode): what `size` wrote on the box goes with it, or
   // the panel hung at the top would keep the field's width and height.
   useLayoutEffect(() => {
@@ -848,7 +955,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               }}
               enterKeyHint="search"
               aria-describedby="command-palette-help"
-              placeholder="Atto o citazione, es. art 2043 cc"
+              // On a phone the example would be cut at «art 20» (consultant 16-11): the words alone.
+              placeholder={isDesktop ? 'Atto o citazione, es. art 2043 cc' : 'Atto o citazione'}
               // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
               // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
               className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-500 dark:placeholder:text-ink-400"
@@ -1317,17 +1425,25 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   return (
     <FloatingPortal>
-      {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while
-          open, so the mark goes with the click that closes, not with the panel's fade. */}
-      {isOpen && (
-        <div
-          data-find-overlay=""
-          aria-hidden
-          // `touch-none`: a drag on it does not scroll the page under it (iOS).
-          className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
-          onClick={onClose}
-        />
-      )}
+      {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while open, so the
+          mark goes with the click that closes, not with the veil's fade. */}
+      {isOpen && <span data-find-overlay="" hidden />}
+      {/* LC40: the veil rises and falls with the island's shape, not at once. */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="command-palette-veil"
+            data-palette-veil=""
+            aria-hidden
+            initial={still ? false : { opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
+            exit={{ opacity: 0, transition: { duration: 0.26, ease: [0.4, 0, 1, 1] } }}
+            // `touch-none`: a drag on it does not scroll the page under it (iOS).
+            className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
+            onClick={onClose}
+          />
+        )}
+      </AnimatePresence>
       {/* Outside the presence, so the focus goes back as the palette closes, not once its fade is over. */}
       <FloatingFocusManager
         context={context}
@@ -1366,9 +1482,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           >
             {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
                 lists scroll inside it past that. */}
-            <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
-              {content}
-            </PanelGrowth>
+            {isIsland && growFromSides ? (
+              <IslandGrowth still={still} from={{ ...growFromSides, height: growFrom, radius: growFrom / 2 }} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col">
+                {content}
+              </IslandGrowth>
+            ) : (
+              <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
+                {content}
+              </PanelGrowth>
+            )}
           </div>
         )}
       </AnimatePresence>

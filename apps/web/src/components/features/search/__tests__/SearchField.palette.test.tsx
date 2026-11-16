@@ -41,7 +41,7 @@ describe('SearchField and the menu together (R2: one field)', () => {
     const field = screen.getByRole('button', { name: /^Cerca una norma, una sentenza o un tema/ });
     act(() => field.focus());
     fireEvent.keyDown(field, { key: 'a' });
-    const box = await screen.findByPlaceholderText(/art 2043 cc/i);
+    const box = await screen.findByPlaceholderText(/^Atto o citazione/);
     expect(box).toHaveValue('a');
     await waitFor(() => expect(box).toHaveFocus());
     await user.keyboard('rt 2043{Escape}');

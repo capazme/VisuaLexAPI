@@ -1,11 +1,10 @@
 import { cn } from '../../../lib/utils';
 import { FOCUS_RING, INK_BG, ON_INK } from './progress/tokens';
 
-/** The lesson's one primary action: an ink key, 48 px, that presses into its edge (as «Inizia» on Oggi). */
+/** The lesson's one primary action: a flat ink button, 44 px, as every primary action of the app (LC39: no raised key). */
 export const LESSON_PRIMARY = cn(
-  'flex min-h-[48px] w-full items-center justify-center gap-3 rounded-xl px-6 text-base font-semibold',
-  'shadow-[0_4px_0_var(--color-primary-950)] transition-[translate,box-shadow] active:translate-y-[3px] active:shadow-[0_1px_0_var(--color-primary-950)] motion-reduce:transition-none',
-  'dark:shadow-[0_4px_0_var(--color-primary-500)] dark:active:shadow-[0_1px_0_var(--color-primary-500)]',
+  'flex min-h-[44px] w-full items-center justify-center gap-3 rounded-xl px-6 text-base font-semibold',
+  'transition-[background-color,scale] hover:bg-primary-800 active:scale-[0.98] motion-reduce:transition-none dark:hover:bg-primary-200',
   INK_BG,
   ON_INK,
   // Disabled in the dark (LC19): the grey slab of every filled action, not the light key faded.
