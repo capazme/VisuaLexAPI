@@ -61,6 +61,7 @@ import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import { DossierAttiPanel } from '../atti/DossierAttiPanel';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
+import { DeadlineCard } from '../../../features/deadlines/DeadlineCard';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { scrollParentOf } from '../practice/practiceView';
 
@@ -708,6 +709,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         </div>
         <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`} className="min-h-[calc(100dvh-8rem)]">
         <div hidden={view !== 'compiti'}>
+          {dossier.kind !== 'studio' && <DeadlineCard dossierId={dossier.id} />}
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
         <div hidden={view !== 'atti'}>
