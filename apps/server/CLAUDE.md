@@ -926,7 +926,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (32 bytes, base64), the file id as AAD of both; the blob at
   `PRATICA_FILES_DIR/<userId>/<dossierId>/<fileId>`, the wrapped key in `pratica_files.chiave_cifrata`.
   Both read per call: without a valid key the file routes answer 503 (the instructions still work).
-  A download is decrypted whole and its tag verified before a byte goes out. `pratica_file_accessi`
+  A download is decrypted whole and its tag verified before a byte goes out; a tag that fails (the key
+  changed: there is no rotation) is a 500 that says so. `scripts/datakit` backs up the `pratica_files`
+  volume with the others; the key is never in a backup. `pratica_file_accessi`
   logs each listing, download, deposit, trash, restore and deletion (user, client, file, time; no
   foreign key to the file). No table has a foreign key to `dossiers`: a dossier in the trash keeps its
   files (unreachable, the owner check finds no dossier) and gets them back on restore;

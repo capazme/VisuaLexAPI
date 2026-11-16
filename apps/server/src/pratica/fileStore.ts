@@ -84,9 +84,18 @@ export async function writeBlob(config: StoreConfig, ids: { userId: string; doss
   return seal(config.key, fileKey, ids.fileId);
 }
 
+/**
+ * A tag that does not verify (the server key changed since the file was stored, or the blob or its wrapped key
+ * was altered) is a 500 with a message that says so; no byte of the file goes out. There is no key rotation:
+ * a lost or changed PRATICA_FILES_KEY makes every stored file unreadable.
+ */
 export async function readBlob(config: StoreConfig, row: { id: string; userId: string; dossierId: string; chiaveCifrata: Uint8Array }): Promise<Buffer> {
-  const fileKey = open(config.key, Buffer.from(row.chiaveCifrata), row.id);
-  return open(fileKey, await readFile(blobPath(config.dir, row.userId, row.dossierId, row.id)), row.id);
+  const sealed = await readFile(blobPath(config.dir, row.userId, row.dossierId, row.id));
+  try {
+    return open(open(config.key, Buffer.from(row.chiaveCifrata), row.id), sealed, row.id);
+  } catch {
+    throw new AppError(500, 'Il file non si può decifrare: la chiave del server è cambiata o il file è danneggiato.');
+  }
 }
 
 /** Removes one file from disk; a file already gone is not an error. */

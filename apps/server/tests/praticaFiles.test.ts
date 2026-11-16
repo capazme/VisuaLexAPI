@@ -196,6 +196,17 @@ describe('Pratica files', () => {
     expect((await upload(user, dossier.id, PDF, 'a.pdf')).status).toBe(503);
   });
 
+  it('refuses to decrypt with another server key: a 500 that says so, no byte of the file, no log line', async () => {
+    const { user, dossier } = await setup('pf-key-changed');
+    const id = (await upload(user, dossier.id, PDF, 'a.pdf')).body.file.id;
+    process.env.PRATICA_FILES_KEY = randomBytes(32).toString('base64');
+    const res = await request(app).get(`/api/dossiers/${dossier.id}/files/${id}/content`).set(authHeader(user));
+    expect(res.status).toBe(500);
+    expect(res.body.detail).toMatch(/chiave del server è cambiata/);
+    expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    expect(await prisma.praticaFileAccesso.count({ where: { azione: 'scaricamento' } })).toBe(0);
+  });
+
   it('files a new version under the original, numbered, even when made from a version', async () => {
     const { user, dossier } = await setup('pf-versions');
     const original = (await upload(user, dossier.id, PDF, 'atto.pdf')).body.file;
