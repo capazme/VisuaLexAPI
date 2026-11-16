@@ -12,6 +12,7 @@ import {
 import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
+import { corpusPractices } from '../../../utils/practice';
 import { useCompare } from '../../../hooks/useCompare';
 import { cn } from '../../../lib/utils';
 import { closeAllPracticesWithUndo } from './practiceUndo';
@@ -34,7 +35,7 @@ const HEADER_BUTTON =
 export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: number | null) => void } = {}) {
   const [barNode, setBarNode] = useState<HTMLElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const ids = useAppStore(useShallow((s) => s.practices.map((p) => p.id)));
+  const ids = useAppStore(useShallow((s) => corpusPractices(s.practices).map((p) => p.id)));
   const activePracticeId = useAppStore((s) => s.activePracticeId);
   const commandPaletteOpen = useAppStore((s) => s.commandPaletteOpen);
   const { createPractice, reorderPractices } = useAppStore(useShallow((s) => ({
