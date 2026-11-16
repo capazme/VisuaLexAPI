@@ -1119,11 +1119,12 @@ numbers are 14 px. The reader's dossier command
 (an article's, a decision's) reads «Aggiungi a questo dossier» and adds there without the popover. The re-sync stays
 additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, keeps none of
 this; there (LC59) every article and identified decision row (`PracticeRowShell`'s `corpusItem`) and every hit of case law
-our reader opens (`CaseLawRow`'s `dossierItem`: the Cassazione's hits, the Union's judgments) says «Aggiungi al dossier»
-and opens the reader's `AddToDossierPopover`, nothing saved before a dossier is chosen (`dossier/addFromResult.tsx`); a row
+our reader opens (`CaseLawRow`'s `dossierItem`: the Cassazione's hits, the Union's judgments; wherever drawn, a dossier's
+«Lettura» included, where it too opens the popover) says «Aggiungi al dossier» and opens the reader's `AddToDossierPopover`, nothing saved before a dossier is chosen (`dossier/addFromResult.tsx`); a row
 held says «Nel dossier «X»» or «In 2 dossier» by the popover's own rules (`dossierContainsArticle`, version included). On a
 phone a table row has it in its «⋯» with «Togli dal tavolo» (the popover is then the bottom sheet); a hit of case law, which
-has no «⋯», keeps the named button at every width. Massimario passages add nothing: a dossier holds no massima.
+has no «⋯», keeps the named button at every width. Massimario passages add nothing: a dossier holds no massima. The
+index entries of the reading view are not marked: the window they open beside has the reader's command.
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
 browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
 with a logged warning «saved workspace too large to back up», when the value is over 1 000 000

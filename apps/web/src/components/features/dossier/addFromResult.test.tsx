@@ -101,6 +101,7 @@ describe('«Aggiungi al dossier» on a row of the Ricerca (LC59)', () => {
   it('writes nothing in the browser: no practice made or changed, the saved workspace untouched', () => {
     const before = appStore.getState();
     const saved = localStorage.getItem('visualex-storage');
+    expect(saved).not.toBeNull();
     render(row({ norma: NORMA }));
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier art. 2043 c.c.' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sinistro Rossi/ }));

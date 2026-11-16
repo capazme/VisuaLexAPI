@@ -53,6 +53,20 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     expect(screen.queryByText(/All\./)).toBeNull();
   });
 
+  it('in the Ricerca it says «Aggiungi al dossier» and which dossier holds it (LC59)', () => {
+    const { practiceId, actId } = setUp([CC_2043]);
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Sinistro Rossi', createdAt: '2026-11-01T00:00:00Z', items: [
+      { id: 'i1', type: 'norma', data: CC_2043.norma_data, addedAt: '2026-11-02T00:00:00Z' },
+    ] }] });
+    try {
+      render(row(practiceId, actId, CC_2043));
+      expect(screen.getByRole('button', { name: /^Aggiungi al dossier art\. 2043/ })).toBeInTheDocument();
+      expect(screen.getByText('Nel dossier «Sinistro Rossi»')).toBeInTheDocument();
+    } finally {
+      appStore.setState({ dossiers: [] });
+    }
+  });
+
   it('says in its header that the article is among the quick norms, open or folded (R3b)', () => {
     const { practiceId, actId } = setUp([CC_2043]);
     appStore.setState({ quickNorms: [] });
