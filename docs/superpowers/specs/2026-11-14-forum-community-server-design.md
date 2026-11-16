@@ -1,7 +1,10 @@
 # The Forum's community, server side: votes, profile, communities by subject
 
-Status: proposed, 14 November 2026, for the owners' yes. Server only (`apps/server`): no file of `apps/web`. It gives
-the Forum's page (`/forum/community`, still empty) a finished API to be built against later. Plan:
+Status: approved by the owner on 14 November 2026 with the choices listed below (G-476), and his answers folded in:
+one public identity (G-477), a number of validations as Learn's cards, never a gate on what is shown (G-478), the
+real name declared with a report «non è chi dice di essere» checked by the owners (G-479); the legal reading of part D
+is the owner's (G-480). Server only (`apps/server`): no file of `apps/web`. It gives the Forum's page
+(`/forum/community`) a finished API to be built against. Plan:
 `docs/superpowers/plans/2026-11-14-forum-community-server.md`.
 
 It rests on the owners' decisions D-214 (the best of Reddit and of LinkedIn: communities by subject, votes that bring
@@ -121,11 +124,13 @@ answer gained fields or an own vote was allowed.
 | `pseudonym` | 3–30 characters, letters, digits, `.`, `_`, `-`; only with `pseudonym`; unique without regard to case |
 | `qualification` | closed list (CHECK): `avvocato`, `praticante`, `magistrato`, `notaio`, `docente`, `dottore` (laureato in giurisprudenza), `studente`, `altro` |
 | `materie` | the subjects the person follows: a set of the five `LingoMateria` values, possibly empty |
+| `name_withdrawn_at`, `name_withdrawn_reason` | set together by the owners when they confirm a report «non è chi dice di essere» (G-479), cleared when they give the name back |
 | `created_at`, `updated_at` | |
 
 A CHECK makes the name match the identity: a real name and no pseudonym, or the reverse. **One public identity per
-person** (question Q1): the profile is under the real name or under a pseudonym, never both, so nothing on the server
-ever links the two. The qualification is declared and shown as declared (D-247): no field records a check.
+person** (G-477): the profile is under the real name or under a pseudonym, never both, so nothing on the server ever
+links the two. The qualification is declared and shown as declared (D-247), and so is the real name (G-479): no field
+records a check. A name withdrawn by the owners (below) is `name_withdrawn_at` on the profile.
 
 App switch `forum_identity` (`assistant/switches.ts`, off at the start): **off**, writing needs no profile, as today;
 **on**, a glossa needs a profile under the real name and a reply or a comment needs a profile. The web turns it on
@@ -189,6 +194,21 @@ C adds `roles` and `validatedCount`. **A public profile never shows**: the email
 real name behind a pseudonym (none is stored), the votes cast, the reports made, hidden or emptied contributions, the
 moderation's acts about the person, the last login, anything outside the Forum. 404 for a profile that does not exist.
 
+**«Non è chi dice di essere»** (G-479). `POST /api/forum/profiles/:profileId/report` `{ "details": "…" }` (0–1,000
+characters; any logged-in person, never on one's own profile, one pending report per person per profile, under the
+`report` counter) → 204. The report goes to the owners alone, in `forum_profile_reports` (the profile by a plain id,
+the reporter SET NULL with their account, `details`, `status` `pending` | `confirmed` | `dismissed`, who closed it and
+when, the reason): `GET /api/moderation/profile-reports?status=` (owners; pages of 1–50; the profile as the public sees
+it and, for the owners only, the account's username and email to check it) and `POST
+/api/moderation/profile-reports/:profileId/resolve` `{ "action": "confirm" | "dismiss", "reason": "…" }` (owners; the
+reason 3–1,000 characters; one decision closes every pending report of the profile; logged). **Confirming withdraws
+the name**: `name_withdrawn_at` is set, every view shows the profile as «nome ritirato» (`identity: "withdrawn"`, no
+qualification), the person can neither write nor change the profile (403 «Il nome del tuo profilo è stato ritirato
+dai responsabili del Forum») until the owners give it back (`POST /api/moderation/profile-reports/:profileId/restore
+{ reason }`, logged). The person reads it, with the owners' reason, on their own profile (`GET /api/forum/profile` →
+`nameWithdrawn: { "at": "…", "reason": "…" }`, else `null`). The reporters are never named to the person reported.
+The log gains the actions `withdraw_name` and `restore_name` on the target kind `profile`.
+
 ### What changes in existing answers
 
 Every author object in the Community's answers and in the reader's lists becomes:
@@ -201,8 +221,8 @@ Every author object in the Community's answers and in the reader's lists becomes
 - `id` is the profile's public id (`null` without a profile), so the Community no longer carries the account's id,
   which other parts of the app (the Forum's published dossiers) show next to the account's username: a pseudonym could
   otherwise be matched to it.
-- `identity` is `real_name`, `pseudonym`, `username` (no profile: the account's username, as today) or `deleted`
-  («utente cancellato»). An emptied item keeps `name: ""` and nulls, as today.
+- `identity` is `real_name`, `pseudonym`, `username` (no profile: the account's username, as today), `withdrawn`
+  («nome ritirato», G-479) or `deleted` («utente cancellato»). An emptied item keeps `name: ""` and nulls, as today.
 - `username` (= `name`) stays, legacy, for the reader's panel.
 - The moderators' queue adds the profile's name; the account's username stays there for the owners and the
   Community's moderators only (C: never for a subject's moderators).
@@ -215,7 +235,9 @@ Every author object in the Community's answers and in the reader's lists becomes
 stands under another name, allowed once they are emptied, with a new public id; from a pseudonym to the real name, the
 same id; the switch off and on, for a glossa and a reply; the
 public profile's fields and nothing more (no email, username, account id); the author objects in the feed, a glossa's
-page and the reader's lists; the profile deleted with the account; the export.
+page and the reader's lists; the report «non è chi dice di essere» (not one's own, one pending, owners only, confirm
+withdraws the name everywhere and stops writing, restore gives it back, the person told, the reporters not named); the
+profile deleted with the account; the export.
 
 ## C · Communities by subject, moderators and validators, the validated answer on top (D-214, D-267)
 
@@ -241,6 +263,9 @@ page and the reader's lists; the profile deleted with the account; the export.
 
 ### Who moderates what
 
+Moderators are there to remove harmful, violent or vulgar content (G-478), never an opinion or its quality: that is
+what votes and validation judge.
+
 - **The owners** (admins): everything, as today; the only ones who appoint and revoke, decide appeals and empty an
   anonymous contribution. Suspension stays theirs (D-267) and is not built here.
 - **The Community's moderators** (`users.forum_moderator`, appointed by the owners, today's): the whole Community, as
@@ -262,15 +287,23 @@ page and the reader's lists; the profile deleted with the account; the export.
 
 - A **validator of the glossa's subject**, under the real name (D-246), validates a visible glossa or reply of someone
   else; not a comment; not a glossa without a subject (409 «La glossa non ha una materia: non si può validare»).
-- **One validation is enough** for an item to be «validata» (question Q2); every validation names its validator (while
-  the validator's account exists) and is shown. The validator withdraws their own at any time.
+- **A number of validations** makes an item «validata», as for Learn's cards (G-478): the threshold is a setting the
+  owners change at runtime, in Learn's settings table and its log (`lingo_impostazioni`, a new key
+  `FORUM_SOGLIA_VALIDAZIONI`, 1–5, 2 by default as Learn's approvals), never an environment variable. Below the
+  threshold an item shows its validations so far (`count`, `threshold`), not «validata»; a change of the threshold
+  applies at once to every item, nothing is stored per item. Only approvals: there is no «errata» vote in the Forum.
+  Every validation names its validator (while the validator's account exists) and is shown. The validator withdraws
+  their own at any time.
+- **Validation never decides what is shown** (G-478): every opinion is published and stays visible, validated or not;
+  validation is an added mark of quality, which only moves validated replies up in a glossa's order.
 - **Editing the text** of a validated glossa or reply withdraws its validations (what was validated is no longer
   there); **changing a glossa's subject** withdraws its validations and its replies' (they were given with another
   subject's authority). The edit's answer says how many (`validationsWithdrawn`).
 - Revoking a validator's role leaves the validations they gave (given with the authority they had then).
 - The author is told once that an item was validated.
-- **Order of a glossa's replies**: the validated replies first (more validations first, then the earliest), then the
-  accepted reply, then by `score`, then the oldest. Comments under a reply stay oldest first.
+- **Order of a glossa's replies**: the validated replies (at the threshold) first, more validations first, then the
+  earliest to reach it; then the accepted reply; then by `score`; then the oldest. Comments under a reply stay oldest
+  first.
 
 ### Routes
 
@@ -294,9 +327,12 @@ Any logged-in person. `glosse` counts the listed ones (as the feed). A community
 withdraws one's own. Both answer the item's validation:
 
 ```json
-{ "validation": { "count": 1, "firstAt": "2026-11-16T10:00:00.000Z",
+{ "validation": { "count": 1, "threshold": 2, "validated": false, "validatedAt": null,
                   "validators": [ { "id": "f0c2…", "name": "Maria Bianchi", "identity": "real_name", "qualification": "avvocato", "score": 41 } ] } }
 ```
+
+(`validatedAt` is when the item reached the threshold in force, from the validations' times.) The owners read and
+change the threshold with Learn's settings routes, which gain the key.
 
 (`validation: null` once none is left; a validator whose account is gone appears as `{ "id": null, "name": "utente
 cancellato", "identity": "deleted", … }`.) Errors: 403 not a validator of the subject («Solo i validatori di questa
@@ -325,9 +361,10 @@ unknown; 409 already closed.
 
 ### What changes in existing answers
 
-- A glossa and each reply carry `validation` (as above, or `null`); a feed item carries `validated` (the glossa) and
-  `validatedReplies` (how many of its visible replies). The feed takes `validated=true|false`: the glossa or one of its
-  replies validated, or neither.
+- A glossa and each reply carry `validation` (as above, or `null` with no validation); a feed item carries `validated`
+  (the glossa at the threshold) and `validatedReplies` (how many of its visible replies are). The feed takes
+  `validated=true|false`: the glossa or one of its replies at the threshold, or neither. Nothing else in the feed or on
+  a glossa's page depends on validation (G-478).
 - The hidden item's notice to its author gains `appeal`: `null`, `pending` or `rejected`.
 - `GET /api/forum/profile` gains `roles`; the public profile gains `roles` (public: validators and moderators are
   named, P-012) and `validatedCount`; `GET /api/forum/profiles/:profileId/validated?page=&limit=` (any logged-in
@@ -343,15 +380,17 @@ unknown; 409 already closed.
 `tests/forumCommunities.test.ts`: appointments (owners only, reason required, real name for a validator, logged with
 the subject); a subject's moderator acting on their subject and refused on another and on a glossa without one;
 their queue (no username) and badge; a glossa's page showing them hidden items in their subject only; validate,
-withdraw, own, comment, no subject, pseudonym profile, not a validator; the text edit and the change of subject that
+withdraw, own, comment, no subject, pseudonym profile, not a validator; the threshold (below it nothing is
+«validata», at it the item is, a change applies at once, nothing hidden or held back below it); the text edit and the change of subject that
 withdraw; the replies' order; the feed's `validated`; the communities' counts; appeals (one per hiding, a new one
 after a new hiding, uphold shows the item again, showing it closes the appeal, the author's deletion removes it,
 owners only, the author told); the profile's `roles`, `validatedCount` and
 list; the export.
 
-## D · Deletion without trace (D-268, D-320): not built until the owners' legal reading
+## D · Deletion without trace (D-268, D-320): not built until the owner's legal reading
 
-Today the server hides and logs, and it stays so. This section says what deletion would remove and asks what the law
+The owner does the legal reading on the six questions below (G-480). Until then the server hides and logs, and it
+stays so. This section says what deletion would remove and asks what the law
 may require; it concludes nothing.
 
 ### What «deleted with no trace» would remove
@@ -384,30 +423,29 @@ whether appeals (C) survive a deletion.
    17(3)(e)), and would it be compatible with D-320?
 6. **The copy in reports.** Under D-268, does the copy of the reported text (kept today for 90 days, G-308) go at once?
 
-## Questions for the owners
+## The owners' answers (14 November 2026)
 
-- **Q1. One public identity per person, or two?** D-246 lets glosses be signed with the real name and discussions be
-  held under a pseudonym, but not whether one person may do both. (a) **One identity** (recommended): the profile is
-  under the real name or under a pseudonym; with a pseudonym one discusses, votes and reports, but signs no glossa and
-  validates nothing; nothing ever links the pseudonym to a real name. (b) Two faces, the real name on glosses and the
-  pseudonym on replies, with two profiles and two scores: the server would have to keep them unlinkable everywhere,
-  and one slip (an id, a count, a timing) reveals the pseudonym. (a) is what B builds.
-- **Q2. When is a reply «validata»?** (a) **One validation** by a validator of the subject, who is named
-  (recommended): with 10–20 validators over five subjects (P-012), a threshold would leave most answers unvalidated.
-  (b) A number of validations, as Learn's cards (set by the owners). The data holds one row per validator either way:
-  moving to (b) later changes a rule, not the data.
-- **Q3. Who validates in the Forum?** (a) **Validators appointed per subject** for the Forum (recommended): judging a
-  legal answer is not judging a study card, and authority goes by subject. (b) Learn's validators
-  (`users.lingo_validatore`), for every subject, with no new appointment.
+- **Q1, one public identity per person** (G-477): the real name or a pseudonym, as recommended. B builds it.
+- **Q2 and Q3, validation** (G-478): **a number of validations, as Learn's cards**, not one; validation never stops a
+  publication nor hides anything, every opinion is accepted, and it is an added, optional proof of quality; moderators
+  are there to remove harmful, violent or vulgar content. C builds a threshold the owners set (default 2), with the
+  Forum's validators appointed per subject as the spec proposed: the answer changed how many validations, not who
+  gives them (to be confirmed with the owner if he meant Learn's validators).
+- **The real name** (G-479): declared, with a report «non è chi dice di essere» that the owners check. B builds it.
+- **Q4, still open.** Today's closed list of report reasons and hiding categories (`forum/reportReasons.ts`, a CHECK)
+  holds `fuori_tema` beside `offensivo`, `dati_personali`, `spam`, `diritti`, `altro`. After G-478 (moderators remove
+  harmful, violent or vulgar content, never an opinion), should a moderator still hide a contribution as off-topic?
+  (a) **Keep `fuori_tema` as a report reason, drop it as a hiding category** (recommended): readers can still point it
+  out, but off-topic content stays visible; (b) keep it as it is; (c) drop it from both. C changes the list only with
+  the answer.
 
-## Choices made here that an owner might make differently
+## Choices the owner approved (G-476)
 
-- The old vote toggle refuses one's own vote at once, and the stored own votes are deleted.
+- The old vote toggle refuses one's own vote at once (403 with the code `own_contribution`), and the stored own votes
+  are deleted.
 - The votes cast by a deleted account go with it (today's behaviour), lowering the scores they gave.
 - A locked glossa can still be voted.
 - The qualification list (eight values with `altro`): a change is a migration.
-- The real name, like the qualification, is declared and never checked: anyone could sign glosses with a colleague's
-  name. D-247 speaks of the qualification only.
 - A pseudonym only for whoever has nothing standing under another name: an existing writer empties their
   contributions first.
 - The validated replies above the accepted one; an edit withdraws the validations instead of being refused; a revoked
@@ -417,7 +455,7 @@ whether appeals (C) survive a deletion.
 
 ## Left out
 
-- Part D, until the owners' word after the legal reading.
+- Part D, until the owner's word after the legal reading (G-480).
 - The Forum's suspension of a person (D-267: the owners'): today an admin can only deactivate an account.
 - Each community's written rules, flair on posts, following people: not decided.
 - Glosses at the margin of the article (item 33 of the web plan): two switches already in place, nothing to build here.

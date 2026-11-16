@@ -36,7 +36,8 @@ waits for the owners' word after the legal reading and is not in this plan.
 ## PR B · `feat/forum-profiles` (D-246, D-247, D-249)
 
 1. **Migration `20261114100001_forum_profiles`**: `forum_profiles` with its CHECKs (identity and name, the forms, the
-   qualification list) and the unique index on `lower(pseudonym)`. Test first: `tests/forumProfiles.test.ts`, the
+   qualification list, the name withdrawn with its reason) and the unique index on `lower(pseudonym)`;
+   `forum_profile_reports`; the log's actions `withdraw_name`, `restore_name` and target kind `profile`. Test first: `tests/forumProfiles.test.ts`, the
    CHECKs and the cascade with the account.
 2. **`src/forum/profiles.ts`**: the Zod schema (Italian messages, reserved pseudonyms), `readProfile`,
    `authorViews(db, users)` (one query for profiles and scores per answer), `requireWriter(tx, userId, 'glossa' |
@@ -48,7 +49,10 @@ waits for the owners' word after the legal reading and is not in this plan.
 5. **Writes**: `createThread` and `createComment` call `requireWriter`; a pseudonym profile never writes a glossa.
 6. **Answers**: every author object through `authorViews` (feed, glossa's page, reader's lists, the create answers);
    the moderators' queue adds the profile's name.
-7. **Export**: the profile. `CLAUDE.md`.
+7. **«Non è chi dice di essere»** (G-479): `POST /forum/profiles/:profileId/report` (the `report` counter),
+   `GET /moderation/profile-reports`, `POST /moderation/profile-reports/:profileId/resolve` and `…/restore` (owners;
+   logged); a withdrawn name in every author object, `nameWithdrawn` on one's own profile, writing refused.
+8. **Export**: the profile and the profile reports one made (never who closed them). `CLAUDE.md`.
 
 ## PR C · `feat/forum-communities` (D-214, D-267)
 
@@ -62,7 +66,8 @@ waits for the owners' word after the legal reading and is not in this plan.
    after `lockThread`; the queue and the badge filtered by the person's subjects, `materia` on each item, no username
    for a subject's moderator; `getThread`'s moderator view limited to their subjects; `hidden_at` set and cleared.
 4. **Validation**: `POST` and `DELETE /forum/validations/:kind/:itemId` (lock order, rules, notification `validated`
-   once); `editThread` and `editComment` withdraw an item's validations on a text change, and a glossa's and its
+   once, when the item reaches the threshold); the threshold `FORUM_SOGLIA_VALIDAZIONI` in Learn's settings table and
+   routes (G-478), read at each request; `editThread` and `editComment` withdraw an item's validations on a text change, and a glossa's and its
    replies' on a change of subject (`validationsWithdrawn`); B's pseudonym check extended to roles and given
    validations.
 5. **Answers**: `validation` on a glossa and its replies, the replies' order (validated, accepted, score, oldest), the
