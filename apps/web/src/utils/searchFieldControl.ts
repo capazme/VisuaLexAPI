@@ -27,6 +27,8 @@ export const PALETTE_SHORTCUT = typeof navigator !== 'undefined' && /mac/i.test(
 
 /** The id of the field's form: the menu grows from it on a computer. */
 export const SEARCH_FIELD_FORM_ID = 'search-field-form';
+/** The top bar's search pill (LC40): the menu grows out of it, as an island, on every page from lg. */
+export const SEARCH_ISLAND_ID = 'search-island';
 
 let listener: Listener | null = null;
 let pending: { request: SearchFieldRequest; at: number } | null = null;
