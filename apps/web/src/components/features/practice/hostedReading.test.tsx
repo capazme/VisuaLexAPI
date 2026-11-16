@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
@@ -280,6 +280,23 @@ describe('the reading state is the practice\'s own (LC52 c2, #526 open points)',
     corpusView.unmount();
     render(<PracticePhoneView {...handlers} practiceId={bound} />);
     expect(s().pendingReveal).toBeNull();
+  });
+
+  it('the Corpus\'s view gives its scroll back when its reader closes, whatever the bound table has to reveal', () => {
+    h.desktop = false;
+    const corpusAct = s().practices.find((p) => p.id === corpus)!.acts[0];
+    let top = 0;
+    render(<div data-testid="scroller" style={{ overflowY: 'auto' }}><PracticePhoneView {...handlers} /></div>);
+    const scroller = screen.getByTestId('scroller');
+    Object.defineProperty(scroller, 'scrollTop', { get: () => top, set: (v: number) => { top = v; }, configurable: true });
+    top = 420;
+    fireEvent.scroll(scroller);
+    act(() => { s().openPhoneReader(corpus, besideRefFor({ kind: 'article', actId: corpusAct.id, articleKey: practiceArticleKey(corpusAct.articles[0]) })); });
+    top = 0;
+    const { actId, articleKey } = boundRow('7');
+    act(() => { s().revealPracticeRow(bound, actId, articleKey); s().closePhoneReader(); });
+    expect(s().pendingReveal?.practiceId).toBe(bound);
+    expect(top).toBe(420);
   });
 
   it('a window of the bound table asked to take focus is not taken by the Corpus\'s windows', () => {

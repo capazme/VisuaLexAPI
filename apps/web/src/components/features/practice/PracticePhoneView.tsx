@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { corpusPractices, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
+import { corpusPractices, isBoundPractice, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { Modal } from '../../ui/Modal';
 import { MenuButton } from '../../ui/MenuButton';
 import { PracticeColumn } from './PracticeColumn';
@@ -28,6 +28,15 @@ export interface PracticePhoneViewProps {
 }
 
 const NEW_PRACTICE_LABEL = 'Nuova pratica';
+
+/** A pending reveal wins over the saved scroll: any of the Corpus's for a Corpus practice, as before; across the line
+ *  between a bound table and the Corpus, never (LC52 c2: one's reveal is not the other's). */
+function revealWaits(practiceId: string): boolean {
+  const { pendingReveal, practices } = appStore.getState();
+  if (!pendingReveal) return false;
+  const bound = (id: string) => practices.some((p) => p.id === id && isBoundPractice(p));
+  return pendingReveal.practiceId === practiceId || bound(pendingReveal.practiceId) === bound(practiceId);
+}
 
 /** How long the column's scroll position is asked for again while its content arrives. */
 const SETTLE_MS = 3000;
@@ -83,7 +92,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
     if (restore.current !== null) {
       const kept = restore.current;
       restore.current = null;
-      if (kept === shownPractice.current && lastTop.current.practiceId === kept && appStore.getState().pendingReveal?.practiceId !== kept) {
+      if (kept === shownPractice.current && lastTop.current.practiceId === kept && !revealWaits(kept)) {
         const target = lastTop.current.top;
         const observer = new ResizeObserver(() => apply());
         const timer = setTimeout(() => stop(true), SETTLE_MS);
@@ -98,7 +107,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
           if (record) lastTop.current = { practiceId: kept, top: scroller!.scrollTop };
         }
         function apply() {
-          if (appStore.getState().pendingReveal?.practiceId === kept) return stop(true);
+          if (revealWaits(kept)) return stop(true);
           if (scroller!.scrollTop < target - 1) scroller!.scrollTop = target;
           if (Math.abs(scroller!.scrollTop - target) <= 1) stop(true);
         }

@@ -72,11 +72,11 @@ function article(validity: ArticleValidity, norma: Partial<NormaVisitata> = {}, 
 let triggerSearch: Mock<(params: SearchParams) => void>;
 let hostSearch: Mock<(params: SearchParams) => void>;
 
-function hosted(data: ArticleData) {
+function hosted(data: ArticleData, onCrossReferenceNavigate?: (article: string, norma: NormaVisitata) => void) {
   return render(
     <MemoryRouter>
       <ReadingHostContext.Provider value={{ search: hostSearch }}>
-        <ArticleTabContent data={data} />
+        <ArticleTabContent data={data} onCrossReferenceNavigate={onCrossReferenceNavigate} />
       </ReadingHostContext.Provider>
     </MemoryRouter>,
   );
@@ -125,6 +125,20 @@ describe('ArticleTabContent — the search gestures go to the host (LC52 c2)', (
     fireEvent.click(screen.getByRole('button', { name: 'Vai al testo del 13 settembre 2014' }));
     expect(hostSearch).toHaveBeenCalledWith(expect.objectContaining({ version_date: '2014-09-13' }));
     expect(triggerSearch).not.toHaveBeenCalled();
+  });
+
+  it('a norm of another act cited in the text (one of the same act stays the container\'s)', () => {
+    const sameAct = vi.fn();
+    const { container } = hosted({
+      article_text: 'Art. 5\nResta ferma la responsabilità di cui all\'art. 2043 c.c.',
+      norma_data: { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08', numero_articolo: '5' },
+      validity: CURRENT,
+    }, sameAct);
+    // the first link is the article's own heading («Art. 5», the same act); the second, the civil code's
+    fireEvent.click(container.querySelectorAll('.citation-hover')[1]);
+    expect(hostSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'codice civile', article: '2043', version: 'vigente' }));
+    expect(triggerSearch).not.toHaveBeenCalled();
+    expect(sameAct).not.toHaveBeenCalled();
   });
 
   it('without a host, the store\'s search, as before', () => {
