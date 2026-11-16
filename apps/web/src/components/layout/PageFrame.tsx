@@ -65,8 +65,10 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
     <div data-page-width={width} className={cn('flex w-full min-w-0 flex-col gap-6', className)}>
       <header className={cn(
         'flex gap-4 md:flex-row md:items-center md:justify-between',
-        actionBeside ? 'flex-row items-start justify-between' : 'flex-col',
-        action && FOCUS_BUTTON_CLEARANCE,
+        // Beside the title, at its middle (LC38: the trash sat low beside «Oggi»).
+        actionBeside ? 'flex-row items-center justify-between' : 'flex-col',
+        // No full-screen button floats on a phone: the action at the content's right edge there (LC38).
+        action && cn(FOCUS_BUTTON_CLEARANCE, 'max-md:pr-0'),
         titleHidden && 'sr-only',
       )}>
         <div className="min-w-0">

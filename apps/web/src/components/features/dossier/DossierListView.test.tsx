@@ -353,7 +353,7 @@ describe('DossierListView — the heading on a phone', () => {
   it('puts «⋯» and «+» beside the title, 44 px each, and no row of buttons under it', () => {
     page();
     const header = screen.getByRole('heading', { level: 1 }).closest('header')!;
-    expect(header).toHaveClass('flex-row', 'items-start', 'justify-between');
+    expect(header).toHaveClass('flex-row', 'items-center', 'justify-between');
     const create = screen.getByRole('button', { name: 'Nuovo dossier' });
     expect(create).toHaveAttribute('id', 'tour-dossier-create');
     expect(create).toHaveClass('h-11', 'w-11');

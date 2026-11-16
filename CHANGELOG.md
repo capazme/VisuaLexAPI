@@ -12,6 +12,17 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-11-16
+
+The Corpus desk at a phone's scale, and Work's trash as a small button. Web only, no migration.
+
+### Phone
+
+- The Corpus desk starts under the search field, with quieter example chips and smaller tools and
+  lists (LC38).
+- Work's trash is a small framed «Cestino» button with a 44 px touch area; an action beside a page's
+  title sits at its middle.
+
 ## [1.25.0] - 2026-11-16
 
 The sign-in page over an engraving, Progressi in stone and ink, a still column at start. Web only, no
