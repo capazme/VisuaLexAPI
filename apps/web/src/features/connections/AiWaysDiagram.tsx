@@ -35,8 +35,11 @@ const summary = `Tre vie per usare l’IA che hai già con LexCraft: ${WAYS.map(
 export function AiWaysDiagram() {
   const [paused, setPaused] = useState(false);
   return (
-    <figure role="img" aria-label={summary} className="relative rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60">
-      <svg viewBox="0 0 480 300" className="hidden w-full md:block" aria-hidden>
+    // The drawing is the image (its summary the name); the pause button sits beside it, not inside `role="img"`,
+    // whose children a screen reader does not reach.
+    <figure className="relative rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800/60">
+      <div role="img" aria-label={summary}>
+      <svg viewBox="0 0 480 300" className="mx-auto hidden w-full max-w-xl md:block" aria-hidden>
         <circle cx="240" cy="132" r="64" fill="none" className="stroke-slate-300/60 dark:stroke-slate-600/60" strokeWidth="1" />
         <circle cx="240" cy="132" r="120" fill="none" className="stroke-slate-300/60 dark:stroke-slate-600/60" strokeWidth="1" />
         {WAYS.map((way) => (
@@ -109,6 +112,7 @@ export function AiWaysDiagram() {
             );
           })}
         </ul>
+      </div>
       </div>
 
       <button
