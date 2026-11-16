@@ -125,16 +125,16 @@ describe('CreditsPage — laid out for consulting', () => {
     expect(list.className).not.toMatch(/overflow-x-auto/);
   });
 
-  it('marks the place being read by a bar on a phone too, not by a tint alone', () => {
+  it('marks the place being read by a stone tile and its weight, not by a tint alone, and no bar beside it (LC37)', () => {
     renderAt('/crediti#norme');
     const index = screen.getByRole('navigation', { name: 'In questa pagina' });
     const here = within(index).getByRole('link', { name: 'Norme' });
     expect(here).toHaveAttribute('aria-current', 'location');
-    // The bar under it below 1024 px, down its edge from there, in ink on every link; only the place's is coloured.
-    expect(here).toHaveClass('max-lg:border-b-2', 'lg:border-l-2', 'border-primary-600', 'font-semibold');
+    expect(here).toHaveClass('bg-ink-300/70', 'font-semibold');
+    expect(here.className).not.toMatch(/border-[lb]-2/);
     const other = within(index).getByRole('link', { name: 'Giurisprudenza' });
-    expect(other).toHaveClass('border-transparent');
-    expect(other).not.toHaveClass('border-primary-600');
+    expect(other).not.toHaveClass('bg-ink-300/70');
+    expect(other).toHaveClass('font-medium');
   });
 
   it('marks the group of the entry an address opens, until the page is scrolled away', async () => {
