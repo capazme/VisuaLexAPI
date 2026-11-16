@@ -2,7 +2,8 @@ import { useId, useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { taskService } from '../../services/taskService';
 import { cn } from '../../lib/utils';
-import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, QUIET_BUTTON, TILE } from '../../components/features/studia/progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, TILE } from '../../components/features/studia/progress/tokens';
+import { buttonClassName } from '../../components/ui/buttonStyles';
 import { FIELD, FIELD_LABEL } from '../../components/features/planner/plannerStyles';
 import { failureMessage, plannerStore } from '../../components/features/planner/plannerStore';
 import { computeDeadline, DEADLINE_OPTIONS, formatLong, formatPlain, type DeadlineKind } from './computeDeadline';
@@ -80,8 +81,8 @@ export function DeadlineCard({ dossierId }: { dossierId: string }) {
             </p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{result.basis} · {result.article}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <button type="button" aria-expanded={open} aria-controls={`${id}-steps`} onClick={() => setOpen((v) => !v)} className={QUIET_BUTTON}>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" aria-expanded={open} aria-controls={`${id}-steps`} onClick={() => setOpen((v) => !v)} className={buttonClassName('secondary', 'md')}>
               {open ? 'Nascondi il calcolo' : 'Mostra il calcolo'}
             </button>
             {isAdded ? (
@@ -89,7 +90,7 @@ export function DeadlineCard({ dossierId }: { dossierId: string }) {
                 <Check size={16} aria-hidden /> In agenda
               </p>
             ) : (
-              <button type="button" onClick={addToAgenda} disabled={saving} className={INK_BUTTON}>
+              <button type="button" onClick={addToAgenda} disabled={saving} className={buttonClassName('primary', 'md')}>
                 Aggiungi all’agenda
               </button>
             )}
