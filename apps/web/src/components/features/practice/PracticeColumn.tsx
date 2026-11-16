@@ -92,7 +92,8 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
     if (!over || active.id === over.id) return;
     reorderActs(practiceId, actIds.indexOf(String(active.id)), actIds.indexOf(String(over.id)));
     // A dossier's «Lettura» (LC55): the dossier takes the order too, as «Fonti» writes it.
-    if (hostDossier) writeActOrder(hostDossier.id, practiceId);
+    const moved = acts?.find((a) => a.id === String(active.id));
+    if (hostDossier && moved) writeActOrder(hostDossier.id, practiceId, moved.key);
   };
 
   return (

@@ -90,14 +90,27 @@ export function rowDossierItems(row: RowDossier, removeFromTable: () => void): M
   ];
 }
 
-/** After the table's acts are dragged: the dossier takes the same order, as «Fonti» writes it (its notes first, then
- *  the acts' articles, then the decisions). */
-export function writeActOrder(dossierId: string, practiceId: string): void {
+/**
+ * After an act of the table is dragged (`movedKey`, its act key): the dossier takes that one move, on its own order, as
+ * «Fonti» writes it — the act goes after the nearest dossier act before it on the table, or first. Never the table's
+ * whole order: the re-sync does not reorder the table, so a reorder made in «Fonti» or by Claude would be overwritten.
+ * An act with nothing in the dossier writes nothing.
+ */
+export function writeActOrder(dossierId: string, practiceId: string, movedKey: string): void {
   const s = appStore.getState();
   const dossier = s.dossiers.find((d) => d.id === dossierId);
   const table = s.practices.find((p) => p.id === practiceId);
   if (!dossier || !table) return;
-  s.setDossierItemOrder(dossierId, dossierItemOrder(dossier.items, layoutDossier(dossier.items), table.acts.map((a) => a.key)));
+  const layout = layoutDossier(dossier.items);
+  const keys = layout.acts.map((a) => a.key);
+  if (!keys.includes(movedKey)) return;
+  const onTable = table.acts.map((a) => a.key);
+  const after = onTable.slice(0, onTable.indexOf(movedKey)).reverse().find((k) => k !== movedKey && keys.includes(k));
+  const rest = keys.filter((k) => k !== movedKey);
+  const at = after === undefined ? 0 : rest.indexOf(after) + 1;
+  const next = [...rest.slice(0, at), movedKey, ...rest.slice(at)];
+  if (next.join('\n') === keys.join('\n')) return;
+  s.setDossierItemOrder(dossierId, dossierItemOrder(dossier.items, layout, next));
 }
 
 /**

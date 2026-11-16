@@ -138,6 +138,16 @@ describe('the mark: «Non nel dossier» for what arrived while reading, nothing 
   });
 });
 
+describe('for a reader of fifty (LC55, the reviewer of #529)', () => {
+  it('a row\'s commands are named, never a bare «×»; «Apri accanto» and the act\'s article numbers are 14 px', () => {
+    render(<Page />);
+    expect(screen.queryByRole('button', { name: /^Togli dal tavolo/ })).toBeNull();
+    expect(rowOf('24', '5')!.getByRole('button', { name: /^Apri accanto/ })).toHaveClass('text-sm');
+    const index = screen.getByRole('list', { name: /Articoli sul tavolo di l\. 8 marzo 2017/ });
+    for (const chip of within(index).getAllByRole('button')) expect(chip).toHaveClass('text-sm');
+  });
+});
+
 describe('«Aggiungi al dossier»', () => {
   it('writes the row into the dossier with addToDossier, as the reader\'s popover does, and the mark goes', async () => {
     svc.addItem.mockResolvedValue({ id: 'srv-3', item_type: 'norm', title: '', content: {}, position: 4, status: 'unread', created_at: '' } as never);
@@ -264,6 +274,27 @@ describe('reordering the acts writes the order into the dossier', () => {
     expect(bound().acts.map((a) => a.norma.numero_atto)).toEqual(['196', '24']);
     expect(svc.reorderItems).toHaveBeenCalledWith('dos-1', ['n196-1', 'n24-5', 'n24-7', 's1']);
     expect(dossierIds()).toEqual(['n196-1', 'n24-5', 'n24-7', 's1']);
+  });
+
+  it('an act only on the table writes nothing', () => {
+    render(<Page />);
+    arrive();
+    const table = bound().acts;
+    const onlyHere = table.find((a) => a.norma.numero_atto === '241')!;
+    act(() => { h.dragEnd!({ active: { id: onlyHere.id }, over: { id: table[0].id } }); });
+    expect(bound().acts[0].id).toBe(onlyHere.id);
+    expect(svc.reorderItems).not.toHaveBeenCalled();
+  });
+
+  it('writes the one move on the dossier\'s own order: a reorder made in «Fonti» meanwhile is kept', () => {
+    const X = { tipo_atto: 'decreto legislativo', numero_atto: '50', data: '2016-04-18' };
+    appStore.setState({ dossiers: [dossierOf([norma('5'), norma('7'), norma('1', DLGS), norma('2', X)])] });
+    render(<Page />);
+    // «Fonti» (or Claude) puts the 196 before the 24; the table, re-synced additively, keeps 24, 196, 50.
+    act(() => { appStore.setState({ dossiers: [dossierOf([norma('1', DLGS), norma('5'), norma('7'), norma('2', X)])] }); });
+    const [l24, , x] = bound().acts;
+    act(() => { h.dragEnd!({ active: { id: x.id }, over: { id: l24.id } }); });
+    expect(svc.reorderItems).toHaveBeenCalledWith('dos-1', ['n50-2', 'n196-1', 'n24-5', 'n24-7']);
   });
 });
 

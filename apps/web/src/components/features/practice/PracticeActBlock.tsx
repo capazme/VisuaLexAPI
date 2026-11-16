@@ -415,7 +415,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                           onClick={() => revealPracticeRow(practiceId, act.id, key)}
                           aria-current={openKeys.includes(key) ? 'true' : undefined}
                           className={cn(
-                            'min-h-[44px] rounded-md px-2 text-xs font-medium transition-colors md:min-h-0 md:py-0.5',
+                            'min-h-[44px] rounded-md px-2 font-medium transition-colors md:min-h-0 md:py-0.5',
+                            // 14 px in a dossier's «Lettura» (LC55); the Corpus keeps its 12.
+                            hostDossier ? 'text-sm' : 'text-xs',
                             // Inset: the row scrolls sideways on a phone and would clip a ring drawn outside the chip.
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
                             openKeys.includes(key)

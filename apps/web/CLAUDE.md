@@ -1112,7 +1112,10 @@ entry and decision says whether it is in it, read from the store's dossier and n
 with «Annulla»; the row stays, marked) on a dossier row, «Aggiungi al dossier» (`addToDossier` with the row's own
 `norma_data`, as the reader's popover) and «Togli dal tavolo» on one that is not; on a computer «Aggiungi al dossier»
 also stands beside the mark. The act's «Rimuovi l'atto» becomes «Togli dal dossier» when it holds dossier articles;
-dragging the acts writes the order (`writeActOrder`, `setDossierItemOrder` as «Fonti»). The reader's dossier command
+dragging an act of the dossier writes that one move on the dossier's own order (`writeActOrder`, `setDossierItemOrder`
+as «Fonti»; an act only on the table writes nothing, and a reorder made in «Fonti» meanwhile is kept). In «Lettura»
+«Apri tutto in Ricerca» moves into the header's «⋯» as «Apri anche in Ricerca», and «Apri accanto» and the act's article
+numbers are 14 px. The reader's dossier command
 (an article's, a decision's) reads «Aggiungi a questo dossier» and adds there without the popover. The re-sync stays
 additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, is unchanged.
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a

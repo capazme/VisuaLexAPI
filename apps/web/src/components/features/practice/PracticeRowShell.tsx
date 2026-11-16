@@ -50,7 +50,7 @@ export function NotInDossier() {
 }
 
 const ADD_BUTTON =
-  'flex min-h-[44px] flex-shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-50 md:min-h-0 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+  'min-h-[44px] flex-shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 md:min-h-0 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const MENU_TRIGGER =
   'flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 -mr-3 md:mr-0 md:min-h-0 md:min-w-0 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
@@ -130,7 +130,8 @@ export function PracticeRowShell({
             onClick={beside.onOpen}
             aria-label={`Apri accanto ${removeName}`}
             title="Apri accanto"
-            className="practice-row-beside flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 md:min-h-0 md:min-w-0 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            // 14 px in a dossier's «Lettura» (LC55, a reader of fifty); the Corpus keeps its 12.
+            className={cn('practice-row-beside flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center gap-1 rounded-md px-2 py-1 font-medium', dossier ? 'text-sm' : 'text-xs', 'text-slate-500 md:min-h-0 md:min-w-0 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500')}
           >
             <PanelRightOpen size={14} aria-hidden />
             {/* Icon-only on a phone, where the row's name needs the width. */}
