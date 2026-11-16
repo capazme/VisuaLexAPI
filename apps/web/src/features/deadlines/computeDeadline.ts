@@ -111,12 +111,15 @@ export function computeDeadline({ kind, start, excludedFromSuspension }: Deadlin
   if (term.days) {
     // Counts only non-suspended days, so August days never reduce the term.
     let n = toNum(from);
+    let skipped = 0;
     for (let left = term.days; left > 0; ) {
       n += 1;
-      if (!(suspend && inAugust(fromNum(n)))) left -= 1;
+      if (suspend && inAugust(fromNum(n))) skipped += 1;
+      else left -= 1;
     }
     raw = fromNum(n);
-    steps.push(`${term.days} giorni, festivi compresi${suspend ? ', saltando i giorni di agosto compresi nel decorso' : ''}: ${formatPlain(raw)}.`);
+    // The August words only when August days fell in the decorso (Papiniano).
+    steps.push(`${term.days} giorni, festivi compresi${skipped > 0 ? ', saltando i giorni di agosto compresi nel decorso' : ''}: ${formatPlain(raw)}.`);
   } else {
     // Calendar months first, then the suspended days that fall in the decorso are added. This order for months is a
     // choice (the rule is not spelled out for them): a jurist should confirm it.

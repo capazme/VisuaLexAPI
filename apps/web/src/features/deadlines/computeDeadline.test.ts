@@ -72,4 +72,9 @@ describe('computeDeadline', () => {
     expect(steps.at(-1)).toBe('Scadenza: giovedì 14 gennaio 2027.');
     expect(steps.length).toBeGreaterThanOrEqual(3);
   });
+
+  it('speaks of August only when August days fall in the decorso', () => {
+    expect(run('appello', '2026-12-15').steps.join(' ')).not.toMatch(/agosto/);
+    expect(run('appello', '2026-07-20').steps.join(' ')).toMatch(/saltando i giorni di agosto/);
+  });
 });
