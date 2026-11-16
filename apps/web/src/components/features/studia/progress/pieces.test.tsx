@@ -24,8 +24,9 @@ describe('GoalRing', () => {
     expect(screen.getByTestId('goal-arc')).toHaveStyle({ width: '0%' });
     rerender(<GoalRing ripassi={3} obiettivo={10} raggiunto />);
     expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 3 di 10 ripassi, raggiunto' })).toBeInTheDocument();
-    // Reached with 3 of 10 (the day counts): the line says so, the bar does not pretend it is full.
-    expect(screen.getByText(/raggiunto/)).toBeInTheDocument();
+    // Reached (the day counts, as the missions read it): the line says so, no count to contradict it, the bar full.
+    expect(screen.getByText('Obiettivo di oggi raggiunto')).toBeInTheDocument();
+    expect(screen.queryByText(/su 10/)).toBeNull();
   });
 });
 
