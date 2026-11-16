@@ -267,11 +267,12 @@ function NavItem({ to, icon: Icon, label, shortLabel, onClick, id, badgeCount, b
 
           {/* LC27 (Luca, 15 Nov: «la mini colonnina … va tolta»): the active entry is its tile alone, in the rail too. */}
 
-          {/* Notification badge: on the icon in the rail, at the end of the row with words. */}
+          {/* Notification badge: on the icon in the rail, at the end of the row with words, 4 px after the word: with the
+              largest text the bold «Scadenze» of the lit entry needed the other 4 (#524). */}
           {showBadge && (
             <CountBadge
               count={badgeCount ?? 0}
-              className={words ? "ml-2 shrink-0" : "absolute top-1 right-1 ring-2 ring-white dark:ring-slate-900"}
+              className={words ? "ml-1 shrink-0" : "absolute top-1 right-1 ring-2 ring-white dark:ring-slate-900"}
             />
           )}
 
