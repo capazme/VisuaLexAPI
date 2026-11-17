@@ -155,7 +155,7 @@ export const UNSUPPORTED_CLIENTS: { name: string; reason: string }[] = [
 
 /** The tools a connected application gets, in the words a user reads. */
 export const AI_TOOLS: { name: string; what: string }[] = [
-  { name: 'Pratica', what: 'elencare e leggere le tue pratiche, crearne di nuovi' },
+  { name: 'Pratica', what: 'elencare e leggere le tue pratiche, crearne di nuove' },
   { name: 'Norme', what: 'aggiungere a una pratica da 1 a 50 norme scritte a parole, verificate sulle fonti' },
   { name: 'Sentenze', what: 'aggiungere a una pratica da 1 a 10 sentenze, verificate sulle fonti' },
   { name: 'Note', what: 'aggiungere una nota a una pratica o a un suo articolo (solo aggiungere, mai modificare)' },
