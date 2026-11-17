@@ -20,6 +20,7 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/work\/pseudonimizzatore(\/|$)/, 'Pseudonimizzatore'],
   [/^\/work\/grafo-pratiche(\/|$)/, 'Grafo delle pratiche'],
   [/^\/learn\/ripasso(\/|$)/, 'Oggi'],
+  [/^\/learn\/lezione(\/|$)/, 'Lezione breve'],
   [/^\/learn\/percorsi(\/|$)/, 'Percorsi'],
   [/^\/learn\/progressi(\/|$)/, 'Progressi'],
   [/^\/learn\/schede(\/|$)/, 'Le mie schede'],

@@ -9,9 +9,6 @@ const src = __dirname; // apps/web/src
 
 /** Files where «VisuaLex» still reaches the screen on purpose, each with why. */
 const ALLOWED: Record<string, string> = {
-  [join('features', 'merlt', 'hub', 'ConsentFirst.tsx')]: 'consent text: changes after Privacy (step 8)',
-  [join('features', 'merlt', 'consent', 'levels.ts')]: 'consent text: changes after Privacy (step 8)',
-  [join('features', 'merlt', 'privacy', 'MerltDataSection.tsx')]: 'privacy text: changes after Privacy (step 8)',
   [join('components', 'features', 'dossier', 'PublishDossierDialog.tsx')]: 'the owner\'s publication warning: to confirm',
   [join('features', 'merlt', 'ops', 'ingestion', 'IngestionRunForm.tsx')]: 'admin only: names the backend\'s `visualex_tree` source',
   [join('features', 'merlt', 'ops', 'ingestion', 'BatchListTable.tsx')]: 'admin only: names the backend\'s `visualex_tree` source',

@@ -1,5 +1,6 @@
 import { ChevronDown, GripVertical, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
+import { DRAG_ROLE_DESCRIPTION } from '../practice/dragAnnouncements';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '../../../lib/utils';
 import { MenuButton } from '../../ui/MenuButton';
@@ -53,7 +54,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
   const { block, dragDisabled, isFolded, onToggleFold } = props;
   const { title, rubricaOf } = useActDetails(props.act ?? block);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: block.key, disabled: dragDisabled });
+    useSortable({ id: block.key, disabled: dragDisabled, attributes: { roleDescription: DRAG_ROLE_DESCRIPTION } });
   const count = block.articles.length;
   const Heading = props.headingLevel === 3 ? 'h3' : 'h2';
   const countLabel = count === 1 ? '1 articolo' : `${count} articoli`;

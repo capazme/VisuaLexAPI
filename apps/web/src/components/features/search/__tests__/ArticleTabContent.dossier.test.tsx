@@ -123,3 +123,26 @@ describe('ArticleTabContent in a dossier\'s «Lettura»: «Note della pratica» 
     expect(screen.queryByText('Da citare nel ricorso, punto 2.')).toBeNull();
   });
 });
+
+describe('ArticleTabContent: one command to add to a practice (LC61)', () => {
+  const bar = () => screen.queryAllByRole('button', { name: /Aggiungi a questa pratica|Alla pratica/ });
+
+  it('an article already in the hosting dossier offers no «Aggiungi a questa pratica» in the bar', () => {
+    lettura('a1');
+    expect(bar()).toHaveLength(0);
+  });
+
+  it('one not in it does', () => {
+    appStore.setState({ dossiers: [{ id: 'dos-1', title: 'Ricorso Rossi', createdAt: '', items: [] }] });
+    lettura(undefined);
+    expect(bar().length).toBeGreaterThan(0);
+  });
+
+  it('in a row that has its own add (the Ricerca), the bar has none; read alone, it keeps «Alla pratica»', () => {
+    const { unmount } = render(<MemoryRouter><ArticleTabContent data={data} dossierCommandInRow /></MemoryRouter>);
+    expect(bar()).toHaveLength(0);
+    unmount();
+    render(<MemoryRouter><ArticleTabContent data={data} /></MemoryRouter>);
+    expect(bar().length).toBeGreaterThan(0);
+  });
+});

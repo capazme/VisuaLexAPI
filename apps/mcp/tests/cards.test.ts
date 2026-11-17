@@ -206,7 +206,7 @@ describe('lingolex_elimina_card', () => {
   it('asks, naming each card by its subject, state and date only — never by text someone wrote', async () => {
     const client = await connect();
     const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1a2b3c4-0000-4000-8000-000000000001'] } });
-    expect(asked[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 scheda di VisuaLex Gymnasium\?/);
+    expect(asked[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 scheda di Learn\?/);
     // Told apart by what the server derived from a verified reference (the primary anchor) and the id's start (security review of PR 5, I1).
     expect(asked[0]).toContain('- Scheda di diritto civile su art. 1453, codice civile, bozza, creata il 5 ottobre 2026 (k1a2b3c4)');
     expect(asked[0]).not.toMatch(/premi Accept|Ignora tutto/);

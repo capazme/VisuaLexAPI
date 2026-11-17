@@ -1,16 +1,19 @@
 import { apiClient } from './api';
 import type {
   EsitoCestino,
+  EsitoEsercizio,
   EsitoCreazione,
   EsitoModifica,
   EsitoProposta,
   EsitoRevisione,
   FiltriSchede,
   Giudizio,
+  Lezione,
   Materia,
   PreferenzeStudio,
   Progressi,
   RevisioneInput,
+  RispostaEsercizio,
   StatoScheda,
   Scheda,
   SchedaDellArticolo,
@@ -155,6 +158,18 @@ export const studiaService = {
   /** Records a grade; `registrata: false` means the card was already graded today. */
   async review(input: RevisioneInput): Promise<EsitoRevisione> {
     const response = await apiClient.post('/lingo/srs/revisioni', input);
+    return response.data;
+  },
+
+  /** A short lesson of the subject, built by the server (LC63, `POST /lingo/lezioni`): the exercises without their keys. */
+  async createLesson(materia: Materia): Promise<Lezione> {
+    const response = await apiClient.post('/lingo/lezioni', { materia });
+    return response.data;
+  },
+
+  /** One answer, graded by the server; the last one ends the lesson and carries the XP it credited. */
+  async answerLesson(id: string, indice: number, risposta: RispostaEsercizio): Promise<EsitoEsercizio> {
+    const response = await apiClient.post(`/lingo/lezioni/${encodeURIComponent(id)}/risposte`, { indice, risposta });
     return response.data;
   },
 

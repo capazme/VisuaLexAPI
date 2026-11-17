@@ -76,7 +76,7 @@ export function deletionMessage(what: {
   const notes = what.attachedNotesStaying
     ? [`${what.attachedNotesStaying} ${what.attachedNotesStaying === 1 ? 'nota collegata resta' : 'note collegate restano'} nella pratica.`]
     : [];
-  return [head, ...shown, ...notes, `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di VisuaLex.`].join('\n');
+  return [head, ...shown, ...notes, `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di LexCraft.`].join('\n');
 }
 
 /**
@@ -89,9 +89,9 @@ export function cardDeletionMessage(lines: string[]): string {
   const shown = lines.slice(0, MAX_LINES).map((line) => `- ${clean(line)}`);
   if (lines.length > MAX_LINES) shown.push(`e altre ${lines.length - MAX_LINES}`);
   return [
-    `ELIMINAZIONE — Spostare nel cestino ${total} ${total === 1 ? 'scheda di VisuaLex Gymnasium' : 'schede di VisuaLex Gymnasium'}?`,
+    `ELIMINAZIONE — Spostare nel cestino ${total} ${total === 1 ? 'scheda di Learn' : 'schede di Learn'}?`,
     ...shown,
-    `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di VisuaLex.`,
+    `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di LexCraft.`,
   ].join('\n');
 }
 

@@ -12,9 +12,9 @@ export const DELETE_SCOPE = 'content:delete';
 export const MAX_DELETIONS = 50;
 
 export const NO_PERMISSION =
-  'Questa applicazione non è autorizzata a eliminare. Puoi abilitarlo in VisuaLex: Impostazioni → Applicazioni collegate → «Può eliminare pratiche, voci e schede».';
+  'Questa applicazione non è autorizzata a eliminare. Puoi abilitarlo in LexCraft: Impostazioni → Applicazioni collegate → «Può eliminare pratiche, voci e schede».';
 export const CANNOT_ASK =
-  'Questo client non può chiederti conferma, quindi da qui non si elimina nulla. Puoi eliminare dalla pagina della pratica in VisuaLex.';
+  'Questo client non può chiederti conferma, quindi da qui non si elimina nulla. Puoi eliminare dalla pagina della pratica in LexCraft.';
 const NOTHING_DELETED = 'Nulla è stato eliminato: l’eliminazione non è stata confermata.';
 /** What the user reads when the question did not end in a confirmation. */
 export const NOT_CONFIRMED: Record<Exclude<Confirmation, 'confirmed' | 'unsupported'>, string> = {
@@ -48,7 +48,7 @@ const entryLine = (item: ApiDossierItem, all: ApiDossierItem[]): string => {
   return `${KIND_WORDS[item.item_type] ?? 'Voce'}${author(item)}`;
 };
 const UNREACHABLE_AFTER_CONFIRM =
-  'VisuaLex non ha risposto e non so se l’eliminazione è avvenuta: controlla il cestino di VisuaLex prima di riprovare.';
+  'LexCraft non ha risposto e non so se l’eliminazione è avvenuta: controlla il cestino di LexCraft prima di riprovare.';
 
 /** The scopes each tool needs: the HTTP layer refuses a call whose token lacks one (403). */
 export const TOOL_SCOPES: Record<string, string[]> = {
@@ -85,7 +85,7 @@ export const NOTE_EXCERPT = 500;
 /** The scope under which the text of the user's notes leaves (G-381 (b), owners, 29 October 2026). */
 export const TEXT_SCOPE = 'dossier:text';
 const RECONNECT_FOR_NOTES =
-  'Per leggere il testo delle note l’utente deve ricollegare l’applicazione a VisuaLex e concedere «Leggere i testi».';
+  'Per leggere il testo delle note l’utente deve ricollegare l’applicazione a LexCraft e concedere «Leggere i testi».';
 /** How many of the user's dossiers a «not found» names. */
 const MAX_LISTED_DOSSIERS = 20;
 
@@ -139,7 +139,8 @@ const noteSchema = () =>
     .min(1)
     .max(MAX_NOTE_LENGTH)
     .refine((text) => text.length <= MAX_NOTE_LENGTH, `Too big: expected string to have <=${MAX_NOTE_LENGTH} characters`)
-    .describe('Il testo della nota');
+    // The web draws an application's note as simple Markdown (D4); the subset is in omnilex_aggiungi_nota_dossier's description.
+    .describe('Il testo della nota, in Markdown semplice');
 
 /**
  * A reference as the model wrote it: never trimmed or rewritten, since a row that did not enter is answered
@@ -227,7 +228,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Elenca le pratiche',
       description:
-        'Le pratiche dell’utente in VisuaLex: id, nome, tipo («lavoro»: un caso di lavoro, può contenere dati dei clienti; «studio»: un tema da studiare), numero di voci.',
+        'Le pratiche dell’utente in LexCraft: id, nome, tipo («lavoro»: un caso di lavoro, può contenere dati dei clienti; «studio»: un tema da studiare), numero di voci.',
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -373,12 +374,12 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         // A route that gave no answer may still be writing its entries: its rows are never reported as refused (the
         // model would create the dossier again, and a client subtracting them would count them as absent).
         const STILL_LANDING =
-          `VisuaLex non ha risposto in tempo: la pratica ${created.id} esiste e le sue voci potrebbero essere ancora in arrivo. ` +
+          `LexCraft non ha risposto in tempo: la pratica ${created.id} esiste e le sue voci potrebbero essere ancora in arrivo. ` +
           'Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
         const reasonOf = (error: unknown): string => {
           if (error instanceof ToolError) return error.message;
           console.error('[mcp] omnilex_crea_dossier step failed:', error instanceof Error ? error.message : 'unknown error');
-          return 'VisuaLex ha avuto un problema in un passo: la pratica è creata, controlla cosa contiene.';
+          return 'LexCraft ha avuto un problema in un passo: la pratica è creata, controlla cosa contiene.';
         };
         /**
          * The norms' or the decisions' route, the existing one: the same checks, points and refunds as their own tools.
@@ -453,7 +454,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
               entrate.note += 1;
             } catch (error) {
               // Without an answer the note may be there: never told to write it again.
-              const motivo = error instanceof NoAnswer ? 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' : reasonOf(error);
+              const motivo = error instanceof NoAnswer ? 'LexCraft non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' : reasonOf(error);
               notesNotEntered.push({ nota: i + 1, motivo });
             }
           });
@@ -541,7 +542,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Aggiungi note a una pratica',
       description:
-        `Aggiunge da 1 a ${MAX_NOTES} note (testo semplice, fino a ${MAX_NOTE_LENGTH} caratteri ciascuna) a una pratica, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
+        `Aggiunge da 1 a ${MAX_NOTES} note a una pratica, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
+        `Markdown semplice: **grassetto**, titoletti con ##, elenchi con - o 1.; niente HTML; fino a ${MAX_NOTE_LENGTH} caratteri per nota. ` +
         'Le note restano segnate come scritte da questa applicazione. Aggiunge soltanto: non modifica né cancella note.',
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id della pratica, o il suo nome esatto'),
@@ -591,8 +593,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
       title: 'Elimina voci da una pratica',
       description:
         `Sposta nel cestino da 1 a ${MAX_DELETIONS} voci di una pratica (gli id da omnilex_leggi_dossier). ` +
-        `Prima chiede conferma all’utente con una finestra che il modello non può compilare; ciò che è eliminato resta ripristinabile da VisuaLex per ${TRASH_DAYS} giorni. ` +
-        'Serve il permesso di eliminare, che l’utente concede nelle impostazioni di VisuaLex.',
+        `Prima chiede conferma all’utente con una finestra che il modello non può compilare; ciò che è eliminato resta ripristinabile da LexCraft per ${TRASH_DAYS} giorni. ` +
+        'Serve il permesso di eliminare, che l’utente concede nelle impostazioni di LexCraft.',
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id della pratica, o il suo nome esatto'),
         voci: z.array(z.string().min(1).max(64)).min(1).max(MAX_DELETIONS).describe('Gli id delle voci da eliminare'),
@@ -643,7 +645,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
       title: 'Elimina una pratica',
       description:
         `Sposta nel cestino un’intera pratica con le sue voci e i suoi compiti. Prima chiede conferma all’utente con una finestra che il modello non può compilare; ` +
-        `la pratica resta ripristinabile da VisuaLex per ${TRASH_DAYS} giorni. Serve il permesso di eliminare, che l’utente concede nelle impostazioni di VisuaLex.`,
+        `la pratica resta ripristinabile da LexCraft per ${TRASH_DAYS} giorni. Serve il permesso di eliminare, che l’utente concede nelle impostazioni di LexCraft.`,
       inputSchema: { dossier: z.string().min(1).max(200).describe('Id della pratica, o il suo nome esatto') },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },

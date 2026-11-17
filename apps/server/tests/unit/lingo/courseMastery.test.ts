@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CHECK_ACQUIRED, CHECK_UNSTARTED, checkCardRank, competenceMastery, courseMastery, wantsCheckCards,
 } from '../../../src/lingo/courseMastery';
-import { COURSE_MISSION, MISSIONS, MODULE_MISSION, XP_DAILY_CEILING } from '../../../src/lingo/missions';
+import { COURSE_MISSION, LESSON_MISSION, MISSIONS, MODULE_MISSION, XP_DAILY_CEILING } from '../../../src/lingo/missions';
 import { addDays } from '../../../src/lingo/studyDay';
 
 // Mastery (Percorsi spec 2026-10-23 §4, §4.1, §10.4) as a pure function, and the check cards' predicate (§10.7).
@@ -156,11 +156,12 @@ describe('check cards (§10.7, G-377 Q10)', () => {
 });
 
 describe('the daily net with modules (G-377 Q5)', () => {
-  it('holds the catalogue’s most, two modules and a course passed under 450', () => {
+  it('holds the catalogue’s most, two modules, a course passed and three short lessons under 450', () => {
     const catalogue = MISSIONS.reduce((sum, m) => sum + m.punti, 0) - MISSIONS.filter((m) => m.missione === null).reduce((s, m) => s + m.punti, 0);
     expect(XP_DAILY_CEILING).toBe(450);
     expect(MODULE_MISSION).toEqual({ punti: 30, percentuale: 70, alGiorno: 2 });
     expect(COURSE_MISSION).toEqual({ punti: 100, competenze: 3, moduli: 3 });
-    expect(catalogue + MODULE_MISSION.alGiorno * MODULE_MISSION.punti + COURSE_MISSION.punti).toBeLessThanOrEqual(XP_DAILY_CEILING);
+    expect(LESSON_MISSION).toEqual({ punti: 10, alGiorno: 3 });
+    expect(catalogue + MODULE_MISSION.alGiorno * MODULE_MISSION.punti + COURSE_MISSION.punti + LESSON_MISSION.alGiorno * LESSON_MISSION.punti).toBeLessThanOrEqual(XP_DAILY_CEILING);
   });
 });

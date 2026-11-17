@@ -153,4 +153,36 @@ describe('AddToDossierPopover with a decision', () => {
     fireEvent.click(screen.getByRole('button', { name: /con la sentenza/i }));
     expect(onDuplicate).toHaveBeenCalledWith('Con la sentenza');
   });
+
+  it('LC61: its title is the command\'s, «1 elemento» is singular, a long name is whole in the tooltip, «già presente» is not faded', () => {
+    const long = 'Ricorso per decreto ingiuntivo Rossi contro Bianchi, secondo grado';
+    appStore.setState({ dossiers: [...appStore.getState().dossiers, { id: 'long', title: long, createdAt: '2026-03-01T00:00:00Z', items: [] }] });
+    renderPopover();
+    expect(screen.getByRole('heading', { name: 'Aggiungi alla pratica' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pratica recente/ })).toHaveTextContent('1 elemento');
+    expect(screen.getByRole('button', { name: /Pratica recente/ })).not.toHaveTextContent('1 elementi');
+    expect(screen.getByText(long)).toHaveAttribute('title', long);
+    expect(screen.getByText(long)).not.toHaveClass('truncate');
+    const present = screen.getByRole('button', { name: /Con duplicato/ });
+    expect(present).not.toHaveClass('opacity-60');
+    expect(screen.getByText('già presente').className).toMatch(/text-emerald-800/);
+  });
+
+  it('LC61: the new practice\'s name field has a label', () => {
+    renderPopover();
+    fireEvent.click(screen.getByRole('button', { name: /Nuova pratica/ }));
+    expect(screen.getByRole('textbox', { name: 'Nome della nuova pratica' })).toBeInTheDocument();
+  });
+
+  it('LC61: every control is 44 px to the touch on a phone', () => {
+    renderPopover();
+    fireEvent.click(screen.getByRole('button', { name: /Nuova pratica/ }));
+    const controls = [
+      screen.getByRole('button', { name: 'Chiudi' }),
+      screen.getByRole('button', { name: /Pratica recente/ }),
+      screen.getByRole('textbox', { name: 'Nome della nuova pratica' }),
+      screen.getByRole('button', { name: 'Crea e aggiungi' }),
+    ];
+    for (const control of controls) expect(control.className).toContain('min-h-[44px]');
+  });
 });

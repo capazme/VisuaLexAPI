@@ -430,7 +430,7 @@ describe('security review of PR 4', () => {
     env.stub.apiOverride = (method, path) => (method === 'POST' && path.endsWith('/trash-items') ? 'drop' : undefined);
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
-    expect(text(result)).toMatch(/controlla il cestino di VisuaLex prima di riprovare/);
+    expect(text(result)).toMatch(/controlla il cestino di LexCraft prima di riprovare/);
     await client.close();
   });
 });

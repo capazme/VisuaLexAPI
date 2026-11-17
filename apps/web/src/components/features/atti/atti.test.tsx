@@ -223,6 +223,14 @@ describe('the dossier\'s «Atti» tab (LC53)', () => {
     expect(await screen.findByRole('textbox', { name: 'Istruzioni per Claude' })).toHaveValue('Testo salvato');
   });
 
+  it('without the server key (503) «Carica un file» is not active (LC61)', async () => {
+    files.list.mockRejectedValue({ status: 503, message: 'off' });
+    renderPanel();
+    await screen.findByText('I file della pratica non sono attivi su questo server.');
+    expect(screen.getByRole('button', { name: 'Carica un file' })).toBeDisabled();
+    expect(screen.queryByText('oppure trascinalo qui.')).toBeNull();
+  });
+
   it('the drafts written with the old editor are offered as Word files', async () => {
     atti.list.mockResolvedValue([
       { id: 'a1', titolo: 'Procura alle liti', tipo: null, stato: 'bozza', dossierId: 'd1', createdAt: '', updatedAt: '' },

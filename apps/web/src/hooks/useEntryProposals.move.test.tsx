@@ -7,6 +7,8 @@ vi.mock('../services/assistantService', () => ({
 }));
 
 import { useEntryProposals } from './useEntryProposals';
+import { appStore } from '../store/useAppStore';
+import { assistantService } from '../services/assistantService';
 import { assistantProposalsStore } from '../store/assistantProposals';
 import { CurrentDossierContext } from '../components/features/dossier/currentDossier';
 import type { Proposal } from '../types';
@@ -62,5 +64,19 @@ describe('useEntryProposals — «Sposta l\'evidenziazione»', () => {
     act(() => reader.result.current.actions!.move!('p1'));
     other.unmount();
     expect(assistantProposalsStore.getState().moving).toEqual({ itemId: 'a1', proposalId: 'p1' });
+  });
+});
+
+describe('useEntryProposals — an entry just added (LC61)', () => {
+  it('asks nothing with the provisional id, and asks with the real one once the server answers', () => {
+    assistantProposalsStore.setState({ enabled: true, byItem: {}, moving: null });
+    vi.mocked(assistantService.listProposals).mockClear();
+    appStore.setState({ pendingDossierItemIds: { 'tmp-1': true } });
+    const reader = renderHook(({ id }) => useEntryProposals(id, 'k', '1'), { wrapper, initialProps: { id: 'tmp-1' } });
+    expect(assistantService.listProposals).not.toHaveBeenCalled();
+    // One write in the store: the item takes its id and leaves the pending ones together.
+    act(() => { appStore.setState({ pendingDossierItemIds: {} }); reader.rerender({ id: 'srv-1' }); });
+    expect(assistantService.listProposals).toHaveBeenCalledWith('d1', 'srv-1');
+    expect(assistantService.listProposals).not.toHaveBeenCalledWith('d1', 'tmp-1');
   });
 });
