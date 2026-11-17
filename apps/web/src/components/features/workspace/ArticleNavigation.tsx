@@ -35,12 +35,18 @@ export function ArticleNavigation({
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // Set by Enter and Esc: the focus goes back to «Art. …» once the field is gone (LC70). Not after a blur, which went elsewhere.
+  const refocus = useRef(false);
 
   // Focus input when editing starts
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
+    } else if (!isEditing && refocus.current) {
+      refocus.current = false;
+      buttonRef.current?.focus();
     }
   }, [isEditing]);
 
@@ -134,8 +140,10 @@ export function ArticleNavigation({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      refocus.current = true;
       handleInputSubmit();
     } else if (e.key === 'Escape') {
+      refocus.current = true;
       setIsEditing(false);
     }
   };
@@ -172,11 +180,13 @@ export function ArticleNavigation({
           onKeyDown={handleKeyDown}
           aria-label="Numero dell'articolo"
           enterKeyHint="go"
-          className="h-11 w-20 rounded-md border border-slate-300 bg-white px-2 text-center text-sm font-medium tabular-nums text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 md:h-7 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          // 16 px on a phone: under it Safari on iPhone zooms the page when the field is touched (LC70).
+          className="h-11 w-20 rounded-md border border-slate-300 bg-white px-2 text-center text-base font-medium tabular-nums text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 md:h-7 md:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           placeholder="Art."
         />
       ) : (
         <button
+          ref={buttonRef}
           type="button"
           onClick={startEditing}
           aria-label={activeArticleId ? `Art. ${activeArticleId}, scrivi un altro numero` : 'Scrivi il numero di un articolo'}

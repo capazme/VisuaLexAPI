@@ -53,4 +53,26 @@ describe('ArticleNavigation (LC68)', () => {
       expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'md:min-h-0');
     }
   });
+
+  it('after Enter or Esc the focus is back on «Art. …»; Esc loads nothing (LC70)', () => {
+    const { onNavigate, onLoadArticle } = nav();
+    const selector = () => screen.getByRole('button', { name: /^Art\. 2043/ });
+    fireEvent.click(selector());
+    fireEvent.keyDown(screen.getByRole('textbox', { name: "Numero dell'articolo" }), { key: 'Escape' });
+    expect(selector()).toHaveFocus();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onLoadArticle).not.toHaveBeenCalled();
+    fireEvent.click(selector());
+    const field = screen.getByRole('textbox', { name: "Numero dell'articolo" });
+    fireEvent.change(field, { target: { value: '9999' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(onLoadArticle).toHaveBeenCalledWith('9999');
+    expect(selector()).toHaveFocus();
+  });
+
+  it('the field\'s text is 16 px on a phone, so Safari does not zoom (LC70)', () => {
+    nav();
+    fireEvent.click(screen.getByRole('button', { name: /^Art\. 2043/ }));
+    expect(screen.getByRole('textbox', { name: "Numero dell'articolo" })).toHaveClass('text-base', 'md:text-sm');
+  });
 });

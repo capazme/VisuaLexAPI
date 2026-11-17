@@ -67,6 +67,15 @@ describe('PracticeTable (spec §3.1)', () => {
     fireEvent.click(within(head).getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.getByRole('menuitem', { name: 'Rinomina' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Chiudi il tavolo' })).toBeInTheDocument();
+    // The name's field: 16 px on a phone, so Safari does not zoom (LC70).
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rinomina' }));
+    expect(screen.getByRole('textbox', { name: 'Nome del tavolo' })).toHaveClass('text-base', 'md:text-xs');
+  });
+
+  it('one act of two articles keeps the card of one article: the same measure, not the whole frame (LC70)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    render(table());
+    expect(screen.getByTestId('practice-table')).toHaveClass('max-w-[44rem]');
   });
 
   it('switching the active practice switches the table', () => {

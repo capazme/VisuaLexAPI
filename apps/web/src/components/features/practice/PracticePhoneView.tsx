@@ -178,17 +178,18 @@ function PhonePracticeHead({ practice, save, editing, rename }: {
 }) {
   const countLine = practiceCountLine(practiceCounts(practice));
   return (
-    // One row (R3: the text first): the name, the count after it, then «⋯».
+    // One row (R3: the text first): the name, the count after it, then «⋯». Under 390 px the count goes under the name,
+    // as in the act's head, rather than both being cut (LC70). The name a step under the acts' 22 px titles (LC70).
     <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col pb-1 min-[390px]:flex-row min-[390px]:items-center min-[390px]:gap-2 min-[390px]:pb-0">
         {editing ? (
-          <PracticeNameInput initial={practice.label} onDone={rename.done} className="min-h-[44px] w-full font-serif text-xl" />
+          <PracticeNameInput initial={practice.label} onDone={rename.done} className="min-h-[44px] w-full font-serif text-lg" />
         ) : (
-          <h2 className={cn('flex min-h-[44px] min-w-0 items-center font-serif text-xl font-medium text-slate-900 dark:text-white', countLine && 'max-w-[70%] shrink-0')}>
+          <h2 className={cn('flex min-h-[44px] min-w-0 items-center font-serif text-lg font-medium text-slate-900 dark:text-white', countLine && 'min-[390px]:max-w-[70%] min-[390px]:shrink-0')}>
             <span className="truncate">{practice.label}</span>
           </h2>
         )}
-        {/* It gives way before the name does. */}
+        {/* From 390 px, beside the name: it gives way before the name does. */}
         {countLine && !editing && <p title={countLine} className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">{countLine}</p>}
       </div>
       <MenuButton

@@ -94,6 +94,10 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // The act's tour, on the practice's first act and once the table's own tour has been seen (when it
   // is done it hands over to this one, `PracticeTable`). Asked once: `tryStartTour` is new each render.
   const isFirstAct = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts[0]?.id === act.id);
+  // The table's only act (LC70): nothing to reorder, and folding it would leave its heading alone; as in Lettura
+  // semplice, no grip and no fold, whatever its articles. The index keeps its heading as an entry among the others.
+  const alone = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts.length === 1) && !isIndex;
+  const plain = simple || alone;
   // A dossier's table (LC54): no tour of the practice, and no other practice to move an act to.
   const bound = useAppStore((s) => s.practices.some((p) => p.id === practiceId && isBoundPractice(p)));
   // In a dossier's «Lettura» (LC55): the act's articles in the dossier. With some, «Rimuovi l'atto» becomes «Togli dal
@@ -128,14 +132,15 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
 
   const heading = actHeading(act.norma);
   const byKey = useMemo(() => new Map(act.articles.map((a) => [practiceArticleKey(a), a])), [act.articles]);
-  // The row the block reads from (Studio, the arrows, the annex): the last one opened, else the first.
-  const current = useMemo(() => {
+  // The row the block reads from (Studio, the arrows, the annex): the last one opened, else the first. Only an open one
+  // is the index's current chip (LC70): one chip marked, not every open row.
+  const activeKey = useMemo(() => {
     for (let i = openKeys.length - 1; i >= 0; i--) {
-      const hit = byKey.get(openKeys[i]);
-      if (hit) return hit;
+      if (byKey.has(openKeys[i])) return openKeys[i];
     }
-    return act.articles[0];
-  }, [openKeys, byKey, act.articles]);
+    return null;
+  }, [openKeys, byKey]);
+  const current = (activeKey && byKey.get(activeKey)) || act.articles[0];
   const studyArticle = (studyKey && byKey.get(studyKey)) || current;
   // Study Mode's tools write notes keyed by the article, not the version: never on a past text (gotcha 32).
   const isLocked = (article: ArticleData | undefined) =>
@@ -240,7 +245,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {...listeners}
           aria-label={`Sposta ${heading}`}
           // Lettura semplice (LC28): one act, nothing to reorder.
-          className={cn(simple ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
+          className={cn(plain ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
@@ -268,7 +273,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 isIndex ? 'text-[17px]' : 'text-[22px]',
               )}
             >
-              {!simple && (
+              {!plain && (
                 <ChevronDown
                   size={16}
                   aria-hidden
@@ -283,7 +288,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {/* On a phone only what the count does not say: the act's articles are its rows and its index, just below. The
               index says neither: its entries are the articles. */}
           {!isIndex && (
-            <p className={cn(simple ? 'ml-0' : 'ml-6', 'truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
+            <p className={cn(plain ? 'ml-0' : 'ml-6', 'truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
               {formatNormaMeta(act.norma, act.articles.length)}
             </p>
           )}
@@ -418,14 +423,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                         <button
                           type="button"
                           onClick={() => revealPracticeRow(practiceId, act.id, key)}
-                          aria-current={openKeys.includes(key) ? 'true' : undefined}
+                          aria-current={key === activeKey ? 'true' : undefined}
                           className={cn(
                             'min-h-[44px] rounded-md px-2 font-medium transition-colors md:min-h-0 md:py-0.5',
                             // 14 px in a dossier's «Lettura» (LC55); the Corpus keeps its 12.
                             hostDossier ? 'text-sm' : 'text-xs',
                             // Inset: the row scrolls sideways on a phone and would clip a ring drawn outside the chip.
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
-                            openKeys.includes(key)
+                            key === activeKey
                               ? 'bg-slate-200/70 text-slate-900 dark:bg-slate-800 dark:text-white'
                               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                           )}
