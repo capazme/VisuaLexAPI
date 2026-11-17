@@ -1303,6 +1303,19 @@ last search and the passages loaded stay in memory for the session (`searchMemor
 storage), so the way back from an article finds the list; `clearRassegneCache` (the logout) forgets it. No store
 (`volumi: 0`) says «Le rassegne non sono ancora caricate su questa installazione.»; a 503 or no answer «Le rassegne non
 sono disponibili al momento.» with «Riprova», a 429 the quota's line. No anchors, notes or highlights (G-399's Q3).
+**In ⌘K** (U3, L-50): a topic (`useSearchQuery`'s `topic`, never a citation) asks `/search_rassegne` too, once the words
+have stood still for 350 ms (`useRassegneForTopic`, which drops an answer that comes after the words changed), and the
+group «Rassegne» under the decisions' row shows the first three passages (the review, year and volume, two lines of text)
+and «Tutti i passi» with the count; no passage or no store draws nothing, a failure one line («Le rassegne non
+rispondono al momento.»). A row remembers the first page (`rememberSearch`) and `GlobalSearch` opens `/rassegne`, the
+passage chosen as the navigation's state by its id (shown whole and focused): the words never in an address nor in the
+history. The page is drawn again on every navigation (`location.key`), so ⌘K used on it shows the new search.
+**A passage into a pratica** (U3, L-51): «Aggiungi alla pratica» (`AddPassageToPratica`, on `RassegnaResult` and on the
+panel's `RassegnaPassage`) opens `AddToDossierPopover` with neither a norm nor a decision — it then adds nothing and only
+reports the pratica chosen — and saves the passage as a note (`addNoteToDossier`; `passageNote`: provenance, source,
+text, the portal's link, the text cut with «…» at the server's 4000 UTF-16 units, the link whole, control characters
+dropped). The note is plain text: the link is not clickable in the pratica nor in the PDF. The toast names the pratica
+with «Apri la pratica».
 
 **«Giurisprudenza» under the article** (`CaseLawSection`, after the text): an accordion closed by default (state per host in
 `sessionStorage`) holding the Massimario's panel (`components/features/rassegne/RassegnePanel`, a block of
