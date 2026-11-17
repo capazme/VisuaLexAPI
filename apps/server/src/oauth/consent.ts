@@ -7,17 +7,17 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 
 /** What each scope lets an application do, as the consent page says it. */
 export const SCOPE_LABELS: Record<string, string> = {
-  'dossier:read': 'Leggere i tuoi dossier: i nomi e le norme che contengono',
+  'dossier:read': 'Leggere le tue pratiche: i nomi, le norme che contengono, le istruzioni che scrivi per l’IA e i nomi dei file degli atti',
   'dossier:write':
-    'Creare dossier, aggiungervi norme e note e glossarne i passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
+    'Creare pratiche, aggiungervi norme, note e atti (anche come versioni nuove: l’originale resta) e glossarne i passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
   'dossier:text':
-    'Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, e le tue note: il testo arriva al fornitore dell’applicazione collegata',
+    'Leggere il testo delle norme e delle sentenze delle tue pratiche, per citarlo alla lettera, le tue note e il testo dei loro atti, con i dati personali che contengono: il testo arriva al fornitore dell’applicazione collegata',
   'lingo:cards:read': 'Leggere le tue schede di studio',
   'lingo:cards:write': 'Creare schede di studio, sempre come tue bozze personali',
   // Percorsi (A1, spec 2026-10-23 §10.6): they join this one consent (G-372), worded as the spec proposes.
   'lingo:courses:read': 'Leggere i tuoi percorsi di studio, i tuoi esiti e le tue segnalazioni',
   'lingo:courses:write': 'Creare percorsi di studio e aggiungervi moduli ed esami (non può modificare né cancellare nulla)',
-  [DELETE_SCOPE]: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
+  [DELETE_SCOPE]: 'Eliminare pratiche, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
 };
 
 const hostOf = (uri: string): string => new URL(uri).hostname;

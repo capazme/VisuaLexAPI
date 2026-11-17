@@ -399,7 +399,7 @@ describe('a full storage', () => {
 
     await Promise.resolve();
     expect(appStore.getState().lastSyncError?.message)
-      .toBe('Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.');
+      .toBe('Lo spazio del browser è esaurito: le impostazioni potrebbero non essere salvate.');
 
     // a second failing save logs nothing more and raises nothing more
     expect(() => appStore.setState({ practices: [practice('p1', 'Uno')] })).not.toThrow();
@@ -447,7 +447,8 @@ describe('clearUserData — logout on a shared browser', () => {
     });
     appStore.setState({ practices: [after], activePracticeId: 'p-new' });
     const state = reload(options().partialize(appStore.getState()));
-    expect(state.practices).toEqual([after]);
-    expect(state.activePracticeId).toBe('p-new');
+    // LC60: the table built after the login is the Ricerca's, of the session: nothing comes back, nothing is migrated.
+    expect(state.practices).toEqual([]);
+    expect(state.activePracticeId).toBeNull();
   });
 });

@@ -47,7 +47,7 @@ describe('the Scrivania on a phone', () => {
 describe('the Scrivania\'s ways to the Corpus tools', () => {
   it('links «Analizza un documento» and «Rassegne», in the flow of the page (seen at 390 px too)', () => {
     renderPage();
-    const tools = screen.getByRole('navigation', { name: 'Altri strumenti del Corpus' });
+    const tools = screen.getByRole('navigation', { name: 'Altri strumenti della Ricerca' });
     const links = within(tools).getAllByRole('link');
     expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['Analizza un documento', '/documents'], ['Rassegne', '/rassegne']]);
     // The links: underlined, in the action's ink (#448: they read as bold text).

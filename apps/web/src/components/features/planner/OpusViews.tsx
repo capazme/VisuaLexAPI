@@ -158,13 +158,13 @@ function ViewFrame({ view, heading, line, defaults, options, before, children, e
 
 /** «Raggruppa: per data / per dossier», the view's option, in a menu. */
 function GroupingMenu({ value, onChange }: { value: Grouping; onChange: (value: Grouping) => void }) {
-  const label = value === 'date' ? 'per data' : 'per dossier';
+  const label = value === 'date' ? 'per data' : 'per pratica';
   return (
     <MenuButton
       label={`Raggruppa: ${label}`}
       triggerClassName={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 px-2 max-md:w-11 max-md:justify-end max-md:px-0 max-md:hover:bg-transparent font-normal no-underline hover:no-underline hover:bg-slate-100 dark:hover:bg-slate-800')}
       items={(['date', 'dossier'] as const).map((choice) => ({
-        label: choice === 'date' ? 'Per data' : 'Per dossier',
+        label: choice === 'date' ? 'Per data' : 'Per pratica',
         checked: choice === value,
         onSelect: () => onChange(choice),
       }))}
@@ -221,7 +221,7 @@ function TodayEmpty() {
           <ul className="border-b border-slate-200 dark:border-slate-800">
             {recent.map((d) => (
               <li key={d.id}>
-                <Link to={`/dossier?dossier=${encodeURIComponent(d.id)}`} className={NEXT_ROW}>
+                <Link to={`/pratiche?dossier=${encodeURIComponent(d.id)}`} className={NEXT_ROW}>
                   <span className="min-w-0 flex-1">
                     <span title={d.title} className="block truncate font-serif text-base text-slate-900 dark:text-slate-50">{d.title}</span>
                     <span className="block text-sm text-slate-600 dark:text-slate-400">
@@ -250,7 +250,7 @@ export function TodayView() {
   const [grouping, setGrouping] = useState<Grouping>(storedGrouping);
   const dossiers = useAppStore((s) => s.dossiers);
   const navigate = useNavigate();
-  const titleOf = (id: string) => dossiers.find((d) => d.id === id)?.title ?? 'Dossier';
+  const titleOf = (id: string) => dossiers.find((d) => d.id === id)?.title ?? 'Pratica';
   const choose = (value: Grouping) => {
     setGrouping(value);
     try {
@@ -262,7 +262,7 @@ export function TodayView() {
   return (
     <ViewFrame
       view="today"
-      heading="Oggi"
+      heading="Scadenziario"
       line={(today) => longDay(today, today)}
       defaults={(day) => ({ plannedDate: day })}
       options={<GroupingMenu value={grouping} onChange={choose} />}
@@ -278,7 +278,7 @@ export function TodayView() {
               heading={group.title}
               count={group.tasks.length}
               add={{ view: 'today', today: day, defaults: { plannedDate: day, ...(group.dossierId ? { dossierId: group.dossierId } : {}) } }}
-              actions={group.dossierId ? [{ label: 'Apri il dossier', icon: FolderOpen, onSelect: () => navigate(`/dossier?dossier=${encodeURIComponent(group.dossierId!)}`) }] : []}
+              actions={group.dossierId ? [{ label: 'Apri la pratica', icon: FolderOpen, onSelect: () => navigate(`/pratiche?dossier=${encodeURIComponent(group.dossierId!)}`) }] : []}
             >
               <TaskList label={group.title} tasks={group.tasks} today={day} optimistic={optimistic} showDossier={false} subtasksOpen />
             </TaskGroup>
@@ -397,9 +397,9 @@ export function InboxView() {
     <ViewFrame
       view="inbox"
       heading="Lista d'ingresso"
-      line="I compiti che non appartengono a un dossier."
+      line="I compiti che non appartengono a una pratica."
       defaults={() => ({})}
-      empty={<TaskViewEmpty title="La lista d'ingresso è vuota" line="Un compito senza dossier arriva qui." art="work-ingresso-vuoto" />}
+      empty={<TaskViewEmpty title="La lista d'ingresso è vuota" line="Un compito senza pratica arriva qui." art="work-ingresso-vuoto" />}
     >
       {(tasks, day, optimistic) => (
         <div>

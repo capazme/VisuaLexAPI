@@ -7,6 +7,7 @@ import { citeStoredItem } from '../norms/decisionCitation';
 import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 import { countingModules } from '../lingo/courses';
 import { LIMITS } from '../schemas/lingo/corso';
+import { deleteDossierFileRows, removeDossierDir } from '../pratica/fileStore';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
@@ -136,7 +137,18 @@ let lastSweep = 0;
 
 /** Removes the entries past their 30 days; returns how many. */
 export async function sweepExpiredTrash(now: Date = new Date()): Promise<number> {
-  const { count } = await prisma.trashEntry.deleteMany({ where: { expiresAt: { lt: now } } });
+  // An expired entry can no longer be restored: the dossiers among them take their case files (LC50) with them.
+  // Their rows (and wrapped keys) go in the entries' transaction; the directories after the commit, best-effort.
+  const { count, gone } = await prisma.$transaction(async (tx) => {
+    const dossiers = await tx.trashEntry.findMany({ where: { expiresAt: { lt: now }, kind: 'DOSSIER' }, select: { userId: true, dossierId: true } });
+    const { count } = await tx.trashEntry.deleteMany({ where: { expiresAt: { lt: now } } });
+    const gone: { userId: string; dossierId: string }[] = [];
+    for (const { userId, dossierId } of dossiers) {
+      if (dossierId && (await deleteDossierFileRows(tx, userId, dossierId))) gone.push({ userId, dossierId });
+    }
+    return { count, gone };
+  });
+  for (const { userId, dossierId } of gone) await removeDossierDir(userId, dossierId);
   return count;
 }
 
@@ -201,7 +213,7 @@ export async function trashDossier(
       const seenIds = new Set(seen.itemIds);
       const sameItems = seenIds.size === dossier.items.length && dossier.items.every((item) => seenIds.has(item.id));
       if (!sameItems || seen.taskCount !== dossier.tasks.length) {
-        throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+        throw new AppError(409, 'La pratica è cambiata dopo la conferma: nulla è stato eliminato.');
       }
     }
     const { items, snapshots, publishedCopy, tasks, ...row } = dossier;
@@ -253,7 +265,7 @@ export async function trashDossierItems(
     // (D7b, which locks the entry's row alone) lands in the payload, one that comes after finds no entry.
     await tx.$queryRaw`SELECT id FROM dossier_items WHERE id IN (${Prisma.join(wanted)}) AND dossier_id = ${dossierId} ORDER BY id FOR UPDATE`;
     const items = await tx.dossierItem.findMany({ where: { id: { in: wanted }, dossierId }, orderBy: { position: 'asc' } });
-    if (items.length === 0) throw new AppError(404, 'Nessuna delle voci indicate è in questo dossier.');
+    if (items.length === 0) throw new AppError(404, 'Nessuna delle voci indicate è in questa pratica.');
     const moved = items.map((item) => item.id);
     const proposals = await lockedProposals(tx, userId, moved);
     const now = new Date();
@@ -274,7 +286,7 @@ export async function trashDossierItems(
     });
     const deleted = await tx.dossierItem.deleteMany({ where: { id: { in: moved }, dossierId } });
     // An entry moved away by a concurrent request between the read and the delete: undo it all.
-    if (deleted.count !== moved.length) throw new AppError(409, 'Il dossier è cambiato nel frattempo: riprova.');
+    if (deleted.count !== moved.length) throw new AppError(409, 'La pratica è cambiata nel frattempo: riprova.');
     if (proposals.length > 0) await tx.highlight.deleteMany({ where: { id: { in: proposals.map((p) => p.id) } } });
     await tx.dossier.update({ where: { id: dossierId }, data: { updatedAt: now } });
     const movedIds = new Set(moved);
@@ -667,7 +679,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
         const target = targetId && (await lockDossier(tx, userId, targetId)) ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
         if (!target) {
           if (targetDossierId) throw new AppError(404, 'Dossier not found');
-          throw new AppError(409, 'Il dossier non esiste più: scegli dove ripristinare.');
+          throw new AppError(409, 'La pratica non esiste più: scegli dove ripristinare.');
         }
         const last = await tx.dossierItem.aggregate({ where: { dossierId: target.id }, _max: { position: true } });
         const start = (last._max.position ?? -1) + 1;
@@ -716,8 +728,17 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
 
 /** Empties one trash entry now. */
 export async function purgeTrashEntry(userId: string, trashId: string): Promise<void> {
-  const { count } = await prisma.trashEntry.deleteMany({ where: { id: trashId, userId, ...(await reachableKinds()) } });
-  if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+  const kinds = await reachableKinds();
+  // A whole dossier gone for good takes its case files (LC50): their rows in the same transaction as the entry
+  // (a restore that won the race leaves nothing to delete, a 404), their directory after the commit.
+  const dossierId = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.trashEntry.findFirst({ where: { id: trashId, userId, ...kinds }, select: { kind: true, dossierId: true } });
+    const { count } = await tx.trashEntry.deleteMany({ where: { id: trashId, userId, ...kinds } });
+    if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+    if (claimed?.kind !== 'DOSSIER' || !claimed.dossierId) return null;
+    return (await deleteDossierFileRows(tx, userId, claimed.dossierId)) ? claimed.dossierId : null;
+  });
+  if (dossierId) await removeDossierDir(userId, dossierId);
 }
 
 // ─── Gymnasium's courses (Percorsi, A1; spec 2026-10-23 §10.9) ───────────────────────────────────────────────

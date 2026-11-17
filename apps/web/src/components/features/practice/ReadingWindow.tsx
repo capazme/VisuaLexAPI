@@ -9,7 +9,10 @@ import { ArticleTabContent } from '../search/ArticleTabContent';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
 import { subjectOf, titleOf, type Subject } from './practiceView';
+import { useDossierItemId } from './inDossier';
 import { closePracticeWindow } from './practiceSwitch';
+import { retryRowText, useRowText } from './useRowText';
+import { RowTextStatus } from './RowTextStatus';
 
 /** The bar of practices floats over the results area (`fixed bottom-6`): a window's scrolling body
  *  keeps the same bottom padding as the column (spec §3.4). */
@@ -98,6 +101,10 @@ interface ReadingWindowBodyProps extends Omit<ReadingWindowProps, 'clearTopRight
 export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }: ReadingWindowBodyProps) {
   const articleKey = besideRef.kind === 'article' ? besideRef.articleKey : '';
   const actId = subject?.kind === 'article' ? subject.actId : '';
+  const textState = useRowText(practiceId, actId, subject?.kind === 'article' ? subject.article : undefined, true);
+  // In a dossier's «Lettura» (LC58): the entry read, for what an application proposed on it and its notes.
+  const dossierItemId = useDossierItemId(practiceId, subject?.kind === 'article' ? { norma: subject.article.norma_data }
+    : subject?.kind === 'decision' ? { decisionId: subject.decisionId } : undefined);
   const readingOrigin = useMemo(
     () => ({ tabId: besideRef.id, blockId: actId, articleKey }),
     [besideRef.id, actId, articleKey],
@@ -110,9 +117,11 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
   );
 
   if (!subject) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Questo testo non è più sul tavolo della pratica.</p>;
+    return <p className="text-sm text-slate-500 dark:text-slate-400">Questo testo non è più sul tavolo.</p>;
   }
   if (subject.kind === 'article') {
+    const { article } = subject;
+    if (textState) return <RowTextStatus state={textState} onRetry={() => retryRowText(practiceId, actId, article)} />;
     return (
       <ArticleTabContent
         data={subject.article}
@@ -120,6 +129,7 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
         readingOrigin={readingOrigin}
         findHostId={practiceId}
         variant="beside"
+        dossierItemId={dossierItemId}
       />
     );
   }
@@ -131,6 +141,7 @@ export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossRefer
         reference={subject.reference}
         hostId={besideRef.id}
         findHostId={practiceId}
+        dossierItemId={dossierItemId}
       />
     );
   }

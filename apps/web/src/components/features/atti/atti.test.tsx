@@ -1,297 +1,293 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
-const atti = vi.hoisted(() => ({
+const files = vi.hoisted(() => ({
   list: vi.fn(),
-  get: vi.fn(),
-  create: vi.fn(),
-  update: vi.fn(),
+  upload: vi.fn(),
+  download: vi.fn(),
+  trash: vi.fn(),
+  restore: vi.fn(),
   remove: vi.fn(),
+  getIstruzioni: vi.fn(),
+  saveIstruzioni: vi.fn(),
 }));
-const dossiers = vi.hoisted(() => ({ getAll: vi.fn(), getById: vi.fn() }));
+const atti = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn() }));
+const saved = vi.hoisted(() => ({ saveBlob: vi.fn() }));
 
+vi.mock('../../../services/praticaFilesService', async (original) => ({ ...(await original<object>()), praticaFilesService: files }));
 vi.mock('../../../services/attiService', async (original) => ({ ...(await original<object>()), attiService: atti }));
-vi.mock('../../../services/dossierService', () => ({ dossierService: dossiers }));
-// «Analizza documento»'s reader has its own tests: here a file's «text» is its name's, and a PDF is refused.
-vi.mock('../documents/documentFile', () => ({
-  readDocumentFile: async (file: File) =>
-    /\.pdf$/i.test(file.name) ? { ok: false, error: 'I PDF non si leggono.' } : { ok: true, text: `Testo di ${file.name}` },
-}));
+vi.mock('../../../utils/saveBlob', () => saved);
 
-import { AttiListView } from './AttiListView';
-import { AttoEditor } from './AttoEditor';
 import { DossierAttiPanel } from './DossierAttiPanel';
-import { SAVE_DELAY_MS, changedOn } from './attiText';
+import { OldAttoRedirect } from './OldAttoRedirect';
+import { SAVE_DELAY_MS } from './attiText';
+import { readDocxBytes } from '../documents/docx/readDocxPackage';
+import { memoryStorage } from '../../../test/memoryStorage';
 
-function Where() {
-  return <span data-testid="where">{useLocation().pathname}</span>;
-}
+const NOTICE_KEY = 'visualex.atti.avviso-visto';
 
-function SentState() {
-  return <span data-testid="sent">{JSON.stringify(useLocation().state)}</span>;
-}
-
-function renderAt(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Where />
-      <Routes>
-        <Route path="/work/atti" element={<AttiListView />} />
-        <Route path="/work/atti/:id" element={<AttoEditor />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
-
-const ATTO = { id: 'a1', titolo: 'Atto di appello', tipo: 'Atto di appello', testo: 'Primo motivo.', stato: 'bozza', dossierId: 'd1', createdAt: '2026-11-15T20:00:00Z', updatedAt: '2026-11-15T20:00:00Z' };
-const DOSSIER = {
-  id: 'd1',
-  name: 'Pratica 2026/14',
-  kind: 'lavoro',
-  is_pinned: false,
-  created_at: '',
-  updated_at: '',
-  items: [
-    { id: 'i1', item_type: 'norm', title: 'Art. 2043', citation: 'art. 2043 c.c.' },
-    { id: 'i2', item_type: 'note', title: 'Nota', content: 'Verificare l’ingiustizia del danno.' },
-    { id: 'i3', item_type: 'sentenza', title: 'Cass. civ., sez. un., n. 34318/2023', citation: null },
-  ],
+const ORIGINAL = {
+  id: 'f1', dossierId: 'd1', nome: 'Citazione.pdf', mime: 'application/pdf', peso: 250_000, versione: 1, versioneDi: null,
+  autore: 'utente', createdAt: '2026-11-10T10:00:00Z', updatedAt: '2026-11-10T10:00:00Z', deletedAt: null,
 };
+const VERSION = {
+  ...ORIGINAL, id: 'f2', nome: 'Citazione v2.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  versione: 2, versioneDi: 'f1', autore: 'claude', createdAt: '2026-11-16T09:00:00Z', updatedAt: '2026-11-16T09:00:00Z',
+};
+const OTHER = { ...ORIGINAL, id: 'f3', nome: 'Procura.pdf', createdAt: '2026-11-12T10:00:00Z', updatedAt: '2026-11-12T10:00:00Z' };
+const TRASHED = { ...ORIGINAL, id: 'f9', nome: 'Vecchio.txt', mime: 'text/plain', deletedAt: '2026-11-16T10:00:00Z' };
+
+function renderPanel() {
+  return render(<MemoryRouter><DossierAttiPanel dossierId="d1" /></MemoryRouter>);
+}
+
+function pick(file: File) {
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  fireEvent.change(input, { target: { files: [file] } });
+}
+
+const pdf = (name = 'Atto.pdf', size = 10) => new File([new Uint8Array(size)], name, { type: 'application/pdf' });
 
 beforeEach(() => {
-  Object.values(atti).forEach((fn) => fn.mockReset());
-  dossiers.getAll.mockResolvedValue([DOSSIER, { ...DOSSIER, id: 'd2', name: 'Studio', kind: 'studio', items: [] }]);
-  dossiers.getById.mockResolvedValue(DOSSIER);
-});
-afterEach(() => vi.useRealTimers());
-
-describe('AttiListView', () => {
-  it('lists the acts with their kind, dossier and state, and opens one', async () => {
-    atti.list.mockResolvedValue([ATTO, { ...ATTO, id: 'a2', titolo: 'Diffida', tipo: null, dossierId: null, stato: 'finale' }]);
-    renderAt('/work/atti');
-    const first = await screen.findByRole('link', { name: /Atto di appello/ });
-    expect(first).toHaveTextContent('Pratica 2026/14');
-    expect(first).toHaveTextContent('Bozza');
-    expect(screen.getByRole('link', { name: /Diffida/ })).toHaveTextContent('Finale');
-    expect(first).toHaveAttribute('href', '/work/atti/a1');
-  });
-
-  it('offers the work dossiers only, creates the act and opens it', async () => {
-    atti.list.mockResolvedValue([]);
-    atti.create.mockResolvedValue({ ...ATTO, id: 'nuovo' });
-    atti.get.mockResolvedValue({ ...ATTO, id: 'nuovo' });
-    renderAt('/work/atti');
-    expect(await screen.findByText(/Non hai ancora atti/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Pratica 2026/14' })).toBeInTheDocument());
-    expect(screen.queryByRole('option', { name: 'Studio' })).toBeNull();
-    fireEvent.change(screen.getByLabelText('Titolo'), { target: { value: '  Appello  ' } });
-    fireEvent.change(screen.getByLabelText('Dossier'), { target: { value: 'd1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crea e apri' }));
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/work/atti/nuovo'));
-    expect(atti.create).toHaveBeenCalledWith({ titolo: 'Appello', tipo: null, dossierId: 'd1' });
-  });
-
-  it('asks for a title before creating, and says why a creation failed', async () => {
-    atti.list.mockResolvedValue([]);
-    atti.create.mockRejectedValue({ status: 404, message: 'Dossier non trovato.' });
-    renderAt('/work/atti');
-    await screen.findByText(/Non hai ancora atti/);
-    fireEvent.click(screen.getByRole('button', { name: 'Crea e apri' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Scrivi il titolo');
-    expect(atti.create).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText('Titolo'), { target: { value: 'A' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crea e apri' }));
-    expect(await screen.findByText('Dossier non trovato.')).toBeInTheDocument();
-  });
-
-  it('says a failed read and reads again on «Riprova»', async () => {
-    atti.list.mockRejectedValueOnce({ message: 'Errore del server. Riprova tra poco.' }).mockResolvedValueOnce([ATTO]);
-    renderAt('/work/atti');
-    expect(await screen.findByText('Errore del server. Riprova tra poco.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByRole('link', { name: /Atto di appello/ })).toBeInTheDocument();
-  });
-
-  it('writes the year only for another year', () => {
-    const now = new Date('2026-11-15T12:00:00Z');
-    expect(changedOn('2026-03-02T12:00:00Z', now)).toBe('2 marzo');
-    expect(changedOn('2025-03-02T12:00:00Z', now)).toBe('2 marzo 2025');
-  });
+  vi.clearAllMocks();
+  vi.stubGlobal('localStorage', memoryStorage());
+  files.list.mockResolvedValue({ files: [{ ...ORIGINAL, versioni: [VERSION] }, { ...OTHER, versioni: [] }], cestino: [TRASHED] });
+  files.getIstruzioni.mockResolvedValue('');
+  files.saveIstruzioni.mockResolvedValue(undefined);
+  files.upload.mockResolvedValue(ORIGINAL);
+  files.trash.mockResolvedValue(undefined);
+  files.restore.mockResolvedValue(undefined);
+  files.remove.mockResolvedValue(undefined);
+  atti.list.mockResolvedValue([]);
 });
 
-describe('AttoEditor', () => {
-  it('saves the text by itself after a pause, once for many keystrokes', async () => {
-    atti.get.mockResolvedValue(ATTO);
-    atti.update.mockImplementation(async (_id, input) => ({ ...ATTO, ...input }));
-    renderAt('/work/atti/a1');
-    fireEvent.click(await screen.findByRole('button', { name: 'Modifica il testo' }));
-    const text = screen.getByLabelText('Testo dell’atto');
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe('the dossier\'s «Atti» tab (LC53)', () => {
+  it('has three parts, in this order, with written headings and the limits beside the upload', async () => {
+    renderPanel();
+    const headings = (await screen.findAllByRole('heading', { level: 3 })).map((h) => h.textContent);
+    expect(headings).toEqual(['Istruzioni per Claude', 'File', 'Carica un file']);
+    expect(screen.getByText('Claude le legge per prime quando lavora su questa pratica.')).toBeInTheDocument();
+    expect(screen.getByText('Fino a 25 MB per file. PDF, Word, ODT, RTF, TXT, JPG, PNG.')).toBeInTheDocument();
+  });
+
+  it('saves the instructions by itself and says «Salvato»', async () => {
+    renderPanel();
+    const box = await screen.findByRole('textbox', { name: 'Istruzioni per Claude' });
     vi.useFakeTimers();
-    fireEvent.change(text, { target: { value: 'Primo motivo. Secondo' } });
-    fireEvent.change(text, { target: { value: 'Primo motivo. Secondo motivo.' } });
-    expect(screen.getByRole('status')).toHaveTextContent('Salvataggio…');
-    await act(async () => {
-      vi.advanceTimersByTime(SAVE_DELAY_MS);
-    });
+    fireEvent.change(box, { target: { value: 'Cita solo la Cassazione.' } });
+    expect(files.saveIstruzioni).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(SAVE_DELAY_MS); });
+    expect(files.saveIstruzioni).toHaveBeenCalledWith('d1', 'Cita solo la Cassazione.');
     vi.useRealTimers();
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Salvato alle/));
-    expect(atti.update).toHaveBeenCalledTimes(1);
-    expect(atti.update).toHaveBeenCalledWith('a1', expect.objectContaining({ testo: 'Primo motivo. Secondo motivo.', titolo: 'Atto di appello' }));
+    expect(await screen.findByText('Salvato')).toBeInTheDocument();
   });
 
-  it('keeps a failed save on screen and saves again on «Riprova»', async () => {
-    atti.get.mockResolvedValue(ATTO);
-    atti.update.mockRejectedValueOnce({ message: 'Troppe richieste in poco tempo. Riprova più tardi.' }).mockResolvedValueOnce(ATTO);
-    renderAt('/work/atti/a1');
-    const title = await screen.findByLabelText('Titolo dell’atto');
-    fireEvent.change(title, { target: { value: 'Appello' } });
-    fireEvent.blur(title);
-    expect(await screen.findByText('Troppe richieste in poco tempo. Riprova più tardi.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Salvato alle/));
-    expect(atti.update).toHaveBeenLastCalledWith('a1', expect.objectContaining({ titolo: 'Appello' }));
+  it('«Grassetto» and «Elenco» write the Markdown into the instructions', async () => {
+    renderPanel();
+    const box = (await screen.findByRole('textbox', { name: 'Istruzioni per Claude' })) as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: 'importante' } });
+    box.setSelectionRange(0, 10);
+    fireEvent.click(screen.getByRole('button', { name: 'Grassetto' }));
+    expect(box.value).toBe('**importante**');
+    box.setSelectionRange(0, 0);
+    fireEvent.click(screen.getByRole('button', { name: 'Elenco' }));
+    expect(box.value).toBe('- **importante**');
   });
 
-  it('does not save an empty title', async () => {
-    atti.get.mockResolvedValue(ATTO);
-    renderAt('/work/atti/a1');
-    const title = await screen.findByLabelText('Titolo dell’atto');
-    fireEvent.change(title, { target: { value: '  ' } });
-    fireEvent.blur(title);
-    expect(await screen.findByRole('status')).toHaveTextContent('Il titolo è obbligatorio');
-    expect(atti.update).not.toHaveBeenCalled();
+  it('lists the files, the last changed first, with the versions under the original and who wrote them', async () => {
+    renderPanel();
+    const list = await screen.findByRole('list', { name: 'File della pratica' });
+    const rows = within(list).getAllByRole('listitem').filter((li) => li.parentElement === list);
+    expect(rows.map((row) => within(row).getAllByText(/\.(pdf|docx)$/)[0].textContent)).toEqual(['Citazione.pdf', 'Procura.pdf']);
+    expect(within(rows[0]).getByText(/versione 2, scritta da Claude, il 16 novembre/)).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/PDF · 250 KB · caricato da te il 12 novembre/)).toBeInTheDocument();
+    for (const label of ['Scarica', 'Carica una versione nuova', 'Sposta nel cestino']) {
+      expect(within(rows[1]).getByRole('button', { name: new RegExp(label) })).toBeInTheDocument();
+    }
   });
 
-  it('lists the dossier’s norms and decisions, and «Cita» writes one where the cursor is', async () => {
-    atti.get.mockResolvedValue({ ...ATTO, testo: 'Visto e considerato' });
-    atti.update.mockResolvedValue(ATTO);
-    renderAt('/work/atti/a1');
-    expect(await screen.findByText('art. 2043 c.c.')).toBeInTheDocument();
-    // Reading: the sources are there, «Cita» only once the text is open to a correction.
-    expect(screen.queryByRole('button', { name: /^Cita/ })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Modifica il testo' }));
-    const text = screen.getByLabelText('Testo dell’atto') as HTMLTextAreaElement;
-    expect(screen.getByRole('button', { name: 'Cita Cass. civ., sez. un., n. 34318/2023' })).toBeInTheDocument();
-    expect(screen.queryByText('Cita Una nota')).toBeNull();
-    text.setSelectionRange(5, 5);
-    fireEvent.click(screen.getByRole('button', { name: 'Cita art. 2043 c.c.' }));
-    expect(text.value).toBe('Vistoart. 2043 c.c. e considerato');
+  it('«Scarica» saves the file under its name', async () => {
+    const blob = new Blob(['x']);
+    files.download.mockResolvedValue(blob);
+    renderPanel();
+    const list = await screen.findByRole('list', { name: 'File della pratica' });
+    fireEvent.click(within(list).getAllByRole('button', { name: /^Scarica/ })[0]);
+    await waitFor(() => expect(saved.saveBlob).toHaveBeenCalledWith(blob, 'Citazione.pdf'));
+    expect(files.download).toHaveBeenCalledWith('d1', 'f1');
   });
 
-  it('deletes only after the confirmation, and goes back to the list', async () => {
-    atti.get.mockResolvedValue(ATTO);
-    atti.remove.mockResolvedValue(undefined);
-    atti.list.mockResolvedValue([]);
-    renderAt('/work/atti/a1');
-    // Not among the page's buttons: in the «⋯» menu, last.
-    expect(await screen.findByRole('button', { name: 'Altre azioni sull’atto' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Elimina/ })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni sull’atto' }));
-    const items = screen.getAllByRole('menuitem');
-    expect(items.map((item) => item.textContent)).toEqual(['Carica una nuova versione', 'Copia il testo', 'Scarica in .txt', 'Elimina l’atto']);
-    fireEvent.click(items.at(-1)!);
-    expect(atti.remove).not.toHaveBeenCalled();
+  it('the first upload shows the notice, with the test line; the next ones do not', async () => {
+    renderPanel();
+    await screen.findByRole('list', { name: 'File della pratica' });
+    pick(pdf());
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Non si può annullare');
-    fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/work\/atti$/));
-    expect(atti.remove).toHaveBeenCalledWith('a1');
+    expect(dialog).toHaveTextContent('I file che carichi restano sul server di LexCraft, cifrati. Nell\'app li vedi solo tu; chi gestisce il server, se serve, può accedervi. Se li fai leggere a Claude, il loro testo arriva al modello che usi.');
+    expect(dialog).toHaveTextContent('È una prova: non caricare atti veri di clienti.');
+    expect(files.upload).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ho capito, carica' }));
+    await waitFor(() => expect(files.upload).toHaveBeenCalledWith('d1', expect.any(File), undefined));
+    expect(localStorage.getItem(NOTICE_KEY)).toBe('1');
+
+    pick(pdf('Secondo.pdf'));
+    await waitFor(() => expect(files.upload).toHaveBeenCalledTimes(2));
+    // The first dialog may still be closing: none stays, and none opens again.
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
   });
 
-  it('says an act that cannot be opened', async () => {
-    atti.get.mockRejectedValue({ status: 404, message: 'Atto non trovato.' });
-    renderAt('/work/atti/zz');
-    expect(await screen.findByRole('alert')).toHaveTextContent('Atto non trovato.');
-    expect(screen.getByRole('link', { name: 'Tutti gli atti' })).toHaveAttribute('href', '/work/atti');
+  it('«Annulla» on the notice uploads nothing and asks again next time', async () => {
+    renderPanel();
+    await screen.findByRole('list', { name: 'File della pratica' });
+    pick(pdf());
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Annulla' }));
+    expect(files.upload).not.toHaveBeenCalled();
+    expect(localStorage.getItem(NOTICE_KEY)).toBeNull();
   });
 
-  it('opens an act with a text to read, with the dossier’s notes beside it and the way back to the dossier’s acts', async () => {
-    atti.get.mockResolvedValue({ ...ATTO, testo: 'Primo motivo.\n\nSecondo motivo.' });
-    renderAt('/work/atti/a1');
-    const article = await screen.findByRole('article', { name: 'Testo dell’atto' });
-    // As written, line for line (the same lines as in «Modifica il testo»).
-    expect(article).toHaveTextContent('Primo motivo. Secondo motivo.');
-    expect(screen.queryByRole('textbox', { name: 'Testo dell’atto' })).toBeNull();
-    expect(await screen.findByText('Verificare l’ingiustizia del danno.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Atti del dossier' })).toHaveAttribute('href', '/dossier?dossier=d1&vista=atti');
+  it('«Carica una versione nuova» uploads under that file', async () => {
+    localStorage.setItem(NOTICE_KEY, '1');
+    renderPanel();
+    const list = await screen.findByRole('list', { name: 'File della pratica' });
+    fireEvent.click(within(list).getAllByRole('button', { name: /Carica una versione nuova/ })[0]);
+    pick(pdf());
+    await waitFor(() => expect(files.upload).toHaveBeenCalledWith('d1', expect.any(File), 'f1'));
   });
 
-  it('«Analizza l’atto» opens «Analizza documento» with the act’s text', async () => {
-    atti.get.mockResolvedValue(ATTO);
-    render(
-      <MemoryRouter initialEntries={['/work/atti/a1']}>
-        <Routes>
-          <Route path="/work/atti/:id" element={<AttoEditor />} />
-          <Route path="/documents" element={<SentState />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    fireEvent.click(await screen.findByRole('button', { name: 'Analizza l’atto' }));
-    expect(await screen.findByTestId('sent')).toHaveTextContent(JSON.stringify({ atto: { id: 'a1', titolo: 'Atto di appello', testo: 'Primo motivo.' } }));
+  it('a file over 25 MB is refused before it is sent', async () => {
+    localStorage.setItem(NOTICE_KEY, '1');
+    renderPanel();
+    await screen.findByRole('list', { name: 'File della pratica' });
+    pick(pdf('Grande.pdf', 25 * 1024 * 1024 + 1));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il file supera 25 MB.');
+    expect(files.upload).not.toHaveBeenCalled();
   });
 
-  it('opens an empty act to be written', async () => {
-    atti.get.mockResolvedValue({ ...ATTO, testo: '' });
-    renderAt('/work/atti/a1');
-    expect(await screen.findByRole('textbox', { name: 'Testo dell’atto' })).toBeInTheDocument();
+  it('an empty file is refused before it is sent, as empty', async () => {
+    localStorage.setItem(NOTICE_KEY, '1');
+    renderPanel();
+    await screen.findByRole('list', { name: 'File della pratica' });
+    pick(pdf('Vuoto.pdf', 0));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il file è vuoto.');
+    expect(files.upload).not.toHaveBeenCalled();
   });
 
-  it('replaces the text with a new version from its file, after the confirmation', async () => {
-    atti.get.mockResolvedValue(ATTO);
-    atti.update.mockImplementation(async (_id, input) => ({ ...ATTO, ...input }));
-    const { container } = renderAt('/work/atti/a1');
-    await screen.findByRole('article', { name: 'Testo dell’atto' });
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [new File(['Testo della versione 3.'], 'appello v3.txt', { type: 'text/plain' })] } });
+  it.each([
+    [{ status: 413, message: 'La pratica supera 500 MB di file (cestino compreso).' }, 'Con questo file la pratica supererebbe 500 MB (cestino compreso).'],
+    [{ status: 413, message: 'Il tuo account supera 2 GB di file (cestino compreso).' }, 'Con questo file il tuo account supererebbe 2 GB.'],
+    [{ status: 415, message: 'Formato non ammesso: PDF, DOCX, DOC, ODT, RTF, TXT, JPG o PNG, controllati sul contenuto.' }, 'Formato non ammesso: PDF, DOCX, DOC, ODT, RTF, TXT, JPG o PNG, controllati sul contenuto.'],
+  ])('an upload refused says so (%o)', async (failure, shown) => {
+    localStorage.setItem(NOTICE_KEY, '1');
+    files.upload.mockRejectedValue(failure);
+    renderPanel();
+    await screen.findByRole('list', { name: 'File della pratica' });
+    pick(pdf());
+    expect(await screen.findByRole('alert')).toHaveTextContent(shown);
+  });
+
+  it('a file that no longer decrypts says to tell who runs LexCraft', async () => {
+    files.download.mockRejectedValue({ status: 500, message: 'Il file non si può decifrare: la chiave del server è cambiata o il file è danneggiato.' });
+    renderPanel();
+    const list = await screen.findByRole('list', { name: 'File della pratica' });
+    fireEvent.click(within(list).getAllByRole('button', { name: /^Scarica/ })[0]);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il file non si può decifrare: la chiave del server è cambiata o il file è danneggiato. Avvisa chi gestisce LexCraft.');
+  });
+
+  it('«Sposta nel cestino», then the trash with «Ripristina» and «Elimina» (asked first; never «per sempre»)', async () => {
+    renderPanel();
+    const list = await screen.findByRole('list', { name: 'File della pratica' });
+    fireEvent.click(within(list).getByRole('button', { name: 'Sposta nel cestino Procura.pdf' }));
+    await waitFor(() => expect(files.trash).toHaveBeenCalledWith('d1', 'f3'));
+
+    const trash = screen.getByRole('list', { name: 'Cestino della pratica' });
+    fireEvent.click(within(trash).getByRole('button', { name: /Ripristina/ }));
+    await waitFor(() => expect(files.restore).toHaveBeenCalledWith('d1', 'f9'));
+
+    fireEvent.click(within(trash).getByRole('button', { name: /Elimina/ }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent('appello v3.txt');
-    expect(atti.update).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Sostituisci' }));
-    expect(await screen.findByText('Testo di appello v3.txt')).toBeInTheDocument();
-    fireEvent.blur(screen.getByLabelText('Titolo dell’atto'));
-    await waitFor(() => expect(atti.update).toHaveBeenCalledWith('a1', expect.objectContaining({ testo: 'Testo di appello v3.txt' })));
+    expect(files.remove).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toMatch(/per sempre/i);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await waitFor(() => expect(files.remove).toHaveBeenCalledWith('d1', 'f9'));
+  });
+
+  it('without the server key (503) the files say they are off, and the instructions still work', async () => {
+    files.list.mockRejectedValue({ status: 503, message: "L'archivio dei file della pratica non è configurato su questo server." });
+    files.getIstruzioni.mockResolvedValue('Testo salvato');
+    renderPanel();
+    expect(await screen.findByText('I file della pratica non sono attivi su questo server.')).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Istruzioni per Claude' })).toHaveValue('Testo salvato');
+  });
+
+  it('without the server key (503) «Carica un file» is not active (LC61)', async () => {
+    files.list.mockRejectedValue({ status: 503, message: 'off' });
+    renderPanel();
+    await screen.findByText('I file della pratica non sono attivi su questo server.');
+    expect(screen.getByRole('button', { name: 'Carica un file' })).toBeDisabled();
+    expect(screen.queryByText('oppure trascinalo qui.')).toBeNull();
+  });
+
+  it('the drafts written with the old editor are offered as Word files', async () => {
+    atti.list.mockResolvedValue([
+      { id: 'a1', titolo: 'Procura alle liti', tipo: null, stato: 'bozza', dossierId: 'd1', createdAt: '', updatedAt: '' },
+      { id: 'a2', titolo: 'Data Breach', tipo: null, stato: 'finale', dossierId: 'd1', createdAt: '', updatedAt: '' },
+    ]);
+    atti.get.mockResolvedValue({ id: 'a1', titolo: 'Procura alle liti', testo: 'Il sottoscritto\nconferisce procura.', dossierId: 'd1' });
+    renderPanel();
+    expect(await screen.findByText('Hai 2 bozze scritte nella versione precedente')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /Scarica come Word/ })[0]);
+    await waitFor(() => expect(saved.saveBlob).toHaveBeenCalled());
+    expect(atti.get).toHaveBeenCalledWith('a1');
+    const [blob, name] = saved.saveBlob.mock.calls[0] as [Blob, string];
+    expect(name).toBe('Procura alle liti.docx');
+    const bytes = await new Promise<Uint8Array>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+      reader.readAsArrayBuffer(blob);
+    });
+    expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    const reading = await readDocxBytes(bytes);
+    expect(reading.text).toContain('Procura alle liti');
+    expect(reading.text).toContain('conferisce procura.');
+  });
+
+  it('with no old drafts there is no such line', async () => {
+    renderPanel();
+    await screen.findByRole('list', { name: 'File della pratica' });
+    expect(screen.queryByText(/versione precedente/)).not.toBeInTheDocument();
   });
 });
 
-describe('DossierAttiPanel', () => {
-  function renderPanel() {
-    return render(
-      <MemoryRouter initialEntries={['/dossier']}>
+function Where() {
+  const { pathname, search } = useLocation();
+  return <span data-testid="where">{pathname + search}</span>;
+}
+
+describe('the old act addresses (LC53)', () => {
+  const renderAt = (path: string) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
         <Where />
         <Routes>
-          <Route path="/dossier" element={<DossierAttiPanel dossierId="d1" />} />
-          <Route path="/work/atti/:id" element={<span>editor</span>} />
+          <Route path="/work/atti/:id" element={<OldAttoRedirect />} />
+          <Route path="*" element={null} />
         </Routes>
       </MemoryRouter>,
     );
-  }
 
-  it('lists the dossier’s acts only', async () => {
-    atti.list.mockResolvedValue([ATTO]);
-    renderPanel();
-    expect(await screen.findByRole('link', { name: /Atto di appello/ })).toHaveAttribute('href', '/work/atti/a1');
-    expect(atti.list).toHaveBeenCalledWith('d1');
+  it('an act with a dossier leads to that dossier\'s «Atti» tab', async () => {
+    atti.get.mockResolvedValue({ id: 'a1', dossierId: 'd1' });
+    renderAt('/work/atti/a1');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/pratiche?dossier=d1&vista=atti'));
   });
 
-  it('loads an act from its file into the dossier and opens it', async () => {
-    atti.list.mockResolvedValue([]);
-    atti.create.mockResolvedValue({ ...ATTO, id: 'caricato' });
-    const { container } = renderPanel();
-    await screen.findByText('Questo dossier non ha ancora atti.');
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [new File(['Atto in prova.'], 'Atto di citazione.txt', { type: 'text/plain' })] } });
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/work/atti/caricato'));
-    expect(atti.create).toHaveBeenCalledWith({ titolo: 'Atto di citazione', testo: 'Testo di Atto di citazione.txt', dossierId: 'd1' });
-  });
-
-  it('refuses a PDF, saying why, and creates nothing', async () => {
-    atti.list.mockResolvedValue([]);
-    const { container } = renderPanel();
-    await screen.findByText('Questo dossier non ha ancora atti.');
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [new File(['%PDF'], 'atto.pdf', { type: 'application/pdf' })] } });
-    expect(await screen.findByRole('alert')).toHaveTextContent('PDF');
-    expect(atti.create).not.toHaveBeenCalled();
+  it('an act without one, or one that cannot be read, leads to the dossiers', async () => {
+    atti.get.mockResolvedValue({ id: 'a1', dossierId: null });
+    renderAt('/work/atti/a1');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/pratiche$/));
   });
 });

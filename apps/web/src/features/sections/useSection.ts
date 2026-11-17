@@ -17,7 +17,7 @@ import { playSectionTransition } from './sectionTransition';
  */
 export const sectionStore = create<{
   section: SectionId;
-  /** The kind of the last of Opus and Gymnasium: the dossiers `/dossier` lists from any section (S7). */
+  /** The kind of the last of Opus and Gymnasium: the dossiers `/pratiche` lists from any section (S7). */
   dossierKind: DossierKind;
   setSection: (section: SectionId) => void;
 }>()(

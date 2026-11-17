@@ -14,7 +14,7 @@ vi.mock('framer-motion', async (importOriginal) => ({
 
 import { CommandPalette } from './CommandPalette';
 import { appStore } from '../../../store/useAppStore';
-import { SEARCH_FIELD_FORM_ID } from '../../../utils/searchFieldControl';
+import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID } from '../../../utils/searchFieldControl';
 import type { CustomAlias, QuickNorm } from '../../../types';
 
 /**
@@ -154,6 +154,46 @@ describe('CommandPalette — growing out of the field (R2)', () => {
         { clipPath: 'inset(0px 0px calc(100% - 44px) 0px round 12px)' },
         { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' },
       ]));
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+    }
+  });
+
+  it('grows out of the top bar\'s pill as an island: the shape changes, the content is never cut and fades in at the end (LC40)', async () => {
+    asDesktop(true);
+    const asked: { keyframes: Keyframe[]; options: KeyframeAnimationOptions; el: HTMLElement }[] = [];
+    const animateSpy = vi.fn(function (this: HTMLElement, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
+      asked.push({ keyframes, options, el: this });
+      return { cancel: vi.fn(), onfinish: null, playState: 'running' } as unknown as Animation;
+    });
+    Object.defineProperty(HTMLElement.prototype, 'animate', { value: animateSpy, configurable: true, writable: true });
+    try {
+      const pill = document.createElement('button');
+      pill.id = SEARCH_ISLAND_ID;
+      pill.setAttribute('data-compact', '');
+      Object.defineProperty(pill, 'offsetHeight', { value: 32 });
+      Object.defineProperty(pill, 'offsetWidth', { value: 352 });
+      // The pill in the bar's middle of a 1024 px window: the 768 px panel reaches 208 px past it on each side.
+      pill.getBoundingClientRect = () => ({ left: 336, top: 10, width: 352, height: 32, right: 688, bottom: 42, x: 336, y: 10, toJSON: () => ({}) }) as DOMRect;
+      document.body.append(pill);
+      render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+      const dialog = screen.getByRole('dialog', { name: 'Menu di ricerca' });
+      const shape = dialog.querySelector<HTMLElement>('[data-island-shape]')!;
+      const content = dialog.querySelector<HTMLElement>('[data-island-content]')!;
+      // Nothing clips the content: only the shape moves, from the pill's rectangle and round ends to the panel.
+      expect(content.style.clipPath).toBe('');
+      const grow = asked.find((a) => a.el === shape)!;
+      expect(grow.keyframes).toEqual([
+        { left: '208px', right: '208px', bottom: 'calc(100% - 32px)', borderRadius: '16px' },
+        { left: '0px', right: '0px', bottom: '0px', borderRadius: '16px' },
+      ]);
+      expect(grow.options).toMatchObject({ duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+      // The content whole, in one fade, near the shape's end; no groups coming one by one.
+      const show = asked.find((a) => a.el === content)!;
+      expect(show.keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+      expect(show.options).toMatchObject({ duration: 120, delay: 255 });
+      expect(asked.filter((a) => a.el.hasAttribute('cmdk-group'))).toEqual([]);
+      pill.remove();
     } finally {
       Reflect.deleteProperty(HTMLElement.prototype, 'animate');
     }
@@ -312,7 +352,7 @@ describe('CommandPalette — the field and the steps', () => {
     const crumb = screen.getByRole('button', { name: 'Torna indietro: Codice civile' });
     expect(crumb).toHaveTextContent('Codice civile');
     await user.click(crumb);
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
   });
 
   it('goes back a step with Backspace on the empty field it opens with, from the keyboard alone (R2, Bill)', async () => {
@@ -320,12 +360,12 @@ describe('CommandPalette — the field and the steps', () => {
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     // «Codice penale», Enter: the article's field, empty, has the focus.
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'codice penale{Enter}');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'codice penale{Enter}');
     const box = await screen.findByRole('textbox', { name: "Numero dell'articolo" });
     await waitFor(() => expect(box).toHaveFocus());
     expect(box).toHaveValue('');
     await user.keyboard('{Backspace}');
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
   });
 
   it('a held Backspace stops at an empty field, and the date gives way to the number first (R2)', async () => {
@@ -492,7 +532,7 @@ describe('CommandPalette — the keys', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     // still on the first step: Enter did not reach cmdk's list (no act in the field's crumb)
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Torna indietro/ })).toBeNull();
   });
 

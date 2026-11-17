@@ -86,10 +86,17 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   description tells the model not to fall back to a note; design
   `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2; the server's `candidates` is left out of
   its answer, `detail` names them), `omnilex_aggiungi_nota_dossier` (`note`, 1–10
-  plain-text notes up to 4,000 characters each, in a dossier or about one of its articles with
+  notes up to 4,000 characters each, in simple Markdown (D4: bold, `##` titles, `-`/`1.` lists, no HTML; the web draws
+  an application's note so, `NoteText`), in a dossier or about one of its articles with
   `voce`, the entry's id; one request per note, one refused and the others go on, answered `{ entrate: [{ nota, id,
   nota_su }], non_entrate?: [{ nota, motivo }] }`, and an error when every note was refused for the same reason;
-  the single `testo`/`voce` form is gone (D8 S1); add-only), `omnilex_stato_account`. A dossier has a kind, `tipo` in the tools:
+  the single `testo`/`voce` form is gone (D8 S1); add-only), `omnilex_stato_account`; and the case's three
+  (`src/tools/pratica.ts`, LC56, listed right after them, always): `omnilex_leggi_pratica` (one call, as text: the
+  lawyer's instructions for Claude first, then sources, notes [their text under `dossier:text`, as
+  `omnilex_leggi_dossier`] and the act files with their ids and versions; `GET /dossiers` and `…/contesto`),
+  `omnilex_leggi_file_pratica` (`dossier:text`: a file's extracted text, a part at a time, or why there is none) and
+  `omnilex_deposita_atto` (`dossier:write`: text or simple Markdown made a DOCX by the server, new or, with
+  `versione_di`, a new version beside the original). No tool writes the instructions. A dossier has a kind, `tipo` in the tools:
   `omnilex_crea_dossier` takes `lavoro` (a practice, the default) or `studio` (a topic
   studied), and `omnilex_elenca_dossier` / `omnilex_leggi_dossier` say it (an older server's
   answer without one reads as `lavoro`). No tool publishes to the Forum: publishing makes data
@@ -97,7 +104,7 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   (owner, 14 October 2026, question 189). `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
   `created_by`) and which article a note is about (`nota_su`). Only when the caller's token holds `dossier:text`
-  («Leggere i testi», whose consent words say «e le tue note»: G-381 (b), owners, 29 October 2026) it also gives each
+  («Leggere i testi», whose consent words name «le tue note» since G-381 (b), owners, 29 October 2026, and the acts of a case since LC56, version 2) it also gives each
   note's text (`testo`), its first 500 characters with `troncata: true` when cut (never inside a surrogate pair), and one
   note whole with `nota_intera` (refused without the scope, or for an id that is not a note of the dossier). The
   server is the gate: the dossier is then read with a token exchanged for `dossier:read dossier:text`, and the server

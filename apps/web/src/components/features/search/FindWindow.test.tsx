@@ -139,9 +139,9 @@ describe('FindWindow — opening', () => {
   it('a bare second request leaves the scope alone', () => {
     render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     act(() => openFindWindow());
-    expect(screen.getByRole('button', { name: 'Tutte le pratiche' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Tutti i tavoli' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('the magnifier opens it scoped to its tab and takes the first match in that text', async () => {
@@ -149,7 +149,7 @@ describe('FindWindow — opening', () => {
     const b = addDrawnTab('B', N2, 'fatto uno, fatto due');
     render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     typeQuery('fatto');
     await settle();
     expect(counter()).toHaveTextContent('di 3');
@@ -157,7 +157,7 @@ describe('FindWindow — opening', () => {
     // B was raised last; the magnifier of A asks for A.
     act(() => openFindWindow({ tabId: a, targetKey: keyOf(N1) }));
     await settle();
-    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questo tavolo' })).toHaveAttribute('aria-pressed', 'true');
     expect(counter()).toHaveTextContent('1 di 1');
     expect(registry.get('vlx-find-current')?.ranges[0].toString().toLowerCase()).toBe('fatto');
     expect(registry.get('vlx-find-current')?.ranges[0].startContainer.parentElement?.textContent).toBe('un fatto in A');
@@ -184,10 +184,10 @@ describe('FindWindow — opening', () => {
     await settle();
     expect(counter()).toHaveTextContent('1 di 1');
     expect(screen.queryByTestId('find-where')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     await settle();
-    expect(screen.getByRole('button', { name: 'Tutte le pratiche' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Tutti i tavoli' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questo tavolo' })).toHaveAttribute('aria-pressed', 'false');
     expect(counter()).toHaveTextContent(/^\d di 3/);
     // One label for an article: its `shortNorm`, and the practice that holds it.
     expect(screen.getByTestId('find-where')).toHaveTextContent(new RegExp(`^${shortNorm(N1)} · Tab A$`));
@@ -210,7 +210,7 @@ describe('FindWindow — opening', () => {
     cleanups.push(registerFindRoot({ tabId: practiceId, targetKey: decisionKey(identity), label: 'Cass. civ., n. 1234/2020', element }));
     render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     typeQuery('fatto');
     await settle();
     expect(counter()).toHaveTextContent('1 di 1');
@@ -228,7 +228,7 @@ describe('FindWindow — opening', () => {
 
     // The reader moves on to B and widens the search; a new query starts where the reader is.
     act(() => appStore.getState().setActivePractice(b));
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     await settle();
     typeQuery('fatt');
     await settle();
@@ -268,10 +268,10 @@ describe('FindWindow — opening', () => {
   it('remembers the scope for the session', () => {
     const { unmount } = render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     act(() => closeFindWindow());
     act(() => openFindWindow());
-    expect(screen.getByRole('button', { name: 'Tutte le pratiche' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Tutti i tavoli' })).toHaveAttribute('aria-pressed', 'true');
     unmount();
   });
 
@@ -287,7 +287,7 @@ describe('FindWindow — opening', () => {
     await settle();
     expect(screen.getByTestId('probe')).toHaveTextContent('false');
     act(() => openFindWindow({ tabId: a }));
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     await settle();
     expect(screen.getByTestId('probe')).toHaveTextContent('false');
     act(() => closeFindWindow());
@@ -529,7 +529,7 @@ describe('FindWindow — on a phone', () => {
     for (const name of ['Risultato precedente', 'Risultato successivo', 'Chiudi la ricerca']) {
       expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
     }
-    for (const name of ['Questa pratica', 'Tutte le pratiche']) {
+    for (const name of ['Questo tavolo', 'Tutti i tavoli']) {
       expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]');
     }
   });
@@ -544,11 +544,11 @@ describe('FindWindow over the practices (spec §6.6)', () => {
     s().addArticlesToPractice(here, { tipo_atto: 'codice civile', data: '' }, [article(N1, 'un fatto qui')]);
     render(<FindWindow />);
     act(() => openFindWindow());
-    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questo tavolo' })).toHaveAttribute('aria-pressed', 'true');
     typeQuery('fatto');
     await settle();
     expect(counter()).toHaveTextContent('1 di 1');
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti i tavoli' }));
     await settle();
     expect(counter()).toHaveTextContent(/di 2/);
     act(() => screen.getByRole('button', { name: 'Risultato successivo' }).click());

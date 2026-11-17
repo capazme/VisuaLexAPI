@@ -52,7 +52,7 @@ const LIST_SELECT = { id: true, titolo: true, tipo: true, stato: true, dossierId
 async function ownDossier(userId: string, dossierId: string | null | undefined) {
   if (!dossierId) return;
   const dossier = await prisma.dossier.findFirst({ where: { id: dossierId, userId }, select: { id: true } });
-  if (!dossier) throw new AppError(404, 'Dossier non trovato.');
+  if (!dossier) throw new AppError(404, 'Pratica non trovata.');
 }
 
 async function ownAtto(userId: string, attoId: string) {

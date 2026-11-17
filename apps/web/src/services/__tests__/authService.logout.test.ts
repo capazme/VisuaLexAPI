@@ -8,7 +8,7 @@ const realLocation = window.location;
 
 beforeEach(() => {
   sessionStorage.clear();
-  vi.stubGlobal('location', { pathname: '/dossier', search: '', hash: '', href: 'http://localhost/dossier' });
+  vi.stubGlobal('location', { pathname: '/pratiche', search: '', hash: '', href: 'http://localhost/dossier' });
 });
 
 afterEach(() => {

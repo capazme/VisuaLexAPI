@@ -313,7 +313,7 @@ describe('trashDossierItems — removing entries moves them to the trash in one 
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await appStore.getState().trashDossierItems('d1', ['b', 'e', 'c'])).toBeNull();
     expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e']);
-    expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dal dossier. Riprova.');
+    expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dalla pratica. Riprova.');
     error.mockRestore();
   });
 

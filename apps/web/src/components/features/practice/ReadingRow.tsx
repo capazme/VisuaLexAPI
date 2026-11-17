@@ -10,6 +10,7 @@ import { workspaceOrigin } from '../../../utils/workspaceOrigin';
 import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 import { INDEX_WIDTH, RAIL_WIDTH, besideLayout } from './besideLayout';
 import { PracticeTable, type PracticeTableProps } from './PracticeTable';
+import { useHostedPractice } from './readingHost';
 import { ReadingWindow } from './ReadingWindow';
 import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 
@@ -95,8 +96,8 @@ function useOverviewScroll(rootRef: RefObject<HTMLElement | null>, practiceId: s
  * headers (§4.4).
  */
 export function ReadingRow(props: Omit<PracticeTableProps, 'layout' | 'concealed'>) {
-  const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
-  const revealPending = useAppStore((s) => s.pendingReveal?.practiceId === s.activePracticeId);
+  const practice = useHostedPractice(props.practiceId);
+  const revealPending = useAppStore((s) => practice !== undefined && s.pendingReveal?.practiceId === practice.id);
   const windows = practice?.beside ?? NO_WINDOWS;
   const count = Math.min(windows.length, MAX_BESIDE) as 0 | 1 | 2;
   const reading = count > 0;

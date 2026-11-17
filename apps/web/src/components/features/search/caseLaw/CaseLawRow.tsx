@@ -1,10 +1,14 @@
-import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FolderPlus } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../../constants/interactions';
 import { formatDateItalianLong } from '../../../../utils/dateUtils';
 import { DECISION_PAGE_AVAILABLE, formatDecisionShort, linkableDecisionPath, type LooseDecisionRef } from '../../../../utils/decisionLinks';
 import type { ReadingBackEntry } from '../../../../utils/readingBackStack';
 import { DecisionLink } from '../../decisions/DecisionLink';
+import { useAddToDossier, useHeldInLabel } from '../../dossier/addFromResult';
+import { HeldInMark } from '../../dossier/HeldInMark';
+import type { DossierSentenzaData } from '../../../../types';
 import { authorityColor } from './authorityColor';
 
 /** Where the browser cannot measure (nothing is laid out yet), a text longer than this is cut. */
@@ -41,6 +45,8 @@ interface CaseLawRowProps {
   children?: ReactNode;
   /** Under the text: the decisions a passage cites, the source's credit. */
   footer?: ReactNode;
+  /** The decision as a dossier keeps it (LC59): the row says «Aggiungi al dossier» and which dossiers hold it. */
+  dossierItem?: DossierSentenzaData;
 }
 
 /** Whether a text cut at three lines is longer than they hold. */
@@ -97,8 +103,11 @@ function ClampedText({ children }: { children: ReactNode }) {
  * Justice's judgments all draw it, so they read alike. Draws an `<li>`: the caller owns the `<ul>`.
  */
 export function CaseLawRow({
-  decision, label, detail, authority, date, year, whenLabel, source, badges, context, externalHref, externalNote, besideId, backEntry, children, footer,
+  decision, label, detail, authority, date, year, whenLabel, source, badges, context, externalHref, externalNote, besideId, backEntry, children, footer, dossierItem,
 }: CaseLawRowProps) {
+  const target = useMemo(() => (dossierItem ? { sentenza: dossierItem } : undefined), [dossierItem]);
+  const heldIn = useHeldInLabel(target);
+  const adding = useAddToDossier(target);
   const estremi = label ?? (decision ? formatDecisionShort(decision) : undefined);
   const chip = cn('rounded px-2 py-0.5 text-xs font-medium', authorityColor(authority ?? estremi));
   const linked = decision && DECISION_PAGE_AVAILABLE && linkableDecisionPath(decision) !== null ? decision : null;
@@ -139,7 +148,24 @@ export function CaseLawRow({
           </span>
         ))}
         {source && <span className="text-[11px] uppercase text-slate-400 dark:text-slate-500">{source}</span>}
+        {heldIn && <HeldInMark label={heldIn} />}
+        {/* Named at every width: a row of case law has no «⋯» to hold it. */}
+        {target && (
+          <button
+            type="button"
+            onClick={(e) => adding.open(e.currentTarget)}
+            aria-label={estremi ? `Aggiungi alla pratica ${estremi}` : undefined}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              TOUCH_TARGET_RESPONSIVE,
+            )}
+          >
+            <FolderPlus size={14} aria-hidden />
+            Aggiungi alla pratica
+          </button>
+        )}
       </div>
+      {adding.popover}
       {context}
       {children !== undefined && children !== null && <ClampedText>{children}</ClampedText>}
       {footer}

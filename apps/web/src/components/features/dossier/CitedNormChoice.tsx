@@ -109,20 +109,20 @@ export function CitedNormChoice({ citation, link, onClose, onOpenOnDashboard, sh
         >
           <div className="w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-md dark:border-slate-700 dark:bg-slate-900">
             <p id={headingId} className="px-2 pb-1 pt-1.5 text-sm text-slate-700 dark:text-slate-200">
-              <span className="font-medium text-slate-900 dark:text-slate-50">{formatCitationLabel(citation)}</span> non è in questo dossier.
+              <span className="font-medium text-slate-900 dark:text-slate-50">{formatCitationLabel(citation)}</span> non è in questa pratica.
             </p>
             <button type="button" onClick={() => onOpenOnDashboard(citation)} className={CHOICE}>
               <ExternalLink size={16} aria-hidden className="shrink-0" />
-              Apri nel Corpus
+              Apri in Ricerca
             </button>
             {/* `aria-disabled`, not `disabled`, while the norm is read: the focus stays on the button. */}
             <button type="button" onClick={() => void addToDossier()} aria-disabled={reading} aria-busy={reading} className={CHOICE}>
               <FolderPlus size={16} aria-hidden className="shrink-0" />
-              {reading ? 'Cerco la norma…' : 'Aggiungi al dossier'}
+              {reading ? 'Cerco la norma…' : 'Aggiungi alla pratica'}
             </button>
             {failed && (
               <p role="alert" className="px-2 pt-1 text-[13px] leading-snug text-red-700 dark:text-red-300">
-                Non riesco a leggere la norma citata: riprova, o aprila nel Corpus.
+                Non riesco a leggere la norma citata: riprova, o aprila in Ricerca.
               </p>
             )}
           </div>

@@ -107,7 +107,7 @@ export function Scrivania() {
         </div>
 
         {/* The Corpus tools beside the search (LC8: Work's bar no longer lists them). */}
-        <nav aria-label="Altri strumenti del Corpus" className="mt-3 flex flex-wrap gap-x-5 gap-y-2 max-md:mt-2 max-md:gap-x-4">
+        <nav aria-label="Altri strumenti della Ricerca" className="mt-3 flex flex-wrap gap-x-5 gap-y-2 max-md:mt-2 max-md:gap-x-4">
           {[['/documents', 'Analizza un documento'], ['/rassegne', 'Rassegne']].map(([to, label]) => (
             <Link key={to} to={to} className={TOOL_LINK}>{label}</Link>
           ))}
@@ -119,7 +119,7 @@ export function Scrivania() {
             <ul className="border-b border-slate-200 dark:border-slate-800">
               {recent.map((d) => (
                 <li key={d.id}>
-                  <button className={ROW} onClick={() => navigate(`/dossier?dossier=${d.id}`)}>
+                  <button className={ROW} onClick={() => navigate(`/pratiche?dossier=${d.id}`)}>
                     <span className="hidden w-36 shrink-0 text-sm text-slate-500 sm:block dark:text-slate-400">{kindLabel(d.kind)}</span>
                     <span className="min-w-0 flex-1">
                       <span title={d.title} className="block truncate font-serif text-[19px] text-slate-900 max-md:text-[17px] dark:text-slate-50">{d.title}</span>

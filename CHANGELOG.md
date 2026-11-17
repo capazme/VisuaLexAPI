@@ -12,6 +12,142 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-11-17
+
+Learn's trail and a short lesson per subject; Rassegne in ⌘K and a passage into a pratica as a note;
+connected apps' notes drawn as Markdown; the small fixes from the tests of 16-11. Two migrations
+(lingo_lessons). The Percorsi stay off.
+
+### Learn
+
+- «Il tuo sentiero» (LC62): each subject opens with a «Lezione breve» node, closed with its reason when
+  the subject has fewer than 4 cards to review.
+- The short lesson (LC63): 5 to 8 exercises from the subject's cards, graded on the server, with an end
+  screen; at most three lessons a day give points. Migrations `20261117100000_lingo_lessons` and
+  `20261117100001_lingo_lessons_period` (rollback written in #540 and tried).
+- Fixes (LC62b): closing a lesson after the first answer asks to confirm; the trail first on a phone;
+  the closed node reachable with Tab.
+
+### Search and pratiche
+
+- ⌘K shows a «Rassegne» group for a topic, and a passage goes into a pratica as a note (U3).
+- A note written by a connected application is drawn as Markdown, folded when long, and printed in the
+  PDF without its marks (D4).
+
+### Fixes
+
+- The small fixes from the tests of 16-11 (LC61): «Carica un file» disabled while act files are off; the
+  PDF viewer closes with Esc; the MERL-T screens say LexCraft; a pratica opened by its address after the
+  Forum opens in Work, and an id that is not yours says so.
+
+## [1.31.0] - 2026-11-17
+
+«Dossier» becomes «Pratiche» everywhere a user reads it, and the Ricerca's own browser-only practices
+go, with a box that saves the old ones as practices. Web only, no migration.
+
+### Pratiche
+
+- Work's entry, page titles, cards, buttons and messages say «Pratiche» / «pratica» (LC60); the address
+  is `/pratiche`, and `/dossier` with everything under it leads there.
+- The Ricerca no longer keeps its own practices (no bar, no «Salva come dossier», no «Nuova pratica»):
+  what you read goes into a practice. Practices left in the browser by the old Ricerca are offered once,
+  in a box, to be saved as practices; nothing is lost before you answer.
+- The consent sentences name practices instead of dossiers; what is granted does not change (Brandeis).
+
+## [1.30.0] - 2026-11-17
+
+Claude works on a case's acts through MCP: it reads the case and its files, PDFs included, and deposits an
+act as a Word file; the «Lettura» shows the dossier's own work under the article; «Aggiungi al dossier»
+from the Ricerca. No migration; one new server dependency (pdfjs-dist). Act files for testing only.
+
+### Claude and the acts (MCP)
+
+- New tools for a case (LC56): read the case (instructions first, then its files), read a file's text in
+  parts, deposit an act as DOCX, or a new version beside the original. Owner only; every other route stays
+  closed to MCP tokens.
+- The «Leggere i testi» permission names the acts and the personal data they contain (consent version 2):
+  an application connected before keeps reading notes and must be reconnected to read acts.
+- The text of PDFs (LC57), with pdfjs-dist 6.5.438; a damaged PDF answers with the reason.
+
+### Dossier
+
+- In «Lettura», under each article, the dossier's own work: its notes and the proposals of the connected
+  applications, and the norms a decision cites (LC58).
+- «Aggiungi al dossier» from every result of the Ricerca (LC59).
+
+## [1.29.0] - 2026-11-16
+
+The dossier gathers the case: its «Lettura» and «Atti» tabs, the act files encrypted on the server, the
+deadline from a notification; Work's new names, the two-page guide and the motto. One migration
+(pratica_files). Act files for testing only: no real client file until there is a backup off this host.
+
+### Dossier
+
+- A «Lettura» tab: the Corpus's reading on the dossier's own table (LC51, LC52, LC54); each row says
+  «Non nel dossier» when it is on the table only, and is added, removed and reordered from there (LC55).
+- An «Atti» tab (LC53): «Istruzioni per Claude», the case's files with their versions, uploaded or written
+  by Claude; the old act editor and Work's «Atti» entry go, `/work/atti` leads to the dossier.
+- The act files on the server (LC50): encrypted at rest with a key per file wrapped by PRATICA_FILES_KEY,
+  with versions, instructions and an access log; the volume is in the backup, the key never is.
+  Migration `20261116120000_pratica_files` (additions only, rollback written in #525).
+
+### Work
+
+- New names (LC48): «Ricerca» for the Corpus, «Scadenziario» for «Oggi» («Scadenze» in the bar),
+  «Pseudonimizzatore» for the Anonimizzatore, and «Grafo delle pratiche» «in arrivo».
+- «Analizza documento» marked «in sviluppo» and the Pseudonimizzatore «in arrivo» among Work's
+  document tools (LC47).
+- The deadline from the notification (LC44): appeal and cassation terms, the long term, the summer
+  suspension and national holidays, shown step by step and added to the dossier's tasks; «Calcolo
+  indicativo: verifica sempre il termine.»
+
+### Look
+
+- The first-visit guide in two pages instead of eleven tours; the motto «La legge è ancora uguale per
+  tutti».
+
+## [1.28.0] - 2026-11-16
+
+Citations and the dossier's sources beside an act's text, the three ways for the AI drawn on the connect
+page, the column as the browser and phone icon, the section tabs whole in the bar. Web only, no migration.
+
+### Atti
+
+- «Citazioni» beside an act's text: the norms and decisions it cites, each with its state in words
+  (verified at the source, not found, ambiguous, not checked); a row opens the norm or the decision. The
+  dossier's sources on the left on a wide frame, «Cita» inserts at the caret (LC46). Not yet tried on a
+  phone: the «Vai alle citazioni» button.
+
+### Connections
+
+- On «Collega un'app AI», a drawing of the three ways to bring your AI: your subscription via MCP (today),
+  a model on the computer and your own key (marked «in arrivo»); a pause button, nothing moves under
+  reduced motion (LC45).
+
+### Look
+
+- The column as the browser's icon (.ico and PNG on a stone square), the iPhone's home-screen icon and the
+  manifest's 192 and 512 px icons (LC43): Safari no longer shows the old blue V.
+- The four section tabs and «Analizza» whole in the 224 px bar (LC41).
+
+## [1.27.0] - 2026-11-16
+
+The search as an island at the top of every section, and Learn's day closed with a plate and a curl of
+smoke. Web only, no migration.
+
+### Search
+
+- On a wide screen the search is a round pill at the middle of the top bar, in every section; the
+  menu grows out of it and closes back into it (LC40). On a phone the field's placeholder drops the
+  example, which was cut.
+
+### Learn
+
+- The day's goal met: Luca's plate in place of the drawn tick, and a curl of smoke rising once from
+  its lamp in place of the confetti (none under reduced motion); the session's end notice with the
+  small plate (LC39).
+- The section tabs as wide as their word, so «Forum» is whole.
+
 ## [1.26.0] - 2026-11-16
 
 The Corpus desk at a phone's scale, and Work's trash as a small button. Web only, no migration.

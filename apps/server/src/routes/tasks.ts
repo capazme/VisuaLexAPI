@@ -158,7 +158,7 @@ router.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   }
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     // A dossier, an entry or a parent deleted meanwhile (a foreign key), or a row gone between the read and the write.
-    if (err.code === 'P2003') return res.status(409).json({ detail: 'Il dossier, la voce o il compito principale non esiste più: riprova.' });
+    if (err.code === 'P2003') return res.status(409).json({ detail: 'La pratica, la voce o il compito principale non esiste più: riprova.' });
     if (err.code === 'P2025') return res.status(404).json({ detail: 'Compito non trovato.' });
   }
   const kind = err instanceof Error ? err.name : typeof err;

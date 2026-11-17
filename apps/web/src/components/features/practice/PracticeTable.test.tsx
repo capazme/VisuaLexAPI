@@ -78,12 +78,10 @@ describe('PracticeTable (spec §3.1)', () => {
     unsubscribe();
   });
 
-  it('in the index (U2) the header is compact: «Salva come dossier» an icon with its name, the title in the index\'s size', () => {
+  it('in the index (U2) the header is compact, the title in the index\'s size, and saves nothing (LC60)', () => {
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     render(table(null, 'index'));
-    const save = screen.getByRole('button', { name: 'Salva come dossier' });
-    expect(save).toHaveTextContent('');
-    expect(save).toHaveClass('min-w-[44px]', 'min-h-[44px]');
+    expect(screen.queryByRole('button', { name: 'Salva come dossier' })).toBeNull();
     expect(screen.getByRole('heading', { level: 2 })).toHaveClass('text-[22px]');
     expect(screen.getByTestId('practice-column')).toHaveAttribute('data-layout', 'index');
   });
@@ -92,23 +90,23 @@ describe('PracticeTable (spec §3.1)', () => {
     const p = s().createPractice('Prima');
     render(table());
     fireEvent.doubleClick(screen.getByRole('heading', { level: 2 }));
-    const field = screen.getByRole('textbox', { name: 'Nome della pratica' });
+    const field = screen.getByRole('textbox', { name: 'Nome del tavolo' });
     fireEvent.change(field, { target: { value: 'Seconda' } });
     fireEvent.blur(field);
     expect(s().practices.find((x) => x.id === p)?.label).toBe('Seconda');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Seconda' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Seconda' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rinomina' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Nome della pratica' }), { target: { value: 'Terza' } });
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nome della pratica' }), { key: 'Enter' });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nome del tavolo' }), { target: { value: 'Terza' } });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nome del tavolo' }), { key: 'Enter' });
     expect(s().practices[0].label).toBe('Terza');
   });
 
-  it('«Chiudi la pratica» closes at once, with no confirmation: «Annulla» is in the notification (K1a)', () => {
+  it('«Chiudi il tavolo» closes at once, with no confirmation: «Annulla» is in the notification (K1a)', () => {
     s().createPractice('Da chiudere');
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Da chiudere' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Da chiudere' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi il tavolo' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(s().practices).toEqual([]);
   });
@@ -151,7 +149,7 @@ describe('PracticeTable (spec §3.1)', () => {
   });
 });
 
-describe('PracticeTable: «Salva come dossier» (spec §7)', () => {
+describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Salva come dossier»)', () => {
   beforeEach(() => {
     vi.mocked(dossierService.create).mockClear();
     vi.mocked(dossierService.addItem).mockClear();
@@ -163,87 +161,72 @@ describe('PracticeTable: «Salva come dossier» (spec §7)', () => {
     appStore.setState({ dossiers: [], lastSyncError: null, pendingDossierItemIds: {}, pendingDossierOrders: {} });
   });
 
-  it('the header menu saves the practice as a new dossier and says what was saved', async () => {
+  it('has no «Salva come dossier», in the header, in its menu or in the act\'s «⋯» of one article', () => {
     const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().renamePractice(practiceId, 'Responsabilità medica');
+    const { unmount } = render(table());
+    expect(screen.queryByRole('button', { name: 'Salva come dossier' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Responsabilità medica' }));
+    expect(screen.queryByRole('menuitem', { name: 'Salva come dossier' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeInTheDocument();
+    unmount();
+    s().closePractice(practiceId);
+    s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Responsabilità medica' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Salva come dossier' }));
-    expect(await screen.findByText('Salvato nel dossier «Responsabilità medica»: 2 articoli')).toBeInTheDocument();
-    expect(dossierService.create).toHaveBeenCalledTimes(1);
-    expect(dossierService.addItem).toHaveBeenCalledTimes(2);
-  });
-
-  it('one article (LC28, the simple reading): no practice header; «Salva come dossier» sits in the act\'s «⋯»', async () => {
-    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
-    s().renamePractice(practiceId, 'Pratica');
-    render(table());
-    expect(screen.queryByRole('button', { name: 'Altre azioni per la pratica Pratica' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /^Azioni su / }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Salva come dossier' }));
-    expect(await screen.findByText('Salvato nel dossier «Pratica»: 1 articolo')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Salva come dossier' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Nuova pratica' })).toBeNull();
   });
 
-  it('«Aggiungi a un dossier…» lists the dossiers and adds to the picked one', async () => {
+  it('«Aggiungi a una pratica…» lists the dossiers and adds to the picked one', async () => {
     const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Pratica' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).getByRole('button', { name: /Esistente/ }));
-    expect(await screen.findByText('Salvato nel dossier «Esistente»: 2 articoli')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Pratica' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).getByRole('button', { name: /Esistente/ }));
+    expect(await screen.findByText('Salvato nella pratica «Esistente»: 2 articoli')).toBeInTheDocument();
     expect(dossierService.create).not.toHaveBeenCalled();
   });
 
-  it('the header\'s own button saves; the outcome sits in the toast band, outside the table', async () => {
-    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+  it('one save at a time: the menu entry is disabled while it runs; the outcome sits in the toast band, outside the table', async () => {
+    let finish: (value: unknown) => void = () => {};
+    vi.mocked(dossierService.addItem).mockReturnValue(new Promise((resolve) => { finish = resolve; }) as never);
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().addArticlesToPractice(practiceId, L24, [article(L24, '7')]);
     s().renamePractice(practiceId, 'Appalti');
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    const header = screen.getByRole('heading', { name: 'Appalti' }).closest('header') as HTMLElement;
-    fireEvent.click(within(header).getByRole('button', { name: 'Salva come dossier' }));
-    const message = await screen.findByText('Salvato nel dossier «Appalti»: 2 articoli');
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Appalti' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).getByRole('button', { name: /Esistente/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Appalti' }));
+    expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeDisabled();
+    await act(async () => { finish({ id: 'srv-i', item_type: 'norm', title: 't', content: {}, position: 0, status: 'unread', created_at: '2026-10-12T00:00:00Z' }); });
+    const message = await screen.findByText(/^Salvato nella pratica «Esistente»/);
     const toast = message.closest('[role="alert"]') as HTMLElement;
     expect(toast.closest('[data-testid="practice-table"]')).toBeNull();
     expect(toast.className).toContain(Z_INDEX.toast);
-    expect(dossierService.create).toHaveBeenCalledTimes(1);
+    expect(dossierService.create).not.toHaveBeenCalled();
   });
 
-  it('one save at a time: the button and the menu entries are disabled while it runs, a second click makes no second dossier', async () => {
-    let finish: (value: unknown) => void = () => {};
-    vi.mocked(dossierService.create).mockReturnValue(new Promise((resolve) => { finish = resolve; }) as never);
-    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
-    s().renamePractice(practiceId, 'Appalti');
-    render(table());
-    const button = screen.getByRole('button', { name: 'Salva come dossier' });
-    fireEvent.click(button);
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Appalti' }));
-    expect(screen.getByRole('menuitem', { name: 'Salva come dossier' })).toBeDisabled();
-    expect(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' })).toBeDisabled();
-    await act(async () => { finish({ id: 'srv-d', name: 'x', created_at: '2026-10-12T00:00:00Z' }); });
-    expect(await screen.findByText('Salvato nel dossier «Appalti»: 2 articoli')).toBeInTheDocument();
-    expect(dossierService.create).toHaveBeenCalledTimes(1);
-    expect(button).not.toBeDisabled();
-  });
-
-  it('«Aggiungi a un dossier…» is a modal dialog: the focus moves in, Tab stays in, Esc gives it back to «⋯»', async () => {
+  it('«Aggiungi a una pratica…» is a modal dialog: the focus moves in, Tab stays in, Esc gives it back to «⋯»', async () => {
     const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    const trigger = screen.getByRole('button', { name: 'Altre azioni per la pratica Pratica' });
+    const trigger = screen.getByRole('button', { name: 'Altre azioni per Pratica' });
     fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
-    const dialog = screen.getByRole('dialog', { name: 'Aggiungi a un dossier' });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Aggiungi a una pratica' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     const first = within(dialog).getByRole('button', { name: /Esistente/ });
     await waitFor(() => expect(first).toHaveFocus());
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(dialog.contains(document.activeElement)).toBe(true);
     fireEvent.keyDown(document, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Aggiungi a un dossier' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Aggiungi a una pratica' })).toBeNull());
     expect(trigger).toHaveFocus();
   });
 });

@@ -140,7 +140,9 @@ describe('the switch', () => {
     // and an exam's questions shaped in the schema text instead (G-391): 14,605 off, 18,742 on, the courses 4,137.
     // With every switch on the list still passes the 18,000 characters of §10.6, an overshoot G-391 accepts until
     // the groups of #318 (1b) keep the courses out of a session that does not use them.
-    expect(off).toBeLessThanOrEqual(14_700);
+    // On 16 November 2026 (LC56) the case's three tools, always listed: 17,095 off, 2,490 more.
+    // On 17 November 2026 (D4) a note's simple Markdown said in omnilex_aggiungi_nota_dossier and both notes' `testo`: 17,308 off.
+    expect(off).toBeLessThanOrEqual(17_350);
     expect(on - off).toBeLessThanOrEqual(4_200);
   });
 });

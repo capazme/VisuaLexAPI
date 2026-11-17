@@ -105,8 +105,8 @@ export async function createCourse(userId: string, input: CourseCreateInput, ori
     // The dossier is locked while the course is written: one trashed meanwhile is waited for and found gone (404).
     const dossiers = await tx.$queryRaw<{ id: string; name: string; kind: string }[]>`
       SELECT id, name, kind::text AS kind FROM dossiers WHERE id = ${input.dossierId} AND user_id = ${userId} FOR KEY SHARE`;
-    if (dossiers.length === 0) throw new AppError(404, 'Dossier non trovato.');
-    if (dossiers[0].kind !== 'studio') throw new AppError(400, 'Il dossier di un percorso deve essere un dossier di studio.');
+    if (dossiers.length === 0) throw new AppError(404, 'Pratica non trovata.');
+    if (dossiers[0].kind !== 'studio') throw new AppError(400, 'La pratica di un percorso deve essere una pratica di studio.');
     const corso = await tx.lingoCorso.create({
       data: {
         autoreId: userId,
@@ -164,17 +164,17 @@ function competenceIds(codes: string[], byCode: Map<string, string>, where: stri
 async function resolveCitations(tx: Tx, dossierId: string | null, blocks: ModuleCreateInput['blocchi']): Promise<StoredCitation[][]> {
   const wanted = [...new Set(blocks.flatMap((b) => b.citazioni.map((c) => c.voce)))];
   if (wanted.length === 0) return blocks.map(() => []);
-  if (!dossierId) throw new AppError(409, 'Il dossier del percorso non c’è più: un modulo senza dossier non può avere citazioni.');
+  if (!dossierId) throw new AppError(409, 'La pratica del percorso non c’è più: un modulo senza pratica non può avere citazioni.');
   // The dossier is locked while its entries are copied: one trashed meanwhile is waited for, then found gone.
   const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM dossiers WHERE id = ${dossierId} FOR KEY SHARE`;
-  if (locked.length === 0) throw new AppError(409, 'Il dossier del percorso non c’è più: un modulo senza dossier non può avere citazioni.');
+  if (locked.length === 0) throw new AppError(409, 'La pratica del percorso non c’è più: un modulo senza pratica non può avere citazioni.');
   const items = await tx.dossierItem.findMany({ where: { id: { in: wanted }, dossierId }, select: { id: true, itemType: true, content: true } });
   const byId = new Map(items.map((item) => [item.id, item]));
   return blocks.map((block, b) =>
     block.citazioni.map(({ marcatore, voce }) => {
       const where = `Blocco ${b + 1}, citazione ${marcatore}`;
       const item = byId.get(voce);
-      if (!item) return refuse(where, 'la voce non è nel dossier del percorso');
+      if (!item) return refuse(where, 'la voce non è nella pratica del percorso');
       if (item.itemType === 'norm') {
         const rebuilt = rebuildNormEntry(item.content);
         if (!rebuilt.ok) return refuse(where, `la norma non si può citare (${rebuilt.reason})`);
@@ -186,7 +186,7 @@ async function resolveCitations(tx: Tx, dossierId: string | null, blocks: Module
         const riferimento = JSON.parse(JSON.stringify(rebuilt.entry)) as Prisma.InputJsonObject;
         return { marcatore, voce, tipo: 'sentenza' as const, riferimento, citation: citeStoredItem('sentenza', rebuilt.entry) };
       }
-      return refuse(where, 'si possono citare solo norme e sentenze del dossier');
+      return refuse(where, 'si possono citare solo norme e sentenze della pratica');
     }),
   );
 }

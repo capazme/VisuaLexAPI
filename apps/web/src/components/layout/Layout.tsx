@@ -9,6 +9,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SettingsModal } from '../ui/SettingsModal';
+import { CorpusPracticesDialog } from '../features/practice/CorpusPracticesDialog';
 import { FeedbackButton } from '../ui/FeedbackButton';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
@@ -23,6 +24,7 @@ import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 import { closeCompare, forgetCompareOpened, useCompare, useCompareOpened } from '../../hooks/useCompare';
 import { useTour } from '../../hooks/useTour';
+import { WelcomeGuide } from '../../features/welcome/WelcomeGuide';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
 import { useServiceHealth } from '../../hooks/useServiceHealth';
@@ -277,7 +279,7 @@ export function Layout() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        navigate('/dossier');
+        navigate('/pratiche');
       }
       // The full screen: Cmd/Ctrl+Shift+F. Without Shift, F is the find window's, below. A key held down toggles it once,
       // and its repeats stay ours (Chrome on a Mac binds ⇧⌘F to its own menu).
@@ -514,7 +516,10 @@ export function Layout() {
         </div>
       </main>
 
+      {/* LC60: the Corpus's practices a browser kept become pratiche, once, by the user's choice. */}
+      <CorpusPracticesDialog />
       <SettingsModal isOpen={settingsDialog.open} section={settingsDialog.section} onClose={closeSettings} onRestartTour={resetAndStartTour} />
+      <WelcomeGuide />
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />

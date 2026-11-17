@@ -3,7 +3,7 @@ import { cn } from '../../lib/utils';
 
 /** The engravings in `public/illustrations` (LC35, Luca 16-11): one ink, transparent, square. */
 export type IllustrationName =
-  | 'learn-fatto-oggi' | 'learn-ripasso' | 'learn-serie' | 'learn-livello' | 'learn-missione' | 'learn-schede-vuote'
+  | 'learn-fatto-oggi' | 'learn-giorno-chiuso' | 'learn-fumo' | 'learn-ripasso' | 'learn-serie' | 'learn-livello' | 'learn-missione' | 'learn-schede-vuote'
   | 'materia-civile' | 'materia-penale' | 'materia-amministrativo' | 'materia-proc-civile' | 'materia-proc-penale'
   | 'work-oggi-vuota' | 'work-ingresso-vuoto' | 'dossier-vuoti' | 'forum-vuoto';
 

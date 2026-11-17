@@ -64,7 +64,7 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
       open={confirmDelete}
       variant="danger"
       title="Eliminare la copia pubblicata?"
-      message="La copia pubblicata, i suoi «Mi piace» e le proposte ricevute vengono eliminati. Il tuo dossier resta com'è; chi l'ha già scaricato ne conserva la copia."
+      message="La copia pubblicata, i suoi «Mi piace» e le proposte ricevute vengono eliminati. La tua pratica resta com'è; chi l'ha già scaricata ne conserva la copia."
       confirmLabel="Elimina dai dossier pubblici"
       onConfirm={async () => {
         setConfirmDelete(false);
@@ -138,7 +138,7 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
               }
             : {
                 label: 'Ripubblica nel Forum', icon: Globe, disabled: busy || blocked,
-                onSelect: () => void act(() => sharedEnvironmentService.republish(published.sharedEnvironmentId), 'Dossier di nuovo nel Forum'),
+                onSelect: () => void act(() => sharedEnvironmentService.republish(published.sharedEnvironmentId), 'Di nuovo nel Forum'),
               },
           { label: 'Apri i dossier pubblici', icon: FolderOpen, onSelect: () => navigate('/forum') },
           { label: 'Elimina dai dossier pubblici', icon: Trash2, danger: true, separatorBefore: true, disabled: busy, onSelect: () => {

@@ -76,6 +76,8 @@ function Block({ practiceId, actId }: { practiceId: string; actId: string }) {
 }
 
 const indexLine = () => screen.getByRole('list', { name: /Articoli sul tavolo/ });
+// The act's «⋯», not an article row's (a row of the Corpus has its own «⋯» for the phone, LC59).
+const ACT_MENU = /^Azioni su (?!art\.)/;
 
 beforeEach(() => {
   h.desktop = true;
@@ -245,7 +247,7 @@ describe('PracticeActBlock: «⋯»', () => {
       expect(screen.queryByRole('alertdialog')).toBeNull();
       expect(s().practices[0].acts).toHaveLength(0);
       await act(async () => {});
-      expect(shown!.message).toBe('Atto tolto dalla pratica');
+      expect(shown!.message).toBe('Atto tolto dal tavolo');
       await act(async () => { await shown!.onUndo(); });
       expect(s().practices[0].acts.map((a) => a.id)).toEqual([actId]);
     } finally {
@@ -254,45 +256,12 @@ describe('PracticeActBlock: «⋯»', () => {
     }
   });
 
-  it("«Sposta in un'altra pratica» lists the other practices and moves the act", () => {
+  it("has no «Sposta in un'altra pratica» (LC60: the Ricerca is one reading bench)", () => {
     const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
-    const other = s().createPractice('Responsabilità medica', { activate: false });
-    s().createPractice('Appalti', { activate: false });
+    s().createPractice('Responsabilità medica', { activate: false });
     render(<Block practiceId={practiceId} actId={actId} />);
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Sposta in un'altra pratica" }));
-    const dialog = screen.getByRole('dialog', { name: "Sposta in un'altra pratica" });
-    const choices = within(dialog).getAllByRole('button').map((b) => b.textContent).filter((t) => t !== '');
-    expect(choices).toEqual(expect.arrayContaining(['Responsabilità medica', 'Appalti', 'Nuova pratica']));
-    expect(choices).not.toContain(s().practices[0].label);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Responsabilità medica' }));
-    expect(s().practices.find((p) => p.id === practiceId)?.acts).toHaveLength(0);
-    expect(s().practices.find((p) => p.id === other)?.acts.map((a) => a.id)).toEqual([actId]);
-    expect(s().activePracticeId).toBe(practiceId);
-  });
-
-  it('«Nuova pratica» moves the act into a new practice named after it, and stays on this table', () => {
-    const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
-    render(<Block practiceId={practiceId} actId={actId} />);
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Sposta in un'altra pratica" }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Nuova pratica' }));
-    expect(s().practices).toHaveLength(2);
-    expect(s().practices[1].label).toBe('l. 24/2017');
-    expect(s().practices[1].acts.map((a) => a.id)).toEqual([actId]);
-    expect(s().activePracticeId).toBe(practiceId);
-  });
-
-  it('«Nuova pratica» is one store write', () => {
-    const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
-    render(<Block practiceId={practiceId} actId={actId} />);
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Sposta in un'altra pratica" }));
-    const writes = vi.fn();
-    const stop = appStore.subscribe(writes);
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Nuova pratica' }));
-    stop();
-    expect(writes).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: ACT_MENU }));
+    expect(screen.queryByRole('menuitem', { name: "Sposta in un'altra pratica" })).toBeNull();
   });
 
   it('the annex suggestion reveals an article the act already holds and fetches nothing', async () => {
@@ -332,9 +301,9 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     for (const name of ['Modalità studio', 'Struttura della norma', 'Esporta PDF della norma']) {
       expect(screen.queryByRole('button', { name })).toBeNull();
     }
-    fireEvent.click(screen.getByRole('button', { name: /^Azioni su/ }));
+    fireEvent.click(screen.getByRole('button', { name: ACT_MENU }));
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
-      'Modalità studio', 'Struttura della norma', 'Esporta PDF della norma', "Sposta in un'altra pratica", "Rimuovi l'atto",
+      'Modalità studio', 'Struttura della norma', 'Esporta PDF della norma', "Rimuovi l'atto",
     ]);
   });
 
@@ -342,7 +311,7 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     h.desktop = false;
     const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
     render(<Block practiceId={practiceId} actId={actId} />);
-    fireEvent.click(screen.getByRole('button', { name: /^Azioni su/ }));
+    fireEvent.click(screen.getByRole('button', { name: ACT_MENU }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Struttura della norma' }));
     await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
     expect(h.trees.every((t) => t.variant === 'drawer')).toBe(true);
@@ -427,7 +396,7 @@ describe('PracticeActBlock: the two views (U2)', () => {
     expect(entries.map((e) => e.textContent)).toEqual([expect.stringContaining('art. 5'), expect.stringContaining('art. 7')]);
     fireEvent.click(screen.getByRole('button', { name: /^Azioni su/ }));
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
-      'Modalità studio', 'Struttura della norma', 'Esporta PDF della norma', "Sposta in un'altra pratica", "Rimuovi l'atto",
+      'Modalità studio', 'Struttura della norma', 'Esporta PDF della norma', "Rimuovi l'atto",
     ]);
   });
 

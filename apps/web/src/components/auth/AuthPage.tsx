@@ -262,7 +262,7 @@ export function AuthPage() {
                 <LexCraftLogo motion="sweep" played={!intro} className="block h-auto w-[300px] sm:w-[420px]" />
               </h1>
               <p className="font-serif text-xl italic leading-snug text-slate-600 sm:text-[22px] dark:text-slate-300">
-                La legge è davvero uguale per tutti
+                La legge è ancora uguale per tutti
               </p>
             </header>
 

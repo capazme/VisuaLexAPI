@@ -32,7 +32,7 @@ afterEach(() => fullScreen(false));
 
 describe('Layout — the frame (U1)', () => {
   it('draws every page in the frame: the window less its margins, at most 1056 px (LC21), wider for a `full` page', () => {
-    at('/dossier');
+    at('/pratiche');
     expect(frame()).toHaveClass(...PAGE_FRAME.split(' '), 'max-w-frame', FULL_PAGE_FRAME);
     // The old frame and its narrowing in full screen are gone.
     expect(frame().className).not.toMatch(/\bmax-w-(?:7xl|4xl)\b|\bpy-12\b/);
@@ -49,7 +49,7 @@ describe('Layout — the frame (U1)', () => {
 
   it('widens in full screen to 2400 px, never narrows', () => {
     fullScreen(true);
-    at('/dossier');
+    at('/pratiche');
     expect(frame()).toHaveClass(...PAGE_FRAME.split(' '), 'max-w-frame-full');
     expect(frame()).not.toHaveClass('max-w-frame');
     expect(frame().className).not.toMatch(/\bmax-w-4xl\b|\bpy-12\b/);
@@ -62,7 +62,7 @@ describe('Layout — where the full-screen button floats over the page (U1)', ()
 
   // LC21: from lg the button sits in the top bar, not over the page; below lg the phone's bar holds it.
   it('gives a top row no room outside full screen: from lg the button sits in the top bar', () => {
-    at('/dossier');
+    at('/pratiche');
     expect(frame()).not.toHaveClass(FROM_LG);
     expect(frame()).not.toHaveClass(FROM_MD);
     expect(frame().className).not.toMatch(/--focus-button-room/);
@@ -83,7 +83,7 @@ describe('Layout — where the full-screen button floats over the page (U1)', ()
 
 describe('Layout — the full-screen button (U1)', () => {
   it('is named in Italian, the same in both states, and says its state with `aria-pressed`', () => {
-    at('/dossier');
+    at('/pratiche');
     const button = screen.getByRole('button', { name: 'Tutto schermo' });
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAttribute('title', expect.stringMatching(/^Tutto schermo \((?:⌘⇧F|Ctrl\+⇧F)\)$/));
@@ -99,7 +99,7 @@ describe('Layout — the full-screen button (U1)', () => {
   });
 
   it('takes ⌘⇧F (Ctrl+⇧F) as its key, the letter in either case', () => {
-    at('/dossier');
+    at('/pratiche');
     const button = () => screen.getByRole('button', { name: 'Tutto schermo' });
     fireEvent.keyDown(window, { key: 'F', ctrlKey: true, shiftKey: true });
     expect(button()).toHaveAttribute('aria-pressed', 'true');
@@ -115,14 +115,14 @@ describe('Layout — the full-screen button (U1)', () => {
     ['⇧F without Cmd or Ctrl', { key: 'F', shiftKey: true }],
     ['⌘⌥⇧F', { key: 'F', metaKey: true, shiftKey: true, altKey: true }],
   ])('no longer takes %s', (_, init) => {
-    at('/dossier');
+    at('/pratiche');
     fireEvent.keyDown(window, init);
     expect(appStore.getState().settings.focusMode).toBe(false);
     expect(screen.getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('toggles once for a key held down, and keeps its repeats from the browser', () => {
-    at('/dossier');
+    at('/pratiche');
     fireEvent.keyDown(window, { key: 'F', metaKey: true, shiftKey: true });
     const repeat = new KeyboardEvent('keydown', { key: 'F', metaKey: true, shiftKey: true, repeat: true, cancelable: true, bubbles: true });
     act(() => {

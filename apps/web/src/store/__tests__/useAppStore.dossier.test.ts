@@ -72,7 +72,7 @@ describe('useAppStore dossier sync', () => {
             expect(dossiers[0].kind).toBe('lavoro');
         });
 
-        it('creates a dossier di studio when asked, and changes the kind in «Modifica»', async () => {
+        it('creates a pratica di studio when asked, and changes the kind in «Modifica»', async () => {
             vi.mocked(dossierService.create).mockResolvedValue(serverDossier);
             vi.mocked(dossierService.update).mockResolvedValue(serverDossier);
 
@@ -92,7 +92,7 @@ describe('useAppStore dossier sync', () => {
 
             expect(id).toBeNull();
             expect(appStore.getState().dossiers).toHaveLength(0);
-            expect(appStore.getState().lastSyncError?.message).toContain('dossier');
+            expect(appStore.getState().lastSyncError?.message).toContain('pratica');
         });
     });
 

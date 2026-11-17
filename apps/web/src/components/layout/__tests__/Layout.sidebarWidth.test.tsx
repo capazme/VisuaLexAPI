@@ -37,7 +37,7 @@ function atWidth(xl: boolean) {
     removeEventListener: () => {},
   }) as unknown as MediaQueryList);
   seen.props = [];
-  const { container } = render(<MemoryRouter initialEntries={['/dossier']}><Layout /></MemoryRouter>);
+  const { container } = render(<MemoryRouter initialEntries={['/pratiche']}><Layout /></MemoryRouter>);
   const last = seen.props.slice(-2);
   const root = container.firstElementChild as HTMLElement;
   return {

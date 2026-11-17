@@ -27,7 +27,7 @@ describe('SettingsModal — the groups (Y1)', () => {
       const heading = screen.getByRole('heading', { level: 3, name });
       expect(heading).not.toHaveClass('uppercase');
     }
-    expect(screen.getByRole('button', { name: /Ricomincia il tour guidato/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Rivedi la guida iniziale/ })).toBeInTheDocument();
   });
 });
 

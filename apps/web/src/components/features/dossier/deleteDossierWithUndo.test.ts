@@ -36,7 +36,7 @@ describe('a dossier deleted from the web app (question 160)', () => {
     svc.delete.mockResolvedValue({ trashId: 't1', itemCount: 3 });
     deleteDossierWithUndo({ id: 'a', title: 'Ricorso Rossi' });
     expect(appStore.getState().dossiers.map((d) => d.id)).toEqual(['b']);
-    await vi.waitFor(() => expect(toast?.message).toBe('Dossier «Ricorso Rossi» spostato nel cestino'));
+    await vi.waitFor(() => expect(toast?.message).toBe('Pratica «Ricorso Rossi» spostata nel cestino'));
     expect(svc.delete).toHaveBeenCalledWith('a');
     toast?.onDismiss();
   });
@@ -61,13 +61,13 @@ describe('a dossier deleted from the web app (question 160)', () => {
     deleteDossierWithUndo({ id: 'a', title: 'Ricorso Rossi' });
     await vi.waitFor(() => expect(toast).not.toBeNull());
     await toast!.onUndo();
-    expect(appStore.getState().lastSyncError?.message).toBe('Impossibile ripristinare «Ricorso Rossi» ora: è nel Cestino, ripristinalo da lì.');
+    expect(appStore.getState().lastSyncError?.message).toBe('Impossibile ripristinare «Ricorso Rossi» ora: è nel Cestino, ripristinala da lì.');
   });
 
   it('refused by the server: put back where it was, an error, and no toast', async () => {
     svc.delete.mockRejectedValue(new Error('down'));
     deleteDossierWithUndo({ id: 'a', title: 'Ricorso Rossi' });
-    await vi.waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile eliminare il dossier. Riprova.'));
+    await vi.waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile eliminare la pratica. Riprova.'));
     expect(appStore.getState().dossiers.map((d) => d.id)).toEqual(['a', 'b']);
     expect(toast).toBeNull();
   });

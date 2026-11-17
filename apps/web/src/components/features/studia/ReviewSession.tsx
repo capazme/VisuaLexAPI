@@ -42,8 +42,8 @@ const schede = (n: number) => (n === 1 ? '1 scheda' : `${n} schede`);
 function endSentence({ reviewed, again, nextDue }: ReviewSummary): string {
   if (reviewed === 0) return 'Nessuna scheda da ripassare per ora.';
   const redo = again === 0 ? 'nessuna da rifare' : `${again} da rifare`;
-  const next = nextDue === null ? '' : ` Le prossime: ${formatInterval(nextDue)}.`;
-  return `Hai ripassato ${schede(reviewed)}, ${redo}.${next}`;
+  const next = nextDue === null ? '' : ` Le prossime ${formatInterval(nextDue)}.`;
+  return `${schede(reviewed)} ${reviewed === 1 ? 'ripassata' : 'ripassate'}, ${redo}.${next}`;
 }
 
 /** The bar's tremble when the ink arrives: a pixel down and back, as the ink settles (under 400 ms in all). */
@@ -202,7 +202,7 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className={cn(COLUMN, 'grid px-4 py-8 md:py-14')}>
         <section data-testid="lesson-end" aria-label="Fine del ripasso" className={cn(TILE, 'mx-auto grid w-full max-w-xl justify-items-center gap-6 p-6 text-center md:p-8')}>
-          <p ref={sentence} tabIndex={-1} className="max-w-prose font-serif text-2xl leading-snug text-slate-900 focus:outline-none md:text-3xl dark:text-slate-50">
+          <p ref={sentence} tabIndex={-1} className="max-w-prose font-serif text-xl leading-snug text-slate-900 focus:outline-none dark:text-slate-50">
             {endSentence(summary)}
           </p>
           <SessionEndProgress data={day} />

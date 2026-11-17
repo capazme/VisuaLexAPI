@@ -485,8 +485,8 @@ export function importReasonsText(reasons: string[]): string {
 
 /** The toast after an import: whole, or how many items were left out (not importable, or refused by the server). */
 export function importReport(imported: number, lost: number): string {
-  if (lost === 0) return 'Dossier importato';
-  return `Dossier importato in parte: ${importCounts(imported, lost)}`;
+  if (lost === 0) return 'Pratica importata';
+  return `Pratica importata in parte: ${importCounts(imported, lost)}`;
 }
 
 /** A dossier as a Forum suggestion carries it; the server makes each entry the item it stands for.

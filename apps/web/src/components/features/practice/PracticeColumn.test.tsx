@@ -118,19 +118,26 @@ describe('PracticeColumn (spec §3)', () => {
     await press('ArrowDown', 'ArrowDown');
     await press('Space', ' ');
     expect(s().practices[0].acts.map((a) => a.id)).toEqual([l24Id, ccId]);
+    // What a screen reader hears says the acts' names in Italian, never the library's English with ids (LC61).
+    const live = document.querySelector('[id^="DndLiveRegion"]');
+    expect(live?.textContent).toMatch(/^Codice civile.* spostato al posto di l\. 8 marzo 2017, n\. 24/);
+    expect(live?.textContent).not.toContain(ccId);
+    // The handle says what it is in Italian (LC61).
+    expect(handle).toHaveAttribute('aria-roledescription', 'riordinabile');
   });
 });
 
 describe('PracticeColumn: the two views (U2)', () => {
   const NEW = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 28994, anno: 2019 };
 
-  it('the overview draws the acts as a grid of panels and «Giurisprudenza» as a strip under it, in the decisions\' tint', () => {
+  it('the overview draws the acts as a grid of panels and «Giurisprudenza» as a strip under it, in Pietra (LC61: no mint wash, no green gavel)', () => {
     const { practiceId } = setUp();
     s().openDecision(NEW, { practiceId, open: false });
     render(column(practiceId));
     expect(screen.getByTestId('practice-acts').className).toBe(OVERVIEW_GRID);
     const strip = screen.getByTestId('practice-decisions');
-    expect(strip).toHaveClass('border-emerald-200/70', 'bg-emerald-50/40');
+    expect(strip).toHaveClass('border-slate-200');
+    expect(strip.outerHTML).not.toMatch(/emerald/);
     // After the grid, not inside it: the strip takes the frame's width.
     expect(screen.getByTestId('practice-acts')).not.toContainElement(strip);
     expect(within(strip).getByRole('button', { name: /^Apri accanto Cass/ })).toBeInTheDocument();

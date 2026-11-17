@@ -75,16 +75,16 @@ describe('PublishDossierDialog', () => {
   it('warns once more for a dossier di lavoro, and tells a title that names a person', async () => {
     open(dossier({ title: 'Pratica RSSMRA85T10A562S' }));
     await screen.findByText(/1 voce/);
-    expect(screen.getByText('È un dossier di lavoro: controlla con attenzione titolo e note.')).toBeInTheDocument();
+    expect(screen.getByText('È una pratica di lavoro: controlla con attenzione titolo e note.')).toBeInTheDocument();
     expect(screen.getByText('Possibile dato personale: codice fiscale')).toBeInTheDocument();
   });
 
-  it('has no extra line for a dossier di studio, and says when an article also sits in a dossier di lavoro', async () => {
+  it('has no extra line for a pratica di studio, and says when an article also sits in a dossier di lavoro', async () => {
     const work: Dossier = { ...dossier({ id: 'w', title: 'Pratica Verdi' }) };
     open(dossier({ kind: 'studio' }), [work]);
     await screen.findByText(/1 voce/);
-    expect(screen.queryByText(/È un dossier di lavoro/)).toBeNull();
-    expect(screen.getAllByText('Anche nel dossier di lavoro «Pratica Verdi»').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/È una pratica di lavoro/)).toBeNull();
+    expect(screen.getAllByText('Anche nella pratica di lavoro «Pratica Verdi»').length).toBeGreaterThan(0);
   });
 
   it('updates the published copy, starting from what the Forum holds', async () => {
@@ -123,7 +123,7 @@ describe('PublishDossierDialog', () => {
   });
 
   it('becomes an update when the server says the dossier is already in the Forum', async () => {
-    service.publish.mockRejectedValue({ status: 409, message: 'Questo dossier è già pubblicato nel Forum: aggiornane la versione pubblicata.' });
+    service.publish.mockRejectedValue({ status: 409, message: 'Questa pratica è già pubblicato nel Forum: aggiornane la versione pubblicata.' });
     open();
     await screen.findByText(/1 voce/);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ho controllato: non contiene dati personali' }));
@@ -163,7 +163,7 @@ describe('PublishDossierDialog', () => {
 
   it('shows the server\'s refusal and stays open', async () => {
     // The shape `services/api.ts` rejects with: the server's Italian detail as the message.
-    service.publish.mockRejectedValue({ status: 409, message: 'Questo dossier è già pubblicato nel Forum: aggiornane la versione pubblicata.' });
+    service.publish.mockRejectedValue({ status: 409, message: 'Questa pratica è già pubblicato nel Forum: aggiornane la versione pubblicata.' });
     const onPublished = open();
     await screen.findByText(/1 voce/);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ho controllato: non contiene dati personali' }));

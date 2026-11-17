@@ -3,7 +3,8 @@ import { phoneBarTitle } from './phoneBarTitle';
 
 describe('phoneBarTitle', () => {
   it.each([
-    ['/work/oggi', 'Oggi'],
+    ['/work/scadenziario', 'Scadenziario'],
+    ['/work/pseudonimizzatore', 'Pseudonimizzatore'],    ['/work/grafo-pratiche', 'Grafo delle pratiche'],
     ['/work/prossimi', 'Prossimi giorni'],
     ['/work/ingresso', "Lista d'ingresso"],
     ['/work/cestino', 'Cestino dei compiti'],
@@ -12,7 +13,7 @@ describe('phoneBarTitle', () => {
     ['/learn/schede', 'Le mie schede'],
     ['/learn/schede/c1', 'Le mie schede'],
     ['/learn/valida', 'Da validare'],
-    ['/dossier', 'Dossier'],
+    ['/pratiche', 'Pratiche'],
     ['/forum', 'Dossier pubblici'],
     ['/forum/community', 'Community'],
     ['/history', 'Cronologia'],
@@ -24,7 +25,7 @@ describe('phoneBarTitle', () => {
     expect(phoneBarTitle(path, 'Opus')).toBe(title);
   });
 
-  it.each(['/labs/contribuisci', '/pagina-che-non-esiste', '/dossierx', '/work'])('falls back to the section on %s', (path) => {
+  it.each(['/labs/contribuisci', '/pagina-che-non-esiste', '/pratichex', '/work'])('falls back to the section on %s', (path) => {
     expect(phoneBarTitle(path, 'Academia')).toBe('Academia');
   });
 });

@@ -5,7 +5,7 @@ import { DayBlock } from './missions/DayBlock';
 import { MissionList } from './missions/MissionList';
 import { TodayMissions } from './missions/TodayMissions';
 import { goalMissionDone } from './missions/missions';
-import { ConfettiBurst } from './progress/Celebration';
+import { SmokeRise } from './progress/Celebration';
 import { STUDY_SETTINGS_PANEL, StatsBand } from './progress/StatsBand';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { usePercorso } from './progress/usePercorso';
@@ -16,18 +16,18 @@ import { TodayExam } from './corsi/TodayExam';
 
 /**
  * «Oggi», Learn's home (LC23, after Duolingo's: Luca, 15 November): the day block first (what is on today and «Inizia il
- * ripasso», the page's one action), then «Il tuo percorso», a unit per subject with its institutes as stops, and the full
+ * ripasso», the page's one action), then «Il tuo sentiero» (LC62), a unit per subject with its institutes as stops, and the full
  * list of missions; beside it from `lg` the day's numbers, the streak and the level, then today's missions. The missions
  * and the statistics are the whole day's (`useProgress(undefined)`); the road is `usePercorso` (G5), on which nothing
  * above waits. The server decides what «today» is.
  *
- * From `lg` two columns, the road and a 20 rem rail (22 from `xl`): the day block on the first row, the road and the list
- * on the second, the rail across both, sticky while it fits. On a phone one column in the document's order: the day, the
- * rail, the road, the list.
+ * From `lg` two columns, the road and a 20 rem rail (22 from `xl`): the day block on the first row, the road on the
+ * second, the list on the third, the rail across all three, sticky while it fits. On a phone one column in the document's
+ * order: the day, the road (LC62b: right after the day, not 1,200 px down under the rail), the rail, the list.
  */
-const SPLIT = 'lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:gap-x-10 xl:grid-cols-[minmax(0,1fr)_22rem]';
+const SPLIT = 'lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_auto_1fr] lg:gap-x-10 xl:grid-cols-[minmax(0,1fr)_22rem]';
 const LEFT = 'lg:col-start-1 lg:row-start-1';
-const ASIDE = 'lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start';
+const ASIDE = 'lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-start';
 /**
  * Sticky under the heading (G6), so the right column never leaves the page empty under it (G8) — while it fits in the
  * window and the settings are closed: taller, its foot must scroll into reach.
@@ -131,6 +131,10 @@ export function ReviewHome() {
           <TodayCourses />
           <TodayExam />
       </div>
+      {/* The road: right after the day block on a phone, under it from `lg`. */}
+      <div className={cn('grid min-w-0 grid-cols-1 content-start', 'lg:col-start-1 lg:row-start-2')}>
+        <LearnPath percorso={percorso} materie={data?.materie ?? null} onRetry={percorso.reload} onOpenCommunity={() => openSettingsFor('comunita')} />
+      </div>
       {/* The day's numbers, beside the road from `lg`, sticky while they fit. */}
       <div ref={aside} className={cn('grid min-w-0 grid-cols-1 content-start gap-6', ASIDE, !settingsOpen && fits && STICK)}>
         <StatsBand
@@ -153,17 +157,14 @@ export function ReviewHome() {
           />
         </div>
       </div>
-      {/* The road and the full list: after the day's numbers on a phone, under the day block from `lg`. */}
-      <div className={cn('grid min-w-0 grid-cols-1 content-start gap-8', 'lg:col-start-1 lg:row-start-2')}>
-        <LearnPath percorso={percorso} materie={data?.materie ?? null} onRetry={percorso.reload} onOpenCommunity={() => openSettingsFor('comunita')} />
-        <div className="min-w-0 empty:hidden">
-          <MissionList data={data} loading={loading && data === null} />
-        </div>
+      {/* The full list: last on a phone, under the road from `lg`. */}
+      <div className="min-w-0 empty:hidden lg:col-start-1 lg:row-start-3">
+        <MissionList data={data} loading={loading && data === null} />
       </div>
-      {/* The confetti start from the goal's mark, in the day block, and fall over the page's first rows, out of the flow. */}
+      {/* LC39: no confetti; a curl of smoke leaves the lamp on the day's plate, in the day block, out of the flow. */}
       {celebrate && data && (
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[32rem]">
-          <ConfettiBurst originRef={goalRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
+          <SmokeRise originRef={goalRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         </div>
       )}
     </section>

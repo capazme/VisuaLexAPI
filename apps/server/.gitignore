@@ -4,3 +4,6 @@ dist/
 .env.local
 *.log
 .DS_Store
+
+# A case's act files in development (PRATICA_FILES_DIR): encrypted, but never in the repository.
+pratica-files/
