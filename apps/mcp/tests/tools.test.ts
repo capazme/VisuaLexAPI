@@ -578,6 +578,18 @@ describe('omnilex_aggiungi_norme_dossier', () => {
 });
 
 describe('omnilex_aggiungi_nota_dossier', () => {
+  it('asks for simple Markdown, never HTML, up to 4000 characters, as the web draws an application\'s note (D4)', async () => {
+    const { tools } = await client.listTools();
+    const add = tools.find((t) => t.name === 'omnilex_aggiungi_nota_dossier')!;
+    expect(add.description).toMatch(/Markdown semplice: \*\*grassetto\*\*, titoletti con ##, elenchi con - o 1\.; niente HTML; fino a 4000 caratteri per nota/);
+    expect(add.description).not.toMatch(/testo semplice/);
+    // The same words on every note's text, `omnilex_crea_dossier`'s included.
+    for (const name of ['omnilex_aggiungi_nota_dossier', 'omnilex_crea_dossier']) {
+      const schema = tools.find((t) => t.name === name)!.inputSchema as { properties: { note: { items: { properties: { testo: { description: string } } } } } };
+      expect(schema.properties.note.items.properties.testo.description).toBe('Il testo della nota, in Markdown semplice');
+    }
+  });
+
   it('adds a note to the dossier named, through dossier:write, and answers with its id', async () => {
     const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'Prova', note: [{ testo: 'Vedi Cass. 2020.' }] } });
     expect(result.isError).toBeFalsy();

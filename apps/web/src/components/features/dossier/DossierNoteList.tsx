@@ -5,6 +5,7 @@ import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { formatTimestampLong } from './dossierUtils';
 import { ROW_REMOVE } from './dossierStyles';
 import { useNoteRemovalFocus } from './useNoteRemovalFocus';
+import { NoteText } from './NoteText';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -16,7 +17,7 @@ export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; on
   const { register, remove } = useNoteRemovalFocus(notes, onRemoveNote);
 
   return notes.map((note) => {
-    const words = <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>;
+    const words = <NoteText note={note} className="text-sm text-slate-800 dark:text-slate-200" />;
     const meta = (
       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
         <span>{formatTimestampLong(note.addedAt)}</span>

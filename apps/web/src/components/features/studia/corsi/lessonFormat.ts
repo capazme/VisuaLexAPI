@@ -94,8 +94,11 @@ export function parseInline(text: string): Inline[] {
   return restore(emphasis(held));
 }
 
-/** A block's text as nodes. Lines of one paragraph are joined by a space, as Markdown reads a soft break. */
-export function parseLesson(text: string): LessonNode[] {
+/**
+ * A block's text as nodes. Lines of one paragraph are joined by a space, as Markdown reads a soft break; a dossier's
+ * note (D4) passes `'\n'` to keep them, as its plain text always did.
+ */
+export function parseLesson(text: string, softBreak = ' '): LessonNode[] {
   const nodes: LessonNode[] = [];
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
   let i = 0;
@@ -146,7 +149,7 @@ export function parseLesson(text: string): LessonNode[] {
       paragraph.push(lines[i].trim());
       i += 1;
     }
-    nodes.push({ kind: 'p', inline: parseInline(paragraph.join(' ')) });
+    nodes.push({ kind: 'p', inline: parseInline(paragraph.join(softBreak)) });
   }
   return nodes;
 }

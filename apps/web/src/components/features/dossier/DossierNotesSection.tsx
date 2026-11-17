@@ -7,6 +7,7 @@ import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { hasAssistantNote } from '../../../utils/aiReview';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { useNoteRemovalFocus } from './useNoteRemovalFocus';
+import { NoteText } from './NoteText';
 import { ROW, ROW_LINE, ROW_REMOVE, ROW_TITLE, SECTION_COUNT, SECTION_HEADING, SECTION_TILE } from './dossierStyles';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
@@ -23,11 +24,7 @@ const isLong = (text: string) => text.length > FOLD_AT || text.split('\n').lengt
 function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => void; rowRef: (el: HTMLElement | null) => void }) {
   const [open, setOpen] = useState(false);
   const long = isLong(note.data);
-  const words = (
-    <p className={cn(ROW_TITLE, 'whitespace-pre-wrap [overflow-wrap:anywhere]', long && !open && 'line-clamp-3')}>
-      {note.data}
-    </p>
-  );
+  const words = <NoteText note={note} className={ROW_TITLE} folded={long && !open} />;
   // The grey line: when; under the words, never beside them, so a phone's narrow row keeps the note's width. Who wrote
   // it is not drawn (D7b): an application's note says it by its validation; the data and the PDF keep it.
   const meta = (
