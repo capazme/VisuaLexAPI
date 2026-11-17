@@ -82,6 +82,7 @@ export function DossierPage() {
   // the last section remembers, the Forum's study ones on a cold boot) is never drawn in its place.
   const reading = useAppStore((s) => s.isLoadingData || (!s.isDataLoaded && !s.dataError));
   const readError = useAppStore((s) => s.dataError);
+  const fetchUserData = useAppStore((s) => s.fetchUserData);
   // A dossier opened by its address takes the user to its kind's section (sections spec S7).
   const selectedKind = selectedDossier ? (selectedDossier.kind ?? 'lavoro') : null;
   useEffect(() => {
@@ -106,7 +107,10 @@ export function DossierPage() {
             <p className="text-[15px] text-slate-700 dark:text-slate-300">
               {readError ? 'Non riesco a leggere le pratiche: riprova tra poco.' : 'Questa pratica non c’è o non è tua.'}
             </p>
-            <Button variant="secondary" onClick={() => setSelectedDossierId(null)}>Vai alle pratiche</Button>
+            <div className="flex gap-2">
+              {readError && <Button onClick={() => void fetchUserData()}>Riprova</Button>}
+              <Button variant="secondary" onClick={() => setSelectedDossierId(null)}>Vai alle pratiche</Button>
+            </div>
           </div>
         )
       ) : selectedDossier ? (

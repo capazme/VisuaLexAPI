@@ -44,8 +44,10 @@ const fold = (value: string) => cleanSectionTitle(value).toLowerCase();
 
 // Normattiva reads a heading off its `<li>` with the levels opened there glued on: «TITOLO III DEI SINGOLI CONTRATTI
 // CAPO I Della vendita Sezione I Disposizioni generali», «Disposizioni sulla legge in generale CAPO I …». Split before a
-// level word (capitals or capitalised) followed by its numeral, or before a «§ n», amendment markers «((» included.
-const GLUED = /\s+(?=(?:\(\()?(?:(?:PARTE|LIBRO|TITOLO|CAPO|SEZIONE|Parte|Libro|Titolo|Capo|Sezione)\s+[IVXLCDM]+\b|§\s*\d))/;
+// level word followed by its numeral, or before a «§ n», amendment markers «((» included. A capitalised level word
+// splits only when it opens a level, its name capitalised after the numeral: «Modifiche al Titolo V della …» is a name.
+const GLUED =
+  /\s+(?=(?:\(\()?(?:(?:PARTE|LIBRO|TITOLO|CAPO|SEZIONE)\s+[IVXLCDM]+\b|(?:Parte|Libro|Titolo|Capo|Sezione)\s+[IVXLCDM]+(?:-?[a-z]+)?(?:\)\))?\s+(?:\(\()?[A-ZÀ-Ý]|§\s*\d))/;
 
 /** One string of the listing as the headings it holds. */
 export function splitHeadings(raw: string): string[] {

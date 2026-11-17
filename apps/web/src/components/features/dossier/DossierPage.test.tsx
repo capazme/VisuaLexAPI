@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true }) }));
@@ -13,6 +13,8 @@ vi.mock('../../../services/dossierService', async (importOriginal) => {
 import { appStore } from '../../../store/useAppStore';
 import { DossierPage } from './DossierPage';
 import { sectionStore } from '../../../features/sections/useSection';
+
+const original = appStore.getState().fetchUserData;
 
 describe('DossierPage', () => {
   it('opens the trash on ?trash=1', async () => {
@@ -65,5 +67,15 @@ describe('DossierPage', () => {
     render(<MemoryRouter initialEntries={['/pratiche?dossier=zz']}><DossierPage /></MemoryRouter>);
     expect(screen.getByText('Questa pratica non c’è o non è tua.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vai alle pratiche' })).toBeInTheDocument();
+  });
+
+  it('LC73: when the pratiche cannot be read, «Riprova» reads them again', () => {
+    const fetchUserData = vi.fn(async () => {});
+    appStore.setState({ dossiers: [], dossiersLoaded: false, isDataLoaded: false, isLoadingData: false, dataError: 'giù', fetchUserData });
+    render(<MemoryRouter initialEntries={['/pratiche?dossier=zz']}><DossierPage /></MemoryRouter>);
+    expect(screen.getByText('Non riesco a leggere le pratiche: riprova tra poco.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(fetchUserData).toHaveBeenCalledTimes(1);
+    appStore.setState({ dataError: null, fetchUserData: original });
   });
 });

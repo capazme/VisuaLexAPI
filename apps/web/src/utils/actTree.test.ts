@@ -84,6 +84,19 @@ describe('glued headings, as Normattiva serves them', () => {
     expect(splitHeadings("((Sezione VI)) ((Dell'impresa familiare))")).toEqual(["((Sezione VI)) ((Dell'impresa familiare))"]);
   });
 
+  it('cuts before a capitalised level word only when it opens a level, not inside a name (LC73)', () => {
+    expect(splitHeadings('Modifiche al Titolo V della parte seconda della Costituzione')).toEqual([
+      'Modifiche al Titolo V della parte seconda della Costituzione',
+    ]);
+    // d.lgs. 36/2023 and the c.c., as Normattiva lists them.
+    expect(splitHeadings('PARTE V DELLO SVOLGIMENTO DELLE PROCEDURE Titolo I Gli atti preparatori')).toEqual([
+      'PARTE V DELLO SVOLGIMENTO DELLE PROCEDURE', 'Titolo I Gli atti preparatori',
+    ]);
+    expect(splitHeadings("Titolo XII ((Delle misure di protezione)) ((Capo I)) ((Dell'amministrazione di sostegno))")).toEqual([
+      'Titolo XII ((Delle misure di protezione))', "((Capo I)) ((Dell'amministrazione di sostegno))",
+    ]);
+  });
+
   it('nests the Libro IV: chapters under titles, sections under chapters, § under sections', () => {
     expect(outline(buildActTree(LIBRO_IV, '2', ['CODICE CIVILE']))).toEqual([
       { 'LIBRO QUARTO DELLE OBBLIGAZIONI': [
