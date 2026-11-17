@@ -32,7 +32,7 @@ import { creditedNow, insertCredit, levelNow, periodOf, type XpLivello, type XpP
 
 export type MissionId =
   | 'dovute' | 'nuove' | 'obiettivo' | 'materia-ferma' | 'scrivi' | 'convalida' | 'caso' | 'settimana' | 'consolida'
-  | 'modulo' | 'percorso';
+  | 'modulo' | 'percorso' | 'lezione';
 
 /**
  * What happened. A grade of a course card names the enrolment (`iscrizioneId`); `modulo` is any study write on a
@@ -46,7 +46,9 @@ export type XpEvent =
   | { tipo: 'lettura' }
   | { tipo: 'modulo'; iscrizioneId: string }
   | { tipo: 'esame'; iscrizioneId: string }
-  | { tipo: 'corso'; iscrizioneId: string };
+  | { tipo: 'corso'; iscrizioneId: string }
+  /** A short lesson's last answer (LC63, `lingo/lessons.ts`), in the transaction that ended it. */
+  | { tipo: 'lezione'; lezioneId: string; materia: LingoMateria };
 
 type CatalogueEvent = Extract<XpEvent, { tipo: 'revisione' | 'proposta' | 'voto' | 'lettura' }>;
 
@@ -83,8 +85,8 @@ export const MISSIONS: readonly MissionDef[] = [
 ];
 
 /**
- * A safety net, not the rule (G-315): the catalogue's most in one day (255), two modules (60) and a course passed
- * (100) stay under it (G-377 Q5; a test pins it).
+ * A safety net, not the rule (G-315): the catalogue's most in one day (255), two modules (60), a course passed
+ * (100) and three short lessons (30, LC63) stay under it (G-377 Q5; a test pins it).
  */
 export const XP_DAILY_CEILING = 450;
 /** The reviews «obiettivo» needs for XP whatever the user's own goal (L-27 choice 5; the default goal). */
@@ -109,6 +111,11 @@ const FONTE: Record<CatalogueEvent['tipo'], LingoFonteXp> = { revisione: 'REVISI
 /** The courses' missions (§10.8, §11; G-377 Q5). */
 export const MODULE_MISSION = { punti: 30, percentuale: 70, alGiorno: 2 } as const;
 export const COURSE_MISSION = { punti: 100, competenze: 3, moduli: 3 } as const;
+/**
+ * «Lezione» (LC63): a finished short lesson, whatever its right answers, at most three a Rome day (`L:<lesson id>`).
+ * With them the day's most is 445, still under `XP_DAILY_CEILING`.
+ */
+export const LESSON_MISSION = { punti: 10, alGiorno: 3 } as const;
 
 export interface XpCredito {
   missione: MissionId;
@@ -252,6 +259,7 @@ async function evaluate(id: MissionId, facts: Facts, today: string, event: Catal
     case 'caso':
     case 'modulo':
     case 'percorso':
+    case 'lezione':
       return { fulfilled: false, vuota: false };
   }
 }
@@ -354,6 +362,7 @@ export async function settleMissions(tx: Prisma.TransactionClient, userId: strin
       dayTotal += mission.punti;
     }
     dayTotal = await settleCourseMissions(tx, userId, today, event, crediti, dayTotal);
+    dayTotal = await settleLessonMission(tx, userId, today, event, crediti, dayTotal);
     settled = { before, crediti, dayTotal };
   } catch (error) {
     // Also undoes the SET LOCAL. The error's text may carry the statement's values: only its name is logged.
@@ -445,6 +454,29 @@ async function settleCourseMissions(
     dayTotal += COURSE_MISSION.punti;
   }
   return dayTotal;
+}
+
+/**
+ * «Lezione» for the event's lesson (LC63), from stored rows only: the person's lesson, ended, not yet credited, and
+ * fewer than `LESSON_MISSION.alGiorno` lessons credited this Rome day. Returns the day's new total; pushes what it credits.
+ */
+async function settleLessonMission(
+  tx: Prisma.TransactionClient, userId: string, today: string, event: XpEvent, crediti: XpCredito[], dayTotal: number,
+): Promise<number> {
+  if (event.tipo !== 'lezione') return dayTotal;
+  const lesson = await tx.lingoLezione.findFirst({ where: { id: event.lezioneId, utenteId: userId, finitaIl: { not: null } }, select: { id: true, materia: true } });
+  if (!lesson) return dayTotal;
+  if ((await tx.lingoCreditoXp.count({ where: { utenteId: userId, missione: 'LEZIONE', giorno: dayToDate(today) } })) >= LESSON_MISSION.alGiorno) return dayTotal;
+  if (dayTotal + LESSON_MISSION.punti > XP_DAILY_CEILING) {
+    console.warn('[xp] daily ceiling reached: «lezione» not credited');
+    return dayTotal;
+  }
+  const written = await insertCredit(tx, {
+    userId, missione: 'LEZIONE', periodo: `L:${lesson.id}`, today, punti: LESSON_MISSION.punti, fonte: 'LEZIONE', fonteId: lesson.id, materia: lesson.materia,
+  });
+  if (!written) return dayTotal;
+  crediti.push({ missione: 'lezione', punti: LESSON_MISSION.punti });
+  return dayTotal + LESSON_MISSION.punti;
 }
 
 /**

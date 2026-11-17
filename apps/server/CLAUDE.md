@@ -824,6 +824,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   most two a Rome day, the rest credited by a later event or the course page) and «Supera un percorso» (100, for three
   competences and three counting modules at least), settled in `settleMissions` with the events `modulo`, `esame`,
   `corso` and a course card's `revisione`; neither is in «Le missioni di oggi».
+- **The short lesson** (LC63; migrations `20261117100000_lingo_lessons`, `20261117100001_lingo_lessons_period`).
+  `routes/lingoLezioni.ts` over `lingo/lessons.ts`, session only (in no delegated row, so a token gets 403).
+  `POST /api/lingo/lezioni { materia }` builds 5–8 exercises from the subject's cards in `reviewScope` (at least
+  `LESSON_MIN_CARDS` = 4, else 409 with the reason; at most `LESSONS_PER_DAY` = 20 a Rome day, else 429): multiple
+  choice, true or false, article ↔ institute, a word taken out of a card's answer — the cards' own words, no sentence
+  of its own. `LingoLezione` (`lingo_lezioni`, cascade from `User`) stores them with their keys; the answer carries
+  none. `POST /:id/risposte { indice, risposta }` grades on the server, stores `{ indice, giusta }` and answers the
+  key; a second answer is `registrata: false`. The answer that completes the lesson sets `finitaIl` and, in its
+  transaction, `settleMissions` with `{ tipo: 'lezione' }` credits «Lezione» (`LESSON_MISSION`: 10, at most three a
+  Rome day, `L:<lesson id>`, fonte `LEZIONE`; not in «Le missioni di oggi»). The export carries `data.lingoLezioni`
+  without the exercises' words (cards' texts, often other people's).
 - **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
   subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own

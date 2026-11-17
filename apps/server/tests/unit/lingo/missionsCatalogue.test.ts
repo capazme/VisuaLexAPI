@@ -24,8 +24,9 @@ describe('the catalogue', () => {
     const values = MISSIONS.flatMap((m) => (m.missione ? [m.missione] : []));
     expect(new Set(values).size).toBe(values.length);
     // A course's missions (Percorsi, spec 2026-10-23 §10.8) are not in the daily catalogue: «Le missioni di oggi»
-    // never lists them, and the answers of a module's end and an exam's hand-in carry their points.
-    const courseMissions: string[] = ['MODULO', 'PERCORSO'];
+    // never lists them, and the answers of a module's end and an exam's hand-in carry their points. Nor is the short
+    // lesson's (LC63): its last answer carries its points.
+    const courseMissions: string[] = ['MODULO', 'PERCORSO', 'LEZIONE'];
     expect([...values].sort()).toEqual(Object.values(LingoMissione).filter((m) => !courseMissions.includes(m)).sort());
     for (const m of MISSIONS) if (m.missione) expect(m.missione).toBe(m.id.toUpperCase().replace('-', '_'));
     expect(MISSIONS.find((m) => m.id === 'caso')!.missione).toBeNull();

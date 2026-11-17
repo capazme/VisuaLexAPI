@@ -81,6 +81,9 @@ import { LessonLoading } from './components/features/studia/LessonFrame';
 const ReviewSession = lazy(() =>
   import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
+const LessonSession = lazy(() =>
+  import('./components/features/studia/lezione/LessonSession').then(m => ({ default: m.LessonSession })),
+);
 
 /** «Ambienti» went into the Forum (spec 2026-10-13-environments-into-forum, D11c, D13): an old address, and its share
  * link's `?import=`, land there. */
@@ -261,6 +264,8 @@ function App() {
               <Route index element={<Navigate to="ripasso" replace />} />
               <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
               <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
+              {/* The short lesson of a subject (LC63), the lesson's frame as the review's. */}
+              <Route path="lezione" element={<Suspense fallback={<LessonLoading />}><LessonSession /></Suspense>} />
               {/* «Percorsi» (courses spec §6): drawn only while the switch `lingo_courses` is on, else back to Oggi. */}
               <Route path="percorsi" element={<Suspense fallback={null}><CoursesView /></Suspense>} />
               <Route path="percorsi/:id" element={<Suspense fallback={null}><CoursePage /></Suspense>} />

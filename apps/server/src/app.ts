@@ -35,6 +35,7 @@ import lingoTestiRoutes from './routes/lingoTesti';
 import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
 import adminStudiaSoglieRoutes from './routes/adminStudiaSoglie';
 import lingoSrsRoutes from './routes/lingoSrs';
+import lingoLezioniRoutes from './routes/lingoLezioni';
 import lingoCorsiRoutes from './routes/lingoCorsi';
 import taskRoutes from './routes/tasks';
 import attiRoutes from './routes/atti';
@@ -152,6 +153,7 @@ app.use('/api/lingo/testi', lingoTestiRoutes);
 app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
 app.use('/api/admin/studia/soglie', adminStudiaSoglieRoutes);
 app.use('/api/lingo/srs', lingoSrsRoutes);
+app.use('/api/lingo/lezioni', lingoLezioniRoutes);
 // Gymnasium's courses (Percorsi, A1), same reason; behind the switch `lingo_courses`.
 app.use('/api/lingo/corsi', lingoCorsiRoutes);
 // The planner's tasks, same reason.
