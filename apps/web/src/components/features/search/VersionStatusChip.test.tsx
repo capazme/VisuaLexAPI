@@ -42,4 +42,15 @@ describe('VersionStatusChip', () => {
         render(<VersionStatusChip chip={chip({ tone, label: tone })} onClick={() => {}} />);
         expect(screen.getByRole('button', { name: tone }).className).toContain(colour);
     });
+
+    it('on a phone the day in figures, on a computer in words; read in full either way (LC70)', () => {
+        render(<VersionStatusChip
+            chip={chip({ tone: 'current', label: 'In vigore dal 19 aprile 1942', short: 'In vigore dal 19/4/1942' })}
+            onClick={() => {}}
+        />);
+        const button = screen.getByRole('button', { name: 'In vigore dal 19 aprile 1942' });
+        expect(screen.getByText('In vigore dal 19/4/1942')).toHaveClass('md:hidden');
+        expect(screen.getByText('In vigore dal 19 aprile 1942')).toHaveClass('hidden', 'md:inline');
+        expect(button).toContainElement(screen.getByText('In vigore dal 19/4/1942'));
+    });
 });

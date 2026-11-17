@@ -2,8 +2,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArticleData, Norma } from '../../types';
 
-const { legalFetch } = vi.hoisted(() => ({ legalFetch: vi.fn() }));
+const { legalFetch, notify } = vi.hoisted(() => ({ legalFetch: vi.fn(), notify: vi.fn() }));
 vi.mock('../../services/legalFetch', () => ({ legalFetch }));
+vi.mock('../../components/ui/notifications/notifications', () => ({ notify }));
 
 import { appStore } from '../../store/useAppStore';
 import { useAnnexNavigation } from '../useAnnexNavigation';
@@ -23,6 +24,7 @@ let original: { triggerSearch: unknown };
 
 beforeEach(() => {
   legalFetch.mockReset();
+  notify.mockReset();
   triggerSearch.mockReset();
   const state = appStore.getState();
   original = { triggerSearch: state.triggerSearch };
@@ -96,5 +98,42 @@ describe('useAnnexNavigation: the act\'s tree', () => {
     expect(treeCalls()).toBe(2);
     error.mockRestore();
     clearActStructureCache();
+  });
+});
+
+describe('useAnnexNavigation: an article that does not come (LC70)', () => {
+  const message = () => notify.mock.calls[0][0].message as string;
+
+  it('a number the act\'s structure does not hold says so on screen', async () => {
+    clearActStructureCache();
+    const norma: Norma = { ...L24, urn: 'urn:nir:stato:legge:2017-03-08;24' };
+    legalFetch.mockImplementation((path: string) => Promise.resolve(path === '/fetch_tree'
+      ? answer({ articles: [], metadata: { annexes: [{ number: null, article_numbers: ['5', '7'] }] } })
+      : answer(path === '/fetch_rubriche' ? {} : [{ error: 'not found' }])));
+    const addArticles = vi.fn();
+    const { result } = renderHook(() => useAnnexNavigation({ norma, articles: [art('5')], addArticles }));
+    await waitFor(() => expect(result.current.allArticleIds).toEqual(['5', '7']));
+    await act(async () => { await result.current.handleLoadArticle('9999'); });
+    expect(addArticles).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(message()).toBe("L'articolo 9999 non c'è in questo atto.");
+    clearActStructureCache();
+  });
+
+  it('a request that fails says the article did not load, not that it is missing', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    legalFetch.mockResolvedValue({ ok: false, status: 500, json: () => Promise.resolve({}) });
+    const { result } = renderHook(() => useAnnexNavigation({ norma: L24, articles: [art('5')], addArticles: vi.fn() }));
+    await act(async () => { await result.current.handleLoadArticle('7'); });
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(message()).toBe("L'articolo 7 non si è caricato. Riprova.");
+    error.mockRestore();
+  });
+
+  it('an article that lands says nothing', async () => {
+    legalFetch.mockResolvedValue(answer([art('7')]));
+    const { result } = renderHook(() => useAnnexNavigation({ norma: L24, articles: [art('5')], addArticles: vi.fn() }));
+    await act(async () => { await result.current.handleLoadArticle('7'); });
+    expect(notify).not.toHaveBeenCalled();
   });
 });
