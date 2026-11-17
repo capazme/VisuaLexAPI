@@ -56,7 +56,7 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
   if (!practice) return null;
   const simple = layout === 'overview' && isSimplePractice(practice);
   // LC68: one act with more articles is named by its own heading too; the head would repeat it as «c.c.».
-  const headless = layout === 'overview' && isOneActPractice(practice);
+  const headless = layout === 'overview' && isOneActPractice(practice) && practice.beside.length === 0;
   return (
     // The frame's width (U1): its rows widen, the text they open stays at the reading measure (`.vlx-art`).
     <div

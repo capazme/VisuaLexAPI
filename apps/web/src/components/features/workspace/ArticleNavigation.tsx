@@ -152,6 +152,7 @@ export function ArticleNavigation({
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
         )}
+        title={prevLabel}
         aria-label={prevLabel}
       >
         {isPrevLoading ? (
@@ -195,6 +196,7 @@ export function ArticleNavigation({
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
         )}
+        title={nextLabel}
         aria-label={nextLabel}
       >
         {isNextLoading ? (

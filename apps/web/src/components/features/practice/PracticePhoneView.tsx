@@ -162,7 +162,7 @@ function PhonePracticeHead({ practice, save }: { practice: Practice; save: Pract
   const countLine = practiceCountLine(practiceCounts(practice));
   return (
     <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
-      <p title={countLine} className="min-w-0 flex-1 truncate text-sm text-slate-600 dark:text-slate-400">{countLine}</p>
+      <p title={countLine || undefined} className="min-w-0 flex-1 truncate text-sm text-slate-600 dark:text-slate-400">{countLine}</p>
       <MenuButton
         // Its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
         className="-mr-3"
