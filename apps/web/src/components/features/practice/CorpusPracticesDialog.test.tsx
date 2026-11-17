@@ -62,7 +62,7 @@ describe('CorpusPracticesDialog (LC60)', () => {
   it('lists only the new collections, all ticked; the empty and the identical ones go without asking', async () => {
     threeCollections();
     render(<CorpusPracticesDialog />);
-    const dialog = await screen.findByRole('dialog', { name: 'Le pratiche della Ricerca diventano pratiche' });
+    const dialog = await screen.findByRole('dialog', { name: 'Le raccolte della Ricerca diventano pratiche' });
     expect(within(dialog).getByText(/Nella Ricerca avevi 1 raccolta di norme e sentenze\./)).toBeInTheDocument();
     const box = within(dialog).getByRole('checkbox', { name: /IA Act/ });
     expect(box).toBeChecked();
@@ -88,7 +88,7 @@ describe('CorpusPracticesDialog (LC60)', () => {
     threeCollections();
     render(<CorpusPracticesDialog />);
     await userEvent.click(await screen.findByRole('button', { name: 'Non salvare' }));
-    expect(await screen.findByText('Le raccolte non spuntate non si potranno recuperare.')).toBeInTheDocument();
+    expect(await screen.findByText('Le raccolte non si potranno recuperare.')).toBeInTheDocument();
     expect(s().practices).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Non salvarle' }));
     await waitFor(() => expect(s().corpusPracticesPending).toBe(false));
@@ -103,7 +103,9 @@ describe('CorpusPracticesDialog (LC60)', () => {
     render(<CorpusPracticesDialog />);
     await userEvent.click(await screen.findByRole('checkbox', { name: /Due/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Salva come pratiche' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Non salvarle' }));
+    expect(await screen.findByText('Le raccolte non spuntate non si potranno recuperare.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Non salvarle' })).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: 'Salva le spuntate' }));
     await waitFor(() => expect(s().corpusPracticesPending).toBe(false));
     expect(svc.create).toHaveBeenCalledTimes(1);
     expect(svc.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Uno' }));

@@ -126,7 +126,7 @@ export function CorpusPracticesDialog() {
         closeOnEscape={false}
         showCloseButton={false}
         size="md"
-        title="Le pratiche della Ricerca diventano pratiche"
+        title="Le raccolte della Ricerca diventano pratiche"
         description={`Nella Ricerca avevi ${n} ${n === 1 ? 'raccolta' : 'raccolte'} di norme e sentenze. Le salviamo come pratiche, così le ritrovi in Pratiche.`}
         footer={
           <>
@@ -173,8 +173,8 @@ export function CorpusPracticesDialog() {
         open={confirming !== null}
         variant="danger"
         title={confirming === 'discard' ? 'Non salvare le raccolte?' : 'Salvare solo quelle spuntate?'}
-        message="Le raccolte non spuntate non si potranno recuperare."
-        confirmLabel="Non salvarle"
+        message={confirming === 'discard' ? 'Le raccolte non si potranno recuperare.' : 'Le raccolte non spuntate non si potranno recuperare.'}
+        confirmLabel={confirming === 'discard' ? 'Non salvarle' : 'Salva le spuntate'}
         cancelLabel="Torna indietro"
         focusCancel
         onCancel={() => setConfirming(null)}
