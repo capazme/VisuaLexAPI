@@ -67,7 +67,14 @@ describe('D4: a long application note, folded', () => {
     expect(screen.getByText('punto 1')).toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: 'Mostra tutto' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('Scadenzario').closest('div')).toHaveClass('overflow-hidden');
     fireEvent.click(toggle);
     expect(screen.getByRole('button', { name: 'Mostra meno' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Scadenzario').closest('div')).not.toHaveClass('overflow-hidden');
+  });
+
+  it('a short one, its blocks apart by blank lines, is not folded', () => {
+    render(<DossierNotesSection notes={[note('## Titolo\n\nUna riga.\n\n- una voce', app)]} onRemove={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Mostra tutto' })).toBeNull();
   });
 });

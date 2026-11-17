@@ -17,13 +17,15 @@ interface Props {
   onRemove: (item: DossierItem) => void;
 }
 
-// A note longer than this, or of more than three lines, is shown folded.
+// A note longer than this, or of more than three lines, is shown folded. An application's note counts the lines it
+// draws: its Markdown's blank lines only part blocks (D4).
 const FOLD_AT = 240;
-const isLong = (text: string) => text.length > FOLD_AT || text.split('\n').length > 3;
+const isLong = ({ data, createdBy }: NoteItem) =>
+  data.length > FOLD_AT || (createdBy ? data.split('\n').filter((line) => line.trim()) : data.split('\n')).length > 3;
 
 function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => void; rowRef: (el: HTMLElement | null) => void }) {
   const [open, setOpen] = useState(false);
-  const long = isLong(note.data);
+  const long = isLong(note);
   const words = <NoteText note={note} className={ROW_TITLE} folded={long && !open} />;
   // The grey line: when; under the words, never beside them, so a phone's narrow row keeps the note's width. Who wrote
   // it is not drawn (D7b): an application's note says it by its validation; the data and the PDF keep it.
