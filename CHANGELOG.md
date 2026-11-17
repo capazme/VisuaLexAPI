@@ -12,6 +12,28 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-11-17
+
+The search island rewritten, the Ricerca reader on a phone, the act structure panel redone; the Forum
+community's server (votes, profile, communities by subject). Three migrations (Forum). MERL-T stays off.
+
+### Ricerca
+
+- The search island rewritten from scratch, opening and closing checked frame by frame, one component
+  instead of two (LC69).
+- The reader on a phone: one head for an act, the article in the selector, the graph off in the reader;
+  status and selector on one line (LC68, LC70).
+- The «Struttura» panel redone: a plain title, a simple close, the act's parts in a short menu (LC71).
+- The reader's commands show their background under the cursor (LC72).
+
+### Forum (server)
+
+- Votes up and down on glosses and replies, never on one's own, and a public personal score (#506).
+- A minimal profile and the «non è chi dice di essere» report, behind `forum_identity`, off (#509).
+- Communities by subject, moderators and validators appointed by the owners, validation and appeal
+  (#510). Migrations `20261116100000_forum_votes_up_down`, `20261116100001_forum_profiles`,
+  `20261116100002_forum_communities`. The web side comes later.
+
 ## [1.32.0] - 2026-11-17
 
 Learn's trail and a short lesson per subject; Rassegne in ⌘K and a passage into a pratica as a note;
