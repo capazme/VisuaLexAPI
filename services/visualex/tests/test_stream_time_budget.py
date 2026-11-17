@@ -128,7 +128,7 @@ async def test_the_closing_line_follows_the_time_budgets_line(controller, monkey
 
 
 async def test_without_asking_there_is_no_closing_line(controller, monkeypatch):
-    # The archive and the e2e harness read every line as an article: they never get it.
+    # The search panel as it is and the archive read every line as an article: they never get it.
     monkeypatch.setattr(app_module, "STREAM_SECONDS_PER_ARTICLE", 10.0)
     controller.app.config["RESPONSE_TIMEOUT"] = 60
     for body in (None, {"end_line": "true"}, {"end_line": 1}):

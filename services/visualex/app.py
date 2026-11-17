@@ -500,8 +500,8 @@ class NormaController:
         # The closing line (G-488), for a client that asks with `"end_line": true`: every stream the
         # server ends itself ends with `{"kind": "end", "sent": N, "total": M}`, after the time
         # budget's line too, so a body that stops without it was cut on the way (a proxy, a crash, a
-        # dropped connection). Asked for, not always sent: the archive and the e2e harness read
-        # every line as an article.
+        # dropped connection). Asked for, not always sent: the search panel as it is and the archive
+        # read every line as an article.
         end_line = isinstance(data, dict) and data.get('end_line') is True
 
         def closing(sent):
