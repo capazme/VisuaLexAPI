@@ -214,6 +214,26 @@ function insetOf(source: HTMLElement | null, box: DOMRect): Inset | null {
   return { ...inset, radius };
 }
 
+/**
+ * LC81: the field the pill becomes, and the rest of the panel's content (the siblings along the way up from it), which
+ * fades around it. The field is seen from the first frame, on the pill's box, and goes to its place (FLIP: a move and
+ * its width; the lens and the words keep their place in it). Without the field (a later step), the content fades whole.
+ */
+function fieldAndRest(content: HTMLElement): { field: HTMLElement | null; rest: HTMLElement[] } {
+  const field = content.querySelector<HTMLElement>('[data-island-field]');
+  const rest: HTMLElement[] = [];
+  for (let el = field; el && el !== content; el = el.parentElement) {
+    for (const sibling of Array.from(el.parentElement?.children ?? [])) if (sibling !== el && sibling instanceof HTMLElement) rest.push(sibling);
+  }
+  return { field, rest };
+}
+/** The field on a box (the pill's, or its own place): measured with no animation on it. */
+const FIELD_KEYS = ['transform', 'minWidth', 'maxWidth', 'opacity'];
+function fieldOn(field: HTMLElement, box: DOMRect): Keyframe {
+  const r = field.getBoundingClientRect();
+  return { transform: `translate(${px(box.left - r.left)}, ${px(box.top - r.top)})`, minWidth: px(box.width), maxWidth: px(box.width) };
+}
+
 /** The values the layers show now (an animation running included), to go on from there. */
 function now(el: HTMLElement, keys: string[]): Keyframe {
   const style = getComputedStyle(el) as unknown as Record<string, string>;
@@ -251,8 +271,15 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
     // Where the layers are now (the other way's animations included), then those animations stopped: the card's own
     // shadow is read once nothing runs.
     const take = () => {
+      const { field, rest } = fieldAndRest(content);
       const was = running.current.length > 0
-        ? { shape: now(shape, SHAPE_KEYS), content: now(content, ['clipPath', 'opacity']), root: now(root, ['opacity']) }
+        ? {
+          shape: now(shape, SHAPE_KEYS),
+          content: now(content, ['clipPath', 'opacity']),
+          root: now(root, ['opacity']),
+          field: field && now(field, FIELD_KEYS),
+          rest: { opacity: rest[0] ? getComputedStyle(rest[0]).opacity : '1' },
+        }
         : null;
       running.current.forEach((a) => a.cancel());
       running.current = [];
@@ -261,7 +288,7 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
       const full: Inset = { top: 0, right: 0, bottom: 0, left: 0, radius: parseFloat(own.borderTopLeftRadius) || 0 };
       // No clip is the whole panel, as an inset: `none` does not interpolate with one (the clip would jump halfway).
       if (was && (!was.content.clipPath || was.content.clipPath === 'none')) was.content.clipPath = clipAt(full);
-      return { was, shadow: own.boxShadow, full };
+      return { was, shadow: own.boxShadow, full, field, rest };
     };
     let frame = 0;
     let idle = 0;
@@ -269,13 +296,26 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
     if (isPresent) {
       const open = () => {
         started.current = true;
-        const { was, shadow, full } = take();
+        const { was, shadow, full, field, rest } = take();
         root.style.opacity = '';
         // Back from a closing, which took the pointer away.
         root.style.pointerEvents = '';
         const from = still ? null : insetOf(source, root.getBoundingClientRect());
         const timing = { ...ISLAND_OPEN, fill: 'backwards' as const };
-        running.current = was
+        // LC81: the field, at its place now (nothing runs on it), and where it starts: on the pill, or where it is.
+        const fieldHome = field && fieldOn(field, field.getBoundingClientRect());
+        const fieldFrom = field && (was?.field ?? (from && source ? { ...fieldOn(field, source.getBoundingClientRect()), opacity: 1 } : null));
+        running.current = fieldHome && fieldFrom && (was || from)
+          ? [
+            was
+              ? shape.animate([was.shape, { ...shapeAt(full), boxShadow: shadow, opacity: 1 }], timing)
+              : shape.animate([{ ...shapeAt(from!), boxShadow: noShadow(shadow) }, { ...shapeAt(full), boxShadow: shadow }], timing),
+            content.animate([{ clipPath: was ? was.content.clipPath : clipAt(from!) }, { clipPath: clipAt(full) }], timing),
+            field!.animate([fieldFrom, { ...fieldHome, opacity: 1 }], timing),
+            ...rest.map((el) => el.animate(was ? [was.rest, { opacity: 1 }] : [{ opacity: 0 }, { opacity: 0, offset: CONTENT_FROM }, { opacity: 1 }], timing)),
+            ...(was ? [root.animate([was.root, { opacity: 1 }], timing)] : []),
+          ]
+          : was
           // Coming back while it closes: from where it is.
           ? [
             shape.animate([was.shape, { ...shapeAt(full), boxShadow: shadow, opacity: 1 }], timing),
@@ -329,13 +369,23 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
       remove.current?.();
       return undefined;
     }
-    const { was, shadow, full } = take();
+    const { was, shadow, full, field, rest } = take();
     const pill = hidden.current;
     const to = still ? null : insetOf(pill ?? source, root.getBoundingClientRect());
     const timing = { ...ISLAND_CLOSE, fill: 'forwards' as const };
     const shapeNow = was?.shape ?? { ...shapeAt(full), boxShadow: shadow, opacity: 1 };
     const contentNow = was?.content ?? { clipPath: clipAt(full), opacity: 1 };
-    running.current = to
+    // LC81: the field goes back onto the pill, seen to the end, and gives way to it in the same crossfade as the shape.
+    const back = pill ?? source;
+    running.current = to && field && back
+      ? [
+        shape.animate([shapeNow, { opacity: 1, offset: PILL_FROM }, { ...shapeAt(to), boxShadow: noShadow(shadow), opacity: 0 }], timing),
+        content.animate([{ clipPath: contentNow.clipPath }, { clipPath: clipAt(to) }], timing),
+        field.animate([was?.field ?? { ...fieldOn(field, field.getBoundingClientRect()), opacity: 1 }, { opacity: 1, offset: PILL_FROM }, { ...fieldOn(field, back.getBoundingClientRect()), opacity: 0 }], timing),
+        ...rest.map((el) => el.animate([was?.rest ?? { opacity: 1 }, { opacity: 0, offset: CONTENT_UNTIL }, { opacity: 0 }], timing)),
+        ...(pill ? [pill.animate([{ opacity: 0 }, { opacity: 0, offset: PILL_FROM }, { opacity: 1 }], timing)] : []),
+      ]
+      : to
       ? [
         shape.animate([shapeNow, { opacity: 1, offset: PILL_FROM }, { ...shapeAt(to), boxShadow: noShadow(shadow), opacity: 0 }], timing),
         content.animate([contentNow, { opacity: 0, offset: CONTENT_UNTIL }, { clipPath: clipAt(to), opacity: 0 }], timing),
@@ -432,7 +482,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const boxRef = useRef<HTMLInputElement>(null);
   const numberRef = useRef<HTMLInputElement>(null);
   // LC81: how the focus came, for the field's frame (`ISLAND_FIELD_FOCUS`), the pill's rule: 1 px from a pointer, 2 px
-  // from the keyboard. Tab, a shortcut (⌘K), an arrow, or Enter or Space on a control count as the keyboard; the words
+  // from the keyboard. Read by a listener on the whole page because a text field always matches `:focus-visible`, a
+  // tap's focus included (the pill, a button, does not): CSS alone cannot tell the two apart. Tab, a shortcut (⌘K), an arrow, or Enter or Space on a control count as the keyboard; the words
   // typed in the field, an on-screen keyboard's included, do not.
   const [keyboard, setKeyboard] = useState(false);
   useEffect(() => {
