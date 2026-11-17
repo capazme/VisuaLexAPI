@@ -845,6 +845,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       ...(isIsland ? [shift({ padding: 16 })] : []),
       // As wide as the field (from the island: the menu's own width, 768 px, the window allowing); as tall as what it
       // holds, up to the height it always had (Bill: one row is not a 640 px panel), the window allowing.
+      // eslint-disable-next-line react-hooks/refs -- `apply` runs as floating-ui places the box, after the render
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
@@ -1495,7 +1496,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           // Two elements: the outer is placed by floating-ui, the inner moves (gotcha 10).
           <div
             key="command-palette"
-            // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
             ref={refs.setFloating}
             {...getFloatingProps()}
             aria-label="Menu di ricerca"
