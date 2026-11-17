@@ -8,9 +8,10 @@
 files a recital, which is never mistaken for an article.
 
 **Architecture:** The Python API settles and freezes the recital text, gives a recital its identity
-(`celex:…~rct26`) and reads recital citations. The ingress opens `/fetch_recitals` to the browser. The server
-stores a recital as a dossier entry of its own kind. The web reads recitals into the act's block, the index, the
-marks and the dossier.
+(`celex:…~rct26`) and reads recital citations. The ingress opens `/fetch_recitals` to the browser. A recital in a
+dossier is a `norm` entry with one more field, `considerando` (G-538), and every part of the server, the MCP and
+the web that reads a `norm` entry learns the field, each with a test. The web reads recitals into the act's
+block, the index, the marks and the dossier.
 
 **Tech Stack:** Python 3 / Quart / BeautifulSoup (services/visualex); Express + Prisma + zod (apps/server);
 the MCP server (apps/mcp); React 19 + Vite + TypeScript + Vitest (apps/web); Caddy (infra/ingress).
@@ -18,8 +19,10 @@ the MCP server (apps/mcp); React 19 + Vite + TypeScript + Vitest (apps/web); Cad
 **Spec:** `docs/superpowers/specs/2026-11-17-eu-recitals-design.md`. Read it with this plan: § numbers below are
 the spec's.
 
-**Gate:** nothing here starts before both owners approve the spec. Q1 decides when the web tasks run. Q2
-decides Tasks 8–11 and 16–18: if the owners choose (b), those tasks are rewritten before anyone builds them.
+**Decided:** the spec is approved (G-536). The server-side pieces (PR 1a, 1b, 2, 3) run now; PR 4a and 4b sit
+where the web owner places them in the web plan (G-537). The dossier entry is a `norma` entry with `considerando`,
+no migration (G-538). The line of §5.2 stands as proposed (G-539). The citation of EU acts before 2015 is fixed
+in a pull request of its own, outside this plan (G-540).
 
 ## Global Constraints
 
@@ -27,9 +30,9 @@ decides Tasks 8–11 and 16–18: if the owners choose (b), those tasks are rewr
   on its own; branch names `feat/recitals-<piece>`.
 - **Tasks 12–18 are `apps/web`: the other owner's area.** His side builds them or approves them before merge.
   Task 7 touches one line of `apps/web/vite.config.ts`, which he approves too.
-- **Shared files.** `infra/ingress/Caddyfile` (Task 7) and the Prisma migration (Task 9) are reserved in the
-  owners' coordination register before the branch touches them. The migration also waits for the orchestrating session's ok.
-  Migrations are written by hand and applied with `migrate deploy`, never `migrate dev` or `reset`.
+- **Shared files.** `infra/ingress/Caddyfile` (Task 7) and the rule 23 sentence of the root `CLAUDE.md` (Task 3)
+  are reserved in the owners' coordination register before the branch touches them. **No migration** (G-538):
+  the Prisma schema does not change.
 - **Identity:** `celex:<CELEX>~rct<N>` (e.g. `celex:32016R0679~rct26`). Marks use `normaKey` = identity and
   `articleId` = `""`.
 - **Labels:**
@@ -40,7 +43,9 @@ decides Tasks 8–11 and 16–18: if the owners choose (b), those tasks are rewr
   «considerando» is always written out; «art.» never appears on a recital.
 - **Field names:** `norma_data.considerando` (the number, digits, no leading zero); `/parse_query`
   `parsed.recital` and top-level `refusal` (`"recital_not_eu"` | `"recital_with_article"`); web
-  `ParsedCitation.recital` and `.refusal`; dossier kind `considerando` on the server and the web.
+  `ParsedCitation.recital` and `.refusal`; a dossier entry `itemType: 'norm'` (server) / `type: 'norma'` (web)
+  whose content has the key `considerando` and no `numero_articolo`. The key decides: a content with it is a
+  recital, whatever its value.
 - **Copy (Italian, exact):**
   - «Considerando: non è una disposizione vincolante, orienta l'interpretazione degli articoli.»
   - «Solo i regolamenti e le direttive dell'Unione hanno considerando numerati.»
@@ -48,8 +53,11 @@ decides Tasks 8–11 and 16–18: if the owners choose (b), those tasks are rewr
   - «Non trovo considerando numerati nella pagina della Gazzetta ufficiale di questo atto.»
   - «Il reg. (UE) 2016/679 ha 173 considerando: il 200 non c'è.» (the act's short citation, the count, the
     missing numbers)
-  - «Questo considerando è già nel dossier»
-  - «Voce non leggibile in questa versione»
+  - «Una voce resta un articolo o un considerando: aggiungila di nuovo.»
+  - «I considerando non si possono ancora proporre nel Forum.»
+  - «un considerando non si può ancora citare in un percorso»
+  - «Il testo di un considerando non si legge ancora da qui: aprilo nel lettore di LexCraft.»
+  - «Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.»
 - **Rule 23 (root `CLAUDE.md`).** After Task 15 merges (PR 4a) the recital text is frozen. A golden is never
   re-recorded to make a test pass.
 - **Tests.** A failing test first. Locally, run only the tests of the task; CI runs the full suites. No bulk
@@ -59,7 +67,7 @@ decides Tasks 8–11 and 16–18: if the owners choose (b), those tasks are rewr
 - **Docs move with the code.** Each pull request updates its area's `CLAUDE.md` wherever it documents the
   behaviour the PR changes. The last task of each PR (3, 6, 7, 11, 15, 18) has a docs step; between them they cover:
   - the Python API's entries for `/fetch_recitals` and `/parse_query`;
-  - the server's dossier kinds;
+  - the server's `norm` entry with `considerando`, and its readers;
   - the web's search, index, reader and dossier;
   - the MCP's tool list.
 
@@ -71,8 +79,9 @@ decides Tasks 8–11 and 16–18: if the owners choose (b), those tasks are rewr
    Task 13 (web).
 3. **«Analizza documento» and «Confronta articoli» unchanged.** The batch answers a recital as not recognised,
    and `isSearchReady` is untouched. Pinned in Task 6 (batch) and Task 13 (`isSearchReady` cases unchanged).
-4. **An entry of a kind the web does not know** is shown read-only and never overwritten. Pinned in Task 12
-   (star, move and save send no `content`).
+4. **A part that reads a `norma` entry and was not taught `considerando`** shows the recital as an article
+   (G-538's cost). The spec's §6.3 lists every part with its test; Task 10's and Task 18's last step greps for
+   any part the table misses.
 6. **A recital and an article in one query** («art. 4 e considerando 26 GDPR») is refused and never opens art.
    4. Pinned in Task 5 (the rest keeps the article), Task 6 (`refusal`) and Task 15 (Enter does not call
    `actions.search`).
@@ -355,168 +364,184 @@ def test_the_new_legacy_fixture_reads_every_recital_in_sequence():
 
 ---
 
-## PR 3 — Server and MCP (`apps/server`, `apps/mcp`, `conventions/sources`) — after Q2
+## PR 3 — Server and MCP (`apps/server`, `apps/mcp` tests, `conventions/sources`) — no migration (G-538)
+
+A recital is a `norm` entry whose content has the key `considerando` (spec §6.2). Nothing in the Prisma schema
+changes. The whole PR is the server's rows of the spec's §6.3 table, each with its test.
 
 ### Task 8: The entry's shape, the identity and labels on the server
 
 **Files:**
 - Create: `conventions/sources/recital-entries.json` (the cases of spec §2.4: input → kept entry or Italian
-  reason)
-- Create: `apps/server/src/schemas/recitalItem.ts`
+  reason), and its row in `conventions/sources/README.md`
+- Create: `apps/server/src/schemas/recitalEntry.ts`
 - Create: `apps/server/src/norms/recital.ts`
-- Test: `apps/server/tests/schemas/recitalEntryFixture.test.ts`, `apps/server/tests/norms/sourcesGolden.test.ts`
+- Test: `apps/server/tests/schemas/recitalEntry.test.ts`, `apps/server/tests/norms/sourcesGolden.test.ts`
 
 **Interfaces:**
-- Produces: `recitalItemContentSchema` (zod, `.strict()`), with the fields of §6.2 including `_dossierMeta`.
-- Produces: `parseRecitalItemContent(raw: unknown): RecitalItemContent`, which throws the fixture's Italian
-  reason.
-- Produces: `recitalIdentity(c: RecitalItemContent): string`, `citeRecital(c): string`, `shortRecital(c): string`
-  and `recitalUnitLabel(c): string`, all in `norms/recital.ts`. The act half comes from the existing `citeAct`.
-- Produces: the README row for `recital-entries.json`.
+- Produces, in `schemas/recitalEntry.ts`:
+  - `interface RecitalEntry { tipo_atto: string; numero_atto: string; data: string; considerando: string }`;
+  - `isRecitalContent(raw: unknown): boolean`: an object with an own key `considerando`, read after
+    `_dossierMeta` is set aside. The key decides, whatever its value (spec §6.2);
+  - `rebuildRecitalEntry(raw: unknown): { ok: true; entry: RecitalEntry; star?: { important: boolean } } | { ok:
+    false; reason: string }`, with the fixture's Italian reasons. `_dossierMeta` is accepted only as `{ important:
+    boolean }`.
+- Produces, in `norms/recital.ts`: `recitalIdentity(e: RecitalEntry): string`, `citeRecital(e): string`,
+  `shortRecital(e): string` and `recitalUnitLabel(e): string`. The act half comes from the existing `citeAct`;
+  the CELEX from a helper of the same file, `actCelex(e): string`.
 
 - [ ] **Step 1: Write the failing tests.**
-  - Every case of `recital-entries.json` is kept or refused with its reason.
+  - Every case of `recital-entries.json` is kept or refused with its reason by `rebuildRecitalEntry`.
+  - `isRecitalContent({considerando: null})` and `isRecitalContent({considerando: '', _dossierMeta: {important:
+    true}})` are true; `isRecitalContent({numero_articolo: '5'})` is false.
   - Every `recitals` case of `golden.json` has `recitalIdentity`, `citeRecital`, `shortRecital` and
-    `recitalUnitLabel` equal to its values.
-- [ ] **Step 2: Run** `npm --prefix apps/server test -- tests/schemas/recitalEntryFixture.test.ts
+    `recitalUnitLabel` equal to its values (the `norms` block of the test is unchanged).
+- [ ] **Step 2: Run** `npm --prefix apps/server test -- tests/schemas/recitalEntry.test.ts
   tests/norms/sourcesGolden.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implement** the schema and the four functions.
+- [ ] **Step 3: Implement** the schema and the functions.
 - [ ] **Step 4: Run** the same command. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(server): a recital entry's shape and labels (spec §2.4)`
 
-### Task 9: The kind, the migration, the routes
+### Task 9: The routes and the stored citation
 
 **Files:**
-- Modify: `apps/server/prisma/schema.prisma` (`DossierItemType`: `considerando`)
-- Create: `apps/server/prisma/migrations/<timestamp>_add_considerando_dossier_item/migration.sql`. The
-  timestamp is after the latest migration on `develop`. The file holds one statement, `ALTER TYPE
-  "DossierItemType" ADD VALUE IF NOT EXISTS 'considerando';`, and a comment in the style of
-  `20261005130000_add_sentenza_dossier_item`.
-- Modify: `apps/server/src/controllers/dossierController.ts`:
-  - the create path and `PUT …/items/:itemId` validate and retitle as for a `sentenza`;
-  - `assertArticleOfDossier` accepts the kind;
-  - the duplicate check runs inside the transaction, on create and on a move;
-  - `serializeItem` adds `citation` and `act_citation`.
-- Test: `apps/server/tests/dossiers.considerando.test.ts`, `apps/server/tests/dossierNotes.test.ts`,
-  `apps/server/tests/dossiers.move.test.ts`
+- Modify: `apps/server/src/norms/citation.ts` (`storedAct`, `citeStoredNorm`)
+- Modify: `apps/server/src/controllers/dossierController.ts` (`addDossierItem`, `updateDossierItem`)
+- Test: `apps/server/tests/norms/citation.test.ts`, `apps/server/tests/dossiers.recital.test.ts` (new),
+  `apps/server/tests/dossierNotes.test.ts`
 
 **Interfaces:**
 - Consumes: Task 8.
 - Produces:
-  - `POST /dossiers/:id/items` with `{itemType: 'considerando', content}`, which stores
-    `parseRecitalItemContent(content)` with `title = citeRecital(content)`;
-  - a duplicate gives 409 «Questo considerando è già nel dossier»;
-  - a PUT that carries `content` revalidates and retitles; a `title` sent alone is dropped.
+  - `citeStoredNorm('norm', content)` is `citeRecital(…)` for a content that `rebuildRecitalEntry` keeps, and
+    null for one with both `considerando` and `numero_articolo`. `citeStoredItem` and `serializeItem.citation`
+    follow; `citeStoredAct` is unchanged;
+  - `POST /dossiers/:id/items` with `itemType: 'norm'` and a recital content stores `rebuildRecitalEntry`'s entry
+    (with the star, if sent) and `title = citeRecital(entry)`; a refused one is 400 with the reason;
+  - `PUT /dossiers/:id/items/:itemId` on a recital entry, or carrying a recital content, does the same. A PUT
+    that would turn an article into a recital, or a recital into an article, is 400: «Una voce resta un articolo
+    o un considerando: aggiungila di nuovo.» A `title` sent alone on a recital entry is dropped.
 
-- [ ] **Step 1: Reserve the migration in the register and get the orchestrating session's ok.**
-- [ ] **Step 2: Write the failing tests** in `dossiers.considerando.test.ts`:
-  - a create stores the title «considerando 26, reg. (UE) 2016/679»;
-  - an extra key is 400;
-  - a second create of the same identity is 409, and so is a move into a dossier that holds it;
-  - a star (`_dossierMeta`) PUT is accepted;
-  - a PUT with a forged `title` keeps the citation;
-  - a note about the entry is accepted (in `dossierNotes.test.ts`).
-- [ ] **Step 3: Run** `npm --prefix apps/server test -- tests/dossiers.considerando.test.ts
-  tests/dossierNotes.test.ts tests/dossiers.move.test.ts`. Expected: FAIL.
-- [ ] **Step 4: Write the migration and the schema change; apply** with `npx --prefix apps/server prisma migrate
-  deploy` on the test database only, as `apps/server/CLAUDE.md` says.
-- [ ] **Step 5: Implement** the controller changes, and run the command of Step 3. Expected: PASS.
-- [ ] **Step 6: Commit** `feat(server): recitals as dossier entries (spec §6.2)`
+- [ ] **Step 1: Write the failing tests.**
+  - `citation.test.ts`: the stored citation of `{tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016',
+    considerando: '26'}` is «considerando 26, reg. (UE) 2016/679», and its act citation «reg. (UE) 2016/679».
+  - `dossiers.recital.test.ts`:
+    - a create stores the title «considerando 26, reg. (UE) 2016/679» whatever title was sent, and the list
+      answers that `citation`;
+    - a create with `numero_articolo` beside `considerando`, or with `allegato`, is 400 with the fixture's
+      reason;
+    - a star PUT (`_dossierMeta`) is accepted and keeps the title;
+    - a PUT with a forged `title` alone keeps the citation;
+    - a PUT that sends an article's content to a recital entry, and one that sends a recital's content to an
+      article entry, are 400;
+    - an article entry is stored and titled as today (a pin).
+  - `dossierNotes.test.ts`: a note about a recital entry is accepted (a pin).
+- [ ] **Step 2: Run** `npm --prefix apps/server test -- tests/norms/citation.test.ts
+  tests/dossiers.recital.test.ts tests/dossierNotes.test.ts`. Expected: FAIL, except the pins.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run** the same command. Expected: PASS.
+- [ ] **Step 5: Commit** `feat(server): a recital entry is checked and cited (spec §6.2)`
 
-### Task 10: The readers: trash, moves, text, study import, suggestions
+### Task 10: Every server reader of a `norm` entry
 
-**Files:**
+**Files** (each row of the spec's §6.3 server table):
 - Modify:
-  - `apps/server/src/norms/decisionCitation.ts` (`citeStoredItem`) and `apps/server/src/norms/citation.ts`
-    (`storedAct`);
-  - `apps/server/src/trash/trash.ts`;
-  - `apps/server/src/utils/environmentDossiers.ts` (the type union and validation);
-  - `apps/server/src/utils/suggestionEntries.ts` (a refusal in words);
-  - `apps/server/src/services/studyImport.ts` (`itemRow`: a refusal, never `norm`);
-  - `apps/server/src/assistant/entryText.ts` (`readEntryText`: `EntryHasNoText`);
-  - the readers that work on a key rather than on a kind: `studyImport.wireNormaKey`, the LingoLex anchors
-    (`lingoCards.ts`), and the saved-norm watcher (`notificationController.ts`, `utils/normaWatcher.ts`).
-- Test: `apps/server/tests/trash.test.ts`, `sharedEnvironments.publish.test.ts`,
-  `suggestions.dossier-entries.test.ts`, `assistant/entryText.test.ts`, the study import's test, the LingoLex
-  cards' test and the watcher's test. Find the last three with `grep -rl "studyImport\|lingoCards\|normas/check"
-  apps/server/tests`.
+  - `apps/server/src/schemas/normEntry.ts` (`rebuildNormEntry` returns `NormEntry | RecitalEntry`; a content
+    with the key goes through `rebuildRecitalEntry`). The compiler then lists each caller that reads
+    `numero_articolo`;
+  - `apps/server/src/utils/environmentDossiers.ts` (keeps it);
+  - `apps/server/src/utils/suggestionEntries.ts` (refuses it: «I considerando non si possono ancora proporre nel
+    Forum.»);
+  - `apps/server/src/lingo/courses.ts` (`resolveCitations` refuses it: «un considerando non si può ancora citare
+    in un percorso»);
+  - `apps/server/src/services/studyImport.ts` (`itemRow` checks and titles it; a refused one counts in
+    `refused`);
+  - `apps/server/src/assistant/entryText.ts` (`readEntryText`: a recital throws a new `RecitalHasNoText`) and
+    `apps/server/src/routes/assistantPassages.ts` (400 «Il testo di un considerando non si legge ancora da qui:
+    aprilo nel lettore di LexCraft.»);
+  - `apps/server/src/norms/resolveReference.ts` (`identify`: a `/parse_query` answer with `parsed.recital` or
+    `refusal` is `not_recognised`: «Un considerando si aggiunge al dossier dal lettore di LexCraft, non da
+    qui.»);
+  - `apps/server/src/controllers/notificationController.ts` (`POST /notifications/normas/check` stores no watch
+    for a `norma_data` with the key, and answers as it does for an AKN text).
+- Test: `trash.test.ts`, `sharedEnvironments.publish.test.ts`, `suggestions.dossier-entries.test.ts`, the course
+  citations' test (`grep -ln "resolveCitations\|citazioni" apps/server/tests/lingoCorsi*.ts`),
+  `studyImport.test.ts`, `assistant/entryText.test.ts`, `assistant/passages.routes.test.ts`,
+  `norms/dossierNorms.test.ts`, `normaNotifications.test.ts`, `lingoCards.test.ts`.
 
 **Interfaces:**
 - Consumes: Tasks 8–9.
-- Produces: in every reader of §6.3 (server), `considerando` handled or refused in words, never read as `norm`.
+- Produces: every server row of spec §6.3 as its «After» column says.
 
-- [ ] **Step 1: Write the failing tests.**
-  - The trash summary of a recital entry is its citation, and a restore brings it back unchanged.
-  - A published environment carries the entry, and a malformed one is refused.
-  - A suggestion with a recital is refused with an Italian reason.
-  - The study import refuses a recital and never stores `norm`.
-  - `readEntryText` on a recital throws `EntryHasNoText`.
-  - Key readers, given `celex:32016R0679~rct26::art::`:
-    - `wireNormaKey` refuses it;
-    - a LingoLex card on it is refused in words;
-    - `POST /notifications/normas/check` registers no watch for it.
-- [ ] **Step 2: Run** the listed files with `npm --prefix apps/server test -- <files>`. Expected: FAIL, except
-  where a reader already refuses the key: keep that test as a pin.
-- [ ] **Step 3: Implement**, then `grep -rn "itemType\|normaKey" apps/server/src` for any other reader that
-  assumes the four kinds or the article key's shape, and handle it. List them in the PR body.
-- [ ] **Step 4: Run** the same command. Expected: PASS.
+- [ ] **Step 1: Write the failing tests**, one per row:
+  - the trash summary of a recital entry is its citation, and a restore brings its content back unchanged;
+  - a published environment keeps a recital entry with `considerando`, and refuses one with `numero_articolo`
+    beside it;
+  - a suggestion with a recital is refused with the Forum's sentence;
+  - a course module citing a recital entry is refused with the course's sentence;
+  - the study import stores a recital entry titled with its citation and its marks under
+    `celex:32016R0679~rct26::art::`, and counts a malformed one in `refused`;
+  - `readEntryText` on a recital throws `RecitalHasNoText`, and the passages route answers its sentence;
+  - `omnilex_aggiungi_norme_dossier`'s route answers «considerando 26 GDPR» `not_recognised` with its sentence
+    (stub `/parse_query` answering `parsed.recital: "26"`), and a recital entry already in the dossier never
+    matches an article (a pin);
+  - `POST /notifications/normas/check` with a recital `norma_data` stores no watch;
+  - a LingoLex card on `celex:32016R0679~rct26` is refused (a pin).
+- [ ] **Step 2: Run** the listed files with `npm --prefix apps/server test -- <files>`. Expected: FAIL, except the
+  pins.
+- [ ] **Step 3: Implement**, then `grep -rn "itemType === 'norm'\|'norm'\|numero_articolo" apps/server/src` for
+  any reader the table misses. Add it to the table in the PR body, with its test.
+- [ ] **Step 4: Run** the same command, then `npm --prefix apps/server run build`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(server): every reader knows a recital entry (spec §6.3)`
 
-### Task 11: The MCP names a recital
+### Task 11: The MCP, pinned
 
 **Files:**
-- Modify: `apps/mcp/src/tools/dossier.ts` (`KIND_WORDS`, `entryLine`, and the note's target), and
-  `apps/mcp/src/confirm.ts` (`KIND_PLURALS`)
-- Test: `apps/mcp/tests/tools.test.ts`
+- No change to `apps/mcp/src` (spec §6.4).
+- Test: `apps/mcp/tests/tools.test.ts`, `apps/mcp/tests/delete.test.ts`, `apps/mcp/tests/pratica.test.ts`,
+  `apps/mcp/tests/glosses.test.ts`
 
-**Interfaces:**
-- Produces:
-  - `omnilex_leggi_dossier` lists «Considerando: considerando 26, reg. (UE) 2016/679»;
-  - a note about it names it;
-  - reading its text answers the server's `EntryHasNoText` in Italian.
-
-- [ ] **Step 1: Write the failing tests** with the stub server returning one `considerando` item and one note
-  about it.
-- [ ] **Step 2: Run** `npm --prefix apps/mcp run build && npm --prefix apps/mcp test -- tests/tools.test.ts`.
-  Expected: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** the same command. Expected: PASS.
-- [ ] **Step 5: Docs.** `apps/server/CLAUDE.md` (the dossier kinds, the readers of §6.3) and `apps/mcp/CLAUDE.md`
-  (what `omnilex_leggi_dossier` says of a recital).
-- [ ] **Step 6: Commit** `feat(mcp): name a recital entry (spec §6.4)`, then open **PR 3**.
+- [ ] **Step 1: Write the tests** with the stub server answering one `norm` item with `citation` «considerando
+  26, reg. (UE) 2016/679» and one note about it:
+  - `omnilex_leggi_dossier` lists «considerando 26, reg. (UE) 2016/679» and «Nota su considerando 26, reg. (UE)
+    2016/679»;
+  - the deletion dialog lists the recital by its citation;
+  - `omnilex_leggi_pratica` lists it by its citation;
+  - `omnilex_leggi_testo_voce` and `omnilex_glossa_voce` pass on the server's 400 sentence.
+- [ ] **Step 2: Run** `npm --prefix apps/mcp run build && npm --prefix apps/mcp test -- tests/tools.test.ts
+  tests/delete.test.ts tests/pratica.test.ts tests/glosses.test.ts`. Expected: PASS (pins: the MCP already
+  passes the server's citation on). A failure is a reader to fix and list.
+- [ ] **Step 3: Docs.** `apps/server/CLAUDE.md` (a recital is a `norm` entry with `considerando`; the readers of
+  §6.3) and `apps/mcp/CLAUDE.md` (what the tools say of a recital).
+- [ ] **Step 4: Commit** `test(mcp): a recital entry by its citation (spec §6.4)`, then open **PR 3** with the
+  §6.3 server table in its body.
 
 ---
 
 ## PR 4a — Web: search, index, reading, marks (`apps/web`) — **web owner's side**
 
-### Task 12: Identity and labels on the web; the unknown-kind placeholder
+### Task 12: Identity and labels on the web
 
 **Files:**
 - Create: `apps/web/src/utils/sources/recital.ts`
 - Modify: `apps/web/src/utils/euCaseLaw.ts` (extract `actCelex(norma)`, used by `euCaseLawQuery` and
   `recital.ts`)
-- Modify: `apps/web/src/components/features/dossier/dossierUtils.ts` (`dossierItemFromApi`)
-- Test: `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (a `recitals` block),
-  `apps/web/src/components/features/dossier/dossierUtils.test.ts`
+- Test: `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (a `recitals` block)
 
 **Interfaces:**
 - Produces: `actCelex(n: Pick<NormaVisitata,'tipo_atto'|'data'|'numero_atto'>): string | null`.
 - Produces: `recitalIdentity(n: RecitalRef): string`, `citeRecital(n): string`, `shortRecital(n): string` and
   `recitalUnitLabel(n): string`, where `RecitalRef = Pick<NormaVisitata,'tipo_atto'|'numero_atto'|'data'> &
   { considerando: string }`.
-- Produces: an unknown kind becomes an item flagged `unreadable: true`, shown as «Voce non leggibile in questa
-  versione». Star, move and save of such an item send no `content`.
 
 - [ ] **Step 1: Write the failing tests.**
   - Every `recitals` golden case has identity and labels equal to these functions.
   - `euCaseLawQuery`'s existing cases still pass.
-  - `dossierItemFromApi({item_type: 'futuro', …})` is `unreadable`, and the store's star, move and save actions
-    on it send no `content`.
-- [ ] **Step 2: Run** `npm --prefix apps/web run test -- --run src/utils/__tests__/sourcesGolden.test.ts
-  src/components/features/dossier/dossierUtils.test.ts`. Expected: FAIL.
+- [ ] **Step 2: Run** `npm --prefix apps/web run test -- --run src/utils/__tests__/sourcesGolden.test.ts`.
+  Expected: FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** the same command. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(web): a recital's identity and labels; unknown entries stay read-only`
+- [ ] **Step 5: Commit** `feat(web): a recital's identity and labels`
 
 ### Task 13: The search reads a recital
 
