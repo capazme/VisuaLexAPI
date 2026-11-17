@@ -111,7 +111,9 @@ describe('the star in the simple reading (one article alone, no row «⋯»)', (
     render(<Page />);
     const first = bound().acts[0];
     act(() => { s().setPracticeArticleText(bound().id, first.id, practiceArticleKey(first.articles[0]), { ...first.articles[0], article_text: 'Art. 7\nTesto.' }); });
-    fireEvent.click(screen.getByRole('button', { name: 'Segna come importante' }));
+    // One name, the state in aria-pressed (LC61).
+    expect(screen.getByRole('button', { name: 'Importante' })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Importante' }));
     expect(s().dossiers[0].items[0].status).toBe('important');
     expect(screen.getByRole('button', { name: 'Importante' })).toHaveAttribute('aria-pressed', 'true');
   });

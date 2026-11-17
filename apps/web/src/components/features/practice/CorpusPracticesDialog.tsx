@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { Dossier } from '../../../types';
@@ -7,6 +8,7 @@ import { corpusPractices, practiceCountLine, practiceCounts, type Practice } fro
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { notify } from '../../ui/notifications/notifications';
 import { dossierArticleKey, practiceDossierItems } from './practiceDossierItems';
 import { savePracticeAsDossier } from './useSavePracticeAsDossier';
 
@@ -62,6 +64,7 @@ export function CorpusPracticesDialog() {
   const [confirming, setConfirming] = useState<'discard' | 'save' | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const navigate = useNavigate();
 
   const offered = useMemo(
     () => (pending && loaded ? offeredCollections(practices, appStore.getState().dossiers, appStore.getState().pendingDossierItemIds).offered : []),
@@ -91,6 +94,7 @@ export function CorpusPracticesDialog() {
     setBusy(true);
     setFailed(false);
     let allSaved = true;
+    const saved: string[] = [];
     for (const practice of ticked) {
       const earlier = madeFor.get(practice.id);
       const target = earlier && appStore.getState().dossiers.some((d) => d.id === earlier) ? { dossierId: earlier } : null;
@@ -101,6 +105,7 @@ export function CorpusPracticesDialog() {
       const unconfirmed = dossiers.find((d) => d.id === outcome.dossierId)?.items.some((i) => pendingDossierItemIds[i.id]) ?? false;
       if (outcome.ok && !unconfirmed) {
         madeFor.delete(practice.id);
+        saved.push(practice.label);
         appStore.getState().closePractice(practice.id);
       } else {
         if (outcome.dossierId) madeFor.set(practice.id, outcome.dossierId);
@@ -108,6 +113,15 @@ export function CorpusPracticesDialog() {
       }
     }
     setBusy(false);
+    // What worked is said (LC61, Papiniano's test of #539), with the way to it.
+    if (saved.length > 0) {
+      notify({
+        type: 'success',
+        message: saved.length === 1 ? `Salvata in Pratiche: «${saved[0]}».` : `${saved.length} raccolte salvate in Pratiche.`,
+        duration: 6000,
+        action: { label: 'Apri Pratiche', onClick: () => navigate('/pratiche') },
+      });
+    }
     if (allSaved) appStore.getState().endCorpusPractices();
     else setFailed(true);
   };
@@ -157,7 +171,8 @@ export function CorpusPracticesDialog() {
                 />
                 <span className="min-w-0 text-sm text-slate-800 dark:text-slate-100">
                   «{practice.label}»
-                  <span className="text-slate-600 dark:text-slate-400"> · {practiceCountLine(practiceCounts(practice))}</span>
+                  {/* No «atto» here (LC61): in Pratiche «Atti» are the lawyer's own; the articles and decisions say it. */}
+                  <span className="text-slate-600 dark:text-slate-400"> · {practiceCountLine({ ...practiceCounts(practice), acts: 0 })}</span>
                 </span>
               </label>
             </li>

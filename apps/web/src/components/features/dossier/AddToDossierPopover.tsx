@@ -204,7 +204,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                 <div className="flex items-center gap-2 min-w-0">
                     <Folder size={16} className="text-primary-500 shrink-0" />
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                        Aggiungi a una pratica
+                        Aggiungi alla pratica
                     </h3>
                 </div>
                 <button
@@ -249,22 +249,24 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                                 className={cn(
                                     'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors',
                                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
+                                    // No opacity on the row (LC61): «già presente» and the name keep their contrast (AA).
                                     alreadyPresent
-                                        ? 'opacity-60 cursor-default'
+                                        ? 'cursor-default'
                                         : 'hover:bg-primary-50 dark:hover:bg-primary-900/10',
                                 )}
                             >
                                 <Folder size={16} className="text-primary-500 shrink-0" />
-                                <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                                {/* Two lines before a cut, the whole name in the tooltip (LC61): two names alike stay apart. */}
+                                <span title={d.title} className="flex-1 min-w-0 line-clamp-2 break-words text-sm font-medium text-slate-800 dark:text-slate-200">
                                     {d.title}
                                 </span>
                                 {alreadyPresent ? (
-                                    <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
-                                        <Check size={12} /> già presente
+                                    <span className="flex items-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-300 shrink-0">
+                                        <Check size={12} aria-hidden /> già presente
                                     </span>
                                 ) : (
-                                    <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">
-                                        {d.items.length} elementi
+                                    <span className="text-xs text-slate-600 dark:text-slate-400 shrink-0">
+                                        {d.items.length === 1 ? '1 elemento' : `${d.items.length} elementi`}
                                     </span>
                                 )}
                             </button>
@@ -296,6 +298,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             onChange={(e) => setNewTitle(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Escape') setCreating(false); }}
                             placeholder="Nome della pratica…"
+                            aria-label="Nome della nuova pratica"
                             className="flex-1 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
                         <button
