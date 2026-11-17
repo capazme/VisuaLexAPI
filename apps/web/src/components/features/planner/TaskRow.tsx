@@ -47,7 +47,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
 
   return (
     <li data-task-row data-task-id={task.id} className="relative min-w-0">
-      <div className="group relative flex items-start gap-1 border-b @2xl:items-center border-slate-200 py-0.5 pr-0.5 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/30">
+      <div className="group relative flex items-start gap-1 border-b border-slate-200 py-0.5 pr-0.5 transition-colors @2xl:items-center @2xl:py-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/30">
         <TaskCheckbox
           label={`Segna come fatto: ${task.title}${task.priority < 4 ? `, priorità ${PRIORITY_LABEL[task.priority].toLowerCase()}` : ''}`}
           priority={task.priority}
@@ -74,7 +74,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
           )}
           </div>
           {hasSigns && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 @2xl:mt-0 @2xl:max-w-[55%] @2xl:shrink-0 @2xl:justify-end">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 @2xl:mt-0 @2xl:max-w-[60%] @2xl:flex-nowrap @2xl:justify-end">
               {task.plannedDate && plannedShown && (
                 <span className={cn(META, DAY_TONE[dayTone(task.plannedDate, today)])}>
                   <CalendarDays size={12} aria-hidden />
@@ -94,7 +94,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
               )}
               {due && task.dueDate && (
                 // On a phone the deadline is a short word in its colour, no box (LC33, after Todoist's red date).
-                <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold max-md:border-transparent! max-md:bg-transparent! max-md:px-0 max-md:py-0', DEADLINE_TONE[due.tone])}>
+                <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold @2xl:shrink-0 @2xl:whitespace-nowrap max-md:border-transparent! max-md:bg-transparent! max-md:px-0 max-md:py-0', DEADLINE_TONE[due.tone])}>
                   <Hourglass size={12} aria-hidden />
                   <span className="max-md:sr-only">
                     {due.tone === 'today'
@@ -144,7 +144,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
                 <Link
                   to={`/pratiche?dossier=${encodeURIComponent(task.dossierId)}`}
                   // At the line's right end; 44 px tall for a finger, laid over the gaps where a pointer is precise.
-                  className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%] @2xl:ml-0 @2xl:max-w-[14rem]', FOCUS_RING)}
+                  className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%] @2xl:ml-0 @2xl:min-w-0 @2xl:max-w-[14rem] @2xl:shrink', FOCUS_RING)}
                 >
                   <span className="sr-only">Pratica: </span>
                   <span className="truncate">{dossierTitle ?? 'Pratica'}</span>

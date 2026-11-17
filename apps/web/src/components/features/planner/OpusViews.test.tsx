@@ -370,7 +370,7 @@ describe('the other views', () => {
     renderAt(<UpcomingView />);
     const strip = await screen.findByRole('list', { name: 'Giorni da martedì 20 ottobre a lunedì 26 ottobre' });
     const days = within(strip).getAllByRole('button');
-    expect(days.map((day) => day.textContent)).toEqual(['mar20', 'mer21', 'gio22', 'ven23', 'sab24', 'dom25', 'lun262']);
+    expect(days.map((day) => day.textContent)).toEqual(['mar 200', 'mer 210', 'gio 220', 'ven 230', 'sab 240', 'dom 250', 'lun 262']);
     expect(days[0]).toHaveAttribute('aria-current', 'date');
     expect(days[0]).toHaveAttribute('aria-pressed', 'true');
     // The count in place of the dot, and in the day's name.

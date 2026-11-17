@@ -15,9 +15,9 @@ interface Props {
 }
 
 /**
- * The days of «Prossimi giorni» (P2c, LC83): one low row from today, no day gone by — each day «mar 17» on one line
- * with its count of tasks beside it, today in ink, the chosen day underlined. It stays under the bar at the top while
- * the days scroll; from `md` under the page's header, 4 rem tall: its 52 px tabs and 12 px of padding (`OpusPage`).
+ * The days of «Prossimi giorni» (P2c, LC83): one low row from today, no day gone by — each day «mar 17» on one
+ * line, its count of tasks under it where the dot was, today in ink, the chosen day underlined. It stays under the bar
+ * at the top while the days scroll; from `md` under the page's header, 4 rem tall: its 52 px tabs and 12 px of padding (`OpusPage`).
  */
 export function WeekStrip({ today, days, selected, counts, onSelect }: Props) {
   return (
@@ -38,16 +38,17 @@ export function WeekStrip({ today, days, selected, counts, onSelect }: Props) {
                 aria-label={`${longDay(day, today)}${isToday ? ', oggi' : ''}${count > 0 ? `, ${count === 1 ? '1 compito' : `${count} compiti`}` : ''}`}
                 onClick={() => onSelect(day)}
                 className={cn(
-                  'relative flex min-h-[44px] w-full items-center justify-center gap-0.5 rounded-t-lg px-0.5 text-xs sm:gap-1 sm:text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  'relative flex min-h-[44px] w-full flex-col items-center justify-center rounded-t-lg px-0.5 text-xs leading-tight text-slate-700 hover:bg-slate-100 sm:text-sm dark:text-slate-300 dark:hover:bg-slate-800',
                   isToday && 'font-semibold text-slate-900 dark:text-slate-50',
                   FOCUS_RING,
                 )}
               >
-                <span className="max-[359px]:sr-only">{weekday}</span>
-                <span className="tabular-nums">{date}</span>
-                {count > 0 && (
-                  <span className="rounded-full bg-slate-200 px-1 text-[11px] sm:px-1.5 sm:text-xs font-medium tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-200">{count}</span>
-                )}
+                {/* The day and its number on one line; under it, where the dot was, the count. */}
+                <span className="whitespace-nowrap">
+                  <span className="max-[359px]:sr-only">{weekday} </span>
+                  <span className="tabular-nums">{date}</span>
+                </span>
+                <span aria-hidden className={cn('text-[11px] font-medium leading-none tabular-nums text-slate-600 dark:text-slate-400', count === 0 && 'invisible')}>{count}</span>
                 {chosen && <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary-700 dark:bg-primary-300" />}
               </button>
             </li>
