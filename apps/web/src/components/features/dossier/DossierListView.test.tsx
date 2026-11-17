@@ -27,7 +27,7 @@ const dossier = (data: NormaVisitata[]): Dossier => ({
 
 beforeEach(() => {
   viewport.desktop = false;
-  appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
+  appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [], isLoadingData: false });
   sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
 });
 
@@ -351,6 +351,14 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     expect(grid.className).not.toMatch(/\bgrid-cols-\d/);
     // A description with no space in it (an address) wraps inside a card of 20rem rather than being cut at its edge.
     expect(within(card).getByText(address)).toHaveClass('break-words', 'line-clamp-2');
+  });
+
+  it('says it is opening the pratiche, not that there are none, while they are read again (after «Riprova»)', () => {
+    appStore.setState({ dossiers: [], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [], isLoadingData: true });
+    sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('status')).toHaveTextContent('Apro le pratiche…');
+    expect(screen.queryByRole('heading', { name: 'Nessuna pratica di lavoro' })).toBeNull();
   });
 
   // LC21: the line art is gone (no drawing over an empty list); the words and the two ways to begin stay.

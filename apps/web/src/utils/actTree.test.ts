@@ -148,6 +148,15 @@ describe('glued headings, as Normattiva serves them', () => {
       { 'CAPO I Delle fonti del diritto': ['1'] },
     ]);
   });
+
+  it('drops the Costituzione\'s name glued to «Principi fondamentali», its first row as Normattiva lists it', () => {
+    const first = 'COSTITUZIONE DELLA REPUBBLICA ITALIANA PRINCIPI FONDAMENTALI';
+    expect(splitHeadings(first)).toEqual(['PRINCIPI FONDAMENTALI']);
+    expect(outline(buildActTree([first, { numero: '1' }, { numero: '12' }, 'PARTE I DIRITTI E DOVERI DEI CITTADINI TITOLO I RAPPORTI CIVILI', { numero: '13' }], null))).toEqual([
+      { 'PRINCIPI FONDAMENTALI': ['1', '12'] },
+      { 'PARTE I DIRITTI E DOVERI DEI CITTADINI': [{ 'TITOLO I RAPPORTI CIVILI': ['13'] }] },
+    ]);
+  });
 });
 
 describe('articleLabel', () => {

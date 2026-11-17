@@ -11,8 +11,8 @@ import { romeDay } from './studyDay';
 
 /**
  * Learn's short lesson (LC63; vault spec «Learn alla Duolingo - specifica (17-11)», §L2): 5–8 exercises in a row,
- * built here from the cards of the review scope (`reviewScope`: one's own cards and the community's validated ones in
- * the subjects switched on, never another person's draft) and graded here. Every exercise recombines the cards' own
+ * built here from the validated cards of the review scope (`reviewScope`: one's own and the community's in the subjects
+ * switched on; never a draft, L-67) and graded here. Every exercise recombines the cards' own
  * words — a question, an answer, an institute, an article — and writes no legal sentence of its own. The keys are
  * stored with the lesson and never sent before the answer; the last answer ends the lesson and `settleMissions`
  * credits «Lezione» in the same transaction. Session only: no route of the lessons is in the delegated table.
@@ -168,14 +168,15 @@ export async function createLesson(userId: string, materia: LingoMateria) {
     }
     const { materieComunita } = await readPreferences(tx, userId);
     const rows = await tx.lingoCard.findMany({
-      where: reviewScope(userId, materieComunita, await courseDayFor(tx, today), materia),
+      // Validated cards only (L-67): never a draft, not even one's own.
+      where: { AND: [reviewScope(userId, materieComunita, await courseDayFor(tx, today), materia), { stato: 'VALIDATA' }] },
       select: { domanda: true, risposta: true, istituto: true, ancore: { where: { isPrimary: true }, select: { normaKey: true, articleId: true }, take: 1 } },
       // shortcut: the first CARDS_READ by id, shuffled after; a random sample in SQL if a subject ever holds more.
       orderBy: { id: 'asc' },
       take: CARDS_READ,
     });
     if (rows.length < LESSON_MIN_CARDS) {
-      throw new AppError(409, `Per una lezione servono almeno ${LESSON_MIN_CARDS} schede in questa materia (ne hai ${rows.length}).`);
+      throw new AppError(409, `Per una lezione servono almeno ${LESSON_MIN_CARDS} schede validate in questa materia (ne hai ${rows.length}).`);
     }
     const cards = rows.map((r) => ({ domanda: r.domanda, risposta: r.risposta, istituto: r.istituto, norma: r.ancore[0] ? normLabel(r.ancore[0].normaKey, r.ancore[0].articleId) : null }));
     const esercizi = buildExercises(cards);
