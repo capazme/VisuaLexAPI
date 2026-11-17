@@ -346,11 +346,18 @@ POST unless noted, JSON bodies.
   were 14 «articles» numbered «1 (commi 101-200)» (and the existence check found no art. 1); the
   persistent keys carry `|parts`, so a tree stored before is read again
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection. `/parse_query`
-  answers `identifies_act` beside `recognized` (`act_identity.py`)
+  answers `identifies_act` beside `recognized` (`act_identity.py`). A recital clause
+  («considerando 26 GDPR», «cons. 26 reg. 2016/679», lists and ranges up to 150; spec
+  `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §3) is taken out first by
+  `tools/recital_clause.py` and the rest read as today (`read_norm_query`): the answer is
+  recognised with `parsed.recital` and no `urn`; `display` is the recital's citation
+  (`sources.cite_recital`), «considerando 26» with no act, nothing when refused. A top-level
+  `refusal` is `recital_not_eu` (not an EU regulation or directive) or `recital_with_article`; a
+  refused `parsed` keeps the act's fields only, never `article`
 - `/parse_query_batch` — `{"queries": [...]}`, 1 to 200 strings of 1 to 200 characters, the body
   at most 48 KB (anything else a 400 that names the limit) → `{"results": [{recognized, parsed,
   source, identifies_act}]}` in order: each read as `/parse_query` reads one (`read_norm_query`),
-  and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
+  a recital clause answered as not recognised this round, and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
   failures and the duration, never a string, and an error by its type only: the strings are the
   citations of a document the user may hold confidential (`tests/test_parse_query_batch.py`
   captures the records). Priced 3 points by the server's scrape gate; routed by the ingress's

@@ -71,7 +71,7 @@ from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
-from visualex_api.tools.sources import cite_act, cite_article
+from visualex_api.tools.sources import cite_act, cite_article, cite_recital, recital_numbers
 from visualex_api.tools.act_identity import identifies_act
 from visualex_api.tools.norm_query import act_names, read_norm_query
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
@@ -233,9 +233,29 @@ class NormAddress:
     checked: list = field(default_factory=list)
 
 
+def _recital_reading(params: dict, source: str | None) -> dict:
+    """/parse_query's answer for a recital clause (spec 2026-11-17 §3.2). Recognised, so the
+    palette never falls through to a topic search; no URN, so a reader that does not know
+    `recital` finds neither an article nor an address. `display`: the recital's citation when the
+    act is ready, «considerando 26» when it is missing, nothing when the reading is refused."""
+    parsed = {k: v for k, v in params.items() if k != "refusal"}
+    answer = {"recognized": True, "parsed": parsed, "identifies_act": identifies_act(parsed),
+              "urn": None, "display": None, "source": source}
+    if params.get("refusal"):
+        answer["refusal"] = params["refusal"]
+    elif answer["identifies_act"]:
+        answer["display"] = cite_recital({"tipo_atto": parsed["act_type"], "numero_atto": parsed.get("act_number"),
+                                          "data": parsed.get("date"), "considerando": parsed["recital"]})
+    else:
+        answer["display"] = f"considerando {recital_numbers(parsed['recital'])}"
+    return answer
+
+
 def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
     """Each string read as /parse_query reads one; one that makes the reading raise is
-    unrecognised, and counted. Returns (results in order, failures)."""
+    unrecognised, and counted. A recital clause is answered as not recognised this round: the
+    document analysis keeps its behaviour (spec 2026-11-17 §3.2). Returns (results in order,
+    failures)."""
     results, failed = [], 0
     for query in queries:
         try:
@@ -243,6 +263,8 @@ def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
         except Exception:
             params, source = None, None
             failed += 1
+        if params is not None and params.get("recital"):
+            params, source = None, None
         results.append({
             "recognized": params is not None,
             "parsed": params,
@@ -1451,6 +1473,8 @@ class NormaController:
             parsed_params, source = read_norm_query(query)
             if parsed_params is None:
                 return jsonify({"parsed": None, "recognized": False, "identifies_act": False})
+            if parsed_params.get("recital"):
+                return jsonify(_recital_reading(parsed_params, source))
 
             # 3. Best-effort URN: build a NormaVisitata with the same pipeline
             # `fetch_norma_data` uses, then pick its .urn. If the URN cannot be
