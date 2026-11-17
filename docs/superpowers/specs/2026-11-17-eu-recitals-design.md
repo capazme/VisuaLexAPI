@@ -188,7 +188,9 @@ the Italian reason it is refused, like `norm-entries.json`. The server's `schema
 PR 3 and the web's `utils/sources/recitalEntry.ts` in PR 4b, so the two sides cannot drift although two people
 build them. Cases:
 
-- a valid entry, with and without `_dossierMeta`;
+- a valid entry, with and without `_dossierMeta`. A kept case gives the entry without `_dossierMeta` and, apart,
+  the star (`{"important": true}`) when one was sent: `{"entry": {…}, "star": {…}}`. Both sides return that
+  pair;
 - the act's type in another case («Regolamento UE»);
 - a full date;
 - refused:
@@ -256,7 +258,9 @@ parser), so both paths take a recital. Then:
 - the rest names no act, or is empty: `recital` with no act (incomplete). Today an empty rest reads as nothing.
 
 `/parse_query` answers `recognized: true` with `parsed.recital`, `identifies_act` as today, and, when there is
-one, a top-level `refusal`. Its `display` is:
+one, a top-level `refusal`. **A refused reading's `parsed` carries neither `article` nor `urn`**, so a reader
+that does not know `refusal` (the server's `resolveReference.identify`, the web's `rassegneService`, MERL-T's
+client) finds no article and adds or opens nothing: «art. 4 e considerando 26 GDPR» never becomes art. 4. Its `display` is:
 
 - the recital's citation (§2.2) for a ready reading;
 - «considerando 26» for an incomplete one;
@@ -392,7 +396,8 @@ All three are *calls*.
 - **Routes.**
   - `POST /dossiers/:id/items` with `itemType: 'norm'` checks a recital content with the schema and titles it.
   - `PUT /dossiers/:id/items/:itemId` does the same when the content it carries, or the content stored, has the
-    key: a PUT can neither turn an article into a recital nor a recital into an article.
+    key: a PUT can neither turn an article into a recital nor a recital into an article. It is refused: «Una
+    voce resta un articolo o un considerando: aggiungila di nuovo.»
   - `serializeItem`'s `citation` is the recital's citation and its `act_citation` the act's (§6.3).
   - **Duplicates** are handled as an article's: the web checks that the recital is not already in the dossier
     (`inDossier.ts`, by identity) and the server does not. *Call*: an article has no server check either, and a
@@ -412,9 +417,10 @@ All three are *calls*.
   - The web's JSON export and import, and the share link: `type: 'norma'` with `considerando` kept (§6.3, web).
   - A dossier published as an environment: the server's `rebuildNormEntry`, which `environmentDossiers.ts`
     calls, learns the shape of §2.4 and keeps it. The web's `dossierPublication.ts` does the same in 4b.
-  - The study import (`studyImport.itemRow`) keeps it as a recital: checked with the shape of §2.4 and titled
-    with its citation. One that fails the check is counted as refused, never stored as an article. Its marks
-    arrive with the recital's key (`celex:…~rct26::art::`), which `wireNormaKey` writes as it is.
+  - The study import, the recovery of an environment and «Aggiungi ai miei dossier» read the published content
+    through the same `rebuildNormEntry`, so they keep it too. One that fails the shape of §2.4 is counted as
+    refused, never stored as an article. The study import titles it with its citation (`itemRow`), and its
+    marks arrive with the recital's key (`celex:…~rct26::art::`), which `wireNormaKey` writes as it is.
   - Forum suggestions refuse it: «I considerando non si possono ancora proporre nel Forum.» The Forum learns
     recitals in a later round.
   - A LingoLex course module citing it refuses it: «un considerando non si può ancora citare in un percorso».
@@ -436,15 +442,17 @@ answer that names an entry takes its citation from there.
 | A note on the entry: `assertArticleOfDossier` | accepted | unchanged |
 | The trash's summary and restore (`trash/trash.ts`) | no citation | the citation; the restore unchanged |
 | The entry's text for the assistant: `readEntryText` (`assistant/entryText.ts`), `routes/assistantPassages.ts` | «I dati di questa norma nella pratica sono incompleti: aggiungila di nuovo.» | refused in its own words: «Il testo di un considerando non si legge ancora da qui: aprilo nel lettore di LexCraft.» |
-| Published environments: `rebuildEntry` (`utils/environmentDossiers.ts`) through `rebuildNormEntry` (`schemas/normEntry.ts`) | refused: «Numero di articolo mancante» | kept as a recital |
+| Published content: `readableContent` (`utils/publishedContent.ts`) and `rebuildEntry` (`utils/environmentDossiers.ts`), through `rebuildNormEntry` (`schemas/normEntry.ts`). Four doors: publishing an environment, the study import, `recoverEnvironment` (`environmentController.ts`), «Aggiungi ai miei dossier» (`sharedEnvironmentController.ts`) | refused: «Numero di articolo mancante», or counted in `refused` | kept as a recital |
 | Forum suggestions: `rebuildDossierEntry` (`utils/suggestionEntries.ts`) | refused: «Numero di articolo mancante» | refused: «I considerando non si possono ancora proporre nel Forum.» |
 | A course module's citations: `resolveCitations` (`lingo/courses.ts`) | refused: «la norma non si può citare (Numero di articolo mancante)» | refused: «un considerando non si può ancora citare in un percorso» |
-| The study import: `itemRow` (`services/studyImport.ts`) | stored as sent, titled «regolamento ue» | checked and titled with its citation, or refused |
+| The study import's row: `itemRow` (`services/studyImport.ts`) | never reached (refused upstream, above); once kept, it would be titled «regolamento ue» | titled with its citation |
 | Adding by reference (`omnilex_aggiungi_norme_dossier`): `identify` (`norms/resolveReference.ts`) | not recognised; after PR 1b, «Manca l'articolo» | not recognised: «Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.» |
 | The same tool's duplicate check: `normIdentity` (`dossierController.ts`) | a recital has no `urn`: never matched | unchanged |
 | The saved-norm watcher: `POST /notifications/normas/check` (`notificationController.ts`) | would store a watch of the recital's text | no watch for a `norma_data` with `considerando` |
 | LingoLex cards (`schemas/lingo/card.ts`, the `normaKey` pattern) | refuses the recital's key | unchanged |
-| MCP: `omnilex_leggi_dossier` (`entryLine`), `omnilex_leggi_pratica`, the deletion dialog (`confirm.ts`) | «Norma», and a note «Nota» | the server's citation; a note about it «Nota su considerando 26, reg. (UE) 2016/679» |
+| MCP: `omnilex_leggi_dossier` (`riferimento`, `titolo`) | `riferimento: null`, `titolo` «regolamento ue» | both the server's citation |
+| MCP: `omnilex_leggi_pratica` (the sources and the notes) | «norm · "regolamento ue"», a note «nota su "regolamento ue"» | «norm · considerando 26, reg. (UE) 2016/679», a note «nota su considerando 26, reg. (UE) 2016/679» |
+| MCP: the deletion dialog (`entryLine` in `tools/dossier.ts`) | «Norma», and a note about it «Nota» | the citation, and «Nota su considerando 26, reg. (UE) 2016/679» |
 | MCP: `omnilex_leggi_testo_voce`, `omnilex_glossa_voce` | the server's «dati incompleti» | the server's refusal above, passed on |
 
 Two parts read the kind but never the content, and change nothing: the assistant's note counts
@@ -456,7 +464,8 @@ the «norme», the owner's own word for what a recital is part of). *Call*.
 Measured on `develop` (17 November 2026): with no change, a recital entry crashes the dossier's reader, makes
 the PDF in «solo le parti evidenziate e annotate» fail, blocks the dossier's publication, and shares one key
 with every other recital of its act, so «Togli dalla pratica» on one sends them all to the trash. All rows are
-PR 4b's, except where the row says 4a. Paths are under `apps/web/src`.
+PR 4b's; some use what 4a builds (`openRecitals`, `recitalsCache.ts`, `recital.ts`). Paths are under
+`apps/web/src`.
 
 | Part | Today, given a recital entry | After |
 |---|---|---|
@@ -483,9 +492,10 @@ PR 4b's, except where the row says 4a. Paths are under `apps/web/src`.
 
 ### 6.4 The MCP, so it does not break
 
-- No MCP code changes. Every line the MCP writes of a `norm` entry is the server's `citation`, which PR 3 makes
-  the recital's: `omnilex_leggi_dossier` lists «considerando 26, reg. (UE) 2016/679», and a note about it reads
-  «Nota su considerando 26, reg. (UE) 2016/679». PR 3's MCP tests pin both.
+- No MCP code changes. Every place the MCP names a `norm` entry takes the server's `citation` (or, failing it,
+  the title), which PR 3 makes the recital's: `omnilex_leggi_dossier` answers `riferimento` «considerando 26,
+  reg. (UE) 2016/679»; `omnilex_leggi_pratica` lists it, and a note about it, by that citation; the deletion
+  dialog writes «Nota su considerando 26, reg. (UE) 2016/679». PR 3's MCP tests pin the three.
 - Reading the entry's text, or glossing it, passes on the server's refusal (§6.3).
 - Creating one through the MCP: not this round. `omnilex_aggiungi_norme_dossier` refuses it in words (§6.3).
 
@@ -645,7 +655,7 @@ Each merges on its own, in this order:
    - the routes and the stored citation;
    - every server and MCP row of §6.3, each with its test.
 5. **4a — Web: search, index, reading, marks** (web owner). §2.1–2.2 web, §3.2 web, §3.3, §4, §5, §6.1, the
-   web rows of §6.3 that read marks, and §7.4. **The freeze binds here.**
+   and §7.4. **The freeze binds here.**
 6. **4b — Web: the dossier** (web owner). §6.2 web side and the dossier's web rows of §6.3: the entry,
    `recitalEntry.ts`, the layout, the reader, the PDF, the trash, export and import, publication, every `type ===
    'norma'` filter.

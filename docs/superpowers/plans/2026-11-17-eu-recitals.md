@@ -319,6 +319,7 @@ def test_the_new_legacy_fixture_reads_every_recital_in_sequence():
 - Produces:
   - `read_norm_query` adds `recital` to the parameters, or `refusal`, by the rules of §3.2;
   - `/parse_query` answers `recognized: true`, `parsed.recital` and, when there is one, a top-level `refusal`.
+    A refused reading's `parsed` has no `article` and no `urn` (spec §3.2).
     Its `display` is `cite_recital(…)` when ready, «considerando 26» when incomplete, and absent when refused;
   - `/parse_query_batch` answers a reading with `recital` or `refusal` as not recognised.
 
@@ -326,7 +327,8 @@ def test_the_new_legacy_fixture_reads_every_recital_in_sequence():
   - «considerando 26 GDPR» (the alias path) and «cons. 26 reg. 2016/679» (the parser path) give `act_type
     "regolamento ue"`, `act_number "679"`, `recital "26"` and no `article`;
   - «considerando 3 l. 241/1990» gives `refusal "recital_not_eu"` with `recognized: true`;
-  - «art. 4 e considerando 26 GDPR» gives `refusal "recital_with_article"`;
+  - «art. 4 e considerando 26 GDPR» gives `refusal "recital_with_article"`, and its `parsed` has no `article` and
+    no `urn`;
   - «considerando 26» gives `recognized: true`, `parsed: {recital: "26"}`, `identifies_act: false` and `display
     "considerando 26"` (today it reads as nothing);
   - `test_nl_parser_convention.py` reads every `recitals` case's citation and short label back to its `input`;
@@ -454,8 +456,8 @@ changes. The whole PR is the server's rows of the spec's §6.3 table, each with 
     Forum.»);
   - `apps/server/src/lingo/courses.ts` (`resolveCitations` refuses it: «un considerando non si può ancora citare
     in un percorso»);
-  - `apps/server/src/services/studyImport.ts` (`itemRow` checks and titles it; a refused one counts in
-    `refused`);
+  - `apps/server/src/services/studyImport.ts` (`itemRow` titles it with its citation; the check and the
+    `refused` count happen upstream, in `readableContent` through `rebuildNormEntry`);
   - `apps/server/src/assistant/entryText.ts` (`readEntryText`: a recital throws a new `RecitalHasNoText`) and
     `apps/server/src/routes/assistantPassages.ts` (400 «Il testo di un considerando non si legge ancora da qui:
     aprilo nel lettore di LexCraft.»);
@@ -476,14 +478,16 @@ changes. The whole PR is the server's rows of the spec's §6.3 table, each with 
 - [ ] **Step 1: Write the failing tests**, one per row:
   - the trash summary of a recital entry is its citation, and a restore brings its content back unchanged;
   - a published environment keeps a recital entry with `considerando`, and refuses one with `numero_articolo`
-    beside it;
+    beside it; «Aggiungi ai miei dossier» and `recoverEnvironment` bring it back as a recital (both read
+    `readableContent`);
   - a suggestion with a recital is refused with the Forum's sentence;
   - a course module citing a recital entry is refused with the course's sentence;
   - the study import stores a recital entry titled with its citation and its marks under
     `celex:32016R0679~rct26::art::`, and counts a malformed one in `refused`;
   - `readEntryText` on a recital throws `RecitalHasNoText`, and the passages route answers its sentence;
   - `omnilex_aggiungi_norme_dossier`'s route answers «considerando 26 GDPR» `not_recognised` with its sentence
-    (stub `/parse_query` answering `parsed.recital: "26"`), and a recital entry already in the dossier never
+    (stub `/parse_query` answering `parsed.recital: "26"`), and «art. 4 e considerando 26 GDPR» the same (stub
+    answering `refusal: "recital_with_article"`, no `article`); a recital entry already in the dossier never
     matches an article (a pin);
   - `POST /notifications/normas/check` with a recital `norma_data` stores no watch;
   - a LingoLex card on `celex:32016R0679~rct26` is refused (a pin).
@@ -503,10 +507,12 @@ changes. The whole PR is the server's rows of the spec's §6.3 table, each with 
 
 - [ ] **Step 1: Write the tests** with the stub server answering one `norm` item with `citation` «considerando
   26, reg. (UE) 2016/679» and one note about it:
-  - `omnilex_leggi_dossier` lists «considerando 26, reg. (UE) 2016/679» and «Nota su considerando 26, reg. (UE)
-    2016/679»;
-  - the deletion dialog lists the recital by its citation;
-  - `omnilex_leggi_pratica` lists it by its citation;
+  - `omnilex_leggi_dossier` answers the recital's `riferimento` «considerando 26, reg. (UE) 2016/679» and the
+    note's `nota_su` its id;
+  - the deletion dialog (`entryLine`) lists the recital by its citation and the note as «Nota su considerando
+    26, reg. (UE) 2016/679»;
+  - `omnilex_leggi_pratica` lists «norm · considerando 26, reg. (UE) 2016/679» and the note «nota su considerando
+    26, reg. (UE) 2016/679»;
   - `omnilex_leggi_testo_voce` and `omnilex_glossa_voce` pass on the server's 400 sentence.
 - [ ] **Step 2: Run** `npm --prefix apps/mcp run build && npm --prefix apps/mcp test -- tests/tools.test.ts
   tests/delete.test.ts tests/pratica.test.ts tests/glosses.test.ts`. Expected: PASS (pins: the MCP already
@@ -682,15 +688,16 @@ each row gets its test. Paths are under `apps/web/src`.
     `normaForDossier`, `dossierSuggestionPayload`);
   - `components/features/practice/practiceDossierItems.ts` (`itemOf`, `dossierArticleKey`);
   - `utils/normaChanges.ts` (`normaFromChangeNotification`: null for a recital);
-  - `AddToDossierPopover.tsx` (from `RecitalReader`, 4a).
+  - `components/features/dossier/AddToDossierPopover.tsx` (from `RecitalReader`, 4a).
 - Test: `utils/sources/__tests__/recitalEntry.test.ts`, `dossierUtils.test.ts`, `practiceDossierItems.test.ts`,
-  `utils/__tests__/normaChanges.test.ts`
+  `utils/normaChanges.test.ts`
 
 **Interfaces:**
 - Consumes: Task 12 (`recitalIdentity`, `citeRecital`, `shortRecital`, `recitalUnitLabel`), PR 3's routes.
 - Produces:
   - `isRecitalNorma(d: DossierNormaData): d is RecitalNormaData` (the own key `considerando` decides);
-  - `rebuildRecitalEntry(raw: unknown): { ok: true; entry: RecitalNormaData } | { ok: false; reason: string }`;
+  - `rebuildRecitalEntry(raw: unknown): { ok: true; entry: RecitalNormaData; star?: { important: boolean } } | {
+    ok: false; reason: string }`, the server's pair (spec §2.4);
   - `entryMarksKey(d: DossierNormaData): { normaKey: string; articleId: string }`: for a recital
     `{ normaKey: recitalIdentity(d), articleId: '' }`, for an article today's `buildItemKey` and
     `uniqueArticleIdFromNorma`;
@@ -708,7 +715,7 @@ each row gets its test. Paths are under `apps/web/src`.
   - Adding recital 26 twice shows the article's «Già presente».
 - [ ] **Step 2: Run** `npm --prefix apps/web run test -- --run src/utils/sources/__tests__/recitalEntry.test.ts
   src/components/features/dossier/dossierUtils.test.ts
-  src/components/features/practice/practiceDossierItems.test.ts src/utils/__tests__/normaChanges.test.ts`.
+  src/components/features/practice/practiceDossierItems.test.ts src/utils/normaChanges.test.ts`.
   Expected: FAIL.
 - [ ] **Step 3: Implement**, then let `npm --prefix apps/web run build` list every reader of `numero_articolo` on
   a `DossierNormaData`. Each one either takes `isRecitalNorma` first or belongs to Task 17 or 18.
