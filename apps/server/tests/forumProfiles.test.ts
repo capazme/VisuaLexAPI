@@ -52,7 +52,7 @@ describe('the Forum’s profile', () => {
       const empty = await mine(alice);
       expect(empty.body).toEqual({
         profile: null, required: false, canWrite: true, canSign: true, score: 0,
-        contributions: { glosse: 0, risposte: 0 }, nameWithdrawn: null,
+        contributions: { glosse: 0, risposte: 0 }, roles: [], nameWithdrawn: null,
       });
 
       const created = await put(alice, REAL);
@@ -194,7 +194,7 @@ describe('the Forum’s profile', () => {
       const res = await publicOf(bob, created.body.profile.id);
       expect(res.body).toEqual({
         id: created.body.profile.id, name: 'Maria Bianchi', identity: 'real_name', qualification: 'avvocato',
-        materie: ['DIRITTO_CIVILE'], score: 1,
+        materie: ['DIRITTO_CIVILE'], score: 1, roles: [], validatedCount: 0,
       });
       expect(JSON.stringify(res.body)).not.toContain(alice.email);
       expect(JSON.stringify(res.body)).not.toContain(alice.username);

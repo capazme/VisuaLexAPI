@@ -303,7 +303,7 @@ describe('the Community', () => {
       expect((await request(app).post(`/api/moderation/reports/thread/${threadId}/resolve`).set(as(mod)).send({ action: 'dismiss', reason: 'Di nuovo' })).status).toBe(404);
 
       // The author reads it with the category; others get a 404; the author was told, not by whom.
-      expect((await page(alice, threadId)).body.hidden).toEqual({ category: 'dati_personali' });
+      expect((await page(alice, threadId)).body.hidden).toEqual({ category: 'dati_personali', appeal: null });
       expect((await page(bob, threadId)).status).toBe(404);
       const told = await request(app).get('/api/forum/notifications').set(as(alice));
       expect(told.body.data[0]).toMatchObject({ kind: 'hidden', category: 'dati_personali', threadId });
