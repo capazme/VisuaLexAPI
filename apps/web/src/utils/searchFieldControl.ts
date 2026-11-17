@@ -29,6 +29,8 @@ export const PALETTE_SHORTCUT = typeof navigator !== 'undefined' && /mac/i.test(
 export const SEARCH_FIELD_FORM_ID = 'search-field-form';
 /** The top bar's search pill (LC40): the menu grows out of it, as an island, on every page from lg. */
 export const SEARCH_ISLAND_ID = 'search-island';
+/** The island's one surface (LC69), Pietra's card: the pill and the panel it grows into wear the same ground and edge. */
+export const ISLAND_SURFACE = 'border border-border bg-card';
 
 let listener: Listener | null = null;
 let pending: { request: SearchFieldRequest; at: number } | null = null;

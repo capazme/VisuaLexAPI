@@ -4,7 +4,7 @@ import { FOCUS_RING } from '../../constants/interactions';
 import { Z_INDEX } from '../../constants/zIndex';
 import { cn } from '../../lib/utils';
 import { ServiceHealthDot } from '../ui/ServiceHealthMenuEntry';
-import { SEARCH_ISLAND_ID } from '../../utils/searchFieldControl';
+import { SEARCH_ISLAND_ID, ISLAND_SURFACE } from '../../utils/searchFieldControl';
 
 /** A 44 px icon button of the bar: no frame of its own, the bar is the frame. */
 const BAR_BUTTON = cn(
@@ -112,8 +112,8 @@ export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, 
           id={SEARCH_ISLAND_ID}
           data-compact=""
           className={cn(
-            'mr-3 flex h-9 w-40 shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-card pl-3 pr-3 text-sm text-slate-600 transition-colors',
-            'hover:border-slate-300 active:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:active:bg-slate-800',
+            'mr-3 flex h-9 w-40 shrink-0 items-center gap-2 rounded-full pl-3 pr-3 text-sm text-slate-600 transition-colors', ISLAND_SURFACE,
+            'hover:border-slate-300 active:bg-slate-100 dark:text-slate-300 dark:active:bg-slate-800',
             FOCUS_RING,
           )}
         >
