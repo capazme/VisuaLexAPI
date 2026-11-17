@@ -18,9 +18,44 @@ export class AppError extends Error {
   }
 }
 
+const SAFE_TOKEN = /^[A-Za-z0-9_.-]{1,80}$/;
+
+/**
+ * What the log says of an unexpected error: its kind, Prisma's code and the model and fields it names, the request's
+ * method and path, and where it was thrown. Never its message: a Prisma validation error quotes the query's arguments
+ * (the text the user was saving, an act with a client's name in it), and other errors may quote their input. Whoever
+ * reads the logs on the host must not read that. The stack keeps its frames, not its first line, which repeats the
+ * message. The path, not the URL: a query string can carry what the user searched for.
+ */
+export function describeUnexpectedError(err: unknown, req?: Pick<Request, 'method' | 'path'>): string {
+  const where = req ? ` on ${req.method} ${String(req.path).slice(0, 200)}` : '';
+  if (!(err instanceof Error)) return `a thrown ${typeof err}, not an Error${where}`;
+
+  const parts = [SAFE_TOKEN.test(err.name) ? err.name : 'Error'];
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === 'string' && SAFE_TOKEN.test(code)) parts.push(`code ${code}`);
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.meta) {
+    const { modelName, target } = err.meta as { modelName?: unknown; target?: unknown };
+    if (typeof modelName === 'string' && SAFE_TOKEN.test(modelName)) parts.push(`model ${modelName}`);
+    const fields = Array.isArray(target) ? target : typeof target === 'string' ? [target] : [];
+    const named = fields.filter((field): field is string => typeof field === 'string' && SAFE_TOKEN.test(field));
+    if (named.length) parts.push(`fields ${named.join(',')}`);
+  }
+
+  // V8 writes `${name}: ${message}` first, then one line per frame: keep only the frames.
+  const stack = err.stack ?? '';
+  const header = String(err);
+  const frames = (stack.startsWith(header) ? stack.slice(header.length) : stack)
+    .split('\n')
+    .filter((line) => /^\s+at /.test(line))
+    .slice(0, 10)
+    .join('\n');
+  return `${parts.join(', ')}${where}${frames ? `\n${frames}` : ''}`;
+}
+
 export const errorHandler = (
   err: Error | AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
@@ -89,7 +124,7 @@ export const errorHandler = (
     if (err.code === 'P2002') return res.status(409).json({ detail: 'Already exists' });
   }
 
-  console.error('Unexpected error:', err);
+  console.error(`Unexpected error: ${describeUnexpectedError(err, req)}`);
 
   return res.status(500).json({
     detail: 'Internal server error',
