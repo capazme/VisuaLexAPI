@@ -1,0 +1,151 @@
+/**
+ * The act's structure for the «Struttura» panel (LC71): the flat listing `/fetch_tree` serves, made a tree again,
+ * and the words the panel writes around it.
+ *
+ * The listing is stateful: heading strings («LIBRO QUARTO Delle obbligazioni», «CAPO I …»), annex labels
+ * («CODICE CIVILE») and article objects, in document order. Nesting is implied by order and rebuilt with a stack,
+ * by the rule of `tools/archivio-normativo/archivio_normativo/hierarchy.py`: a heading clears every level below it.
+ * Unlike that walker, a heading of no known level («§ 3 …», «Disposizioni preliminari») is kept, at the deepest level.
+ */
+import type { AnnexMetadata } from '../types';
+import { cleanSectionTitle } from './sectionTitle';
+import { CODES_TABLE } from './sources/actTypes';
+
+interface TreeArticleItem {
+  numero?: string;
+  allegato?: string | null;
+  parte?: unknown;
+  [key: string]: unknown;
+}
+export type ActTreeItem = string | TreeArticleItem;
+
+export type ActTreeNode =
+  | { type: 'heading'; key: string; title: string; children: ActTreeNode[] }
+  | { type: 'article'; numero: string };
+
+const LEVELS = ['parte', 'libro', 'titolo', 'capo', 'sezione'];
+const HEADING = /^(PARTE|LIBRO|TITOLO|CAPO|SEZIONE)\b/i;
+
+/** An article number, numeric or roman, with any single lowercase suffix («669-terdecies», «II bis»). */
+export function isArticleString(str: string): boolean {
+  if (!str || typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  // Any single lowercase word as suffix: Normattiva runs past «decies» (art. 2409-octiesdecies c.c.). Section
+  // headings arrive uppercase and multi-word, which keeps them out.
+  return /^\d+(?:[-\s][a-z]+)?$/.test(trimmed) || /^[IVXLCDM]+(?:[-\s][a-z]+)?$/.test(trimmed);
+}
+
+function rankOf(title: string): number {
+  const match = HEADING.exec(title.trim());
+  return match ? LEVELS.indexOf(match[1].toLowerCase()) : LEVELS.length;
+}
+
+const fold = (value: string) => cleanSectionTitle(value).toLowerCase();
+
+/**
+ * The tree of one part of the act: `annex` null is the dispositivo. `annexLabels` are the parts' names, which the
+ * listing also carries as strings: they name the part, not a heading inside it.
+ */
+export function buildActTree(data: ActTreeItem[], annex: string | null, annexLabels: string[] = []): ActTreeNode[] {
+  const labels = new Set(annexLabels.map(fold));
+  const root: ActTreeNode[] = [];
+  const stack: { rank: number; children: ActTreeNode[] }[] = [];
+  let pending: string[] = [];
+  let inside = false;
+  let count = 0;
+
+  const place = (numero: string, itemAnnex: string | null) => {
+    const matches = itemAnnex === null ? annex === null : annex !== null && String(itemAnnex) === String(annex);
+    if (!matches) {
+      // The headings met since the last article belong to the part these articles are in.
+      pending = [];
+      inside = false;
+      return;
+    }
+    if (!inside) stack.length = 0;
+    for (const title of pending) {
+      const rank = rankOf(title);
+      while (stack.length && stack[stack.length - 1].rank >= rank) stack.pop();
+      const node: ActTreeNode = { type: 'heading', key: `h${count++}`, title, children: [] };
+      (stack.length ? stack[stack.length - 1].children : root).push(node);
+      stack.push({ rank, children: node.children });
+    }
+    pending = [];
+    inside = true;
+    (stack.length ? stack[stack.length - 1].children : root).push({ type: 'article', numero });
+  };
+
+  for (const item of data) {
+    if (typeof item === 'string') {
+      // A bare number is the legacy listing, which knows no annexes: the dispositivo's.
+      if (isArticleString(item)) place(item.trim(), null);
+      else if (!labels.has(fold(item))) pending.push(item);
+      continue;
+    }
+    // `parte`: a split article after its first part, listed once (G-387 (a)).
+    if (!item || typeof item !== 'object' || item.numero === undefined || item.parte) continue;
+    place(String(item.numero), item.allegato ?? null);
+  }
+  return root;
+}
+
+const KEYWORD = /^(PARTE|LIBRO|TITOLO|CAPO|SEZIONE|ALLEGATO)$/i;
+const ROMAN = /^([IVXLCDM]+)(\b.*)?$/;
+
+/**
+ * A heading in sentence case, as the reader writes it: «LIBRO PRIMO DELLE PERSONE» → «Libro primo delle persone»,
+ * «CAPO II-BIS» → «Capo II-bis». Only words wholly in capitals are lowered; a numeral is kept only right after a
+ * level word, since «DI», «CI» and «LI» are numerals too. Mixed-case source text is left as it is.
+ * shortcut: an acronym in capitals («UE») is lowered with the rest; a list of them if a heading needs one.
+ */
+export function headingLabel(raw: string): string {
+  const words = cleanSectionTitle(raw).split(' ');
+  const out = words.map((word, i) => {
+    if (word !== word.toUpperCase() || word === word.toLowerCase()) return word;
+    const roman = i > 0 && KEYWORD.test(words[i - 1]) ? ROMAN.exec(word) : null;
+    if (roman) return roman[1] + (roman[2] ?? '').toLowerCase();
+    return word.toLowerCase();
+  });
+  const text = out.join(' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const CODE_ANNEX: ReadonlyMap<string, string> = new Map(
+  Object.entries(CODES_TABLE).flatMap(([name, urn]) => {
+    const match = /;\d+[a-z]*:(\w+)$/.exec(urn);
+    return match ? [[name.toLowerCase().replace(/\s+/g, ' ').trim(), match[1]] as const] : [];
+  }),
+);
+
+/**
+ * The part of the act a reader means when no article is open: a code's own part, from the codes table («codice
+ * civile» is annex 2 of the r.d. 262/1942, not its two-article dispositivo); else the part with the most articles,
+ * the dispositivo on a tie. Null for an act in one part.
+ */
+export function mainAnnex(tipoAtto: string | undefined, annexes: AnnexMetadata[] | undefined): string | null {
+  if (!annexes || annexes.length < 2) return null;
+  const coded = CODE_ANNEX.get((tipoAtto ?? '').toLowerCase().replace(/\s+/g, ' ').trim());
+  if (coded && annexes.some((a) => a.number === coded)) return coded;
+  let best = annexes.find((a) => a.number === null) ?? annexes[0];
+  for (const annex of annexes) if (annex.article_count > best.article_count) best = annex;
+  return best.number;
+}
+
+const PLURAL = /^(disposizioni|norme|preleggi)$/;
+const FEMININE = /^(costituzione|legge|l\.|l\.r\.|direttiva|carta|convenzione|decisione|delibera|deliberazione|circolare)$/;
+const MASCULINE = /^(codice|codici|decreto|d\.lgs\.|d\.l\.|d\.p\.r\.|r\.d\.|d\.m\.|d\.p\.c\.m\.|regolamento|testo|trattato|statuto|r\.d\.l\.|d\.lgs\.lgt\.)$/;
+
+/**
+ * The panel's title: «Struttura del Codice civile», «Struttura della Costituzione», «Struttura delle Disposizioni…».
+ * An act whose first word is not known reads «Struttura · <act>»: a wrong article is worse than none.
+ */
+export function structureTitle(actName: string): string {
+  const name = actName.trim();
+  if (!name) return 'Struttura';
+  const first = name.split(/\s+/)[0].toLowerCase();
+  if (PLURAL.test(first)) return `Struttura delle ${name}`;
+  if (FEMININE.test(first)) return `Struttura della ${name}`;
+  if (MASCULINE.test(first)) return `Struttura del ${name}`;
+  if (/^[aeiou]/i.test(first)) return `Struttura dell'${name}`;
+  return `Struttura · ${name}`;
+}

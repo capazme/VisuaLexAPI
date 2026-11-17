@@ -1,7 +1,7 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, useDragControls, useMotionValue } from 'framer-motion';
-import { X, Check, FileText, List, Layers, GripHorizontal, Search, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Check, ChevronRight } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
@@ -10,737 +10,453 @@ import { normalizeArticleId } from '../../../utils/treeUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { cleanSectionTitle } from '../../../utils/sectionTitle';
 import { abrogatiFor, rubricheFor } from '../../../utils/actRubriche';
+import { buildActTree, headingLabel, type ActTreeItem, type ActTreeNode } from '../../../utils/actTree';
 import { spring } from '../../../lib/motion';
 
-/** Window geometry, also used to keep the parked position inside the viewport. */
+/** The window's width on a computer; its place is the store's (`structureWindow.position`), kept inside the viewport. */
 const WINDOW_WIDTH = 420;
-/** How much of the window must stay on screen vertically after a drag. */
+/** How much of the window must stay on screen vertically. */
 const WINDOW_MIN_VISIBLE = 160;
 
 function clampToViewport(position: { x: number; y: number }) {
-  const maxX = Math.max(0, window.innerWidth - WINDOW_WIDTH);
-  const maxY = Math.max(0, window.innerHeight - WINDOW_MIN_VISIBLE);
   return {
-    x: Math.min(Math.max(0, position.x), maxX),
-    y: Math.min(Math.max(0, position.y), maxY),
+    x: Math.min(Math.max(0, position.x), Math.max(0, window.innerWidth - WINDOW_WIDTH)),
+    y: Math.min(Math.max(0, position.y), Math.max(0, window.innerHeight - WINDOW_MIN_VISIBLE)),
   };
 }
 
-/**
- * Fold a string for filtering: accents stripped, lowercased.
- * A lawyer types "responsabilita" and expects "Responsabilità del debitore".
- */
+/** Accents stripped, lowercased: a lawyer types «responsabilita» and expects «Responsabilità del debitore». */
 function foldIndexLabel(value: string): string {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-/** Above this many sections the index opens collapsed — the codice civile has 406. */
+/** Above this many headings the tree opens collapsed, but for the way to the articles on the table. */
 const COLLAPSE_THRESHOLD = 8;
-
-// A tree node is either a section-title string or an article object carrying
-// its number and (optional) annex marker.
-interface TreeArticleNode {
-  numero?: string;
-  allegato?: string | null;
-  [key: string]: unknown;
-}
-type TreeViewNode = string | TreeArticleNode;
 
 export interface TreeViewPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  treeData: TreeViewNode[];
+  treeData: ActTreeItem[];
   urn: string;
+  /** «Struttura del Codice civile» (`structureTitle`). */
   title?: string;
-  /** Callback when article is selected - includes target annex (null for dispositivo) */
+  /** An article picked: its number and its part (null for the dispositivo). */
   onArticleSelect?: (articleNumber: string, targetAnnex: string | null) => void;
+  /** The articles on the table, as unique ids («2043», «all2:2043»). */
   loadedArticles?: string[];
-  /** Annex metadata for tabs - if provided, shows annex tabs */
+  /** The article open now, as a unique id: marked, and the list opens scrolled to it. */
+  activeArticle?: string;
+  /** The act's parts: with more than one, a menu chooses which the tree shows. */
   annexes?: AnnexMetadata[];
-  /** Currently selected annex (from loaded articles) */
+  /** The part the panel opens on: the open article's, else the act's main part (`useAnnexNavigation`). */
   currentAnnex?: string | null;
   /**
-   * Article rubriche keyed by article number ("2043" → "Risarcimento per
-   * fatto illecito"). Arrives after the tree and is always partial: coverage
-   * is ~89% for the codici and 0% for acts that carry no rubriche at all.
-   * An article without one renders as a bare number.
+   * Rubriche keyed by article number («2043» → «Risarcimento per fatto illecito»). They arrive after the tree and are
+   * partial: an article without one is its number alone.
    */
   rubriche?: Record<string, string>;
-  /** Keys of the articles the act declares repealed (fallback for flat acts). */
+  /** Keys of the articles the act declares repealed (flat acts). */
   abrogati?: string[];
-  /**
-   * Per-annex titles. For an act in parts they replace the flat `rubriche`
-   * map: the part matched to the annex on screen, or none (`utils/actRubriche.ts`).
-   */
+  /** Per-part titles: for an act in parts they replace `rubriche` (`utils/actRubriche.ts`). */
   rubricheParts?: RubrichePart[];
   /**
-   * Which shell to wear.
-   *
-   * `window` is the desktop surface: a draggable, backdrop-less window
-   * portalled to `document.body`. The portal is why this variant also checks
-   * the viewport and renders nothing on small screens — a portal escapes the
-   * `hidden md:block` wrapper it lives under, so without the check the desktop
-   * renderer would leak a window onto phones alongside the mobile drawer.
-   *
-   * `drawer` is the mobile surface: today's right-side sheet with a backdrop,
-   * not portalled, so its `md:hidden` wrapper keeps it off desktop.
+   * `window`, the computer's: a window over the table, portalled to the body (a transformed ancestor would hold a
+   * `fixed` child, gotcha 22) and drawn only on a computer, since the portal escapes its `hidden md:block` wrapper.
+   * `drawer`, the phone's: a full-height sheet with a backdrop, in place.
    */
   variant?: 'window' | 'drawer';
 }
 
-// Check if a string is an article number (numeric or roman numeral)
-function isArticleString(str: string): boolean {
-  if (!str || typeof str !== 'string') return false;
-  const trimmed = str.trim();
-
-  // Numeric articles: "1", "1-bis", "2 bis", "2409-octiesdecies", "669-terdecies".
-  //
-  // The suffix is ANY single lowercase word, not an enumerated list. Normattiva
-  // runs well past `decies` — art. 669-terdecies c.p.c. (reclamo cautelare),
-  // art. 2409-octiesdecies c.c., art. 25-undecies of D.Lgs. 231/2001 — and an
-  // enumerated list silently reclassified every one of them as a SECTION TITLE,
-  // dropping them from the index entirely.
-  //
-  // Staying lowercase and single-word is what keeps section headers out: those
-  // arrive uppercase and multi-word ("LIBRO PRIMO DELLE PERSONE…").
-  if (/^\d+(?:[-\s][a-z]+)?$/.test(trimmed)) {
-    return true;
-  }
-
-  // Roman numerals: "I", "II", "III", "I-bis", "II terdecies"
-  if (/^[IVXLCDM]+(?:[-\s][a-z]+)?$/.test(trimmed)) {
-    return true;
-  }
-
-  return false;
+interface Row {
+  node: ActTreeNode;
+  depth: number;
 }
 
-// Parse tree data into structured sections
-// Handles both flat string arrays ["1", "2", ...] and object arrays [{allegato, numero}, ...]
-interface ParsedSection {
-  title: string;
-  articles: string[];
+/** The headings' keys under `nodes` that hold an article `holds` says yes to. */
+function headingsHolding(nodes: ActTreeNode[], holds: (numero: string) => boolean, into = new Set<string>()): boolean {
+  let any = false;
+  for (const node of nodes) {
+    if (node.type === 'article') {
+      if (holds(node.numero)) any = true;
+    } else if (headingsHolding(node.children, holds, into)) {
+      into.add(node.key);
+      any = true;
+    }
+  }
+  return any;
+}
+
+function filterTree(nodes: ActTreeNode[], keep: (numero: string) => boolean): ActTreeNode[] {
+  return nodes.flatMap((node): ActTreeNode[] => {
+    if (node.type === 'article') return keep(node.numero) ? [node] : [];
+    const children = filterTree(node.children, keep);
+    return children.length ? [{ ...node, children }] : [];
+  });
+}
+
+function countArticles(nodes: ActTreeNode[]): number {
+  return nodes.reduce((sum, node) => sum + (node.type === 'article' ? 1 : countArticles(node.children)), 0);
+}
+
+function countHeadings(nodes: ActTreeNode[]): number {
+  return nodes.reduce((sum, node) => sum + (node.type === 'heading' ? 1 + countHeadings(node.children) : 0), 0);
 }
 
 /**
- * Parse tree data filtering by a specific annex.
- * The tree contains a mix of:
- * - Objects: {allegato: null|"1"|"2", numero: "X"} - articles with their annex
- * - Strings: Section titles like "LIBRO PRIMO...", "TITOLO II...", "CAPO I..."
- *
- * Section titles are applied to following articles, but only sections with
- * articles matching the target annex are included.
+ * The act's structure (LC71): its title, the part when it has several, a filter, and the tree of books, titles and
+ * chapters with each article as «Art. 2043 · Risarcimento per fatto illecito». A pick opens the article on the table
+ * and leaves the panel open. The filter has the focus on opening, the arrows walk the list, Esc closes and gives the
+ * focus back to what opened it.
  */
-function parseTreeDataForAnnex(data: TreeViewNode[], targetAnnex: string | null): ParsedSection[] {
-  const sections: ParsedSection[] = [];
-  let currentSection: ParsedSection = { title: 'Articoli', articles: [] };
-  let pendingSectionTitle: string | null = null;
-
-  for (const item of data) {
-    // Handle string items (section titles or legacy article numbers)
-    if (typeof item === 'string') {
-      if (isArticleString(item)) {
-        // Legacy format: plain article number string (no annex info)
-        // Only include if targeting dispositivo (null annex)
-        if (targetAnnex === null) {
-          if (pendingSectionTitle && pendingSectionTitle !== currentSection.title) {
-            if (currentSection.articles.length > 0) {
-              sections.push(currentSection);
-            }
-            currentSection = { title: pendingSectionTitle, articles: [] };
-            pendingSectionTitle = null;
-          }
-          currentSection.articles.push(item);
-        }
-      } else {
-        // It's a section title - store it for when we find matching articles
-        pendingSectionTitle = item;
-      }
-      continue;
-    }
-
-    // Handle object items (article data with allegato info)
-    if (item && typeof item === 'object' && item.numero !== undefined) {
-      const itemAnnex = item.allegato ?? null;
-
-      // Check if this article belongs to the target annex
-      // Compare with type coercion: null === null, "1" === "1"
-      const annexMatches = (itemAnnex === null && targetAnnex === null) ||
-                           (itemAnnex !== null && targetAnnex !== null && String(itemAnnex) === String(targetAnnex));
-
-      if (annexMatches) {
-        // Create new section if we have a pending title
-        if (pendingSectionTitle && pendingSectionTitle !== currentSection.title) {
-          if (currentSection.articles.length > 0) {
-            sections.push(currentSection);
-          }
-          currentSection = { title: pendingSectionTitle, articles: [] };
-          pendingSectionTitle = null;
-        }
-        currentSection.articles.push(item.numero);
-      }
-      continue;
-    }
-  }
-
-  // Push last section
-  if (currentSection.articles.length > 0) {
-    sections.push(currentSection);
-  }
-
-  return sections;
-}
-
 export function TreeViewPanel({
   isOpen,
   onClose,
   treeData,
-  title = 'Struttura Atto',
+  title = 'Struttura',
   onArticleSelect,
   loadedArticles = [],
+  activeArticle,
   annexes,
   currentAnnex,
   rubriche,
   abrogati,
   rubricheParts,
-  variant = 'drawer'
+  variant = 'drawer',
 }: TreeViewPanelProps) {
-  // Track which annex tab is selected in the UI
-  // This is separate from currentAnnex (which reflects loaded articles)
-  // Allows user to select a tab and click articles before loading completes
+  // The part chosen in the menu; undefined follows `currentAnnex`.
   const [selectedAnnex, setSelectedAnnex] = useState<string | null | undefined>(undefined);
-  // Free-text filter over article numbers and rubriche
   const [filterQuery, setFilterQuery] = useState('');
-  // Explicit expand/collapse choices, keyed by annex + section index so a tab
-  // switch cannot inherit the previous tab's open sections.
-  const [sectionOverrides, setSectionOverrides] = useState<Record<string, boolean>>({});
+  // Open/closed choices, keyed by part and heading so a part does not inherit another's.
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const { tryStartTour } = useTour();
-
   const isDesktop = useIsDesktop();
   const isWindow = variant === 'window';
-  const storedPosition = useAppStore(s => s.structureWindow.position);
-  const setStructureWindowPosition = useAppStore(s => s.setStructureWindowPosition);
+  const storedPosition = useAppStore((s) => s.structureWindow.position);
+  const place = useMemo(() => clampToViewport(storedPosition), [storedPosition]);
+  const filterRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const scrolledRef = useRef(false);
+  const selectId = useId();
 
-  const dragControls = useDragControls();
-  // Motion values seed from the parked position once, clamped in case the
-  // window was parked on a wider screen than the one rehydrating it.
-  const initialPosition = useMemo(() => clampToViewport(storedPosition), [storedPosition]);
-  const x = useMotionValue(initialPosition.x);
-  const y = useMotionValue(initialPosition.y);
-
-  // Drag from the header only, and never when the pointer went down on a
-  // control inside it — otherwise the close button would start a drag.
-  const startWindowDrag = (event: React.PointerEvent) => {
-    if (!isWindow) return;
-    if ((event.target as HTMLElement).closest('button')) return;
-    dragControls.start(event);
-  };
-
-  const handleWindowDragEnd = () => {
-    const next = clampToViewport({ x: x.get(), y: y.get() });
-    x.set(next.x);
-    y.set(next.y);
-    setStructureWindowPosition(next);
-  };
-
-  // Start tree view tour on first open
   useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => tryStartTour('treeView'), 300);
-      return () => clearTimeout(timer);
-    }
+    if (!isOpen) return undefined;
+    const timer = setTimeout(() => tryStartTour('treeView'), 300);
+    return () => clearTimeout(timer);
   }, [isOpen, tryStartTour]);
 
-  // Reset selected annex when panel opens or when currentAnnex changes externally
+  // A new act, a reopened panel: no inherited part, filter or open headings (gotcha 11).
   useEffect(() => {
-    // External-sync: reset local selection when the panel opens or the annex
-    // changes from outside. (CLAUDE.md gotcha #11)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedAnnex(undefined);
-    // Same transaction, same justification: a new act (or a reopened panel)
-    // must not inherit the previous one's filter or open sections.
     setFilterQuery('');
-    setSectionOverrides({});
+    setOverrides({});
   }, [currentAnnex, isOpen]);
 
-  // The annex to use for display and article clicks
-  // If user selected a tab, use that; otherwise use the loaded annex
-  const effectiveAnnex = selectedAnnex !== undefined ? selectedAnnex : currentAnnex;
+  // On opening: remember what had the focus (the «Struttura» button), give it to the filter.
+  useEffect(() => {
+    if (!isOpen) {
+      scrolledRef.current = false;
+      return;
+    }
+    const active = document.activeElement;
+    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    filterRef.current?.focus();
+  }, [isOpen]);
 
-  // Show annexes section if we have multiple annexes
-  const showAnnexes = annexes && annexes.length > 1;
-
-  // Handle annex tab click - just change the view, don't load articles
-  // User will click on a specific article to load it
-  const handleAnnexTabClick = (annexNumber: string | null) => {
-    // Skip if already on this annex
-    if (annexNumber === effectiveAnnex) return;
-
-    // Just update the selected tab - this changes which articles are displayed
-    // No article is loaded until user clicks one
-    setSelectedAnnex(annexNumber);
+  const close = () => {
+    onClose();
+    // On a phone the opener is an entry of «⋯», gone with its menu: then the focus stays where the browser puts it.
+    const opener = openerRef.current;
+    if (opener?.isConnected) opener.focus();
   };
-  // Parse tree data into sections filtered by current annex
-  // This ensures each annex tab shows its own section structure (titles/chapters)
-  const parsedSections = useMemo(() => {
-    if (treeData && treeData.length > 0) {
-      return parseTreeDataForAnnex(treeData, effectiveAnnex ?? null);
+
+  const effectiveAnnex = selectedAnnex !== undefined ? selectedAnnex : (currentAnnex ?? null);
+  const showAnnexes = !!annexes && annexes.length > 1;
+  const annexInfo = annexes?.find((a) => a.number === effectiveAnnex);
+
+  const tree = useMemo<ActTreeNode[]>(() => {
+    const built = buildActTree(treeData ?? [], effectiveAnnex, annexes?.map((a) => a.label));
+    // No headings in this part: the part's own list, when the metadata has it, is the fuller one.
+    if (countHeadings(built) === 0 && annexInfo?.article_numbers?.length) {
+      return annexInfo.article_numbers.map((numero) => ({ type: 'article' as const, numero }));
     }
-    return null;
-  }, [treeData, effectiveAnnex]);
+    return built;
+  }, [treeData, effectiveAnnex, annexes, annexInfo]);
 
-  // Get articles for the currently selected annex from metadata
-  // This ensures we show the correct articles for each annex tab
-  const articlesForCurrentAnnex = useMemo(() => {
-    if (!annexes || annexes.length === 0) return null;
+  const loadedSet = useMemo(() => new Set(loadedArticles.map(normalizeArticleId)), [loadedArticles]);
+  // «Art. 1» of Allegato 1 («all1:1») is never «Art. 1» of the dispositivo («1»).
+  const uniqueId = (numero: string) => (effectiveAnnex ? `all${effectiveAnnex}:${numero}` : numero);
+  const isLoaded = (numero: string) => loadedSet.has(normalizeArticleId(uniqueId(numero)));
+  const activeId = activeArticle ? normalizeArticleId(activeArticle) : null;
+  const isActive = (numero: string) => activeId !== null && normalizeArticleId(uniqueId(numero)) === activeId;
 
-    // Find the annex matching effectiveAnnex
-    const currentAnnexInfo = annexes.find(a =>
-      a.number === effectiveAnnex ||
-      (a.number === null && effectiveAnnex === null)
-    );
-
-    if (currentAnnexInfo?.article_numbers && currentAnnexInfo.article_numbers.length > 0) {
-      return currentAnnexInfo.article_numbers;
-    }
-
-    return null;
-  }, [annexes, effectiveAnnex]);
-
-  // Check if parsedSections has actual structure (titles/chapters, not just one generic section)
-  const hasStructuredSections = parsedSections && (
-    parsedSections.length > 1 ||
-    (parsedSections.length === 1 && parsedSections[0].title !== 'Articoli')
-  );
-
-  // Determine display mode:
-  // - Prefer structured view (with titles/chapters) when available for ANY annex
-  // - Fall back to flat article list only when no section structure exists
-  const useStructuredView = hasStructuredSections;
-  const displayArticles = useStructuredView ? null : articlesForCurrentAnnex;
-
-  // Count stats based on what we're displaying
-  const stats = useMemo(() => {
-    if (displayArticles) {
-      return { total: displayArticles.length, loaded: loadedArticles.length };
-    }
-    if (parsedSections) {
-      const totalArticles = parsedSections.reduce((sum, s) => sum + s.articles.length, 0);
-      return { total: totalArticles, loaded: loadedArticles.length };
-    }
-    return null;
-  }, [displayArticles, parsedSections, loadedArticles]);
-
-  // Create normalized set for comparison
-  const loadedSetNormalized = useMemo(
-    () => new Set(loadedArticles.map(normalizeArticleId)),
-    [loadedArticles]
-  );
-  const isArticleLoaded = (id: string) => loadedSetNormalized.has(normalizeArticleId(id));
-
-  // Build unique ID with current annex context, so "Art. 1" of Allegato 1
-  // ("all1:1") is never mistaken for "Art. 1" of the dispositivo ("1").
-  const uniqueIdForContext = (articleNum: string) =>
-    effectiveAnnex ? `all${effectiveAnnex}:${articleNum}` : articleNum;
-
-  // Which titles belong to the annex on screen: the rule, and why an act in
-  // parts never borrows the top-level map, is `utils/actRubriche.ts`.
-  const annexArticleNumbers = useMemo(
-    () => annexes?.find(
-      a => a.number === effectiveAnnex || (a.number === null && effectiveAnnex === null)
-    )?.article_numbers ?? null,
-    [annexes, effectiveAnnex],
-  );
-  // Rubriche keyed the same way article numbers are compared, so a tree
-  // emitting "1-bis" still finds a rubrica stored under "1 bis" (gotcha 9).
+  // Which titles belong to the part on screen: `utils/actRubriche.ts`. Keyed as article numbers are compared, so
+  // «1-bis» finds a rubrica stored under «1 bis» (gotcha 9).
+  const partNumbers = annexInfo?.article_numbers ?? null;
   const rubricheNormalized = useMemo(
-    () => rubricheFor({ rubriche, parts: rubricheParts }, annexArticleNumbers),
-    [rubriche, rubricheParts, annexArticleNumbers],
+    () => rubricheFor({ rubriche, parts: rubricheParts }, partNumbers),
+    [rubriche, rubricheParts, partNumbers],
   );
-  const rubricaFor = (articleNum: string) => rubricheNormalized[normalizeArticleId(articleNum)] ?? '';
-
-  // An abrogated article has no rubrica because it has no content. Saying so
-  // beats a blank row: the reader cannot otherwise tell "repealed" from "we
-  // could not find the title".
   const abrogatiNormalized = useMemo(
-    () => abrogatiFor({ abrogati, parts: rubricheParts }, annexArticleNumbers),
-    [abrogati, rubricheParts, annexArticleNumbers],
+    () => abrogatiFor({ abrogati, parts: rubricheParts }, partNumbers),
+    [abrogati, rubricheParts, partNumbers],
   );
-  const isAbrogato = (articleNum: string) => abrogatiNormalized.has(normalizeArticleId(articleNum));
+  const rubricaFor = (numero: string) => rubricheNormalized[normalizeArticleId(numero)] ?? '';
+  const isAbrogato = (numero: string) => abrogatiNormalized.has(normalizeArticleId(numero));
 
-  // One shape for both display modes: the flat per-annex list becomes a single
-  // section, so filtering, counting and collapsing have a single code path.
-  const annexLabel = annexes?.find(
-    a => a.number === effectiveAnnex || (a.number === null && effectiveAnnex === null)
-  )?.label || 'Articoli';
+  const query = foldIndexLabel(filterQuery.trim());
+  const isFiltering = query.length > 0;
+  const shown = useMemo(() => {
+    if (!isFiltering) return tree;
+    return filterTree(tree, (numero) =>
+      foldIndexLabel(numero).startsWith(query)
+      || foldIndexLabel(rubricheNormalized[normalizeArticleId(numero)] ?? '').includes(query)
+      || (abrogatiNormalized.has(normalizeArticleId(numero)) && 'abrogato'.includes(query)));
+  }, [tree, isFiltering, query, rubricheNormalized, abrogatiNormalized]);
 
-  const displaySections = useMemo<ParsedSection[] | null>(() => {
-    if (displayArticles) return [{ title: annexLabel, articles: displayArticles }];
-    if (parsedSections && parsedSections.length > 0) return parsedSections;
-    return null;
-  }, [displayArticles, parsedSections, annexLabel]);
-
-  const normalizedQuery = foldIndexLabel(filterQuery.trim());
-  const isFiltering = normalizedQuery.length > 0;
-
-  // Sections carry their original index so a collapse choice survives the
-  // filter hiding the sections above it.
-  const sectionsToRender = useMemo(() => {
-    if (!displaySections) return null;
-    const indexed = displaySections.map((section, idx) => ({ ...section, idx }));
-    if (!isFiltering) return indexed;
-
-    return indexed
-      .map(section => ({
-        ...section,
-        articles: section.articles.filter(articleNum =>
-          foldIndexLabel(articleNum).startsWith(normalizedQuery) ||
-          foldIndexLabel(rubricheNormalized[normalizeArticleId(articleNum)] ?? '').includes(normalizedQuery) ||
-          (abrogatiNormalized.has(normalizeArticleId(articleNum)) && 'abrogato'.includes(normalizedQuery))
-        ),
-      }))
-      .filter(section => section.articles.length > 0);
-  }, [displaySections, isFiltering, normalizedQuery, rubricheNormalized, abrogatiNormalized]);
-
-  const totalArticleCount = useMemo(
-    () => displaySections?.reduce((sum, s) => sum + s.articles.length, 0) ?? 0,
-    [displaySections]
-  );
-  const matchedArticleCount = useMemo(
-    () => sectionsToRender?.reduce((sum, s) => sum + s.articles.length, 0) ?? 0,
-    [sectionsToRender]
-  );
-
-  // The codice civile has 406 sections; opening all of them defeats the point
-  // of an index. Below the threshold everything stays open.
-  const collapsedByDefault = (displaySections?.length ?? 0) > COLLAPSE_THRESHOLD;
-  const sectionKey = (idx: number) => `${effectiveAnnex ?? 'main'}::${idx}`;
-
-  const isSectionExpanded = (section: { idx: number; articles: string[] }) => {
-    // A filter is a request to see the matches, so it wins over every default.
+  const collapsedByDefault = countHeadings(tree) > COLLAPSE_THRESHOLD;
+  // Where the reader already is stays open: the headings over the articles on the table and the open one.
+  const openByDefault = useMemo(() => {
+    const keys = new Set<string>();
+    headingsHolding(tree, (numero) => isLoaded(numero) || isActive(numero), keys);
+    return keys;
+    // isLoaded and isActive read these.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tree, loadedSet, activeId, effectiveAnnex]);
+  const overrideKey = (key: string) => `${effectiveAnnex ?? 'main'}::${key}`;
+  const isExpanded = (key: string) => {
     if (isFiltering) return true;
-    const override = sectionOverrides[sectionKey(section.idx)];
+    const override = overrides[overrideKey(key)];
     if (override !== undefined) return override;
-    if (!collapsedByDefault) return true;
-    // Where you already are stays open.
-    return section.articles.some(articleNum => isArticleLoaded(uniqueIdForContext(articleNum)));
+    return !collapsedByDefault || openByDefault.has(key);
+  };
+  const toggle = (key: string, expanded: boolean) => setOverrides((prev) => ({ ...prev, [overrideKey(key)]: !expanded }));
+
+  const rows: Row[] = [];
+  const walk = (nodes: ActTreeNode[], depth: number) => {
+    for (const node of nodes) {
+      rows.push({ node, depth });
+      if (node.type === 'heading' && isExpanded(node.key)) walk(node.children, depth + 1);
+    }
+  };
+  walk(shown, 0);
+
+  // Once per opening, the open article in view; rubriche landing later do not scroll again.
+  const treeReady = tree.length > 0;
+  useEffect(() => {
+    if (!isOpen || !treeReady || scrolledRef.current) return;
+    scrolledRef.current = true;
+    const current = listRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
+    current?.scrollIntoView?.({ block: 'center' });
+  }, [isOpen, treeReady]);
+
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // An open discussion panel or citation preview closes on Esc at the document: this one is the panel's.
+      e.stopPropagation();
+      close();
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const list = Array.from(listRef.current?.querySelectorAll<HTMLElement>('[data-tree-row]') ?? []);
+    const at = list.indexOf(e.target as HTMLElement);
+    // From the filter or a row only: the part's menu keeps its own arrows.
+    if (!list.length || (at === -1 && e.target !== filterRef.current)) return;
+    e.preventDefault();
+    const next = e.key === 'ArrowDown' ? Math.min(at + 1, list.length - 1) : at - 1;
+    if (next < 0) filterRef.current?.focus();
+    else list[next].focus();
   };
 
-  const toggleSection = (idx: number, expanded: boolean) => {
-    setSectionOverrides(prev => ({ ...prev, [sectionKey(idx)]: !expanded }));
-  };
+  const drawer = !isWindow;
+  const rowHeight = drawer ? 'min-h-[44px] py-2' : 'min-h-8 py-1';
+  const ROW_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500';
 
-  // One row per article: number in a fixed leading slot, rubrica beside it.
-  const renderArticleRow = (articleNum: string, sectionIdx: number, articleIdx: number) => {
-    const isLoaded = isArticleLoaded(uniqueIdForContext(articleNum));
-    const isClickable = onArticleSelect && !isLoaded;
-    // Create unique key: section index + article index + article number
-    const uniqueKey = `sec${sectionIdx}-art${articleIdx}-${articleNum}`;
-    const rubrica = rubricaFor(articleNum);
-    const abrogato = !rubrica && isAbrogato(articleNum);
-
+  const renderRow = ({ node, depth }: Row, index: number): ReactNode => {
+    const indent = { paddingLeft: 8 + depth * 14 };
+    if (node.type === 'heading') {
+      const expanded = isExpanded(node.key);
+      return (
+        <div
+          key={node.key}
+          role="button"
+          tabIndex={0}
+          data-tree-row
+          aria-expanded={expanded}
+          onClick={() => toggle(node.key, expanded)}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ' || (e.key === 'ArrowRight' && !expanded) || (e.key === 'ArrowLeft' && expanded)) {
+              e.preventDefault();
+              toggle(node.key, expanded);
+            }
+          }}
+          style={indent}
+          className={cn(
+            'flex w-full cursor-pointer select-none items-start gap-1.5 rounded-md pr-2 text-left text-sm font-medium leading-snug text-slate-800 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/70',
+            rowHeight,
+            ROW_FOCUS,
+          )}
+        >
+          <ChevronRight
+            size={14}
+            aria-hidden
+            className={cn('mt-[3px] shrink-0 text-slate-400 transition-transform duration-150', expanded && 'rotate-90')}
+          />
+          <span className="min-w-0 flex-1">{headingLabel(node.title)}</span>
+        </div>
+      );
+    }
+    const { numero } = node;
+    const loaded = isLoaded(numero);
+    const active = isActive(numero);
+    const clickable = !!onArticleSelect && !loaded;
+    const rubrica = rubricaFor(numero);
+    const tail = rubrica || (isAbrogato(numero) ? 'abrogato' : '');
     return (
       <button
-        key={uniqueKey}
-        onClick={() => isClickable && onArticleSelect(articleNum, effectiveAnnex ?? null)}
-        // aria-disabled rather than disabled: a `disabled` button is dropped
-        // from the tab order AND renders no native tooltip in Chrome or Safari.
-        // Both matter here — the rubrica is truncated to one line and `title` is
-        // the only route to the full text, and the rows a lawyer most wants to
-        // re-read are exactly the loaded ones. The click is guarded instead.
-        aria-disabled={!isClickable}
+        key={`a${index}-${numero}`}
+        type="button"
+        data-tree-row
+        onClick={() => clickable && onArticleSelect(numero, effectiveAnnex)}
+        // aria-disabled, not disabled: a loaded row stays in the tab order and keeps its tooltip (the rubrica is cut
+        // to one line). The click is guarded instead.
+        aria-disabled={!clickable}
+        aria-current={active ? 'true' : undefined}
         title={rubrica || undefined}
+        style={indent}
         className={cn(
-          "w-full flex items-center gap-2.5 rounded-md px-2 text-left border border-transparent transition-colors",
-          variant === 'drawer' ? "min-h-[44px] py-2" : "py-1",
-          isLoaded
-            ? "bg-emerald-50 border-emerald-200/70 text-emerald-700 dark:bg-emerald-900/25 dark:border-emerald-800/50 dark:text-emerald-400 cursor-default"
-            : "text-slate-700 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-primary-900/40 hover:border-primary-200 dark:hover:border-primary-800 hover:text-primary-600 dark:hover:text-primary-400 cursor-pointer"
+          'flex w-full items-baseline gap-1.5 rounded-md pr-2 text-left text-sm transition-colors',
+          rowHeight,
+          ROW_FOCUS,
+          active
+            ? 'bg-slate-200/70 text-slate-900 dark:bg-slate-800 dark:text-white'
+            : loaded
+              ? 'cursor-default text-slate-700 dark:text-slate-300'
+              : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/70',
         )}
       >
-        {/* min-w, not a fixed w: the slot has to hold "2409-octiesdecies" as
-            well as "3". A hard 44px with shrink-0 makes a long id spill left,
-            out of the row — and the codici are full of them. */}
-        <span className="min-w-11 shrink-0 text-right text-xs font-bold tabular-nums">
-          {articleNum}
+        {/* The number never shrinks: «Art. 2409-octiesdecies» widens its row instead of spilling out of it. */}
+        <span className="shrink-0 whitespace-nowrap font-medium tabular-nums text-slate-900 dark:text-slate-100">
+          Art. {numero}
         </span>
-        {rubrica ? (
-          <span className="flex-1 min-w-0 truncate text-xs font-normal">
-            {rubrica}
-          </span>
-        ) : abrogato ? (
-          <span className="flex-1 min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-            Abrogato
-          </span>
-        ) : null}
-        {isLoaded && (
-          <Check size={12} strokeWidth={3} aria-hidden className="ml-auto shrink-0 text-emerald-500" />
+        {/* The spaces make the name «Art. 2043 Risarcimento per fatto illecito»; the dot is for the eye. */}
+        {tail && (
+          <>
+            {' '}
+            <span aria-hidden className="shrink-0 text-slate-400 dark:text-slate-500">·</span>
+            {' '}
+            <span className={cn('min-w-0 flex-1 truncate', rubrica ? 'text-slate-600 dark:text-slate-400' : 'italic text-slate-500 dark:text-slate-400')}>
+              {tail}
+            </span>
+          </>
+        )}
+        {loaded && !active && (
+          <>
+            <Check size={13} aria-hidden className="ml-auto shrink-0 self-center text-slate-400" />
+            <span className="sr-only">, sul tavolo</span>
+          </>
         )}
       </button>
     );
   };
 
+  const fieldHeight = drawer ? 'min-h-[44px] text-base' : 'h-8 text-sm';
+  const FIELD = cn(
+    'w-full rounded-md border border-slate-300 bg-transparent px-2 text-slate-800 dark:border-slate-600 dark:text-slate-100',
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+    fieldHeight,
+  );
+  const matched = isFiltering ? countArticles(shown) : 0;
+
   const panelBody = (
     <>
-            {/* Header with Glass-like effect — doubles as the window drag handle */}
-            <div
-              onPointerDown={startWindowDrag}
-              // `touch-none` is load-bearing, not cosmetic: with
-              // `dragListener={false}` framer-motion drives the gesture from
-              // this handle's pointer events, and a handle left at the default
-              // `touch-action: auto` lets the browser claim the gesture for
-              // panning — the window then never moves.
-              className={cn(
-                "sticky top-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-5 z-10",
-                isWindow && "cursor-grab active:cursor-grabbing select-none touch-none",
-              )}
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 py-1.5 pl-4 pr-1.5 dark:border-slate-800">
+        <h2 className="min-w-0 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">{title}</h2>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Chiudi la struttura"
+          title="Chiudi la struttura"
+          className={cn(
+            'inline-flex shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
+            drawer ? 'h-11 w-11' : 'h-8 w-8',
+            ROW_FOCUS,
+          )}
+        >
+          <X size={18} aria-hidden />
+        </button>
+      </header>
+
+      <div className="shrink-0 space-y-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+        {showAnnexes && (
+          <>
+            <label htmlFor={selectId} className="sr-only">Parte dell'atto</label>
+            {/* The parts in the act's order, by their whole names. */}
+            <select
+              id={selectId}
+              value={effectiveAnnex ?? ''}
+              onChange={(e) => setSelectedAnnex(e.target.value === '' ? null : e.target.value)}
+              className={cn(FIELD, 'cursor-pointer dark:bg-slate-900')}
             >
-              <div id="tour-tree-header" className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3">
-                  {isWindow && (
-                    <GripHorizontal
-                      size={16}
-                      aria-hidden
-                      className="text-slate-300 dark:text-slate-600 shrink-0"
-                    />
-                  )}
-                  <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 shadow-sm border border-primary-200/50 dark:border-primary-800/50">
-                    <List size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight uppercase tracking-tight">{title}</h3>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">Indice Strutturale</p>
-                  </div>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+              {annexes!.map((annex) => (
+                <option key={annex.number ?? 'main'} value={annex.number ?? ''}>
+                  {headingLabel(annex.label)}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        <input
+          ref={filterRef}
+          type="text"
+          role="searchbox"
+          value={filterQuery}
+          onChange={(e) => setFilterQuery(e.target.value)}
+          placeholder="Filtra per numero o rubrica"
+          aria-label="Filtra gli articoli per numero o rubrica"
+          autoComplete="off"
+          spellCheck={false}
+          className={FIELD}
+        />
+        {isFiltering && (
+          <p role="status" aria-live="polite" className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+            {matched} di {countArticles(tree)}
+          </p>
+        )}
+      </div>
 
-              {/* Enhanced Stats */}
-              {stats && (
-                <div id="tour-tree-stats" className="flex items-center gap-4">
-                  <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center gap-2">
-                    <FileText size={14} className="text-slate-500" />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      {stats.total} <span className="font-medium text-slate-600 dark:text-slate-400">Articoli totali</span>
-                    </span>
-                  </div>
-                  <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg flex items-center gap-2 border border-emerald-100/50 dark:border-emerald-800/30">
-                    <Check size={14} className="text-emerald-500" />
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                      {stats.loaded} <span className="font-medium uppercase text-[11px] text-emerald-800 dark:text-emerald-300">Caricati</span>
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Annex Tabs - Show when multiple annexes exist */}
-            {showAnnexes && (
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
-                <div className="flex items-center gap-2 mb-3">
-                  <Layers size={14} className="text-primary-500" />
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                    Sezioni documento
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {annexes!.map((annex) => {
-                    const isActive = effectiveAnnex === annex.number ||
-                      (effectiveAnnex === null && annex.number === null);
-
-                    return (
-                      <motion.button
-                        key={annex.number || 'main'}
-                        onClick={() => handleAnnexTabClick(annex.number)}
-                        whileTap={{ scale: 0.98 }}
-                        // No `layout`. The annex list is static — nothing ever
-                        // enters, leaves or reorders — so a layout animation has
-                        // nothing to describe and only re-measures. It made the
-                        // whole row visibly shuffle on every re-render, and the
-                        // rubriche landing seconds after the tree added exactly
-                        // such a re-render: the section moved on its own while
-                        // the reader was looking at it, and a chip mid-animation
-                        // rendered blank. `whileTap` stays: a scale transform does
-                        // not affect layout, so siblings hold still. No hover
-                        // scale: a row of chips takes the colour change only.
-                        className={cn(
-                          "relative px-3 py-2 text-xs font-semibold rounded-xl transition-colors border overflow-hidden",
-                          isActive
-                            ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:border-toga-400 text-white border-primary-600"
-                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600 hover:text-primary-600 dark:hover:text-primary-400"
-                        )}
-                      >
-                        <span className="relative block truncate max-w-[140px]">{annex.label}</span>
-                        <span className={cn(
-                          "relative text-[11px] block mt-0.5 font-medium",
-                          isActive ? "text-primary-100 dark:text-ink-700" : "text-slate-600 dark:text-slate-400"
-                        )}>
-                          {annex.article_count} articoli
-                        </span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Scrollable Content — a dense list of rows, one article each */}
-            <div id="tour-tree-structure" className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
-              {sectionsToRender ? (
-                <>
-                  {/* Filter — sticky, bled edge to edge over the content padding */}
-                  <div className="sticky top-0 z-20 -mx-3 px-3 pt-1 pb-2 bg-white dark:bg-slate-900 border-b border-slate-200/70 dark:border-slate-800">
-                    <div className="relative">
-                      <Search
-                        size={14}
-                        aria-hidden
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                      />
-                      <input
-                        type="text"
-                        value={filterQuery}
-                        onChange={(e) => setFilterQuery(e.target.value)}
-                        placeholder="Filtra per numero o rubrica…"
-                        aria-label="Filtra gli articoli per numero o rubrica"
-                        className={cn(
-                          "w-full pl-8 pr-3 rounded-lg border text-xs",
-                          "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800",
-                          "text-slate-700 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-400",
-                          "focus:outline-none focus:ring-2 focus:ring-primary-500",
-                          variant === 'drawer' ? "min-h-[44px] py-2" : "py-1.5"
-                        )}
-                      />
-                    </div>
-                    {isFiltering && (
-                      <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 tabular-nums">
-                        {matchedArticleCount} di {totalArticleCount}
-                      </p>
-                    )}
-                  </div>
-
-                  {sectionsToRender.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                      <Search size={32} className="opacity-20 mb-3" />
-                      <p className="text-xs font-medium">Nessun articolo corrisponde al filtro</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1 pt-2 pb-10">
-                      {sectionsToRender.map((section) => {
-                        const expanded = isSectionExpanded(section);
-
-                        return (
-                          <div key={section.idx}>
-                            {/* Section header — the only element carrying
-                                role="button", so no interactive child can
-                                re-trigger the toggle. */}
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              aria-expanded={expanded}
-                              aria-label={`${expanded ? 'Comprimi' : 'Espandi'} ${cleanSectionTitle(section.title)}`}
-                              onClick={() => toggleSection(section.idx, expanded)}
-                              onKeyDown={(e) => {
-                                if (e.target !== e.currentTarget) return;
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  toggleSection(section.idx, expanded);
-                                }
-                              }}
-                              className={cn(
-                                "w-full flex items-center gap-2 px-2 rounded-md cursor-pointer select-none",
-                                "hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                                variant === 'drawer' ? "min-h-[44px] py-2" : "py-1.5"
-                              )}
-                            >
-                              <ChevronRight
-                                size={14}
-                                aria-hidden
-                                className={cn(
-                                  "shrink-0 text-slate-400 transition-transform",
-                                  expanded && "rotate-90"
-                                )}
-                              />
-                              <span className="flex-1 min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                                {cleanSectionTitle(section.title)}
-                              </span>
-                              <span className="shrink-0 text-[11px] font-semibold text-slate-600 dark:text-slate-400 tabular-nums">
-                                {section.articles.length}
-                              </span>
-                            </div>
-
-                            {expanded && (
-                              <div className="pl-3">
-                                {section.articles.map((articleNum, artIdx) =>
-                                  renderArticleRow(articleNum, section.idx, artIdx)
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-col items-center justify-center py-20 text-slate-400"
-                >
-                  <List size={48} className="opacity-20 mb-4" />
-                  <p className="text-sm font-medium">Struttura non ancora disponibile</p>
-                </motion.div>
-              )}
-            </div>
-
+      <div ref={listRef} aria-label="Indice dell'atto" role="group" className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1.5">
+        {!treeReady ? (
+          <p className="px-2 py-6 text-sm text-slate-500 dark:text-slate-400">Struttura non ancora disponibile</p>
+        ) : rows.length === 0 ? (
+          <p className="px-2 py-6 text-sm text-slate-500 dark:text-slate-400">Nessun articolo corrisponde al filtro</p>
+        ) : (
+          rows.map(renderRow)
+        )}
+      </div>
     </>
   );
 
   if (isWindow) {
-    // Rendered on the viewport, not in place: a window this
-    // component lives under is transform-driven, and a transformed ancestor
-    // becomes the containing block for `fixed` descendants — a window
-    // positioned inside it would be placed against the panel rather than the
-    // screen (CLAUDE.md gotcha #22). The portal escapes that, which is also
-    // why the viewport check below is needed: a portal escapes the
-    // `hidden md:block` wrapper too, and would otherwise surface on phones.
     if (!isDesktop) return null;
-
     return createPortal(
       <AnimatePresence>
         {isOpen && (
           <motion.aside
-            drag
-            dragListener={false}
-            dragControls={dragControls}
-            dragMomentum={false}
-            dragConstraints={{
-              left: 0,
-              top: 0,
-              right: Math.max(0, window.innerWidth - WINDOW_WIDTH),
-              bottom: Math.max(0, window.innerHeight - WINDOW_MIN_VISIBLE),
-            }}
-            onDragEnd={handleWindowDragEnd}
-            style={{ x, y, width: WINDOW_WIDTH }}
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
+            style={{ left: place.x, top: place.y, width: WINDOW_WIDTH, transformOrigin: 'top right' }}
             aria-label={`${title}, finestra`}
+            onKeyDown={onKeyDown}
             // A tool held over the table: a press in it is not a click away from the rail's overlay.
             data-floating-tool
             className={cn(
-              "fixed top-0 left-0 max-h-[76vh] rounded-2xl overflow-hidden",
-              "bg-white dark:bg-slate-900 shadow-lg flex flex-col",
-              "border border-slate-200 dark:border-slate-800",
+              'fixed flex max-h-[76vh] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900',
               Z_INDEX.structure,
             )}
           >
@@ -756,22 +472,22 @@ export function TreeViewPanel({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop with Glass effect */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[100]"
+            onClick={close}
+            className="fixed inset-0 z-[100] bg-ink-950/40"
           />
-
-          {/* Sidebar Side Panel */}
+          {/* Full height on a phone, from the right edge. */}
           <motion.aside
-            initial={{ x: '100%', opacity: 0.9 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0.9 }}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
             transition={spring.snappy}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-slate-900 shadow-lg z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800"
+            aria-label={title}
+            onKeyDown={onKeyDown}
+            className="fixed inset-y-0 right-0 z-[100] flex w-full flex-col border-l border-slate-200 bg-white sm:w-[450px] dark:border-slate-800 dark:bg-slate-900"
           >
             {panelBody}
           </motion.aside>
