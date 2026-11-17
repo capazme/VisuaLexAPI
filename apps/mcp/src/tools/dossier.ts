@@ -241,7 +241,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
   server.registerTool(
     'omnilex_leggi_dossier',
     {
-      title: 'Leggi una pratica',
+      title: 'Leggi le voci di una pratica',
       description:
         'Il tipo della pratica («lavoro» o «studio») e le sue voci (id, tipo, titolo, riferimento della norma o della sentenza), senza il testo degli articoli. ' +
         `Con il permesso «Leggere i testi», anche il testo delle note (${NOTE_EXCERPT} caratteri; intera con nota_intera). La pratica si indica per id o per nome esatto.`,
