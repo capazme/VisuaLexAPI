@@ -30,7 +30,7 @@ vi.mock('../search/ArticleTabContent', async () => {
 vi.mock('../search/TreeViewPanel', () => ({
   TreeViewPanel: (props: Record<string, unknown>) => {
     h.trees.push(props);
-    return null;
+    return <div data-testid="structure" id={props.id as string} />;
   },
 }));
 vi.mock('../workspace/ArticleNavigation', () => ({
@@ -316,6 +316,11 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     fireEvent.click(structure);
     expect(s().structureWindow.blockId).toBe(actId);
     expect(screen.getByRole('button', { name: 'Struttura della norma' })).toHaveAttribute('aria-expanded', 'true');
+    // In the card (LC77): right under its heading, before its text, and named by the command.
+    const space = screen.getByTestId('structure');
+    expect(space.previousElementSibling?.tagName).toBe('HEADER');
+    expect(space.closest('section')).toHaveAttribute('data-act-id', actId);
+    expect(screen.getByRole('button', { name: 'Struttura della norma' })).toHaveAttribute('aria-controls', space.id);
     await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ isOpen: true })));
   });
 

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { cn } from '../../lib/utils';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
 import { prefersReducedMotion } from '../../features/sections/sectionTransition';
@@ -37,6 +37,8 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const running = useRef<Animation[]>([]);
+  // The height's own animation among them, for the content's later growth to take over.
+  const heightAnim = useRef<Animation | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const first = useRef(true);
 
@@ -70,10 +72,12 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     const fill: FillMode = open ? 'none' : 'forwards';
     const fade = inner.animate([{ opacity: fromOpacity }, { opacity: open ? 1 : 0 }], { ...timing, fill });
     const anims = [fade];
+    heightAnim.current = null;
     if (!prefersReducedMotion()) {
       // Opening ends on its natural height (none held in pixels): the content may still grow, a tree arriving late.
       const toHeight = open ? outer.offsetHeight : 0;
-      anims.push(outer.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], { ...timing, fill }));
+      heightAnim.current = outer.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], { ...timing, fill });
+      anims.push(heightAnim.current);
     }
     running.current = anims;
     const last = anims[anims.length - 1];
@@ -84,6 +88,35 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     };
     // `initialFocusRef` is a ref: reading it at the change is enough.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Open, the content may still change height (a tree arriving after the first measure, a filter): the space follows
+  // it on the opening's timing, from where it is, instead of jumping.
+  useEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!open || !outer || !inner || typeof ResizeObserver === 'undefined' || !canAnimate()) return undefined;
+    let last = inner.offsetHeight;
+    const observer = new ResizeObserver(() => {
+      const next = inner.offsetHeight;
+      if (Math.abs(next - last) < 1 || prefersReducedMotion()) {
+        last = next;
+        return;
+      }
+      const from = outer.getBoundingClientRect().height;
+      last = next;
+      const replaced = heightAnim.current;
+      replaced?.cancel();
+      const grow = outer.animate([{ height: `${from}px` }, { height: `${next}px` }], ISLAND_OPEN);
+      heightAnim.current = grow;
+      const anims = [...running.current.filter((a) => a !== replaced), grow];
+      running.current = anims;
+      grow.onfinish = () => {
+        if (running.current === anims) running.current = [];
+      };
+    });
+    observer.observe(inner);
+    return () => observer.disconnect();
   }, [open]);
 
   if (!mounted) return null;

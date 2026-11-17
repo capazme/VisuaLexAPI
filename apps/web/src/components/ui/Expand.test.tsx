@@ -117,6 +117,26 @@ describe('Expand', () => {
     expect(screen.getByRole('button', { name: 'Apri' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('open, follows its content growing (a tree arriving late) from where it is instead of jumping', () => {
+    let notify: () => void = () => {};
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class { constructor(cb: () => void) { notify = cb; } observe() {} disconnect() {} } as unknown as typeof ResizeObserver;
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 60 } as DOMRect);
+    try {
+      render(<Harness />);
+      fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
+      const opening = heights()[0];
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 400 });
+      act(() => notify());
+      expect(opening.anim.cancel).toHaveBeenCalled();
+      expect(heights()[1].frames).toEqual([{ height: '60px' }, { height: '400px' }]);
+      expect(heights()[1].timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+    } finally {
+      rect.mockRestore();
+      globalThis.ResizeObserver = original;
+    }
+  });
+
   it('without Web Animations opens and closes at once', () => {
     delete (Element.prototype as Partial<Element>).animate;
     render(<Harness />);
