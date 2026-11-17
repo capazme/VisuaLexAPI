@@ -165,9 +165,12 @@ describe('POST /api/lingo/lezioni/:id/risposte', () => {
     expect(rows[0]).toMatchObject({ missione: 'LEZIONE', periodo: `L:${id}`, punti: 10, fonte: 'LEZIONE', fonteId: id, materia: 'DIRITTO_CIVILE' });
     const row = await prisma.lingoLezione.findUniqueOrThrow({ where: { id } });
     expect(row.finitaIl).not.toBeNull();
-    // An answer after the end changes nothing and credits nothing.
+    // An answer after the end changes nothing and credits nothing; it says the end again, with what was credited.
     const after = await answer(a, id, 0, (await keys(id))[0].giusta);
     expect(after.body.registrata).toBe(false);
+    expect(after.body.fine).toMatchObject({ giuste: esercizi.length, totale: esercizi.length });
+    expect(after.body.fine.xp.crediti).toEqual([{ missione: 'lezione', punti: 10 }]);
+    expect(after.body.fine.xp.nuovoLivello).toBe(false);
     expect(await credits(alice)).toHaveLength(1);
   });
 

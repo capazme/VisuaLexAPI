@@ -138,6 +138,22 @@ describe('LessonSession', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Giusto!');
   });
 
+  it('shows the end when the last answer is sent again after its response was lost', async () => {
+    create.mockResolvedValue({ ...LESSON, esercizi: LESSON.esercizi.slice(0, 1) });
+    answer
+      .mockRejectedValueOnce(new Error('lost'))
+      .mockResolvedValueOnce({ registrata: false, indice: 0, giusta: true, soluzione: 0, fine: { giuste: 1, totale: 1, xp: xp(10) } });
+    const user = userEvent.setup();
+    renderLesson();
+    await user.click(await screen.findByRole('button', { name: 'Il ritardo' }));
+    await user.click(await screen.findByRole('button', { name: 'Riprova' }));
+    const next = await screen.findByRole('button', { name: 'Continua' });
+    // The correction is the button's description: a screen reader hears it with the focus.
+    expect(next).toHaveAccessibleDescription('Giusto!');
+    await user.click(next);
+    expect(await screen.findByRole('region', { name: 'Lezione finita' })).toHaveTextContent('+10 XP');
+  });
+
   it('reads no subject it does not know', async () => {
     renderLesson('DIRITTO_ROMANO');
     expect(await screen.findByText('Materia non riconosciuta.')).toBeInTheDocument();

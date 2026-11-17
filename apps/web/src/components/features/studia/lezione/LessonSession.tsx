@@ -255,7 +255,8 @@ export function LessonSession() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') navigate(HOME);
+      // Esc in the match's select closes its list, not the lesson.
+      if (event.key === 'Escape' && !(event.target instanceof HTMLSelectElement)) navigate(HOME);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -337,10 +338,10 @@ export function LessonSession() {
         )}
         {graded && (
           <div className={cn('grid gap-3 rounded-2xl px-4 py-4', graded.giusta ? 'bg-green-50 dark:bg-green-950/40' : 'bg-red-50 dark:bg-red-950/40')}>
-            <p role="status" className={cn('text-base font-semibold', graded.giusta ? SUCCESS_TEXT : 'text-red-700 dark:text-red-400')}>
+            <p id="lezione-correzione" role="status" className={cn('text-base font-semibold', graded.giusta ? SUCCESS_TEXT : 'text-red-700 dark:text-red-400')}>
               {graded.giusta ? 'Giusto!' : `Non è così. La risposta giusta: ${sentence(solutionWords(exercise, graded.soluzione))}`}
             </p>
-            <button ref={continueRef} type="button" onClick={next} className={cn(INK_BUTTON, 'w-full sm:w-auto sm:justify-self-end')}>
+            <button ref={continueRef} type="button" onClick={next} aria-describedby="lezione-correzione" className={cn(INK_BUTTON, 'w-full sm:w-auto sm:justify-self-end')}>
               Continua
             </button>
           </div>

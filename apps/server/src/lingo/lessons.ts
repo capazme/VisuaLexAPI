@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { settleMissions, type XpEsito } from './missions';
 import { courseDayFor, reviewScope } from './reviewQueue';
 import { dayToDate } from './studyDays';
+import { levelNow } from './xpLedger';
 import { readPreferences } from './studyPreferences';
 import { romeDay } from './studyDay';
 
@@ -226,7 +227,14 @@ export async function answerLesson(userId: string, lessonId: string, indice: num
     const exercise = esercizi[indice];
     if (!shapeFits(exercise, risposta)) throw new AppError(400, 'La risposta non è nella forma di questo esercizio.');
     const stored = esiti.find((e) => e.indice === indice);
-    if (stored) return { registrata: false, indice, giusta: stored.giusta, soluzione: exercise.giusta };
+    if (stored) {
+      // A lesson already ended says its end again (a last answer whose response was lost, sent once more), with what
+      // the ledger holds for it — never a credit assumed.
+      if (!lesson.finitaIl) return { registrata: false, indice, giusta: stored.giusta, soluzione: exercise.giusta };
+      const credit = await tx.lingoCreditoXp.findFirst({ where: { missione: 'LEZIONE', fonteId: lessonId }, select: { punti: true } });
+      const xp: XpEsito = { crediti: credit ? [{ missione: 'lezione', punti: credit.punti }] : [], livello: await levelNow(tx, userId, today), nuovoLivello: false };
+      return { registrata: false, indice, giusta: stored.giusta, soluzione: exercise.giusta, fine: { giuste: esiti.filter((e) => e.giusta).length, totale: esercizi.length, xp } };
+    }
 
     const giusta = isRight(exercise, risposta);
     const next = [...esiti, { indice, giusta }];
