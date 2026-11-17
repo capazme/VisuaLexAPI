@@ -78,7 +78,7 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
           ref={buttonRef}
           type="button"
           id="tour-search-field"
-          aria-label={value ? `Cerca una norma, una sentenza o un tema: ${value}` : 'Cerca una norma, una sentenza o un tema'}
+          aria-label={value ? `Apri il menu di ricerca: ${value}` : 'Apri il menu di ricerca'}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           onClick={(event) => {

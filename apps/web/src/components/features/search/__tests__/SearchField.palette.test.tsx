@@ -38,7 +38,7 @@ describe('SearchField and the menu together (R2: one field)', () => {
         <Palette />
       </MemoryRouter>,
     );
-    const field = screen.getByRole('button', { name: /^Cerca una norma, una sentenza o un tema/ });
+    const field = screen.getByRole('button', { name: /^Apri il menu di ricerca/ });
     act(() => field.focus());
     fireEvent.keyDown(field, { key: 'a' });
     const box = await screen.findByPlaceholderText(/^Norma, sentenza o tema/);
