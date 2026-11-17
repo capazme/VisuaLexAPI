@@ -16,7 +16,7 @@ import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
-import { ISLAND_SURFACE, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
+import { ISLAND_FIELD_FOCUS, ISLAND_LENS, ISLAND_PLACEHOLDER, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TEXT, ISLAND_WORDS, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
@@ -65,8 +65,9 @@ const ROW = 'relative isolate flex min-h-[44px] w-full cursor-pointer items-cent
 const ROW_ICON = 'shrink-0 text-ink-500 dark:text-ink-400';
 const SUBTLE = 'text-ink-600 dark:text-ink-400';
 // A group's heading, drawn by cmdk (`heading`), which also names the group for a screen reader.
-const GROUP_WITH_HEADING = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-600 dark:[&_[cmdk-group-heading]]:text-ink-400';
-const COLUMN_TITLE = 'px-3 pt-3 font-serif text-base font-medium text-ink-900 dark:text-ink-50';
+const GROUP_WITH_HEADING = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:text-ink-600 dark:[&_[cmdk-group-heading]]:text-ink-400';
+// Pietra's type (LC81): a serif title at 18 px and weight 400, as its headings; a group's name 12 px, weight 600.
+const COLUMN_TITLE = 'px-3 pt-3 font-serif text-lg font-normal text-ink-900 dark:text-ink-50';
 const QUIET_LINE = 'px-3 py-2 text-sm text-ink-600 dark:text-ink-400';
 const FIELD_INPUT = cn(
   'h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-ink-900 placeholder:text-ink-500',
@@ -430,6 +431,23 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // the ref is empty once the palette has closed or moved on to another step.
   const boxRef = useRef<HTMLInputElement>(null);
   const numberRef = useRef<HTMLInputElement>(null);
+  // LC81: how the focus came, for the field's frame (`ISLAND_FIELD_FOCUS`), the pill's rule: 1 px from a pointer, 2 px
+  // from the keyboard. Tab, a shortcut (⌘K), an arrow, or Enter or Space on a control count as the keyboard; the words
+  // typed in the field, an on-screen keyboard's included, do not.
+  const [keyboard, setKeyboard] = useState(false);
+  useEffect(() => {
+    const onPointer = () => setKeyboard(false);
+    const onKey = (event: KeyboardEvent) => {
+      const onControl = !(event.target instanceof HTMLInputElement) && (event.key === 'Enter' || event.key === ' ');
+      if (event.key === 'Tab' || event.metaKey || event.ctrlKey || event.key.startsWith('Arrow') || onControl) setKeyboard(true);
+    };
+    document.addEventListener('pointerdown', onPointer, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, []);
   const { tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (tour) => {
@@ -964,14 +982,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     <div className="flex items-center gap-2 px-3 pt-2" onKeyDown={keepKeys}>
       <motion.div key={step} {...stepMotion} className="flex min-w-0 flex-1 items-center gap-3">
         {step === 'select_act' && (
-          // The field's border carries the focus ring (`focus-within`); the box inside draws none, or the
-          // global `input:focus-visible` ring would stand out around it, over the icon.
-          <div className={cn(
-            'flex h-12 min-w-0 flex-1 items-center gap-3 rounded-lg border border-ink-200 bg-white px-3',
-            'focus-within:border-toga-500 focus-within:ring-2 focus-within:ring-toga-500/30',
-            'dark:border-ink-700 dark:bg-ink-950 dark:focus-within:border-toga-400',
-          )}>
-            <Search size={20} aria-hidden className="shrink-0 text-ink-500 dark:text-ink-400" />
+          // LC81: the pill it grew from, the same object: its shape, type, lens, ground and edge, and its focus on the
+          // frame (`ISLAND_FIELD_FOCUS`). The box inside draws none, or the global `input:focus-visible` ring would
+          // stand out around it.
+          <div data-island-field="" data-keyboard={keyboard ? '' : undefined} className={cn('flex-1', ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_FIELD_FOCUS)}>
+            <Search aria-hidden className={ISLAND_LENS} />
             <Command.Input
               ref={boxRef}
               autoFocus
@@ -984,11 +999,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               }}
               enterKeyHint="search"
               aria-describedby="command-palette-help"
-              // On a phone the example would be cut at «art 20» (consultant 16-11): the words alone.
-              placeholder={isDesktop ? 'Atto o citazione, es. art 2043 cc' : 'Atto o citazione'}
-              // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
-              // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
-              className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-500 dark:placeholder:text-ink-400"
+              // LC81: the pill's words, so nothing changes as it grows; the examples are on the line under the field.
+              placeholder={ISLAND_PLACEHOLDER}
+              // The pill's type (16 px at least on a phone: Safari on an iPhone zooms into a field under 16 px).
+              className={cn('h-full w-full min-w-0 bg-transparent outline-none placeholder:text-slate-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:placeholder:text-slate-400', ISLAND_TEXT, ISLAND_WORDS)}
               onKeyDown={(e) => {
                 // The field's order (R2): a decision, then the server still naming the act (the search runs when it
                 // answers), then a norm — unless the arrows chose another row, which Enter then picks.
@@ -1075,7 +1089,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         type="button"
         onClick={onClose}
         aria-label="Chiudi"
-        className={cn('inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100', FOCUS_RING)}
+        // LC81: as tall as the field (40 px, 32 from lg), 44 px to the finger.
+        className={cn("relative inline-flex size-10 shrink-0 items-center justify-center rounded-full text-ink-500 after:absolute after:-inset-0.5 after:content-[''] hover:bg-ink-100 hover:text-ink-800 lg:size-8 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100", FOCUS_RING)}
       >
         <X size={18} aria-hidden />
       </button>
@@ -1083,15 +1098,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   );
 
   // The help line, or what the box was read as, 10 px under the field and on the line of its text: the
-  // field's edge (12 px of row, 1 of border, 12 of padding), then on the first step the icon's 20 px and
-  // the gap's 12. The visible line is aria-hidden: the status region says it.
+  // lens's edge (12 px of row, 1 of border, 12 in), then on the first step the lens's 16 px and a gap of 8, to the
+  // words' 36 px in (`ISLAND_SHAPE`). The visible line is aria-hidden: the status region says it.
   // The line under the box says what no row says: the wait for the server. A decision, a norm or a topic read in the
   // box is its row, the chosen one, with «↵» — a second line saying the same was one too many (Bill).
   const lineSays = step === 'select_act' && preview && (waiting || resolvingRemotely) ? preview : null;
   const fieldLine = (
-    <div aria-hidden className="flex min-h-5 items-center gap-3 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
+    <div aria-hidden className="flex min-h-5 items-center gap-2 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
       {step === 'select_act' && (
-        <span className="flex w-5 shrink-0 justify-center">
+        <span className="flex w-4 shrink-0 justify-center">
           {lineSays && <lineSays.icon size={14} className={lineSays.tone} />}
         </span>
       )}

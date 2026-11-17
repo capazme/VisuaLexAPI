@@ -4,7 +4,7 @@ import { ChevronRight, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { FOCUS_RING } from '../../constants/interactions';
 import { pageName } from '../../features/sections/pageNames';
-import { PALETTE_SHORTCUT, SEARCH_ISLAND_ID, ISLAND_FOCUS, ISLAND_SURFACE } from '../../utils/searchFieldControl';
+import { PALETTE_SHORTCUT, SEARCH_ISLAND_ID, ISLAND_FOCUS, ISLAND_HINT, ISLAND_LENS, ISLAND_PLACEHOLDER, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TEXT } from '../../utils/searchFieldControl';
 import type { Section } from '../../features/sections/sections';
 
 /**
@@ -89,13 +89,13 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         }}
         aria-keyshortcuts="Meta+K Control+K"
         className={cn(
-          'flex h-8 w-[22rem] items-center gap-2 rounded-full pl-3 pr-2 text-[13px] text-slate-600 transition-colors', ISLAND_SURFACE,
-          'dark:text-slate-400',
+          // LC81: the panel's field's shape, type and lens.
+          'w-[22rem] transition-colors', ISLAND_SHAPE, ISLAND_TEXT, ISLAND_HINT, ISLAND_SURFACE,
           ISLAND_FOCUS,
         )}
       >
-        <Search aria-hidden size={15} strokeWidth={1.75} className="shrink-0" />
-        <span>Norma, sentenza o tema</span>
+        <Search aria-hidden className={ISLAND_LENS} />
+        <span>{ISLAND_PLACEHOLDER}</span>
         <kbd aria-hidden className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 font-mono text-[11px] text-slate-500 dark:border-slate-700">{PALETTE_SHORTCUT}</kbd>
       </button>}
       </div>
