@@ -1,12 +1,13 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
-import { MoreHorizontal, X } from 'lucide-react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { MoreHorizontal, Pencil, X } from 'lucide-react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
+import { cn } from '../../../lib/utils';
 import { isBoundPractice, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { MenuButton } from '../../ui/MenuButton';
 import { PracticeColumn } from './PracticeColumn';
 import { ReadingFullScreen } from './ReadingFullScreen';
-import { PracticeEmpty, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
+import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, TableNameLine, type PracticeStreaming } from './PracticeParts';
 import { scrollParentOf } from './practiceView';
 import { CLOSE_TABLE, closePracticeWithUndo, tableItemsForAct } from './practiceUndo';
 import { usePracticeSaveActions, type PracticeSaveActions } from './usePracticeSaveActions';
@@ -38,8 +39,8 @@ const USER_SCROLL = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
 
 
 /**
- * The phone's table (spec §8, R3): with more than one act, one line with its count and «⋯» (LC68: with one, the act's
- * heading is the head) (LC60: no list of practices and no «Salva
+ * The phone's table (spec §8, R3): with more than one act, one line that names the table, with «⋯» (LC68: with one, the
+ * act's head is the only one, the table's name small over its title) (LC60: no list of practices and no «Salva
  * come dossier»: the Ricerca is one reading bench of the session), over the active practice's column, rows opening in place. «Apri accanto», a decision opened from a
  * link and a topic search read in the full-screen reader instead (`phoneReader`, T19), which takes
  * the column's place — the column is not kept mounted under it (gotcha 26) — and gives it back at the
@@ -61,10 +62,20 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
   // LC68: one act names the table by its own heading; the table's head is not drawn and its «⋯» rides the act's.
   const oneAct = practice !== undefined && !bound && isOneActPractice(practice);
   const simple = practice !== undefined && isSimplePractice(practice);
+  const renamePractice = useAppStore((s) => s.renamePractice);
+  const [editing, setEditing] = useState(false);
+  const rename = useMemo(() => ({
+    start: () => setEditing(true),
+    done: (name: string | null) => {
+      setEditing(false);
+      if (name !== null && practice) renamePractice(practice.id, name);
+    },
+  }), [practice, renamePractice]);
   const reading = useMemo(() => ({
     simple,
-    practiceItems: oneAct && practice ? tableItemsForAct(save.items, practice.id) : [],
-  }), [simple, oneAct, practice, save.items]);
+    practiceItems: oneAct && practice ? tableItemsForAct(save.items, practice.id, rename.start) : [],
+    tableName: oneAct && practice ? <TableNameLine label={practice.label} editing={editing} onDone={rename.done} /> : undefined,
+  }), [simple, oneAct, practice, save.items, editing, rename]);
 
   // The column's scroll position (the page's content scroller) is kept, with its practice, while the
   // column is drawn and given back when the reader closes on the same practice — unless a row is
@@ -133,8 +144,9 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
     <>
       {readerOpen ? <ReadingFullScreen onCrossReference={onCrossReference} practiceId={shownId ?? undefined} /> : (
         <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
-          {/* With more than one act, one line under the search page's field: the table's count and «⋯» (LC68: no name). */}
-          {practice && !bound && !oneAct && <PhonePracticeHead practice={practice} save={save} />}
+          {/* With more than one act, one line under the search page's field: the table's name, its count, «⋯» (R3). With one,
+              the act's head is the only one (LC68): the name sits small over its title. */}
+          {practice && !bound && !oneAct && <PhonePracticeHead practice={practice} save={save} editing={editing} rename={rename} />}
           {practice && (
             // At the layout's 16 px from the edges (R3b): no step of its own.
             <div className="space-y-4 pb-4 pt-2">
@@ -156,19 +168,36 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
   );
 }
 
-/** The phone's head of the table (R3), one row with more than one act: its count and its «⋯» (spec §7, carry-over 15).
- *  No name (LC68): the Ricerca's table is not a pratica, and its label was the first act's abbreviation. */
-function PhonePracticeHead({ practice, save }: { practice: Practice; save: PracticeSaveActions }) {
+/** The phone's head of the table (R3) with more than one act, one row: its name, the count after it, and its «⋯» (spec
+ *  §7, carry-over 15). The toast is portalled to the document in the toast band. */
+function PhonePracticeHead({ practice, save, editing, rename }: {
+  practice: Practice;
+  save: PracticeSaveActions;
+  editing: boolean;
+  rename: { start: () => void; done: (name: string | null) => void };
+}) {
   const countLine = practiceCountLine(practiceCounts(practice));
   return (
+    // One row (R3: the text first): the name, the count after it, then «⋯».
     <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
-      <p title={countLine || undefined} className="min-w-0 flex-1 truncate text-sm text-slate-600 dark:text-slate-400">{countLine}</p>
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {editing ? (
+          <PracticeNameInput initial={practice.label} onDone={rename.done} className="min-h-[44px] w-full font-serif text-xl" />
+        ) : (
+          <h2 className={cn('flex min-h-[44px] min-w-0 items-center font-serif text-xl font-medium text-slate-900 dark:text-white', countLine && 'max-w-[70%] shrink-0')}>
+            <span className="truncate">{practice.label}</span>
+          </h2>
+        )}
+        {/* It gives way before the name does. */}
+        {countLine && !editing && <p title={countLine} className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">{countLine}</p>}
+      </div>
       <MenuButton
         // Its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
         className="-mr-3"
-        label="Altre azioni per il tavolo"
+        label={`Altre azioni per ${practice.label}`}
         triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
         items={[
+          { label: 'Rinomina', icon: Pencil, onSelect: rename.start },
           ...save.items,
           { label: CLOSE_TABLE, icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
         ]}

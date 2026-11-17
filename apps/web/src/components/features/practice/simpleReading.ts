@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { MenuItem } from '../../ui/MenuButton';
 import type { Practice } from '../../../utils/practice';
 
@@ -23,6 +23,8 @@ export interface SimpleReading {
   simple: boolean;
   /** The practice's own menu, appended to the act's «⋯» while the practice heading is not drawn. */
   practiceItems: MenuItem[];
+  /** The table's name, drawn small over the act's title while the table's own head is not drawn (LC68). */
+  tableName?: ReactNode;
 }
 
 export const SimpleReadingContext = createContext<SimpleReading>({ simple: false, practiceItems: [] });

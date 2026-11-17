@@ -300,6 +300,18 @@ export function practiceCountLine(counts: PracticeCounts): string {
   ].filter(Boolean).join(' · ');
 }
 
+/**
+ * The name a new Ricerca table takes (LC68, Luca 17-11: «ricerca del» and today's date, not the act searched): «Ricerca
+ * del 17 novembre», «Ricerca dell'8 novembre», «Ricerca del 1º novembre»; the year only when it is not this one.
+ */
+export function searchTableLabel(date: Date, today: Date = new Date()): string {
+  const day = date.getDate();
+  const month = date.toLocaleDateString('it-IT', { month: 'long' });
+  const year = date.getFullYear() === today.getFullYear() ? '' : ` ${date.getFullYear()}`;
+  const of = day === 8 || day === 11 ? "dell'" : 'del ';
+  return `Ricerca ${of}${day === 1 ? '1º' : day} ${month}${year}`;
+}
+
 // --- Saved state is untrusted input (spec §10): checked before use, never thrown on. ---
 
 /** A practice's name as stored and shown: trimmed, at most this long (spec §10). */

@@ -14,7 +14,7 @@ import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
 import { SimpleReadingContext, isOneActPractice, isSimplePractice } from './simpleReading';
 import { useHostedPractice } from './readingHost';
-import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
+import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, TableNameLine, type PracticeStreaming } from './PracticeParts';
 
 export interface PracticeTableProps {
   onViewPdf: (urn: string) => void;
@@ -88,18 +88,29 @@ function PracticeHeader({ practice, compact, simple, headless, children }: { pra
   const countLine = practiceCountLine(practiceCounts(practice));
   const save = usePracticeSaveActions(practice.id);
   const bound = isBoundPractice(practice);
-  // Lettura semplice (LC28): the practice's actions ride the act's «⋯»; its name stays for a screen reader.
+  // One act (LC28, LC68): one head, the act's; the table's name small over its title, its actions in the act's «⋯».
+  const one = headless && !bound;
   const reading = useMemo(() => ({
     simple,
-    practiceItems: headless && !bound ? tableItemsForAct(save.items, practice.id) : [],
-  }), [simple, headless, bound, save.items, practice.id]);
+    practiceItems: one ? tableItemsForAct(save.items, practice.id, () => setEditing(true)) : [],
+    tableName: one ? (
+      <TableNameLine
+        id="tour-practice-header"
+        label={practice.label}
+        editing={editing}
+        onDone={(name) => {
+          setEditing(false);
+          if (name !== null) renamePractice(practice.id, name);
+        }}
+      />
+    ) : undefined,
+  }), [simple, one, save.items, practice.id, practice.label, editing, renamePractice]);
 
   if (bound) return <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>;
 
   if (headless) {
     return (
       <>
-        <h2 id="tour-practice-header" className="sr-only">{practice.label}</h2>
         {save.overlay}
         <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>
       </>

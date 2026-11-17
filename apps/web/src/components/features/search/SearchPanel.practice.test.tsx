@@ -73,7 +73,7 @@ import { actKeyOf } from '../dossier/dossierLayout';
 import { searchesIntoOnePractice } from '../dossier/openInPractice';
 import { computeNormaGroups } from '../dossier/dossierUtils';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
-import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
+import { besideRefFor, practiceArticleKey, searchTableLabel } from '../../../utils/practice';
 import type { Dossier } from '../../../types';
 import { notificationStore, resetNotifications } from '../../ui/notifications/notifications';
 
@@ -169,12 +169,12 @@ describe.each([
 });
 
 describe('SearchPanel with the practices: where a search lands (spec §5.1)', () => {
-  it('a search with no practice creates one named after the act (`shortAct`)', async () => {
+  it('a search with no practice creates one named «Ricerca del …» today (LC68)', async () => {
     env.lines = [ccArticle('2043')];
     panel();
     act(() => { s().triggerSearch(params('2043')); });
     await waitFor(() => expect(s().practices).toHaveLength(1));
-    expect(s().practices[0].label).toBe('c.c.');
+    expect(s().practices[0].label).toBe(searchTableLabel(new Date()));
     expect(s().activePracticeId).toBe(s().practices[0].id);
   });
 

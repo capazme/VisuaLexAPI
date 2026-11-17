@@ -85,7 +85,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     .filter((key) => key.startsWith(prefix))
     .map((key) => key.slice(prefix.length))));
   const isDesktop = useIsDesktop();
-  const { simple, practiceItems } = useSimpleReading();
+  const { simple, practiceItems, tableName } = useSimpleReading();
   const isIndex = layout === 'index';
   const isPanel = layout === 'overview';
   // Studio, Struttura and PDF as buttons beside the title: the overview's panel; on a phone and in the index they are
@@ -246,6 +246,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         </button>
         {/* In the overview the title gives way and the tools follow it, not the row's far end (U2). */}
         <div className={cn('min-w-0 flex-1 py-1', isPanel && 'md:flex-initial')}>
+          {/* One act (LC68): the table's name, small, over the act's title; the act's head is the only one. */}
+          {!isIndex && tableName}
           {/* The accordion pattern: the heading holds the toggle, its name is the act's own words. */}
           <h3 className="min-w-0">
             <div

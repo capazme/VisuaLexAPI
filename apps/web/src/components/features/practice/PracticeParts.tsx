@@ -121,3 +121,15 @@ export function PracticeNameInput({ initial, onDone, className }: {
     />
   );
 }
+
+/** The table's name over its one act's title (LC68): small, secondary, the field in its place while it is renamed. */
+export function TableNameLine({ label, editing, onDone, id }: {
+  label: string;
+  editing: boolean;
+  onDone: (name: string | null) => void;
+  id?: string;
+}) {
+  return editing
+    ? <PracticeNameInput initial={label} onDone={onDone} className="mb-0.5 w-full py-0.5 text-xs" />
+    : <h2 id={id} className="truncate text-xs text-slate-600 dark:text-slate-400">{label}</h2>;
+}

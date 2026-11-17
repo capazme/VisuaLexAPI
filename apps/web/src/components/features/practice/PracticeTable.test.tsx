@@ -27,6 +27,7 @@ import { PracticeNotice } from './PracticeParts';
 import { subscribeSearchField } from '../../../utils/searchFieldControl';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FOUND, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
+import { searchTableLabel } from '../../../utils/practice';
 
 const s = () => appStore.getState();
 const table = (streaming: Parameters<typeof PracticeTable>[0]['streaming'] = null, layout: 'overview' | 'index' = 'overview') =>
@@ -50,10 +51,22 @@ describe('PracticeTable (spec §3.1)', () => {
     const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().openDecision(FOUND, { practiceId, open: false });
     render(table());
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('l. 24/2017');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
     expect(screen.getByText('1 atto · 2 articoli · 1 sentenza')).toBeInTheDocument();
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
+  });
+
+  it('one act: one head, the act\'s, the table\'s name small over its title, one «⋯» with both menus (LC68)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    render(table());
+    const head = screen.getByRole('region', { name: 'l. 8 marzo 2017, n. 24' }).querySelector('header')!;
+    expect(within(head).getAllByRole('button', { name: /^(Azioni su|Altre azioni per) / })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Altre azioni per / })).toBeNull();
+    expect(within(head).getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
+    fireEvent.click(within(head).getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
+    expect(screen.getByRole('menuitem', { name: 'Rinomina' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Chiudi il tavolo' })).toBeInTheDocument();
   });
 
   it('switching the active practice switches the table', () => {
@@ -62,7 +75,7 @@ describe('PracticeTable (spec §3.1)', () => {
     render(table());
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Altra');
     act(() => { s().setActivePractice(s().practices[0].id); });
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('l. 24/2017');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
     void other;
   });
 
