@@ -21,7 +21,7 @@ describe('VersionStatusChip', () => {
     it('is words in `text-sm`, not a pill, and keeps its 44px touch target (R3)', () => {
         render(<VersionStatusChip chip={chip()} onClick={() => {}} />);
         const button = screen.getByRole('button');
-        expect(button).toHaveClass('text-sm', 'min-h-[44px]', 'md:min-h-0');
+        expect(button).toHaveClass('text-sm', 'min-h-[44px]', 'md:min-h-0', 'vlx-hover-tile');
         expect(button.className).not.toMatch(/\bbg-|\bpx-|rounded-full/);
     });
 
