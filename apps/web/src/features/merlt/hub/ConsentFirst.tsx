@@ -27,7 +27,7 @@ export function ConsentFirst({ onChoose }: { onChoose: () => void }) {
         Attiva MERL-T
       </h2>
       <p className="mt-2 max-w-prose text-sm text-slate-800 dark:text-slate-200">
-        MERL-T è l’intelligenza giuridica di VisuaLex: risponde alle tue domande sul grafo delle norme e impara dai
+        MERL-T è l’intelligenza giuridica di LexCraft: risponde alle tue domande sul grafo delle norme e impara dai
         giudizi di chi lo usa. Il grafo lo puoi leggere sempre; per chiedere e per insegnare serve il tuo consenso.
       </p>
       {/* What each level collects in the consent screen's own words (`levels.ts`), never a shorter list; said as what
