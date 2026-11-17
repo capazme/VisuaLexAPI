@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { atLeastUnits } from '../utils/utf16Length';
-import { hashPassword } from '../utils/password';
+import { hashPassword, passwordSchema } from '../utils/password';
 import { AppError } from '../middleware/errorHandler';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
 import { logModeration } from '../forum/moderationLog';
@@ -11,7 +10,8 @@ import { logModeration } from '../forum/moderationLog';
 const createUserSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50),
-  password: z.string().refine(...atLeastUnits(3)),
+  // The rule a person meets at sign-up: an account the administrator opens is no weaker.
+  password: passwordSchema(),
   isAdmin: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true),
 });
@@ -32,7 +32,7 @@ const updateUserSchema = z.object({
 });
 
 const resetPasswordSchema = z.object({
-  newPassword: z.string().refine(...atLeastUnits(3)),
+  newPassword: passwordSchema(),
 });
 
 /**
