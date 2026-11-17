@@ -2,8 +2,8 @@
 
 Status: approved by the owner on 14 November 2026 with the choices listed below (G-476), and his answers folded in:
 one public identity (G-477), a number of validations as Learn's cards, never a gate on what is shown (G-478), the
-real name declared with a report «non è chi dice di essere» checked by the owners (G-479); the legal reading of part D
-is the owner's (G-480). Server only (`apps/server`): no file of `apps/web`. It gives the Forum's page
+real name declared with a report «non è chi dice di essere» checked by the owners (G-479), the Forum's own validators
+per subject (G-489), off-topic kept as a reason to hide (G-490); the legal reading of part D is the owner's (G-480). Server only (`apps/server`): no file of `apps/web`. It gives the Forum's page
 (`/forum/community`) a finished API to be built against. Plan:
 `docs/superpowers/plans/2026-11-14-forum-community-server.md`.
 
@@ -166,7 +166,8 @@ the real name (the web says so first, `contributions` below). Changing one pseud
   "canWrite": true,          // may write a reply or a comment now
   "canSign": true,           // may write a glossa now
   "score": 41,
-  "contributions": { "glosse": 2, "risposte": 9 }   // visible ones, for the web's warning before a change of name
+  "contributions": { "glosse": 2, "risposte": 9 }   // not emptied, hidden ones included (replies and comments):
+                                                    // what a change of name reaches, for the web's warning
 }
 ```
 
@@ -332,7 +333,8 @@ withdraws one's own. Both answer the item's validation:
 ```
 
 (`validatedAt` is when the item reached the threshold in force, from the validations' times.) The owners read and
-change the threshold with Learn's settings routes, which gain the key.
+change the threshold with `GET|PUT /api/admin/forum/validation-threshold` (`{ "threshold": 2 }`, 1–5); it is stored
+under a new key of Learn's settings table, and each change goes in that table's log.
 
 (`validation: null` once none is left; a validator whose account is gone appears as `{ "id": null, "name": "utente
 cancellato", "identity": "deleted", … }`.) Errors: 403 not a validator of the subject («Solo i validatori di questa
@@ -428,16 +430,13 @@ whether appeals (C) survive a deletion.
 - **Q1, one public identity per person** (G-477): the real name or a pseudonym, as recommended. B builds it.
 - **Q2 and Q3, validation** (G-478): **a number of validations, as Learn's cards**, not one; validation never stops a
   publication nor hides anything, every opinion is accepted, and it is an added, optional proof of quality; moderators
-  are there to remove harmful, violent or vulgar content. C builds a threshold the owners set (default 2), with the
-  Forum's validators appointed per subject as the spec proposed: the answer changed how many validations, not who
-  gives them (to be confirmed with the owner if he meant Learn's validators).
+  are there to remove harmful, violent or vulgar content. C builds a threshold the owners set (default 2).
+- **Who validates** (G-489): the Forum's validators, appointed by the owners per subject, as the spec proposed; not
+  Learn's validators.
 - **The real name** (G-479): declared, with a report «non è chi dice di essere» that the owners check. B builds it.
-- **Q4, still open.** Today's closed list of report reasons and hiding categories (`forum/reportReasons.ts`, a CHECK)
-  holds `fuori_tema` beside `offensivo`, `dati_personali`, `spam`, `diritti`, `altro`. After G-478 (moderators remove
-  harmful, violent or vulgar content, never an opinion), should a moderator still hide a contribution as off-topic?
-  (a) **Keep `fuori_tema` as a report reason, drop it as a hiding category** (recommended): readers can still point it
-  out, but off-topic content stays visible; (b) keep it as it is; (c) drop it from both. C changes the list only with
-  the answer.
+- **Q4, off-topic** (G-490): `fuori_tema` **stays a hiding category** as well as a report reason, as it is today
+  (option (b), not the one recommended). The closed list (`forum/reportReasons.ts`, a CHECK) does not change:
+  `offensivo`, `dati_personali`, `spam`, `fuori_tema`, `diritti`, `altro`.
 
 ## Choices the owner approved (G-476)
 
