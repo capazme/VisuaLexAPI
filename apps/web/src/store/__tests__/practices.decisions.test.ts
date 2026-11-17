@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
 import {
-  articleRowKey, articleWindowId, decisionRowKey, decisionWindowId, practiceArticleKey, type BesideRef, type Practice,
+  articleRowKey, articleWindowId, decisionRowKey, decisionWindowId, practiceArticleKey, searchTableLabel, type BesideRef, type Practice,
 } from '../../utils/practice';
 import type { DecisionReference } from '../../types/decisions';
 import { formatDecisionShort } from '../../utils/decisionLinks';
@@ -68,7 +68,7 @@ describe('openDecision: one entry per decision per practice (§6.1)', () => {
 
   it('a new entry is not identified, labelled from the citation, in a practice created when there is none', () => {
     const { practiceId, decisionId } = s().openDecision(PLAIN);
-    expect(practice(practiceId).label).toBe('Sentenze');
+    expect(practice(practiceId).label).toBe(searchTableLabel(new Date()));
     expect(practice(practiceId).decisions).toEqual([
       { id: decisionId, reference: PLAIN, label: formatDecisionShort(PLAIN), identified: false },
     ]);

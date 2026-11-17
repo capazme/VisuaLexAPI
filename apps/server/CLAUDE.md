@@ -564,6 +564,73 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   released), each by id, then deletes the votes (`lingo/deleteUserAccount.ts`): left to the cascade and
   the SET NULLs, the rows would be locked in any order, a reply before its glossa, and could deadlock with
   a reply being written or voted.
+  **The minimal profile** (spec §B, D-246, D-247, D-249, G-477, G-479; migration
+  `20261116100001_forum_profiles`; `forum/profiles.ts`, `controllers/forumProfileController.ts`):
+  `forum_profiles`, one per person, deleted with the account, under the real name **or** a pseudonym, never
+  both (CHECKs); a declared qualification (closed list) and real name, nothing records a check; the subjects
+  (`LingoMateria[]`). Its `id` is the person's **public id in the Forum**: every author object in the
+  Community's answers and the reader's lists is `{ id: <profile id or null>, name, identity: real_name |
+  pseudonym | username | withdrawn | deleted, qualification, score, username }` (`username` repeats `name`
+  for the reader's panel) and never carries the account's id, which the published dossiers show with the
+  username. `GET`/`PUT /forum/profile` (one's own: `profile`, `required`, `canWrite`, `canSign`, `score`,
+  `contributions` not emptied, hidden included, `nameWithdrawn`), `GET /forum/profiles/:profileId` (name,
+  identity, qualification, subjects, score: nothing else). **A pseudonym never relabels what others read
+  under another name**: refused (409) while any glossa, reply or comment not emptied stands under the real
+  name or the username; leaving the real name renews the public id; unique against pseudonyms and usernames
+  without regard to case (an index on `lower(pseudonym)`; the check is an exact `lower() =`, never Prisma's
+  case-blind `equals`, an ILIKE where `_` is a wildcard); never one's own username (the published dossiers
+  show it); Latin letters only, in a real name too (no lookalike letter of another alphabet), counted in
+  characters as the CHECKs count them; reserved words. A pseudonym never signs a glossa;
+  the app switch **`forum_identity`** (off) makes a glossa need the real name and a reply any profile.
+  `requireWriter` runs inside each create and edit, after the glossa's and the reply's locks, holding the
+  account row for share; `PUT` holds it for update, so no write lands between the check and a change of name.
+  Writing refusals carry codes: `real_name_required`, `profile_required`, `name_withdrawn`.
+  **«Non è chi dice di essere»** (G-479): `POST /forum/profiles/:profileId/report { details? }`
+  (`forum_profile_reports`, the profile by a plain id, one pending per reporter, the `report` counter);
+  the owners (admins) alone: `GET /moderation/profile-reports?status=`, `POST
+  /moderation/profile-reports/:profileId/resolve { action: confirm | dismiss, reason }` (confirm withdraws
+  the name: «nome ritirato» everywhere, no writing, no change of profile) and `…/restore { reason }`; logged
+  as `withdraw_name`, `restore_name` (target `profile`) or `dismiss` (target `report`, `profile:<id>`). The
+  sweep erases a closed report's details after 90 days. The export carries the profile and the reports one
+  made.
+  **Communities by subject** (spec §C, D-214, D-267, G-478; migration `20261116100002_forum_communities`;
+  `controllers/forumCommunitiesController.ts`, `forum/roles.ts`, `forum/validation.ts`, `forum/appeals.ts`,
+  `forum/reportQueue.ts`): a community is one of Learn's five subjects, a glossa's `materia` places it;
+  `GET /forum/communities` (listed glosse, `members` = profiles following the subject, moderators and
+  validators by their profiles, `withoutSubject`). **Roles per subject** (`forum_subject_roles`): `PUT
+  /admin/users/:id/forum-roles { materia, role: moderator | validator, granted, reason }`, owners only,
+  logged with the subject (`forum_moderation_log.materia`); a validator needs a real-name profile, a
+  moderator any profile; the person's account row held for update, as a change of profile holds it. A
+  **subject's moderator** has the whole Community moderators' acts on the glosse of their subject alone:
+  every moderation route reads the subject **after** locking the glossa (`requireModeratorOf`), the queue
+  and the badge's `pendingReports` hold their subject's items (`readReportGroups`; an item whose glossa is
+  gone is the whole Community moderators'), the queue never shows them the account's username (`author`
+  null; `authorName`, `authorId` = profile id), and a glossa's page shows them hidden items only in their
+  subject. **Validation** (`forum_validations`, one per validator per glossa or reply, `ON DELETE SET NULL`
+  on the validator: it still counts, «utente cancellato»): `POST`/`DELETE /forum/validations/:kind/:itemId`,
+  a validator of the glossa's subject, under the real name, on someone else's visible glossa or reply (not a
+  comment, not a glossa without a subject, 409; the validation under the `edit` counter, the withdrawal under
+  none); the author told once (`validated`, as long as that notification lives: the sweep deletes it 90 days
+  after it is read) when the item reaches the **threshold**, `FORUM_SOGLIA_VALIDAZIONI` in `lingo_impostazioni`
+  (1–5, default 2; `GET`/`PUT /admin/forum/validation-threshold`, logged in `lingo_impostazioni_log`, read at
+  every request: nothing is stored per item). The migration adds the enum value and compares the key as
+  text in the CHECK: Postgres refuses to use a new enum value in the transaction that added it. Validation
+  **never hides or holds back** anything (G-478): every item carries `validation` (`count`, `threshold`,
+  `validated`, `validatedAt`, `validators`) or null; a glossa's replies order validated first (more
+  validations, then the earliest to reach it), then the accepted one, then score, then the oldest; the feed
+  carries `validated` and `validatedReplies` and takes `validated=true|false`. A new text withdraws the
+  item's validations, a new subject the glossa's and its replies' (`validationsWithdrawn` in the edit's
+  answer); emptying an item, by its author or the owners, withdraws its validations. A validator, or whoever
+  gave validations, cannot take a pseudonym. **Appeals to the owners**
+  (`forum_appeals`, the item by a plain id; `hidden_at` on threads and comments, set by every hiding and
+  cleared when shown): `POST /forum/appeals { kind, itemId, text }` by the author of a hidden item, once per
+  hiding (the `report` counter); the owners' `GET /moderation/appeals` and `POST /moderation/appeals/:id/decide
+  { action: uphold | reject, reason }` (uphold shows the item, logged `unhide`; reject logged
+  `appeal_rejected`; the author told, `appeal`); showing an item by any route closes its pending appeal as
+  upheld with a fixed note, never the moderator's free reason (it may name who reported); the author's deletion of the item deletes its appeals; the hidden notice carries `appeal`
+  (`pending` | `rejected` | null). The profiles carry `roles` (public) and `validatedCount`; `GET
+  /forum/profiles/:profileId/validated` lists the visible contributions at the threshold. The export
+  carries the roles, the validations given and the appeals, never who appointed or decided.
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing

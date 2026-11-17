@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
-import { articleRowKey, decisionRowKey, decisionWindowId, practiceArticleKey, MAX_PRACTICE_LABEL, type Practice } from '../../utils/practice';
-import { shortAct } from '../../utils/sources';
+import { articleRowKey, decisionRowKey, decisionWindowId, practiceArticleKey, MAX_PRACTICE_LABEL, searchTableLabel, type Practice } from '../../utils/practice';
 import { CC_BARE, CC_RD, L24, L241, article } from '../../utils/__fixtures__/savedWorkspaces';
 
 type AppState = ReturnType<typeof appStore.getState>;
@@ -25,12 +24,12 @@ afterEach(() => {
 });
 
 describe('a search lands in a practice (T11, §5.1)', () => {
-  it('into no practice: creates one named after the act and makes it active', () => {
+  it('into no practice: creates one named «Ricerca del …» today (LC68) and makes it active', () => {
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     expect(s().practices).toHaveLength(1);
     expect(s().activePracticeId).toBe(practiceId);
     const created = practice(practiceId);
-    expect(created.label).toBe(shortAct(L24));
+    expect(created.label).toBe(searchTableLabel(new Date()));
     expect(created.labelIsCustom).toBe(false);
     expect(created.acts.map((a) => a.id)).toEqual([actId]);
   });
@@ -64,7 +63,7 @@ describe('a search lands in a practice (T11, §5.1)', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { practiceId } = s().addArticlesToPractice('gone', L24, [article(L24, '5')]);
     expect(s().activePracticeId).toBe(practiceId);
-    expect(practice(practiceId).label).toBe(shortAct(L24));
+    expect(practice(practiceId).label).toBe(searchTableLabel(new Date()));
   });
 
   it('a named practice receives the articles without becoming active', () => {

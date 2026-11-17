@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
-import { decisionRowKey, decisionWindowId, type Practice } from '../../utils/practice';
+import { decisionRowKey, decisionWindowId, searchTableLabel, type Practice } from '../../utils/practice';
 import type { DecisionReference } from '../../types/decisions';
 import { FOUND, L24, article } from '../../utils/__fixtures__/savedWorkspaces';
 
@@ -51,9 +51,9 @@ describe('the ways in route to the practice (spec §5, §6.1-§6.2)', () => {
     expect(s().phoneReader).toEqual({ practiceId: p, ref: { id: decisionWindowId(id), kind: 'decision', decisionId: id } });
   });
 
-  it('a decision read from a link with no practice creates «Sentenze»', () => {
+  it('a decision read from a link with no practice creates «Ricerca del …» (LC68)', () => {
     s().openDecision(REF, { fromLink: true });
-    expect(s().practices.map((p) => p.label)).toEqual(['Sentenze']);
+    expect(s().practices.map((p) => p.label)).toEqual([searchTableLabel(new Date())]);
   });
 
   it('a decision read from a link beside a practice or a window lands in that practice, not the active one', () => {

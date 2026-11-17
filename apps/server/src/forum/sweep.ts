@@ -8,18 +8,26 @@ let lastSweep = 0;
 
 /**
  * Erases the copy of the reported text from the reports closed more than 90 days ago (the report
- * stays, as a record: G-308) and deletes the notifications read more than 90 days ago (spec
- * 2026-10-20-forum-community-glosse-design §5.7, §6.5). Returns what it touched.
+ * stays, as a record: G-308), and the details of the reports «non è chi dice di essere» closed as long
+ * ago (they may say things about the person: spec 2026-11-14 §B), and deletes the notifications read
+ * more than 90 days ago (spec 2026-10-20-forum-community-glosse-design §5.7, §6.5). Returns what it
+ * touched.
  */
 export async function sweepCommunity(now: Date = new Date()) {
   const before = new Date(now.getTime() - COMMUNITY_RETENTION_DAYS * DAY_MS);
   const closedLongAgo = { status: { not: 'pending' }, resolvedAt: { lt: before }, reportedText: { not: null } };
-  const [threadReports, commentReports, notifications] = await prisma.$transaction([
+  const [threadReports, commentReports, notifications, profileReports] = await prisma.$transaction([
     prisma.articleThreadReport.updateMany({ where: closedLongAgo, data: { reportedText: null } }),
     prisma.articleCommentReport.updateMany({ where: closedLongAgo, data: { reportedText: null } }),
     prisma.forumNotification.deleteMany({ where: { readAt: { lt: before } } }),
+    prisma.forumProfileReport.updateMany({
+      where: { status: { not: 'pending' }, resolvedAt: { lt: before }, details: { not: null } }, data: { details: null },
+    }),
   ]);
-  return { reportCopies: threadReports.count + commentReports.count, notifications: notifications.count };
+  return {
+    reportCopies: threadReports.count + commentReports.count, notifications: notifications.count,
+    profileReportDetails: profileReports.count,
+  };
 }
 
 /**

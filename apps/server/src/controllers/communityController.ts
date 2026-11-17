@@ -8,13 +8,18 @@ import { maybeSweepCommunity } from '../forum/sweep';
 import { withDailyLimit } from '../forum/limits';
 import { lockComment, lockThread } from '../forum/locks';
 import { notify } from '../forum/notify';
-import { readRoles } from '../forum/roles';
+import { moderatesSubject, readRoles } from '../forum/roles';
+import { appealStateOf } from '../forum/appeals';
+import {
+  VALIDATIONS_SELECT, readThreshold, validatedAt, validatedRepliesOf, validatedThreadIds, validationSummary, withdrawValidations,
+} from '../forum/validation';
 import { readReportReason } from '../forum/reportReasons';
 import {
   ACCEPTED_SELECT, LISTED_THREAD, NO_AUTHOR, VISIBLE, VISIBLE_REPLY, acceptedId, authorView, decisionLabel, excerpt,
-  isOwn, isPassageWithheld, isVisible, type Scores, type Viewer,
+  isOwn, isPassageWithheld, isVisible, type Authors, type Viewer,
 } from '../forum/views';
-import { castVote, personalScores, voteSummary, voteSummaryOf, type VoteValue } from '../forum/votes';
+import { castVote, voteSummary, voteSummaryOf, type VoteValue } from '../forum/votes';
+import { readAuthors, requireWriter } from '../forum/profiles';
 import { COMMENT_MAX, REPLY_MAX, materiaSchema, parsePaging } from './articleDiscussionController';
 
 // The Forum's Community (spec docs/superpowers/specs/2026-10-20-forum-community-glosse-design.md): the
@@ -48,6 +53,8 @@ const feedSchema = z.object({
   participated: trueOrFalse('participated'),
   // false: answered, not settled; true: settled.
   accepted: trueOrFalse('accepted'),
+  // true: the glossa or one of its visible replies is «validata» (spec 2026-11-14 §C); false: neither.
+  validated: trueOrFalse('validated'),
 }).superRefine((q, ctx) => {
   if (q.act !== undefined && q.normaKey !== undefined) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indica l’atto o la chiave, non entrambi' });
@@ -88,7 +95,7 @@ const feedSelect = (viewerId: string) => ({
   acceptedComment: ACCEPTED_SELECT,
   user: { select: { id: true, username: true } },
   votes: { where: { userId: viewerId }, select: { value: true } },
-  _count: { select: { votes: true, comments: { where: VISIBLE_REPLY } } },
+  _count: { select: { votes: true, comments: { where: VISIBLE_REPLY }, validations: true } },
 }) satisfies Prisma.ArticleThreadSelect;
 
 type FeedRow = Prisma.ArticleThreadGetPayload<{ select: ReturnType<typeof feedSelect> }>;
@@ -99,7 +106,7 @@ function target(thread: { targetKind: string; decisionKey: string | null }) {
     : { kind: 'article' as const };
 }
 
-function feedItemView(thread: FeedRow, viewer: Viewer, scores: Scores) {
+function feedItemView(thread: FeedRow, viewer: Viewer, authors: Authors, validation: { threshold: number; replies: number }) {
   const withheld = isPassageWithheld(thread, viewer);
   return {
     id: thread.id,
@@ -113,10 +120,12 @@ function feedItemView(thread: FeedRow, viewer: Viewer, scores: Scores) {
     target: target(thread),
     decisionLabel: decisionLabel(thread),
     passage: thread.passageQuote === null ? null : { quote: withheld ? null : thread.passageQuote, withheld },
-    user: authorView(thread, scores),
+    user: authorView(thread, authors),
     materia: thread.materia,
     ...voteSummary(thread.score, thread._count.votes, thread.votes[0]?.value ?? 0),
     replyCount: thread._count.comments,
+    validated: thread.deletedAt === null && thread._count.validations >= validation.threshold,
+    validatedReplies: validation.replies,
     acceptedCommentId: acceptedId(thread),
     createdAt: thread.createdAt,
     lastActivityAt: thread.lastActivityAt,
@@ -150,6 +159,11 @@ export const listFeed = async (req: Request, res: Response) => {
   if (query.accepted === 'true') and.push(SETTLED);
   if (query.accepted === 'false') and.push({ comments: { some: VISIBLE_REPLY } }, { NOT: SETTLED });
   if (query.sort === 'unanswered') and.push({ comments: { none: VISIBLE_REPLY } });
+  const threshold = await readThreshold(prisma);
+  if (query.validated !== undefined) {
+    const ids = await validatedThreadIds(prisma, threshold);
+    and.push(query.validated === 'true' ? { id: { in: ids } } : { id: { notIn: ids } });
+  }
   const where: Prisma.ArticleThreadWhereInput = { AND: and };
 
   const orderBy: Prisma.ArticleThreadOrderByWithRelationInput[] = query.sort === 'popular'
@@ -163,58 +177,79 @@ export const listFeed = async (req: Request, res: Response) => {
     prisma.articleThread.findMany({ where, select: feedSelect(viewer.id), orderBy, skip: (page - 1) * limit, take: limit }),
   ]);
 
-  const scores = await personalScores(prisma, threads.map(thread => thread.userId));
+  const [authors, validatedReplies] = await Promise.all([
+    readAuthors(prisma, threads.map(thread => thread.userId)),
+    validatedRepliesOf(prisma, threads.map(thread => thread.id), threshold),
+  ]);
   res.json({
-    data: threads.map(thread => feedItemView(thread, viewer, scores)),
+    data: threads.map(thread => feedItemView(thread, viewer, authors, { threshold, replies: validatedReplies.get(thread.id) ?? 0 })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 };
 
-type CommentRow = Prisma.ArticleCommentGetPayload<{ include: { user: { select: { id: true; username: true } }; votes: true } }>;
+const COMMENT_INCLUDE = {
+  user: { select: { id: true, username: true } },
+  votes: true,
+  validations: VALIDATIONS_SELECT,
+} satisfies Prisma.ArticleCommentInclude;
+
+type CommentRow = Prisma.ArticleCommentGetPayload<{ include: typeof COMMENT_INCLUDE }>;
+
+type PageContext = {
+  viewer: { id: string; isModerator: boolean };
+  authors: Authors;
+  threshold: number;
+  appeals: { targetKind: string; targetId: string; status: string; createdAt: Date }[];
+};
 
 /**
  * One reply or comment as its page shows it. Visible: its text and author. Hidden: its text with the
- * moderation's notice to its author and to moderators, else a bare place («removed»). Emptied by its
- * author: a bare place, without the author's name.
+ * moderation's notice to its author and to moderators (and the author's appeal, §C), else a bare place
+ * («removed»). Emptied by its author: a bare place, without the author's name.
  */
-function itemView(item: CommentRow, viewer: { id: string; isModerator: boolean }, scores: Scores) {
-  const own = isOwn(item.userId, viewer.id);
-  const shown = item.deletedAt === null && (!item.isHidden || own || viewer.isModerator);
+function itemView(item: CommentRow, page: PageContext) {
+  const own = isOwn(item.userId, page.viewer.id);
+  const shown = item.deletedAt === null && (!item.isHidden || own || page.viewer.isModerator);
   return {
     id: item.id,
     parentId: item.parentId,
     body: shown ? item.body : '',
-    user: item.isHidden && !shown ? NO_AUTHOR : authorView(item, scores),
+    user: item.isHidden && !shown ? NO_AUTHOR : authorView(item, page.authors),
     createdAt: item.createdAt,
     editedAt: item.editedAt,
     deleted: item.deletedAt !== null,
     removed: item.isHidden && !shown,
-    hidden: item.isHidden && shown ? { category: item.hiddenReason } : null,
-    ...voteSummaryOf(item, viewer.id),
+    hidden: item.isHidden && shown ? { category: item.hiddenReason, appeal: appealStateOf(page.appeals, 'comment', item) } : null,
+    ...voteSummaryOf(item, page.viewer.id),
+    validation: shown ? validationSummary(item.validations, page.threshold, page.authors) : null,
     isOwner: own,
   };
 }
 
 /**
  * One glossa with its discussion, for its page in the Community. Replies come with their comments
- * nested, a third level stored before the rule of two flattened under its reply; the accepted reply
- * first, then by votes, then the oldest (§5.2). A hidden or emptied item stays as a place only where
- * something visible hangs on it. A hidden glossa is a 404 but to its author and to moderators; an emptied
- * one with nothing visible under it is a 404 to everyone.
+ * nested, a third level stored before the rule of two flattened under its reply. Their order (§C): the
+ * validated ones first (more validations first, then the earliest to reach the threshold), then the
+ * accepted reply, then by score, then the oldest; validation only orders, it never hides (G-478). A
+ * hidden or emptied item stays as a place only where something visible hangs on it. A hidden glossa is a
+ * 404 but to its author and to the moderators of its subject; an emptied one with nothing visible under
+ * it is a 404 to everyone.
  */
 export const getThread = async (req: Request, res: Response) => {
   const viewerId = req.user!.id;
   const roles = await readRoles(prisma, viewerId);
-  const viewer = { id: viewerId, isAdmin: roles.isAdmin, isModerator: roles.isModerator };
   const thread = await prisma.articleThread.findUnique({
     where: { id: req.params.threadId },
     include: {
       user: { select: { id: true, username: true } },
       acceptedComment: ACCEPTED_SELECT,
-      comments: { orderBy: { createdAt: 'asc' }, include: { user: { select: { id: true, username: true } }, votes: true } },
+      comments: { orderBy: { createdAt: 'asc' }, include: COMMENT_INCLUDE },
       votes: true,
+      validations: VALIDATIONS_SELECT,
     },
   });
+  // A subject's moderators read hidden items in their subject alone (§C).
+  const viewer = { id: viewerId, isAdmin: roles.isAdmin, isModerator: thread ? moderatesSubject(roles, thread.materia) : false };
   const own = thread ? isOwn(thread.userId, viewerId) : false;
   if (!thread || (thread.isHidden && !own && !viewer.isModerator)) throw new AppError(404, 'Glossa non trovata');
 
@@ -237,18 +272,33 @@ export const getThread = async (req: Request, res: Response) => {
     if (!commentsOf.has(reply.id)) commentsOf.set(reply.id, []);
     commentsOf.get(reply.id)!.push(comment);
   }
+  const [threshold, appeals] = await Promise.all([
+    readThreshold(prisma),
+    prisma.forumAppeal.findMany({ where: { threadId: thread.id }, select: { targetKind: true, targetId: true, status: true, createdAt: true } }),
+  ]);
   const accepted = acceptedId(thread);
+  // Only what is visible leads: a hidden reply, in its author's or a moderator's view, keeps its place by score.
+  const reachedAt = (reply: CommentRow) => (isVisible(reply) ? validatedAt(reply.validations, threshold) : null);
   const replies = thread.comments
     .filter(comment => comment.parentId === null)
-    .map(reply => ({ reply, comments: (commentsOf.get(reply.id) ?? []).filter(readable) }))
+    .map(reply => ({ reply, comments: (commentsOf.get(reply.id) ?? []).filter(readable), reached: reachedAt(reply) }))
     .filter(({ reply, comments }) => readable(reply) || comments.length > 0)
-    .sort((a, b) => (Number(b.reply.id === accepted) - Number(a.reply.id === accepted))
+    .sort((a, b) => (Number(b.reached !== null) - Number(a.reached !== null))
+      || (a.reached !== null && b.reached !== null
+        ? (b.reply.validations.length - a.reply.validations.length) || (a.reached - b.reached!)
+        : 0)
+      || (Number(b.reply.id === accepted) - Number(a.reply.id === accepted))
       || (b.reply.score - a.reply.score)
       || (a.reply.createdAt.getTime() - b.reply.createdAt.getTime()));
   if (thread.deletedAt !== null && !thread.comments.some(isVisible)) throw new AppError(404, 'Glossa non trovata');
 
   const withheld = isPassageWithheld(thread, viewer);
-  const scores = await personalScores(prisma, [thread.userId, ...thread.comments.map(comment => comment.userId)]);
+  const authors = await readAuthors(prisma, [
+    thread.userId,
+    ...thread.validations.map(row => row.validatorId),
+    ...thread.comments.flatMap(comment => [comment.userId, ...comment.validations.map(row => row.validatorId)]),
+  ]);
+  const page: PageContext = { viewer, authors, threshold, appeals };
   res.json({
     id: thread.id,
     normaKey: thread.normaKey,
@@ -267,22 +317,23 @@ export const getThread = async (req: Request, res: Response) => {
     passageReleased: thread.passageReleasedAt !== null,
     articleUrn: thread.articleUrn,
     textHash: thread.textHash,
-    user: authorView(thread, scores),
+    user: authorView(thread, authors),
     materia: thread.materia,
     createdAt: thread.createdAt,
     lastActivityAt: thread.lastActivityAt,
     editedAt: thread.editedAt,
     deleted: thread.deletedAt !== null,
     locked: thread.lockedAt !== null,
-    hidden: thread.isHidden ? { category: thread.hiddenReason } : null,
+    hidden: thread.isHidden ? { category: thread.hiddenReason, appeal: appealStateOf(appeals, 'thread', thread) } : null,
     acceptedCommentId: accepted,
     ...voteSummaryOf(thread, viewerId),
+    validation: thread.deletedAt === null ? validationSummary(thread.validations, threshold, authors) : null,
     replyCount: thread.comments.filter(comment => comment.parentId === null && isVisible(comment)).length,
     isOwner: own,
     replies: replies.map(({ reply, comments }) => ({
-      ...itemView(reply, viewer, scores),
+      ...itemView(reply, page),
       accepted: reply.id === accepted,
-      comments: comments.map(comment => ({ ...itemView(comment, viewer, scores), parentId: reply.id })),
+      comments: comments.map(comment => ({ ...itemView(comment, page), parentId: reply.id })),
     })),
   });
 };
@@ -314,6 +365,7 @@ export const editThread = async (req: Request, res: Response) => {
     const thread = await tx.articleThread.findUniqueOrThrow({ where: { id: req.params.threadId } });
     if (!isVisible(thread)) throw new AppError(404, 'Glossa non trovata');
     if (!isOwn(thread.userId, userId)) throw new AppError(403, 'Puoi modificare solo le tue glosse');
+    await requireWriter(tx, userId, 'edit');
     const title = data.title ?? thread.title;
     if (thread.passageQuote === null && title.length < 3) {
       throw new AppError(400, 'Il titolo è obbligatorio (almeno 3 caratteri) per una glossa senza un passo citato');
@@ -329,7 +381,13 @@ export const editThread = async (req: Request, res: Response) => {
         ...(textChanged ? { editedAt: new Date() } : {}),
       },
     });
-    return { id: updated.id, title: updated.title, body: updated.body, materia: updated.materia, editedAt: updated.editedAt };
+    // What was validated is no longer there (§C): a new text withdraws the glossa's validations, a new
+    // subject the glossa's and its replies' (they were given with another subject's authority).
+    const materiaChanged = data.materia !== undefined && data.materia !== thread.materia;
+    const validationsWithdrawn = materiaChanged
+      ? await withdrawValidations(tx, { threadId: thread.id, withReplies: true })
+      : textChanged ? await withdrawValidations(tx, { threadId: thread.id }) : 0;
+    return { id: updated.id, title: updated.title, body: updated.body, materia: updated.materia, editedAt: updated.editedAt, validationsWithdrawn };
   }));
   res.json(answer);
 };
@@ -346,6 +404,7 @@ export const editComment = async (req: Request, res: Response) => {
     const comment = await tx.articleComment.findUniqueOrThrow({ where: { id: req.params.commentId } });
     if (!isVisible(comment)) throw new AppError(404, 'Risposta non trovata');
     if (!isOwn(comment.userId, userId)) throw new AppError(403, 'Puoi modificare solo le tue risposte');
+    await requireWriter(tx, userId, 'edit');
     if (comment.parentId !== null && data.body.length > COMMENT_MAX) {
       throw new AppError(400, `Un commento può avere al massimo ${COMMENT_MAX} caratteri`);
     }
@@ -353,7 +412,8 @@ export const editComment = async (req: Request, res: Response) => {
       where: { id: comment.id },
       data: { body: data.body, ...(data.body !== comment.body ? { editedAt: new Date() } : {}) },
     });
-    return { id: updated.id, body: updated.body, editedAt: updated.editedAt };
+    const validationsWithdrawn = data.body !== comment.body ? await withdrawValidations(tx, { commentId: comment.id }) : 0;
+    return { id: updated.id, body: updated.body, editedAt: updated.editedAt, validationsWithdrawn };
   }));
   res.json(answer);
 };
@@ -373,11 +433,17 @@ export const deleteThread = async (req: Request, res: Response) => {
     if (thread.deletedAt !== null || (thread.isHidden && !isOwn(thread.userId, userId))) throw new AppError(404, 'Glossa non trovata');
     if (!isOwn(thread.userId, userId)) throw new AppError(403, 'Puoi cancellare solo le tue glosse');
     const others = await tx.articleComment.count({ where: { threadId: thread.id, OR: [{ userId: { not: userId } }, { userId: null }] } });
+    // The author's deletion makes an appeal pointless (§C): a glossa gone takes its own and its replies'
+    // appeals, an emptied one its own.
     if (others === 0) {
+      await tx.forumAppeal.deleteMany({ where: { threadId: thread.id } });
       await tx.articleThread.delete({ where: { id: thread.id } });
       return 'deleted' as const;
     }
+    await tx.forumAppeal.deleteMany({ where: { targetKind: 'thread', targetId: thread.id } });
     await tx.articleThread.update({ where: { id: thread.id }, data: { title: '', body: '', deletedAt: new Date() } });
+    // What was validated is gone (§C); the replies keep theirs.
+    await withdrawValidations(tx, { threadId: thread.id });
     return 'emptied' as const;
   });
   res.json({ outcome });
@@ -398,12 +464,15 @@ export const deleteComment = async (req: Request, res: Response) => {
     const comment = await tx.articleComment.findUniqueOrThrow({ where: { id: req.params.commentId }, include: { thread: { select: { acceptedCommentId: true } } } });
     if (comment.deletedAt !== null || (comment.isHidden && !isOwn(comment.userId, userId))) throw new AppError(404, 'Risposta non trovata');
     if (!isOwn(comment.userId, userId)) throw new AppError(403, 'Puoi cancellare solo le tue risposte');
+    // Deleted or emptied by its author, an appeal against its hiding is pointless (§C).
+    await tx.forumAppeal.deleteMany({ where: { targetKind: 'comment', targetId: comment.id } });
     const under = await tx.articleComment.count({ where: { parentId: comment.id } });
     if (under === 0 && comment.thread.acceptedCommentId !== comment.id) {
       await tx.articleComment.delete({ where: { id: comment.id } });
       return 'deleted' as const;
     }
     await tx.articleComment.update({ where: { id: comment.id }, data: { body: '', deletedAt: new Date() } });
+    await withdrawValidations(tx, { commentId: comment.id });
     return 'emptied' as const;
   });
   res.json({ outcome });

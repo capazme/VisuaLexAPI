@@ -85,7 +85,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     .filter((key) => key.startsWith(prefix))
     .map((key) => key.slice(prefix.length))));
   const isDesktop = useIsDesktop();
-  const { simple, practiceItems } = useSimpleReading();
+  const { simple, practiceItems, tableName } = useSimpleReading();
   const isIndex = layout === 'index';
   const isPanel = layout === 'overview';
   // Studio, Struttura and PDF as buttons beside the title: the overview's panel; on a phone and in the index they are
@@ -246,6 +246,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         </button>
         {/* In the overview the title gives way and the tools follow it, not the row's far end (U2). */}
         <div className={cn('min-w-0 flex-1 py-1', isPanel && 'md:flex-initial')}>
+          {/* One act (LC68): the table's name, small, over the act's title; the act's head is the only one. */}
+          {!isIndex && tableName}
           {/* The accordion pattern: the heading holds the toggle, its name is the act's own words. */}
           <h3 className="min-w-0">
             <div
@@ -391,9 +393,23 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
           {(act.articles.length > 1 || loadingArticle || showNavigation) && (
             // On a phone one row: the chips scroll sideways beside the arrows (R3: two rows of chips came before the text).
+            // The arrows first, the left arrow's glyph on the text's edge (LC68: no empty half row before them).
             <div className="flex items-center gap-x-3 gap-y-1 py-1 md:flex-wrap md:py-1.5">
+              {showNavigation && (
+                <ArticleNavigation
+                  className="-ml-3 shrink-0 md:-ml-1"
+                  allArticleIds={allArticleIds}
+                  loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
+                  activeArticleId={current?.norma_data.numero_articolo || null}
+                  loadingArticleId={loadingArticle}
+                  onNavigate={(number) => {
+                    revealPracticeArticle(practiceId, act.id, currentAnnex ? `all${currentAnnex}:${number}` : number);
+                  }}
+                  onLoadArticle={(number) => openArticle(number)}
+                />
+              )}
               {/* A compact index, with more than one article: one alone says nothing it does not say below (R3). */}
-              {act.articles.length > 1 ? (
+              {act.articles.length > 1 && (
                 <ul aria-label={`Articoli sul tavolo di ${heading}`} className={cn('practice-act-index flex min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex-wrap md:overflow-visible', HIDDEN_SCROLLBAR)}>
                   {act.articles.map((article) => {
                     const key = practiceArticleKey(article);
@@ -420,27 +436,12 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                     );
                   })}
                 </ul>
-              ) : (
-                // The place the index takes, so the arrows stay at the right.
-                <span aria-hidden className="flex-1" />
               )}
               {loadingArticle && (
                 <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
                   <Loader2 size={12} aria-hidden className="animate-spin text-primary-600 dark:text-primary-400" />
                   Caricamento…
                 </span>
-              )}
-              {showNavigation && (
-                <ArticleNavigation
-                  allArticleIds={allArticleIds}
-                  loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
-                  activeArticleId={current?.norma_data.numero_articolo || null}
-                  loadingArticleId={loadingArticle}
-                  onNavigate={(number) => {
-                    revealPracticeArticle(practiceId, act.id, currentAnnex ? `all${currentAnnex}:${number}` : number);
-                  }}
-                  onLoadArticle={(number) => openArticle(number)}
-                />
               )}
             </div>
           )}
