@@ -201,6 +201,31 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
 
   const annexes = treeMetadata?.annexes && treeMetadata.annexes.length > 1 ? treeMetadata.annexes : null;
   const showNavigation = (allArticleIds && allArticleIds.length > 1) || act.articles.length > 1;
+  // Where the selector stands (LC70, Luca): with one article at the end of its status line, the rule under both; with
+  // more, on a computer, at the right of the act's heading; on a phone with more, first in the index's line.
+  const navigation = (className: string) => (
+    <ArticleNavigation
+      className={className}
+      allArticleIds={allArticleIds}
+      loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
+      activeArticleId={current?.norma_data.numero_articolo || null}
+      loadingArticleId={loadingArticle}
+      onNavigate={(number) => {
+        revealPracticeArticle(practiceId, act.id, currentAnnex ? `all${currentAnnex}:${number}` : number);
+      }}
+      onLoadArticle={(number) => openArticle(number)}
+    />
+  );
+  const loadingStatus = loadingArticle && (
+    <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+      <Loader2 size={12} aria-hidden className="animate-spin text-primary-600 dark:text-primary-400" />
+      Caricamento…
+    </span>
+  );
+  const navInHead = showNavigation && !simple && toolsShown;
+  const statusEnd = simple && (showNavigation || loadingArticle)
+    ? <>{loadingStatus}{showNavigation && navigation('-mr-3 shrink-0 md:-mr-1')}</>
+    : undefined;
 
   return (
     <section
@@ -234,7 +259,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           // first; four 44 px buttons took a row of their own), from `md` the tools beside it. Sticky from `md`
           // only: on a phone, with an open row's toolbar pinned under it, the two took half the screen. In the index
           // it pins nothing: the acts are a few lines each, and their headings would stack.
-          'practice-act-head relative flex items-start gap-1 border-b border-slate-200 bg-slate-50 py-1 md:items-center md:gap-2 dark:border-slate-800 dark:bg-slate-950',
+          'practice-act-head relative flex items-start gap-1 border-slate-200 bg-slate-50 py-1 md:items-center md:gap-2 dark:border-slate-800 dark:bg-slate-950',
+          // Lettura semplice (LC70): the one rule is under the status line and the selector, not here.
+          !simple && 'border-b',
           isIndex ? 'md:py-1' : cn('md:sticky md:top-0 md:py-2', Z_INDEX.stickyHead),
         )}
       >
@@ -297,6 +324,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             into the page's margin, as every icon on the column's right edge (R3b). */}
         <div className={cn('-mr-3 mt-1 flex flex-shrink-0 items-center gap-1 md:mr-0 md:mt-0', !isPanel && 'ml-auto')}>
           {/* The tools in the overview; on a phone and in the index they are entries of «⋯» (below), not drawn at all. */}
+          {navInHead && navigation('shrink-0')}
           {toolsShown && <div className="flex items-center gap-1">
             <button
               type="button"
@@ -396,23 +424,12 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
       {!act.isCollapsed && !isIndex && (
         <div className="py-1">
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
-          {(act.articles.length > 1 || loadingArticle || showNavigation) && (
+          {/* Lettura semplice (LC70): no line of its own; the selector and the loading are in the status line. */}
+          {!simple && (act.articles.length > 1 || loadingArticle || (showNavigation && !navInHead)) && (
             // On a phone one row: the chips scroll sideways beside the arrows (R3: two rows of chips came before the text).
             // The arrows first, the left arrow's glyph on the text's edge (LC68: no empty half row before them).
             <div className="flex items-center gap-x-3 gap-y-1 py-1 md:flex-wrap md:py-1.5">
-              {showNavigation && (
-                <ArticleNavigation
-                  className="-ml-3 shrink-0 md:-ml-1"
-                  allArticleIds={allArticleIds}
-                  loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
-                  activeArticleId={current?.norma_data.numero_articolo || null}
-                  loadingArticleId={loadingArticle}
-                  onNavigate={(number) => {
-                    revealPracticeArticle(practiceId, act.id, currentAnnex ? `all${currentAnnex}:${number}` : number);
-                  }}
-                  onLoadArticle={(number) => openArticle(number)}
-                />
-              )}
+              {showNavigation && !navInHead && navigation('-ml-3 shrink-0 md:-ml-1')}
               {/* A compact index, with more than one article: one alone says nothing it does not say below (R3). */}
               {act.articles.length > 1 && (
                 <ul aria-label={`Articoli sul tavolo di ${heading}`} className={cn('practice-act-index flex min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex-wrap md:overflow-visible', HIDDEN_SCROLLBAR)}>
@@ -442,12 +459,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   })}
                 </ul>
               )}
-              {loadingArticle && (
-                <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-                  <Loader2 size={12} aria-hidden className="animate-spin text-primary-600 dark:text-primary-400" />
-                  Caricamento…
-                </span>
-              )}
+              {loadingStatus}
             </div>
           )}
 
@@ -477,6 +489,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 article={article}
                 onCrossReference={onCrossReference}
                 onOpenStudyMode={() => openStudy(article)}
+                statusEnd={statusEnd}
                 annexSuggestion={annexes && openKeys.includes(key) ? (
                   <AnnexSuggestion
                     className="mb-3"

@@ -21,7 +21,12 @@ vi.mock('../../../utils/actStructureCache', () => ({
   fetchActTree: () => Promise.resolve({ articles: [], metadata: { annexes: h.annexes } }),
   fetchActRubriche: () => Promise.resolve({ rubriche: {}, abrogati: [], parts: [] }),
 }));
-vi.mock('../search/ArticleTabContent', () => ({ ArticleTabContent: () => <div data-testid="reader" /> }));
+// The reader shows what it is given for the end of its status line (LC70), as the real one's bar does.
+vi.mock('../search/ArticleTabContent', async () => {
+  const { useContext } = await import('react');
+  const { StatusLineEnd } = await import('../search/statusLineEnd');
+  return { ArticleTabContent: () => <div data-testid="reader">{useContext(StatusLineEnd)}</div> };
+});
 vi.mock('../search/TreeViewPanel', () => ({
   TreeViewPanel: (props: Record<string, unknown>) => {
     h.trees.push(props);
@@ -31,7 +36,7 @@ vi.mock('../search/TreeViewPanel', () => ({
 vi.mock('../workspace/ArticleNavigation', () => ({
   ArticleNavigation: (props: Record<string, unknown>) => {
     h.navs.push(props);
-    return null;
+    return <span data-testid="article-nav" />;
   },
 }));
 vi.mock('../workspace/LazyStudyMode', () => ({
@@ -43,6 +48,7 @@ vi.mock('../workspace/LazyStudyMode', () => ({
 
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { PracticeActBlock } from './PracticeActBlock';
+import { SimpleReadingContext } from './simpleReading';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
 import { resetNotifications } from '../../ui/notifications/notifications';
 import { articleRowKey, practiceArticleKey } from '../../../utils/practice';
@@ -460,5 +466,42 @@ describe('PracticeActBlock: one act of two articles reads as one of one (LC70)',
     expect(screen.getByRole('button', { name: /^Sposta / })).toHaveClass('hidden');
     expect(screen.getByRole('button', { name: /^Sposta / })).not.toHaveClass('md:block');
     expect(container.querySelector('header .lucide-chevron-down')).toBeNull();
+  });
+});
+
+describe('PracticeActBlock: where the selector stands (LC70, Luca)', () => {
+  it('one article: on its status line, not on a line of its own; no rule under the act\'s heading', () => {
+    const { practiceId, actId } = setUp(L24_URN, [article(L24_URN, '5')]);
+    const { container } = render(
+      <SimpleReadingContext.Provider value={{ simple: true, practiceItems: [] }}>
+        <Block practiceId={practiceId} actId={actId} />
+      </SimpleReadingContext.Provider>,
+    );
+    return waitFor(() => {
+      expect(within(screen.getByTestId('reader')).getByTestId('article-nav')).toBeInTheDocument();
+      expect(screen.getAllByTestId('article-nav')).toHaveLength(1);
+      expect(container.querySelector('header')).not.toHaveClass('border-b');
+    });
+  });
+
+  it('more articles, on a computer: at the right of the act\'s heading, once; the status stays with each article', () => {
+    const { practiceId, actId } = setUp(L24_URN, [article(L24_URN, '5'), article(L24_URN, '7')]);
+    const { container } = render(<Block practiceId={practiceId} actId={actId} />);
+    const header = container.querySelector('header')!;
+    expect(within(header).getByTestId('article-nav')).toBeInTheDocument();
+    expect(screen.getAllByTestId('article-nav')).toHaveLength(1);
+    expect(header).toHaveClass('border-b');
+  });
+
+  it('more articles, on a phone: first in the index\'s line, not in the heading', () => {
+    h.desktop = false;
+    try {
+      const { practiceId, actId } = setUp(L24_URN, [article(L24_URN, '5'), article(L24_URN, '7')]);
+      const { container } = render(<Block practiceId={practiceId} actId={actId} />);
+      expect(within(container.querySelector('header')!).queryByTestId('article-nav')).toBeNull();
+      expect(screen.getAllByTestId('article-nav')).toHaveLength(1);
+    } finally {
+      h.desktop = true;
+    }
   });
 });
