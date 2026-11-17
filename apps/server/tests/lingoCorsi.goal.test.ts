@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { authHeader, createTestUser, type TestUser } from './helpers';
 import { CORSI, acceptDeclaration, app, course, delegatedAs, prisma, request, switchCourses, type Headers } from './corsiHelpers';
 import { addDays, romeDay } from '../src/lingo/studyDay';
-import { EXAM_DATE_MAX_DAYS } from '../src/lingo/courses';
+import { examDateLimit } from '../src/lingo/courses';
 
 // A Learn path's goal and exam date, the learner's (G-488; the web plan's item 26): on the enrolment, set with
 // `PATCH /:id` from the web only, carried by the list, the page, «Oggi», the exports, and kept by the trash.
@@ -12,6 +12,8 @@ let bob: TestUser;
 let token: Headers;
 let session: Headers;
 const TODAY = romeDay(new Date());
+/** The same day five years on, written here rather than taken from the code. */
+const FIVE_YEARS = `${Number(TODAY.slice(0, 4)) + 5}-${TODAY.slice(5) === '02-29' ? '02-28' : TODAY.slice(5)}`;
 
 beforeEach(async () => {
   alice = await createTestUser('alice');
@@ -76,8 +78,8 @@ describe('the goal and the exam date', () => {
     expect(refused.status).toBe(400);
     expect(refused.body.detail).toBe('La data dell’esame è già passata.');
     expect((await patch(id, { dataEsame: TODAY })).status).toBe(200);
-    expect((await patch(id, { dataEsame: addDays(TODAY, EXAM_DATE_MAX_DAYS) })).status).toBe(200);
-    const far = await patch(id, { dataEsame: addDays(TODAY, EXAM_DATE_MAX_DAYS + 1) });
+    expect((await patch(id, { dataEsame: FIVE_YEARS })).status).toBe(200);
+    const far = await patch(id, { dataEsame: addDays(FIVE_YEARS, 1) });
     expect(far.status).toBe(400);
     expect(far.body.detail).toBe('La data dell’esame è troppo lontana: al massimo fra cinque anni.');
     for (const dataEsame of ['2027-02-30', '2027-13-01', '17/12/2027', '2027-12-17T00:00:00Z', 20271217]) {
@@ -91,7 +93,13 @@ describe('the goal and the exam date', () => {
     expect((await patch(id, { obiettivo: { tipo: 'ALTRO', nota: 'a'.repeat(201) } })).status).toBe(400);
     expect((await patch(id, { obiettivo: { tipo: 'ALTRO', nota: 'riga\u0007' } })).status).toBe(400);
     // What was refused left nothing.
-    expect((await request(app).get(`${CORSI}/${id}`).set(session)).body.dataEsame).toBe(addDays(TODAY, EXAM_DATE_MAX_DAYS));
+    expect((await request(app).get(`${CORSI}/${id}`).set(session)).body.dataEsame).toBe(FIVE_YEARS);
+  });
+
+  it('the limit is the same day five years on, and 29 February becomes the 28th', () => {
+    expect(examDateLimit('2026-11-17')).toBe('2031-11-17');
+    expect(examDateLimit('2028-02-29')).toBe('2033-02-28');
+    expect(examDateLimit('2027-12-31')).toBe('2032-12-31');
   });
 
   it('are the session’s and the author’s: a token gets 403, someone else 404', async () => {

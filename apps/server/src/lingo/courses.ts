@@ -8,7 +8,7 @@ import { LIMITS, type CourseCreateInput, type CoursePatch, type ExamCreateInput,
 import { rebuildNormEntry } from '../schemas/normEntry';
 import { checkLessonText } from './courseFormat';
 import { masteryFor } from './courseProgress';
-import { addDays, daysBetween, romeDay } from './studyDay';
+import { addDays, romeDay } from './studyDay';
 import { dateToDay, dayToDate } from './studyDays';
 import { currentText, hasAccepted, serializeText } from './texts';
 
@@ -58,8 +58,11 @@ export function goalView(enrolment: { obiettivo: LingoCorsoObiettivo | null; obi
   };
 }
 
-/** The farthest an exam date may be set, in days from today: five years. */
-export const EXAM_DATE_MAX_DAYS = 5 * 366;
+/** The farthest an exam date may be set: the same day five years on (29 February becomes the 28th). */
+export function examDateLimit(today: string): string {
+  const monthDay = today.slice(5) === '02-29' ? '02-28' : today.slice(5);
+  return `${Number(today.slice(0, 4)) + 5}-${monthDay}`;
+}
 
 interface ModuleLike {
   id: string;
@@ -752,10 +755,10 @@ export async function listCourses(userId: string, today = romeDay(new Date())) {
  * date from today to five years on, null to clear. The user's own acts, in the web: not in the delegated table.
  */
 export async function patchCourse(userId: string, corsoId: string, body: CoursePatch, today = romeDay(new Date())) {
-  if (body.dataEsame) {
-    const days = daysBetween(today, body.dataEsame);
-    if (days < 0) throw new AppError(400, 'La data dell’esame è già passata.');
-    if (days > EXAM_DATE_MAX_DAYS) throw new AppError(400, 'La data dell’esame è troppo lontana: al massimo fra cinque anni.');
+  // Days as 'YYYY-MM-DD' compare as strings.
+  if (body.dataEsame && body.dataEsame < today) throw new AppError(400, 'La data dell’esame è già passata.');
+  if (body.dataEsame && body.dataEsame > examDateLimit(today)) {
+    throw new AppError(400, 'La data dell’esame è troppo lontana: al massimo fra cinque anni.');
   }
   return prisma.$transaction(async (tx) => {
     if (!(await lockCourse(tx, userId, corsoId, 'UPDATE'))) throw new AppError(404, NOT_FOUND);
