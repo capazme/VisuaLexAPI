@@ -34,7 +34,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, readingBackStack: [], windowFocusRequest: null, decisionFocusRequest: null,
-    phoneReader: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    phoneReader: null, structureWindow: { blockId: null },
   });
 });
 afterEach(() => {

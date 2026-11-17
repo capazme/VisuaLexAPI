@@ -1,33 +1,14 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, ChevronRight } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { normalizeArticleId } from '../../../utils/treeUtils';
-import { useAppStore } from '../../../store/useAppStore';
 import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
-import { Z_INDEX } from '../../../constants/zIndex';
 import { abrogatiFor, rubricheFor } from '../../../utils/actRubriche';
 import { articleLabel, buildActTree, headingLabel, type ActTreeItem, type ActTreeNode } from '../../../utils/actTree';
-import { Modal } from '../../ui/Modal';
-
-/** The window's width on a computer; its place is the store's (`structureWindow.position`), kept inside the viewport. */
-const WINDOW_WIDTH = 420;
-/** The window is at most 76vh tall (`max-h-[76vh]`): no higher than the rest of the screen, less a margin. */
-const WINDOW_MAX_TOP = 0.24;
-const WINDOW_MARGIN = 8;
-
-// The window no longer moves (LC71): a place stored by the old drag, low on the screen, would leave the list cut off,
-// so the whole window is kept on screen.
-function clampToViewport(position: { x: number; y: number }) {
-  return {
-    x: Math.min(Math.max(0, position.x), Math.max(0, window.innerWidth - WINDOW_WIDTH)),
-    y: Math.min(Math.max(0, position.y), Math.max(0, window.innerHeight * WINDOW_MAX_TOP - WINDOW_MARGIN)),
-  };
-}
+import { Expand } from '../../ui/Expand';
 
 /** Accents stripped, lowercased: a lawyer types «responsabilita» and expects «Responsabilità del debitore». */
 function foldIndexLabel(value: string): string {
@@ -63,12 +44,8 @@ export interface TreeViewPanelProps {
   abrogati?: string[];
   /** Per-part titles: for an act in parts they replace `rubriche` (`utils/actRubriche.ts`). */
   rubricheParts?: RubrichePart[];
-  /**
-   * `window`, the computer's: a window over the table, portalled to the body (a transformed ancestor would hold a
-   * `fixed` child, gotcha 22) and drawn only on a computer, since the portal escapes its `hidden md:block` wrapper.
-   * `drawer`, the phone's: a full-height sheet with a backdrop, in place.
-   */
-  variant?: 'window' | 'drawer';
+  /** The space's id, for the «Struttura» command's `aria-controls`. */
+  id?: string;
 }
 
 interface Row {
@@ -109,8 +86,9 @@ function countHeadings(nodes: ActTreeNode[]): number {
 /**
  * The act's structure (LC71): its title, the part when it has several, a filter, and the tree of books, titles and
  * chapters with each article as «Art. 2043 · Risarcimento per fatto illecito». A pick opens the article on the table
- * and leaves the panel open. The filter has the focus on opening, the arrows walk the list, Esc closes and gives the
- * focus back to what opened it.
+ * and leaves the index open. LC77: no longer a window over the table nor a dialog on a phone, but a space in the act's
+ * own card (`Expand`), opening under its heading and pushing the text down. The filter has the focus on opening, the
+ * arrows walk the list, Esc empties the filter and then closes, giving the focus back to what opened it.
  */
 export function TreeViewPanel({
   isOpen,
@@ -125,7 +103,7 @@ export function TreeViewPanel({
   rubriche,
   abrogati,
   rubricheParts,
-  variant = 'drawer',
+  id,
 }: TreeViewPanelProps) {
   // The part chosen in the menu; undefined follows `currentAnnex`.
   const [selectedAnnex, setSelectedAnnex] = useState<string | null | undefined>(undefined);
@@ -134,12 +112,8 @@ export function TreeViewPanel({
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const { tryStartTour } = useTour();
   const isDesktop = useIsDesktop();
-  const isWindow = variant === 'window';
-  const storedPosition = useAppStore((s) => s.structureWindow.position);
-  const place = useMemo(() => clampToViewport(storedPosition), [storedPosition]);
   const filterRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const openerRef = useRef<HTMLElement | null>(null);
   const scrolledRef = useRef(false);
   const selectId = useId();
   const titleId = useId();
@@ -150,30 +124,19 @@ export function TreeViewPanel({
     return () => clearTimeout(timer);
   }, [isOpen, tryStartTour]);
 
-  // A new act, a reopened panel: no inherited part, filter or open headings (gotcha 11).
+  // A new act, a reopened panel: no inherited part, filter or open headings (gotcha 11). Not on closing: the index
+  // fades out as it was, not reset under the reader's eyes.
   useEffect(() => {
+    if (!isOpen) return;
     setSelectedAnnex(undefined);
     setFilterQuery('');
     setOverrides({});
   }, [currentAnnex, isOpen]);
 
-  // On opening: remember what had the focus (the «Struttura» button), give it to the filter.
+  // The focus is the space's (`Expand`): to the filter on opening, back to the opener on closing.
   useEffect(() => {
-    if (!isOpen) {
-      scrolledRef.current = false;
-      return;
-    }
-    const active = document.activeElement;
-    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
-    filterRef.current?.focus();
+    if (!isOpen) scrolledRef.current = false;
   }, [isOpen]);
-
-  const close = () => {
-    onClose();
-    // On a phone the opener is an entry of «⋯», gone with its menu: then the focus stays where the browser puts it.
-    const opener = openerRef.current;
-    if (opener?.isConnected) opener.focus();
-  };
 
   const effectiveAnnex = selectedAnnex !== undefined ? selectedAnnex : (currentAnnex ?? null);
   const showAnnexes = !!annexes && annexes.length > 1;
@@ -256,21 +219,20 @@ export function TreeViewPanel({
   useEffect(() => {
     if (!isOpen || !treeReady || scrolledRef.current) return;
     scrolledRef.current = true;
-    const current = listRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
-    current?.scrollIntoView?.({ block: 'center' });
+    const list = listRef.current;
+    const current = list?.querySelector<HTMLElement>('[aria-current="true"]');
+    // The list's own scroll, not `scrollIntoView`: in the page's flow that would move the page too.
+    if (list && current) list.scrollTop = current.offsetTop - (list.clientHeight - current.offsetHeight) / 2;
   }, [isOpen, treeReady]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Escape') {
-      e.preventDefault();
-      // An open discussion panel or citation preview closes on Esc at the document: this one is the panel's.
-      e.stopPropagation();
-      // The first Esc empties a filled filter, the next closes the panel.
+      // The first Esc empties a filled filter; the next is the space's, which closes it.
       if (filterQuery) {
+        e.preventDefault();
+        e.stopPropagation();
         setFilterQuery('');
         filterRef.current?.focus();
-      } else {
-        close();
       }
       return;
     }
@@ -285,7 +247,8 @@ export function TreeViewPanel({
     else list[next].focus();
   };
 
-  const drawer = !isWindow;
+  // On a phone, rows and fields a finger can hit.
+  const drawer = !isDesktop;
   const rowHeight = drawer ? 'min-h-[44px] py-2' : 'min-h-8 py-1';
   const ROW_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500';
 
@@ -396,10 +359,10 @@ export function TreeViewPanel({
   const panelBody = (
     <>
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 py-1.5 pl-4 pr-1.5 dark:border-slate-800">
-        <h2 id={titleId} className="min-w-0 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">{title}</h2>
+        <h4 id={titleId} className="min-w-0 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">{title}</h4>
         <button
           type="button"
-          onClick={close}
+          onClick={onClose}
           aria-label="Chiudi la struttura"
           title="Chiudi la struttura"
           className={cn(
@@ -450,7 +413,7 @@ export function TreeViewPanel({
         )}
       </div>
 
-      <div ref={listRef} aria-label="Indice dell'atto" role="group" className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1.5">
+      <div ref={listRef} aria-label="Indice dell'atto" role="group" className="relative min-h-0 flex-1 overflow-y-auto px-1.5 py-1.5">
         {!treeReady ? (
           <p className="px-2 py-6 text-sm text-slate-500 dark:text-slate-400">Struttura non ancora disponibile</p>
         ) : rows.length === 0 ? (
@@ -462,48 +425,26 @@ export function TreeViewPanel({
     </>
   );
 
-  if (isWindow) {
-    if (!isDesktop) return null;
-    return createPortal(
-      <AnimatePresence>
-        {isOpen && (
-          <motion.aside
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            style={{ left: place.x, top: place.y, width: WINDOW_WIDTH, transformOrigin: 'top right' }}
-            aria-label={`${title}, finestra`}
-            onKeyDown={onKeyDown}
-            // A tool held over the table: a press in it is not a click away from the rail's overlay.
-            data-floating-tool
-            className={cn(
-              'fixed flex max-h-[76vh] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900',
-              Z_INDEX.structure,
-            )}
-          >
-            {panelBody}
-          </motion.aside>
-        )}
-      </AnimatePresence>,
-      document.body,
-    );
-  }
-
-  // On a phone a dialog over the whole screen (`Modal`): aria-modal, the focus kept inside and given back on closing.
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={close}
-      labelledBy={titleId}
-      showCloseButton={false}
-      phoneFullScreen
+    <Expand
+      id={id}
+      open={isOpen}
+      onClose={onClose}
       initialFocusRef={filterRef}
-      contentClassName="flex min-h-0 flex-col overflow-hidden p-0"
+      onKeyDown={onKeyDown}
+      // Opened on a page scrolled down, its title lands under the act's sticky heading (`--practice-head`), not behind it.
+      className="scroll-mt-[calc(var(--practice-head,0px)+0.5rem)]"
     >
-      <div onKeyDown={onKeyDown} className="flex min-h-0 flex-1 flex-col">
+      {/* In the card, between its heading and its text: a list as long as the c.c.'s scrolls inside its own height. */}
+      <section
+        aria-labelledby={titleId}
+        className={cn(
+          'my-2 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
+          drawer ? 'max-h-[70vh]' : 'max-h-[min(60vh,32rem)]',
+        )}
+      >
         {panelBody}
-      </div>
-    </Modal>
+      </section>
+    </Expand>
   );
 }

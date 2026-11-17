@@ -130,8 +130,6 @@ export interface StructureWindowState {
      * it would open a window owned by nothing.
      */
     blockId: string | null;
-    /** Where the user parked it. Persisted: that is the point of a movable window. */
-    position: { x: number; y: number };
 }
 
 /** The reading tools (A4): the highlighter, and the note tool (§6). */
@@ -528,7 +526,6 @@ interface AppState {
     // Structure Window Actions
     openStructureWindow: (blockId: string) => void;
     closeStructureWindow: () => void;
-    setStructureWindowPosition: (position: { x: number; y: number }) => void;
 
     // Reading Back-Stack Actions
     /**
@@ -1407,10 +1404,7 @@ const appStore = createStore<AppState>()(
             decisionFocusRequest: null,
             windowFocusRequest: null,
             phoneReader: null,
-            structureWindow: {
-                blockId: null,
-                position: { x: Math.max(16, window.innerWidth - 400), y: 96 },
-            },
+            structureWindow: { blockId: null },
             readingBackStack: [],
 
             updateSettings: (newSettings) => set((state) => {
@@ -1671,10 +1665,6 @@ const appStore = createStore<AppState>()(
 
             closeStructureWindow: () => set((state) => {
                 state.structureWindow.blockId = null;
-            }),
-
-            setStructureWindowPosition: (position) => set((state) => {
-                state.structureWindow.position = position;
             }),
 
             // ── Reading back-stack ───────────────────────────────────────
@@ -3020,10 +3010,6 @@ const appStore = createStore<AppState>()(
             partialize: (state) => ({
                 settings: state.settings,
                 searchPanelState: state.searchPanelState,
-                // Narrowed on purpose: the parked position is worth keeping,
-                // the owning block id is not — it would rehydrate a window
-                // belonging to a block that no longer exists.
-                structureWindow: { position: state.structureWindow.position, blockId: null },
                 // LC60: the Ricerca's table is the session's, and so is a table bound to a dossier (LC51). Only the
                 // Corpus's practices of before stay saved, until the riquadro is answered; the open rows, the pending
                 // reveal and the notice are the session's.
