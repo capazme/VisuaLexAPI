@@ -44,6 +44,8 @@ export interface ReadingToolbarProps {
     highlightsButtonRef?: Ref<HTMLButtonElement | null>;
     highlightsCount: number;
     isDiscussionOpen: boolean;
+    /** The discussions on the article (LC74): «Glosse 3» on its button; none, the word alone. */
+    discussionCount?: number;
     isPinnedQuick: boolean;
     onToggleNotes: () => void;
     onToggleHighlightsPeek: () => void;
@@ -66,7 +68,7 @@ export interface ReadingToolbarProps {
     onCompare: () => void;
     /**
      * The compact form of a light window beside a practice's table (spec §4.1, T12): notes and
-     * highlights in words, and behind «⋯» the discussions, the magnifier and copy, nothing else (the
+     * highlights in words, «Glosse» on its own, and behind «⋯» the magnifier and copy, nothing else (the
      * phone row has no notes or highlights buttons to begin with). The status and the annex stay:
      * they say which text this is. The tools the table's row keeps (quick norm, dossier, Study Mode,
      * the source link, sharing, export, a date, a comparison) are the row's.
@@ -88,6 +90,7 @@ export interface ReadingToolbarProps {
 const ACTION = cn(
     'vlx-hover-tile inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600',
     'hover:text-slate-900 aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
+    'aria-pressed:bg-ink-300/70 aria-pressed:text-slate-900 dark:aria-pressed:bg-ink-700/60 dark:aria-pressed:text-white',
     'dark:text-slate-300 dark:hover:text-white dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white',
     'disabled:cursor-not-allowed disabled:opacity-40',
     FOCUS_RING,
@@ -107,6 +110,7 @@ export function ReadingToolbar({
     highlightsButtonRef,
     highlightsCount,
     isDiscussionOpen,
+    discussionCount = 0,
     isPinnedQuick,
     onToggleNotes,
     onToggleHighlightsPeek,
@@ -159,13 +163,6 @@ export function ReadingToolbar({
             disabled: Boolean(lockedReason),
             description: lockedReason,
         }]),
-        {
-            label: isDiscussionOpen ? 'Chiudi le glosse' : 'Glosse sull’articolo',
-            icon: MessageCircle,
-            onSelect: onToggleDiscussion,
-            disabled: Boolean(lockedReason),
-            description: lockedReason,
-        },
         ...(find ? [{ label: find.isOpen ? 'Chiudi la ricerca nel testo' : 'Cerca nel testo', icon: Search, onSelect: toggleFind }] : []),
         {
             label: 'Copia',
@@ -199,6 +196,27 @@ export function ReadingToolbar({
             })
             : []),
     ];
+
+    /**
+     * «Glosse» (LC74): a button of its own before «⋯», pressed while the margin is open, with the count when there is
+     * one. On a phone the icon and the count, the whole name for a screen reader.
+     */
+    const glossesButton = (phone = false) => (
+        <button
+            type="button"
+            data-glosses-button=""
+            onClick={onToggleDiscussion}
+            aria-pressed={isDiscussionOpen}
+            aria-label={discussionCount > 0 ? `Glosse, ${discussionCount}` : phone ? 'Glosse' : undefined}
+            title={tip('Glosse sull’articolo', lockedReason)}
+            className={ACTION}
+            {...lock(lockedReason)}
+        >
+            <MessageCircle size={phone ? 18 : 16} aria-hidden />
+            {!phone && 'Glosse'}
+            {discussionCount > 0 && <span aria-hidden className="tabular-nums">{discussionCount}</span>}
+        </button>
+    );
 
     // The annex as the source convention names it: never a code's own (the codice civile is Allegato 2 of its decree).
     const annex = namedAnnex(normaData);
@@ -268,6 +286,7 @@ export function ReadingToolbar({
                     so it can be turned off where there is no Esc (A4 §6). */}
                 {!lockedReason && noteToolOn && <NoteToolButton triggerClassName={ACTION} />}
                 {!compact && !hideDossier && dossierButton(undefined, true)}
+                {glossesButton(true)}
                 <div ref={phoneMoreRef} className="contents">
                     {/* Its list is long (the colours close it): capped under the bar, it scrolls on its own. */}
                     <MenuButton
@@ -299,6 +318,7 @@ export function ReadingToolbar({
                 {/* The note tool (A4 §6): a personal note, or a gloss with colleagues. */}
                 {!lockedReason && <NoteToolButton gloss triggerClassName={ACTION} />}
                 {!compact && !hideDossier && dossierButton(dossierButtonRef)}
+                {glossesButton()}
                 <div ref={desktopMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>
                         <MoreHorizontal size={18} aria-hidden />

@@ -1187,6 +1187,19 @@
   }
 }
 
+/* LC74: a card widened by one article's glosses (`useGlossMargin`) keeps the text of every other article in it where it
+   was, at the width the card gave it closed. */
+[data-glosses-room]:has([data-glosses-beside]) [data-article-root]:not([data-glosses-beside]) {
+  max-width: var(--glosses-text-width);
+}
+
+/* LC74: the glosses can make the page scroll where there was nothing to scroll; with classic scrollbars the bar would
+   then take its room and move the centred text by half of it. The room is kept on the page that holds the one-act card
+   (overlay scrollbars take none: nothing changes there). */
+.vlx-page:has([data-glosses-room]) {
+  scrollbar-gutter: stable;
+}
+
 /* The ground under the pointer of the sections' tabs (Work, Learn, Forum, Labs; `SectionTabs`), the one source for a
    row of commands (LC72): a colour, no slide. Unlayered, so it beats a button's own `hover:bg-*`. A pressed or open
    button keeps its ground still; a disabled one does not answer; the keyboard's focus takes the same ground beside its

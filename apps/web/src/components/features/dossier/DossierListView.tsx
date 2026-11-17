@@ -56,6 +56,7 @@ const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
   const { dossiers, updateDossier, importDossier } = useAppStore();
+  const isLoadingData = useAppStore((s) => s.isLoadingData);
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -336,6 +337,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             <div className="col-span-full">
               <EmptyState variant="dossier" title="Nessun risultato" description="Prova a modificare i filtri di ricerca." />
             </div>
+          ) : isLoadingData ? (
+            // Read again after «Riprova»: not empty yet, only not read.
+            <p role="status" className="col-span-full p-6 text-sm text-slate-600 dark:text-slate-400">Apro le pratiche…</p>
           ) : (
             // No dossier yet (S7c): what a dossier is for and the two ways to begin; no drawing since LC21.
             <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">

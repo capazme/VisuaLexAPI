@@ -40,7 +40,7 @@ describe('SearchPanel on a phone — with the practices (spec §8, P5)', () => {
     appStore.setState({
       practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
       practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null, pendingDecision: null,
-      structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+      structureWindow: { blockId: null },
     });
   });
   afterEach(() => {

@@ -30,7 +30,7 @@ function setViewport(isDesktop: boolean) {
 
 beforeEach(() => {
   appStore.setState({
-    structureWindow: { blockId: 'block-a', position: { x: 120, y: 80 } },
+    structureWindow: { blockId: 'block-a' },
   });
 });
 
@@ -38,13 +38,12 @@ afterEach(() => {
   window.matchMedia = originalMatchMedia;
 });
 
-describe('TreeViewPanel — window variant', () => {
+describe('TreeViewPanel — on a computer, in the card (LC77)', () => {
   beforeEach(() => setViewport(true));
 
-  it('renders the index outside its own subtree, on document.body', () => {
+  it('renders the index in its own place in the page: no portal, no dialog, nothing fixed', () => {
     const { container } = render(
       <TreeViewPanel
-        variant="window"
         isOpen
         onClose={vi.fn()}
         treeData={['1', '2']}
@@ -53,10 +52,10 @@ describe('TreeViewPanel — window variant', () => {
       />,
     );
 
-    // Portalled out: nothing lands in the component's own container, which is
-    // the whole point — the workspace panel it lives under is transformed.
-    expect(container).toBeEmptyDOMElement();
-    expect(screen.getByText('Struttura Atto')).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Struttura Atto' });
+    expect(container).toContainElement(region);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(container.querySelector('.fixed')).toBeNull();
   });
 
   it('stays open after an article is picked', () => {
@@ -65,7 +64,6 @@ describe('TreeViewPanel — window variant', () => {
 
     render(
       <TreeViewPanel
-        variant="window"
         isOpen
         onClose={onClose}
         treeData={['1', '2']}
@@ -83,27 +81,9 @@ describe('TreeViewPanel — window variant', () => {
     expect(screen.getByRole('button', { name: 'Art. 2' })).toBeInTheDocument();
   });
 
-  it('renders nothing on a small viewport, so the portal cannot leak onto mobile', () => {
-    setViewport(false);
-
-    render(
-      <TreeViewPanel
-        variant="window"
-        isOpen
-        onClose={vi.fn()}
-        treeData={['1']}
-        urn="urn:test"
-        title="Struttura Atto"
-      />,
-    );
-
-    expect(screen.queryByText('Struttura Atto')).not.toBeInTheDocument();
-  });
-
   it('renders nothing while closed', () => {
     render(
       <TreeViewPanel
-        variant="window"
         isOpen={false}
         onClose={vi.fn()}
         treeData={['1']}
@@ -116,13 +96,12 @@ describe('TreeViewPanel — window variant', () => {
   });
 });
 
-describe('TreeViewPanel — drawer variant', () => {
+describe('TreeViewPanel — on a phone, in the page (LC77)', () => {
   beforeEach(() => setViewport(false));
 
-  it('is a modal dialog over the whole screen, named by its title', () => {
-    render(
+  it('opens in the page, full width, not as a dialog over the whole screen', () => {
+    const { container } = render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1']}
@@ -131,9 +110,12 @@ describe('TreeViewPanel — drawer variant', () => {
       />,
     );
 
-    const dialog = screen.getByRole('dialog', { name: "Struttura dell'Atto" });
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog.className).toContain('max-sm:h-full');
+    const region = screen.getByRole('region', { name: "Struttura dell'Atto" });
+    expect(container).toContainElement(region);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(container.querySelector('.fixed')).toBeNull();
+    // Rows a finger can hit.
+    expect(screen.getByRole('button', { name: 'Art. 1' }).className).toContain('min-h-[44px]');
   });
 
   it('also stays open after a pick', () => {
@@ -142,7 +124,6 @@ describe('TreeViewPanel — drawer variant', () => {
 
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={onClose}
         treeData={['1']}
@@ -164,7 +145,6 @@ describe('TreeViewPanel — rubriche', () => {
   it('renders a rubrica beside its article number', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['2043', '2044']}
@@ -186,7 +166,6 @@ describe('TreeViewPanel — rubriche', () => {
   it('renders the bare number for an article the export has no rubrica for', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['2043', '2044']}
@@ -211,7 +190,6 @@ describe('TreeViewPanel — rubriche', () => {
   it('survives an act with no rubriche at all (the Costituzione)', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1', '2']}
@@ -233,7 +211,6 @@ describe('TreeViewPanel — rubriche', () => {
 
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['2043']}
@@ -260,7 +237,6 @@ describe('TreeViewPanel — filter', () => {
   it('matches by article-number prefix', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1', '12', '120', '2043']}
@@ -280,7 +256,6 @@ describe('TreeViewPanel — filter', () => {
   it('matches by rubrica substring, ignoring accents', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1218', '2043']}
@@ -306,7 +281,6 @@ describe('TreeViewPanel — filter', () => {
   it('reports how many articles the filter kept', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1', '12', '120', '2043']}
@@ -322,7 +296,6 @@ describe('TreeViewPanel — filter', () => {
   it('shows an empty state when nothing matches', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1', '2']}
@@ -352,7 +325,6 @@ describe('TreeViewPanel — collapsible sections', () => {
   it('keeps sections expanded at or below the eight-section threshold', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={treeWithSections(3)}
@@ -370,7 +342,6 @@ describe('TreeViewPanel — collapsible sections', () => {
   it('starts collapsed above the threshold — the codice civile has 406 sections', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={treeWithSections(9)}
@@ -387,7 +358,6 @@ describe('TreeViewPanel — collapsible sections', () => {
   it('opens the section holding an already-loaded article', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={treeWithSections(9)}
@@ -404,7 +374,6 @@ describe('TreeViewPanel — collapsible sections', () => {
   it('expands a collapsed section from the keyboard', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={treeWithSections(9)}
@@ -426,7 +395,6 @@ describe('TreeViewPanel — collapsible sections', () => {
   it('auto-expands matching sections while a filter is active', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={treeWithSections(9)}
@@ -449,10 +417,9 @@ describe('TreeViewPanel — collapsible sections', () => {
 describe('TreeViewPanel — index rows, the details that regress silently', () => {
   beforeEach(() => setViewport(false));
 
-  it('keeps a 44px touch target on the drawer variant', () => {
+  it('keeps a 44px touch target on a phone', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['2043']}
@@ -468,7 +435,6 @@ describe('TreeViewPanel — index rows, the details that regress silently', () =
   it('lets a long article id widen its own row instead of spilling out of it', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['3', '2409-octiesdecies']}
@@ -487,7 +453,6 @@ describe('TreeViewPanel — index rows, the details that regress silently', () =
   it('keeps a loaded article focusable and tooltipped', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['2043']}
@@ -510,7 +475,6 @@ describe('TreeViewPanel — index rows, the details that regress silently', () =
     const onArticleSelect = vi.fn();
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['2043']}
@@ -530,7 +494,6 @@ describe('TreeViewPanel — index rows, the details that regress silently', () =
     const sections = Array.from({ length: 9 }, (_, i) => [`SEZIONE ${i + 1}`, `${i + 1}`]).flat();
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={sections}
@@ -561,7 +524,6 @@ describe('TreeViewPanel — article ids past "decies"', () => {
   it.each(LONG_IDS)('lists art. %s as an article, not a section header', (id) => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1', id]}
@@ -575,7 +537,6 @@ describe('TreeViewPanel — article ids past "decies"', () => {
   it('still treats an uppercase multi-word heading as a section title', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['LIBRO PRIMO DELLE PERSONE E DELLA FAMIGLIA', '1', '2']}
@@ -614,7 +575,6 @@ describe('TreeViewPanel — titles follow the annex', () => {
   it('leaves the Dispositivo unlabelled instead of borrowing the code body titles', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={[{ allegato: null, numero: '1' }, { allegato: null, numero: '2' }]}
@@ -637,7 +597,6 @@ describe('TreeViewPanel — titles follow the annex', () => {
   it('labels the code body from its own part', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={[
@@ -659,7 +618,6 @@ describe('TreeViewPanel — titles follow the annex', () => {
   it('marks a repealed article instead of leaving the row blank', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={[{ allegato: '2', numero: '3' }]}
@@ -676,7 +634,6 @@ describe('TreeViewPanel — titles follow the annex', () => {
   it('uses the flat map for an act with no parts', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['2043']}
@@ -695,7 +652,6 @@ describe('TreeViewPanel — titles follow the annex', () => {
   it('never falls back to the flat map for an act in parts', () => {
     render(
       <TreeViewPanel
-        variant="drawer"
         isOpen
         onClose={vi.fn()}
         treeData={['1', '2']}
@@ -735,7 +691,7 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
   it('shows no statistics, no subtitle and a plain title', () => {
     setViewport(true);
     render(
-      <TreeViewPanel variant="window" isOpen onClose={vi.fn()} treeData={['1', '2']} urn="urn:test" title="Struttura del Codice civile" loadedArticles={['1']} />,
+      <TreeViewPanel isOpen onClose={vi.fn()} treeData={['1', '2']} urn="urn:test" title="Struttura del Codice civile" loadedArticles={['1']} />,
     );
     expect(screen.getByRole('heading', { name: 'Struttura del Codice civile' })).toBeInTheDocument();
     expect(screen.queryByText(/articoli totali/i)).not.toBeInTheDocument();
@@ -746,7 +702,7 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
   it('opens on the part it is given, with the parts by their whole names in the act’s order', () => {
     setViewport(false);
     render(
-      <TreeViewPanel variant="drawer" isOpen onClose={vi.fn()} treeData={CC_TREE} urn="urn:test" annexes={CC_ANNEXES} currentAnnex="2" />,
+      <TreeViewPanel isOpen onClose={vi.fn()} treeData={CC_TREE} urn="urn:test" annexes={CC_ANNEXES} currentAnnex="2" />,
     );
     const menu = screen.getByLabelText("Parte dell'atto") as HTMLSelectElement;
     expect(menu.value).toBe('2');
@@ -764,7 +720,7 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
     setViewport(false);
     render(
       <TreeViewPanel
-        variant="drawer" isOpen onClose={vi.fn()} treeData={CC_TREE} urn="urn:test" annexes={CC_ANNEXES} currentAnnex="2"
+        isOpen onClose={vi.fn()} treeData={CC_TREE} urn="urn:test" annexes={CC_ANNEXES} currentAnnex="2"
         loadedArticles={['all2:2043']} activeArticle="all2:2043"
         rubricheParts={[{ name: 'CODICE CIVILE', keys: ['2043', '2044'], rubriche: { '2043': 'Risarcimento per fatto illecito' }, abrogati: [] }]}
       />,
@@ -782,7 +738,7 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
       return (
         <>
           <button type="button" onClick={() => setOpen(true)}>Struttura</button>
-          <TreeViewPanel variant="window" isOpen={open} onClose={() => { onClose(); setOpen(false); }} treeData={['1', '2']} urn="urn:test" />
+          <TreeViewPanel isOpen={open} onClose={() => { onClose(); setOpen(false); }} treeData={['1', '2']} urn="urn:test" />
         </>
       );
     }
@@ -811,7 +767,7 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
       return (
         <>
           <button type="button" onClick={() => setOpen(true)}>Struttura</button>
-          <TreeViewPanel variant="drawer" isOpen={open} onClose={() => { onClose(); setOpen(false); }} treeData={['1']} urn="urn:test" />
+          <TreeViewPanel isOpen={open} onClose={() => { onClose(); setOpen(false); }} treeData={['1']} urn="urn:test" />
         </>
       );
     }
@@ -827,21 +783,10 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
   });
 });
 
-describe('TreeViewPanel — a place stored by the old drag', () => {
-  it('keeps the whole window on screen, since it no longer moves', () => {
-    setViewport(true);
-    appStore.setState({ structureWindow: { blockId: 'block-a', position: { x: 5000, y: 5000 } } });
-    render(<TreeViewPanel variant="window" isOpen onClose={vi.fn()} treeData={['1']} urn="urn:test" title="Struttura" />);
-    const panel = screen.getByLabelText('Struttura, finestra');
-    expect(parseFloat(panel.style.top)).toBeLessThanOrEqual(window.innerHeight * 0.24);
-    expect(parseFloat(panel.style.left)).toBeLessThanOrEqual(window.innerWidth - 420);
-  });
-});
-
 describe('TreeViewPanel — the consultant’s notes on #557', () => {
   beforeEach(() => setViewport(true));
   const panel = (extra: Partial<React.ComponentProps<typeof TreeViewPanel>> = {}) => (
-    <TreeViewPanel variant="window" isOpen onClose={vi.fn()} treeData={['1', '2', '3']} urn="urn:test" {...extra} />
+    <TreeViewPanel isOpen onClose={vi.fn()} treeData={['1', '2', '3']} urn="urn:test" {...extra} />
   );
 
   it('empties a filled filter on the first Esc and closes on the second', () => {
