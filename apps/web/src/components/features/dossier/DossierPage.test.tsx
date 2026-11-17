@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true }) }));
@@ -11,8 +11,15 @@ vi.mock('../../../services/dossierService', async (importOriginal) => {
 });
 
 import { appStore } from '../../../store/useAppStore';
+import { dossierService } from '../../../services/dossierService';
+import { bookmarkService } from '../../../services/bookmarkService';
+import { environmentService } from '../../../services/environmentService';
+import { quickNormService } from '../../../services/quickNormService';
+import { customAliasService } from '../../../services/customAliasService';
 import { DossierPage } from './DossierPage';
 import { sectionStore } from '../../../features/sections/useSection';
+
+const original = appStore.getState().fetchUserData;
 
 describe('DossierPage', () => {
   it('opens the trash on ?trash=1', async () => {
@@ -65,5 +72,36 @@ describe('DossierPage', () => {
     render(<MemoryRouter initialEntries={['/pratiche?dossier=zz']}><DossierPage /></MemoryRouter>);
     expect(screen.getByText('Questa pratica non c’è o non è tua.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vai alle pratiche' })).toBeInTheDocument();
+  });
+
+  it('LC73: when the pratiche cannot be read, «Riprova» reads them again', () => {
+    const fetchUserData = vi.fn(async () => {});
+    appStore.setState({ dossiers: [], dossiersLoaded: false, isDataLoaded: false, isLoadingData: false, dataError: 'giù', fetchUserData });
+    render(<MemoryRouter initialEntries={['/pratiche?dossier=zz']}><DossierPage /></MemoryRouter>);
+    expect(screen.getByText('Non riesco a leggere le pratiche: riprova tra poco.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(fetchUserData).toHaveBeenCalledTimes(1);
+    appStore.setState({ dataError: null, fetchUserData: original });
+  });
+
+  it.each(['/pratiche?dossier=zz', '/pratiche'])('LC73: /api/dossiers answering 503 on %s says so, with «Riprova», never «non c’è» or «nessuna»', async (path) => {
+    const unavailable = Object.assign(new Error('Service Unavailable'), { status: 503 });
+    const spies = [
+      vi.spyOn(dossierService, 'getAll').mockRejectedValue(unavailable),
+      vi.spyOn(bookmarkService, 'getAll').mockResolvedValue([]),
+      vi.spyOn(environmentService, 'getAll').mockResolvedValue([]),
+      vi.spyOn(quickNormService, 'getAll').mockResolvedValue([]),
+      vi.spyOn(customAliasService, 'getAll').mockResolvedValue([]),
+    ];
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.setState({ dossiers: [], dossiersLoaded: false, isDataLoaded: false, isLoadingData: false, dataError: null });
+    await act(() => appStore.getState().fetchUserData());
+    render(<MemoryRouter initialEntries={[path]}><DossierPage /></MemoryRouter>);
+    expect(screen.getByText('Non riesco a leggere le pratiche: riprova tra poco.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
+    expect(screen.queryByText(/non c’è o non è tua|^Nessuna /)).toBeNull();
+    spies.forEach((spy) => spy.mockRestore());
+    vi.mocked(console.error).mockRestore();
+    appStore.setState({ dataError: null });
   });
 });

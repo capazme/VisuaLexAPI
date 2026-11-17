@@ -25,6 +25,11 @@ describe('VersionStatusChip', () => {
         expect(button.className).not.toMatch(/\bbg-|\bpx-|rounded-full/);
     });
 
+    it('under the pointer has the ground and no underline (LC73)', () => {
+        render(<VersionStatusChip chip={chip()} onClick={() => {}} />);
+        expect(screen.getByRole('button').className).not.toMatch(/underline/);
+    });
+
     it('opens the date dialog when pressed', () => {
         const onClick = vi.fn();
         render(<VersionStatusChip chip={chip({ tone: 'current', label: 'In vigore dal 28 dicembre 2025' })} onClick={onClick} />);

@@ -439,7 +439,7 @@ describe('«Le mie schede», the detail', () => {
     renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     expect(within(detail).getByText('Perché la prestazione è corrispettiva.')).toBeInTheDocument();
-    expect(within(detail).getByText('scritta da Claude Code (applicazione collegata)')).toBeInTheDocument();
+    expect(within(detail).getByText('scritta da Claude Code, applicazione collegata')).toBeInTheDocument();
     expect(within(detail).getByText('Da rivedere')).toBeInTheDocument();
     expect(within(detail).getByText(/Diritto civile · Risoluzione per inadempimento · Definizione/)).toBeInTheDocument();
   });

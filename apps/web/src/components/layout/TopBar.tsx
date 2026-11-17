@@ -87,6 +87,8 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
           event.currentTarget.focus({ preventScroll: true });
           onSearch();
         }}
+        // The phone's name too: the placeholder words are not the button's purpose.
+        aria-label="Apri il menu di ricerca"
         aria-keyshortcuts="Meta+K Control+K"
         className={cn(
           'flex h-8 w-[22rem] items-center gap-2 rounded-full pl-3 pr-2 text-[13px] text-slate-600 transition-colors', ISLAND_SURFACE,
