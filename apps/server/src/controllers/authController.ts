@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { Request, Response } from 'express';
-import type { User } from '@prisma/client';
+import { Prisma, type User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { atLeastUnits } from '../utils/utf16Length';
@@ -62,39 +63,78 @@ const toMeResponse = (user: User) => ({
   last_login_at: user.lastLoginAt,
 });
 
-// Register - creates inactive user pending admin approval
+const REGISTERED = {
+  message: 'Registrazione completata. Il tuo account è in attesa di approvazione da parte di un amministratore.',
+  pending_approval: true,
+};
+const USERNAME_TAKEN = 'User with this email or username already exists';
+
+const isUniqueClash = (error: unknown): error is Prisma.PrismaClientKnownRequestError =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
+/**
+ * Register - creates inactive user pending admin approval.
+ *
+ * Which emails have an account is nobody's business (item 9 of the security inventory, G-520 (a)). A username already
+ * taken says so first, whatever the email, since usernames are public (the Forum shows them), with the words the web
+ * already translates: checked after the email, it would have told a taken email apart (201) from a free one (400).
+ * With a free username, an email that already has an account gets exactly the answer of a new registration, after
+ * the same work (the password is hashed and thrown away), and nothing is created or changed.
+ *
+ * Accepted residual risk, until the e-mail is confirmed (self-service sign-up, parked): someone can register the email
+ * with a new username, then try that username again with another email. The second answer tells whether the first
+ * created an account, so whether the email was free. It leaves a pending account in the email's name, which the
+ * administrators see.
+ */
 export const register = async (req: Request, res: Response) => {
   const { email, username, password } = registerSchema.parse(req.body);
 
-  // Check if user already exists
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ email }, { username }],
-    },
-  });
-
-  if (existingUser) {
-    throw new AppError(400, 'User with this email or username already exists');
+  const [emailTaken, usernameTaken] = await Promise.all([
+    prisma.user.findUnique({ where: { email }, select: { id: true } }),
+    prisma.user.findUnique({ where: { username }, select: { id: true } }),
+  ]);
+  const hashedPassword = await hashPassword(password);
+  if (usernameTaken) {
+    throw new AppError(400, USERNAME_TAKEN);
+  }
+  if (emailTaken) {
+    res.status(201).json(REGISTERED);
+    return;
   }
 
-  // Hash password
-  const hashedPassword = await hashPassword(password);
-
-  // Create user with isActive: false (requires admin approval)
-  await prisma.user.create({
-    data: {
-      email,
-      username,
-      password: hashedPassword,
-      isActive: false, // User must be approved by admin
-    },
-  });
+  try {
+    // Create user with isActive: false (requires admin approval)
+    await prisma.user.create({
+      data: {
+        email,
+        username,
+        password: hashedPassword,
+        isActive: false, // User must be approved by admin
+      },
+    });
+  } catch (error) {
+    // Two registrations at once with the same email or username: the second meets the unique index. Answered as the
+    // checks above would have answered it, so the race says nothing more than they do.
+    if (!isUniqueClash(error)) throw error;
+    if (await prisma.user.findUnique({ where: { username }, select: { id: true } })) {
+      throw new AppError(400, USERNAME_TAKEN);
+    }
+    res.status(201).json(REGISTERED);
+    return;
+  }
 
   // Don't generate tokens - user cannot login until approved
-  res.status(201).json({
-    message: 'Registrazione completata. Il tuo account è in attesa di approvazione da parte di un amministratore.',
-    pending_approval: true,
-  });
+  res.status(201).json(REGISTERED);
+};
+
+/**
+ * A bcrypt hash of nothing anyone knows, at the cost `hashPassword` uses: a sign-in with an unknown email compares
+ * against it, so it takes as long as a wrong password and the time of the answer does not tell which emails exist.
+ */
+// Computed when the module loads, not on the first unknown email: that first sign-in would otherwise take twice as long.
+const decoyHash = hashPassword(randomUUID());
+const spendAPasswordCheck = async (password: string): Promise<void> => {
+  await verifyPassword(password, await decoyHash);
 };
 
 // Login
@@ -107,6 +147,7 @@ export const login = async (req: Request, res: Response) => {
   });
 
   if (!user) {
+    await spendAPasswordCheck(password);
     throw new AppError(401, 'Invalid credentials');
   }
 
