@@ -34,9 +34,9 @@ export function NotesHighlightsButtons({
 }: NotesHighlightsButtonsProps) {
     if (labelled) {
         const word = cn(
-            'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600 transition-colors',
-            'hover:bg-slate-100 hover:text-slate-900 aria-expanded:bg-slate-200/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
-            'dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:aria-expanded:bg-slate-800 dark:aria-expanded:text-white',
+            'vlx-hover-tile inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600',
+            'hover:text-slate-900 aria-expanded:bg-slate-200/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
+            'dark:text-slate-300 dark:hover:text-white dark:aria-expanded:bg-slate-800 dark:aria-expanded:text-white',
             'disabled:cursor-not-allowed disabled:opacity-40',
             FOCUS_RING,
         );

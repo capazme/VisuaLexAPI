@@ -46,9 +46,9 @@ export interface PracticeActBlockProps {
  * article's actions; 36 px, on a computer only (a phone has them in «⋯»). The 44 px below `md` is for a narrow window.
  */
 const TOOL_BUTTON =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40';
+  'vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40';
 const MENU_TRIGGER =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:bg-slate-800';
+  'vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:bg-slate-800';
 
 /** A row's chip in the act's index: «2043», «All. A 1», «5 · testo al 29/12/2007». */
 function chipLabel(article: ArticleData): string {

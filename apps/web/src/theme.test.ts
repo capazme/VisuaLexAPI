@@ -810,3 +810,37 @@ describe('the section change (T1)', () => {
     expect(css).toMatch(/\.motion-reduce\\:transition-none\s*\{\s*@media \(prefers-reduced-motion: reduce\)\s*\{\s*transition-property:\s*none/);
   }, 30000);
 });
+
+describe('the ground under the pointer, one source for rows of commands (LC72)', () => {
+  /** The rules `.vlx-hover-tile` compiles to, with the tabs' own utility beside them for the same colour. */
+  async function tile() {
+    const css = await compile(['bg-ink-200/70', 'dark:bg-ink-800/60']);
+    const start = css.indexOf('.vlx-hover-tile {');
+    return { css, block: css.slice(start, css.indexOf('@media print', start)) };
+  }
+
+  it('is the tabs\' ground: ink 200 at 70 %, ink 800 at 60 % in the dark, in 100 ms on the strong ease-out', async () => {
+    const { css, block } = await tile();
+    const light = /\.bg-ink-200\\\/70\s*\{\s*background-color:\s*([^;]+);/.exec(css)?.[1];
+    expect(light).toBeTruthy();
+    expect(block).toContain(`background-color: ${light};`);
+    expect(block).toContain('var(--color-ink-800) 60%');
+    expect(block).toMatch(/transition-duration:\s*100ms/);
+    expect(block).toMatch(/transition-timing-function:\s*var\(--ease-out\)/);
+  }, 30000);
+
+  it('answers neither a disabled button nor a pressed or open one, and the pointer only where there is one', async () => {
+    const { block } = await tile();
+    const guard = ':not(:disabled, [aria-pressed="true"], [aria-expanded="true"])';
+    expect(block).toContain(`.vlx-hover-tile${guard}:focus-visible`);
+    expect(block).toMatch(/@media \(hover: hover\)\s*\{\s*\.vlx-hover-tile:not\(:disabled, \[aria-pressed="true"\], \[aria-expanded="true"\]\):hover/);
+    // No `:hover` outside the media query: a tap on a phone leaves nothing behind.
+    expect(block.split('@media (hover: hover)')[0]).not.toContain(':hover');
+  }, 30000);
+
+  it('moves colour only, so with reduced motion the ground appears and nothing slides', async () => {
+    const { block } = await tile();
+    expect(block).toMatch(/transition-property:\s*color, background-color;/);
+    expect(block).not.toMatch(/transform|translate|scale|box-shadow/);
+  }, 30000);
+});
