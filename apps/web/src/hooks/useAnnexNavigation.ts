@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { extractArticleIdsFromTree, normalizeArticleId, type TreeNode } from '../utils/treeUtils';
 import { getUniqueArticleId } from '../utils/articleIds';
+import { mainAnnex } from '../utils/actTree';
 import type { Norma, ArticleData, TreeMetadata } from '../types';
 import { legalFetch } from '../services/legalFetch';
 import { fetchActRubriche, fetchActTree, type RubrichePart } from '../utils/actStructureCache';
@@ -99,10 +100,12 @@ export function useAnnexNavigation({
   // Where a loaded article lands: the practice's act, else nowhere (a global search).
   const land = addArticles ?? null;
 
-  // Derive current annex from active article (if provided) or first loaded article
+  // Derive current annex from active article (if provided) or first loaded article. With none open, the act's main
+  // part (LC71): the codice civile's own text, not the two articles of its r.d. 262/1942 — the index opens there and
+  // the arrows count its articles.
   const currentAnnex = activeArticle?.norma_data?.allegato
     ?? articles[0]?.norma_data?.allegato
-    ?? null;
+    ?? (articles.length === 0 ? mainAnnex(norma.tipo_atto, treeMetadata?.annexes) : null);
 
   // Loaded article unique identifiers — distinguishes between "Art 1"
   // (main body) and "Art 1" (annex 2). Shared helper keeps the encoding

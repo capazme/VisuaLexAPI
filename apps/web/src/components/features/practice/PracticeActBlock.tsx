@@ -29,7 +29,8 @@ import { useTour } from '../../../hooks/useTour';
 import { formatNormaMeta } from '../../../utils/normaMeta';
 import { actHeading } from '../../../utils/sources';
 import { READ_ONLY_REASON, describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
-import { filterLoadedIdsForAnnex } from '../../../utils/articleIds';
+import { filterLoadedIdsForAnnex, getUniqueArticleId } from '../../../utils/articleIds';
+import { structureTitle } from '../../../utils/actTree';
 import { findPracticeArticle, isBoundPractice, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
 
 export interface PracticeActBlockProps {
@@ -519,8 +520,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         onClose={isDesktop ? closeStructureWindow : closeDrawer}
         treeData={treeData || []}
         urn={act.norma.urn || ''}
-        title="Struttura dell'atto"
+        title={structureTitle(heading)}
         loadedArticles={loadedArticleIds}
+        activeArticle={current ? getUniqueArticleId(current) : undefined}
         onArticleSelect={(articleNumber, targetAnnex) => openArticle(articleNumber, targetAnnex)}
         annexes={treeMetadata?.annexes}
         currentAnnex={currentAnnex}
