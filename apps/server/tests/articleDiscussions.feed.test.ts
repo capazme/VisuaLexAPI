@@ -267,7 +267,7 @@ describe('one glossa', () => {
     // Its author still reads the hidden reply, with the moderation's notice (§5.7).
     const author = await get(bob, thread.id);
     expect(author.body.isOwner).toBe(false);
-    expect(author.body.replies.map((c: { body: string; hidden: unknown }) => [c.body, c.hidden])).toEqual([['Visibile.', null], ['Nascosta.', { category: null }]]);
+    expect(author.body.replies.map((c: { body: string; hidden: unknown }) => [c.body, c.hidden])).toEqual([['Visibile.', null], ['Nascosta.', { category: null, appeal: null }]]);
   });
 
   it('withholds a decision’s quotation as the feed does', async () => {

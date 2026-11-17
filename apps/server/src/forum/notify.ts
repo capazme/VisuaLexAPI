@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
-export type NotificationKind = 'reply' | 'comment' | 'accepted' | 'hidden';
+export type NotificationKind = 'reply' | 'comment' | 'accepted' | 'hidden' | 'validated' | 'appeal';
 
 /**
  * Tells a contribution's author what happened to it (spec 2026-10-20 §6.5), in the transaction of the
