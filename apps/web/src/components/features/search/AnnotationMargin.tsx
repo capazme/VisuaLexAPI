@@ -397,7 +397,26 @@ export function AnnotationMargin({
                         className="vlx-gloss-column"
                         style={layout && !aside ? { height: layout.height } : undefined}
                     >
-                        {aside ?? entries.map((entry) => {
+                        {aside != null ? (
+                            <>
+                                {/* A note being written stays in the column, in the flow, over the aside. */}
+                                {hasDraft && draft && (
+                                    <div className="mb-3">
+                                        <NoteDraftCard
+                                            key={draftKey}
+                                            ref={(el: HTMLElement | null) => keepCard('draft', el)}
+                                            text={draft.text}
+                                            value={draftText}
+                                            onChange={writeDraft}
+                                            onSave={saveDraft}
+                                            onCancel={cancelDraft}
+                                            placed
+                                        />
+                                    </div>
+                                )}
+                                {aside}
+                            </>
+                        ) : entries.map((entry) => {
                             const top = layout?.tops[entry.key];
                             return (
                                 <div

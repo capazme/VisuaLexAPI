@@ -25,17 +25,24 @@ function contentWidth(el: HTMLElement) {
     return el.clientWidth - (Number.parseFloat(style.paddingLeft) || 0) - (Number.parseFloat(style.paddingRight) || 0);
 }
 
+/** The reading area the margin needs, the brief's «about 1100 px»: the card at the measure (44rem) and the margin. */
+const AREA_REM = 44 + SPAN_REM;
+
 /**
- * Whether the card can widen by the margin: only the one-act card of the Ricerca grows (`PracticeTable`'s
- * `data-glosses-room`), up to what holds it; a card already widened by a margin counts as it was.
+ * Where the margin has room, in the one-act card of the Ricerca (`PracticeTable`'s `data-glosses-room`), the only one
+ * that grows. `column`: the reading area is wide enough (`AREA_REM`): the notes' column, where it is, may take the
+ * glosses. `beside`: besides, the card can widen by the margin up to what holds it (a card already widened by a margin
+ * counts as it was). Elsewhere (a window, the index, the grid of acts, a narrow window): none, under the text.
  */
-export function roomBeside(root: HTMLElement): boolean {
+export function marginRoom(root: HTMLElement): { column: boolean; beside: boolean } {
     const room = root.closest<HTMLElement>('[data-glosses-room]');
     const outer = room?.parentElement;
-    if (!room || !outer) return false;
+    if (!room || !outer) return { column: false, beside: false };
+    const area = contentWidth(outer);
     const span = SPAN_REM * remPx();
     const widened = room.querySelector('[data-glosses-beside]') ? span : 0;
-    return contentWidth(outer) - (room.getBoundingClientRect().width - widened) >= span - 0.5;
+    const column = area >= AREA_REM * remPx() - 0.5;
+    return { column, beside: column && area - (room.getBoundingClientRect().width - widened) >= span - 0.5 };
 }
 
 /** Where an element is now, its own animations included. */
@@ -65,18 +72,21 @@ interface Options {
  */
 export function useGlossMargin({ open, rootRef, columnShown }: Options) {
     const [host] = useState(() => (typeof document === 'undefined' ? null : document.createElement('div')));
-    const [roomy, setRoomy] = useState(false);
+    const [room, setRoom] = useState({ column: false, beside: false });
     const [shown, setShown] = useState(false);
     const [textWidth, setTextWidth] = useState<number | null>(null);
     const [besideSlot, setBesideSlot] = useState<HTMLElement | null>(null);
     const [columnSlot, setColumnSlot] = useState<HTMLElement | null>(null);
     const [belowSlot, setBelowSlot] = useState<HTMLElement | null>(null);
-    const placement: GlossPlacement = columnShown ? 'column' : roomy ? 'beside' : 'below';
+    const placement: GlossPlacement = columnShown ? (room.column ? 'column' : 'below') : room.beside ? 'beside' : 'below';
 
     useLayoutEffect(() => {
         const root = rootRef.current;
         if (!root) return undefined;
-        const check = () => setRoomy(roomBeside(root));
+        const check = () => {
+            const next = marginRoom(root);
+            setRoom((was) => (was.column === next.column && was.beside === next.beside ? was : next));
+        };
         check();
         const outer = root.closest('[data-glosses-room]')?.parentElement;
         if (!outer || typeof ResizeObserver === 'undefined') return undefined;

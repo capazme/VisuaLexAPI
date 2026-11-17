@@ -834,7 +834,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // The glosses at the margin (LC74): beside the text where the card can widen, in the notes' column where that is
     // already there, else under the text. One margin per article, opened on its own.
     const articleRootRef = useRef<HTMLDivElement>(null);
-    const glossesEnabled = Boolean(discussionAnchor.articleId) && Boolean(article_text) && !readOnly;
+    // As the side panel was: an article with an id, not a past text (a notice in place of the text keeps its glosses).
+    const glossesEnabled = Boolean(discussionAnchor.articleId) && !readOnly;
     const [glossCount, setGlossCount] = useState(0);
     const glossMargin = useGlossMargin({ open: discussion.open && glossesEnabled, rootRef: articleRootRef, columnShown: marginShown });
     const glossBeside = glossMargin.shown && glossMargin.placement === 'beside';

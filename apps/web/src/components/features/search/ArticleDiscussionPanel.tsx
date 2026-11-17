@@ -189,6 +189,13 @@ export function ArticleDiscussionPanel({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose, isMargin]);
 
+  // The margin opened: the focus goes into it, so the keyboard does not cross the whole article to reach it (its slot
+  // beside the text comes after it in the page); the composer's field takes it instead when that is what was asked.
+  useEffect(() => {
+    if (!isMargin || !isOpen || draft) return;
+    panelRef.current?.focus({ preventScroll: true });
+  }, [isMargin, isOpen, draft]);
+
   // In the margin the composer opens on a request (its line, or «Discuti» on words): the reader goes on writing in it.
   const composerRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -597,9 +604,10 @@ export function ArticleDiscussionPanel({
       // In the page's flow, beside or under the text (LC74): no portal, no veil, nothing over the page.
       <section
         ref={panelRef}
+        tabIndex={-1}
         aria-labelledby={marginHeadingId}
         data-gloss-margin=""
-        className="space-y-3"
+        className="space-y-3 outline-none"
         onKeyDown={event => {
           if (event.key !== 'Escape') return;
           event.stopPropagation();
