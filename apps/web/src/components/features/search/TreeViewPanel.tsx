@@ -426,7 +426,15 @@ export function TreeViewPanel({
   );
 
   return (
-    <Expand id={id} open={isOpen} onClose={onClose} initialFocusRef={filterRef} onKeyDown={onKeyDown}>
+    <Expand
+      id={id}
+      open={isOpen}
+      onClose={onClose}
+      initialFocusRef={filterRef}
+      onKeyDown={onKeyDown}
+      // Opened on a page scrolled down, its title lands under the act's sticky heading (`--practice-head`), not behind it.
+      className="scroll-mt-[calc(var(--practice-head,0px)+0.5rem)]"
+    >
       {/* In the card, between its heading and its text: a list as long as the c.c.'s scrolls inside its own height. */}
       <section
         aria-labelledby={titleId}

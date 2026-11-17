@@ -137,6 +137,29 @@ describe('Expand', () => {
     }
   });
 
+  it('on opening comes into view from its start, smoothly, and at once under reduced motion', () => {
+    let heightsAtScroll = -1;
+    const scroll = vi.fn(() => { heightsAtScroll = heights().length; });
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      render(<Harness />);
+      const button = screen.getByRole('button', { name: 'Apri' });
+      fireEvent.click(button);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      expect(scroll.mock.contexts[0]).toBe(screen.getByRole('textbox', { name: 'Campo' }).closest('#space'));
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' });
+      // Brought into view while it has its natural height, before the opening starts from none.
+      expect(heightsAtScroll).toBe(0);
+      fireEvent.click(button);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      window.matchMedia = ((query: string) => ({ matches: query.includes('reduce'), media: query })) as unknown as typeof window.matchMedia;
+      fireEvent.click(button);
+      expect(scroll).toHaveBeenLastCalledWith({ block: 'nearest', behavior: 'auto' });
+    } finally {
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+    }
+  });
+
   it('without Web Animations opens and closes at once', () => {
     delete (Element.prototype as Partial<Element>).animate;
     render(<Harness />);

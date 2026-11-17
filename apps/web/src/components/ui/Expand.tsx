@@ -60,13 +60,20 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
       if (opener?.isConnected && (active === document.body || active === null || outer?.contains(active))) opener.focus({ preventScroll: true });
     }
 
-    if (initial || !outer || !inner || !canAnimate()) return;
+    // Brought into view from its start, clear of what sticks above it (its `scroll-margin-top`, the scroller's padding),
+    // while it still has its natural height: a page scrolled down would leave its title under a sticky heading.
+    const reveal = () => outer?.scrollIntoView?.({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    if (initial || !outer || !inner || !canAnimate()) {
+      if (open && !initial) reveal();
+      return;
+    }
     // Where the last movement is now, read before it is cancelled: the new one starts there.
     const moving = running.current.length > 0;
     const fromHeight = moving ? outer.getBoundingClientRect().height : open ? 0 : outer.offsetHeight;
     const fromOpacity = moving ? Number(getComputedStyle(inner).opacity) : open ? 0 : 1;
     running.current.forEach((a) => a.cancel());
     running.current = [];
+    if (open) reveal();
 
     const timing = open ? ISLAND_OPEN : ISLAND_CLOSE;
     const fill: FillMode = open ? 'none' : 'forwards';
