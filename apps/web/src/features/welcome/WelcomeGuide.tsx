@@ -7,9 +7,9 @@ import { focusSearchFieldOrPalette, PALETTE_SHORTCUT } from '../../utils/searchF
 import { closeWelcomeGuide, useWelcomeGuideOpen } from './welcomeGuideStore';
 
 const SECTIONS: { name: string; line: string; plate: IllustrationName }[] = [
-  { name: 'Work', line: 'Cerchi le norme, le tieni nei dossier, scrivi gli atti.', plate: 'dossier-vuoti' },
+  { name: 'Work', line: 'Cerchi le norme, le tieni nelle pratiche, scrivi gli atti.', plate: 'dossier-vuoti' },
   { name: 'Learn', line: 'Ripassi ogni giorno le schede, materia per materia.', plate: 'learn-ripasso' },
-  { name: 'Forum', line: 'Discuti norme e sentenze, pubblichi i tuoi dossier.', plate: 'forum-vuoto' },
+  { name: 'Forum', line: 'Discuti norme e sentenze, pubblichi le fonti delle tue pratiche.', plate: 'forum-vuoto' },
 ];
 
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];

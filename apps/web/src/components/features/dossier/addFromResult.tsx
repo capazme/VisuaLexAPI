@@ -18,7 +18,7 @@ export function useHeldInLabel(target: DossierTarget | undefined): string | null
     if (!target) return null;
     const held = dossiers.filter((d) => ('norma' in target ? dossierContainsArticle(d, target.norma) : dossierContainsDecision(d, target.sentenza)));
     if (held.length === 0) return null;
-    return held.length === 1 ? `Nel dossier «${held[0].title}»` : `In ${held.length} dossier`;
+    return held.length === 1 ? `Nella pratica «${held[0].title}»` : `In ${held.length} pratiche`;
   }, [dossiers, target]);
 }
 

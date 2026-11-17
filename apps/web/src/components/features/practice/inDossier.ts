@@ -68,8 +68,8 @@ export function useArticleInDossier(norma: NormaVisitata): RowDossier | undefine
   return useRowDossier(
     (d) => articleItemIds(d, norma),
     (dossierId) => appStore.getState().addToDossier(dossierId, norma, 'norma'),
-    'Articolo tolto dal dossier',
-    'Aggiunto al dossier',
+    'Articolo tolto dalla pratica',
+    'Aggiunto alla pratica',
   );
 }
 
@@ -86,8 +86,8 @@ export function useDecisionInDossier(entry: PracticeDecision): RowDossier | unde
   return useRowDossier(
     (d) => decisionItemIds(d, entry),
     entry.identified ? (dossierId) => appStore.getState().addToDossier(dossierId, decisionEntrySentenza(entry)!, 'sentenza') : undefined,
-    'Sentenza tolta dal dossier',
-    'Aggiunta al dossier',
+    'Sentenza tolta dalla pratica',
+    'Aggiunta alla pratica',
   );
 }
 
@@ -141,11 +141,11 @@ export function rowDossierItems(row: RowDossier, removeFromTable: () => void): M
   if (row.inDossier) {
     return [
       { label: row.important ? 'Rimuovi da importanti' : 'Segna come importante', icon: Star, onSelect: row.toggleImportant },
-      { label: 'Togli dal dossier', icon: FolderMinus, danger: true, separatorBefore: true, onSelect: row.remove },
+      { label: 'Togli dalla pratica', icon: FolderMinus, danger: true, separatorBefore: true, onSelect: row.remove },
     ];
   }
   return [
-    ...(row.add ? [{ label: 'Aggiungi al dossier', icon: FolderPlus, onSelect: row.add }] : []),
+    ...(row.add ? [{ label: 'Aggiungi alla pratica', icon: FolderPlus, onSelect: row.add }] : []),
     { label: 'Togli dal tavolo', icon: X, danger: true, onSelect: removeFromTable },
   ];
 }

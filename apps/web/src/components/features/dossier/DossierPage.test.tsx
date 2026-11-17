@@ -17,7 +17,7 @@ import { sectionStore } from '../../../features/sections/useSection';
 describe('DossierPage', () => {
   it('opens the trash on ?trash=1', async () => {
     appStore.setState({ dossiers: [] });
-    render(<MemoryRouter initialEntries={['/dossier?trash=1']}><DossierPage /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/pratiche?trash=1']}><DossierPage /></MemoryRouter>);
     expect(screen.getByRole('heading', { level: 1, name: 'Cestino' })).toBeInTheDocument();
     expect(await screen.findByText('Il cestino è vuoto')).toBeInTheDocument();
   });
@@ -25,7 +25,7 @@ describe('DossierPage', () => {
   it("takes a dossier opened by its address to its kind's section, from any section (sections spec S7)", () => {
     sectionStore.setState({ section: 'forum', dossierKind: 'lavoro' });
     appStore.setState({ dossiers: [{ id: 's', title: 'Diritto penale', kind: 'studio', createdAt: '2026-10-01T00:00:00Z', items: [] }] });
-    render(<MemoryRouter initialEntries={['/dossier?dossier=s']}><DossierPage /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/pratiche?dossier=s']}><DossierPage /></MemoryRouter>);
     expect(sectionStore.getState()).toMatchObject({ section: 'gymnasium', dossierKind: 'studio' });
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
   });

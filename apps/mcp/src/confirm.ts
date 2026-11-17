@@ -69,12 +69,12 @@ export function deletionMessage(what: {
   // The fixed words come first, so no stored text can pose as the question.
   const tasks = what.tasks ? ` e ${what.tasks} ${what.tasks === 1 ? 'compito' : 'compiti'}` : '';
   const head = what.wholeDossier
-    ? `ELIMINAZIONE — Spostare nel cestino il dossier «${name}» con ${what.total} ${what.total === 1 ? 'voce' : 'voci'}${tasks}?`
-    : `ELIMINAZIONE — Spostare nel cestino ${what.total} ${what.total === 1 ? 'voce' : 'voci'} del dossier «${name}»?`;
+    ? `ELIMINAZIONE — Spostare nel cestino la pratica «${name}» con ${what.total} ${what.total === 1 ? 'voce' : 'voci'}${tasks}?`
+    : `ELIMINAZIONE — Spostare nel cestino ${what.total} ${what.total === 1 ? 'voce' : 'voci'} della pratica «${name}»?`;
   const shown = what.lines.slice(0, MAX_LINES).map((line) => `- ${clean(line)}`);
   if (what.lines.length > MAX_LINES) shown.push(`e altre ${what.lines.length - MAX_LINES}${hiddenKinds(what.kinds?.slice(MAX_LINES))}`);
   const notes = what.attachedNotesStaying
-    ? [`${what.attachedNotesStaying} ${what.attachedNotesStaying === 1 ? 'nota collegata resta' : 'note collegate restano'} nel dossier.`]
+    ? [`${what.attachedNotesStaying} ${what.attachedNotesStaying === 1 ? 'nota collegata resta' : 'note collegate restano'} nella pratica.`]
     : [];
   return [head, ...shown, ...notes, `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di VisuaLex.`].join('\n');
 }

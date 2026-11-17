@@ -49,7 +49,7 @@ export interface PracticeRowShellProps {
 export function NotInDossier() {
   return (
     <span className="flex-shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-      Non nel dossier
+      Non nella pratica
     </span>
   );
 }
@@ -74,7 +74,7 @@ export function PracticeRowShell({
   const adding = useAddToDossier(corpus);
   // The toggle's name replaces its content: it carries the mark's words, and the star's (LC58).
   const name = outside
-    ? `${shownName}, non nel dossier`
+    ? `${shownName}, non nella pratica`
     : starred
       ? `${shownName}, importante`
       : heldIn ? `${shownName}, ${heldIn.charAt(0).toLowerCase()}${heldIn.slice(1)}` : shownName;
@@ -126,16 +126,16 @@ export function PracticeRowShell({
         </div>
         {/* Beside the mark on a computer; a phone has it in «⋯», where the row's name needs the width. */}
         {outside && dossier.add && (
-          <button type="button" onClick={dossier.add} aria-label={`Aggiungi al dossier ${removeName}`} className={cn(ADD_BUTTON, 'hidden md:flex')}>
+          <button type="button" onClick={dossier.add} aria-label={`Aggiungi alla pratica ${removeName}`} className={cn(ADD_BUTTON, 'hidden md:flex')}>
             <FolderPlus size={14} aria-hidden />
-            Aggiungi al dossier
+            Aggiungi alla pratica
           </button>
         )}
         {corpus && (
-          <button type="button" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi al dossier ${removeName}`} title="Aggiungi al dossier" className={cn(ADD_BUTTON, 'hidden md:flex')}>
+          <button type="button" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi alla pratica ${removeName}`} title="Aggiungi alla pratica" className={cn(ADD_BUTTON, 'hidden md:flex')}>
             <FolderPlus size={14} aria-hidden />
             {/* Icon only in a narrow column: the row's name is never the one cut. */}
-            <span className="hidden @[40rem]:inline">Aggiungi al dossier</span>
+            <span className="hidden @[40rem]:inline">Aggiungi alla pratica</span>
           </button>
         )}
         {beside && (folded ? (
@@ -177,7 +177,7 @@ export function PracticeRowShell({
                 className="md:hidden"
                 triggerClassName={MENU_TRIGGER}
                 items={[
-                  { label: 'Aggiungi al dossier', icon: FolderPlus, onSelect: () => adding.open(null) },
+                  { label: 'Aggiungi alla pratica', icon: FolderPlus, onSelect: () => adding.open(null) },
                   { label: 'Togli dal tavolo', icon: X, danger: true, onSelect: onRemove },
                 ]}
               >

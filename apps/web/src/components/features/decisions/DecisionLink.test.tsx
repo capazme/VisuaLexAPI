@@ -99,9 +99,9 @@ describe('DecisionLink', () => {
   });
 
   it('navigates to the address anywhere else, from the preview, opening nothing itself', async () => {
-    renderAt('/dossier', <DecisionLink to={REF}>x</DecisionLink>);
+    renderAt('/pratiche', <DecisionLink to={REF}>x</DecisionLink>);
     await preview();
-    expect(screen.getByTestId('where')).toHaveTextContent('/dossier');
+    expect(screen.getByTestId('where')).toHaveTextContent('/pratiche');
     openFromPreview(/^Apri la sentenza$/);
     expect(openDecision).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/sentenze/cassazione-civile/99999/2024');
@@ -158,7 +158,7 @@ describe('DecisionLink', () => {
     });
 
     it.each([
-      ['a click off the search page', '/dossier', {}],
+      ['a click off the search page', '/pratiche', {}],
       ['a ctrl-click', '/', { ctrlKey: true }],
     ])('is not recorded for %s', async (_what, path, init) => {
       renderAt(path, <DecisionLink to={REF} backEntry={BACK}>x</DecisionLink>);

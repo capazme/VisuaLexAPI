@@ -36,9 +36,9 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
           // Mounted on an empty list too: a sheet open on the last task stays open when it moves to another dossier.
           <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic}>
             {tasks.length === 0 ? (
-              <p className="px-1 text-sm text-slate-600 dark:text-slate-400">Nessun compito in questo dossier.</p>
+              <p className="px-1 text-sm text-slate-600 dark:text-slate-400">Nessun compito in questa pratica.</p>
             ) : (
-              <TaskList label="Compiti del dossier" tasks={tasks} today={today} optimistic={state.optimistic} showDossier={false} />
+              <TaskList label="Compiti della pratica" tasks={tasks} today={today} optimistic={state.optimistic} showDossier={false} />
             )}
           </TaskSheetScope>
         )}

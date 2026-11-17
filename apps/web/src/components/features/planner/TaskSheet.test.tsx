@@ -70,8 +70,8 @@ describe('the task sheet', () => {
     const sheet = await openSheet([task('a', { priority: 2, labels: ['udienza'] })], 'Compito a');
     const fields = within(sheet).getByRole('complementary', { name: 'Campi del compito' });
     const labels = [...fields.querySelectorAll('label, span[id]')].map((el) => el.textContent);
-    expect(labels.filter((text) => ['Dossier', 'Data pianificata', 'Termine finale', 'Priorità', 'Etichette', 'Ripetizione'].includes(text ?? ''))).toEqual([
-      'Dossier', 'Data pianificata', 'Termine finale', 'Priorità', 'Etichette', 'Ripetizione',
+    expect(labels.filter((text) => ['Pratica', 'Data pianificata', 'Termine finale', 'Priorità', 'Etichette', 'Ripetizione'].includes(text ?? ''))).toEqual([
+      'Pratica', 'Data pianificata', 'Termine finale', 'Priorità', 'Etichette', 'Ripetizione',
     ]);
     expect(within(sheet).queryByText(/Promemoria|Assegnatario|Posizione|Commenta/)).toBeNull();
     // The tick says the priority in words, not only in colour.
@@ -125,10 +125,10 @@ describe('the task sheet', () => {
     const a = task('a');
     service.update.mockImplementation(saved(a));
     const sheet = await openSheet([a], 'Compito a');
-    fireEvent.click(within(sheet).getByRole('button', { name: "Dossier Lista d'ingresso" }));
-    const search = within(sheet).getByRole('combobox', { name: 'Cerca un dossier' });
+    fireEvent.click(within(sheet).getByRole('button', { name: "Pratica Lista d'ingresso" }));
+    const search = within(sheet).getByRole('combobox', { name: 'Cerca una pratica' });
     fireEvent.change(search, { target: { value: 'esame' } });
-    expect(within(within(sheet).getByRole('listbox', { name: 'Dossier' })).getAllByRole('option').map((o) => o.textContent)).toEqual(['Esame di diritto civile']);
+    expect(within(within(sheet).getByRole('listbox', { name: 'Pratiche' })).getAllByRole('option').map((o) => o.textContent)).toEqual(['Esame di diritto civile']);
     fireEvent.keyDown(search, { key: 'Enter' });
     await waitFor(() => expect(service.update).toHaveBeenCalledWith('a', { dossierId: 'd2', origin: 'studio' }));
   });
@@ -261,9 +261,9 @@ describe('the task sheet', () => {
     const sheet = await openSheet([a], 'Compito a');
     // What the inbox lists once the task has gone to a dossier.
     service.list.mockResolvedValue(answer([]));
-    fireEvent.click(within(sheet).getByRole('button', { name: "Dossier Lista d'ingresso" }));
-    fireEvent.keyDown(within(sheet).getByRole('combobox', { name: 'Cerca un dossier' }), { key: 'ArrowDown' });
-    fireEvent.keyDown(within(sheet).getByRole('combobox', { name: 'Cerca un dossier' }), { key: 'Enter' });
+    fireEvent.click(within(sheet).getByRole('button', { name: "Pratica Lista d'ingresso" }));
+    fireEvent.keyDown(within(sheet).getByRole('combobox', { name: 'Cerca una pratica' }), { key: 'ArrowDown' });
+    fireEvent.keyDown(within(sheet).getByRole('combobox', { name: 'Cerca una pratica' }), { key: 'Enter' });
     await waitFor(() => expect(service.update).toHaveBeenCalledWith('a', { dossierId: 'd2', origin: 'studio' }));
     const path = within(screen.getByRole('dialog', { name: 'Compito a' })).getByRole('navigation', { name: 'Dove si trova il compito' });
     await waitFor(() => expect(within(path).getByRole('link', { name: 'Esame di diritto civile' })).toBeInTheDocument());

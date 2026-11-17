@@ -219,7 +219,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             )}
           >
             <Layers size={14} />
-            Dalle pratiche ({availableArticles.length})
+            Dal tavolo ({availableArticles.length})
           </button>
           <button
             onClick={() => setActiveTab('search')}

@@ -36,7 +36,7 @@ async function requireSwitch(_req: Request, _res: Response, next: NextFunction) 
 async function entryOf(req: Request) {
   const { id, itemId } = req.params;
   const dossier = await prisma.dossier.findFirst({ where: { id, userId: req.user!.id }, select: { id: true } });
-  if (!dossier) throw new AppError(404, 'Dossier non trovato');
+  if (!dossier) throw new AppError(404, 'Pratica non trovata');
   const item = await prisma.dossierItem.findFirst({ where: { id: itemId, dossierId: dossier.id } });
   if (!item) throw new AppError(404, 'Voce non trovata');
   return item;

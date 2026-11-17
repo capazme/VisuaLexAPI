@@ -159,8 +159,8 @@ function App() {
           }
         >
           <Route index element={<SearchPage />} />
-          <Route path="dossier" element={<DossierPage />} />
-          {/* Work's planner (Opus, wave 1): «Scadenziario» is the section's home; «Dossier» stays at /dossier. */}
+          <Route path="pratiche" element={<DossierPage />} />
+          {/* Work's planner (Opus, wave 1): «Scadenziario» is the section's home; «Pratiche» is at /pratiche (LC60). */}
           <Route path="work" element={<OpusPage />}>
             <Route index element={<Navigate to="scadenziario" replace />} />
             <Route path="scadenziario" element={<TodayView />} />
@@ -184,7 +184,7 @@ function App() {
             </ComingSoon>} />
           </Route>
           {/* LC53: the act editor is gone; its addresses lead to the act's dossier («Atti» tab), else to the dossiers. */}
-          <Route path="work/atti" element={<Navigate to="/dossier" replace />} />
+          <Route path="work/atti" element={<Navigate to="/pratiche" replace />} />
           <Route path="work/atti/:id" element={<OldAttoRedirect />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentsRedirect />} />
@@ -207,6 +207,8 @@ function App() {
           <Route path="merlt/chiedi" element={<MovedTo from="/merlt/chiedi" to="/labs/grafo" />} />
           <Route path="merlt/*" element={<MovedTo from="/merlt" to="/labs" />} />
           <Route path="grafo/*" element={<MovedTo from="/grafo" to="/labs/grafo" />} />
+          {/* LC60: «Dossier» is «Pratiche»; a dossier's link keeps its query (`?dossier=`, `vista`) and its anchor. */}
+          <Route path="dossier/*" element={<MovedTo from="/dossier" to="/pratiche" />} />
           {/* The MERL-T pages are development addresses (spec D6): without the development mode they
               lead to «/». The server's guards (consent, validators, admins) stay the real barrier. */}
           <Route

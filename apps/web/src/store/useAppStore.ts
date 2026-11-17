@@ -209,6 +209,8 @@ interface AppState {
     isLoadingData: boolean;
     dataError: string | null;
     isDataLoaded: boolean;
+    /** The user's dossiers were read from the server (a failed read leaves the list empty, not known). Session-only. */
+    dossiersLoaded: boolean;
 
     /**
      * Transient user-facing error for server sync failures (highlights /
@@ -255,8 +257,16 @@ interface AppState {
      * practices from them once, in `migrate` (spec §9).
      */
     practices: Practice[];
-    /** The practice on screen; null with none. Persisted. */
+    /** The practice on screen; null with none. Persisted while `corpusPracticesPending`. */
     activePracticeId: string | null;
+    /**
+     * LC60: the Ricerca is a reading bench of the session, never saved in the browser. A load that finds the Corpus's
+     * practices of before saved there sets this: they wait for the riquadro (`CorpusPracticesDialog`), saved as before
+     * (and parked at a sign-out) until it is answered, so none is lost on the way. Session-only, read from the saved value.
+     */
+    corpusPracticesPending: boolean;
+    /** The riquadro was answered: the Corpus's practices leave the store and the browser; a dossier's tables stay. */
+    endCorpusPractices: () => void;
     /** The open rows (T15), keyed `practiceId/actId/articleKey` or `practiceId/decisionId`.
      *  Session-only, absent from `partialize`: after a reload every row is closed. */
     practiceRows: Record<string, true>;
@@ -842,6 +852,7 @@ const appStore = createStore<AppState>()(
             isLoadingData: false,
             dataError: null,
             isDataLoaded: false,
+            dossiersLoaded: false,
 
             lastSyncError: null,
             pushSyncError: (message) => set((state) => {
@@ -873,6 +884,11 @@ const appStore = createStore<AppState>()(
             },
             practices: [],
             activePracticeId: null,
+            corpusPracticesPending: false,
+            endCorpusPractices: () => {
+                get().closeAllPractices();
+                set((state) => { state.corpusPracticesPending = false; });
+            },
             practiceRows: {},
             pendingReveal: null,
             practiceNotice: null,
@@ -1420,6 +1436,7 @@ const appStore = createStore<AppState>()(
                     // CORS, backend down, 500 — all looked identical). Log the
                     // reason so devs see it in the console and the UI at least
                     // surfaces a dataError banner when both calls fail.
+                    let dossiersRead = true;
                     const [bookmarksRes, dossiersRes, environmentsRes, quickNormsRes, customAliasesRes] = await Promise.all([
                         bookmarkService.getAll().catch((err) => {
                             console.error('fetchUserData: bookmarks failed:', err);
@@ -1427,6 +1444,7 @@ const appStore = createStore<AppState>()(
                         }),
                         dossierService.getAll().catch((err) => {
                             console.error('fetchUserData: dossiers failed:', err);
+                            dossiersRead = false;
                             return [];
                         }),
                         environmentService.getAll().catch((err) => {
@@ -1468,6 +1486,7 @@ const appStore = createStore<AppState>()(
                         state.customAliases = customAliases;
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
+                        state.dossiersLoaded = dossiersRead;
                     });
                 } catch (error) {
                     console.error('Failed to fetch user data:', error);
@@ -1497,11 +1516,13 @@ const appStore = createStore<AppState>()(
                     state.customAliases = [];
                     state.environments = [];
                     state.isDataLoaded = false;
+                    state.dossiersLoaded = false;
                     state.dataError = null;
 
                     // The practices: a shared browser must not show the last user's table (spec §10).
                     state.practices = [];
                     state.activePracticeId = null;
+                    state.corpusPracticesPending = false;
                     state.practiceRows = {};
                     state.pendingReveal = null;
                     state.practiceNotice = null;
@@ -1803,7 +1824,7 @@ const appStore = createStore<AppState>()(
                     return created.id;
                 } catch (err) {
                     console.error('Failed to create dossier:', err);
-                    get().pushSyncError('Impossibile creare il dossier. Riprova.');
+                    get().pushSyncError('Impossibile creare la pratica. Riprova.');
                     return null;
                 }
             },
@@ -1829,7 +1850,7 @@ const appStore = createStore<AppState>()(
                             if (!state.dossiers.some(d => d.id === id)) state.dossiers.splice(Math.min(index, state.dossiers.length), 0, dossier);
                         });
                     }
-                    get().pushSyncError('Impossibile eliminare il dossier. Riprova.');
+                    get().pushSyncError('Impossibile eliminare la pratica. Riprova.');
                     return null;
                 }
             },
@@ -1854,7 +1875,7 @@ const appStore = createStore<AppState>()(
                     ...(updates.kind !== undefined && { kind: updates.kind }),
                 }).catch(err => {
                     console.error('Failed to update dossier:', err);
-                    get().pushSyncError('Impossibile salvare le modifiche al dossier. Riprova.');
+                    get().pushSyncError('Impossibile salvare le modifiche alla pratica. Riprova.');
                 });
             },
 
@@ -1872,7 +1893,7 @@ const appStore = createStore<AppState>()(
                 if (!dossier) return;
                 dossierService.update(id, { isPinned: dossier.isPinned }).catch(err => {
                     console.error('Failed to update dossier pin:', err);
-                    get().pushSyncError('Impossibile salvare il dossier in evidenza. Riprova.');
+                    get().pushSyncError('Impossibile salvare la pratica in evidenza. Riprova.');
                 });
             },
 
@@ -2026,7 +2047,7 @@ const appStore = createStore<AppState>()(
                         }
                         shiftNoteCounts(d, true);
                     });
-                    get().pushSyncError('Impossibile rimuovere dal dossier. Riprova.');
+                    get().pushSyncError('Impossibile rimuovere dalla pratica. Riprova.');
                     return null;
                 }
             },
@@ -2106,7 +2127,7 @@ const appStore = createStore<AppState>()(
                     });
                 } catch (err) {
                     console.error('Failed to reload the dossier:', dossierId, err);
-                    if (!quiet) get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
+                    if (!quiet) get().pushSyncError('Ripristinato, ma non riesco a ricaricare la pratica: aggiorna la pagina.');
                 }
             },
 
@@ -2275,7 +2296,7 @@ const appStore = createStore<AppState>()(
                         }
                     }
                     if (failed > 0) {
-                        get().pushSyncError('Impossibile spostare alcuni elementi tra i dossier. Riprova.');
+                        get().pushSyncError('Impossibile spostare alcuni elementi tra le pratiche. Riprova.');
                     }
                 })();
             },
@@ -3002,11 +3023,11 @@ const appStore = createStore<AppState>()(
                 // the owning block id is not — it would rehydrate a window
                 // belonging to a block that no longer exists.
                 structureWindow: { position: state.structureWindow.position, blockId: null },
-                // The practices are UI state too (spec D6); the open rows, the pending reveal and
-                // the notice are the session's.
-                // A table bound to a dossier is the session's (LC51): its dossier is the copy on the server.
-                practices: corpusPractices(state.practices),
-                activePracticeId: state.activePracticeId,
+                // LC60: the Ricerca's table is the session's, and so is a table bound to a dossier (LC51). Only the
+                // Corpus's practices of before stay saved, until the riquadro is answered; the open rows, the pending
+                // reveal and the notice are the session's.
+                practices: state.corpusPracticesPending ? corpusPractices(state.practices) : [],
+                activePracticeId: state.corpusPracticesPending ? state.activePracticeId : null,
                 // Every other user-data slice is server-backed and hydrated by
                 // fetchUserData, so it does not survive in localStorage —
                 // persisting would cause drift with the server. The practices
@@ -3406,7 +3427,7 @@ function migratePersisted(persisted: unknown, from: number): Record<string, unkn
  *  logged once (gotcha 18); nothing is thrown, since a throw in `merge` would reset the store. The
  *  session-only fields start empty, whatever the storage holds, except the migration's notice. */
 function practicesOnLoad(persisted: unknown): Pick<AppState,
-    'practices' | 'activePracticeId' | 'practiceRows' | 'pendingReveal' | 'practiceNotice'> {
+    'practices' | 'activePracticeId' | 'practiceRows' | 'pendingReveal' | 'practiceNotice' | 'corpusPracticesPending'> {
     const p = (persisted ?? {}) as { practices?: unknown; activePracticeId?: unknown };
     const sanitized = sanitizePractices(p.practices);
     const dropped = [...sanitized.dropped];
@@ -3423,7 +3444,8 @@ function practicesOnLoad(persisted: unknown): Pick<AppState,
     warnDropped(dropped);
     const practiceNotice = migrationNotice;
     migrationNotice = null;
-    return { practices, activePracticeId, practiceRows: {}, pendingReveal: null, practiceNotice };
+    // LC60: what a load finds are the Corpus's practices of before, waiting for the riquadro.
+    return { practices, activePracticeId, practiceRows: {}, pendingReveal: null, practiceNotice, corpusPracticesPending: practices.length > 0 };
 }
 
 /** A save the browser refused (T20): logged once a session with the key, the size and the error's
@@ -3435,7 +3457,7 @@ function reportSaveFailure({ name, bytes, error }: StorageFailure): void {
     const errorName = (error as { name?: unknown } | null)?.name;
     console.error(`persist: the browser refused to save "${name}" (${bytes} bytes): ${typeof errorName === 'string' ? errorName : String(error)}`, error);
     queueMicrotask(() => {
-        appStore.getState().pushSyncError('Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.');
+        appStore.getState().pushSyncError('Lo spazio del browser è esaurito: le impostazioni potrebbero non essere salvate.');
     });
 }
 

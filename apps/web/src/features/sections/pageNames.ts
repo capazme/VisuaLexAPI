@@ -4,7 +4,7 @@
  * (`StudiaPage`), Opus's (`OpusPage`), the dossier list, the Forum's two pages and Academia's two read their titles
  * from here. The search page has none: its bar is the search field.
  */
-export const DOSSIER_PAGE = 'Dossier';
+export const DOSSIER_PAGE = 'Pratiche';
 /** The Forum's two pages (S7a reads them for their titles). */
 export const PUBLIC_DOSSIERS_PAGE = 'Dossier pubblici';
 export const COMMUNITY_PAGE = 'Community';
@@ -25,7 +25,7 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/learn\/progressi(\/|$)/, 'Progressi'],
   [/^\/learn\/schede(\/|$)/, 'Le mie schede'],
   [/^\/learn\/valida(\/|$)/, 'Da validare'],
-  [/^\/dossier(\/|$)/, DOSSIER_PAGE],
+  [/^\/pratiche(\/|$)/, DOSSIER_PAGE],
   [/^\/forum\/community(\/|$)/, COMMUNITY_PAGE],
   [/^\/forum\/?$/, PUBLIC_DOSSIERS_PAGE],
   [/^\/history(\/|$)/, 'Cronologia'],

@@ -133,11 +133,11 @@ describe('DecisionView', () => {
   it('adds the decision to a dossier, labelled as lawyers cite it, and tells how it went', async () => {
     view(FOUND);
     expect(screen.queryByTestId('popover')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
     expect(screen.getByTestId('popover')).toHaveTextContent('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 99999');
     fireEvent.click(screen.getByRole('button', { name: 'Scegli Pratica' }));
     expect(await screen.findByText('Aggiunta a «Pratica»')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
     fireEvent.click(screen.getByRole('button', { name: 'Scegli doppia' }));
     expect(await screen.findByText('Già presente in «Pratica»')).toBeInTheDocument();
   });
@@ -272,7 +272,7 @@ describe('DecisionView', () => {
   it('keeps 44px touch targets on mobile on its buttons and on the links to choose from', () => {
     const target = ['min-h-[44px]', 'md:min-h-0'];
     const found = view(FOUND);
-    for (const name of ['Copia citazione', 'Copia collegamento', 'Aggiungi al dossier']) {
+    for (const name of ['Copia citazione', 'Copia collegamento', 'Aggiungi alla pratica']) {
       expect(screen.getByRole('button', { name })).toHaveClass(...target);
     }
     found.unmount();
@@ -296,7 +296,7 @@ describe('DecisionView', () => {
 });
 
 describe('DecisionView in a dossier\'s «Lettura» (LC55)', () => {
-  it('«Aggiungi a questo dossier» adds to that dossier without the popover; a second time says it is there', async () => {
+  it('«Aggiungi a questa pratica» adds to that dossier without the popover; a second time says it is there', async () => {
     const { appStore } = await import('../../../store/useAppStore');
     const { ReadingHostContext } = await import('../practice/readingHost');
     const addToDossier = vi.fn();
@@ -307,20 +307,20 @@ describe('DecisionView in a dossier\'s «Lettura» (LC55)', () => {
         <DecisionView answer={FOUND} reference={REF} {...handlers} />
       </ReadingHostContext.Provider>,
     );
-    expect(screen.queryByRole('button', { name: 'Aggiungi al dossier' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi a questo dossier' }));
+    expect(screen.queryByRole('button', { name: 'Aggiungi alla pratica' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi a questa pratica' }));
     expect(screen.queryByTestId('popover')).toBeNull();
     expect(addToDossier).toHaveBeenCalledWith('dos-1', expect.objectContaining({ corte: 'cassazione', numero: 99999, anno: 2024 }), 'sentenza');
     expect(await screen.findByText('Aggiunta a «Ricorso Rossi»')).toBeInTheDocument();
     appStore.setState({
       dossiers: [{ id: 'dos-1', title: 'Ricorso Rossi', createdAt: '', items: [{ id: 's', addedAt: '', type: 'sentenza', data: { ...REF, etichetta: 'x' } }] }],
     } as never);
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi a questo dossier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi a questa pratica' }));
     expect(addToDossier).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Già presente in «Ricorso Rossi»')).toBeInTheDocument();
   });
 
-  it('«Aggiungi a questo dossier» is 14 px there, as the rows\' commands (the tests of 16-11); the Corpus keeps 12', async () => {
+  it('«Aggiungi a questa pratica» is 14 px there, as the rows\' commands (the tests of 16-11); the Corpus keeps 12', async () => {
     const { appStore } = await import('../../../store/useAppStore');
     const { ReadingHostContext } = await import('../practice/readingHost');
     appStore.setState({ dossiers: [{ id: 'dos-1', title: 'Ricorso Rossi', createdAt: '', items: [] }] });
@@ -330,10 +330,10 @@ describe('DecisionView in a dossier\'s «Lettura» (LC55)', () => {
         <DecisionView answer={FOUND} reference={REF} {...handlers} />
       </ReadingHostContext.Provider>,
     );
-    expect(screen.getByRole('button', { name: 'Aggiungi a questo dossier' })).toHaveClass('text-sm/5');
-    expect(screen.getByRole('button', { name: 'Aggiungi a questo dossier' })).not.toHaveClass('text-xs/5');
+    expect(screen.getByRole('button', { name: 'Aggiungi a questa pratica' })).toHaveClass('text-sm/5');
+    expect(screen.getByRole('button', { name: 'Aggiungi a questa pratica' })).not.toHaveClass('text-xs/5');
     hosted.unmount();
     render(<DecisionView answer={FOUND} reference={REF} {...handlers} />);
-    expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveClass('text-xs/5');
+    expect(screen.getByRole('button', { name: 'Aggiungi alla pratica' })).toHaveClass('text-xs/5');
   });
 });

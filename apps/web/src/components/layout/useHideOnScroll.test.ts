@@ -109,7 +109,7 @@ describe('useHideOnScroll', () => {
     const { result, rerender } = hook(el);
     to(300);
     expect(result.current.hidden).toBe(true);
-    rerender({ enabled: true, resetKey: '/dossier' });
+    rerender({ enabled: true, resetKey: '/pratiche' });
     expect(result.current.hidden).toBe(false);
     to(600);
     expect(result.current.hidden).toBe(true);
@@ -117,7 +117,7 @@ describe('useHideOnScroll', () => {
     expect(result.current.hidden).toBe(false);
     to(900);
     expect(result.current.hidden).toBe(true);
-    rerender({ enabled: false, resetKey: '/dossier' });
+    rerender({ enabled: false, resetKey: '/pratiche' });
     expect(result.current.hidden).toBe(false);
   });
 });

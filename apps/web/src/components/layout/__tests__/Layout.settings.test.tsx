@@ -34,7 +34,7 @@ afterEach(() => appStore.getState().closeSettings());
 
 describe('Layout — Impostazioni, opened from anywhere', () => {
   it('the user menu opens it at its top, «Chiudi» closes it', () => {
-    at('/dossier');
+    at('/pratiche');
     fireEvent.click(screen.getAllByRole('button', { name: 'Impostazioni' })[0]);
     expect(screen.getByRole('dialog', { name: 'Impostazioni' })).toHaveAttribute('data-section', '');
     fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
@@ -42,7 +42,7 @@ describe('Layout — Impostazioni, opened from anywhere', () => {
     expect(appStore.getState().settingsDialog).toEqual({ open: false, section: null });
   });
 
-  it.each(['/', '/dossier', '/learn/ripasso'])('a reader\'s gear opens it at the colours\' meanings on %s', (path) => {
+  it.each(['/', '/pratiche', '/learn/ripasso'])('a reader\'s gear opens it at the colours\' meanings on %s', (path) => {
     at(path);
     act(() => appStore.getState().openSettings('highlightColors'));
     expect(screen.getByRole('dialog', { name: 'Impostazioni' })).toHaveAttribute('data-section', 'highlightColors');

@@ -95,13 +95,13 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Giurisprudenza (1)');
   });
 
-  it('in the Ricerca an identified decision says «Aggiungi al dossier»; one never identified has nothing to add (LC59)', () => {
+  it('in the Ricerca an identified decision says «Aggiungi alla pratica»; one never identified has nothing to add (LC59)', () => {
     const { practiceId, decisionId } = s().openDecision({ corte: 'cassazione', numero: 28994, anno: 2019 }, { open: false });
     const { rerender } = render(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
-    expect(screen.queryByRole('button', { name: /^Aggiungi al dossier/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Aggiungi alla pratica/ })).toBeNull();
     act(() => { s().setDecisionEntryIdentity(practiceId, decisionId, NEW, { tipo: 'sentenza', data_deposito: '2019-11-11' }, 'Cass. civ., n. 28994/2019'); });
     rerender(<PracticeDecisionsSection practiceId={practiceId} layout="overview" />);
-    expect(screen.getByRole('button', { name: 'Aggiungi al dossier Cass. civ., n. 28994/2019' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aggiungi alla pratica Cass. civ., n. 28994/2019' })).toBeInTheDocument();
   });
 
   it('names the toggle with the visible text, deposit included', () => {

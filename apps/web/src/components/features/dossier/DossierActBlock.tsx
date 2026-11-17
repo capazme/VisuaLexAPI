@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, GripVertical, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, GripVertical, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '../../../lib/utils';
@@ -24,8 +24,6 @@ export interface DossierActBlockProps {
   selectedIds: Set<string>;
   showCheckbox: boolean;
   onToggleSelect: (itemId: string) => void;
-  /** "Apri tutto" for this act's groups. */
-  onOpenAct: () => void;
   /** The act's index, to take more of its articles. */
   onAddArticles: () => void;
   /** All its articles, behind one undo toast. */
@@ -129,17 +127,6 @@ export function DossierActBlock(props: DossierActBlockProps) {
         <div className="flex flex-shrink-0 items-center">
           <button
             type="button"
-            onClick={props.onOpenAct}
-            title="Apri tutto in Ricerca"
-            aria-label={`Apri tutto ${block.heading} in Ricerca`}
-            className={ACTION_BUTTON}
-          >
-            <ExternalLink size={15} aria-hidden />
-            {/* From lg, and while the act is 42 rem wide: in the left column of two its name takes the room. */}
-            <span className="hidden lg:@2xl:inline">Apri tutto</span>
-          </button>
-          <button
-            type="button"
             onClick={props.onAddArticles}
             title="Aggiungi articoli di quest'atto"
             aria-label={`Aggiungi articoli di ${block.heading}`}
@@ -153,7 +140,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
             triggerClassName={cn(ACTION_BUTTON, 'text-slate-500')}
             // In the left column of two, which scrolls on its own (D7d), the last act's menu opens upwards.
             placement="auto"
-            items={[{ label: "Rimuovi l'atto dal dossier", icon: Trash2, danger: true, onSelect: props.onRemoveAct }]}
+            items={[{ label: "Rimuovi l'atto dalla pratica", icon: Trash2, danger: true, onSelect: props.onRemoveAct }]}
           >
             <MoreHorizontal size={18} />
           </MenuButton>

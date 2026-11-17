@@ -29,18 +29,18 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
         onClick={onBack}
         className="mb-4 inline-flex min-h-[44px] items-center gap-2 rounded text-sm text-slate-500 hover:text-primary-600 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
-        <ArrowLeft size={16} /> Torna ai dossier
+        <ArrowLeft size={16} /> Torna alle pratiche
       </button>
       {/* The title as on every section page (W2), under the way back. */}
       <header className="mb-6">
         <h1 className={PAGE_TITLE}>Cestino</h1>
         <p className="mt-1 max-w-prose text-sm text-slate-500 dark:text-slate-400">
-          Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni, come ciò che elimini tu: i dossier, le voci che togli da un dossier, le schede di studio.
+          Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni, come ciò che elimini tu: le pratiche, le voci che togli da una pratica, le schede di studio.
         </p>
       </header>
       {error && <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {entries && entries.length === 0 && !error && (
-        <EmptyState variant="generic" title="Il cestino è vuoto" description="Nessun elemento eliminato da un’applicazione collegata, nessun dossier, voce o scheda di studio eliminati da te." />
+        <EmptyState variant="generic" title="Il cestino è vuoto" description="Nessun elemento eliminato da un’applicazione collegata, nessuna pratica, voce o scheda di studio eliminati da te." />
       )}
       {entries && entries.length > 0 && (
         <ul className="space-y-2">

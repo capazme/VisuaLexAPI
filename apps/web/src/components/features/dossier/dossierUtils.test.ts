@@ -510,9 +510,9 @@ describe('an imported dossier', () => {
   });
 
   it('says whether everything came in', () => {
-    expect(importReport(3, 0)).toBe('Dossier importato');
-    expect(importReport(1, 1)).toBe('Dossier importato in parte: 1 voce importata, 1 scartata');
-    expect(importReport(4, 2)).toBe('Dossier importato in parte: 4 voci importate, 2 scartate');
+    expect(importReport(3, 0)).toBe('Pratica importata');
+    expect(importReport(1, 1)).toBe('Pratica importata in parte: 1 voce importata, 1 scartata');
+    expect(importReport(4, 2)).toBe('Pratica importata in parte: 4 voci importate, 2 scartate');
   });
 
   it('a Forum suggestion carries decisions as sentenzaRef, with the citation recomputed', () => {
@@ -625,7 +625,7 @@ describe('dossier share links', () => {
 
 describe('dossierFromApi — the kind and the copy in the Forum', () => {
   const api = { id: 'd', name: 'D', is_pinned: false, created_at: '2026-10-14', updated_at: '2026-10-14', items: [] };
-  it('reads a dossier di studio, its published copy and the admin\'s block', () => {
+  it('reads a pratica di studio, its published copy and the admin\'s block', () => {
     const d = dossierFromApi({
       ...api, kind: 'studio', forum_blocked: true,
       published: { shared_environment_id: 'e', version: 3, is_active: false, updated_at: '2026-10-14T10:00:00Z' },

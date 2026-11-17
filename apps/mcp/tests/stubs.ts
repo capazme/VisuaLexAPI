@@ -175,7 +175,7 @@ export async function startStubs() {
         });
       }
       const dossier = stub.dossiers.find((d) => d.id === req.body.dossierId);
-      if (!dossier) return void res.status(404).json({ detail: 'Dossier non trovato.' });
+      if (!dossier) return void res.status(404).json({ detail: 'Pratica non trovata.' });
       const competenze = (req.body.competenze as { testo: string }[]).map((c, i) => ({ codice: `C${i + 1}`, ordine: i + 1, testo: c.testo }));
       const course: StubCourse = { id: `p${stub.courses.length + 1}`, titolo: req.body.titolo, materia: req.body.materia, moduliPrevisti: req.body.moduliPrevisti, competenze, moduli: [], esami: [], stato: 'in-preparazione', segnalazioni: [], giudizi: [] };
       stub.courses.push(course);

@@ -68,7 +68,7 @@ export function DossierPage() {
     setImporting(null);
     const outcome = await importDossier(dossier);
     if (!outcome) {
-      showToast('Impossibile importare il dossier: errore server', 'error');
+      showToast('Impossibile importare la pratica: errore server', 'error');
       return;
     }
     setSelectedDossierId(outcome.id);

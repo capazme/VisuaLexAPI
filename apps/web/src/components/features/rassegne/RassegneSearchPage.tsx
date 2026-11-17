@@ -6,7 +6,7 @@
  * an article (`searchMemory`).
  */
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { PageFrame } from '../../layout/PageFrame';
 import { Input } from '../../ui/Input';
@@ -50,7 +50,18 @@ function fieldProblem(text: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Drawn again on every navigation, so that ⌘K's «Tutti i passi» used on this page shows the search it remembered. The
+ * passage chosen there comes as the navigation's state, by its id: never the words.
+ */
 export function RassegneSearchPage() {
+  const location = useLocation();
+  const state: unknown = location.state;
+  const chosen = state && typeof state === 'object' && 'passo' in state && typeof state.passo === 'string' ? state.passo : null;
+  return <SearchPage key={location.key} chosen={chosen} />;
+}
+
+function SearchPage({ chosen }: { chosen: string | null }) {
   const navigate = useNavigate();
   const triggerSearch = useAppStore((s) => s.triggerSearch);
   const [initial] = useState(rememberedSearch);
@@ -67,7 +78,8 @@ export function RassegneSearchPage() {
 
   useEffect(() => {
     if (!initial) fieldRef.current?.focus();
-  }, [initial]);
+    else if (chosen) itemRefs.current[initial.items.findIndex((p) => p.id === chosen)]?.focus();
+  }, [initial, chosen]);
 
   // The list as it stands is the one the way back from an article finds.
   useEffect(() => {
@@ -259,6 +271,7 @@ export function RassegneSearchPage() {
                 ref={(el) => { itemRefs.current[i] = el; }}
                 passo={passo}
                 q={ready.q}
+                opened={passo.id === chosen}
                 onOpenArticle={openArticle}
               />
             ))}

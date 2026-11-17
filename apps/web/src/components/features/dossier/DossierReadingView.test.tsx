@@ -117,7 +117,7 @@ describe('the «Lettura» builds the dossier\'s bound table and shows it', () =>
 
   it('says, at its head, what happens to what is opened while reading', () => {
     render(<DossierReadingView dossier={TWO} showToast={toast} />);
-    expect(screen.getByText('Quello che apri leggendo resta qui finché non lo aggiungi al dossier.')).toBeInTheDocument();
+    expect(screen.getByText('Quello che apri leggendo resta qui finché non lo aggiungi alla pratica.')).toBeInTheDocument();
   });
 
   it('re-syncs the table when the dossier is refreshed (an item added, by Claude too)', () => {
@@ -141,7 +141,7 @@ describe('what is the Corpus practice\'s is not drawn in the dossier', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     for (const label of PRACTICE_ONLY) expect(screen.queryByText(label)).toBeNull();
     // An act of the dossier leaves it rather than the table (LC55 c4).
-    expect(screen.getByRole('menuitem', { name: 'Togli dal dossier' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Togli dalla pratica' })).toBeInTheDocument();
     expect(h.tours).not.toHaveBeenCalled();
     expect(screen.getByTestId('practice-column').className).not.toContain('practice-bar-height');
   });
@@ -266,7 +266,7 @@ describe('the dossier hosts the reading: its gestures stay on its table', () => 
 
   it('a dossier with nothing to read says so', () => {
     render(<DossierReadingView dossier={dossierOf([])} showToast={toast} />);
-    expect(screen.getByText('Questo dossier non ha ancora norme o sentenze da leggere.')).toBeInTheDocument();
+    expect(screen.getByText('Questa pratica non ha ancora norme o sentenze da leggere.')).toBeInTheDocument();
     expect(within(document.body).queryByText('Pratica vuota')).toBeNull();
   });
 });

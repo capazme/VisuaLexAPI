@@ -96,7 +96,7 @@ describe('Layout — Cmd/Ctrl+F', () => {
     overlay.remove();
   });
 
-  it.each(['/dossier', '/forum', '/history', '/labs/grafo'])('leaves the browser\'s own find alone on %s', (path) => {
+  it.each(['/pratiche', '/forum', '/history', '/labs/grafo'])('leaves the browser\'s own find alone on %s', (path) => {
     render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
     const event = new KeyboardEvent('keydown', { key: 'f', metaKey: true, cancelable: true, bubbles: true });
     act(() => {
@@ -111,15 +111,15 @@ describe('Layout — Cmd/Ctrl+F', () => {
       <MemoryRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<Link to="/dossier">Dossier</Link>} />
-            <Route path="dossier" element={<p>I miei dossier</p>} />
+            <Route index element={<Link to="/pratiche">Pratiche</Link>} />
+            <Route path="pratiche" element={<p>I miei dossier</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
     );
     press({ metaKey: true });
     expect(screen.getByRole('search', FIND)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('link', { name: 'Dossier' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Pratiche' }));
     expect(screen.getByText('I miei dossier')).toBeInTheDocument();
     expect(screen.queryByRole('search', FIND)).not.toBeInTheDocument();
   });

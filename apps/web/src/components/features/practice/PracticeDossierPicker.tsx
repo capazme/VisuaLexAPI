@@ -42,7 +42,7 @@ export function PracticeDossierPicker({ isOpen, onPick, onClose }: PracticeDossi
       isOpen={isOpen}
       onClose={close}
       size="sm"
-      title="Aggiungi a un dossier"
+      title="Aggiungi a una pratica"
       icon={<Folder size={18} />}
       variant="info"
       initialFocusRef={focusRef}
@@ -57,8 +57,8 @@ export function PracticeDossierPicker({ isOpen, onPick, onClose }: PracticeDossi
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cerca dossier…"
-              aria-label="Cerca dossier"
+              placeholder="Cerca una pratica…"
+              aria-label="Cerca una pratica"
               className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
@@ -67,7 +67,7 @@ export function PracticeDossierPicker({ isOpen, onPick, onClose }: PracticeDossi
       <div className="min-h-[80px] space-y-1 px-2 py-2">
         {visible.length === 0 ? (
           <p className="py-6 text-center text-sm italic text-slate-500 dark:text-slate-400">
-            {dossiers.length === 0 ? 'Nessun dossier presente.' : 'Nessun dossier corrisponde alla ricerca.'}
+            {dossiers.length === 0 ? 'Nessuna pratica presente.' : 'Nessuna pratica corrisponde alla ricerca.'}
           </p>
         ) : (
           visible.map((d, index) => (

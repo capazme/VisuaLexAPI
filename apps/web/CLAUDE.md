@@ -37,7 +37,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   «Riprova», which reloads (the one mend for a file a deploy removed; before P1 no boundary held it and the app went
   blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
   entry chosen again, included).
-  In the signed-in layout: `/` (search), `/dossier`, `/work` (the planner, below: `OpusPage`
+  In the signed-in layout: `/` (search), `/pratiche` (the dossiers, «Pratiche» on screen since LC60; `/dossier` and
+  everything under it is an old address, `MovedTo` keeps its query and anchor), `/work` (the planner, below: `OpusPage`
   over `scadenziario`, `prossimi`, `ingresso` and `cestino`; `/work` redirects to `scadenziario`; LC48: `/work/oggi` and
   `/work/anonimizzatore` are old addresses, `MovedTo` sends them to `/work/scadenziario` and `/work/pseudonimizzatore`),
   `/learn` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
@@ -1087,6 +1088,18 @@ they are, inert: no code writes or reads them, a saved quick norm or link still 
 and the Python API ignores it. `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
 `set`. `clearUserData` empties the practices.
+**LC60, «Pratiche».** What a user reads says «pratica» / «Pratiche» for a dossier (the code keeps `dossier`;
+`pratiche.guard.test.ts` refuses the word in literals and JSX text outside the Forum, which keeps «Dossier pubblici»). The
+Ricerca is one reading bench of the session: no bar of practices (`PracticeBar` and `PracticeChip` are gone), no «Salva
+come dossier», «Nuova pratica», «Sposta in un'altra pratica», list of practices on the phone, «Apri tutto in Ricerca» or
+«Apri anche in Ricerca»; its table is closed with «Chiudi il tavolo» and added to a pratica with «Aggiungi a una pratica…».
+`partialize` saves no practice, except the Corpus practices a browser kept from before, while they wait for the riquadro
+(`corpusPracticesPending`, set by the load that finds them; parked at a sign-out as before). `CorpusPracticesDialog`
+(mounted by `Layout`, once `dossiersLoaded` says the dossiers were read) drops the empty ones and those holding exactly a
+dossier's articles and decisions, offers the rest ticked, saves each through `savePracticeAsDossier` and closes it, and
+then `endCorpusPractices`; a failed save takes nothing else away and the riquadro stays (a retry adds to the dossier a
+first, partial try made). No key of its own: the riquadro shows while such practices are in the browser.
+
 A practice with a `dossierId` (LC51: a reading table bound to a dossier, built by `openDossierPractice`, its articles
 without text until `setPracticeArticleText`, re-synced additively by `resyncDossierPractice`) is the session's: `partialize`
 leaves it out (`corpusPractices`), `sanitizePractices` drops one found saved, it is never the active practice, and
@@ -1290,6 +1303,19 @@ last search and the passages loaded stay in memory for the session (`searchMemor
 storage), so the way back from an article finds the list; `clearRassegneCache` (the logout) forgets it. No store
 (`volumi: 0`) says «Le rassegne non sono ancora caricate su questa installazione.»; a 503 or no answer «Le rassegne non
 sono disponibili al momento.» with «Riprova», a 429 the quota's line. No anchors, notes or highlights (G-399's Q3).
+**In ⌘K** (U3, L-50): a topic (`useSearchQuery`'s `topic`, never a citation) asks `/search_rassegne` too, once the words
+have stood still for 350 ms (`useRassegneForTopic`, which drops an answer that comes after the words changed), and the
+group «Rassegne» under the decisions' row shows the first three passages (the review, year and volume, two lines of text)
+and «Tutti i passi» with the count; no passage or no store draws nothing, a failure one line («Le rassegne non
+rispondono al momento.»). A row remembers the first page (`rememberSearch`) and `GlobalSearch` opens `/rassegne`, the
+passage chosen as the navigation's state by its id (shown whole and focused): the words never in an address nor in the
+history. The page is drawn again on every navigation (`location.key`), so ⌘K used on it shows the new search.
+**A passage into a pratica** (U3, L-51): «Aggiungi alla pratica» (`AddPassageToPratica`, on `RassegnaResult` and on the
+panel's `RassegnaPassage`) opens `AddToDossierPopover` with neither a norm nor a decision — it then adds nothing and only
+reports the pratica chosen — and saves the passage as a note (`addNoteToDossier`; `passageNote`: provenance, source,
+text, the portal's link, the text cut with «…» at the server's 4000 UTF-16 units, the link whole, control characters
+dropped). The note is plain text: the link is not clickable in the pratica nor in the PDF. The toast names the pratica
+with «Apri la pratica».
 
 **«Giurisprudenza» under the article** (`CaseLawSection`, after the text): an accordion closed by default (state per host in
 `sessionStorage`) holding the Massimario's panel (`components/features/rassegne/RassegnePanel`, a block of

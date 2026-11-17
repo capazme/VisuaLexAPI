@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FolderPlus, MoreHorizontal, Pencil, Plus, X } from 'lucide-react';
+import { MoreHorizontal, Pencil, X } from 'lucide-react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import type { ArticleData } from '../../../types';
@@ -29,8 +29,8 @@ export interface PracticeTableProps {
 }
 
 /**
- * A practice's table on the desktop — the one given, else the Corpus's active one — (spec §3): its header (name, count line, «Salva come
- * dossier», «⋯»), the streaming bar of a search landing in it, then its column — the overview's grid, or the index of
+ * A practice's table on the desktop — the one given, else the Corpus's active one — (spec §3): its header (name, count line,
+ * «⋯»; LC60: no «Salva come dossier», the Ricerca's table is the session's), the streaming bar of a search landing in it, then its column — the overview's grid, or the index of
  * the reading view, where the header is compact. An empty practice says so. Topic searches are windows beside it
  * (`ReadingRow`, T8); the phone's table keeps its band. (The migration's notice is `SearchPanel`'s, over both layouts.)
  */
@@ -75,14 +75,16 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
   );
 }
 
+/** LC60: the Ricerca's table is not a «pratica» (that is a dossier now): it is closed as the reading table it is. */
+export const CLOSE_TABLE = 'Chiudi il tavolo';
+
 /** The index's title (U2): the act headings' serif, a step larger than theirs, so the name fits a 320 px column. */
 const INDEX_TITLE = 'font-serif text-[22px] font-medium leading-tight text-slate-900 dark:text-white';
 
-/** In the index (`compact`) the name is smaller and «Salva come dossier» is a 44 px icon beside «⋯». A dossier's table
+/** In the index (`compact`) the name is smaller. A dossier's table
  *  (LC54) draws none of it: the dossier's page already names it, and its name, count and actions are the Corpus's. */
 function PracticeHeader({ practice, compact, simple, children }: { practice: Practice; compact: boolean; simple: boolean; children: ReactNode }) {
   const renamePractice = useAppStore((s) => s.renamePractice);
-  const createPractice = useAppStore((s) => s.createPractice);
   const [editing, setEditing] = useState(false);
   const countLine = practiceCountLine(practiceCounts(practice));
   const save = usePracticeSaveActions(practice.id);
@@ -92,10 +94,9 @@ function PracticeHeader({ practice, compact, simple, children }: { practice: Pra
     simple,
     practiceItems: simple && !bound ? [
       ...save.items.map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item)),
-      { label: 'Nuova pratica', icon: Plus, onSelect: () => { createPractice('Nuova pratica', { activate: true }); } },
-      { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
+      { label: CLOSE_TABLE, icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
     ] : [],
-  }), [simple, bound, save.items, createPractice, practice.id]);
+  }), [simple, bound, save.items, practice.id]);
 
   if (bound) return <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>;
 
@@ -140,28 +141,13 @@ function PracticeHeader({ practice, compact, simple, children }: { practice: Pra
         )}
         {countLine && <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{countLine}</p>}
       </div>
-      <button
-        type="button"
-        onClick={save.saveAsNew}
-        disabled={save.busy}
-        id="tour-practice-save"
-        aria-label={compact ? 'Salva come dossier' : undefined}
-        title={compact ? 'Salva come dossier' : undefined}
-        className={cn(
-          'inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-          compact ? 'min-w-[44px] justify-center' : 'px-3 md:min-h-0 md:py-1.5',
-        )}
-      >
-        <FolderPlus size={16} aria-hidden />
-        {!compact && 'Salva come dossier'}
-      </button>
       <MenuButton
-        label={`Altre azioni per la pratica ${practice.label}`}
+        label={`Altre azioni per ${practice.label}`}
         triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-2 dark:text-slate-300 dark:hover:bg-slate-800"
         items={[
           { label: 'Rinomina', icon: Pencil, onSelect: () => setEditing(true) },
           ...save.items,
-          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
+          { label: CLOSE_TABLE, icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
         ]}
       >
         <MoreHorizontal size={18} aria-hidden />

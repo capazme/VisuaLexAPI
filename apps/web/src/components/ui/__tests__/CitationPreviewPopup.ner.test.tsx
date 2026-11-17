@@ -84,7 +84,7 @@ describe('CitationPreviewPopup — NER feedback bar (surface: article_xref)', ()
 
   it('renders the NER row BELOW the primary "Apri nella pratica" action (design §3.7)', () => {
     renderPopup();
-    const primary = screen.getByRole('button', { name: /apri nella pratica/i });
+    const primary = screen.getByRole('button', { name: /apri sul tavolo/i });
     const nerRow = screen.getByText(/citazione corretta\?/i);
     // primary action must precede the feedback row in document order
     expect(primary.compareDocumentPosition(nerRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

@@ -570,7 +570,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
                   {coursesOn && <NavItem to="/learn/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}
                   <NavItem to="/learn/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
-                  <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+                  <NavItem to="/pratiche" icon={Folder} label="Pratiche" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 </NavGroup>
                 {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}
                 <NavGroup name="Contribuisci" heading layout={layout}>
@@ -585,7 +585,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                     giorni» and «Lista d'ingresso» are tabs of Work's page (`OpusPage`), «Rassegne» a link of the search page (LC8). */}
                 <NavItem to="/work/scadenziario" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Scadenziario" shortLabel="Scadenze" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
                 {searchEntry('Ricerca', ['/rassegne'])}
-                <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+                <NavItem to="/pratiche" icon={Folder} label="Pratiche" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <div aria-hidden className={cn("h-px bg-slate-200 dark:bg-slate-700", layout === 'rail' ? "mx-auto w-6" : "my-1.5 w-full")} />
                 <NavGroup name="Strumenti sul documento" layout={layout}>
                   <NavItem to="/documents" icon={FileSearch} label="Analizza documento" shortLabel="Analizza" soon="dev" onClick={closeMobile} layout={layout} />

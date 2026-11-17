@@ -63,7 +63,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     expect(svc.reorderItems).toHaveBeenCalledTimes(1);
     expect(svc.reorderItems.mock.calls[0][1]).toHaveLength(6);
     expect(s().dossiers[0].items).toHaveLength(6);
-    expect(result.current.notice?.message).toBe('Salvato nel dossier «Responsabilità medica»: 4 articoli, 2 sentenze');
+    expect(result.current.notice?.message).toBe('Salvato nella pratica «Responsabilità medica»: 4 articoli, 2 sentenze');
     expect(result.current.notice?.type).toBe('success');
     // the practice is not linked and not touched
     expect(s().practices).toHaveLength(1);
@@ -88,7 +88,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     expect(svc.reorderItems).not.toHaveBeenCalled();
     expect(s().dossiers).toHaveLength(0);
     expect(s().practices[0].acts).toHaveLength(2);
-    expect(s().lastSyncError?.message).toBe('Impossibile creare il dossier. Riprova.');
+    expect(s().lastSyncError?.message).toBe('Impossibile creare la pratica. Riprova.');
   });
 
   it('every add refused: the empty dossier is removed again and an Italian sync error shown', async () => {
@@ -129,7 +129,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     await act(async () => { await result.current.saveAsNew(id); });
     expect(svc.addItem).toHaveBeenCalledTimes(1);
     expect(result.current.notice?.message).toBe(
-      'Salvato nel dossier «P»: 1 articolo. 1 sentenza non identificata non è stata salvata',
+      'Salvato nella pratica «P»: 1 articolo. 1 sentenza non identificata non è stata salvata',
     );
   });
 
@@ -138,7 +138,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     const { result } = renderHook(() => useSavePracticeAsDossier());
     await act(async () => { await result.current.saveAsNew(id); });
     expect(svc.create).not.toHaveBeenCalled();
-    expect(result.current.notice?.message).toBe('La pratica non ha nulla da salvare.');
+    expect(result.current.notice?.message).toBe('Non c’è nulla da salvare.');
   });
 
   it('an existing dossier: what it holds is skipped and counted, nothing is reordered', async () => {
@@ -157,7 +157,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     expect(svc.create).not.toHaveBeenCalled();
     expect(svc.addItem).toHaveBeenCalledTimes(4);
     expect(svc.reorderItems).not.toHaveBeenCalled();
-    expect(result.current.notice?.message).toBe('Salvato nel dossier «Esistente»: 3 articoli, 1 sentenza. 2 già presenti');
+    expect(result.current.notice?.message).toBe('Salvato nella pratica «Esistente»: 3 articoli, 1 sentenza. 2 già presenti');
   });
 
   it('an existing dossier refusing every add: the message says nothing was saved, not «in parte»', async () => {
@@ -168,7 +168,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     const { result } = renderHook(() => useSavePracticeAsDossier());
     await act(async () => { await result.current.addToExisting(id, 'd1'); });
     expect(svc.delete).not.toHaveBeenCalled();
-    expect(result.current.notice).toEqual({ message: 'Nessun elemento è stato salvato nel dossier «Esistente»', type: 'error' });
+    expect(result.current.notice).toEqual({ message: 'Nessun elemento è stato salvato nella pratica «Esistente»', type: 'error' });
     expect(s().lastSyncError?.message).toContain('2 elementi non sono stati salvati');
   });
 
@@ -187,7 +187,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     const { result } = renderHook(() => useSavePracticeAsDossier());
     await act(async () => { await result.current.addToExisting(id, 'd1'); });
     expect(svc.addItem).not.toHaveBeenCalled();
-    expect(result.current.notice?.message).toBe('Il dossier «Esistente» ha già tutto: 1 già presente');
+    expect(result.current.notice?.message).toBe('La pratica «Esistente» ha già tutto: 1 già presente');
 
     await act(async () => { await result.current.saveAsNew(id); });
     expect(svc.addItem).toHaveBeenCalledTimes(1);
@@ -220,7 +220,7 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     const { result } = renderHook(() => useSavePracticeAsDossier());
     await act(async () => { await result.current.addToExisting(id, 'd1'); });
     expect(svc.addItem).not.toHaveBeenCalled();
-    expect(result.current.notice?.message).toBe('Il dossier «Esistente» ha già tutto: 1 già presente');
+    expect(result.current.notice?.message).toBe('La pratica «Esistente» ha già tutto: 1 già presente');
   });
 });
 
@@ -255,6 +255,6 @@ describe('«Apri tutto» of a dossier, then «Salva come dossier» (spec §5.1, 
       expect.objectContaining({ corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019, sezione: '3', tipo: 'sentenza', data_deposito: '2019-11-11' }),
       expect.objectContaining({ corte: 'corte_costituzionale', numero: 1, anno: 2020 }),
     ]));
-    expect(result.current.notice?.message).toBe('Salvato nel dossier «Ricorso Rossi»: 2 sentenze');
+    expect(result.current.notice?.message).toBe('Salvato nella pratica «Ricorso Rossi»: 2 sentenze');
   });
 });

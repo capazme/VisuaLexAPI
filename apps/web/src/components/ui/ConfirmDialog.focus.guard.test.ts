@@ -18,6 +18,7 @@ const CANCEL_FIRST: [string, string][] = [
   ['components/features/studia/corsi/CoursePage.tsx', 'Ritirare il modulo'],
   ['components/features/search/discussionControls.tsx', 'Segnalare ai moderatori?'],
   ['components/features/atti/PraticaFilesPanel.tsx', 'Eliminare il file?'],
+  ['components/features/practice/CorpusPracticesDialog.tsx', 'Non salvare le raccolte?'], // LC60: what is not saved is lost
   ['components/features/atti/PraticaFilesPanel.tsx', 'Prima di caricare il primo file'], // the notice is read before the first upload
   ['components/features/studia/lezione/LessonSession.tsx', 'Interrompere la lezione?'], // a lesson left is not resumed
 ];

@@ -16,7 +16,7 @@ export function MoveToDossierModal({ currentDossierId, dossiers, onMove, onClose
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-sm border border-slate-200 dark:border-slate-800">
         <div className="p-6">
-          <h3 className="font-semibold text-lg text-slate-900 dark:text-white mb-4">Sposta in altro dossier</h3>
+          <h3 className="font-semibold text-lg text-slate-900 dark:text-white mb-4">Sposta in un'altra pratica</h3>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {others.map((d) => (
               <button
@@ -29,7 +29,7 @@ export function MoveToDossierModal({ currentDossierId, dossiers, onMove, onClose
               </button>
             ))}
             {others.length === 0 && (
-              <p className="text-slate-500 text-sm text-center py-4">Nessun altro dossier disponibile</p>
+              <p className="text-slate-500 text-sm text-center py-4">Nessun'altra pratica disponibile</p>
             )}
           </div>
           <button

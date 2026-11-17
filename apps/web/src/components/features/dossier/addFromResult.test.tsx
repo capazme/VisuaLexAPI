@@ -48,12 +48,12 @@ beforeEach(() => {
   appStore.setState({ dossiers: [dossier('a', 'Sinistro Rossi'), dossier('b', 'Studio GDPR')] });
 });
 
-describe('«Aggiungi al dossier» on a row of the Ricerca (LC59)', () => {
+describe('«Aggiungi alla pratica» on a row of the Ricerca (LC59)', () => {
   it('an article row has the command, with its name, and it opens the dossier choice', () => {
     render(row({ norma: NORMA }));
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier art. 2043 c.c.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica art. 2043 c.c.' }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Aggiungi a dossier')).toBeInTheDocument();
+    expect(within(dialog).getByText('Aggiungi a una pratica')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: /Sinistro Rossi/ }));
     const held = appStore.getState().dossiers.find((d) => d.id === 'a')!.items;
     expect(held).toHaveLength(1);
@@ -62,7 +62,7 @@ describe('«Aggiungi al dossier» on a row of the Ricerca (LC59)', () => {
 
   it('a decision row adds the decision', () => {
     render(row({ sentenza: SENTENZA }, 'Cass. civ., n. 24908/2026'));
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier Cass. civ., n. 24908/2026' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica Cass. civ., n. 24908/2026' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Studio GDPR/ }));
     expect(appStore.getState().dossiers.find((d) => d.id === 'b')!.items[0]).toMatchObject({ type: 'sentenza', data: expect.objectContaining({ numero: 24908 }) });
   });
@@ -70,31 +70,31 @@ describe('«Aggiungi al dossier» on a row of the Ricerca (LC59)', () => {
   it('says in words the one dossier that holds it, and still lets it be added to another', () => {
     appStore.setState({ dossiers: [dossier('a', 'Sinistro Rossi', [normaItem(NORMA)]), dossier('b', 'Studio GDPR')] });
     render(row({ norma: NORMA }));
-    expect(screen.getByText('Nel dossier «Sinistro Rossi»')).toBeInTheDocument();
+    expect(screen.getByText('Nella pratica «Sinistro Rossi»')).toBeInTheDocument();
     // The toggle's name replaces its content: the mark's words are in it.
-    expect(screen.getByRole('button', { name: 'Espandi art. 2043 c.c., nel dossier «Sinistro Rossi»' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier art. 2043 c.c.' }));
+    expect(screen.getByRole('button', { name: 'Espandi art. 2043 c.c., nella pratica «Sinistro Rossi»' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica art. 2043 c.c.' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Studio GDPR/ }));
-    expect(screen.getByText('In 2 dossier')).toBeInTheDocument();
+    expect(screen.getByText('In 2 pratiche')).toBeInTheDocument();
   });
 
   it('counts the dossiers that hold a decision', () => {
     appStore.setState({ dossiers: [dossier('a', 'Sinistro Rossi', [sentenzaItem(SENTENZA)]), dossier('b', 'Studio GDPR', [sentenzaItem(SENTENZA)])] });
     render(row({ sentenza: SENTENZA }, 'Cass. civ., n. 24908/2026'));
-    expect(screen.getByText('In 2 dossier')).toBeInTheDocument();
+    expect(screen.getByText('In 2 pratiche')).toBeInTheDocument();
   });
 
   it('a past text is not the text in force: the mark agrees with the popover', () => {
     appStore.setState({ dossiers: [dossier('a', 'Sinistro Rossi', [normaItem(NORMA)])] });
     render(row({ norma: { ...NORMA, data_versione: '2007-12-29' } }));
-    expect(screen.queryByText(/Nel dossier/)).toBeNull();
+    expect(screen.queryByText(/Nella pratica/)).toBeNull();
   });
 
   it('on a phone the row\'s «⋯» names it, beside «Togli dal tavolo»', () => {
     render(row({ norma: NORMA }));
     fireEvent.click(screen.getByRole('button', { name: 'Azioni su art. 2043 c.c.' }));
     expect(screen.getByRole('menuitem', { name: /Togli dal tavolo/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: /Aggiungi al dossier/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Aggiungi alla pratica/ }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
@@ -103,7 +103,7 @@ describe('«Aggiungi al dossier» on a row of the Ricerca (LC59)', () => {
     const saved = localStorage.getItem('visualex-storage');
     expect(saved).not.toBeNull();
     render(row({ norma: NORMA }));
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier art. 2043 c.c.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica art. 2043 c.c.' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sinistro Rossi/ }));
     const after = appStore.getState();
     expect(after.practices).toBe(before.practices);
@@ -121,25 +121,25 @@ describe('«Aggiungi al dossier» on a row of the Ricerca (LC59)', () => {
         <div />
       </PracticeRowShell>,
     );
-    expect(screen.queryByRole('button', { name: /^Aggiungi al dossier/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Aggiungi alla pratica/ })).toBeNull();
   });
 });
 
-describe('«Aggiungi al dossier» on a hit of case law (LC59)', () => {
+describe('«Aggiungi alla pratica» on a hit of case law (LC59)', () => {
   const hit = () => render(
     <MemoryRouter><ul><CaseLawRow decision={SENTENZA} dossierItem={SENTENZA} source="Archivio della Cassazione" /></ul></MemoryRouter>,
   );
 
   it('has the command with its name, and adds the decision', () => {
     hit();
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier Cass. civ., n. 24908/2026' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica Cass. civ., n. 24908/2026' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sinistro Rossi/ }));
     expect(appStore.getState().dossiers.find((d) => d.id === 'a')!.items[0]).toMatchObject({ type: 'sentenza' });
-    expect(screen.getByText('Nel dossier «Sinistro Rossi»')).toBeInTheDocument();
+    expect(screen.getByText('Nella pratica «Sinistro Rossi»')).toBeInTheDocument();
   });
 
   it('a row with nothing to add draws no command', () => {
     render(<MemoryRouter><ul><CaseLawRow decision={SENTENZA} source="Massimario" /></ul></MemoryRouter>);
-    expect(screen.queryByRole('button', { name: /Aggiungi al dossier/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Aggiungi alla pratica/ })).toBeNull();
   });
 });

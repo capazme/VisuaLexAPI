@@ -969,7 +969,7 @@ export function AdminPage() {
                       <thead className="bg-gray-50 dark:bg-gray-700/50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                            Dossier
+                            Dossier pubblicato
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
                             Autore
@@ -1462,7 +1462,7 @@ export function AdminPage() {
                 Elimina dai dossier pubblici
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-6">
-                La copia pubblicata e tutte le sue versioni vengono eliminate per sempre. Il dossier del suo autore resta com'è.
+                La copia pubblicata e tutte le sue versioni vengono eliminate per sempre. La pratica del suo autore resta com'è.
               </p>
               <div className="flex justify-center gap-3">
                 <button

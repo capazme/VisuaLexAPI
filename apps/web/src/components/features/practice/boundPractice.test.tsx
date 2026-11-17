@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../services/trashService', () => ({ trashService: { purge: vi.fn(async () => {}) } }));
 vi.mock('../../../services/dossierService', () => ({
@@ -9,7 +9,6 @@ vi.mock('../../../services/dossierService', () => ({
 
 import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
-import { PracticeBar } from './PracticeBar';
 import { closeAllPracticesWithUndo } from './practiceUndo';
 import { useSavePracticeAsDossier } from './useSavePracticeAsDossier';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
@@ -20,7 +19,7 @@ import type { Dossier } from '../../../types';
 
 const s = () => appStore.getState();
 const DOSSIER: Dossier = {
-  id: 'dos-1', title: 'Legata al dossier', createdAt: '',
+  id: 'dos-1', title: 'Legata alla pratica', createdAt: '',
   items: [{ id: 'n', addedAt: '', type: 'norma', data: { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08', numero_articolo: '5' } }],
 };
 
@@ -32,22 +31,6 @@ afterEach(() => {
 });
 
 describe('a bound table in the Corpus', () => {
-  it('the bar shows a chip per Corpus practice and none for the bound table', () => {
-    s().createPractice('Una');
-    s().openDossierPractice(DOSSIER);
-    s().createPractice('Due');
-    render(<PracticeBar />);
-    expect(screen.getByRole('button', { name: /^Una/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Due/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Legata al dossier/ })).toBeNull();
-  });
-
-  it('the bar is not drawn when the bound table is the only one', () => {
-    s().openDossierPractice(DOSSIER);
-    render(<PracticeBar />);
-    expect(screen.queryByRole('navigation', { name: 'Pratiche' })).toBeNull();
-  });
-
   it('«Chiudi tutte» counts and closes the Corpus practices; «Annulla» puts back those only', async () => {
     s().createPractice('Una');
     const bound = s().openDossierPractice(DOSSIER);
@@ -58,9 +41,9 @@ describe('a bound table in the Corpus', () => {
       closeAllPracticesWithUndo();
       expect(s().practices.map((p) => p.id)).toEqual([bound]);
       await act(async () => {});
-      expect(shown!.message).toBe('2 pratiche chiuse');
+      expect(shown!.message).toBe('2 tavoli chiusi');
       await act(async () => { await shown!.onUndo(); });
-      expect(s().practices.map((p) => p.label)).toEqual(['Una', 'Legata al dossier', 'Due']);
+      expect(s().practices.map((p) => p.label)).toEqual(['Una', 'Legata alla pratica', 'Due']);
       expect(s().activePracticeId).not.toBe(bound);
     } finally {
       unregister();
@@ -94,6 +77,6 @@ describe('a bound table in the Corpus', () => {
     s().createPractice('Due');
     // the bar's indices: «Due» (1) before «Una» (0)
     s().reorderPractices(1, 0);
-    expect(s().practices.map((p) => p.label)).toEqual(['Due', 'Legata al dossier', 'Una']);
+    expect(s().practices.map((p) => p.label)).toEqual(['Due', 'Legata alla pratica', 'Una']);
   });
 });

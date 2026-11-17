@@ -107,23 +107,23 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('the mark: «Non nel dossier» for what arrived while reading, nothing for what is in it', () => {
-  it('rows of the dossier carry no mark; a row that came while reading says «Non nel dossier», in words', () => {
+describe('the mark: «Non nella pratica» for what arrived while reading, nothing for what is in it', () => {
+  it('rows of the dossier carry no mark; a row that came while reading says «Non nella pratica», in words', () => {
     render(<Page />);
-    expect(screen.queryByText('Non nel dossier')).toBeNull();
+    expect(screen.queryByText('Non nella pratica')).toBeNull();
     arrive();
-    expect(screen.getAllByText('Non nel dossier')).toHaveLength(1);
-    expect(rowOf('241', '3')!.getByText('Non nel dossier')).toBeInTheDocument();
+    expect(screen.getAllByText('Non nella pratica')).toHaveLength(1);
+    expect(rowOf('241', '3')!.getByText('Non nella pratica')).toBeInTheDocument();
     // the toggle's name replaces its content: it says it too
-    expect(rowOf('241', '3')!.getByRole('button', { name: /non nel dossier/ })).toBeInTheDocument();
-    expect(rowOf('24', '5')!.queryByText('Non nel dossier')).toBeNull();
+    expect(rowOf('241', '3')!.getByRole('button', { name: /non nella pratica/ })).toBeInTheDocument();
+    expect(rowOf('24', '5')!.queryByText('Non nella pratica')).toBeNull();
   });
 
   it('a decision of the dossier carries no mark; one only on the table does', () => {
     render(<Page />);
     act(() => { s().addKnownDecisions(bound().id, [{ corte: 'cassazione', archivio: 'civile' as const, numero: 100, anno: 2023 }]); });
     const rows = bound().decisions.map((d) => document.querySelector<HTMLElement>(`[data-practice-row="${decisionRowKey(bound().id, d.id)}"]`)!);
-    const marked = rows.filter((el) => within(el).queryByText('Non nel dossier'));
+    const marked = rows.filter((el) => within(el).queryByText('Non nella pratica'));
     expect(marked).toHaveLength(1);
     expect(marked[0].textContent).toContain('100');
   });
@@ -133,8 +133,8 @@ describe('the mark: «Non nel dossier» for what arrived while reading, nothing 
     arrive();
     act(() => { s().openBeside(bound().id, { id: 'x', kind: 'article', actId: bound().acts[0].id, articleKey: practiceArticleKey(bound().acts[0].articles[0]) }); });
     const index = screen.getByRole('list', { name: /Articoli sul tavolo di l\. 7 agosto 1990/ });
-    expect(within(index).getByText('Non nel dossier')).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: /Articoli sul tavolo di l\. 8 marzo 2017/ }).textContent).not.toContain('Non nel dossier');
+    expect(within(index).getByText('Non nella pratica')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: /Articoli sul tavolo di l\. 8 marzo 2017/ }).textContent).not.toContain('Non nella pratica');
   });
 });
 
@@ -148,18 +148,18 @@ describe('for a reader of fifty (LC55, the reviewer of #529)', () => {
   });
 });
 
-describe('«Aggiungi al dossier»', () => {
+describe('«Aggiungi alla pratica»', () => {
   it('writes the row into the dossier with addToDossier, as the reader\'s popover does, and the mark goes', async () => {
     svc.addItem.mockResolvedValue({ id: 'srv-3', item_type: 'norm', title: '', content: {}, position: 4, status: 'unread', created_at: '' } as never);
     render(<Page />);
     arrive();
-    fireEvent.click(rowOf('241', '3')!.getByRole('button', { name: /^Aggiungi al dossier/ }));
+    fireEvent.click(rowOf('241', '3')!.getByRole('button', { name: /^Aggiungi alla pratica/ }));
     expect(svc.addItem).toHaveBeenCalledWith('dos-1', expect.objectContaining({
       content: expect.objectContaining({ tipo_atto: 'legge', numero_atto: '241', numero_articolo: '3' }),
     }));
     // «Fonti» reads the same store
     expect(s().dossiers[0].items.some((i) => i.type === 'norma' && i.data.numero_atto === '241')).toBe(true);
-    expect(screen.queryByText('Non nel dossier')).toBeNull();
+    expect(screen.queryByText('Non nella pratica')).toBeNull();
     await waitFor(() => expect(dossierIds()).toContain('srv-3'));
     // the re-sync that follows draws no second row
     expect(bound().acts.find((a) => a.norma.numero_atto === '241')!.articles).toHaveLength(1);
@@ -171,7 +171,7 @@ describe('«Aggiungi al dossier»', () => {
     render(<Page />);
     arrive();
     menuOf(rowOf('241', '3'));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi al dossier' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi alla pratica' }));
     expect(svc.addItem).toHaveBeenCalledTimes(1);
   });
 
@@ -181,23 +181,23 @@ describe('«Aggiungi al dossier»', () => {
     act(() => { s().addKnownDecisions(bound().id, [{ corte: 'cassazione', archivio: 'civile' as const, numero: 100, anno: 2023 }]); });
     const entry = bound().decisions.find((d) => d.reference.numero === 100)!;
     const row = within(document.querySelector<HTMLElement>(`[data-practice-row="${decisionRowKey(bound().id, entry.id)}"]`)!);
-    fireEvent.click(row.getByRole('button', { name: /^Aggiungi al dossier/ }));
+    fireEvent.click(row.getByRole('button', { name: /^Aggiungi alla pratica/ }));
     expect(svc.addItem).toHaveBeenCalledWith('dos-1', expect.objectContaining({ content: expect.objectContaining({ numero: 100, anno: 2023 }) }));
   });
 });
 
-describe('«Togli dal dossier»', () => {
-  it('goes through the trash with «Annulla»; the row stays on the table with «Non nel dossier»', async () => {
+describe('«Togli dalla pratica»', () => {
+  it('goes through the trash with «Annulla»; the row stays on the table with «Non nella pratica»', async () => {
     svc.trashItems.mockResolvedValue({ trashId: 't1', moved: ['n24-5'], notFound: [] });
     render(<Page />);
     menuOf(rowOf('24', '5'));
     expect(screen.queryByRole('menuitem', { name: 'Togli dal tavolo' })).toBeNull();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Togli dal dossier' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Togli dalla pratica' }));
     expect(svc.trashItems).toHaveBeenCalledWith('dos-1', ['n24-5']);
     expect(dossierIds()).not.toContain('n24-5');
-    await waitFor(() => expect(toast?.message).toBe('Articolo tolto dal dossier'));
+    await waitFor(() => expect(toast?.message).toBe('Articolo tolto dalla pratica'));
     expect(trashChanged).toHaveBeenCalled();
-    expect(rowOf('24', '5')!.getByText('Non nel dossier')).toBeInTheDocument();
+    expect(rowOf('24', '5')!.getByText('Non nella pratica')).toBeInTheDocument();
 
     // «Annulla»: back in the dossier, the mark goes
     vi.mocked(trashService.restore).mockResolvedValue({ dossierId: 'dos-1' } as never);
@@ -205,7 +205,7 @@ describe('«Togli dal dossier»', () => {
     await act(async () => { await toast!.onUndo(); });
     expect(trashService.restore).toHaveBeenCalledWith('t1');
     expect(dossierIds()).toContain('n24-5');
-    expect(rowOf('24', '5')!.queryByText('Non nel dossier')).toBeNull();
+    expect(rowOf('24', '5')!.queryByText('Non nella pratica')).toBeNull();
   });
 
   it('a decision of the dossier leaves it the same way', async () => {
@@ -213,34 +213,34 @@ describe('«Togli dal dossier»', () => {
     render(<Page />);
     const entry = bound().decisions[0];
     menuOf(within(document.querySelector<HTMLElement>(`[data-practice-row="${decisionRowKey(bound().id, entry.id)}"]`)!));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Togli dal dossier' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Togli dalla pratica' }));
     expect(svc.trashItems).toHaveBeenCalledWith('dos-1', ['s1']);
-    await waitFor(() => expect(toast?.message).toBe('Sentenza tolta dal dossier'));
+    await waitFor(() => expect(toast?.message).toBe('Sentenza tolta dalla pratica'));
     expect(bound().decisions).toHaveLength(1);
   });
 
-  it('«Rimuovi l\'atto» on an act of the dossier becomes «Togli dal dossier»: its articles go to the trash, the act stays', async () => {
+  it('«Rimuovi l\'atto» on an act of the dossier becomes «Togli dalla pratica»: its articles go to the trash, the act stays', async () => {
     svc.trashItems.mockResolvedValue({ trashId: 't3', moved: ['n24-5', 'n24-7'], notFound: [] });
     render(<Page />);
     fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.queryByRole('menuitem', { name: /Rimuovi l'atto/ })).toBeNull();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Togli dal dossier' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Togli dalla pratica' }));
     expect(svc.trashItems).toHaveBeenCalledWith('dos-1', ['n24-5', 'n24-7']);
-    await waitFor(() => expect(toast?.message).toBe('2 articoli tolti dal dossier'));
+    await waitFor(() => expect(toast?.message).toBe('2 articoli tolti dalla pratica'));
     expect(bound().acts.find((a) => a.norma.numero_atto === '24')!.articles).toHaveLength(2);
   });
 });
 
 describe('the simple reading (one article alone, no row heading)', () => {
-  it('a lone article not in the dossier says so over its text, with «Aggiungi al dossier»', () => {
+  it('a lone article not in the dossier says so over its text, with «Aggiungi alla pratica»', () => {
     svc.addItem.mockReturnValue(new Promise(() => {}));
     appStore.setState({ dossiers: [dossierOf([])] });
     render(<Page />);
     arrive();
-    expect(screen.getByText('Non nel dossier')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    expect(screen.getByText('Non nella pratica')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
     expect(svc.addItem).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('Non nel dossier')).toBeNull();
+    expect(screen.queryByText('Non nella pratica')).toBeNull();
   });
 });
 
@@ -261,7 +261,7 @@ describe('«Togli dal tavolo»', () => {
     render(<Page />);
     arrive();
     fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 7 agosto 1990, n. 241' }));
-    expect(screen.queryByRole('menuitem', { name: 'Togli dal dossier' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Togli dalla pratica' })).toBeNull();
     expect(screen.getByRole('menuitem', { name: /Rimuovi l'atto/ })).toBeInTheDocument();
   });
 });
@@ -299,12 +299,12 @@ describe('reordering the acts writes the order into the dossier', () => {
 });
 
 describe('the re-sync marks, and never takes a row off the table', () => {
-  it('an item removed elsewhere (Claude via MCP, «Fonti») leaves its row with «Non nel dossier»; one added appears', () => {
+  it('an item removed elsewhere (Claude via MCP, «Fonti») leaves its row with «Non nella pratica»; one added appears', () => {
     render(<Page />);
     act(() => { appStore.setState({ dossiers: [dossierOf([norma('7'), norma('1', DLGS), sentenza, norma('9')])] }); });
-    expect(rowOf('24', '5')!.getByText('Non nel dossier')).toBeInTheDocument();
+    expect(rowOf('24', '5')!.getByText('Non nella pratica')).toBeInTheDocument();
     expect(rowOf('24', '9')).not.toBeNull();
-    expect(rowOf('24', '9')!.queryByText('Non nel dossier')).toBeNull();
-    expect(screen.getAllByText('Non nel dossier')).toHaveLength(1);
+    expect(rowOf('24', '9')!.queryByText('Non nella pratica')).toBeNull();
+    expect(screen.getAllByText('Non nella pratica')).toHaveLength(1);
   });
 });

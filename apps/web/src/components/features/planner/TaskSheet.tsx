@@ -107,11 +107,11 @@ export function TaskSheet(props: TaskSheetProps) {
           <nav aria-label="Dove si trova il compito" className="flex min-w-0 flex-1 items-center gap-1 text-sm text-slate-600 dark:text-slate-400">
             {task.dossierId ? (
               <Link
-                to={`/dossier?dossier=${encodeURIComponent(task.dossierId)}`}
+                to={`/pratiche?dossier=${encodeURIComponent(task.dossierId)}`}
                 className={cn('inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded px-1 hover:text-slate-900 hover:underline dark:hover:text-slate-100', FOCUS_RING)}
               >
                 <Folder size={15} aria-hidden className="shrink-0" />
-                <span className="truncate">{dossierTitle ?? 'Dossier'}</span>
+                <span className="truncate">{dossierTitle ?? 'Pratica'}</span>
               </Link>
             ) : (
               <span className="inline-flex min-w-0 items-center gap-1.5 px-1">
