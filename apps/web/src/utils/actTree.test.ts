@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildActTree, headingLabel, mainAnnex, structureTitle, type ActTreeNode } from './actTree';
+import { articleLabel, buildActTree, headingLabel, mainAnnex, splitHeadings, structureTitle, type ActTreeNode } from './actTree';
 
 /** The tree as an outline: «Libro: [Titolo: [2043]]». */
 function outline(nodes: ActTreeNode[]): unknown[] {
@@ -52,6 +52,69 @@ describe('buildActTree', () => {
     expect(outline(buildActTree(data, '2', labels))).toEqual([
       { 'LIBRO QUINTO Del lavoro': [{ 'SEZIONE II Del consiglio': [{ '§ 3 Del sistema con consiglio di sorveglianza': ['2409-octies'] }] }] },
     ]);
+  });
+});
+
+describe('glued headings, as Normattiva serves them', () => {
+  // The strings as /fetch_tree reads them off www.normattiva.it, r.d. 262/1942, on 17-11-2026: one `<li>` per string,
+  // the levels it opens glued on.
+  const LIBRO_IV = [
+    'LIBRO QUARTO DELLE OBBLIGAZIONI TITOLO I DELLE OBBLIGAZIONI IN GENERALE CAPO I Disposizioni preliminari',
+    { numero: '1173', allegato: '2' },
+    'TITOLO III DEI SINGOLI CONTRATTI CAPO I Della vendita Sezione I Disposizioni generali',
+    { numero: '1470', allegato: '2' },
+    'Sezione II Della vendita di cose mobili § 1 Disposizioni generali',
+    { numero: '1510', allegato: '2' },
+    '((§ 1 bis Della vendita dei beni di consumo))',
+    { numero: '1519-bis', allegato: '2' },
+    'Sezione III Della vendita di cose immobili',
+    { numero: '1537', allegato: '2' },
+  ];
+
+  it('splits a string into the headings it holds', () => {
+    expect(splitHeadings('TITOLO III DEI SINGOLI CONTRATTI CAPO I Della vendita Sezione I Disposizioni generali')).toEqual([
+      'TITOLO III DEI SINGOLI CONTRATTI', 'CAPO I Della vendita', 'Sezione I Disposizioni generali',
+    ]);
+    expect(splitHeadings('Disposizioni sulla legge in generale CAPO I Delle fonti del diritto')).toEqual([
+      'Disposizioni sulla legge in generale', 'CAPO I Delle fonti del diritto',
+    ]);
+    expect(splitHeadings("TITOLO VII ((DELLO STATO DI FIGLIO)) CAPO I ((Della presunzione di paternità)) ((...))")).toEqual([
+      'TITOLO VII ((DELLO STATO DI FIGLIO))', 'CAPO I ((Della presunzione di paternità)) ((...))',
+    ]);
+    expect(splitHeadings("((Sezione VI)) ((Dell'impresa familiare))")).toEqual(["((Sezione VI)) ((Dell'impresa familiare))"]);
+  });
+
+  it('nests the Libro IV: chapters under titles, sections under chapters, § under sections', () => {
+    expect(outline(buildActTree(LIBRO_IV, '2', ['CODICE CIVILE']))).toEqual([
+      { 'LIBRO QUARTO DELLE OBBLIGAZIONI': [
+        { 'TITOLO I DELLE OBBLIGAZIONI IN GENERALE': [{ 'CAPO I Disposizioni preliminari': ['1173'] }] },
+        { 'TITOLO III DEI SINGOLI CONTRATTI': [
+          { 'CAPO I Della vendita': [
+            { 'Sezione I Disposizioni generali': ['1470'] },
+            { 'Sezione II Della vendita di cose mobili': [
+              { '§ 1 Disposizioni generali': ['1510'] },
+              { '((§ 1 bis Della vendita dei beni di consumo))': ['1519-bis'] },
+            ] },
+            { 'Sezione III Della vendita di cose immobili': ['1537'] },
+          ] },
+        ] },
+      ] },
+    ]);
+  });
+
+  it('drops the part label glued to the first chapter of the preleggi', () => {
+    const data = ['Disposizioni sulla legge in generale CAPO I Delle fonti del diritto', { numero: '1', allegato: '1' }];
+    expect(outline(buildActTree(data, '1', ['Disposizioni sulla legge in generale']))).toEqual([
+      { 'CAPO I Delle fonti del diritto': ['1'] },
+    ]);
+  });
+});
+
+describe('articleLabel', () => {
+  it('writes «Art.» before an article, not before a row that is not one', () => {
+    expect(articleLabel('2043')).toBe('Art. 2043');
+    expect(articleLabel('IV')).toBe('Art. IV');
+    expect(articleLabel('Indice allegati')).toBe('Indice allegati');
   });
 });
 

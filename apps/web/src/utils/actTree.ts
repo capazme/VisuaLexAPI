@@ -36,11 +36,26 @@ export function isArticleString(str: string): boolean {
 }
 
 function rankOf(title: string): number {
-  const match = HEADING.exec(title.trim());
+  const match = HEADING.exec(cleanSectionTitle(title));
   return match ? LEVELS.indexOf(match[1].toLowerCase()) : LEVELS.length;
 }
 
 const fold = (value: string) => cleanSectionTitle(value).toLowerCase();
+
+// Normattiva reads a heading off its `<li>` with the levels opened there glued on: «TITOLO III DEI SINGOLI CONTRATTI
+// CAPO I Della vendita Sezione I Disposizioni generali», «Disposizioni sulla legge in generale CAPO I …». Split before a
+// level word (capitals or capitalised) followed by its numeral, or before a «§ n», amendment markers «((» included.
+const GLUED = /\s+(?=(?:\(\()?(?:(?:PARTE|LIBRO|TITOLO|CAPO|SEZIONE|Parte|Libro|Titolo|Capo|Sezione)\s+[IVXLCDM]+\b|§\s*\d))/;
+
+/** One string of the listing as the headings it holds. */
+export function splitHeadings(raw: string): string[] {
+  return raw.split(GLUED).map((part) => part.trim()).filter(Boolean);
+}
+
+/** «Art. 2043», but a row the source lists that is not an article («Indice allegati») as it is. */
+export function articleLabel(numero: string): string {
+  return /^(\d|[IVXLCDM]+\b)/.test(numero.trim()) ? `Art. ${numero}` : numero;
+}
 
 /**
  * The tree of one part of the act: `annex` null is the dispositivo. `annexLabels` are the parts' names, which the
@@ -79,7 +94,7 @@ export function buildActTree(data: ActTreeItem[], annex: string | null, annexLab
     if (typeof item === 'string') {
       // A bare number is the legacy listing, which knows no annexes: the dispositivo's.
       if (isArticleString(item)) place(item.trim(), null);
-      else if (!labels.has(fold(item))) pending.push(item);
+      else for (const heading of splitHeadings(item)) if (!labels.has(fold(heading))) pending.push(heading);
       continue;
     }
     // `parte`: a split article after its first part, listed once (G-387 (a)).

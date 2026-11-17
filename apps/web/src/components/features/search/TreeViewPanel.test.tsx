@@ -119,8 +119,8 @@ describe('TreeViewPanel — window variant', () => {
 describe('TreeViewPanel — drawer variant', () => {
   beforeEach(() => setViewport(false));
 
-  it('renders in place rather than through a portal', () => {
-    const { container } = render(
+  it('is a modal dialog over the whole screen, named by its title', () => {
+    render(
       <TreeViewPanel
         variant="drawer"
         isOpen
@@ -131,9 +131,9 @@ describe('TreeViewPanel — drawer variant', () => {
       />,
     );
 
-    // Not portalled, so its `md:hidden` wrapper keeps it off desktop.
-    expect(container).not.toBeEmptyDOMElement();
-    expect(screen.getByText("Struttura dell'Atto")).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: "Struttura dell'Atto" });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog.className).toContain('max-sm:h-full');
   });
 
   it('also stays open after a pick', () => {
@@ -837,3 +837,52 @@ describe('TreeViewPanel — a place stored by the old drag', () => {
     expect(parseFloat(panel.style.left)).toBeLessThanOrEqual(window.innerWidth - 420);
   });
 });
+
+describe('TreeViewPanel — the consultant’s notes on #557', () => {
+  beforeEach(() => setViewport(true));
+  const panel = (extra: Partial<React.ComponentProps<typeof TreeViewPanel>> = {}) => (
+    <TreeViewPanel variant="window" isOpen onClose={vi.fn()} treeData={['1', '2', '3']} urn="urn:test" {...extra} />
+  );
+
+  it('empties a filled filter on the first Esc and closes on the second', () => {
+    const onClose = vi.fn();
+    render(panel({ onClose }));
+    const filter = screen.getByLabelText('Filtra gli articoli per numero o rubrica');
+    fireEvent.change(filter, { target: { value: '2' } });
+    fireEvent.keyDown(filter, { key: 'Escape' });
+    expect(filter).toHaveValue('');
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(filter, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('brings the list back to the top when the filter changes', () => {
+    render(panel());
+    const list = screen.getByRole('group', { name: "Indice dell'atto" });
+    list.scrollTop = 300;
+    fireEvent.change(screen.getByLabelText('Filtra gli articoli per numero o rubrica'), { target: { value: '3' } });
+    expect(list.scrollTop).toBe(0);
+  });
+
+  it('marks the open article apart from a hovered row', () => {
+    render(panel({ activeArticle: '2' }));
+    const open = screen.getByRole('button', { name: 'Art. 2' });
+    const other = screen.getByRole('button', { name: 'Art. 1' });
+    expect(open.className).toContain('shadow-[inset_2px_0_0_currentColor]');
+    expect(other.className).not.toContain('shadow-[inset_2px_0_0_currentColor]');
+  });
+
+  it('writes a row that is not an article as it is', () => {
+    render(panel({ treeData: ['1', { numero: 'Indice allegati', allegato: null }] }));
+    expect(screen.getByRole('button', { name: 'Indice allegati' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Art\. Indice/ })).not.toBeInTheDocument();
+  });
+
+  it('is one Tab stop: the open article’s row', () => {
+    render(panel({ activeArticle: '2' }));
+    expect(screen.getByRole('button', { name: 'Art. 2' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('button', { name: 'Art. 1' })).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('button', { name: 'Art. 3' })).toHaveAttribute('tabindex', '-1');
+  });
+});
+

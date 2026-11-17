@@ -11,8 +11,8 @@ import { useAppStore } from '../../../store/useAppStore';
 import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { abrogatiFor, rubricheFor } from '../../../utils/actRubriche';
-import { buildActTree, headingLabel, type ActTreeItem, type ActTreeNode } from '../../../utils/actTree';
-import { spring } from '../../../lib/motion';
+import { articleLabel, buildActTree, headingLabel, type ActTreeItem, type ActTreeNode } from '../../../utils/actTree';
+import { Modal } from '../../ui/Modal';
 
 /** The window's width on a computer; its place is the store's (`structureWindow.position`), kept inside the viewport. */
 const WINDOW_WIDTH = 420;
@@ -142,6 +142,7 @@ export function TreeViewPanel({
   const openerRef = useRef<HTMLElement | null>(null);
   const scrolledRef = useRef(false);
   const selectId = useId();
+  const titleId = useId();
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -245,6 +246,11 @@ export function TreeViewPanel({
   };
   walk(shown, 0);
 
+  // A new filter shows its matches from the top.
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [filterQuery]);
+
   // Once per opening, the open article in view; rubriche landing later do not scroll again.
   const treeReady = tree.length > 0;
   useEffect(() => {
@@ -259,7 +265,13 @@ export function TreeViewPanel({
       e.preventDefault();
       // An open discussion panel or citation preview closes on Esc at the document: this one is the panel's.
       e.stopPropagation();
-      close();
+      // The first Esc empties a filled filter, the next closes the panel.
+      if (filterQuery) {
+        setFilterQuery('');
+        filterRef.current?.focus();
+      } else {
+        close();
+      }
       return;
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -277,15 +289,20 @@ export function TreeViewPanel({
   const rowHeight = drawer ? 'min-h-[44px] py-2' : 'min-h-8 py-1';
   const ROW_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500';
 
+  // One Tab stop in the list (the open article's row, else the first); the arrows walk it.
+  const activeRow = rows.findIndex(({ node }) => node.type === 'article' && isActive(node.numero));
+  const tabStop = activeRow === -1 ? 0 : activeRow;
+
   const renderRow = ({ node, depth }: Row, index: number): ReactNode => {
     const indent = { paddingLeft: 8 + depth * 14 };
+    const tabIndex = index === tabStop ? 0 : -1;
     if (node.type === 'heading') {
       const expanded = isExpanded(node.key);
       return (
         <div
           key={node.key}
           role="button"
-          tabIndex={0}
+          tabIndex={tabIndex}
           data-tree-row
           aria-expanded={expanded}
           onClick={() => toggle(node.key, expanded)}
@@ -322,6 +339,7 @@ export function TreeViewPanel({
       <button
         key={`a${index}-${numero}`}
         type="button"
+        tabIndex={tabIndex}
         data-tree-row
         onClick={() => clickable && onArticleSelect(numero, effectiveAnnex)}
         // aria-disabled, not disabled: a loaded row stays in the tab order and keeps its tooltip (the rubrica is cut
@@ -334,8 +352,9 @@ export function TreeViewPanel({
           'flex w-full items-baseline gap-1.5 rounded-md pr-2 text-left text-sm transition-colors',
           rowHeight,
           ROW_FOCUS,
+          // The open article: a firmer ground than the hover's and a rule on its left edge, in the text's ink.
           active
-            ? 'bg-slate-200/70 text-slate-900 dark:bg-slate-800 dark:text-white'
+            ? 'bg-slate-200 text-slate-900 shadow-[inset_2px_0_0_currentColor] dark:bg-slate-700/80 dark:text-white'
             : loaded
               ? 'cursor-default text-slate-700 dark:text-slate-300'
               : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/70',
@@ -343,7 +362,7 @@ export function TreeViewPanel({
       >
         {/* The number never shrinks: «Art. 2409-octiesdecies» widens its row instead of spilling out of it. */}
         <span className="shrink-0 whitespace-nowrap font-medium tabular-nums text-slate-900 dark:text-slate-100">
-          Art. {numero}
+          {articleLabel(numero)}
         </span>
         {/* The spaces make the name «Art. 2043 Risarcimento per fatto illecito»; the dot is for the eye. */}
         {tail && (
@@ -377,7 +396,7 @@ export function TreeViewPanel({
   const panelBody = (
     <>
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 py-1.5 pl-4 pr-1.5 dark:border-slate-800">
-        <h2 className="min-w-0 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">{title}</h2>
+        <h2 id={titleId} className="min-w-0 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">{title}</h2>
         <button
           type="button"
           onClick={close}
@@ -471,31 +490,20 @@ export function TreeViewPanel({
     );
   }
 
+  // On a phone a dialog over the whole screen (`Modal`): aria-modal, the focus kept inside and given back on closing.
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={close}
-            className="fixed inset-0 z-[100] bg-ink-950/40"
-          />
-          {/* Full height on a phone, from the right edge. */}
-          <motion.aside
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={spring.snappy}
-            aria-label={title}
-            onKeyDown={onKeyDown}
-            className="fixed inset-y-0 right-0 z-[100] flex w-full flex-col border-l border-slate-200 bg-white sm:w-[450px] dark:border-slate-800 dark:bg-slate-900"
-          >
-            {panelBody}
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+    <Modal
+      isOpen={isOpen}
+      onClose={close}
+      labelledBy={titleId}
+      showCloseButton={false}
+      phoneFullScreen
+      initialFocusRef={filterRef}
+      contentClassName="flex min-h-0 flex-col overflow-hidden p-0"
+    >
+      <div onKeyDown={onKeyDown} className="flex min-h-0 flex-1 flex-col">
+        {panelBody}
+      </div>
+    </Modal>
   );
 }
