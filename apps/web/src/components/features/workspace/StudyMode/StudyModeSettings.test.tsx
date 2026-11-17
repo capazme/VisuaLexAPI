@@ -1,14 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-// Impostazioni is a page (LC84): the gear opens it at «Significato dei colori» (`#colori`).
-const openSettings = vi.hoisted(() => vi.fn());
-vi.mock('../../settings/settingsRoute', () => ({ useOpenSettings: () => openSettings }));
+import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { StudyModeSettings } from './StudyModeSettings';
 
-afterEach(() => openSettings.mockReset());
-
-describe('StudyModeSettings — the way to the colours\' meanings', () => {
-  it('its last entry opens Impostazioni at «Significato dei colori»', () => {
+describe('StudyModeSettings — no way out to the colours\' meanings (LC84)', () => {
+  it('has no entry to Impostazioni: going there would leave Study Mode and lose its state', () => {
     render(
       <StudyModeSettings
         isOpen
@@ -21,9 +16,6 @@ describe('StudyModeSettings — the way to the colours\' meanings', () => {
         onThemeChange={vi.fn()}
       />,
     );
-    const entry = screen.getByRole('button', { name: 'Cambia il significato dei colori' });
-    expect(entry).toHaveClass('min-h-[44px]');
-    fireEvent.click(entry);
-    expect(openSettings).toHaveBeenCalledWith('colori');
+    expect(screen.queryByRole('button', { name: 'Cambia il significato dei colori' })).toBeNull();
   });
 });

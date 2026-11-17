@@ -1629,9 +1629,9 @@ colour's meaning reads it through `useHighlightColorMeanings` (`highlightColorIt
 the first letter, not an acronym the user wrote). Beside the highlighter one gear and only that (no «?»: the menu
 already explains; the gear says «change it»), named and titled «Cambia il significato dei colori»
 (`CHANGE_MEANINGS_LABEL`), the trigger's look with 44 px of width on a phone — the article's bar, the decision's, the
-dossier reader's; on the phone's «⋯» the same words are the entry after the inks; none over a lesson; in Study Mode, whose header
-has a gear already (its own settings, «Impostazioni (S)»), the entry is the last of that panel, not a second gear
-(`meaningsGear={false}`); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
+dossier reader's; on the phone's «⋯» the same words are the entry after the inks; none over a lesson; none in Study Mode
+(`meaningsGear={false}`, and since LC84 no entry in its settings panel either: going to the Impostazioni page would
+leave Study Mode and lose its state, Bill); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
 dialog over it would fight it: Impostazioni stays the user menu's there). All open Impostazioni at «Significato dei colori» (`openSettings('colori')`, `/impostazioni#colori`):
 LC84, Impostazioni is a page (`features/settings/SettingsPage`, below). No gear inside a lesson (`CitationPanel`):
 going to the page would end the lesson.

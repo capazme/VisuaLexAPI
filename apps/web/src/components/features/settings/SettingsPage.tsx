@@ -170,8 +170,12 @@ export function SettingsPage() {
                     if (!res.ok) throw new Error('Failed to fetch version');
                     return res.json();
                 })
-                .then(data => {
-                    setVersionInfo(data);
+                .then((data: VersionInfo) => {
+                    // A malformed answer shows no details, never takes the page down.
+                    if (typeof data?.version !== 'string' || typeof data.git?.branch !== 'string' || typeof data.git.commit?.hash !== 'string') {
+                        throw new Error('Malformed version');
+                    }
+                    setVersionInfo({ ...data, changelog: Array.isArray(data.changelog) ? data.changelog : [] });
                     setVersionError(false);
                 })
                 .catch(() => {

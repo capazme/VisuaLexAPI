@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
@@ -108,5 +108,16 @@ describe('Impostazioni — «Elimina l’account…» (Y1)', () => {
     for (const name of [/Esporta i miei dati/, /Elimina l’account…/, /Elimina definitivamente/, 'Annulla']) {
       expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]');
     }
+  });
+});
+
+describe('Impostazioni — «Informazioni»', () => {
+  it('a malformed answer of /version shows no details and keeps the page', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+    render(view());
+    expect(await screen.findByRole('button', { name: 'Versione (errore)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Versione (errore)' }));
+    await waitFor(() => expect(screen.getByText('Impossibile caricare le informazioni')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { level: 1, name: 'Impostazioni' })).toBeInTheDocument();
   });
 });

@@ -1,11 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Plus, Sun, Moon, BookOpen, Settings } from 'lucide-react';
+import { X, Minus, Plus, Sun, Moon, BookOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { StudyModeTheme } from './StudyMode';
 import { spring } from '../../../../lib/motion';
-import { CHANGE_MEANINGS_LABEL } from '../../search/highlightColorItems';
 
-import { useOpenSettings } from '../../settings/settingsRoute';
 interface StudyModeSettingsProps {
   isOpen: boolean;
   onClose: () => void;
@@ -52,7 +50,6 @@ export function StudyModeSettings({
   onThemeChange
 }: StudyModeSettingsProps) {
   const styles = THEME_SETTINGS_STYLES[theme];
-  const openSettings = useOpenSettings();
 
   return (
     <AnimatePresence>
@@ -237,20 +234,8 @@ export function StudyModeSettings({
                 </div>
               </div>
 
-              {/* The colours' meanings are the app's settings, not Study Mode's: Impostazioni is a page (LC84), so going there
-                  leaves Study Mode, and «Indietro» brings back the reader without it. */}
-              <button
-                type="button"
-                onClick={() => openSettings('colori')}
-                className={cn(
-                  'flex min-h-[44px] w-full items-center gap-2 rounded-md px-2 text-sm transition-colors md:min-h-0 md:py-2',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                  styles.button,
-                  styles.text
-                )}
-              >
-                <Settings size={16} aria-hidden /> {CHANGE_MEANINGS_LABEL}
-              </button>
+              {/* No way to the colours' meanings here (LC84, Bill): Impostazioni is a page, and going there would leave Study
+                  Mode and lose its state. They are changed in Impostazioni, reached from the highlighter outside it. */}
             </div>
           </motion.div>
         </>
