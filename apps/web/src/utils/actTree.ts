@@ -23,7 +23,6 @@ export type ActTreeNode =
   | { type: 'heading'; key: string; title: string; children: ActTreeNode[] }
   | { type: 'article'; numero: string };
 
-const LEVELS = ['parte', 'libro', 'titolo', 'capo', 'sezione'];
 const HEADING = /^(PARTE|LIBRO|TITOLO|CAPO|SEZIONE)\b/i;
 
 /** An article number, numeric or roman, with any single lowercase suffix («669-terdecies», «II bis»). */
@@ -35,9 +34,16 @@ export function isArticleString(str: string): boolean {
   return /^\d+(?:[-\s][a-z]+)?$/.test(trimmed) || /^[IVXLCDM]+(?:[-\s][a-z]+)?$/.test(trimmed);
 }
 
-function rankOf(title: string): number {
+/**
+ * A heading's level, in the order the act first uses each level word: the d.lgs. 36/2023 puts its Parti inside its Libri,
+ * other acts their Libri or Titoli inside Parti. A heading of no known level is the deepest.
+ */
+function rankOf(title: string, order: string[]): number {
   const match = HEADING.exec(cleanSectionTitle(title));
-  return match ? LEVELS.indexOf(match[1].toLowerCase()) : LEVELS.length;
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  const word = match[1].toLowerCase();
+  if (!order.includes(word)) order.push(word);
+  return order.indexOf(word);
 }
 
 const fold = (value: string) => cleanSectionTitle(value).toLowerCase();
@@ -67,6 +73,7 @@ export function buildActTree(data: ActTreeItem[], annex: string | null, annexLab
   const labels = new Set(annexLabels.map(fold));
   const root: ActTreeNode[] = [];
   const stack: { rank: number; children: ActTreeNode[] }[] = [];
+  const order: string[] = [];
   let pending: string[] = [];
   let inside = false;
   let count = 0;
@@ -81,7 +88,7 @@ export function buildActTree(data: ActTreeItem[], annex: string | null, annexLab
     }
     if (!inside) stack.length = 0;
     for (const title of pending) {
-      const rank = rankOf(title);
+      const rank = rankOf(title, order);
       while (stack.length && stack[stack.length - 1].rank >= rank) stack.pop();
       const node: ActTreeNode = { type: 'heading', key: `h${count++}`, title, children: [] };
       (stack.length ? stack[stack.length - 1].children : root).push(node);

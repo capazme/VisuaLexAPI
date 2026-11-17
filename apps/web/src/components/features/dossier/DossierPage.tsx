@@ -99,7 +99,7 @@ export function DossierPage() {
     <>
       {showTrash ? (
         <TrashPage trash={trash} onBack={() => setShowTrash(false)} showToast={showToast} />
-      ) : selectedDossierId && !selectedDossier ? (
+      ) : !selectedDossier && (selectedDossierId || readError) ? (
         reading ? (
           <p role="status" className="p-6 text-sm text-slate-600 dark:text-slate-400">Apro la pratica…</p>
         ) : (
@@ -109,7 +109,7 @@ export function DossierPage() {
             </p>
             <div className="flex gap-2">
               {readError && <Button onClick={() => void fetchUserData()}>Riprova</Button>}
-              <Button variant="secondary" onClick={() => setSelectedDossierId(null)}>Vai alle pratiche</Button>
+              {selectedDossierId && <Button variant="secondary" onClick={() => setSelectedDossierId(null)}>Vai alle pratiche</Button>}
             </div>
           </div>
         )
