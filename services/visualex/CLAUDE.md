@@ -407,8 +407,9 @@ POST unless noted, JSON bodies.
   a legacy paragraph without «(N)» joins the recital before it with `\n` once
   the next recital arrives. `tests/test_recitals_text_frozen.py` holds each
   recital's projection (SHA-256 and length); it binds from the web's PR 4a of
-  that plan. EU article text has its own guard,
-  `tests/test_eurlex_article_text_frozen.py`, binding now
+  that plan. EU article text read from the Official Journal's markup has its
+  own guard, `tests/test_eurlex_article_text_frozen.py`, binding now (the
+  consolidated markup has none yet)
 - `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
   AKN text plus, for the codici, the FRBRWork date of each article (the day
   its current text came into force). `urn` is the act's full URL as

@@ -154,7 +154,8 @@ did not create.
     `decisionRender.test.ts` checks that the rendered text nodes spell
     `decisionProjection`; the anchors that no longer land are listed on the
     decision's tab (`UnmatchedAnchors`), so none is dropped silently.
-    EU texts are held to the same contract. An EU article's `article_text` is guarded by
-    `test_eurlex_article_text_frozen.py`, binding now. A recital's text (`/fetch_recitals`), whose
+    EU texts are held to the same contract. An EU article's `article_text` read from the Official
+    Journal's markup is guarded by `test_eurlex_article_text_frozen.py`, binding now (the
+    consolidated markup has no such guard yet). A recital's text (`/fetch_recitals`), whose
     projection is the text with every `\n` removed, is guarded by `test_recitals_text_frozen.py`; it
     binds from the pull request that first stores marks on a recital (PR 4a of the recitals plan).

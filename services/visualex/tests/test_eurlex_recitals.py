@@ -173,6 +173,18 @@ class TestLegacyParagraphsBetweenRecitals:
         soup = _legacy("(1) Primo.", "Articolo 1", "Testo dell'articolo.", formula=False)
         assert extract_recitals(soup) == [{"number": "1", "text": "Primo."}]
 
+    def test_the_first_articles_heading_ends_the_preamble(self):
+        # No enacting formula, and a footnote paragraph after the articles carries the next number.
+        soup = _legacy("(1) Primo.", "(2) Secondo.", "Articolo 1", "Testo dell'articolo.", "(3) Nota.", formula=False)
+        assert extract_recitals(soup) == [
+            {"number": "1", "text": "Primo."},
+            {"number": "2", "text": "Secondo."},
+        ]
+
+    def test_a_continuation_that_names_an_article_is_still_a_continuation(self):
+        soup = _legacy("(1) Primo.", "Articolo 1 della direttiva 95/46/CE.", "(2) Secondo.")
+        assert extract_recitals(soup)[0]["text"] == "Primo.\nArticolo 1 della direttiva 95/46/CE."
+
     def test_an_empty_paragraph_adds_no_newline(self):
         soup = _legacy("(1) Primo.", "", "  ", "(2) Secondo.")
         assert extract_recitals(soup)[0] == {"number": "1", "text": "Primo."}

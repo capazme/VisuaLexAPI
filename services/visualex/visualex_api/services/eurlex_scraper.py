@@ -39,6 +39,9 @@ _RECITAL_NUMBER_ONLY = re.compile(r"^\(\d+\)$")
 _LEGACY_RECITAL = re.compile(r"^\((\d+)\)\s+(.*)$", re.S)
 _LEGACY_PREAMBLE_MARKER = re.compile(r"considerando quanto segue", re.I)
 _LEGACY_ENACTING_FORMULA = re.compile(r"^HA(?:NNO)?\s+ADOTTAT[OA]\b", re.I)
+# The first article's heading, alone in its paragraph: the preamble is over even when the enacting
+# formula was not recognised, so no article text is held as a recital's continuation.
+_LEGACY_FIRST_ARTICLE = re.compile(r"^Articolo\s+1$", re.I)
 # Space, tab, CR and LF only: the no-break space is a character of the source and stays (spec
 # 2026-11-17 §7.2.4).
 _ASCII_WHITESPACE = re.compile(r"[ \t\r\n]+")
@@ -116,7 +119,7 @@ def _extract_recitals_legacy(soup) -> list[dict]:
     pending: list[str] = []
     for p in marker.find_all_next("p"):
         text = _paragraph_text(p)
-        if _LEGACY_ENACTING_FORMULA.match(text):
+        if _LEGACY_ENACTING_FORMULA.match(text) or _LEGACY_FIRST_ARTICLE.match(text):
             break
         match = _LEGACY_RECITAL.match(text)
         if not match:
