@@ -5,6 +5,7 @@ import { getUniqueArticleId } from '../utils/articleIds';
 import type { Norma, ArticleData, TreeMetadata } from '../types';
 import { legalFetch } from '../services/legalFetch';
 import { fetchActRubriche, fetchActTree, type RubrichePart } from '../utils/actStructureCache';
+import { notify } from '../components/ui/notifications/notifications';
 
 interface UseAnnexNavigationProps {
   /** The norma being displayed */
@@ -300,6 +301,19 @@ export function useAnnexNavigation({
       if (loadingArticle) return; // Already loading something
 
       setLoadingArticle(articleNumber);
+      // Said on screen, not in the console alone (LC70). The server answers alike for an article that is not there and
+      // one that failed: the act's structure tells them apart; without it, nothing is claimed about the act.
+      const notLoaded = () => {
+        const wanted = normalizeArticleId(articleNumber);
+        const missing = allArticleIds !== undefined && !allArticleIds.some((id) => normalizeArticleId(id) === wanted);
+        notify({
+          type: 'error',
+          message: missing
+            ? `L'articolo ${articleNumber} non c'è in questo atto.`
+            : `L'articolo ${articleNumber} non si è caricato. Riprova.`,
+          duration: 6000,
+        });
+      };
 
       try {
         const response = await legalFetch('/fetch_all_data', {
@@ -324,9 +338,12 @@ export function useAnnexNavigation({
 
         if (validArticles.length > 0) {
           land(norma, validArticles);
+        } else {
+          notLoaded();
         }
       } catch (e) {
         console.error('Error loading article:', e);
+        notLoaded();
       } finally {
         setLoadingArticle(null);
       }
@@ -342,7 +359,7 @@ export function useAnnexNavigation({
         annex: annexForApi
       });
     }
-  }, [norma, currentAnnex, land, loadingArticle, isArticleLoaded, triggerSearch]);
+  }, [norma, currentAnnex, land, loadingArticle, isArticleLoaded, triggerSearch, allArticleIds]);
 
   return {
     // Tree state

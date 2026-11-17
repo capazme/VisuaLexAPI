@@ -122,7 +122,8 @@ export function PracticeNameInput({ initial, onDone, className }: {
   );
 }
 
-/** The table's name over its one act's title (LC68): small, secondary, the field in its place while it is renamed. */
+/** The table's name over its one act's title (LC68): small, secondary, the field in its place while it is renamed — at
+ *  16 px on a phone, under which Safari on iPhone zooms the page (LC70). */
 export function TableNameLine({ label, editing, onDone, id }: {
   label: string;
   editing: boolean;
@@ -130,6 +131,6 @@ export function TableNameLine({ label, editing, onDone, id }: {
   id?: string;
 }) {
   return editing
-    ? <PracticeNameInput initial={label} onDone={onDone} className="mb-0.5 w-full py-0.5 text-xs" />
+    ? <PracticeNameInput initial={label} onDone={onDone} className="mb-0.5 w-full py-0.5 text-base md:text-xs" />
     : <h2 id={id} className="truncate text-xs text-slate-600 dark:text-slate-400">{label}</h2>;
 }

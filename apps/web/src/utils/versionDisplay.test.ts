@@ -90,6 +90,7 @@ describe('describeVersion — the text in force', () => {
     expect(shown.chip).toEqual({
       tone: 'current',
       label: 'In vigore dal 28 dicembre 2025',
+      short: 'In vigore dal 28/12/2025',
       title: 'Testo consolidato di Normattiva, a fini informativi: fa fede la Gazzetta Ufficiale. Versione n. 8.',
     });
     expect(shown.banner).toBeNull();
@@ -100,6 +101,10 @@ describe('describeVersion — the text in force', () => {
     expect(describeVersion(validity({ valid_from: '2005-01-01' }), {}).chip?.label).toBe('In vigore dal 1° gennaio 2005');
     expect(describeVersion(validity({ valid_from: '2014-08-08' }), {}).chip?.label).toBe("In vigore dall'8 agosto 2014");
     expect(describeVersion(validity({ valid_from: null }), {}).chip?.label).toBe('In vigore');
+    // A phone's short form (LC70): the day in figures, no leading zeros, the same elision; none without a day.
+    expect(describeVersion(validity({ valid_from: '1942-04-19' }), {}).chip?.short).toBe('In vigore dal 19/4/1942');
+    expect(describeVersion(validity({ valid_from: '2014-08-08' }), {}).chip?.short).toBe("In vigore dall'8/8/2014");
+    expect(describeVersion(validity({ valid_from: null }), {}).chip?.short).toBeUndefined();
   });
 
   it('says nothing about the version when the page names none', () => {
