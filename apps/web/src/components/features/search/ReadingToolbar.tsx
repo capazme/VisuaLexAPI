@@ -18,6 +18,7 @@ import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
 import { namedAnnex } from '../../../utils/sources';
 import { EUROPEAN_LINK_NOTE, normLinkActionLabel } from '../../../utils/normattivaLink';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
+import { useOpenSettings } from '../settings/settingsRoute';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
@@ -147,7 +148,7 @@ export function ReadingToolbar({
     // room for the tool's toggle alone, the inks close the «⋯», and the gear's way to their meanings after them.
     const ink = useHighlighterInk();
     const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
-    const openSettings = useAppStore((s) => s.openSettings);
+    const openSettings = useOpenSettings();
     const noteToolOn = useAppStore((s) => s.readingTool === 'note');
     const statusEnd = useContext(StatusLineEnd);
     const meanings = useHighlightColorMeanings();
@@ -195,7 +196,7 @@ export function ReadingToolbar({
         ...(phone && !lockedReason
             ? highlightColorItems(ink, meanings, setHighlighterInk, {
                 section: true,
-                onChangeMeanings: () => openSettings('highlightColors'),
+                onChangeMeanings: () => openSettings('colori'),
             })
             : []),
     ];

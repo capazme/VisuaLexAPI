@@ -12,6 +12,10 @@ vi.mock('../../../hooks/useTour', () => ({
   },
 }));
 
+// Impostazioni is a page (LC84): the palette's «Gestisci» rows open it at their part.
+const openSettings = vi.hoisted(() => vi.fn());
+vi.mock('../settings/settingsRoute', () => ({ useOpenSettings: () => openSettings }));
+
 // The reviews' call is its own (`searchRassegne`): the global fetch stubs below answer /parse_query only.
 const searchRassegne = vi.hoisted(() => vi.fn());
 vi.mock('../../../services/rassegneService', async (importOriginal) => ({
@@ -162,7 +166,7 @@ describe('CommandPalette — reaching the alias manager', () => {
   };
 
   afterEach(() => {
-    appStore.setState({ customAliases: [], aliasManagerOpen: false });
+    appStore.setState({ customAliases: [] });
   });
 
   it('offers to create the first alias when the user has none', () => {
@@ -179,8 +183,8 @@ describe('CommandPalette — reaching the alias manager', () => {
 
     await user.click(screen.getByText('Crea un alias'));
 
-    // The palette closes first, then hands over — hence the wait.
-    await waitFor(() => expect(appStore.getState().aliasManagerOpen).toBe(true));
+    // The palette closes and Impostazioni opens at its aliases.
+    expect(openSettings).toHaveBeenCalledWith('alias');
   });
 
   it('keeps the entry once aliases exist, alongside them', () => {

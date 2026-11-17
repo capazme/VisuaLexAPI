@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+// Impostazioni is a page (LC84): the gear opens it at «Significato dei colori» (`#colori`).
+const openSettings = vi.hoisted(() => vi.fn());
+vi.mock('../../settings/settingsRoute', () => ({ useOpenSettings: () => openSettings }));
 import { StudyModeSettings } from './StudyModeSettings';
-import { appStore } from '../../../../store/useAppStore';
 
-afterEach(() => appStore.getState().closeSettings());
+afterEach(() => openSettings.mockReset());
 
 describe('StudyModeSettings — the way to the colours\' meanings', () => {
   it('its last entry opens Impostazioni at «Significato dei colori»', () => {
@@ -22,6 +24,6 @@ describe('StudyModeSettings — the way to the colours\' meanings', () => {
     const entry = screen.getByRole('button', { name: 'Cambia il significato dei colori' });
     expect(entry).toHaveClass('min-h-[44px]');
     fireEvent.click(entry);
-    expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
+    expect(openSettings).toHaveBeenCalledWith('colori');
   });
 });

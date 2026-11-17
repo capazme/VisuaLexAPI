@@ -1,17 +1,27 @@
-import { useState, useEffect, useRef } from 'react';
-import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Download, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '../../store/useAppStore';
-import { useAuth } from '../../hooks/useAuth';
-import { cn } from '../../lib/utils';
-import { FIELD_TEXT } from '../../constants/interactions';
-import { Modal } from './Modal';
-import { accountService } from '../../services/accountService';
-import { ConnectedAppsSection } from '../../features/connections/ConnectedAppsSection';
-import { MerltDataSection } from '../../features/merlt/privacy/MerltDataSection';
-import { HighlightMeaningsSection } from '../features/search/HighlightMeaningsSection';
-import type { SettingsSection } from '../../types';
-import { forgetUserData } from '../../services/sessionEnd';
+import { useState, useEffect, useRef, useCallback, type MouseEvent, type ReactNode } from 'react';
+import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Download, Trash2, ArrowLeft } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAppStore } from '../../../store/useAppStore';
+import { useAuth } from '../../../hooks/useAuth';
+import { useTour } from '../../../hooks/useTour';
+import { cn } from '../../../lib/utils';
+import { FIELD_TEXT, FOCUS_RING } from '../../../constants/interactions';
+import { Expand } from '../../ui/Expand';
+import { PageFrame } from '../../layout/PageFrame';
+import { accountService } from '../../../services/accountService';
+import { ConnectedAppsSection } from '../../../features/connections/ConnectedAppsSection';
+import { MerltDataSection } from '../../../features/merlt/privacy/MerltDataSection';
+import { isMerltEnabled } from '../../../features/merlt/featureFlag';
+import { useConsentIfProvided } from '../../../features/merlt/consent/useConsent';
+import { HighlightMeaningsSection } from '../search/HighlightMeaningsSection';
+import type { SettingsSection } from '../../../types';
+import { forgetUserData } from '../../../services/sessionEnd';
+import { isWorkspaceCovered } from '../../../utils/findWindowControl';
+import { scrollParentOf } from '../../../utils/scrollParent';
+import { KeyboardShortcutsSection } from './KeyboardShortcutsSection';
+import { AliasSection } from './AliasSection';
+import { QuickNormsSection } from './QuickNormsSection';
+import type { SettingsState } from './settingsRoute';
 
 interface CommitInfo {
     hash: string;
@@ -35,18 +45,30 @@ interface VersionInfo {
     changelog: CommitInfo[];
 }
 
-interface SettingsModalProps {
-    isOpen: boolean;
-    /** The section it opens at, scrolled to with its first field focused (the reader's gear: «Significato dei colori»); else «Chiudi». */
-    section?: SettingsSection | null;
-    onClose: () => void;
-    onRestartTour?: () => void;
+// An anchor scrolled to stops under the phone's bar (the scroller's `scroll-padding-top`) with the page's air.
+const PART = 'scroll-mt-4';
+
+/** A part of the page: its anchor (`#dati`) and what it holds. */
+function Part({ id, children }: { id: SettingsSection; children: ReactNode }) {
+    return <section id={id} className={PART}>{children}</section>;
 }
 
-export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }: SettingsModalProps) {
+/**
+ * Impostazioni as a page of its own (LC84, L-73: «niente sopra il contenuto»; it was `SettingsModal`), with the
+ * keyboard's shortcuts, the aliases and the quick norms that were dialogs of their own. An index at the left from `lg`,
+ * a list at the top below it; an address with a part (`/impostazioni#dati`) brings that part in view. «Indietro» and Esc
+ * go back to the page it was opened from (`settingsFrom` in the history's state), or to the search page when it was
+ * opened by its address. What opens inside it opens in the page (`Expand`), never over it.
+ */
+export function SettingsPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { isAdmin, canUseDevMode, devMode, setDevMode } = useAuth();
     const { settings, updateSettings } = useAppStore();
+    const { resetAndStartTour } = useTour();
+    // MERL-T's part is drawn only where MerltDataSection draws (the flag and its consent's context).
+    const consent = useConsentIfProvided();
+    const merltShown = isMerltEnabled() && consent !== null;
     const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
     const [versionLoading, setVersionLoading] = useState(false);
     const [versionError, setVersionError] = useState(false);
@@ -55,7 +77,8 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
     const [accountMessage, setAccountMessage] = useState<string | null>(null);
     const [deletePassword, setDeletePassword] = useState('');
     const [deleteConfirmation, setDeleteConfirmation] = useState('');
-    // Erasing the account is behind its own button (Y1): the password and the confirmation only once it is asked for.
+    // Erasing the account is behind its own button (Y1): the password and the confirmation only once it is asked for,
+    // in the page (`Expand`). Leaving the page forgets them: it unmounts.
     const [deleteOpen, setDeleteOpen] = useState(false);
     const deleteOpener = useRef<HTMLButtonElement>(null);
     const meaningsField = useRef<HTMLInputElement>(null);
@@ -66,23 +89,51 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
         setAccountMessage(null);
         deleteOpener.current?.focus();
     };
-    // The dialog stays mounted (`Layout`): closed, it forgets a deletion begun and its password, during render (no
-    // effect), so it opens again with «Elimina l’account…» closed.
-    const [wasOpen, setWasOpen] = useState(isOpen);
-    if (wasOpen !== isOpen) {
-        setWasOpen(isOpen);
-        if (!isOpen) {
-            setDeleteOpen(false);
-            setDeletePassword('');
-            setDeleteConfirmation('');
-            setAccountMessage(null);
-        }
-    }
     const [devModeBusy, setDevModeBusy] = useState(false);
     const [devModeError, setDevModeError] = useState(false);
 
+    // Back where it was opened from (the same history entry, so the page there is as it was left), or to the search
+    // page when there is nowhere in the app to go back to.
+    const from = (location.state as SettingsState | null)?.settingsFrom;
+    const goBack = useCallback(() => {
+        if (from) navigate(-1);
+        else navigate('/');
+    }, [from, navigate]);
+
+    // Esc goes back, unless something inside took it (a field giving up its change, an open `Expand`) or a dialog or
+    // the palette covers the page.
     useEffect(() => {
-        if (isOpen && !versionInfo && !versionLoading && !versionError) {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || event.defaultPrevented || isWorkspaceCovered()) return;
+            event.preventDefault();
+            goBack();
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [goBack]);
+
+    // The part in the address comes in view, moving the page's scroller alone (gotcha 34); the colours' meanings give
+    // their first field the focus, as the reader's gear always did.
+    useEffect(() => {
+        const id = decodeURIComponent(location.hash.slice(1));
+        const part = id ? document.getElementById(id) : null;
+        if (!part) return;
+        const scroller = scrollParentOf(part);
+        if (scroller) {
+            const room = (parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0) + 16;
+            scroller.scrollTo({ top: scroller.scrollTop + part.getBoundingClientRect().top - scroller.getBoundingClientRect().top - room });
+        }
+        if (id === 'colori') meaningsField.current?.focus({ preventScroll: true });
+    }, [location.hash]);
+
+    // The index changes the anchor in place: «Indietro» still goes back where the page was opened from.
+    const goTo = (id: SettingsSection) => (event: MouseEvent<HTMLAnchorElement>) => {
+        event.preventDefault();
+        navigate({ hash: `#${id}` }, { replace: true, state: location.state });
+    };
+
+    useEffect(() => {
+        if (!versionInfo && !versionLoading && !versionError) {
             // Async data-fetch on open: the loading flag gates a one-shot fetch.
             // (CLAUDE.md gotcha #11)
             setVersionLoading(true);
@@ -101,7 +152,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                 })
                 .finally(() => setVersionLoading(false));
         }
-    }, [isOpen, versionInfo, versionLoading, versionError]);
+    }, [versionInfo, versionLoading, versionError]);
 
     const formatDate = (dateStr: string) => {
         if (!dateStr || dateStr === 'unknown') return 'N/D';
@@ -157,8 +208,8 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
         }
     };
 
-    // The server answers with the user and every mounted `useAuth()` follows: the sidebar and the open
-    // article change under this dialog, no reload. A refusal leaves the mode as it was.
+    // The server answers with the user and every mounted `useAuth()` follows: the sidebar changes beside this page,
+    // no reload. A refusal leaves the mode as it was.
     const handleToggleDevMode = async () => {
         setDevModeBusy(true);
         setDevModeError(false);
@@ -184,17 +235,59 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
         { value: 'mono', label: 'Mono', fontClass: 'font-mono' },
     ];
 
+    const index: Array<{ id: SettingsSection; name: string; shown?: boolean }> = [
+        { id: 'aspetto', name: 'Aspetto' },
+        { id: 'colori', name: 'Significato dei colori' },
+        { id: 'norme-rapide', name: 'Norme rapide' },
+        { id: 'alias', name: 'Alias' },
+        { id: 'scorciatoie', name: 'Scorciatoie da tastiera' },
+        { id: 'aiuto', name: 'Aiuto' },
+        { id: 'sviluppo', name: 'Sviluppo', shown: canUseDevMode },
+        { id: 'amministrazione', name: 'Amministrazione', shown: isAdmin },
+        { id: 'dati', name: 'Dati e privacy' },
+        { id: 'merlt', name: 'Dati MERL-T', shown: merltShown },
+        { id: 'app-collegate', name: 'Applicazioni collegate' },
+        { id: 'informazioni', name: 'Informazioni' },
+    ];
+
     return (
-        <Modal
-            isOpen={isOpen}
-            onClose={onClose}
-            title="Impostazioni"
-            icon={<Settings size={20} />}
-            size="md"
-            // The section's first field takes the focus, and the dialog's body scrolls to the section.
-            initialFocusRef={section === 'highlightColors' ? meaningsField : undefined}
-        >
-            <div className="space-y-6">
+        <div className="flex flex-col gap-4 pb-12">
+            <button
+                type="button"
+                onClick={goBack}
+                aria-keyshortcuts="Escape"
+                className={cn('inline-flex min-h-[44px] w-fit items-center gap-1.5 rounded-lg px-2 -ml-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:py-1.5 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
+            >
+                <ArrowLeft size={16} aria-hidden /> Indietro
+            </button>
+            <PageFrame title="Impostazioni">
+                <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
+                    {/* The index: a list at the top below lg, a column that stays in sight from lg. */}
+                    <nav aria-label="Parti delle impostazioni" className="lg:sticky lg:top-0 lg:self-start">
+                        <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-0.5">
+                            {index.filter((part) => part.shown !== false).map((part) => (
+                                <li key={part.id}>
+                                    <a
+                                        href={`#${part.id}`}
+                                        onClick={goTo(part.id)}
+                                        aria-current={location.hash === `#${part.id}` ? 'location' : undefined}
+                                        className={cn(
+                                            'flex min-h-[44px] items-center rounded-lg border border-slate-200 px-3 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+                                            'lg:min-h-0 lg:border-transparent lg:py-1.5',
+                                            'aria-[current=location]:bg-slate-100 aria-[current=location]:font-medium aria-[current=location]:text-slate-900 dark:aria-[current=location]:bg-slate-800 dark:aria-[current=location]:text-slate-50',
+                                            FOCUS_RING,
+                                        )}
+                                    >
+                                        {part.name}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+
+                    <div className="min-w-0 max-w-2xl space-y-10">
+                <Part id="aspetto">
+                <div className="space-y-6">
                 {/* Theme - iOS-style Segmented Control */}
                 <div>
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Tema</h3>
@@ -281,30 +374,46 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                     </div>
                 </div>
 
-                {/* What each highlight colour means to this user, with the other reading settings. */}
-                <HighlightMeaningsSection firstFieldRef={meaningsField} revealOnFocus={section === 'highlightColors'} />
+                </div>
+                </Part>
 
-                {/* Restart Tour */}
-                {onRestartTour && (
-                    <div>
-                        <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Aiuto</h3>
-                        <button
-                            onClick={() => {
-                                onClose();
-                                // Small delay to let modal close animation complete
-                                setTimeout(() => onRestartTour(), 200);
-                            }}
-                            className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
-                        >
-                            <HelpCircle size={16} />
-                            Rivedi la guida iniziale
-                        </button>
-                    </div>
-                )}
+                {/* What each highlight colour means to this user, with the other reading settings. */}
+                <Part id="colori"><HighlightMeaningsSection firstFieldRef={meaningsField} /></Part>
+
+                <Part id="norme-rapide">
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Norme rapide</h3>
+                    <QuickNormsSection />
+                </Part>
+
+                <Part id="alias">
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Alias</h3>
+                    <AliasSection />
+                </Part>
+
+                <Part id="scorciatoie">
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Scorciatoie da tastiera</h3>
+                    <KeyboardShortcutsSection />
+                </Part>
+
+                <Part id="aiuto">
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Aiuto</h3>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            // The guide opens over the page it was opened from, once that page is back.
+                            goBack();
+                            setTimeout(() => resetAndStartTour(), 300);
+                        }}
+                        className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
+                    >
+                        <HelpCircle size={16} />
+                        Rivedi la guida iniziale
+                    </button>
+                </Part>
 
                 {/* Development mode - only for accounts the administrator enabled */}
                 {canUseDevMode && (
-                    <div>
+                    <Part id="sviluppo">
                         <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Sviluppo</h3>
                         <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                             <div className="min-w-0">
@@ -340,26 +449,24 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                         {devModeError && (
                             <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">Impossibile cambiare la modalità sviluppo. Riprova.</p>
                         )}
-                    </div>
+                    </Part>
                 )}
 
                 {/* Admin Panel - only for admins */}
                 {isAdmin && (
-                    <div>
+                    <Part id="amministrazione">
                         <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Amministrazione</h3>
                         <button
-                            onClick={() => {
-                                onClose();
-                                navigate('/admin');
-                            }}
+                            onClick={() => navigate('/admin')}
                             className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors text-sm font-medium"
                         >
                             <Shield size={16} />
                             Pannello Admin
                         </button>
-                    </div>
+                    </Part>
                 )}
 
+                <Part id="dati">
                 <div>
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati e privacy</h3>
                     <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
@@ -375,29 +482,35 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                         >
                             <Trash2 size={16} aria-hidden /> Elimina l’account…
                         </button>
-                        {deleteOpen && (
-                            <div id="delete-account-form" className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                        {/* In the page, under its button (L-73); its first field takes the focus, Esc and «Annulla» give it back. */}
+                        <Expand id="delete-account-form" open={deleteOpen} onClose={closeDelete}>
+                            <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400">L’account e i suoi dati vengono eliminati per sempre. Per confermare, la password e la frase «ELIMINA ACCOUNT».</p>
-                                <input autoFocus type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
+                                <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
                                 <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
                                 <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="min-h-[44px] md:min-h-0 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
                                 <button type="button" onClick={closeDelete} className="w-full inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 dark:text-slate-300 dark:hover:bg-slate-800">Annulla</button>
                             </div>
-                        )}
+                        </Expand>
                         {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
                     </div>
                 </div>
 
-                <MerltDataSection />
+                </Part>
 
-                <ConnectedAppsSection />
+                <Part id="merlt"><MerltDataSection /></Part>
 
+                <Part id="app-collegate"><ConnectedAppsSection /></Part>
+
+                <Part id="informazioni">
                 {/* Version Info */}
                 <div>
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Informazioni</h3>
                     <button
+                        type="button"
                         onClick={() => setShowInfo(!showInfo)}
                         aria-expanded={showInfo}
+                        aria-controls="version-details"
                         className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
                     >
                         <Info size={16} />
@@ -411,7 +524,8 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                         }
                     </button>
 
-                    {showInfo && versionInfo && (
+                    <Expand id="version-details" open={showInfo} onClose={() => setShowInfo(false)}>
+                    {versionInfo && (
                         <div className="mt-3 space-y-3">
                             {/* Version & Git Info */}
                             <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 text-xs">
@@ -471,7 +585,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                         </div>
                     )}
 
-                    {showInfo && !versionInfo && (
+                    {!versionInfo && (
                         <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-500 text-center">
                             {versionLoading ? 'Caricamento…' : versionError ? (
                                 <div className="space-y-2">
@@ -486,8 +600,12 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                             ) : 'Caricamento…'}
                         </div>
                     )}
+                    </Expand>
                 </div>
-            </div>
-        </Modal>
+                </Part>
+                    </div>
+                </div>
+            </PageFrame>
+        </div>
     );
 }

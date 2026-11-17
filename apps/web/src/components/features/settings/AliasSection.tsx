@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Tag, Pencil, Trash2, ArrowRight, AlertCircle, Plus, Package, BookOpen, Search, Info } from 'lucide-react';
-import { Modal } from '../../ui/Modal';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import type { CustomAlias } from '../../../types';
@@ -38,10 +37,9 @@ const ACT_TYPES = [
     { value: 'CDFUE', label: 'CDFUE' },
 ];
 
-export function AliasManager() {
+/** The user's aliases and what the system already knows, a part of the Impostazioni page (LC84: it was a dialog). */
+export function AliasSection() {
     const {
-        aliasManagerOpen,
-        closeAliasManager,
         addCustomAlias,
         updateCustomAlias,
         removeCustomAlias,
@@ -61,7 +59,7 @@ export function AliasManager() {
     // names the resolver understands without any alias at all. Both were
     // invisible here, which is how this screen came to suggest "es. gdpr" as a
     // trigger to create while `gdpr` had been a shipped preset all along.
-    const { catalog, loading: catalogLoading } = useAliasCatalog(aliasManagerOpen);
+    const { catalog, loading: catalogLoading } = useAliasCatalog(true);
     const [catalogFilter, setCatalogFilter] = useState('');
 
     // Edit state
@@ -189,12 +187,6 @@ export function AliasManager() {
     const aliases = getCustomAliasesSorted();
 
     return (
-        <Modal
-            isOpen={aliasManagerOpen}
-            onClose={closeAliasManager}
-            title="Alias Personalizzati"
-            size="lg"
-        >
             <div className="space-y-6">
                 {/* Info Banner */}
                 <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-4">
@@ -443,7 +435,6 @@ export function AliasManager() {
                     )}
                 </div>
             </div>
-        </Modal>
     );
 }
 
@@ -474,7 +465,11 @@ function AliasItem({
 }: AliasItemProps) {
     if (isEditing) {
         return (
-            <div className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 border border-primary-200 dark:border-primary-800">
+            // Esc gives up the change and stays on the page (taken here, before the page's own Esc goes back).
+            <div
+                onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onCancelEdit(); } }}
+                className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 border border-primary-200 dark:border-primary-800"
+            >
                 <div className="flex gap-2 mb-2">
                     <input
                         type="text"
@@ -543,16 +538,21 @@ function AliasItem({
                     <span className="block text-[11px] text-slate-400/80">{formatLastUsed(alias.lastUsedAt)}</span>
                 )}
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* In sight at every width: on a page, not under a pointer only (a phone has none, the keyboard neither). */}
+            <div className="flex gap-1">
                 <button
+                    type="button"
                     onClick={() => onStartEdit(alias)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                    aria-label={`Modifica l’alias ${alias.trigger}`}
+                    className="grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                 >
                     <Pencil size={14} />
                 </button>
                 <button
+                    type="button"
                     onClick={onDelete}
-                    className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500"
+                    aria-label={`Elimina l’alias ${alias.trigger}`}
+                    className="grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-500 hover:bg-red-100 hover:text-red-600 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-red-900/30"
                 >
                     <Trash2 size={14} />
                 </button>

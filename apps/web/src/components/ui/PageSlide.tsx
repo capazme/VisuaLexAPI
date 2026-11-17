@@ -4,11 +4,13 @@ import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
 import { prefersReducedMotion } from '../../features/sections/sectionTransition';
 
 /** How far a page travels as it comes and goes: a nudge, not a whole screen. */
-const SHIFT = '24px';
+const SHIFT = 24;
 
 export interface PageSlideProps {
   /** The page shown, usually the route's path: a new key is a new page. */
   pageKey: string;
+  /** Going back (LC84, leaving Impostazioni): the same movement the other way, the page coming from the left. */
+  back?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -19,7 +21,7 @@ export interface PageSlideProps {
  * island's opening (`ISLAND_OPEN`), the leaving one its closing (`ISLAND_CLOSE`). Under reduced motion only the fade.
  * Without Web Animations the page changes at once.
  */
-export function PageSlide({ pageKey, className, children }: PageSlideProps) {
+export function PageSlide({ pageKey, back = false, className, children }: PageSlideProps) {
   const [current, setCurrent] = useState({ key: pageKey, node: children });
   const [leaving, setLeaving] = useState<{ key: string; node: ReactNode } | null>(null);
   const motion = typeof Element.prototype.animate === 'function';
@@ -40,14 +42,15 @@ export function PageSlide({ pageKey, className, children }: PageSlideProps) {
       return undefined;
     }
     const still = prefersReducedMotion();
+    const toward = back ? -1 : 1;
     const enter = enterRef.current;
     const leave = leaveRef.current;
     const coming = enter?.animate(
-      [{ opacity: 0, transform: still ? 'none' : `translateX(${SHIFT})` }, { opacity: 1, transform: 'none' }],
+      [{ opacity: 0, transform: still ? 'none' : `translateX(${toward * SHIFT}px)` }, { opacity: 1, transform: 'none' }],
       ISLAND_OPEN,
     );
     const going = leave?.animate(
-      [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: still ? 'none' : `translateX(-${SHIFT})` }],
+      [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: still ? 'none' : `translateX(${-toward * SHIFT}px)` }],
       { ...ISLAND_CLOSE, fill: 'forwards' },
     );
     if (going) going.onfinish = () => setLeaving(null);

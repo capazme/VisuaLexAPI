@@ -1,37 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
-vi.mock('../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
-vi.mock('../../features/merlt/privacy/MerltDataSection', () => ({ MerltDataSection: () => null }));
-vi.mock('../../services/accountService', () => ({ accountService: {} }));
-// The dialog's body is the scroller in a browser; jsdom computes no overflow from the classes.
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
+vi.mock('../../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../../../features/merlt/privacy/MerltDataSection', () => ({ MerltDataSection: () => null }));
+vi.mock('../../../services/accountService', () => ({ accountService: {} }));
+// The layout's content area is the scroller in a browser; jsdom computes no overflow from the classes.
 const scrollParent = vi.hoisted(() => vi.fn());
-vi.mock('../../utils/scrollParent', () => ({ scrollParentOf: scrollParent }));
+vi.mock('../../../utils/scrollParent', () => ({ scrollParentOf: scrollParent }));
 
-import { SettingsModal } from './SettingsModal';
-import { appStore } from '../../store/useAppStore';
-import type { SettingsSection } from '../../types';
+import { SettingsPage } from './SettingsPage';
+import { appStore } from '../../../store/useAppStore';
+import type { SettingsSection } from '../../../types';
 
 const own = () => appStore.getState().settings.highlightColorMeanings;
 const setOwn = (meanings: Record<string, string>) =>
   appStore.setState((st) => ({ settings: { ...st.settings, highlightColorMeanings: meanings } }));
 
+// Opened by its address, with no page of the app to go back to: «Indietro» and Esc go to the search page.
 function open(section: SettingsSection | null = null) {
-  const onClose = vi.fn();
   render(
-    <MemoryRouter>
-      <SettingsModal isOpen section={section} onClose={onClose} />
+    <MemoryRouter initialEntries={[`/impostazioni${section ? `#${section}` : ''}`]}>
+      <Routes>
+        <Route path="/" element={<p>Pagina di ricerca</p>} />
+        <Route path="/impostazioni" element={<SettingsPage />} />
+      </Routes>
     </MemoryRouter>,
   );
-  return { onClose, region: screen.getByRole('region', { name: 'Significato dei colori' }) };
+  return { region: screen.getByRole('region', { name: 'Significato dei colori' }) };
 }
 
 const field = (region: HTMLElement, colour: string) => within(region).getByRole('textbox', { name: colour });
 
 beforeEach(() => {
-  // The version box asks /version when the modal opens; it is not under test.
+  // The version box asks /version when the page opens; it is not under test.
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 });
 afterEach(() => {
@@ -80,18 +83,18 @@ describe('Impostazioni › «Significato dei colori»', () => {
     expect(within(region).getByRole('status')).toHaveTextContent('Il significato non può essere vuoto: il giallo resta «Tesi».');
   });
 
-  it('Esc gives up a change and keeps Impostazioni open; the next Esc closes it', () => {
-    const { region, onClose } = open();
+  it('Esc gives up a change and keeps Impostazioni open; the next Esc goes back', () => {
+    const { region } = open();
     const red = field(region, 'Rosso');
     red.focus();
     fireEvent.change(red, { target: { value: 'Contro' } });
     fireEvent.keyDown(red, { key: 'Escape' });
     expect(red).toHaveValue('Da rivedere');
-    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByText('Pagina di ricerca')).toBeNull();
     fireEvent.blur(red);
     expect(own()).toEqual({});
     fireEvent.keyDown(red, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Pagina di ricerca')).toBeInTheDocument();
   });
 
   it('a meaning written back to the default is no meaning of one\'s own', () => {
@@ -122,33 +125,32 @@ describe('Impostazioni › «Significato dei colori»', () => {
     expect(within(region).getByRole('button', { name: 'Ripristina predefiniti' })).toHaveClass('min-h-[44px]');
   });
 
-  it('opened by the reader\'s gear, it focuses the first field, «Giallo», a control of the dialog\'s Tab order', async () => {
-    const { region } = open('highlightColors');
+  it('opened by the reader\'s gear (`#colori`), it focuses the first field, «Giallo», a control of the Tab order', async () => {
+    const { region } = open('colori');
     const yellow = field(region, 'Giallo');
     await waitFor(() => expect(document.activeElement).toBe(yellow));
-    // A control of the dialog's Tab order, so its trap leaves Shift+Tab to the browser (the control before it): from
-    // an element outside that order (a heading with tabIndex -1) it jumped to the dialog's last control. (jsdom lays
-    // nothing out, so the trap itself is not run here: `offsetParent` is always null.)
     expect(yellow.tabIndex).toBe(0);
     expect(yellow).not.toHaveAttribute('tabindex');
     expect(screen.getByRole('heading', { name: 'Significato dei colori' })).not.toHaveAttribute('tabindex');
   });
 
-  it('and scrolls the dialog\'s body to the section, its heading at the top, once', async () => {
+  it('and scrolls the page\'s scroller alone to the part, its heading at the top with 16 px of air (gotcha 34)', async () => {
     const scroller = document.createElement('div');
     scroller.scrollTop = 40;
+    // jsdom has no `scrollTo` on an element: the call sets the place, as a browser does with no smooth scroll.
+    scroller.scrollTo = ((options: ScrollToOptions) => { scroller.scrollTop = options.top ?? 0; }) as typeof scroller.scrollTo;
     scrollParent.mockReturnValue(scroller);
     const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
       return { top: this.tagName === 'SECTION' ? 500 : 100 } as DOMRect;
     });
     try {
-      const { region } = open('highlightColors');
+      const { region } = open('colori');
       await waitFor(() => expect(document.activeElement).toBe(field(region, 'Giallo')));
-      // From the field's place to the section's top: 500 − 100 more.
-      expect(scroller.scrollTop).toBe(440);
+      // The part 400 px below the scroller's top, less the page's 16 px of air.
+      expect(scroller.scrollTop).toBe(424);
       field(region, 'Verde').focus();
       field(region, 'Giallo').focus();
-      expect(scroller.scrollTop).toBe(440);
+      expect(scroller.scrollTop).toBe(424);
     } finally {
       rect.mockRestore();
     }
@@ -162,8 +164,10 @@ describe('Impostazioni › «Significato dei colori»', () => {
     expect(scrollParent).not.toHaveBeenCalled();
   });
 
-  it('opened from the user menu, the focus goes to «Chiudi» as before', async () => {
+  it('is a page, not a dialog: nothing in it is drawn over the content (L-73)', () => {
     open();
-    await waitFor(() => expect(document.activeElement).toHaveAccessibleName(/Chiudi/));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('[aria-modal]')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Impostazioni' })).toBeInTheDocument();
   });
 });

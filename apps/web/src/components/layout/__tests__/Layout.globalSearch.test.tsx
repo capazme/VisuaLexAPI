@@ -4,14 +4,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
-vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 // The planner's host reads the tasks from the server: not under test here.
 vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
-vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
 vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
@@ -34,6 +32,7 @@ import { Layout } from '../Layout';
 import { DecisionAddress } from '../../features/decisions/DecisionAddress';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
+import { QuickNormsSection } from '../../features/settings/QuickNormsSection';
 
 // The palette's box: its placeholder is shorter on a phone (jsdom's width), so its start.
 const PALETTE_BOX = /^Atto o citazione/;
@@ -49,6 +48,7 @@ function at(path: string) {
           <Route path="history" element={<p>Pagina cronologia</p>} />
           <Route path="learn" element={<p>Pagina studia</p>} />
           <Route path="sentenze" element={<DecisionAddress />} />
+          <Route path="impostazioni" element={<QuickNormsSection />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -143,20 +143,19 @@ describe('Layout — ⌘K opens the palette on every page', () => {
     expect(screen.getByText('Pagina di ricerca')).toBeInTheDocument();
   });
 
-  it('a quick norm used from its manager on another page lands on the search page, as a trigger checked for an annex', async () => {
+  it('a quick norm used from Impostazioni › Norme rapide lands on the search page, as a trigger checked for an annex', async () => {
     const params = { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' as const, version_date: '' };
     appStore.setState({
       quickNorms: [{ id: 'q1', label: 'Danno ingiusto', searchParams: params, createdAt: '', usageCount: 0 }],
-      quickNormsManagerOpen: true,
       selectQuickNorm: vi.fn(),
     });
     const user = userEvent.setup();
-    at('/pratiche');
+    at('/impostazioni#norme-rapide');
     await user.click(screen.getByText('Danno ingiusto'));
     expect(triggerSearch).toHaveBeenCalledWith(params);
     expect(isTypedSearch(triggerSearch.mock.calls[0][0])).toBe(false);
     expect(await screen.findByText('Pagina di ricerca')).toBeInTheDocument();
-    appStore.setState({ quickNorms: [], quickNormsManagerOpen: false, selectQuickNorm: original.selectQuickNorm });
+    appStore.setState({ quickNorms: [], selectQuickNorm: original.selectQuickNorm });
   });
 
   it('a quick norm picked in the palette runs as a typed search, and its saved params stay unmarked', async () => {

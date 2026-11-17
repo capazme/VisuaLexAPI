@@ -32,7 +32,10 @@ export function usePageTitleInView(scroller: HTMLElement | null, { enabled, rese
         // Nothing drawn yet (a page loaded with its route, on its way): no answer, so the bar does not name the page
         // only to clear it a moment later, when the title arrives in sight.
         // Not taken as seen: a page drawn later with no `h1` (the error in a page's place) must still name the page.
-        if (!scroller.firstElementChild?.firstElementChild) {
+        // The page's place is inside `PageSlide` (LC84): the last one, the page coming in.
+        const places = scroller.querySelectorAll('[data-page-place]');
+        const place = places.length > 0 ? places[places.length - 1] : scroller.firstElementChild;
+        if (!place?.firstElementChild) {
           watched = undefined;
           return;
         }

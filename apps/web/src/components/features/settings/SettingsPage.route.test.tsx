@@ -1,0 +1,98 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
+vi.mock('../../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../../../features/merlt/privacy/MerltDataSection', () => ({ MerltDataSection: () => null }));
+vi.mock('../../../services/accountService', () => ({ accountService: {} }));
+
+import { SettingsPage } from './SettingsPage';
+import { useOpenSettings, useSettingsRequests } from './settingsRoute';
+import type { SettingsSection } from '../../../types';
+
+/** A page of the app with a way into Impostazioni, as the sidebar and the reader's gear have. */
+function Elsewhere({ section }: { section?: SettingsSection }) {
+  const openSettings = useOpenSettings();
+  return <button type="button" onClick={() => openSettings(section)}>Apri le impostazioni</button>;
+}
+
+function Where() {
+  // What `Layout` does: the requests become the navigation.
+  useSettingsRequests();
+  const { pathname, hash } = useLocation();
+  return <p data-testid="where">{pathname + hash}</p>;
+}
+
+function app(section?: SettingsSection, start = '/pratiche') {
+  render(
+    <MemoryRouter initialEntries={[start]}>
+      <Routes>
+        <Route path="/" element={<p>Pagina di ricerca</p>} />
+        <Route path="/pratiche" element={<Elsewhere section={section} />} />
+        <Route path="/impostazioni" element={<SettingsPage />} />
+      </Routes>
+      <Where />
+    </MemoryRouter>,
+  );
+}
+
+const where = () => screen.getByTestId('where');
+const enter = () => fireEvent.click(screen.getByRole('button', { name: 'Apri le impostazioni' }));
+
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+});
+
+describe('Impostazioni — a page with its parts (LC84)', () => {
+  it('opens at the part asked for, an anchor of the page', () => {
+    app('dati');
+    enter();
+    expect(where()).toHaveTextContent('/impostazioni#dati');
+    expect(document.getElementById('dati')).toContainElement(screen.getByRole('heading', { name: 'Dati e privacy' }));
+  });
+
+  it('has a part for each of the former dialogs: the quick norms, the aliases, the shortcuts', () => {
+    app();
+    enter();
+    for (const [id, name] of [['norme-rapide', 'Norme rapide'], ['alias', 'Alias'], ['scorciatoie', 'Scorciatoie da tastiera']]) {
+      expect(document.getElementById(id)).toContainElement(screen.getByRole('heading', { level: 3, name }));
+    }
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('lists its parts in an index whose links change the anchor in place', () => {
+    app();
+    enter();
+    const index = screen.getByRole('navigation', { name: 'Parti delle impostazioni' });
+    fireEvent.click(within(index).getByRole('link', { name: 'Alias' }));
+    expect(where()).toHaveTextContent('/impostazioni#alias');
+    expect(within(index).getByRole('link', { name: 'Alias' })).toHaveAttribute('aria-current', 'location');
+    // Replaced, not pushed: «Indietro» still goes back to the page it was opened from.
+    fireEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+    expect(where()).toHaveTextContent(/^\/pratiche$/);
+  });
+
+  it('Esc goes back to the page it was opened from', () => {
+    app('scorciatoie');
+    enter();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(where()).toHaveTextContent(/^\/pratiche$/);
+  });
+
+  it('opened by its address, «Indietro» goes to the search page', () => {
+    app(undefined, '/impostazioni');
+    fireEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+    expect(screen.getByText('Pagina di ricerca')).toBeInTheDocument();
+  });
+
+  it('an Esc taken by a space open in the page closes that space and stays', () => {
+    app('dati');
+    enter();
+    fireEvent.click(screen.getByRole('button', { name: /Elimina l’account…/ }));
+    const password = screen.getByLabelText('Password corrente per eliminare account');
+    fireEvent.keyDown(password, { key: 'Escape' });
+    expect(screen.queryByLabelText('Password corrente per eliminare account')).toBeNull();
+    expect(where()).toHaveTextContent('/impostazioni#dati');
+  });
+});

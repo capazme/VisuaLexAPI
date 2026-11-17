@@ -1,23 +1,14 @@
-import { useState, useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { X, Plus, Link, FileText, Star, Trash2, ExternalLink, Pencil, Check } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
+import { useSearchActions } from '../../../hooks/useSearchActions';
 import { parseNormattivaUrl, generateLabelFromParams, validateSearchParams } from '../../../utils/normattivaParser';
 import type { SearchParams, QuickNorm } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { getActTypesByGroup } from '../../../constants/actTypes';
-import { useTour } from '../../../hooks/useTour';
 import { AttributionChip } from '../bulletin/AttributionChip';
-import { spring } from '../../../lib/motion';
-
-interface QuickNormsManagerProps {
-  isOpen: boolean;
-  onClose: () => void;
-  /** Runs a quick norm used from the list (the host brings the reader to the search page); without it, the store's trigger. */
-  onSearch?: (params: SearchParams) => void;
-}
 
 type InputMode = 'url' | 'manual';
 
@@ -31,17 +22,13 @@ function formatLastUsed(iso?: string): string | null {
   return `ultima ${formatDistanceToNow(date, { addSuffix: true, locale: it })}`;
 }
 
-export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManagerProps) {
-  const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, selectQuickNorm, triggerSearch } = useAppStore();
-  const { tryStartTour } = useTour();
-
-  // Start quickNorms tour on first open
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => tryStartTour('quickNorms'), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, tryStartTour]);
+/**
+ * The quick norms (LC84: «Norme rapide», a part of the Impostazioni page; it was a dialog over the page). One used from
+ * the list runs as it always did (a trigger, checked for an annex) and brings the reader to the search page.
+ */
+export function QuickNormsSection() {
+  const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, selectQuickNorm } = useAppStore();
+  const { trigger } = useSearchActions();
 
   const [inputMode, setInputMode] = useState<InputMode>('manual');
   const [urlInput, setUrlInput] = useState('');
@@ -115,9 +102,8 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
 
   const handleUseQuickNorm = useCallback((qn: QuickNorm) => {
     selectQuickNorm(qn.id);
-    (onSearch ?? triggerSearch)(qn.searchParams);
-    onClose();
-  }, [selectQuickNorm, triggerSearch, onSearch, onClose]);
+    trigger(qn.searchParams);
+  }, [selectQuickNorm, trigger]);
 
   const handleStartEdit = useCallback((qn: QuickNorm) => {
     setEditingId(qn.id);
@@ -137,51 +123,8 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
     setEditLabel('');
   }, []);
 
-  if (!isOpen) return null;
-
   return (
-    <div id="tour-quicknorms-panel" className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/40 backdrop-blur-md"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={spring.snappy}
-        className={cn(
-          'relative w-full max-w-2xl max-h-[85vh] overflow-hidden',
-          'bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl',
-          'rounded-2xl shadow-glass-lg',
-          'border border-white/20 dark:border-white/10',
-          'flex flex-col'
-        )}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-white/5">
-          <div className="flex items-center gap-3">
-            <Star className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Ricerche Frequenti
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div id="tour-quicknorms-panel" className="space-y-6">
           {/* Add New Section */}
           <div id="tour-qn-add" className="space-y-4">
             <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
@@ -372,7 +315,8 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                             onChange={(e) => setEditLabel(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleSaveEdit();
-                              if (e.key === 'Escape') handleCancelEdit();
+                              // Esc gives up the change and stays on the page, before the page's own Esc goes back.
+                              if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit(); }
                             }}
                             className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                             autoFocus
@@ -419,7 +363,8 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                           </div>
                         </button>
 
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* In sight at every width: a phone has no pointer to bring them out, the keyboard neither. */}
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleStartEdit(qn)}
                             className="p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg text-slate-500 hover:text-primary-600"
@@ -454,7 +399,5 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
             )}
           </div>
         </div>
-      </motion.div>
-    </div>
   );
 }
