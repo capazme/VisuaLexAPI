@@ -17,6 +17,8 @@ import {
 import { hasDecisionText } from '../../../utils/decisionText';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { sentenzaFromDecision } from '../dossier/dossierUtils';
+import { useHostDossier } from '../practice/readingHost';
+import { addToThisDossier } from '../practice/inDossier';
 import { DecisionDownloads } from './DecisionDownloads';
 import { DecisionAnchorsWithoutText } from './DecisionAnchorsWithoutText';
 import { DecisionTextView } from './DecisionTextView';
@@ -88,6 +90,8 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
   // bases, so this is defence in depth.
   const sourceUrl = httpsUrl(answer.fonte.url);
   const [dossierAnchor, setDossierAnchor] = useState<HTMLElement | null>(null);
+  // In a dossier's «Lettura» (LC55): «Aggiungi a questo dossier», no choice of dossier.
+  const hostDossier = useHostDossier();
 
   const copy = async (text: string, done: string, what: string) => {
     try {
@@ -142,10 +146,13 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
           variant="secondary"
           size="sm"
           icon={<FolderPlus size={16} />}
-          className={TOUCH_TARGET_RESPONSIVE}
-          onClick={(e) => setDossierAnchor(e.currentTarget)}
+          // 14 px in a dossier's «Lettura», as its rows' commands (the tests of 16-11); 12 elsewhere.
+          className={cn(TOUCH_TARGET_RESPONSIVE, hostDossier && 'text-sm/5')}
+          onClick={(e) => (hostDossier
+            ? addToThisDossier(hostDossier.id, { sentenza: sentenzaFromDecision(answer.identita, answer.attributi) }, onToast, 'Aggiunta')
+            : setDossierAnchor(e.currentTarget))}
         >
-          Aggiungi al dossier
+          {hostDossier ? 'Aggiungi a questa pratica' : 'Aggiungi alla pratica'}
         </Button>
         {sourceUrl && (
           <a

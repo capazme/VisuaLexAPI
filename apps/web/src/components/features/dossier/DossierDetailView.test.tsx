@@ -68,6 +68,8 @@ vi.mock('../../../services/dossierService', () => ({
   },
 }));
 
+// The «Lettura» tab's own view (its tests: `DossierReadingView.test.tsx`): here, only when it is mounted.
+vi.mock('./DossierReadingView', () => ({ DossierReadingView: ({ dossier: shown }: { dossier: { id: string } }) => <div data-testid="lettura">{shown.id}</div> }));
 vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn(async () => ({ dossierId: 'd1' })) } }));
 
 import { appStore } from '../../../store/useAppStore';
@@ -157,9 +159,10 @@ describe('DossierDetailView — the page by act', () => {
     expect(screen.getByText(/2 fonti · 3 articoli · 1 nota/)).toBeInTheDocument();
   });
 
-  it('has three actions and a menu in its header, and no selection bar until asked', () => {
+  it('has its actions and a menu in its header, and no selection bar until asked', () => {
     renderView();
-    expect(screen.getByRole('button', { name: 'Apri tutto nel Corpus' })).toBeInTheDocument();
+    // LC60: the pratica is read in its «Lettura», never opened again in the Ricerca.
+    expect(screen.queryByRole('button', { name: 'Apri tutto in Ricerca' })).toBeNull();
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-haspopup', 'menu');
     }
@@ -179,13 +182,13 @@ describe('DossierDetailView — the page by act', () => {
     };
     expect(items('Aggiungi')).toEqual(['Articoli da una norma', 'Nota', 'Cerca un articolo']);
     expect(items('Esporta')).toEqual(['PDF', 'Copia link di condivisione', 'JSON', 'Salva snapshot']);
-    expect(items('Altre azioni')).toEqual(['Modifica', 'Aggiungi ai preferiti', 'Seleziona elementi', 'Elimina dossier']);
+    expect(items('Altre azioni')).toEqual(['Modifica', 'Aggiungi ai preferiti', 'Seleziona elementi', 'Elimina la pratica']);
   });
 
   it("removes a whole act as one trash entry behind one undo toast, and «Annulla» restores it (question 181)", async () => {
     const { rerender } = renderView();
     fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dal dossier" }));
+    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dalla pratica" }));
     await waitFor(() => expect(toast?.message).toBe('2 articoli rimossi'));
     // One call for the act's articles, none of the others.
     expect(dossierService.trashItems).toHaveBeenCalledTimes(1);
@@ -239,8 +242,8 @@ describe('DossierDetailView — the page by act', () => {
     vi.mocked(dossierService.trashItems).mockRejectedValueOnce(new Error('down'));
     renderView();
     fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dal dossier" }));
-    await waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dal dossier. Riprova.'));
+    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dalla pratica" }));
+    await waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dalla pratica. Riprova.'));
     expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a3', 'b1', 'a1', 'n1']);
     expect(toast).toBeNull();
     error.mockRestore();
@@ -249,7 +252,7 @@ describe('DossierDetailView — the page by act', () => {
   it('filters by the act, and turns dragging off while filtering', () => {
     renderView();
     expect(screen.getByRole('button', { name: `Sposta ${L247}` })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: '21 aprile' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '21 aprile' } });
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
     expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: `Sposta ${L49}` })).toBeNull();
@@ -257,7 +260,7 @@ describe('DossierDetailView — the page by act', () => {
 
   it('reads the title of the whole act while the search shows part of it', () => {
     renderView();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: 'art. 3' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: 'art. 3' } });
     const block = screen.getByRole('region', { name: L247 });
     expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 3']);
     // The act's title and rubriche are asked for both its articles, so the search reads nothing again.
@@ -327,7 +330,7 @@ describe('DossierDetailView — decisions', () => {
   it('keeps the acts mounted while a search leaves one kind on screen', () => {
     renderView(withDecision);
     const act247 = screen.getByRole('region', { name: L247 });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: '247' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '247' } });
     expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
     expect(screen.getByRole('region', { name: L247 })).toBe(act247);
@@ -359,14 +362,14 @@ describe('DossierDetailView — decisions', () => {
 
   it('finds a decision by its citation', () => {
     renderView(withDecision);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: '13 gennaio 2014' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '13 gennaio 2014' } });
     expect(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
   });
 
   it('removes a decision behind the undo toast; «Annulla» restores the trash entry, the decision with its own id', async () => {
     renderView(withDecision);
-    fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CITATION} dal dossier` }));
+    fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CITATION} dalla pratica` }));
     await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
     expect(dossierService.trashItems).toHaveBeenCalledWith('d1', ['s1']);
     expect(appStore.getState().dossiers[0].items.map((i) => i.id)).not.toContain('s1');
@@ -398,7 +401,7 @@ describe('DossierDetailView — notes about an article', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Nota' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Testo della nota' }), { target: { value: 'Nuova nota' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
     await waitFor(() => expect(dossierService.addNote).toHaveBeenCalledWith('d1', { text: 'Nuova nota' }));
     await waitFor(() => expect(appStore.getState().dossiers[0].items.some((i) => i.id === 'srv-note')).toBe(true));
   });
@@ -414,7 +417,7 @@ describe('DossierDetailView — search keeps an article and its notes together',
     const d = withNote();
     appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
     render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: 'decadenza' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: 'decadenza' } });
     expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /Note \(/ })).toBeNull();
   });
@@ -523,7 +526,7 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     open(dossier);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Impossibile creare il PDF del dossier', 'error'));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Impossibile creare il PDF della pratica', 'error'));
     expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeEnabled();
     error.mockRestore();
@@ -551,7 +554,7 @@ describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
   it('more than a hundred ask no question, and write nothing until the notification is gone', async () => {
     const addToDossier = await importing(150);
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    await waitFor(() => expect(toast?.message).toBe('150 articoli verranno importati nel dossier'));
+    await waitFor(() => expect(toast?.message).toBe('150 articoli verranno importati nella pratica'));
     expect(addToDossier).not.toHaveBeenCalled();
     await act(async () => { toast?.onDismiss(); });
     await waitFor(() => expect(addToDossier).toHaveBeenCalledTimes(150));
@@ -570,7 +573,7 @@ describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
     appStore.setState({ dossiers: [] });
     await act(async () => { toast?.onDismiss(); });
     expect(addToDossier).not.toHaveBeenCalled();
-    expect(appStore.getState().lastSyncError?.message).toBe('Nessun articolo importato: il dossier «Ricorso Rossi» non c’è più.');
+    expect(appStore.getState().lastSyncError?.message).toBe('Nessun articolo importato: la pratica «Ricorso Rossi» non c’è più.');
   });
 
   it('asks before leaving the page while an import waits, and no more once it is written', async () => {
@@ -602,8 +605,8 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
 
   it('draws the header\'s actions in one row under the title, every one 44 px', () => {
     renderView();
-    const open = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
-    const row = open.parentElement!;
+    const open = screen.getByRole('button', { name: 'Aggiungi' });
+    const row = open.closest('.flex-wrap') as HTMLElement;
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) expect(row).toContainElement(screen.getByRole('button', { name }));
     // Under the title, not beside it: a long name would be squeezed.
     expect(screen.getByRole('heading', { level: 1 }).closest('header')).not.toContainElement(open);
@@ -617,15 +620,15 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     const title = 'Ransomware EVST – pagamento del riscatto e fondi pubblici, profili di responsabilità';
     renderView({ ...dossier, title, description: 'Richiesta di riscatto ricevuta il 3 ottobre' });
     const heading = screen.getByRole('heading', { level: 1, name: title });
-    const open = screen.getByRole('button', { name: 'Apri tutto nel Corpus' });
-    const row = open.parentElement!;
+    const open = screen.getByRole('button', { name: 'Aggiungi' });
+    const row = open.closest('.flex-wrap') as HTMLElement;
     // Nothing beside the title: the header holds only the section's phrase, the title and the description.
     expect(heading.closest('header')!.querySelector('button')).toBeNull();
     // After the line of the facts.
-    expect(screen.getByText(/creato il/).compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText(/creata il/).compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The row wraps as a row when the window is narrow, never a label inside its button.
     expect(row).toHaveClass('flex-wrap');
-    const buttons = ['Apri tutto nel Corpus', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
+    const buttons = ['Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
     for (const button of buttons) expect(button).toHaveClass('whitespace-nowrap');
     expect(row.lastElementChild).toContainElement(screen.getByRole('button', { name: 'Altre azioni' }));
   });
@@ -646,7 +649,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(within(block).getByText('Aggiunto il 12 ottobre 2026')).toHaveClass('text-[13px]');
     expect(title).toHaveClass('text-[15px]');
     expect(within(block).getByRole('button', { name: 'Segna come importante' })).toHaveClass('h-11', 'w-11');
-    expect(within(block).getByRole('button', { name: 'Rimuovi articolo dal dossier' })).toHaveClass('h-11', 'w-11');
+    expect(within(block).getByRole('button', { name: 'Rimuovi articolo dalla pratica' })).toHaveClass('h-11', 'w-11');
   });
 
   it('writes no grey line it cannot fill: no «Aggiunto il» without a date', () => {
@@ -669,8 +672,53 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
 
   it('writes the search at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
     renderView(dossier);
-    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' });
+    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' });
     expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
     expect(search).not.toHaveClass('text-base');
+  });
+});
+
+describe('DossierDetailView — the «Lettura» tab (LC54 c3)', () => {
+  afterEach(() => { window.history.replaceState(null, '', '/'); });
+
+  it('offers four views in order: Fonti, Lettura, Atti, Compiti; the narrow padding keeps them whole on a phone', () => {
+    renderView();
+    const tabs = within(screen.getByRole('tablist', { name: 'Viste della pratica' })).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Lettura', 'Atti', 'Compiti']);
+    for (const tab of tabs) expect(tab).toHaveClass('px-2.5', 'sm:px-4');
+  });
+
+  it('mounts the reading only once it is chosen, with the page\'s dossier', () => {
+    renderView();
+    expect(screen.queryByTestId('lettura')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('lettura')).toHaveTextContent('d1');
+  });
+
+  it('opens on the reading with `?vista=lettura`', () => {
+    window.history.replaceState(null, '', '/pratiche?dossier=d1&vista=lettura');
+    renderView();
+    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('lettura')).toBeInTheDocument();
+  });
+
+  it('keeps the tabs at the top in the other views, and lets them scroll away in «Lettura», where the act\'s head sticks (#529)', () => {
+    renderView();
+    const bar = () => screen.getByRole('tablist', { name: 'Viste della pratica' }).closest('div.-mx-2');
+    expect(bar()).toHaveClass('sticky');
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(bar()).not.toHaveClass('sticky');
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(bar()).toHaveClass('sticky');
+  });
+  it('opens nothing in the Ricerca, from «Lettura» or from «Fonti» (LC60)', () => {
+    renderView();
+    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    expect(screen.queryByRole('menuitem', { name: 'Apri anche in Ricerca' })).toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(screen.queryByRole('button', { name: 'Apri tutto in Ricerca' })).toBeNull();
   });
 });

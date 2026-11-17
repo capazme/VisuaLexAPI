@@ -40,6 +40,12 @@ describe('DecisionResultList', () => {
     expect(screen.getByRole('button', { name: 'Indice della Cassazione' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('offers «Aggiungi alla pratica» on every hit, with its name (LC59)', async () => {
+    mockSearch(PAGE);
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    expect(await screen.findByRole('button', { name: /^Aggiungi alla pratica Cass\. civ\., sez\. lav\., n\. 24908\/2026/ })).toBeInTheDocument();
+  });
+
   it('switches to the text and says so', async () => {
     mockSearch(PAGE_INDEX); mockSearch({ ...PAGE_TEXT, modo: 'testo' });
     render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);

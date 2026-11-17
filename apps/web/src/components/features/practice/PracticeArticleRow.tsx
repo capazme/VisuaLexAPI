@@ -1,6 +1,8 @@
 import { useMemo, type ReactNode } from 'react';
 import { useSimpleReading } from './simpleReading';
-import { Zap } from 'lucide-react';
+import { retryRowText, useRowText } from './useRowText';
+import { RowTextStatus } from './RowTextStatus';
+import { Star, Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { ArticleTabContent } from '../search/ArticleTabContent';
@@ -8,7 +10,8 @@ import { articleLabel } from '../dossier/dossierLayout';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
 import { shortNorm } from '../../../utils/sources';
-import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
+import { NotInDossier, PracticeRowShell, type RowBeside } from './PracticeRowShell';
+import { useArticleInDossier } from './inDossier';
 import { articleRowKey, articleWindowId, besideRefFor, practiceArticleKey } from '../../../utils/practice';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { quickNormParamsOf } from '../../../utils/quickNormParams';
@@ -37,12 +40,17 @@ export function PracticeArticleRow({
   const articleKey = practiceArticleKey(article);
   const rowKey = articleRowKey(practiceId, actId, articleKey);
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
+  const textState = useRowText(practiceId, actId, article, simple || isOpen);
   // Among the quick norms (R3b): its toggle is an entry of the reader's «⋯», so the row says it, open or folded, by the
   // reader's own rule (`isQuickNorm`, so the two never disagree) — for the text in force only: a quick norm opens that one.
   const quickParams = useMemo(() => quickNormParamsOf(article.norma_data), [article.norma_data]);
   const isQuick = useAppStore((s) => s.quickNorms.length > 0 && !historicalItemLabel(article.norma_data) && s.isQuickNorm(quickParams));
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
+  // In a dossier's «Lettura» (LC55): in the dossier or not; undefined in the Corpus.
+  const dossier = useArticleInDossier(article.norma_data);
+  // In the Corpus (LC59): «Aggiungi al dossier» through the reader's popover, and the dossiers that hold it.
+  const corpusItem = useMemo(() => ({ norma: article.norma_data }), [article.norma_data]);
   const closeBeside = useAppStore((s) => s.closeBeside);
   const openPhoneReader = useAppStore((s) => s.openPhoneReader);
   const closePhoneReader = useAppStore((s) => s.closePhoneReader);
@@ -79,18 +87,56 @@ export function PracticeArticleRow({
   const named = shortNorm(norma)
     + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '');
 
+  // A bound row's text still coming, or failed (LC54): said in its place, never an empty reader.
+  const reader = textState ? <RowTextStatus state={textState} onRetry={() => retryRowText(practiceId, actId, article)} /> : (
+    <ArticleTabContent
+      data={article}
+      onCrossReferenceNavigate={onCrossReference}
+      onOpenStudyMode={onOpenStudyMode}
+      readingOrigin={readingOrigin}
+      dossierItemId={dossier?.itemId}
+      // The row's header (or, in Lettura semplice of a dossier, the line over the text) has the add (LC61).
+      dossierCommandInRow={!simple || dossier !== undefined}
+    />
+  );
+
   // Lettura semplice (LC28): the article alone, its own heading in the text («Art. 530 / Sentenza di assoluzione») the
   // only one; no row heading repeating it, no fold. The reading toolbar pins under the act's heading as in the table.
   if (simple) {
     return (
       <div className="pt-2" style={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}>
+        {/* No row heading here: the mark and «Aggiungi al dossier» stand over the text; «Togli…» is the act's «⋯». */}
+        {dossier && !dossier.inDossier && (
+          <p className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+            <NotInDossier />
+            {dossier.add && (
+              <button
+                type="button"
+                onClick={dossier.add}
+                className="inline-flex min-h-[44px] items-center rounded-md px-2 font-medium text-primary-700 hover:bg-primary-50 md:min-h-0 md:py-0.5 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                Aggiungi alla pratica
+              </button>
+            )}
+          </p>
+        )}
+        {/* No row «⋯» here: the star stands over the text with its name (LC58), as the act's commands do. */}
+        {dossier?.inDossier && (
+          <p className="mb-2 text-sm">
+            <button
+              type="button"
+              aria-pressed={dossier.important}
+              onClick={dossier.toggleImportant}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 font-medium text-slate-700 hover:bg-amber-50 md:min-h-0 md:py-0.5 dark:text-slate-200 dark:hover:bg-amber-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <Star size={14} aria-hidden className={dossier.important ? 'fill-amber-400 text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'} />
+              {/* One name, the state in `aria-pressed` and the star's fill (LC61). */}
+              Importante
+            </button>
+          </p>
+        )}
         {annexSuggestion}
-        <ArticleTabContent
-          data={article}
-          onCrossReferenceNavigate={onCrossReference}
-          onOpenStudyMode={onOpenStudyMode}
-          readingOrigin={readingOrigin}
-        />
+        {reader}
       </div>
     );
   }
@@ -105,6 +151,8 @@ export function PracticeArticleRow({
       removeName={named}
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
       beside={beside}
+      dossier={dossier}
+      corpusItem={corpusItem}
       header={(
         <>
           <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">
@@ -132,12 +180,7 @@ export function PracticeArticleRow({
       regionStyle={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}
     >
       {annexSuggestion}
-      <ArticleTabContent
-        data={article}
-        onCrossReferenceNavigate={onCrossReference}
-        onOpenStudyMode={onOpenStudyMode}
-        readingOrigin={readingOrigin}
-      />
+      {reader}
     </PracticeRowShell>
   );
 }

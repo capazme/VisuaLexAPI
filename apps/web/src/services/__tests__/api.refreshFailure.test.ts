@@ -28,7 +28,7 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   notify.mockClear();
-  vi.stubGlobal('location', { pathname: '/dossier', search: '', hash: '', href: 'http://localhost/dossier' });
+  vi.stubGlobal('location', { pathname: '/pratiche', search: '', hash: '', href: 'http://localhost/dossier' });
   localStorage.setItem('access_token', 'stale');
   localStorage.setItem('refresh_token', 'r1');
   localStorage.setItem('merlt-qa-thread-v1', 'questions');

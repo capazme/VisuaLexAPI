@@ -12,7 +12,7 @@ import type { TaskView } from '../../../types/tasks';
 /** The view the page shows, for «c»: what a new task starts with, and whether it will be seen there. */
 function pageView(pathname: string, dossierId: string | null): { view: TaskView; dossierId?: string } | null {
   if (dossierId) return { view: 'dossier', dossierId };
-  if (pathname === '/work/oggi') return { view: 'today' };
+  if (pathname === '/work/scadenziario') return { view: 'today' };
   if (pathname === '/work/prossimi') return { view: 'upcoming' };
   if (pathname === '/work/ingresso') return { view: 'inbox' };
   return null;
@@ -52,7 +52,7 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
   const clearNotice = plannerStore((s) => s.clearNotice);
   const serverToday = plannerStore((s) => s.today);
   const { pathname, search } = useLocation();
-  const openDossierId = pathname === '/dossier' ? new URLSearchParams(search).get('dossier') : null;
+  const openDossierId = pathname === '/pratiche' ? new URLSearchParams(search).get('dossier') : null;
 
   useEffect(() => {
     if (!enabled) return;

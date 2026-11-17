@@ -7,6 +7,7 @@ import {
 } from '../store/assistantProposals';
 import type { ProposalActions } from '../components/features/search/BlockAnnotationsSheet';
 import { CurrentDossierContext } from '../components/features/dossier/currentDossier';
+import { useAppStore } from '../store/useAppStore';
 
 const NONE: Highlight[] = [];
 const NO_GLOSSES: Proposal[] = [];
@@ -23,8 +24,10 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
   const dossierId = useContext(CurrentDossierContext);
   const enabled = assistantProposalsStore((s) => s.enabled);
   const proposals = assistantProposalsStore((s) => (itemId ? s.byItem[itemId] : undefined));
+  // An entry just added holds a provisional id until the server answers (LC61): asked then, `/proposals` gives a 404.
+  const provisional = useAppStore((s) => !!itemId && s.pendingDossierItemIds[itemId] === true);
   // The dossier to ask, or null when this reader asks nothing.
-  const proposalsOf = enabled && itemId && !readOnly ? dossierId : null;
+  const proposalsOf = enabled && itemId && !readOnly && !provisional ? dossierId : null;
 
   useEffect(() => {
     if (!proposalsOf || !itemId) return;

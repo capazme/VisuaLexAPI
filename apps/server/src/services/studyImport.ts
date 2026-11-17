@@ -32,7 +32,7 @@ export async function spendStudyImport(userId: string): Promise<void> {
     await limiter.consume(userId);
   } catch (err) {
     if (err instanceof RateLimiterRes) {
-      throw new AppError(429, `Hai aggiunto troppi dossier in poco tempo (al massimo ${IMPORTS_PER_HOUR} volte all'ora): riprova più tardi.`);
+      throw new AppError(429, `Hai aggiunto troppe pratiche in poco tempo (al massimo ${IMPORTS_PER_HOUR} volte all'ora): riprova più tardi.`);
     }
     console.error('study import limiter error (fail-open):', err);
   }

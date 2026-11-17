@@ -97,17 +97,17 @@ function checkShape(shape: Shape): void {
   if (shape.recurrence && shape.dueDate) {
     throw new AppError(400, 'Un compito con un termine finale non si ripete: togli la ripetizione o il termine.');
   }
-  if (shape.dossierItemId && !shape.dossierId) throw new AppError(400, 'Una voce di dossier richiede il suo dossier.');
+  if (shape.dossierItemId && !shape.dossierId) throw new AppError(400, 'Una voce di una pratica richiede la sua pratica.');
 }
 
 async function assertOwnDossier(tx: Prisma.TransactionClient, userId: string, dossierId: string): Promise<void> {
   const dossier = await tx.dossier.findFirst({ where: { id: dossierId, userId }, select: { id: true } });
-  if (!dossier) throw new AppError(404, 'Dossier non trovato.');
+  if (!dossier) throw new AppError(404, 'Pratica non trovata.');
 }
 
 async function assertItemOfDossier(tx: Prisma.TransactionClient, dossierId: string, itemId: string): Promise<void> {
   const item = await tx.dossierItem.findFirst({ where: { id: itemId, dossierId }, select: { id: true } });
-  if (!item) throw new AppError(404, 'Voce del dossier non trovata.');
+  if (!item) throw new AppError(404, 'Voce della pratica non trovata.');
 }
 
 /** The user's task, open to changes (not in the trash), or a parent named by a client. Lock it first (`lockTask`) to rely on it. */
@@ -183,7 +183,7 @@ export async function createTask(userId: string, input: TaskInput & { title: str
   return prisma.$transaction(async (tx) => {
     const parent = input.parentId ? await lockedParent(tx, userId, input.parentId) : null;
     if (parent && input.dossierId !== undefined && input.dossierId !== parent.dossierId) {
-      throw new AppError(400, 'Un sottocompito sta nel dossier del compito principale.');
+      throw new AppError(400, 'Un sottocompito sta nella pratica del compito principale.');
     }
     const dossierId = parent ? parent.dossierId : input.dossierId ?? null;
     const shape: Shape = {
@@ -256,13 +256,13 @@ export async function updateTask(userId: string, id: string, input: TaskInput): 
           throw new AppError(400, 'Un compito non può stare sotto un suo sottocompito.');
         }
         if (input.dossierId !== undefined && input.dossierId !== parent.dossierId) {
-          throw new AppError(400, 'Un sottocompito sta nel dossier del compito principale.');
+          throw new AppError(400, 'Un sottocompito sta nella pratica del compito principale.');
         }
         parentId = parent.id;
         dossierId = parent.dossierId;
       }
     } else if (input.dossierId !== undefined && input.dossierId !== existing.dossierId) {
-      if (existing.parentId) throw new AppError(400, 'Un sottocompito sta nel dossier del compito principale.');
+      if (existing.parentId) throw new AppError(400, 'Un sottocompito sta nella pratica del compito principale.');
       dossierId = input.dossierId;
     }
     const dossierMoved = dossierId !== existing.dossierId;
@@ -489,7 +489,7 @@ export async function listTasks(userId: string, view: TaskView, dossierId: strin
       orderBy = listOrder;
       break;
     case 'dossier':
-      if (!dossierId) throw new AppError(400, 'La vista per dossier richiede il dossier.');
+      if (!dossierId) throw new AppError(400, 'La vista per pratica richiede la pratica.');
       await assertOwnDossier(prisma, userId, dossierId);
       where = { ...open, dossierId };
       orderBy = listOrder;

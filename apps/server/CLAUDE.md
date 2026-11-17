@@ -209,10 +209,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `assistant_note_versions` is for the second cut (the
   versions an assistant replaced); nothing writes it yet. The scope `dossier:text` is worded on the
   consent page and in «Applicazioni collegate» (`SCOPE_LABELS`): the texts of norms and decisions and, since G-381 (b)
-  (owners, 29 October 2026), the user's notes. **A note's content reaches a connected application only** through a token
+  (owners, 29 October 2026), the user's notes, and since LC56 (16 November 2026) the text of the acts uploaded to a
+  case. **A note's content reaches a connected application only** through a token
   with `dossier:text` whose grant was approved with those words: approving a request for `dossier:text` stores
-  `TEXT_CONSENT_VERSION` (`oauth/config.ts`, now 1) on the grant (`oauth_grants.text_consent_version`), `delegatedAuth`
-  reads it live into `req.delegation.readsNotes`, and `serializeItem` answers a note's `content` null otherwise (a
+  `TEXT_CONSENT_VERSION` (`oauth/config.ts`, now 2) on the grant (`oauth_grants.text_consent_version`), `delegatedAuth`
+  reads it live into `req.delegation.readsNotes` (version ≥ 1, `NOTES_CONSENT_VERSION`) and `readsActs` (≥ 2: the
+  act text route answers a lower one 403 «… va ricollegata: il permesso «Leggere i testi» ora comprende anche gli
+  atti.»), and `serializeItem` answers a note's `content` null otherwise (a
   norm's or a decision's never). The migration gave version 1 to the grants that already held `dossier:text` (G-385,
   owners, 29 October 2026: no active users yet); widening the words means raising the version, and a grant with a lower
   one reads no note until the user connects again. A grant made before `dossier:text` existed has it only
@@ -868,6 +871,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   most two a Rome day, the rest credited by a later event or the course page) and «Supera un percorso» (100, for three
   competences and three counting modules at least), settled in `settleMissions` with the events `modulo`, `esame`,
   `corso` and a course card's `revisione`; neither is in «Le missioni di oggi».
+- **The short lesson** (LC63; migrations `20261117100000_lingo_lessons`, `20261117100001_lingo_lessons_period`).
+  `routes/lingoLezioni.ts` over `lingo/lessons.ts`, session only (in no delegated row, so a token gets 403).
+  `POST /api/lingo/lezioni { materia }` builds 5–8 exercises from the subject's cards in `reviewScope` (at least
+  `LESSON_MIN_CARDS` = 4, else 409 with the reason; at most `LESSONS_PER_DAY` = 20 a Rome day, else 429): multiple
+  choice, true or false, article ↔ institute, a word taken out of a card's answer — the cards' own words, no sentence
+  of its own. `LingoLezione` (`lingo_lezioni`, cascade from `User`) stores them with their keys; the answer carries
+  none. `POST /:id/risposte { indice, risposta }` grades on the server, stores `{ indice, giusta }` and answers the
+  key; a second answer is `registrata: false`. The answer that completes the lesson sets `finitaIl` and, in its
+  transaction, `settleMissions` with `{ tipo: 'lezione' }` credits «Lezione» (`LESSON_MISSION`: 10, at most three a
+  Rome day, `L:<lesson id>`, fonte `LEZIONE`; not in «Le missioni di oggi»). The export carries `data.lingoLezioni`
+  without the exercises' words (cards' texts, often other people's).
 - **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
   subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own
@@ -960,6 +974,38 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (days 'YYYY-MM-DD', times 'HH:MM'), never `assigneeId` (another person's id from wave 4) — the
   export's rule, no other person's id, name or text. They cascade with the account, and a task
   assigned to a deleted account loses its assignee.
+- **A case's act files** (LC50, server part; testing only, no real client files until the volume has a
+  backup off the host). `routes/praticaFiles.ts`, mounted at `/api/dossiers` before the dossier routes;
+  the user's session, except the three LC56 routes below. `GET /:dossierId/files` (originals with
+  `versioni`, and `cestino`), `POST /:dossierId/files` and `/:dossierId/files/:fileId/versions` (multipart
+  `file`; 25 MB a file, 500 MB a case, 2 GB a user, the trash counted; PDF, DOCX, DOC, ODT, RTF, TXT,
+  JPG, PNG, the extension agreeing with the first bytes, 415 otherwise; 413 over a ceiling),
+  `GET /:dossierId/files/:fileId/content`, `POST …/trash` and `…/restore` (an original takes its
+  versions), `DELETE /:dossierId/files/:fileId` (only from the trash: rows and disk), `GET|PUT
+  /:dossierId/istruzioni { testo }` (Markdown, at most 20,000 characters). Another user's dossier or file
+  is a 404. `pratica/fileStore.ts`: AES-256-GCM, a random key per file wrapped with `PRATICA_FILES_KEY`
+  (32 bytes, base64), the file id as AAD of both; the blob at
+  `PRATICA_FILES_DIR/<userId>/<dossierId>/<fileId>`, the wrapped key in `pratica_files.chiave_cifrata`.
+  Both read per call: without a valid key the file routes answer 503 (the instructions still work).
+  A download is decrypted whole and its tag verified before a byte goes out; a tag that fails (the key
+  changed: there is no rotation) is a 500 that says so. `scripts/datakit` backs up the `pratica_files`
+  volume with the others; the key is never in a backup. `pratica_file_accessi`
+  logs each listing, download, deposit, trash, restore and deletion (user, client, file, time; no
+  foreign key to the file). No table has a foreign key to `dossiers`: a dossier in the trash keeps its
+  files (unreachable, the owner check finds no dossier) and gets them back on restore;
+  `purgeTrashEntry` and `sweepExpiredTrash` remove them (`removeDossierFiles`), and `deleteUserAccount`
+  removes the user's directory after its transaction. `readPraticaFileContent` is an internal reader no
+  route calls. `tests/praticaFiles.test.ts`.
+  **For an exchanged MCP token** (LC56, owner, 16 November 2026, the co-owner's review afterwards; testing only),
+  three rows of the delegated table, owner only (404 otherwise): `GET /:dossierId/contesto` (`dossier:read`; the
+  instructions and the live files, no trash, an `elenco` line), `GET /:dossierId/files/:fileId/text?parte=n`
+  (`dossier:text` and a grant approved with consent words version 2, else 403; the text extracted in parts of 50,000 characters,
+  a `scaricamento` line with the client; PDF, DOC, RTF and images answer `testo: null` and a `motivo`), `POST
+  /:dossierId/files/atto { nome, testo ≤ 500,000, versioneDi? }` (`dossier:write`; the text made a DOCX and stored
+  through the uploads' own `deposit`: ceilings, lock, `autore: claude`, the client, a `deposito` line; a version
+  beside the original, never over it). The raw file, uploads, trash, restore, deletion and the instructions' writing
+  stay 403 to a token. `pratica/docText.ts`: text out of DOCX (`word/document.xml`), ODT (`content.xml`) and TXT,
+  and a minimal DOCX in, with `node:zlib` only (no package reads PDF here). `tests/praticaFilesMcp.test.ts`.
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
@@ -1101,6 +1147,8 @@ volume and the root filesystem is read-only.
 saved-norm watcher (see the Node backend section); all three have defaults.
 `SCRAPE_QUOTA_POINTS` / `SCRAPE_QUOTA_WINDOW_SECONDS` / `SCRAPE_IP_POINTS` (defaults
 300, 60, 1200) size the quota behind `GET /api/auth/verify`.
+`PRATICA_FILES_KEY` (32 bytes, base64; `openssl rand -base64 32`) and `PRATICA_FILES_DIR` drive a
+case's act files (no default for either: without them the file routes answer 503).
 `OAUTH_*` configure the authorization server (see `.env.example`);
 `tests/setup.ts` lifts its per-address limits for the suite and sets a test
 `OAUTH_MCP_CLIENT_SECRET`.

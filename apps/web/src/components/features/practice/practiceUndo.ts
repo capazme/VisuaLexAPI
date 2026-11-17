@@ -1,6 +1,7 @@
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { notify } from '../../ui/notifications/notifications';
 import { appStore } from '../../../store/useAppStore';
+import { isBoundPractice } from '../../../utils/practice';
 
 /**
  * Closing a practice, all of them, or taking an act off the table, with «Annulla» instead of a confirmation (K1a): the
@@ -25,7 +26,7 @@ const rowsUnder = (prefix: string) =>
 export function closePracticeWithUndo(practiceId: string): void {
   const state = appStore.getState();
   const practice = state.practices.find((p) => p.id === practiceId);
-  if (!practice) return;
+  if (!practice || isBoundPractice(practice)) return;
   const at = state.practices.indexOf(practice);
   const rows = rowsUnder(`${practiceId}/`);
   const wasActive = state.activePracticeId === practiceId;
@@ -33,24 +34,26 @@ export function closePracticeWithUndo(practiceId: string): void {
     action: () => appStore.getState().closePractice(practiceId),
     undo: () => {
       if (!appStore.getState().reopenPractices([{ practice, index: at }], rows, wasActive ? practiceId : null)) {
-        notRestorable(`Non ripristinabile: la pratica «${practice.label}» è già sul tavolo.`);
+        notRestorable(`Non ripristinabile: «${practice.label}» è già sul tavolo.`);
       }
     },
-    message: `Pratica «${practice.label}» chiusa`,
+    message: `«${practice.label}» chiuso`,
   });
 }
 
 export function closeAllPracticesWithUndo(): void {
-  const { practices, practiceRows, activePracticeId } = appStore.getState();
-  if (practices.length === 0) return;
+  const { practiceRows, activePracticeId } = appStore.getState();
+  // «Chiudi tutte» closes the Corpus's practices; each keeps its index in the whole list, where «Annulla» puts it back.
+  const closing = appStore.getState().practices.flatMap((practice, index) => (isBoundPractice(practice) ? [] : [{ practice, index }]));
+  if (closing.length === 0) return;
   void showUndoToast({
     action: () => appStore.getState().closeAllPractices(),
     undo: () => {
-      if (!appStore.getState().reopenPractices(practices.map((practice, index) => ({ practice, index })), { ...practiceRows }, activePracticeId)) {
-        notRestorable('Non ripristinabile: le pratiche sono già sul tavolo.');
+      if (!appStore.getState().reopenPractices(closing, { ...practiceRows }, activePracticeId)) {
+        notRestorable('Non ripristinabile: è già tutto sul tavolo.');
       }
     },
-    message: practices.length === 1 ? 'Pratica chiusa' : `${practices.length} pratiche chiuse`,
+    message: closing.length === 1 ? 'Tavolo chiuso' : `${closing.length} tavoli chiusi`,
   });
 }
 
@@ -67,9 +70,9 @@ export function removePracticeActWithUndo(practiceId: string, actId: string): vo
     action: () => appStore.getState().removePracticeAct(practiceId, actId),
     undo: () => {
       if (!appStore.getState().restorePracticeAct(practiceId, act, at, beside, rows)) {
-        notRestorable(`Non ripristinabile: la pratica «${practice.label}» è stata chiusa.`);
+        notRestorable(`Non ripristinabile: «${practice.label}» è stato chiuso.`);
       }
     },
-    message: 'Atto tolto dalla pratica',
+    message: 'Atto tolto dal tavolo',
   });
 }

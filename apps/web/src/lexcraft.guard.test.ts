@@ -9,9 +9,6 @@ const src = __dirname; // apps/web/src
 
 /** Files where «VisuaLex» still reaches the screen on purpose, each with why. */
 const ALLOWED: Record<string, string> = {
-  [join('features', 'merlt', 'hub', 'ConsentFirst.tsx')]: 'consent text: changes after Privacy (step 8)',
-  [join('features', 'merlt', 'consent', 'levels.ts')]: 'consent text: changes after Privacy (step 8)',
-  [join('features', 'merlt', 'privacy', 'MerltDataSection.tsx')]: 'privacy text: changes after Privacy (step 8)',
   [join('components', 'features', 'dossier', 'PublishDossierDialog.tsx')]: 'the owner\'s publication warning: to confirm',
   [join('features', 'merlt', 'ops', 'ingestion', 'IngestionRunForm.tsx')]: 'admin only: names the backend\'s `visualex_tree` source',
   [join('features', 'merlt', 'ops', 'ingestion', 'BatchListTable.tsx')]: 'admin only: names the backend\'s `visualex_tree` source',
@@ -47,6 +44,16 @@ describe('the name LexCraft on screen', () => {
   it('every allowed file still writes it: one that no longer does leaves the list', () => {
     const stale = Object.keys(ALLOWED).filter((file) => !codeLines(readFileSync(join(src, file), 'utf8')).some(([, l]) => l.includes('VisuaLex')));
     expect(stale).toEqual([]);
+  });
+
+  // LC48: Work's search is «Ricerca» and the tool «Pseudonimizzatore» (it pseudonymises, it does not anonymise). The Labs
+  // graph keeps «Corpus» as a node type.
+  it('no line outside a comment writes «Corpus» or «Anonimizzatore», but the Labs graph\'s node type', () => {
+    const graph = join('features', 'merlt', 'graph', 'page', 'NodeDetailsDrawer.tsx');
+    const found = sources(src).map((file) => relative(src, file)).filter((file) => file !== graph)
+      .flatMap((file) => codeLines(readFileSync(join(src, file), 'utf8'))
+        .filter(([, line]) => /\bCorpus\b|Anonimizzator/.test(line)).map(([n]) => `${file}:${n}`));
+    expect(found).toEqual([]);
   });
 
   it('the page\'s title, its description, the splash and the installed app say LexCraft', () => {

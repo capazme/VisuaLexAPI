@@ -44,7 +44,7 @@ describe('SectionSwitcher (spec S3)', () => {
     fireEvent.click(trigger());
     const items = screen.getAllByRole('menuitemradio');
     expect(items.map((i) => i.textContent)).toEqual([
-      'WorkDossier di lavoro e strumenti per la professione',
+      'WorkPratiche di lavoro e strumenti per la professione',
       'LearnSchede, ripasso, esami e concorsi',
       'ForumDossier pubblici e community',
     ]);
@@ -89,7 +89,7 @@ describe('SectionSwitcher (spec S3)', () => {
   });
 
   it("goes to the chosen section's page and tells the phone's menu to close (S4)", () => {
-    const onChoose = renderSwitcher('/dossier');
+    const onChoose = renderSwitcher('/pratiche');
     fireEvent.click(trigger());
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Learn/ }));
     expect(screen.getByTestId('where')).toHaveTextContent('/learn/ripasso');
@@ -99,7 +99,7 @@ describe('SectionSwitcher (spec S3)', () => {
 
   it('leaves nothing running once it is gone: the wait for the new title stops with it', async () => {
     const { unmount } = render(
-      <MemoryRouter initialEntries={['/dossier']}>
+      <MemoryRouter initialEntries={['/pratiche']}>
         <Where />
         <SectionSwitcher forumCount={0} onChoose={vi.fn()} />
       </MemoryRouter>,
@@ -129,11 +129,11 @@ describe('SectionSwitcher (spec S3)', () => {
 
   it('takes the focus to the new section\'s title, as the page changes (S2)', async () => {
     render(
-      <MemoryRouter initialEntries={['/dossier']}>
+      <MemoryRouter initialEntries={['/pratiche']}>
         <SectionSwitcher forumCount={0} />
         <main>
           <Routes>
-            <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
+            <Route path="/pratiche" element={<h2 data-section-title="opus" tabIndex={-1}>Le tue pratiche di lavoro</h2>} />
             <Route path="/learn/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
           </Routes>
         </main>
@@ -154,7 +154,7 @@ describe('SectionSwitcher (spec S3)', () => {
           <Routes>
             <Route path="/learn/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
             {/* Opus's home is the planner's «Oggi». */}
-            <Route path="/work/oggi" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
+            <Route path="/work/scadenziario" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
           </Routes>
         </main>
       </MemoryRouter>,
@@ -194,7 +194,7 @@ describe('SectionSwitcher (spec S3)', () => {
     Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
     try {
       render(
-        <MemoryRouter initialEntries={['/dossier']}>
+        <MemoryRouter initialEntries={['/pratiche']}>
           <Where />
           <SectionSwitcher forumCount={0} inDrawer />
         </MemoryRouter>,
@@ -283,7 +283,7 @@ describe('SectionSwitcher (spec S3)', () => {
     });
 
     it('works from the keyboard: arrows open and move, Home and End, Enter chooses, Esc and Tab close', () => {
-      renderSplit('/dossier');
+      renderSplit('/pratiche');
       fireEvent.keyDown(arrow(), { key: 'ArrowDown' });
       const menu = screen.getByRole('menu');
       expect(arrow()).toHaveAttribute('aria-expanded', 'true');
@@ -321,7 +321,7 @@ describe('SectionSwitcher (spec S3)', () => {
       });
       Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
       try {
-        renderSplit('/dossier');
+        renderSplit('/pratiche');
         fireEvent.click(arrow());
         expect(screen.getAllByTestId('section-check')).toHaveLength(1);
         fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
@@ -344,7 +344,7 @@ describe('SectionSwitcher (spec S3)', () => {
       const animate = vi.fn(() => ({ cancel: vi.fn(), reverse: vi.fn(), finished: new Promise(() => {}), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
       Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
       try {
-        renderSplit('/dossier');
+        renderSplit('/pratiche');
         fireEvent.click(arrow());
         const menu = screen.getByRole('menu');
         const rolledUp = () => animate.mock.contexts.some((el, i) => el === menu && String((animate.mock.calls[i] as unknown as Keyframe[][])[0][1].clipPath).includes('100%'));
@@ -364,7 +364,7 @@ describe('SectionSwitcher (spec S3)', () => {
       const animate = vi.fn(() => ({ cancel: vi.fn(), reverse, finished: new Promise(() => {}), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
       Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
       try {
-        renderSplit('/dossier');
+        renderSplit('/pratiche');
         fireEvent.click(arrow());
         fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
         // Rolling up: still drawn, no longer expanded.
@@ -386,7 +386,7 @@ describe('SectionSwitcher (spec S3)', () => {
       Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
       Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: true }) });
       try {
-        renderSplit('/dossier');
+        renderSplit('/pratiche');
         fireEvent.click(arrow());
         fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
         expect(screen.queryByRole('menu')).toBeNull();
@@ -398,7 +398,7 @@ describe('SectionSwitcher (spec S3)', () => {
     });
 
     it('with no Web Animations closes at once after the choice', () => {
-      renderSplit('/dossier');
+      renderSplit('/pratiche');
       fireEvent.click(arrow());
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
       expect(screen.queryByRole('menu')).toBeNull();
@@ -406,7 +406,7 @@ describe('SectionSwitcher (spec S3)', () => {
     });
 
     it('a click outside closes it; a click on the arrow or in the menu does not count as outside', () => {
-      renderSplit('/dossier');
+      renderSplit('/pratiche');
       fireEvent.click(arrow());
       fireEvent.mouseDown(screen.getByRole('menu'));
       fireEvent.mouseDown(arrow());
@@ -422,7 +422,7 @@ describe('SectionSwitcher (spec S3)', () => {
     it("in the phone's drawer goes at once with the choice: the drawer closing is the change (T1)", () => {
       Element.prototype.animate = vi.fn(() => ({ cancel: vi.fn(), finished: Promise.resolve(), addEventListener: vi.fn() })) as unknown as typeof Element.prototype.animate;
       try {
-        const onChoose = renderSplit('/dossier', { inDrawer: true });
+        const onChoose = renderSplit('/pratiche', { inDrawer: true });
         fireEvent.click(arrow());
         fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
         expect(screen.queryByRole('menu')).toBeNull();
@@ -433,7 +433,7 @@ describe('SectionSwitcher (spec S3)', () => {
     });
 
     it("in the phone's drawer is as wide as the drawer less 32 px, with entries of 56 px", () => {
-      renderSplit('/dossier', { inDrawer: true });
+      renderSplit('/pratiche', { inDrawer: true });
       fireEvent.click(arrow());
       expect(screen.getByRole('menu')).toHaveClass('w-[calc(100%-12px)]', 'left-1.5');
       expect(screen.getByRole('menuitemradio', { name: /Work/ })).toHaveClass('min-h-14');

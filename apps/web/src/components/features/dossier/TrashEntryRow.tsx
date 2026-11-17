@@ -18,7 +18,7 @@ interface Props {
 }
 
 function titleOf(entry: TrashEntry, showSource: boolean): string {
-  if (entry.kind === 'DOSSIER') return `Dossier «${entry.label}»`;
+  if (entry.kind === 'DOSSIER') return `Pratica «${entry.label}»`;
   if (entry.kind === 'LINGO_CARDS') return entry.itemCount === 1 ? 'Scheda di studio' : `Schede di studio (${entry.itemCount})`;
   if (entry.kind === 'LINGO_CORSO') return `Percorso «${entry.label}»`;
   if (entry.kind === 'LINGO_CORSO_MODULO') {
@@ -99,14 +99,14 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
       {needsTarget && (
         <div className="mt-2 flex flex-col gap-2 rounded-md bg-amber-50 p-2 md:flex-row md:items-center dark:bg-amber-950/20">
           <p role="alert" className="text-sm text-amber-800 dark:text-amber-300">{needsTarget}</p>
-          <label className="sr-only" htmlFor={`trash-target-${entry.id}`}>Dossier in cui ripristinare</label>
+          <label className="sr-only" htmlFor={`trash-target-${entry.id}`}>Pratica in cui ripristinare</label>
           <select
             id={`trash-target-${entry.id}`}
             value={target}
             onChange={(e) => setTarget(e.target.value)}
             className="min-h-[44px] rounded-md border border-slate-300 bg-white px-2 text-sm md:min-h-0 md:py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
           >
-            <option value="">Scegli un dossier…</option>
+            <option value="">Scegli una pratica…</option>
             {dossiers.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
           </select>
           <button
@@ -123,7 +123,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
         open={confirmPurge}
         variant="danger"
         title="Eliminare definitivamente?"
-        message={`${title} lascia il cestino e non si potrà più ripristinare. Il resto del cestino e i tuoi dossier non saranno toccati.`}
+        message={`${title} lascia il cestino e non si potrà più ripristinare. Il resto del cestino e le tue pratiche non saranno toccati.`}
         confirmLabel="Elimina definitivamente"
         focusCancel
         onConfirm={() => void purge()}

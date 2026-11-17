@@ -152,13 +152,13 @@ describe('omnilex_glossa_voce', () => {
   it('keeps the glosses stored when the general one is refused, and gives the server’s reason', async () => {
     const glosses = env.stub.apiOverride!;
     env.stub.apiOverride = (method, path, body) =>
-      path === '/dossiers/d1/notes' ? [400, { detail: 'La voce indicata non è un articolo di questo dossier.' }] : glosses(method, path, body);
+      path === '/dossiers/d1/notes' ? [400, { detail: 'La voce indicata non è un articolo di questa pratica.' }] : glosses(method, path, body);
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', generale: 'Sulla sentenza.', glosse: ONE } });
     expect(result.isError).toBeFalsy();
     expect(json(result)).toMatchObject({
       glosse: [{ esito: 'proposta', id: 'h0' }],
-      generale: { esito: 'rifiutata', motivo: expect.stringContaining('La voce indicata non è un articolo di questo dossier.') },
+      generale: { esito: 'rifiutata', motivo: expect.stringContaining('La voce indicata non è un articolo di questa pratica.') },
     });
     await client.close();
   });

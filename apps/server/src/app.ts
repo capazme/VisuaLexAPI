@@ -35,9 +35,11 @@ import lingoTestiRoutes from './routes/lingoTesti';
 import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
 import adminStudiaSoglieRoutes from './routes/adminStudiaSoglie';
 import lingoSrsRoutes from './routes/lingoSrs';
+import lingoLezioniRoutes from './routes/lingoLezioni';
 import lingoCorsiRoutes from './routes/lingoCorsi';
 import taskRoutes from './routes/tasks';
 import attiRoutes from './routes/atti';
+import praticaFilesRoutes from './routes/praticaFiles';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -151,12 +153,15 @@ app.use('/api/lingo/testi', lingoTestiRoutes);
 app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
 app.use('/api/admin/studia/soglie', adminStudiaSoglieRoutes);
 app.use('/api/lingo/srs', lingoSrsRoutes);
+app.use('/api/lingo/lezioni', lingoLezioniRoutes);
 // Gymnasium's courses (Percorsi, A1), same reason; behind the switch `lingo_courses`.
 app.use('/api/lingo/corsi', lingoCorsiRoutes);
 // The planner's tasks, same reason.
 app.use('/api/tasks', taskRoutes);
 // The acts (Atti, draft for Alfred and Guglielmo), same reason.
 app.use('/api/atti', attiRoutes);
+// A case's act files and instructions (LC50): its own paths under /api/dossiers, before the dossier routes.
+app.use('/api/dossiers', praticaFilesRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 // The runtime switches' administration (GET /features is mounted above, before the limiters).

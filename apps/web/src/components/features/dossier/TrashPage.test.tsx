@@ -20,13 +20,13 @@ describe('TrashPage', () => {
   it('says what the user removes passes through it too: dossiers, entries of a dossier and study cards (question 181)', () => {
     render(<TrashPage trash={trash([])} onBack={() => {}} showToast={() => {}} />);
     const note = screen.getByText(/resta qui 30 giorni/);
-    expect(note).toHaveTextContent('come ciò che elimini tu: i dossier, le voci che togli da un dossier, le schede di studio.');
+    expect(note).toHaveTextContent('come ciò che elimini tu: le pratiche, le voci che togli da una pratica, le schede di studio.');
     expect(note).not.toHaveTextContent('non passano di qui');
-    expect(screen.getByText(/nessun dossier, voce o scheda di studio eliminati da te/)).toBeInTheDocument();
+    expect(screen.getByText(/nessuna pratica, voce o scheda di studio eliminati da te/)).toBeInTheDocument();
   });
   it('lists every entry', () => {
     render(<TrashPage trash={trash([entry])} onBack={() => {}} showToast={() => {}} />);
-    expect(screen.getByText('Dossier «Vecchia pratica»')).toBeInTheDocument();
+    expect(screen.getByText('Pratica «Vecchia pratica»')).toBeInTheDocument();
   });
   it('says when the trash is out of reach', () => {
     render(<TrashPage trash={trash(null, 'Il cestino non è raggiungibile in questo momento.')} onBack={() => {}} showToast={() => {}} />);

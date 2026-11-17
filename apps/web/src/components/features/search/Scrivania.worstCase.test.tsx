@@ -65,8 +65,8 @@ describe('the Scrivania with the worst realistic data', () => {
   it('names the kind of each dossier', () => {
     renderPage();
     const list = screen.getByRole('region', { name: 'Riprendi' });
-    expect(within(list).getAllByText('Dossier di lavoro').length).toBeGreaterThan(0);
-    expect(within(list).getByText('Dossier di studio')).toBeInTheDocument();
+    expect(within(list).getAllByText('Pratica di lavoro').length).toBeGreaterThan(0);
+    expect(within(list).getByText('Pratica di studio')).toBeInTheDocument();
   });
 
   it('with an empty account shows no «Riprendi» and says how to add a frequent search', () => {

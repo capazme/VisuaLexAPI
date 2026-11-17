@@ -667,13 +667,16 @@ export function DocumentReviewPage() {
 
   return (
     <PageFrame
-      title="Analizza documento"
+      // «in sviluppo», as its entry in Work says (LC47).
+      title={<>Analizza documento <span className="ml-1 align-middle font-sans text-xs font-medium tracking-normal text-slate-600 dark:text-slate-400">in sviluppo</span></>}
       // Where the document goes, said once (#376 §6.4, G-401; Luca, LC29: «è duplicato 2 volte, dai, su»).
-      line={onAtto
+      line={<>{onAtto
         ? 'Trova le norme citate nell’atto: le citazioni si riconoscono come in una ricerca, e l’atto resta tra i tuoi atti.'
         : local
           ? 'Trova le norme citate in un atto, solo nel browser: LexCraft non riceve nulla.'
           : 'Trova le norme citate in un atto. Il documento resta sul tuo computer: a LexCraft arrivano solo le citazioni trovate, come in una ricerca.'}
+        <span className="mt-1 block text-sm">Funziona già, ma è ancora in sviluppo: i risultati vanno controllati. Con l’app da scrivania arriverà una lettura più completa, con un modello di IA che gira sul tuo computer.</span>
+      </>}
     >
       {fromAtto && (
         <Link to={`/work/atti/${encodeURIComponent(fromAtto.id)}`} className={cn('-mt-2 w-fit rounded-sm text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100', FOCUS_RING)}>

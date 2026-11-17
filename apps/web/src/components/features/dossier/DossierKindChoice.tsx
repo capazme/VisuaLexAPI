@@ -12,7 +12,7 @@ interface Props {
 export function DossierKindChoice({ value, onChange, disabled }: Props) {
   return (
     <fieldset className="space-y-2" disabled={disabled}>
-      <legend className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Tipo di dossier</legend>
+      <legend className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Tipo di pratica</legend>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {DOSSIER_KINDS.map(({ kind, label, hint, icon: Icon }) => (
           <label

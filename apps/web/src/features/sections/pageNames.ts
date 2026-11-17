@@ -4,7 +4,7 @@
  * (`StudiaPage`), Opus's (`OpusPage`), the dossier list, the Forum's two pages and Academia's two read their titles
  * from here. The search page has none: its bar is the search field.
  */
-export const DOSSIER_PAGE = 'Dossier';
+export const DOSSIER_PAGE = 'Pratiche';
 /** The Forum's two pages (S7a reads them for their titles). */
 export const PUBLIC_DOSSIERS_PAGE = 'Dossier pubblici';
 export const COMMUNITY_PAGE = 'Community';
@@ -13,18 +13,19 @@ export const ASSISTANT_PAGE = 'Assistente';
 export const GRAPH_PAGE = 'Grafo';
 
 const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
-  [/^\/work\/oggi(\/|$)/, 'Oggi'],
+  [/^\/work\/scadenziario(\/|$)/, 'Scadenziario'],
   [/^\/work\/prossimi(\/|$)/, 'Prossimi giorni'],
   [/^\/work\/ingresso(\/|$)/, "Lista d'ingresso"],
   [/^\/work\/cestino(\/|$)/, 'Cestino dei compiti'],
-  [/^\/work\/atti(\/|$)/, 'Atti'],
-  [/^\/work\/anonimizzatore(\/|$)/, 'Anonimizzatore'],
+  [/^\/work\/pseudonimizzatore(\/|$)/, 'Pseudonimizzatore'],
+  [/^\/work\/grafo-pratiche(\/|$)/, 'Grafo delle pratiche'],
   [/^\/learn\/ripasso(\/|$)/, 'Oggi'],
+  [/^\/learn\/lezione(\/|$)/, 'Lezione breve'],
   [/^\/learn\/percorsi(\/|$)/, 'Percorsi'],
   [/^\/learn\/progressi(\/|$)/, 'Progressi'],
   [/^\/learn\/schede(\/|$)/, 'Le mie schede'],
   [/^\/learn\/valida(\/|$)/, 'Da validare'],
-  [/^\/dossier(\/|$)/, DOSSIER_PAGE],
+  [/^\/pratiche(\/|$)/, DOSSIER_PAGE],
   [/^\/forum\/community(\/|$)/, COMMUNITY_PAGE],
   [/^\/forum\/?$/, PUBLIC_DOSSIERS_PAGE],
   [/^\/history(\/|$)/, 'Cronologia'],

@@ -18,7 +18,7 @@ function Group({ section }: { section: SectionId }) {
             <p>Studia</p>
             <a href="/learn/ripasso">Oggi</a>
             <a href="/learn/progressi">Progressi</a>
-            <a href="/dossier">Dossier</a>
+            <a href="/pratiche">Dossier</a>
           </div>
           <div aria-hidden />
           <div role="group" aria-label="Contribuisci">

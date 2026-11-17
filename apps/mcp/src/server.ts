@@ -14,6 +14,7 @@ import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier
 import { CARD_TOOL_SCOPES, COURSE_CARD_SCOPE, registerCardTools } from './tools/cards.js';
 import { COURSE_SCHEMA_TEXT, COURSE_TOOL_SCOPES, registerCourseTools } from './tools/courses.js';
 import { GLOSS_TOOL_SCOPES, registerGlossTools, registerTextTool } from './tools/glosses.js';
+import { PRATICA_TOOL_SCOPES, registerPraticaTools } from './tools/pratica.js';
 import { readFeatures } from './features.js';
 
 /** Hostnames always accepted besides the endpoint's: the health check calls the loopback. */
@@ -35,10 +36,10 @@ const ALL_SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:card
  * sources server should not bounce between the two to file an article, and a dossier is one call (D8 S1).
  */
 export const SERVER_INSTRUCTIONS =
-  'VisuaLex: i dossier dell’utente (pratiche e temi di studio, con norme, sentenze e note) e le sue schede di studio di Gymnasium. ' +
-  'Qui si leggono e si arricchiscono. Per un dossier basta una chiamata: omnilex_crea_dossier con l’elenco delle norme e delle sentenze a parole ' +
-  '(«art. 2043 c.c.», «Cass. civ., n. 31310/2024») e le note. Non verificare prima i riferimenti con altri strumenti: VisuaLex li verifica alla fonte. ' +
-  'Cercare o studiare il testo di norme e sentenze fuori da un dossier si fa con altri strumenti.';
+  'LexCraft: le pratiche dell’utente (casi di lavoro e temi di studio, con norme, sentenze e note) e le sue schede di studio di Learn. ' +
+  'Qui si leggono e si arricchiscono. Per una pratica basta una chiamata: omnilex_crea_dossier con l’elenco delle norme e delle sentenze a parole ' +
+  '(«art. 2043 c.c.», «Cass. civ., n. 31310/2024») e le note. Non verificare prima i riferimenti con altri strumenti: LexCraft li verifica alla fonte. ' +
+  'Cercare o studiare il testo di norme e sentenze fuori da una pratica si fa con altri strumenti.';
 
 /** The protected resource metadata URL for the endpoint (RFC 9728 §3.1). */
 export function resourceMetadataUrl(config: McpConfig): string {
@@ -77,7 +78,7 @@ function scopesNeeded(message: unknown): string[] {
   if (!message || typeof message !== 'object') return [];
   const { method, params } = message as { method?: unknown; params?: { name?: unknown; arguments?: { modulo?: unknown } } };
   if (method !== 'tools/call' || typeof params?.name !== 'string') return [];
-  const scopes = TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? COURSE_TOOL_SCOPES[params.name] ?? [];
+  const scopes = TOOL_SCOPES[params.name] ?? PRATICA_TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? COURSE_TOOL_SCOPES[params.name] ?? [];
   // Cards tied to a course's module write into the course: a token without its scope is asked to step up here.
   if (params.name === 'lingolex_salva_card' && params.arguments?.modulo !== undefined) return [...scopes, COURSE_CARD_SCOPE];
   return scopes;
@@ -215,6 +216,7 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
         // courses (Percorsi, M1), whose tools and card parameters are listed only then.
         const features = await readFeatures(config);
         registerDossierTools(server, config, runner, { articleParts: features.articleParts });
+        registerPraticaTools(server, config, runner);
         registerCardTools(server, config, runner, features.courses ? COURSE_SCHEMA_TEXT : undefined);
         // An entry's text, always (G-372).
         registerTextTool(server, config, runner);

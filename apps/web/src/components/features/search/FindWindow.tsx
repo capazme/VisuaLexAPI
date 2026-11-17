@@ -339,7 +339,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1.5 pb-1.5 pt-1">
         <div role="group" aria-label="Dove cercare" className="inline-flex rounded-md bg-slate-100 p-0.5 dark:bg-slate-800">
-          {([['tab', 'Questa pratica'], ['all', 'Tutte le pratiche']] as const).map(([value, label]) => (
+          {([['tab', 'Questo tavolo'], ['all', 'Tutti i tavoli']] as const).map(([value, label]) => (
             <button
               key={value}
               type="button"

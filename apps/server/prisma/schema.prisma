@@ -91,6 +91,7 @@ model User {
   lingoPreferenzeStudio LingoPreferenzeStudio?
   lingoGiornateStudio   LingoGiornataStudio[]
   lingoCreditiXp        LingoCreditoXp[]
+  lingoLezioni          LingoLezione[]
   // Gymnasium's courses (Percorsi, A1): the ones this user wrote, and their enrolments.
   lingoCorsi            LingoCorso[]
   lingoIscrizioni       LingoCorsoIscrizione[]
@@ -124,6 +125,10 @@ model User {
   tasks         Task[] @relation("TaskOwner")
   atti          Atto[]
   assignedTasks Task[] @relation("TaskAssignee")
+  // A case's act files, its instructions for Claude and their access log (LC50): they go with the account.
+  praticaFiles      PraticaFile[]
+  praticaIstruzioni PraticaIstruzioni[]
+  praticaAccessi    PraticaFileAccesso[]
 
   @@map("users")
 }
@@ -1555,6 +1560,7 @@ enum LingoMissione {
   CONSOLIDA
   MODULO
   PERCORSO
+  LEZIONE
 }
 
 enum LingoFonteXp {
@@ -1564,13 +1570,14 @@ enum LingoFonteXp {
   LETTURA
   MODULO
   ESAME
+  LEZIONE
 }
 
 model LingoCreditoXp {
   id        String        @id @default(uuid())
   utenteId  String        @map("utente_id")
   missione  LingoMissione
-  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once)
+  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once), M:/C:/L:<uuid> (a module, a course, a lesson)
   giorno    DateTime      @db.Date
   punti     Int
   fonte     LingoFonteXp
@@ -1584,6 +1591,25 @@ model LingoCreditoXp {
   @@unique([missione, fonteId])
   @@index([utenteId, giorno])
   @@map("lingo_crediti_xp")
+}
+
+// Learn's short lesson (LC63): 5–8 exercises the server built from the review scope's cards, with their keys
+// (`esercizi`, copied), the outcomes (`esiti`, `{ indice, giusta }` in the order answered) and the end. The person's
+// alone; the CHECKs (5–8 exercises, no more outcomes than exercises) are in the migration.
+model LingoLezione {
+  id        String       @id @default(uuid())
+  utenteId  String       @map("utente_id")
+  giorno    DateTime     @db.Date
+  materia   LingoMateria
+  esercizi  Json
+  esiti     Json         @default("[]")
+  finitaIl  DateTime?    @map("finita_il")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@index([utenteId, giorno])
+  @@map("lingo_lezioni")
 }
 
 // The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the
@@ -2229,4 +2255,97 @@ model Atto {
   @@index([userId, updatedAt])
   @@index([dossierId])
   @@map("atti")
+}
+
+// ─── A case's act files (LC50, server part; testing only, no real client files) ───
+// The files a lawyer uploads to a case (a `lavoro` dossier), with their versions, encrypted at rest under
+// PRATICA_FILES_DIR (src/pratica/fileStore.ts). None of these tables has a foreign key to `dossiers`, on purpose
+// (as `dossier_items.about_item_id`): deleting a dossier moves it to the trash and a restore brings it back with
+// the same id, so its files stay on disk, unreachable (the owner check finds no dossier), until the trash entry is
+// emptied or swept, which removes them. The account's deletion removes them through `users`' cascade and the disk.
+enum PraticaFileAutore {
+  utente
+  claude
+}
+
+model PraticaFile {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  dossierId String  @map("dossier_id")
+  // The name shown and sent back on download; never the name on disk (the id is).
+  nome      String
+  // Checked on the content's first bytes, never taken from the client.
+  mime      String
+  // Bytes of the plaintext.
+  peso      Int
+  // SHA-256 of the plaintext, lower-case hex.
+  sha256    String
+  // The original this is a version of (always the original, never another version); null for an original.
+  // A plain column, no foreign key: the routes keep a group together.
+  versioneDi String? @map("versione_di")
+  // 1 for an original, then 2, 3... within its group.
+  versione  Int     @default(1)
+  autore    PraticaFileAutore @default(utente)
+  // Which connected application deposited it (MCP); null = the user. Set by the server, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+  // A pseudonymised copy (VeloPII); always false until that exists.
+  pseudonimizzato Boolean @default(false)
+  // The file's own key, wrapped (AES-256-GCM) with PRATICA_FILES_KEY: iv (12) | tag (16) | key (32).
+  chiaveCifrata Bytes @map("chiave_cifrata")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  // In the case's trash; removed from disk only by the permanent deletion.
+  deletedAt DateTime? @map("deleted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dossierId])
+  @@index([versioneDi])
+  @@map("pratica_files")
+}
+
+// The case's instructions for Claude: one row per dossier, free Markdown.
+model PraticaIstruzioni {
+  dossierId String   @id @map("dossier_id")
+  userId    String   @map("user_id")
+  testo     String   @default("") @db.Text
+  // Who wrote the last change: a connected application (MCP), or null = the user.
+  updatedByClientId   String? @map("updated_by_client_id")
+  updatedByClientName String? @map("updated_by_client_name")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("pratica_istruzioni")
+}
+
+enum PraticaFileAzione {
+  elenco
+  scaricamento
+  deposito
+  cestino
+  ripristino
+  cancellazione
+}
+
+// Every read, download, deposit and deletion of a case's files. `file_id` has no foreign key: the line
+// outlives the file. Null for a listing.
+model PraticaFileAccesso {
+  id        String            @id @default(uuid())
+  userId    String            @map("user_id")
+  dossierId String            @map("dossier_id")
+  fileId    String?           @map("file_id")
+  azione    PraticaFileAzione
+  clientId   String?          @map("client_id")
+  clientName String?          @map("client_name")
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([fileId])
+  @@map("pratica_file_accessi")
 }

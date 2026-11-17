@@ -11,7 +11,6 @@ import {
   FolderInput,
   FileJson,
   TreeDeciduous,
-  ExternalLink,
   Star,
   X,
   GripVertical,
@@ -34,6 +33,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { dragAnnouncements } from '../practice/dragAnnouncements';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
@@ -43,7 +43,7 @@ import { appStore, useAppStore } from '../../../store/useAppStore';
 import { EmptyState } from '../../ui/EmptyState';
 import type { Dossier, DossierItem, DossierKind } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, shareableDossier, type NormaGroup,
+  formatTimestampLong, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, shareableDossier,
 } from './dossierUtils';
 import { countsLine, dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
@@ -60,19 +60,21 @@ import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import { DossierAttiPanel } from '../atti/DossierAttiPanel';
+import { DossierReadingView } from './DossierReadingView';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
+import { DeadlineCard } from '../../../features/deadlines/DeadlineCard';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { scrollParentOf } from '../practice/practiceView';
 
 const VIEW_PANEL = 'dossier-view';
+const VISTE = ['lettura', 'atti'] as const;
+type DossierView = 'fonti' | 'lettura' | 'atti' | 'compiti';
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { kindLabel } from './dossierKinds';
 import { DossierForumActions } from './DossierForumActions';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
-import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
-import { searchesIntoOnePractice } from './openInPractice';
 import { AddNoteModal } from './AddNoteModal';
 import { saveBlob } from '../../../utils/saveBlob';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
@@ -108,7 +110,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     updateDossierItemStatus,
     moveToDossier,
     triggerSearch,
-    triggerMultiSearch,
     addToDossier,
     addNoteToDossier,
   } = useAppStore();
@@ -119,14 +120,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // `?vista=atti`: the way back from an act lands on the dossier's acts.
   const viewTop = useRef<HTMLDivElement>(null);
   /** A new view starts under the tabs: scrolled past them, the scroller goes back to where they stick; above, it stays. */
-  const chooseView = (next: 'fonti' | 'atti' | 'compiti') => {
+  const chooseView = (next: DossierView) => {
     const mark = viewTop.current;
     const scroller = mark ? scrollParentOf(mark) : null;
     const stuckAt = mark && scroller ? mark.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop : null;
     setView(next);
     if (scroller && stuckAt !== null && scroller.scrollTop > stuckAt) scroller.scrollTop = stuckAt;
   };
-  const [view, setView] = useState<'fonti' | 'atti' | 'compiti'>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
+  // `?vista=lettura` (LC54) opens on the reading.
+  const [view, setView] = useState<DossierView>(() => VISTE.find((v) => v === new URLSearchParams(window.location.search).get('vista')) ?? 'fonti');
   const [attiCount, setAttiCount] = useState<number | null>(null);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -136,7 +138,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [treeNavigatorAct, setTreeNavigatorAct] = useState<{ tipo_atto: string; numero_atto: string; data: string } | null | undefined>(undefined);
   const [foldedActs, setFoldedActs] = useState<Set<string>>(new Set());
   const [itemSearchQuery, setItemSearchQuery] = useState('');
-  const [openPickerGroups, setOpenPickerGroups] = useState<NormaGroup[] | null>(null);
   // The note being written: about the dossier (no article), or about one article.
   const [noteTarget, setNoteTarget] = useState<{ aboutItemId?: string; heading: string } | null>(null);
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
@@ -196,16 +197,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const fullLayout = useMemo(() => layoutDossier(dossier.items), [dossier.items]);
   const fullBlocks = useMemo(() => new Map(fullLayout.acts.map((a) => [a.key, a])), [fullLayout]);
   // What a screen reader hears while an act is dragged: its heading, never its key.
-  const dragAnnouncements = useMemo(() => {
+  const actAnnouncements = useMemo(() => {
     const heading = (id: string | number) => fullBlocks.get(String(id))?.heading ?? '';
-    return {
-      onDragStart: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} iniziato.`,
-      onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? `${heading(active.id)} sopra ${heading(over.id)}.` : `${heading(active.id)} fuori dall'elenco degli atti.`,
-      onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? `${heading(active.id)} spostato al posto di ${heading(over.id)}.` : `${heading(active.id)} lasciato dov'era.`,
-      onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
-    };
+    return dragAnnouncements(heading);
   }, [fullBlocks]);
   // What it holds, in one line, as the list's card says it (S7c).
   const dossierCounts = countsLine(dossier.items);
@@ -315,34 +309,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     triggerSearch(searchParamsFromNorma(item.data));
   };
 
-  const normaGroups = useMemo<NormaGroup[]>(() => computeNormaGroups(dossier.items), [dossier.items]);
-
-  // Queue one search per norma-group (one act's, or the dossier's). The practice is created up front
-  // and its id passed as `targetPracticeId`, so results never leak into a pre-existing practice with the
-  // same label (gotcha 15). One practice holds them all, and `everyGroup` (the whole dossier opened)
-  // brings its decisions too (spec §5.1, T17).
-  const openGroupsOnDashboard = (groups: NormaGroup[], everyGroup = false) => {
-    if (groups.length === 0) return;
-    const paramsList = searchesIntoOnePractice(dossier, groups, everyGroup);
-    navigate('/');
-    triggerMultiSearch(paramsList);
-  };
-
-  const hasDecisions = fullLayout.decisions.length > 0;
-  const handleOpenAllOnDashboard = () => {
-    // Decisions alone (D7a): one practice holding them, no search to run.
-    if (normaGroups.length === 0) {
-      if (!hasDecisions) return;
-      searchesIntoOnePractice(dossier, [], true);
-      navigate('/');
-      return;
-    }
-    if (normaGroups.length === 1) {
-      openGroupsOnDashboard(normaGroups, true);
-      return;
-    }
-    setOpenPickerGroups(normaGroups);
-  };
 
   // All the act's articles, as one trash entry behind one undo toast.
   const handleRemoveAct = (block: ActBlock) => {
@@ -362,7 +328,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       shareUrl = `${window.location.origin}/dossier?import=${encodeDossierShare(dossier)}`;
     } catch (e) {
       console.error('Failed to build share link:', e);
-      showToast('Impossibile creare il link di condivisione di questo dossier. Puoi esportarlo in JSON.', 'error');
+      showToast('Impossibile creare il link di condivisione di questa pratica. Puoi esportarla in JSON.', 'error');
       return;
     }
     try {
@@ -377,7 +343,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const handleAddNote = async (text: string): Promise<boolean> => {
     if (!noteTarget) return false;
     const saved = await addNoteToDossier(dossier.id, text, noteTarget.aboutItemId);
-    if (saved) showToast(noteTarget.aboutItemId ? "Nota aggiunta all'articolo" : 'Nota aggiunta al dossier', 'success');
+    if (saved) showToast(noteTarget.aboutItemId ? "Nota aggiunta all'articolo" : 'Nota aggiunta alla pratica', 'success');
     return saved;
   };
 
@@ -392,12 +358,12 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       // The notification's time stops while the tab is hidden, so the import waits for the user to come back.
       const warn = (event: BeforeUnloadEvent) => event.preventDefault();
       window.addEventListener('beforeunload', warn);
-      void showUndoToast({ action: () => undefined, undo: () => {}, message: `${articles.length} articoli verranno importati nel dossier` }).then((stands) => {
+      void showUndoToast({ action: () => undefined, undo: () => {}, message: `${articles.length} articoli verranno importati nella pratica` }).then((stands) => {
         window.removeEventListener('beforeunload', warn);
         if (!stands) return;
         // The dossier deleted meanwhile (it is in the trash): nothing to write into.
         if (!appStore.getState().dossiers.some((d) => d.id === dossier.id)) {
-          appStore.getState().pushSyncError(`Nessun articolo importato: il dossier «${dossier.title}» non c’è più.`);
+          appStore.getState().pushSyncError(`Nessun articolo importato: la pratica «${dossier.title}» non c’è più.`);
           return;
         }
         importArticles(articles, normInfo);
@@ -423,8 +389,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     if (articles.length > 0) {
       showToast(
         articles.length === 1
-          ? '1 articolo importato nel dossier'
-          : `${articles.length} articoli importati nel dossier`,
+          ? '1 articolo importato nella pratica'
+          : `${articles.length} articoli importati nella pratica`,
         'success',
       );
     }
@@ -479,7 +445,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       if (gaps.length > 0) showToast(`PDF salvato: ${gaps.join('; ')}`, 'info');
     } catch (err) {
       console.error('Failed to export the dossier PDF:', err);
-      showToast('Impossibile creare il PDF del dossier', 'error');
+      showToast('Impossibile creare il PDF della pratica', 'error');
     } finally {
       setPdfProgress(null);
     }
@@ -492,7 +458,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       setSnapshots(previous => [snapshot, ...previous.filter(item => item.id !== snapshot.id)]);
       showToast(snapshot.unchanged ? 'Nessuna modifica: snapshot già aggiornato' : `Snapshot v${snapshot.version} salvato`, 'success');
     } catch {
-      showToast('Impossibile salvare lo snapshot del dossier', 'error');
+      showToast('Impossibile salvare lo snapshot della pratica', 'error');
     } finally {
       setSnapshotBusy(false);
     }
@@ -504,7 +470,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     }
   };
 
-  const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
   const twoColumns = layout.acts.length > 0 && layout.decisions.length > 0;
 
   // The acts, in the order dragged; the decisions, in stored order (D7a: each column its own).
@@ -514,7 +479,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       collisionDetection={closestCenter}
       onDragEnd={handleActDragEnd}
       accessibility={{
-        announcements: dragAnnouncements,
+        announcements: actAnnouncements,
         screenReaderInstructions: { draggable: "Per spostare l'atto premi Spazio, poi le frecce su e giù, e di nuovo Spazio per lasciarlo; Esc annulla." },
       }}
     >
@@ -536,8 +501,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               selectedIds={selectedItems}
               showCheckbox={showBulkActions}
               onToggleSelect={toggleItemSelection}
-              // The whole act, even while the search shows only some of its articles.
-              onOpenAct={() => openGroupsOnDashboard((fullBlocks.get(block.key) ?? block).groups)}
               onAddArticles={() => setTreeNavigatorAct({
                 tipo_atto: block.articles[0].data.tipo_atto,
                 numero_atto: block.articles[0].data.numero_atto || '',
@@ -578,26 +541,16 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   // The header's actions in one row (D3), each 44 px as the planner's controls (S7c). A label never wraps inside its
   // button (D3b): when the window is narrow the row wraps, as a row. Only on the buttons: their menus wrap their items.
-  const rowPrimary = cn(HEADER_PRIMARY, 'whitespace-nowrap');
   const rowButton = cn(HEADER_BUTTON, 'whitespace-nowrap');
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={handleOpenAllOnDashboard}
-        disabled={!hasNormaItems && !hasDecisions}
-        className={rowPrimary}
-      >
-        <ExternalLink size={16} aria-hidden />
-        <span>Apri tutto<span className="hidden sm:inline"> nel Corpus</span></span>
-      </button>
       <MenuButton
         label="Aggiungi"
         align="left"
         triggerClassName={rowButton}
         items={[
           { label: 'Articoli da una norma', icon: TreeDeciduous, onSelect: () => setTreeNavigatorAct(null) },
-          { label: 'Nota', icon: StickyNote, onSelect: () => setNoteTarget({ heading: 'Aggiungi una nota al dossier' }) },
+          { label: 'Nota', icon: StickyNote, onSelect: () => setNoteTarget({ heading: 'Aggiungi una nota alla pratica' }) },
           { label: 'Cerca un articolo', icon: Search, onSelect: () => navigate('/') },
         ]}
       >
@@ -626,7 +579,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           { label: 'Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
           { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
           { label: showBulkActions ? 'Annulla selezione' : 'Seleziona elementi', icon: CheckSquare, onSelect: () => { setShowBulkActions((v) => !v); clearSelection(); } },
-          { label: 'Elimina dossier', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => {
+          { label: 'Elimina la pratica', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => {
             // No confirmation: the dossier goes to the trash and the notification's «Annulla» restores it (K1a).
             deleteDossierWithUndo(dossier, trashChanged);
             onBack();
@@ -649,7 +602,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         onClick={onBack}
         className={cn('-ml-2 mb-2 inline-flex lg:hidden min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
       >
-        <ArrowLeft size={18} aria-hidden /> Torna ai dossier
+        <ArrowLeft size={18} aria-hidden /> Torna alle pratiche
       </button>
 
       {/* In the sections' frame (W2, S7c): the dossier's name as the title, in the reader's serif and with no icon,
@@ -680,7 +633,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 <span aria-hidden className="text-slate-400">·</span>
               </span>
             )}
-            <span>{kindLabel(dossier.kind)} · creato il {formatTimestampLong(dossier.createdAt)} · {dossierCounts}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}</span>
+            <span>{kindLabel(dossier.kind)} · creata il {formatTimestampLong(dossier.createdAt)} · {dossierCounts}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}</span>
             {dossier.sourceSuggestionId && <AttributionChip author={dossier.originalAuthor} />}
           </p>
           <div className="pt-2">{actions}</div>
@@ -691,25 +644,32 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         {/* LC27 (Luca, 15 Nov): the tabs stay at the top while the view scrolls, and a change of view starts the new
             one right under them, in place — no jump to the page's top, no scrolling to it. */}
         <div ref={viewTop} aria-hidden />
-        <div className="sticky top-0 z-10 -mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950">
+        {/* In «Lettura» the act's own head sticks at the top while reading (#529, Papiniano): the tabs scroll away there,
+            or the two sticky heads overlap and the tabs vanish under it. */}
+        <div className={cn('-mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950', view !== 'lettura' && 'sticky top-0 z-10')}>
         <SegmentedTabs
           tabs={[
             { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
+            { id: 'lettura', label: 'Lettura' },
             { id: 'atti', label: 'Atti', extra: attiCount === null ? undefined : <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{attiCount}</span> },
             { id: 'compiti', label: 'Compiti' },
           ]}
           value={view}
           onChange={chooseView}
-          label="Viste del dossier"
+          label="Viste della pratica"
           panelId={VIEW_PANEL}
           className="w-fit max-w-full"
-          tabClassName="gap-2 px-4"
+          // Four tabs whole on a 390 px phone (LC54): less padding below `sm`.
+          tabClassName="gap-1.5 px-2.5 sm:gap-2 sm:px-4"
         />
         </div>
         <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`} className="min-h-[calc(100dvh-8rem)]">
         <div hidden={view !== 'compiti'}>
+          {dossier.kind !== 'studio' && <DeadlineCard dossierId={dossier.id} />}
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
+        {/* Mounted only once chosen: opening it builds the dossier's reading table (LC54). */}
+        {view === 'lettura' && <DossierReadingView dossier={dossier} showToast={showToast} onTrashChanged={trashChanged} />}
         <div hidden={view !== 'atti'}>
           <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
         </div>
@@ -722,8 +682,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 type="text"
                 value={itemSearchQuery}
                 onChange={(e) => setItemSearchQuery(e.target.value)}
-                placeholder="Cerca in questo dossier…"
-                aria-label="Cerca negli elementi del dossier"
+                placeholder="Cerca in questa pratica…"
+                aria-label="Cerca negli elementi della pratica"
                 className={cn(FIELD, 'pl-9 pr-11')}
               />
               {itemSearchQuery && (
@@ -792,7 +752,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
               <EmptyState
                 variant="dossier"
-                title="Dossier vuoto"
+                title="Pratica vuota"
                 description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
                 action={
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -813,7 +773,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               <EmptyState
                 variant="search"
                 title="Nessun elemento corrisponde ai filtri"
-                description="La ricerca non ha trovato corrispondenze in questo dossier."
+                description="La ricerca non ha trovato corrispondenze in questa pratica."
                 action={
                   <button
                     type="button"
@@ -904,7 +864,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         {noteTarget && (
           <AddNoteModal
             heading={noteTarget.heading}
-            confirmLabel={noteTarget.aboutItemId ? "Aggiungi all'articolo" : 'Aggiungi al dossier'}
+            confirmLabel={noteTarget.aboutItemId ? "Aggiungi all'articolo" : 'Aggiungi alla pratica'}
             onClose={() => setNoteTarget(null)}
             onSave={handleAddNote}
           />
@@ -918,20 +878,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           onExport={(options) => void handleExportPdf(options)}
         />
 
-        {openPickerGroups && (
-          <OpenOnDashboardPicker
-            groups={openPickerGroups}
-            onPick={(group) => {
-              setOpenPickerGroups(null);
-              openGroupsOnDashboard([group]);
-            }}
-            onPickAll={() => {
-              setOpenPickerGroups(null);
-              openGroupsOnDashboard(normaGroups, true);
-            }}
-            onClose={() => setOpenPickerGroups(null)}
-          />
-        )}
         </div>
       </PageFrame>
     </div>

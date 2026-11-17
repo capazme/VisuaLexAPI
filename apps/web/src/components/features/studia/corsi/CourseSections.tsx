@@ -256,15 +256,15 @@ function ExamState({ titolo, esame, inPreparazione }: { titolo: string; esame: E
 /** The course's dossier, one link (§6.4, §7); its groups by module come with the dossier groups' spec. */
 export function DossierLink({ dossier }: { dossier: CorsoPagina['dossier'] }) {
   if (!dossier) {
-    return <p className={cn('text-sm', MUTED_TEXT)}>Il dossier del percorso non c’è più.</p>;
+    return <p className={cn('text-sm', MUTED_TEXT)}>La pratica del percorso non c’è più.</p>;
   }
   return (
     <Link
-      to={`/dossier?dossier=${encodeURIComponent(dossier.id)}`}
+      to={`/pratiche?dossier=${encodeURIComponent(dossier.id)}`}
       className={cn(SECONDARY_BUTTON, 'inline-flex max-w-full items-center gap-2 justify-self-start', FOCUS_RING)}
     >
       <FolderOpen aria-hidden size={16} className="shrink-0" />
-      <span className="min-w-0 break-words">Dossier «{dossier.name}»</span>
+      <span className="min-w-0 break-words">Pratica «{dossier.name}»</span>
     </Link>
   );
 }

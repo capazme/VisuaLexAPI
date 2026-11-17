@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 describe('Layout — the phone\'s bar below lg (M1)', () => {
-  it.each(['/dossier', '/dossier?dossier=d1', '/history', '/forum', '/learn/schede', '/documents'])(
+  it.each(['/pratiche', '/pratiche?dossier=d1', '/history', '/forum', '/learn/schede', '/documents'])(
     'draws the bar with the menu button and starts the content under it on %s',
     (path) => {
       at(path);
@@ -55,13 +55,13 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
 
   // jsdom cannot measure: the class is the check. 10.5 rem leaves 8 px of air before «Commenti» at 768 (LC4).
   it('ends its magnifier before «Commenti» from md, with the search field\'s room', () => {
-    at('/dossier');
+    at('/pratiche');
     const row = within(screen.getByTestId('phone-top-bar')).getByRole('button', { name: 'Apri il menu' }).parentElement;
     expect(row).toHaveClass('md:pr-[10.5rem]');
   });
 
   it('opens the search menu from its magnifier', async () => {
-    at('/dossier');
+    at('/pratiche');
     await userEvent.click(within(screen.getByTestId('phone-top-bar')).getByRole('button', { name: 'Apri il menu di ricerca' }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
   });
@@ -118,7 +118,7 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
 
   it('adds nothing in focus mode, where neither the bar nor the button is drawn', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
-    at('/dossier');
+    at('/pratiche');
     expect(screen.queryByTestId('phone-top-bar')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Apri il menu' })).toBeNull();
     // `lg:pt-10` is every page's from lg (LC21); the phone's inset is what is left out.
@@ -128,7 +128,7 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
 
 describe('Layout — what a section change animates (T1)', () => {
   it('names the content area only, so the bars and the floating buttons hold still; <main> keeps its stacking context', () => {
-    at('/dossier');
+    at('/pratiche');
     const area = screen.getByTestId('layout-content').parentElement!;
     expect(area).toHaveClass('vlx-page');
     expect(document.querySelectorAll('.vlx-page')).toHaveLength(1);

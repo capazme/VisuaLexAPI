@@ -42,7 +42,7 @@ export function CitationPreviewPopup({
   position,
   onClose,
   onOpenCitation,
-  openLabel = 'Apri nella pratica',
+  openLabel = 'Apri sul tavolo',
   onMouseEnter,
   onMouseLeave,
   nerFeedbackEnabled,

@@ -297,7 +297,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                             className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
                         >
                             <HelpCircle size={16} />
-                            Ricomincia il tour guidato
+                            Rivedi la guida iniziale
                         </button>
                     </div>
                 )}

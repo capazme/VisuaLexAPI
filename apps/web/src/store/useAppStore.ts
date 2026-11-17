@@ -19,6 +19,7 @@ import { decisionPath, formatDecisionShort, identityOf } from '../utils/decision
 import {
     addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
     findPracticeArticle, holdsSubject, labelOr, MAX_BESIDE, mergeDecisionEntries, practiceArticleKey,
+    corpusPractices, isBoundPractice,
     practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
     type PracticeAct, type PracticeDecision, type PracticeSubject,
 } from '../utils/practice';
@@ -208,6 +209,8 @@ interface AppState {
     isLoadingData: boolean;
     dataError: string | null;
     isDataLoaded: boolean;
+    /** The user's dossiers were read from the server (a failed read leaves the list empty, not known). Session-only. */
+    dossiersLoaded: boolean;
 
     /**
      * Transient user-facing error for server sync failures (highlights /
@@ -254,8 +257,16 @@ interface AppState {
      * practices from them once, in `migrate` (spec §9).
      */
     practices: Practice[];
-    /** The practice on screen; null with none. Persisted. */
+    /** The practice on screen; null with none. Persisted while `corpusPracticesPending`. */
     activePracticeId: string | null;
+    /**
+     * LC60: the Ricerca is a reading bench of the session, never saved in the browser. A load that finds the Corpus's
+     * practices of before saved there sets this: they wait for the riquadro (`CorpusPracticesDialog`), saved as before
+     * (and parked at a sign-out) until it is answered, so none is lost on the way. Session-only, read from the saved value.
+     */
+    corpusPracticesPending: boolean;
+    /** The riquadro was answered: the Corpus's practices leave the store and the browser; a dossier's tables stay. */
+    endCorpusPractices: () => void;
     /** The open rows (T15), keyed `practiceId/actId/articleKey` or `practiceId/decisionId`.
      *  Session-only, absent from `partialize`: after a reload every row is closed. */
     practiceRows: Record<string, true>;
@@ -286,7 +297,20 @@ interface AppState {
      * False when there was nothing to put back: «Annulla» then says so, never «Ripristinato».
      */
     reopenPractices: (closed: { practice: Practice; index: number }[], rows: Record<string, true>, activeId: string | null) => boolean;
-    /** Ignored for an id that names no practice. */
+    /**
+     * A reading table bound to `dossier` (LC51 c1): one practice per dossier, with its `dossierId`, named after it,
+     * holding its articles as rows of their acts WITHOUT their text (`setPracticeArticleText` gives a row its text once
+     * it is read) and its decisions closed and unread, as «Apri tutto» adds them. Session only: never saved in the
+     * browser, never the Corpus's active practice. A table already open for the dossier is re-synced and returned.
+     */
+    openDossierPractice: (dossier: Dossier) => string;
+    /** The bound table of a refreshed dossier takes what the dossier gained; what is on the table only, its open rows
+     *  and its windows stay (additive: nothing is removed). Nothing when no table is open for the dossier. */
+    resyncDossierPractice: (dossier: Dossier) => void;
+    /** A row's text, fetched once the row is read: the row keeps its key (`norma_data`) and its place. Nothing for a
+     *  row the act does not hold. */
+    setPracticeArticleText: (practiceId: string, actId: string, articleKey: string, loaded: ArticleData) => void;
+    /** Ignored for an id that names no practice, and for a bound table (never the Corpus's active practice). */
     setActivePractice: (id: string) => void;
     reorderPractices: (fromIndex: number, toIndex: number) => void;
     /**
@@ -828,6 +852,7 @@ const appStore = createStore<AppState>()(
             isLoadingData: false,
             dataError: null,
             isDataLoaded: false,
+            dossiersLoaded: false,
 
             lastSyncError: null,
             pushSyncError: (message) => set((state) => {
@@ -859,6 +884,11 @@ const appStore = createStore<AppState>()(
             },
             practices: [],
             activePracticeId: null,
+            corpusPracticesPending: false,
+            endCorpusPractices: () => {
+                get().closeAllPractices();
+                set((state) => { state.corpusPracticesPending = false; });
+            },
             practiceRows: {},
             pendingReveal: null,
             practiceNotice: null,
@@ -899,7 +929,10 @@ const appStore = createStore<AppState>()(
                 if (index < 0) return;
                 const closed = state.practices[index];
                 if (state.activePracticeId === id) {
-                    state.activePracticeId = (state.practices[index + 1] ?? state.practices[index - 1])?.id ?? null;
+                    // the neighbour in the bar: a bound table is not in it
+                    const next = state.practices.slice(index + 1).find((p) => !isBoundPractice(p)) ??
+                        state.practices.slice(0, index).reverse().find((p) => !isBoundPractice(p));
+                    state.activePracticeId = next?.id ?? null;
                 }
                 if (closed.acts.some((a) => a.id === state.structureWindow.blockId)) state.structureWindow.blockId = null;
                 state.practices.splice(index, 1);
@@ -909,17 +942,22 @@ const appStore = createStore<AppState>()(
             },
 
             closeAllPractices: () => set((state) => {
-                if (state.practices.some((p) => p.acts.some((a) => a.id === state.structureWindow.blockId))) {
+                // «Chiudi tutte» is the Corpus's: a bound table stays, with its rows, its reveal and its reader.
+                const kept = state.practices.filter(isBoundPractice);
+                const keeps = (practiceId: string | undefined) => kept.some((p) => p.id === practiceId);
+                if (state.practices.some((p) => !isBoundPractice(p) && p.acts.some((a) => a.id === state.structureWindow.blockId))) {
                     state.structureWindow.blockId = null;
                 }
-                state.practices = [];
+                state.practices = kept;
                 state.activePracticeId = null;
-                state.practiceRows = {};
-                state.pendingReveal = null;
-                state.phoneReader = null;
+                state.practiceRows = Object.fromEntries(Object.entries(state.practiceRows).filter(([key]) => keeps(key.split('/')[0])));
+                if (!keeps(state.pendingReveal?.practiceId)) state.pendingReveal = null;
+                if (!keeps(state.phoneReader?.practiceId)) state.phoneReader = null;
             }),
 
-            reopenPractices: (closed, rows, activeId) => {
+            reopenPractices: (asked, rows, activeId) => {
+                // «Annulla» puts back Corpus practices only: a bound table is rebuilt from its dossier, never restored.
+                const closed = asked.filter(({ practice }) => !isBoundPractice(practice));
                 const openNow = new Set(get().practices.map((p) => p.id));
                 if (closed.every(({ practice }) => openNow.has(practice.id))) return false;
                 set((state) => {
@@ -938,15 +976,20 @@ const appStore = createStore<AppState>()(
 
             setActivePractice: (id) => {
                 const { practices, activePracticeId } = get();
-                if (activePracticeId === id || !practices.some((p) => p.id === id)) return;
+                const named = practices.find((p) => p.id === id);
+                if (activePracticeId === id || !named || isBoundPractice(named)) return;
                 set((state) => { activate(state, id); });
             },
 
             reorderPractices: (fromIndex, toIndex) => {
-                if (!movable(get().practices.length, fromIndex, toIndex)) return;
+                // The indices are the bar's, which shows no bound table: those keep their places.
+                if (!movable(corpusPractices(get().practices).length, fromIndex, toIndex)) return;
                 set((state) => {
-                    const [moved] = state.practices.splice(fromIndex, 1);
-                    state.practices.splice(toIndex, 0, moved);
+                    const slots = state.practices.flatMap((p, i) => (isBoundPractice(p) ? [] : [i]));
+                    const order = slots.map((i) => state.practices[i]);
+                    const [moved] = order.splice(fromIndex, 1);
+                    order.splice(toIndex, 0, moved);
+                    slots.forEach((slot, k) => { state.practices[slot] = order[k]; });
                 });
             },
 
@@ -983,7 +1026,7 @@ const appStore = createStore<AppState>()(
                     state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
                     activate(state, id);
                     // The index is the act's drawer, in the column: the phone's reader gives way to it.
-                    state.phoneReader = null;
+                    readerGivesWay(state, id);
                     state.structureWindow.blockId = actId;
                 });
                 return actId;
@@ -995,7 +1038,7 @@ const appStore = createStore<AppState>()(
                 if (!hit) return false;
                 // Its practice comes on screen in the same step (carry-over ruling 9: the way back, a find match).
                 set((state) => {
-                    state.activePracticeId = practiceId;
+                    putOnScreen(state, practiceId);
                     revealRow(state, practiceId, actId, practiceArticleKey(hit));
                 });
                 return true;
@@ -1005,7 +1048,7 @@ const appStore = createStore<AppState>()(
                 const act = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
                 if (!act || !act.articles.some((a) => practiceArticleKey(a) === articleKey)) return false;
                 set((state) => {
-                    state.activePracticeId = practiceId;
+                    putOnScreen(state, practiceId);
                     revealRow(state, practiceId, actId, articleKey);
                 });
                 return true;
@@ -1014,7 +1057,7 @@ const appStore = createStore<AppState>()(
             revealPracticeDecision: (practiceId, decisionId) => {
                 if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return false;
                 set((state) => {
-                    state.activePracticeId = practiceId;
+                    putOnScreen(state, practiceId);
                     revealDecisionRow(state, practiceId, decisionId);
                 });
                 return true;
@@ -1078,7 +1121,8 @@ const appStore = createStore<AppState>()(
                 const source = practices.find((p) => p.id === fromPracticeId);
                 const target = practices.find((p) => p.id === toPracticeId);
                 const act = source?.acts.find((a) => a.id === actId);
-                if (!source || !target || !act) return;
+                // A bound table is not on the move's list: its acts are its dossier's.
+                if (!source || !target || !act || isBoundPractice(source) || isBoundPractice(target)) return;
                 // Into a practice holding the same act, it joins that act and takes its id.
                 const merged = addArticles(target.acts, act.norma, act.articles, () => act.id);
                 const nowId = merged.actId;
@@ -1223,19 +1267,46 @@ const appStore = createStore<AppState>()(
             addKnownDecisions: (practiceId, decisions) => {
                 if (decisions.length === 0 || !get().practices.some((p) => p.id === practiceId)) return;
                 set((state) => {
-                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
-                    for (const known of decisions) {
-                        const reference = identityOf(known);
-                        const entry: PracticeDecision = {
-                            id: uuidv4(), reference, label: formatDecisionShort({ ...reference, sezione: known.sezione }), identified: true,
-                        };
-                        if (known.data_deposito) entry.depositDate = known.data_deposito;
-                        if (known.tipo) entry.tipo = known.tipo;
-                        if (known.sezione) entry.sezione = known.sezione;
-                        const at = practice.decisions.findIndex((d) => sameDecision(d.reference, reference));
-                        if (at < 0) practice.decisions.push(entry);
-                        else practice.decisions[at] = mergeDecisionEntries(practice.decisions[at], entry);
-                    }
+                    mergeKnownDecisions(state.practices.find((p) => p.id === practiceId) as Practice, decisions);
+                });
+            },
+
+            openDossierPractice: (dossier) => {
+                const held = get().practices.find((p) => p.dossierId === dossier.id);
+                if (held) {
+                    get().resyncDossierPractice(dossier);
+                    return held.id;
+                }
+                const created: Practice = { ...newPractice(dossier.title, true), dossierId: dossier.id };
+                set((state) => {
+                    state.practices.push(created);
+                    syncFromDossier(state.practices[state.practices.length - 1], dossier);
+                });
+                return created.id;
+            },
+
+            resyncDossierPractice: (dossier) => {
+                if (!get().practices.some((p) => p.dossierId === dossier.id)) return;
+                set((state) => {
+                    syncFromDossier(state.practices.find((p) => p.dossierId === dossier.id) as Practice, dossier);
+                });
+            },
+
+            setPracticeArticleText: (practiceId, actId, articleKey, loaded) => {
+                const held = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (!held || !held.articles.some((a) => practiceArticleKey(a) === articleKey)) return;
+                set((state) => {
+                    const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                    const at = act ? act.articles.findIndex((a) => practiceArticleKey(a) === articleKey) : -1;
+                    if (!act || at < 0) return;
+                    // The row keeps its own `norma_data`: its key, and so its open row and its windows, do not move.
+                    // The rest is the load's alone: an earlier failed load leaves no `error` behind.
+                    const { norma_data: _asked, brocardi_info: _info, brocardi_error: _error, ...text } =
+                        loaded as ArticleData & { brocardi_info?: unknown; brocardi_error?: unknown };
+                    void _asked; void _info; void _error;
+                    act.articles[at] = { ...text, norma_data: act.articles[at].norma_data };
+                    // An act a dossier gave no URN takes the one its text came with, as a search's act does (LC54).
+                    if (!act.norma.urn && loaded.norma_data?.url) act.norma.urn = loaded.norma_data.url;
                 });
             },
 
@@ -1324,7 +1395,7 @@ const appStore = createStore<AppState>()(
                 const shown = get().phoneReader;
                 if (get().activePracticeId === practiceId && shown?.practiceId === practiceId && shown.ref.id === ref.id) return;
                 set((state) => {
-                    state.activePracticeId = practiceId;
+                    putOnScreen(state, practiceId);
                     state.phoneReader = { practiceId, ref };
                 });
             },
@@ -1365,6 +1436,7 @@ const appStore = createStore<AppState>()(
                     // CORS, backend down, 500 — all looked identical). Log the
                     // reason so devs see it in the console and the UI at least
                     // surfaces a dataError banner when both calls fail.
+                    let dossiersRead = true;
                     const [bookmarksRes, dossiersRes, environmentsRes, quickNormsRes, customAliasesRes] = await Promise.all([
                         bookmarkService.getAll().catch((err) => {
                             console.error('fetchUserData: bookmarks failed:', err);
@@ -1372,6 +1444,7 @@ const appStore = createStore<AppState>()(
                         }),
                         dossierService.getAll().catch((err) => {
                             console.error('fetchUserData: dossiers failed:', err);
+                            dossiersRead = false;
                             return [];
                         }),
                         environmentService.getAll().catch((err) => {
@@ -1413,6 +1486,7 @@ const appStore = createStore<AppState>()(
                         state.customAliases = customAliases;
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
+                        state.dossiersLoaded = dossiersRead;
                     });
                 } catch (error) {
                     console.error('Failed to fetch user data:', error);
@@ -1442,11 +1516,13 @@ const appStore = createStore<AppState>()(
                     state.customAliases = [];
                     state.environments = [];
                     state.isDataLoaded = false;
+                    state.dossiersLoaded = false;
                     state.dataError = null;
 
                     // The practices: a shared browser must not show the last user's table (spec §10).
                     state.practices = [];
                     state.activePracticeId = null;
+                    state.corpusPracticesPending = false;
                     state.practiceRows = {};
                     state.pendingReveal = null;
                     state.practiceNotice = null;
@@ -1748,7 +1824,7 @@ const appStore = createStore<AppState>()(
                     return created.id;
                 } catch (err) {
                     console.error('Failed to create dossier:', err);
-                    get().pushSyncError('Impossibile creare il dossier. Riprova.');
+                    get().pushSyncError('Impossibile creare la pratica. Riprova.');
                     return null;
                 }
             },
@@ -1774,7 +1850,7 @@ const appStore = createStore<AppState>()(
                             if (!state.dossiers.some(d => d.id === id)) state.dossiers.splice(Math.min(index, state.dossiers.length), 0, dossier);
                         });
                     }
-                    get().pushSyncError('Impossibile eliminare il dossier. Riprova.');
+                    get().pushSyncError('Impossibile eliminare la pratica. Riprova.');
                     return null;
                 }
             },
@@ -1799,7 +1875,7 @@ const appStore = createStore<AppState>()(
                     ...(updates.kind !== undefined && { kind: updates.kind }),
                 }).catch(err => {
                     console.error('Failed to update dossier:', err);
-                    get().pushSyncError('Impossibile salvare le modifiche al dossier. Riprova.');
+                    get().pushSyncError('Impossibile salvare le modifiche alla pratica. Riprova.');
                 });
             },
 
@@ -1817,7 +1893,7 @@ const appStore = createStore<AppState>()(
                 if (!dossier) return;
                 dossierService.update(id, { isPinned: dossier.isPinned }).catch(err => {
                     console.error('Failed to update dossier pin:', err);
-                    get().pushSyncError('Impossibile salvare il dossier in evidenza. Riprova.');
+                    get().pushSyncError('Impossibile salvare la pratica in evidenza. Riprova.');
                 });
             },
 
@@ -1971,7 +2047,7 @@ const appStore = createStore<AppState>()(
                         }
                         shiftNoteCounts(d, true);
                     });
-                    get().pushSyncError('Impossibile rimuovere dal dossier. Riprova.');
+                    get().pushSyncError('Impossibile rimuovere dalla pratica. Riprova.');
                     return null;
                 }
             },
@@ -2051,7 +2127,7 @@ const appStore = createStore<AppState>()(
                     });
                 } catch (err) {
                     console.error('Failed to reload the dossier:', dossierId, err);
-                    if (!quiet) get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
+                    if (!quiet) get().pushSyncError('Ripristinato, ma non riesco a ricaricare la pratica: aggiorna la pagina.');
                 }
             },
 
@@ -2220,7 +2296,7 @@ const appStore = createStore<AppState>()(
                         }
                     }
                     if (failed > 0) {
-                        get().pushSyncError('Impossibile spostare alcuni elementi tra i dossier. Riprova.');
+                        get().pushSyncError('Impossibile spostare alcuni elementi tra le pratiche. Riprova.');
                     }
                 })();
             },
@@ -2947,10 +3023,11 @@ const appStore = createStore<AppState>()(
                 // the owning block id is not — it would rehydrate a window
                 // belonging to a block that no longer exists.
                 structureWindow: { position: state.structureWindow.position, blockId: null },
-                // The practices are UI state too (spec D6); the open rows, the pending reveal and
-                // the notice are the session's.
-                practices: state.practices,
-                activePracticeId: state.activePracticeId,
+                // LC60: the Ricerca's table is the session's, and so is a table bound to a dossier (LC51). Only the
+                // Corpus's practices of before stay saved, until the riquadro is answered; the open rows, the pending
+                // reveal and the notice are the session's.
+                practices: state.corpusPracticesPending ? corpusPractices(state.practices) : [],
+                activePracticeId: state.corpusPracticesPending ? state.activePracticeId : null,
                 // Every other user-data slice is server-backed and hydrated by
                 // fetchUserData, so it does not survive in localStorage —
                 // persisting would cause drift with the server. The practices
@@ -3045,8 +3122,68 @@ function foldedBy(state: AppState, practiceId: string, subject: PracticeSubject)
 /** Makes a practice the one on screen. The phone's reader belongs to one practice: another one
  *  coming on screen takes the reader off, in the same update (T19). */
 function activate(state: AppState, practiceId: string): void {
-    if (state.phoneReader && state.phoneReader.practiceId !== practiceId) state.phoneReader = null;
+    if (isBound(state, practiceId)) return;
+    if (state.phoneReader && state.phoneReader.practiceId !== practiceId) readerGivesWay(state, practiceId);
     state.activePracticeId = practiceId;
+}
+
+/** The phone's reader gives way to `practiceId` when it is that practice's, or when both are the Corpus's (T19). A bound
+ *  table's reader and the Corpus's never close each other (LC52 c2). */
+function readerGivesWay(state: AppState, practiceId: string): void {
+    const reader = state.phoneReader;
+    if (!reader) return;
+    if (reader.practiceId === practiceId || (!isBound(state, reader.practiceId) && !isBound(state, practiceId))) {
+        state.phoneReader = null;
+    }
+}
+
+/** A practice comes on screen without touching the phone's reader; a bound table never does (LC51). */
+function putOnScreen(state: AppState, practiceId: string): void {
+    if (!isBound(state, practiceId)) state.activePracticeId = practiceId;
+}
+
+function isBound(state: Pick<AppState, 'practices'>, practiceId: string): boolean {
+    const practice = state.practices.find((p) => p.id === practiceId);
+    return !!practice && isBoundPractice(practice);
+}
+
+/** Decisions whose identity is known into `practice`, identified and closed; one entry per decision (T17). */
+function mergeKnownDecisions(
+    practice: Practice,
+    decisions: Array<DecisionIdentity & { sezione?: string; tipo?: string; data_deposito?: string }>,
+): void {
+    for (const known of decisions) {
+        const reference = identityOf(known);
+        const entry: PracticeDecision = {
+            id: uuidv4(), reference, label: formatDecisionShort({ ...reference, sezione: known.sezione }), identified: true,
+        };
+        if (known.data_deposito) entry.depositDate = known.data_deposito;
+        if (known.tipo) entry.tipo = known.tipo;
+        if (known.sezione) entry.sezione = known.sezione;
+        const at = practice.decisions.findIndex((d) => sameDecision(d.reference, reference));
+        if (at < 0) practice.decisions.push(entry);
+        else practice.decisions[at] = mergeDecisionEntries(practice.decisions[at], entry);
+    }
+}
+
+/**
+ * A bound table takes its dossier (LC51 c1): the title, each article as a row of its act WITHOUT its text (read when
+ * the row opens), the decisions as «Apri tutto» adds them (`openInPractice.ts`). Additive: acts, rows and decisions
+ * already there keep their ids, so the open rows and the windows stay.
+ */
+function syncFromDossier(practice: Practice, dossier: Dossier): void {
+    practice.label = labelOr(dossier.title, DEFAULT_PRACTICE_LABEL);
+    for (const item of dossier.items) {
+        if (item.type !== 'norma') continue;
+        const { article_text: _text, ...norma_data } = item.data;
+        void _text;
+        const act: Norma = { tipo_atto: norma_data.tipo_atto, data: norma_data.data, numero_atto: norma_data.numero_atto };
+        if (norma_data.tipo_atto_reale) act.tipo_atto_reale = norma_data.tipo_atto_reale;
+        // The act's URN, as a search gives it (an article's): its «Struttura» and «PDF» need it (LC54).
+        if (norma_data.urn) act.urn = norma_data.urn;
+        practice.acts = addArticles(practice.acts, act, [{ norma_data }], uuidv4).acts;
+    }
+    mergeKnownDecisions(practice, dossier.items.flatMap((item) => (item.type === 'sentenza' ? [item.data] : [])));
 }
 
 /** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. The row moves
@@ -3060,7 +3197,7 @@ function revealRow(state: AppState, practiceId: string, actId: string, articleKe
     delete state.practiceRows[rowKey];
     state.practiceRows[rowKey] = true;
     // A row is revealed in the table: the phone's reader, which replaces the column, gives way.
-    state.phoneReader = null;
+    readerGivesWay(state, practiceId);
     const window_ = foldedBy(state, practiceId, { kind: 'article', actId, articleKey });
     if (window_) state.windowFocusRequest = window_;
     else state.pendingReveal = { practiceId, rowKey };
@@ -3142,13 +3279,16 @@ function practiceBackEntry(state: AppState, entry: ReadingBackEntry): PracticeBa
 function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
     const practice = state.practices.find((p) => p.id === entry.practiceId);
     if (!practice) return;
-    state.activePracticeId = practice.id;
+    putOnScreen(state, practice.id);
     const { subject } = entry;
     if (!isDesktopViewport()) {
         // A phone has no windows: a subject read beside is read in the full-screen reader, and a row of
         // the table is revealed with the reader closed (T19).
-        state.phoneReader = entry.place === 'beside' ? { practiceId: practice.id, ref: besideRefFor(subject) } : null;
-        if (entry.place === 'beside') return;
+        if (entry.place === 'beside') {
+            state.phoneReader = { practiceId: practice.id, ref: besideRefFor(subject) };
+            return;
+        }
+        readerGivesWay(state, practice.id);
     }
     if (entry.place === 'beside') {
         const ref = besideRefFor(subject);
@@ -3166,7 +3306,7 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
 function revealDecisionRow(state: AppState, practiceId: string, decisionId: string): void {
     const rowKey = decisionRowKey(practiceId, decisionId);
     state.practiceRows[rowKey] = true;
-    state.phoneReader = null;
+    readerGivesWay(state, practiceId);
     const window_ = foldedBy(state, practiceId, { kind: 'decision', decisionId });
     if (window_) state.windowFocusRequest = window_;
     else state.pendingReveal = { practiceId, rowKey };
@@ -3287,7 +3427,7 @@ function migratePersisted(persisted: unknown, from: number): Record<string, unkn
  *  logged once (gotcha 18); nothing is thrown, since a throw in `merge` would reset the store. The
  *  session-only fields start empty, whatever the storage holds, except the migration's notice. */
 function practicesOnLoad(persisted: unknown): Pick<AppState,
-    'practices' | 'activePracticeId' | 'practiceRows' | 'pendingReveal' | 'practiceNotice'> {
+    'practices' | 'activePracticeId' | 'practiceRows' | 'pendingReveal' | 'practiceNotice' | 'corpusPracticesPending'> {
     const p = (persisted ?? {}) as { practices?: unknown; activePracticeId?: unknown };
     const sanitized = sanitizePractices(p.practices);
     const dropped = [...sanitized.dropped];
@@ -3304,7 +3444,8 @@ function practicesOnLoad(persisted: unknown): Pick<AppState,
     warnDropped(dropped);
     const practiceNotice = migrationNotice;
     migrationNotice = null;
-    return { practices, activePracticeId, practiceRows: {}, pendingReveal: null, practiceNotice };
+    // LC60: what a load finds are the Corpus's practices of before, waiting for the riquadro.
+    return { practices, activePracticeId, practiceRows: {}, pendingReveal: null, practiceNotice, corpusPracticesPending: practices.length > 0 };
 }
 
 /** A save the browser refused (T20): logged once a session with the key, the size and the error's
@@ -3316,7 +3457,7 @@ function reportSaveFailure({ name, bytes, error }: StorageFailure): void {
     const errorName = (error as { name?: unknown } | null)?.name;
     console.error(`persist: the browser refused to save "${name}" (${bytes} bytes): ${typeof errorName === 'string' ? errorName : String(error)}`, error);
     queueMicrotask(() => {
-        appStore.getState().pushSyncError('Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.');
+        appStore.getState().pushSyncError('Lo spazio del browser è esaurito: le impostazioni potrebbero non essere salvate.');
     });
 }
 
