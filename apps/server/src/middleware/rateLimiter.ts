@@ -59,13 +59,15 @@ if (backend === 'memory') {
 }
 
 /**
- * Try to identify the user from the Authorization header without failing.
- * Returns userId if valid access token, null otherwise.
+ * The user a request counts for, without failing: the one `delegatedAuth` or `webSession` set, else the one a
+ * valid Bearer access token names; null otherwise.
  */
 function identifyUser(req: Request): string | null {
-  // An exchanged token: the MCP server calls for every user from one address,
-  // so counting it by address would throttle them all together.
-  if (req.delegation && req.user) return req.user.id;
+  // An exchanged token (the MCP server calls for every user from one address,
+  // so counting it by address would throttle them all together) or the web's
+  // session cookie (an office behind one address would share the anonymous
+  // tier): `delegatedAuth` or `webSession` already set the user.
+  if (req.user) return req.user.id;
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return null;
   const payload = verifyToken(header.substring(7));

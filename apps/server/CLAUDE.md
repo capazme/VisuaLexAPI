@@ -40,6 +40,32 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   accepted price of stopping guesses spread over many addresses.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
   connection errors go to the limiters' memory fallback.
+- **The web's session (A.1, step 1 of `docs/superpowers/specs/2026-11-16-web-session-cookies-design.md`).**
+  `src/auth/webSession.ts`: a session is a `WebSession` row (SHA-256 of the
+  secret, a coarse device label, no IP); the browser holds the secret in an
+  `HttpOnly; SameSite=Strict; Path=/` cookie, `__Host-vx_session` and `Secure`
+  when the first `ALLOWED_ORIGINS` entry is https (`SESSION_COOKIE_SECURE`
+  overrides), `vx_session` otherwise. 7 days idle, 30 at most
+  (`SESSION_IDLE_DAYS`, `SESSION_MAX_DAYS`); `lastUsedAt` written at most every
+  10 minutes; dead rows swept at most daily on a sign-in.
+  `middleware/webSession.ts`, mounted on `/api` before the ingress's login check
+  and the limiters, sets `req.user` and `req.webSessionId`; a Bearer token takes
+  precedence until the web has moved. Sign-in opens a session only for a request
+  with `X-VisuaLex-Client: web` (answering the user, no tokens), otherwise the
+  tokens as before. Routes: `POST /auth/logout`, `GET /auth/sessions`,
+  `DELETE /auth/sessions/:id`, `POST /auth/logout-all`. What ends sessions
+  (D3): one's own password change (all but the one in use), the
+  administrator's reset and `db:reset-admin` (all, and every OAuth grant
+  revoked), a deactivation (all), account deletion (cascade).
+- `src/middleware/csrfGuard.ts` — on `/api` after `delegatedAuth`: a
+  POST/PUT/PATCH/DELETE that carries the session cookie or the web header must
+  carry `X-VisuaLex-Client: web` and, when an `Origin` is present, one in
+  `ALLOWED_ORIGINS` or the request's own host; otherwise **403**
+  `code: "csrf_refused"`. Exempt: exchanged tokens, `/api/merlt/internal/*`,
+  and (until step 3) a Bearer token or a request with neither cookie nor
+  header. The scraping gate applies the same rule to a cookie-authenticated
+  write named by `X-Forwarded-Method`. In tests, `authHeader` sends the cookie
+  and the header; `bearerHeader` the old JWT; `cookieOnly` the cookie alone.
 - `src/middleware/auth.ts` — `authenticate` answers **401** only when the
   session is over: no token, a token that does not verify, the wrong type, a
   missing or disabled user. When it cannot read the user (the database is

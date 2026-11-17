@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { request, app, createTestUser, authHeader } from './helpers';
+import { request, app, createTestUser, authHeader, bearerHeader } from './helpers';
 import { prisma as appPrisma } from '../src/lib/prisma';
 
 /**
@@ -15,6 +15,19 @@ describe('authenticate when the database cannot answer', () => {
   it('answers 503, not 401, and the same token works once the database is back', async () => {
     const user = await createTestUser('auth-db-down');
     vi.spyOn(appPrisma.user, 'findUnique').mockRejectedValueOnce(new Error('connection refused'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const down = await request(app).get('/api/dossiers').set(bearerHeader(user));
+    expect(down.status).toBe(503);
+    expect(down.body.detail).toMatch(/temporaneamente/i);
+
+    const back = await request(app).get('/api/dossiers').set(bearerHeader(user));
+    expect(back.status).toBe(200);
+  });
+
+  it('answers 503, not 401, for a session cookie it cannot read, and the same cookie works once the database is back', async () => {
+    const user = await createTestUser('auth-db-down-cookie');
+    vi.spyOn(appPrisma.webSession, 'findUnique').mockRejectedValueOnce(new Error('connection refused'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const down = await request(app).get('/api/dossiers').set(authHeader(user));
