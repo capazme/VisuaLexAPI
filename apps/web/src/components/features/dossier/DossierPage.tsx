@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import { Toast } from '../../ui/Toast';
+import { Button } from '../../ui/Button';
 import { DossierListView } from './DossierListView';
 import { DossierDetailView } from './DossierDetailView';
 import { ImportDossierModal } from './ImportDossierModal';
@@ -77,6 +78,10 @@ export function DossierPage() {
   };
 
   const selectedDossier = dossiers.find((d) => d.id === selectedDossierId) ?? null;
+  // A pratica asked by its address (LC61): until the pratiche are read it is not looked for, and the list (of the kind
+  // the last section remembers, the Forum's study ones on a cold boot) is never drawn in its place.
+  const reading = useAppStore((s) => s.isLoadingData || (!s.isDataLoaded && !s.dataError));
+  const readError = useAppStore((s) => s.dataError);
   // A dossier opened by its address takes the user to its kind's section (sections spec S7).
   const selectedKind = selectedDossier ? (selectedDossier.kind ?? 'lavoro') : null;
   useEffect(() => {
@@ -93,6 +98,17 @@ export function DossierPage() {
     <>
       {showTrash ? (
         <TrashPage trash={trash} onBack={() => setShowTrash(false)} showToast={showToast} />
+      ) : selectedDossierId && !selectedDossier ? (
+        reading ? (
+          <p role="status" className="p-6 text-sm text-slate-600 dark:text-slate-400">Apro la pratica…</p>
+        ) : (
+          <div className="flex flex-col items-start gap-3 p-6">
+            <p className="text-[15px] text-slate-700 dark:text-slate-300">
+              {readError ? 'Non riesco a leggere le pratiche: riprova tra poco.' : 'Questa pratica non c’è o non è tua.'}
+            </p>
+            <Button variant="secondary" onClick={() => setSelectedDossierId(null)}>Vai alle pratiche</Button>
+          </div>
+        )
       ) : selectedDossier ? (
         <DossierDetailView
           dossier={selectedDossier}
