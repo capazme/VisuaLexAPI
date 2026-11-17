@@ -97,7 +97,7 @@ router.post('/', async (req, res) => {
     res.status(409).json({
       detail: 'Prima di creare un percorso devi accettare la dichiarazione sul materiale di studio, in VisuaLex › Percorsi.',
       richiedeTesto: outcome.richiedeTesto,
-      link: '/studia/percorsi',
+      link: '/learn/percorsi',
     });
     return;
   }
