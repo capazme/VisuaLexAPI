@@ -73,10 +73,11 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
 
   return (
     <section aria-labelledby={headingId} className={cn(TILE, 'overflow-hidden')}>
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+      {/* Tighter under `sm` (LC62b): on a 390 px phone the road was 1,200 px tall; the nodes stay 44 px. */}
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5 sm:py-4 dark:border-slate-800">
         <div className="flex min-w-0 items-center gap-3">
         {/* LC35: the subject's emblem, an engraving; its colour stays on the dot by the name. */}
-        <Illustration name={SUBJECT_ART[materia]} className="h-12 w-12" />
+        <Illustration name={SUBJECT_ART[materia]} className="h-9 w-9 sm:h-12 sm:w-12" />
         <div className="min-w-0">
           <h3 id={headingId} className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
             <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(materia) }} />
@@ -93,9 +94,9 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
         </button>
       </header>
       <LessonNode materia={materia} label={label} cards={cards} />
-      <ol aria-label={`Istituti di ${label}`} className="relative px-5 py-4">
+      <ol aria-label={`Istituti di ${label}`} className="relative px-4 py-2 sm:px-5 sm:py-4">
         {/* The road: one line under the nodes, from the first to the last drawn. */}
-        {shown.length > 1 && <span aria-hidden className="absolute bottom-9 left-[42px] top-9 w-0.5 bg-slate-200 dark:bg-slate-800" />}
+        {shown.length > 1 && <span aria-hidden className="absolute bottom-9 left-[38px] top-9 w-0.5 bg-slate-200 sm:left-[42px] dark:bg-slate-800" />}
         {shown.map((stop, index) => {
           const kind = kindOf(stop);
           const isHere = stop.istituto === here;
@@ -108,13 +109,13 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
                 aria-current={isHere ? 'step' : undefined}
                 onClick={() => navigate(instituteSessionPath(materia, stop.istituto))}
                 className={cn(
-                  'group flex w-full items-center gap-4 rounded-xl py-2 pl-1 pr-2 text-left transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/60',
+                  'group flex w-full items-center gap-4 rounded-xl py-1 pl-1 pr-2 text-left transition-colors sm:py-2 hover:bg-slate-100 dark:hover:bg-slate-800/60',
                   FOCUS_RING,
                 )}
               >
                 <Node kind={kind} due={stop.dovute} />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-serif text-lg leading-snug text-slate-900 [overflow-wrap:anywhere] dark:text-slate-50">{stop.istituto}</span>
+                  <span className="block font-serif text-base leading-snug text-slate-900 [overflow-wrap:anywhere] sm:text-lg dark:text-slate-50">{stop.istituto}</span>
                   <span id={`${headingId}-${index}`} className={cn('block text-[13px] tabular-nums', MUTED_TEXT)}>{stopLine(stop)}</span>
                 </span>
                 {/* «Sei qui»: the logo's column, as the sidebar's active entry, and the one start of this subject. */}
@@ -160,20 +161,21 @@ function LessonNode({ materia, label, cards }: { materia: Materia; label: string
         {open ? <ListChecks size={20} /> : <Lock size={18} />}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-serif text-lg leading-snug text-slate-900 dark:text-slate-50">Lezione breve</span>
+        <span className="block font-serif text-base leading-snug text-slate-900 sm:text-lg dark:text-slate-50">Lezione breve</span>
         <span className={cn('block text-[13px]', MUTED_TEXT)}>{line}</span>
       </span>
     </>
   );
-  const row = 'flex w-full items-center gap-4 rounded-xl py-2 pl-1 pr-2 text-left';
+  const row = 'flex w-full items-center gap-4 rounded-xl py-1 pl-1 pr-2 text-left sm:py-2';
   return (
-    <div className="border-b border-slate-200 px-5 py-2 dark:border-slate-800">
+    <div className="border-b border-slate-200 px-4 py-1 sm:px-5 sm:py-2 dark:border-slate-800">
       {open ? (
         <Link to={lessonPath(materia)} aria-label={`Lezione breve di ${label}: ${line}`} className={cn(row, 'transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/60', FOCUS_RING)}>
           {body}
         </Link>
       ) : (
-        <div role="group" aria-label={`Lezione breve di ${label}, chiusa: servono almeno ${LESSON_MIN_CARDS} schede (ne hai ${cards})`} className={row}>
+        // Focusable though it leads nowhere: the keyboard reaches it and hears why it is closed.
+        <div role="group" tabIndex={0} aria-label={`Lezione breve di ${label}, chiusa: servono almeno ${LESSON_MIN_CARDS} schede (ne hai ${cards})`} className={cn(row, FOCUS_RING)}>
           {body}
         </div>
       )}

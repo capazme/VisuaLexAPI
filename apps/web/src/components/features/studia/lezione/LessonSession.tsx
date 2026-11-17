@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { FIELD_TEXT } from '../../../../constants/interactions';
+import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { cn } from '../../../../lib/utils';
 import { studiaService } from '../../../../services/studiaService';
 import type { EsercizioLezione, EsitoEsercizio, Lezione, Materia, RispostaEsercizio } from '../../../../types/studia';
@@ -223,7 +224,8 @@ type Load = { status: 'loading' } | { status: 'error'; detail: string | null } |
  * The short lesson (LC63), a screen of its own in `LessonFrame`: the server builds 5–8 exercises from the subject's
  * cards, one is shown at a time under a progress bar, each answer goes to the server, which grades it and gives the
  * key, and the correction is said at once. The last answer brings the end: the right answers and the XP the server
- * credited, or that it credited none. Esc and the cross go back to «Oggi».
+ * credited, or that it credited none. Esc and the cross go back to «Oggi»: at once before the first answer and
+ * from the end, after a confirmation in between, since a lesson left is not resumed.
  */
 export function LessonSession() {
   const navigate = useNavigate();
@@ -240,6 +242,10 @@ export function LessonSession() {
   const [sendFailed, setSendFailed] = useState(false);
   const [fine, setFine] = useState<EsitoEsercizio['fine'] | null>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  // Leaving loses something only between the first answer and the end.
+  const asksToLeave = answered > 0 && fine === null;
+  const leave = useCallback(() => (asksToLeave ? setConfirmLeave(true) : navigate(HOME)), [asksToLeave, navigate]);
 
   useEffect(() => {
     if (materia === null) return;
@@ -255,12 +261,12 @@ export function LessonSession() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // Esc in the match's select closes its list, not the lesson.
-      if (event.key === 'Escape' && !(event.target instanceof HTMLSelectElement)) navigate(HOME);
+      // Esc in the match's select closes its list, not the lesson; with the question open, Esc is the question's.
+      if (event.key === 'Escape' && !(event.target instanceof HTMLSelectElement) && !confirmLeave) leave();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate]);
+  }, [leave, confirmLeave]);
 
   useEffect(() => {
     if (graded) continueRef.current?.focus();
@@ -355,7 +361,7 @@ export function LessonSession() {
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <button
           type="button"
-          onClick={() => navigate(HOME)}
+          onClick={leave}
           aria-label="Chiudi la lezione"
           className={cn('inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
         >
@@ -378,6 +384,16 @@ export function LessonSession() {
           {body}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmLeave}
+        title="Interrompere la lezione?"
+        message="Le risposte date restano, ma questa lezione non si riprende: la prossima volta ne inizi una nuova."
+        confirmLabel="Interrompi"
+        cancelLabel="Continua la lezione"
+        focusCancel
+        onConfirm={() => navigate(HOME)}
+        onCancel={() => setConfirmLeave(false)}
+      />
     </div>
   );
 }

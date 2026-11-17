@@ -533,29 +533,30 @@ describe('ReviewHome', () => {
   });
 
   describe('«Oggi» (Gymnasium spec §5.1)', () => {
-    it('puts the day first, then the day\'s numbers, the road and the full list, and from `lg` sets the numbers in a sticky right column', async () => {
+    it('puts the day first, then the road, the day\'s numbers and the full list, and from `lg` sets the numbers in a sticky right column', async () => {
       progress.mockResolvedValue(answer(18, 8));
       const { container } = renderHome();
       const day = await screen.findByRole('region', { name: 'Il ripasso di oggi' });
       const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
       const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
       const list = screen.getByRole('region', { name: 'Tutte le missioni' });
-      // On a phone the rail comes right after the day block: the document keeps that order on every width.
-      expect(follows(day, stats) && follows(stats, missions) && follows(missions, road()) && follows(road(), list)).toBe(true);
+      // On a phone the road comes right after the day block (LC62b): the document keeps that order on every width.
+      expect(follows(day, road()) && follows(road(), stats) && follows(stats, missions) && follows(missions, list)).toBe(true);
       const section = container.querySelector('section')!;
       expect(section).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-[minmax(0,1fr)_20rem]');
       // Left, row 1: the day block.
       expect(day.parentElement).toHaveClass('lg:col-start-1', 'lg:row-start-1');
       // Right, both rows: the band, then today's missions, sticky.
       const rail = stats.parentElement!;
-      expect(rail).toHaveClass('lg:col-start-2', 'lg:row-span-2', 'lg:row-start-1', 'lg:self-start', 'lg:sticky', 'lg:top-8');
+      expect(rail).toHaveClass('lg:col-start-2', 'lg:row-span-3', 'lg:row-start-1', 'lg:self-start', 'lg:sticky', 'lg:top-8');
       expect(rail).toContainElement(missions);
       expect(follows(stats, missions)).toBe(true);
-      // Left, row 2: the road and the full list.
+      // Left, row 2: the road; row 3: the full list.
       const below = road().parentElement!;
       expect(below).toHaveClass('lg:col-start-1', 'lg:row-start-2');
-      expect(below).toContainElement(list);
-      expect([...section.children].slice(0, 3)).toEqual([day.parentElement, rail, below]);
+      const foot = list.parentElement!;
+      expect(foot).toHaveClass('lg:col-start-1', 'lg:row-start-3');
+      expect([...section.children].slice(0, 4)).toEqual([day.parentElement, below, rail, foot]);
     });
 
     it('says the subjects once, in the road: no subject filter, no «Le tue materie»', async () => {
@@ -576,7 +577,7 @@ describe('ReviewHome', () => {
         progress.mockResolvedValue(answer(18, 8));
         renderHome();
         const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
-        expect(stats.parentElement).toHaveClass('lg:col-start-2', 'lg:row-span-2', 'lg:sticky', 'lg:self-start');
+        expect(stats.parentElement).toHaveClass('lg:col-start-2', 'lg:row-span-3', 'lg:sticky', 'lg:self-start');
         expect(stats.parentElement?.parentElement).toHaveClass('lg:grid-cols-[minmax(0,1fr)_20rem]');
       } finally {
         appStore.setState({ settings: before });
@@ -726,10 +727,10 @@ describe('ReviewHome', () => {
       expect(screen.getByRole('list', { name: 'Missioni di oggi' }).querySelector('[data-missione="obiettivo"]')).toHaveTextContent('0 di 10');
     });
 
-    it('lays the page in the order fixed: the day, the numbers, today\'s missions, the road, the full list', async () => {
+    it('lays the page in the order fixed: the day, the road, the numbers, today\'s missions, the full list', async () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
-      const order = ['Il ripasso di oggi', 'I tuoi progressi', 'Le missioni di oggi', 'Il tuo sentiero', 'Tutte le missioni'];
+      const order = ['Il ripasso di oggi', 'Il tuo sentiero', 'I tuoi progressi', 'Le missioni di oggi', 'Tutte le missioni'];
       const headings = await Promise.all(order.map((name) => screen.findByRole('heading', { name })));
       for (let i = 1; i < headings.length; i++) {
         expect(headings[i - 1].compareDocumentPosition(headings[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
