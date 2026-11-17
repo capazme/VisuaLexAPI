@@ -56,7 +56,8 @@ function Stop({ to, name, kind, icon, title, line }: { to: string | null; name: 
           {body}
         </Link>
       ) : (
-        <div role="group" aria-label={name} className={ROW}>
+        // A closed node is focusable, so the keyboard reaches it and hears why it is closed.
+        <div role="group" aria-label={name} tabIndex={kind === 'locked' ? 0 : undefined} className={cn(ROW, kind === 'locked' && FOCUS_RING)}>
           {body}
         </div>
       )}

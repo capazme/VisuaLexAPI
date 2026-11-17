@@ -3,6 +3,7 @@ import { cn } from '../../../lib/utils';
 import { FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { SearchParams } from '../../../types';
 import { articleLink } from './articleLink';
+import { AddPassageToPratica } from './AddPassageToPratica';
 import { provenance } from './rassegnaFilters';
 import { anchorWord, excerptStart, findWords, type Span } from './searchExcerpt';
 import type { RassegnaRisultato } from './types';
@@ -40,6 +41,8 @@ interface Props {
   /** the words searched, as sent (`searchWords`) */
   q: string;
   onOpenArticle: (params: SearchParams) => void;
+  /** shown whole from the start (the passage chosen in ⌘K) */
+  opened?: boolean;
 }
 
 /**
@@ -48,9 +51,9 @@ interface Props {
  * articles it cites as links that open them, the source's credit. Draws an `<li>` (focusable, so
  * «Altri passi» can hand the focus to the first it brought): the caller owns the `<ul>`.
  */
-export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function RassegnaResult({ passo, q, onOpenArticle }, ref) {
+export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function RassegnaResult({ passo, q, onOpenArticle, opened = false }, ref) {
   const textId = useId();
-  const [whole, setWhole] = useState(false);
+  const [whole, setWhole] = useState(opened);
   const spans = useMemo(() => findWords(passo.testo, q), [passo.testo, q]);
   // opened on the longest word searched, else on the first word found
   const start = useMemo(() => {
@@ -99,6 +102,7 @@ export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function Rassegna
           Apri sul portale del Massimario
         </a>
       </p>
+      <AddPassageToPratica passo={passo} />
     </li>
   );
 });
