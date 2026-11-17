@@ -279,8 +279,9 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(count.parentElement).toContainElement(screen.getByRole('heading', { level: 2 }));
     expect(count.parentElement).not.toContainElement(screen.getByRole('button', { name: /^Altre azioni per / }));
     expect(count.parentElement).toHaveClass('min-w-0', 'flex-1');
-    // The name keeps its room; the count gives way, its words in its title.
-    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('shrink-0');
+    // The name keeps its room; the count gives way, its words in its title. Under 390 px it goes under the name (LC70).
+    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('min-[390px]:shrink-0', 'text-lg');
+    expect(count.parentElement).toHaveClass('flex-col', 'min-[390px]:flex-row');
     expect(count).toHaveAttribute('title', '1 atto · 1 articolo · 1 sentenza');
   });
 

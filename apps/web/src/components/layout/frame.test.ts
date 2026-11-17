@@ -25,8 +25,8 @@ describe('the search page has one limit, the frame\'s (U1)', () => {
   });
 
   it('draws the practice and its loading skeleton at the frame\'s width', () => {
-    // One exception (LC28): the simple reading, one article alone, takes the room it needs, not the frame's.
-    expect(read('components/features/practice/PracticeTable.tsx').replace(/simple && '[^']*'/, '')).not.toMatch(/\bmax-w-/);
+    // One exception (LC28, LC70): one act alone, of one article or more, takes the room it needs, not the frame's.
+    expect(read('components/features/practice/PracticeTable.tsx').replace(/headless && '[^']*'/, '')).not.toMatch(/\bmax-w-/);
     expect(read('components/features/search/SearchPanel.tsx')).not.toMatch(/animate-pulse[^"]*max-w-|max-w-[^"]*animate-pulse/);
   });
 });
