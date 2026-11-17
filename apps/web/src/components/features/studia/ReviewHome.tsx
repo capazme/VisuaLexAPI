@@ -16,7 +16,7 @@ import { TodayExam } from './corsi/TodayExam';
 
 /**
  * «Oggi», Learn's home (LC23, after Duolingo's: Luca, 15 November): the day block first (what is on today and «Inizia il
- * ripasso», the page's one action), then «Il tuo percorso», a unit per subject with its institutes as stops, and the full
+ * ripasso», the page's one action), then «Il tuo sentiero» (LC62), a unit per subject with its institutes as stops, and the full
  * list of missions; beside it from `lg` the day's numbers, the streak and the level, then today's missions. The missions
  * and the statistics are the whole day's (`useProgress(undefined)`); the road is `usePercorso` (G5), on which nothing
  * above waits. The server decides what «today» is.
