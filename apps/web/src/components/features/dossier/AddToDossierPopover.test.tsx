@@ -173,4 +173,16 @@ describe('AddToDossierPopover with a decision', () => {
     fireEvent.click(screen.getByRole('button', { name: /Nuova pratica/ }));
     expect(screen.getByRole('textbox', { name: 'Nome della nuova pratica' })).toBeInTheDocument();
   });
+
+  it('LC61: every control is 44 px to the touch on a phone', () => {
+    renderPopover();
+    fireEvent.click(screen.getByRole('button', { name: /Nuova pratica/ }));
+    const controls = [
+      screen.getByRole('button', { name: 'Chiudi' }),
+      screen.getByRole('button', { name: /Pratica recente/ }),
+      screen.getByRole('textbox', { name: 'Nome della nuova pratica' }),
+      screen.getByRole('button', { name: 'Crea e aggiungi' }),
+    ];
+    for (const control of controls) expect(control.className).toContain('min-h-[44px]');
+  });
 });

@@ -228,6 +228,7 @@ describe('the dossier\'s «Atti» tab (LC53)', () => {
     renderPanel();
     await screen.findByText('I file della pratica non sono attivi su questo server.');
     expect(screen.getByRole('button', { name: 'Carica un file' })).toBeDisabled();
+    expect(screen.queryByText('oppure trascinalo qui.')).toBeNull();
   });
 
   it('the drafts written with the old editor are offered as Word files', async () => {

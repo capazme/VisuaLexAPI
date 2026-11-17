@@ -18,6 +18,7 @@ import { dossierRecency, dossierContainsArticle, dossierContainsDecision } from 
 import { useDossierKind } from '../../../features/sections/useSection';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
 
@@ -209,7 +210,8 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                 </div>
                 <button
                     onClick={onClose}
-                    className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                    // 44 px to the touch on a phone (LC61), as every control of the sheet.
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center md:min-h-0 md:min-w-0 p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                     title="Chiudi (Esc)"
                     aria-label="Chiudi"
                 >
@@ -226,7 +228,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Cerca una pratica…"
-                            className="w-full pl-8 pr-2.5 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
+                            className="w-full min-h-[44px] md:min-h-0 pl-8 pr-2.5 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
                     </div>
                 </div>
@@ -248,6 +250,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                                 onClick={() => handlePick(d.id)}
                                 className={cn(
                                     'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors',
+                                    TOUCH_TARGET_RESPONSIVE,
                                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                                     // No opacity on the row (LC61): «già presente» and the name keep their contrast (AA).
                                     alreadyPresent
@@ -282,6 +285,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                         onClick={() => setCreating(true)}
                         className={cn(
                             'w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed rounded-lg transition-colors text-sm',
+                            TOUCH_TARGET_RESPONSIVE,
                             'border-slate-300 dark:border-slate-700 text-slate-500',
                             'hover:border-primary-500 hover:text-primary-500',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
@@ -299,12 +303,12 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             onKeyDown={(e) => { if (e.key === 'Escape') setCreating(false); }}
                             placeholder="Nome della pratica…"
                             aria-label="Nome della nuova pratica"
-                            className="flex-1 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
+                            className="flex-1 min-h-[44px] md:min-h-0 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
                         <button
                             type="submit"
                             disabled={busy || !newTitle.trim()}
-                            className="px-3 text-sm font-semibold text-white bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="min-h-[44px] md:min-h-0 px-3 text-sm font-semibold text-white bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             Crea e aggiungi
                         </button>
