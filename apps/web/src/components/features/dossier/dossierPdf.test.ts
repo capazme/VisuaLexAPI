@@ -274,4 +274,15 @@ describe('buildPdfBlocks — notes', () => {
     const act = blocks[1] as Extract<PdfBlock, { kind: 'act' }>;
     expect(act.articles[0].notes).toEqual(['Sul dovere. (scritta da Claude Code (applicazione collegata))']);
   });
+
+  it("prints an application's Markdown without its marks, lines and list items kept; the user's note as written (D4)", () => {
+    const text = '## Scadenze\n\n**Garante**: 72 *ore*\n\n---\n\n- uno\n- due\n\n3. tre\n4. quattro\n\n> citata';
+    const app: DossierItem = { id: 'na', type: 'note', addedAt: '', data: text, createdBy: { clientName: 'Claude Code' } };
+    const own: DossierItem = { id: 'nf', type: 'note', addedAt: '', data: '## Mia\n**resta**' };
+    const [notes] = buildPdfBlocks([app, own], new Map(), new Map()) as Extract<PdfBlock, { kind: 'notes' }>[];
+    expect(notes.notes).toEqual([
+      'Scadenze\nGarante: 72 ore\n• uno\n• due\n3. tre\n4. quattro\ncitata (scritta da Claude Code (applicazione collegata))',
+      '## Mia\n**resta**',
+    ]);
+  });
 });

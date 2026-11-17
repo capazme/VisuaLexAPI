@@ -19,6 +19,7 @@ import {
 } from '../decisions/decisionPdf';
 import { PDF_MARGIN, createPdfWriter, type PdfFont, type PdfWriter } from '../../../utils/pdfWriter';
 import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
+import { notePlainText } from './noteMarkdown';
 import { EXCERPT_GAP, articleTextBetween, excerptParts, type ExcerptPart } from './pdfExcerpts';
 
 /**
@@ -87,9 +88,10 @@ export const PDF_NO_MARKS = 'Nessuna parte evidenziata o annotata';
 export const PDF_MARKS_UNAVAILABLE = 'Evidenziazioni e note non disponibili al momento';
 export const PDF_DECISIONS_HEADING = 'Giurisprudenza';
 
-// A note as the PDF prints it: its text, then who wrote it when an application did.
+// A note as the PDF prints it: its text, then who wrote it when an application did. An application's Markdown is printed
+// without its marks (D4): the writer sets one face per line, so bold inside a line is not drawn.
 function noteLine(note: DossierItem): string {
-  return note.createdBy ? `${String(note.data)} (${claudeMarkSentence(note.createdBy)})` : String(note.data);
+  return note.createdBy ? `${notePlainText(String(note.data))} (${claudeMarkSentence(note.createdBy)})` : String(note.data);
 }
 
 function plain(html: string): string {

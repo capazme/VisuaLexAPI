@@ -86,7 +86,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   description tells the model not to fall back to a note; design
   `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2; the server's `candidates` is left out of
   its answer, `detail` names them), `omnilex_aggiungi_nota_dossier` (`note`, 1–10
-  plain-text notes up to 4,000 characters each, in a dossier or about one of its articles with
+  notes up to 4,000 characters each, in simple Markdown (D4: bold, `##` titles, `-`/`1.` lists, no HTML; the web draws
+  an application's note so, `NoteText`), in a dossier or about one of its articles with
   `voce`, the entry's id; one request per note, one refused and the others go on, answered `{ entrate: [{ nota, id,
   nota_su }], non_entrate?: [{ nota, motivo }] }`, and an error when every note was refused for the same reason;
   the single `testo`/`voce` form is gone (D8 S1); add-only), `omnilex_stato_account`; and the case's three

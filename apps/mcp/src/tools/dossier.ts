@@ -139,7 +139,8 @@ const noteSchema = () =>
     .min(1)
     .max(MAX_NOTE_LENGTH)
     .refine((text) => text.length <= MAX_NOTE_LENGTH, `Too big: expected string to have <=${MAX_NOTE_LENGTH} characters`)
-    .describe('Il testo della nota');
+    // The web draws an application's note as simple Markdown (D4); the subset is in omnilex_aggiungi_nota_dossier's description.
+    .describe('Il testo della nota, in Markdown semplice');
 
 /**
  * A reference as the model wrote it: never trimmed or rewritten, since a row that did not enter is answered
@@ -541,7 +542,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Aggiungi note a una pratica',
       description:
-        `Aggiunge da 1 a ${MAX_NOTES} note (testo semplice, fino a ${MAX_NOTE_LENGTH} caratteri ciascuna) a una pratica, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
+        `Aggiunge da 1 a ${MAX_NOTES} note a una pratica, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
+        `Markdown semplice: **grassetto**, titoletti con ##, elenchi con - o 1.; niente HTML; fino a ${MAX_NOTE_LENGTH} caratteri per nota. ` +
         'Le note restano segnate come scritte da questa applicazione. Aggiunge soltanto: non modifica né cancella note.',
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id della pratica, o il suo nome esatto'),
