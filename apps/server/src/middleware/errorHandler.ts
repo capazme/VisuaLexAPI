@@ -3,9 +3,14 @@ import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 
 export class AppError extends Error {
+  /**
+   * `code`, when given, is answered as `error`: a stable name a client can act on without reading the
+   * Italian `detail` (as `{ detail, error }` elsewhere, e.g. `insufficient_scope`).
+   */
   constructor(
     public statusCode: number,
     public message: string,
+    public code?: string,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -22,6 +27,7 @@ export const errorHandler = (
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       detail: err.message,
+      ...(err.code ? { error: err.code } : {}),
     });
   }
 

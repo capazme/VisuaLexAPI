@@ -336,7 +336,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   The saved-norm notifications name the norm by its citation (`changeMessage`), the stored key
   only when the snapshot names no article.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
-  unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
+  unhandled throw. `AppError` carries its own, and an optional `code` answered as `error` beside the
+  Italian `detail` (a stable name the web can act on, e.g. `own_contribution`); a Zod `ZodError` becomes **400**
   naming the offending fields; the JSON parser's own refusals (a malformed or too large body) keep
   their 4xx with a fixed `detail`, logged by type only — their error carries the raw body; everything
   else is a 500. Controllers therefore
@@ -471,10 +472,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   any fire-and-forget promise (`void f()`) that rejects crashes the whole
   server: catch it where it is fired.
 - **Article discussions** (`routes/articleDiscussions.ts`): threads anchored
-  on `{normaKey, articleId, version}` with comments, toggled votes and
+  on `{normaKey, articleId, version}` with comments, votes up and down and
   reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
   `requireAdmin`. `sort=recent|active|popular` orders by `createdAt`,
-  `lastActivityAt` (set at creation and by a reply, by nothing else), vote count. A thread may carry a `passage` (quotation, plain-text
+  `lastActivityAt` (set at creation and by a reply, by nothing else), score. A thread may carry a `passage` (quotation, plain-text
   offset, 32-char prefix and suffix), `articleUrn` and `textHash` (SHA-256 of the plain
   projection when the thread was opened); the title is optional only for passage
   threads; `GET /article-discussions/passages` lists an article's passage threads
@@ -514,8 +515,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   why) and notifications, drops `lockedById`, and counts anonymous replies among the others'. The closed lists (report reasons and hiding categories, `forum/reportReasons.ts`;
   statuses; notification kinds; log actions) are CHECKs. **Pending PR2c** (the reader's panel cannot
   meet them yet): a free report reason is read as `altro` with its text in `details`; no licence check
-  (`licence_text_id` stays null); releasing a quotation needs no reason; voting on one's own content is
-  allowed.
+  (`licence_text_id` stays null); releasing a quotation needs no reason.
   Pull request 2, the routes (`controllers/communityController.ts`, `forumModerationController.ts`,
   `forumNotificationController.ts`, `routes/forumCommunity.ts`; helpers in `src/forum/`):
   `GET /article-discussions/feed` (every listed glossa: `sort=active` by default |recent|popular|unanswered;
@@ -543,9 +543,27 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `GET /forum/notifications`, `POST /forum/notifications/read { ids | all }`; the Forum's badge
   (`/notifications/forum-unread-count`) adds `community` to its total, and `pendingReports` (items, not in
   the total) for moderators. Daily per-user limits (`forum/limits.ts`, 24 hours from the first write:
-  `FORUM_DAILY_GLOSSE` 10, `FORUM_DAILY_REPLIES` 60, `FORUM_DAILY_REPORTS` 20, `FORUM_DAILY_EDITS` 60;
-  an Italian 429; a refused write gives its point back; fail-open). None of these routes is in
-  `oauth/delegatedRoutes.ts`: a connected application can neither read nor write the Community.
+  `FORUM_DAILY_GLOSSE` 10, `FORUM_DAILY_REPLIES` 60, `FORUM_DAILY_REPORTS` 20, `FORUM_DAILY_EDITS` 60,
+  `FORUM_DAILY_VOTES` 300; an Italian 429; a refused write gives its point back; fail-open). None of these
+  routes is in `oauth/delegatedRoutes.ts`: a connected application can neither read nor write the Community.
+  **Votes up and down** (spec `docs/superpowers/specs/2026-11-14-forum-community-server-design.md` §A, D-248;
+  migration `20261116100000_forum_votes_up_down`; `forum/votes.ts`): `PUT /article-discussions/:threadId/vote`
+  and `PUT /article-discussion-comments/:commentId/vote` `{ value: 1 | -1 | 0 }` → `{ value, score, upvotes,
+  downvotes }`, one vote per person per item (`value` SMALLINT, a CHECK), locking the glossa then the reply.
+  Never on one's own contribution: **403 with `error: 'own_contribution'`**, on the old toggle too; on a
+  comment only `0` (400 otherwise); 404 on what is hidden, emptied or under a hidden glossa; a locked glossa
+  can still be voted. The old `POST …/vote` stays for the reader's panel as a toggle of the up vote (none →
+  up, up → none, down → up), answering `{ voted, voteCount }`. `article_threads.score` and
+  `article_comments.score` are **kept by a database trigger** on the votes (cascades included), never
+  written by the server. Every glossa, reply and comment in an answer carries `score`, `upvotes`,
+  `downvotes`, `userVote`, and the legacy `voteCount` (= up votes) and `userVoted`; every author object
+  carries the author's **personal score** (`forum/votes.ts` `personalScores`: the sum over their visible
+  glosses, replies and comments, those under a hidden glossa left out; `null` without an author).
+  `popular` and a glossa's replies (after the accepted one) order by `score`. Deleting an account first
+  locks every glossa and then every reply the deletion writes (the ones the person voted, wrote, locked or
+  released), each by id, then deletes the votes (`lingo/deleteUserAccount.ts`): left to the cascade and
+  the SET NULLs, the rows would be locked in any order, a reply before its glossa, and could deadlock with
+  a reply being written or voted.
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing

@@ -18,10 +18,12 @@ router.delete('/article-discussions/:threadId', community.deleteThread);
 router.post('/article-discussions/:threadId/comments', controller.createComment);
 router.post('/article-discussions/:threadId/accept', community.acceptReply);
 router.post('/article-discussions/:threadId/vote', controller.toggleThreadVote);
+router.put('/article-discussions/:threadId/vote', community.voteThread);
 router.post('/article-discussions/:threadId/report', controller.reportThread);
 router.patch('/article-discussion-comments/:commentId', community.editComment);
 router.delete('/article-discussion-comments/:commentId', community.deleteComment);
 router.post('/article-discussion-comments/:commentId/vote', controller.toggleCommentVote);
+router.put('/article-discussion-comments/:commentId/vote', community.voteComment);
 router.post('/article-discussion-comments/:commentId/report', community.reportComment);
 router.patch('/admin/article-discussions/:threadId', requireAdmin, controller.moderateThread);
 
