@@ -104,6 +104,8 @@ export interface VersionChip {
   /** `upcoming`: the text in force today, which a later text will repeal or change (G-355). */
   tone: ValidityState | 'upcoming';
   label: string;
+  /** The same words with the day in figures («In vigore dal 19/4/1942»), for a phone's status line (LC70). */
+  short?: string;
   title: string;
 }
 
@@ -158,6 +160,12 @@ export interface VersionDisplay {
   updateNotesOpen: boolean;
 }
 
+/** «In vigore dal 19/4/1942»: the day in figures, no leading zeros; undefined when the day is not an ISO one. */
+function shortFrom(isoDate: string | null | undefined): string | undefined {
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate ?? '');
+  return day ? `In vigore ${withPreposition('dal', `${Number(day[3])}/${Number(day[2])}/${day[1]}`)}` : undefined;
+}
+
 function chipFor(validity: ArticleValidity): VersionChip {
   // The days in full, as a lawyer writes them (R3): «dal 1° gennaio 2005», «dall'8 agosto».
   const from = validity.valid_from ? withPreposition('dal', formatDateForCitation(validity.valid_from)) : '';
@@ -166,7 +174,7 @@ function chipFor(validity: ArticleValidity): VersionChip {
   const title = `${SOURCE_NOTE}${version}`;
   switch (validity.state) {
     case 'current':
-      return { tone: 'current', label: from ? `In vigore ${from}` : 'In vigore', title };
+      return { tone: 'current', label: from ? `In vigore ${from}` : 'In vigore', short: shortFrom(validity.valid_from), title };
     case 'historical':
       return {
         tone: 'historical',
