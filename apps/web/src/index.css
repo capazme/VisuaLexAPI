@@ -1187,6 +1187,12 @@
   }
 }
 
+/* LC74: a card widened by one article's glosses (`useGlossMargin`) keeps the text of every other article in it where it
+   was, at the width the card gave it closed. */
+[data-glosses-room]:has([data-glosses-beside]) [data-article-root]:not([data-glosses-beside]) {
+  max-width: var(--glosses-text-width);
+}
+
 /* The ground under the pointer of the sections' tabs (Work, Learn, Forum, Labs; `SectionTabs`), the one source for a
    row of commands (LC72): a colour, no slide. Unlayered, so it beats a button's own `hover:bg-*`. A pressed or open
    button keeps its ground still; a disabled one does not answer; the keyboard's focus takes the same ground beside its

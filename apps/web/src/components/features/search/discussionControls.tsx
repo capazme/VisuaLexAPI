@@ -48,18 +48,30 @@ export function ReplyForm({ onSend, placeholder = 'Scrivi una risposta…', send
 }
 
 /** «Segnala», which asks first: one touch meant for the control beside it must not reach the moderators. */
-export function ReportButton({ onReport, label }: { onReport: () => void; label?: string }) {
+export function ReportButton({ onReport, label, inline = false }: { onReport: () => void; label?: string; inline?: boolean }) {
   const [asking, setAsking] = useState(false);
+  const question = 'La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto.';
   return (
     <>
-      <button type="button" onClick={() => setAsking(true)} aria-label={label} className={cn('inline-flex items-center gap-1 px-2 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 md:px-0', TOUCH)}>
+      <button type="button" onClick={() => setAsking(true)} aria-label={label} aria-expanded={inline ? asking : undefined} className={cn('inline-flex items-center gap-1 px-2 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 md:px-0', TOUCH)}>
         <AlertTriangle size={12} aria-hidden /> Segnala
       </button>
+      {/* `inline` (the article's margin, L-73): the question under the row, in the page, not a dialog over it. The
+          parent row wraps, so it takes a line of its own. */}
+      {inline && asking && (
+        <div role="group" aria-label="Segnalare ai moderatori?" className="basis-full rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+          <p>{question}</p>
+          <div className="mt-2 flex justify-end gap-2">
+            <button type="button" onClick={() => setAsking(false)} className={cn('px-2 text-slate-600 dark:text-slate-300', TOUCH)}>Annulla</button>
+            <button type="button" onClick={() => { setAsking(false); onReport(); }} className={cn('rounded-md bg-red-600 px-2.5 font-semibold text-white hover:bg-red-700', TOUCH)}>Segnala</button>
+          </div>
+        </div>
+      )}
       <ConfirmDialog
-        open={asking}
+        open={asking && !inline}
         variant="danger"
         title="Segnalare ai moderatori?"
-        message="La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto."
+        message={question}
         confirmLabel="Segnala"
         focusCancel
         onCancel={() => setAsking(false)}

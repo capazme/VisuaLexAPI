@@ -112,13 +112,13 @@ function openMore(row: HTMLElement) {
 const entries = (menu: HTMLElement) => within(menu).getAllByRole('menuitem').map((item) => item.querySelector('span > span')?.textContent ?? item.textContent);
 
 describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
-  it('shows exactly notes, highlights, the highlighter, the note tool, and behind «⋯» discussions, the find window and copy', () => {
+  it('shows exactly notes, highlights, the highlighter, the note tool, «Glosse», and behind «⋯» the find window and copy', () => {
     const { container } = show('beside');
     expect(labels(desktopRow(container))).toEqual([
       'Note', 'Evidenziazioni', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
-      'Strumento nota (nota personale)', 'Tipo di nota', 'Altre azioni sull’articolo',
+      'Strumento nota (nota personale)', 'Tipo di nota', 'Glosse', 'Altre azioni sull’articolo',
     ]);
-    expect(entries(openMore(desktopRow(container)))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
+    expect(entries(openMore(desktopRow(container)))).toEqual(['Cerca nel testo', 'Copia']);
   });
 
   it('«Cerca nel testo» opens the find window on that text, scoped to the window\'s practice', async () => {
@@ -135,7 +135,7 @@ describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
   it('a past text keeps the rules of describeVersion: discussions off', () => {
     const past: ArticleValidity = { state: 'historical', valid_from: '2003-12-25', valid_to: '2007-12-29', version_number: 3, act_updated: null, request_in_window: true };
     const { container } = show('beside', article({ validity: past, norma_data: { ...NORMA, data_versione: '2005-06-01', versione: 'originale' } }));
-    expect(within(openMore(desktopRow(container))).getByRole('menuitem', { name: /^Glosse sull’articolo/ })).toBeDisabled();
+    expect(within(desktopRow(container)).getByRole('button', { name: 'Glosse' })).toBeDisabled();
   });
 });
 

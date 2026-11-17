@@ -123,10 +123,11 @@ describe('ArticleTabContent passage discussions', () => {
     expect(screen.queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
     expect(container.querySelector('.vlx-sign[data-threads="1"]')).toBeNull();
 
-    // The glosse are an entry of the article's «⋯» (R3).
-    fireEvent.click(screen.getAllByRole('button', { name: 'Altre azioni sull’articolo' })[0]);
-    fireEvent.click(screen.getAllByRole('menuitem', { name: 'Glosse sull’articolo' })[0]);
-    const panel = await screen.findByRole('dialog', { name: 'Glosse sull’articolo' });
+    // «Glosse» is a button of its own before «⋯» (LC74); the margin is in the article, not a dialog over the page.
+    fireEvent.click(screen.getAllByRole('button', { name: /^Glosse( \d+)?$/ })[0]);
+    const panel = await screen.findByRole('region', { name: 'Glosse' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(container.contains(panel)).toBe(true);
     const panelError = await within(panel).findByRole('alert');
     expect(screen.getAllByRole('alert')).toHaveLength(1);
     expect(within(panel).queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
