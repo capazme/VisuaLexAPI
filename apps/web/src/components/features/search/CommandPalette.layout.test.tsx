@@ -657,13 +657,15 @@ describe('CommandPalette — the field and its line', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const box = screen.getByRole('combobox');
     expect(box).toHaveClass('focus-visible:ring-0', 'focus-visible:ring-offset-0');
-    expect(box.parentElement).toHaveClass('border', 'focus-within:ring-2');
+    // LC81: one edge, the pill's rule: 2 px only from the keyboard (`data-keyboard`), never the tinted ring of old.
+    expect(box.parentElement).toHaveClass('border', 'data-[keyboard]:has-[input:focus]:ring-1');
+    expect(box.parentElement!.className).not.toMatch(/focus-within/);
   });
 
   it('never draws a field under 16 px, so Safari on an iPhone does not zoom into it, with the text size «piccolo» too', async () => {
     asDesktop(false);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(screen.getByRole('combobox')).toHaveClass('text-[length:max(1.125rem,16px)]');
+    expect(screen.getByRole('combobox')).toHaveClass('text-[length:max(1rem,16px)]');
     await userEvent.setup().click(screen.getByRole('button', { name: /Filtri avanzati/ }));
     const years = screen.getAllByRole('spinbutton');
     expect(years.length).toBeGreaterThan(0);
