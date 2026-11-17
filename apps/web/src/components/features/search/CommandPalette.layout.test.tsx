@@ -296,6 +296,8 @@ describe('CommandPalette — the island (LC69)', () => {
     expect(again.keyframes[0]).toMatchObject({ top: '0px', right: '120px', bottom: '200px', left: '120px', borderRadius: '15px', opacity: '0.4' });
     expect(again.options).toMatchObject(ISLAND_OPEN);
     expect(runOn(contentOf()).keyframes[0]).toMatchObject({ clipPath: caught.clipPath });
+    // It takes the pointer again (the closing took it away).
+    expect(shapeOf().parentElement!.style.pointerEvents).toBe('');
     // Still hidden: the pill's way back was dropped with the closing.
     expect(runOn(pill).animation.cancel).toHaveBeenCalled();
     expect(pill.style.opacity).toBe('0');

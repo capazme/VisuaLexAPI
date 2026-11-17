@@ -270,6 +270,8 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
         started.current = true;
         const { was, shadow, full } = take();
         root.style.opacity = '';
+        // Back from a closing, which took the pointer away.
+        root.style.pointerEvents = '';
         const from = still ? null : insetOf(source, root.getBoundingClientRect());
         const timing = { ...ISLAND_OPEN, fill: 'backwards' as const };
         running.current = was
