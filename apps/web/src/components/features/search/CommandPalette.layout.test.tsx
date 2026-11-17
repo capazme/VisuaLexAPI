@@ -221,6 +221,27 @@ describe('CommandPalette — the island (LC69)', () => {
     expect(form.style.opacity).toBe('0');
   });
 
+  it('on a phone\'s search page, where no pill is, grows out of the page\'s field', async () => {
+    asDesktop(false);
+    recordAnimations();
+    const form = document.createElement('form');
+    form.id = SEARCH_FIELD_FORM_ID;
+    form.style.borderTopLeftRadius = '20px';
+    document.body.append(form);
+    const own = Element.prototype.getBoundingClientRect;
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this === form) return rect(52, 8, 322, 40);
+      if (this.parentElement?.getAttribute('aria-label') === 'Menu di ricerca') return rect(16, 8, 358, 600);
+      return own.call(this);
+    });
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
+    expect(runOn(shapeOf()).keyframes[0]).toMatchObject({ top: '0px', right: '0px', bottom: '560px', left: '36px', borderRadius: '20px' });
+    expect(form.style.opacity).toBe('0');
+  });
+
   it('closes back into the pill, keeps the box where it is (a computer), and shows the pill again only as the shape lands', async () => {
     asDesktop(true);
     recordAnimations();

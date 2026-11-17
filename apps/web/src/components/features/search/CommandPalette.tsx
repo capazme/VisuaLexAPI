@@ -801,6 +801,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       : document.getElementById(SEARCH_ISLAND_ID);
   const anchor = island?.isConnected ? island : field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
   const isIsland = anchor !== null && anchor === island;
+  // What the panel grows out of: what it hangs from, or on a phone's search page (no pill there, and the panel hangs
+  // at the top by itself) the page's field, under it (LC69).
+  const growSource = anchor ?? (isOpen && !isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null);
   // From the island the menu's own width, 768 px, the window allowing.
   const islandWidth = Math.min(768, (typeof window === 'undefined' ? 1024 : window.innerWidth) - 32);
   // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
@@ -1502,7 +1505,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           >
             {/* The panel grows out of the pill or the field it opens from (LC69, one way for both). As tall as its content,
                 up to `--palette-max-h`: the lists scroll inside it past that. */}
-            <IslandPanel still={still} source={anchor} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col">
+            <IslandPanel still={still} source={growSource} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col">
               {content}
             </IslandPanel>
           </div>

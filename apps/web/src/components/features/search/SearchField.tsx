@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { FIELD_TEXT } from '../../../constants/interactions';
 import { useAppStore } from '../../../store/useAppStore';
-import { ISLAND_SURFACE, PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
+import { ISLAND_FOCUS, ISLAND_SURFACE, ISLAND_TARGET, PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
 /**
@@ -99,11 +99,12 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
             // The field's type size (`FIELD_TEXT`, 16 px at least on a phone, «piccolo» included), as the box it opens.
             compact
               ? cn('relative flex h-8 w-full min-w-0 items-center rounded-full pl-9 pr-2 text-left text-[13px]', ISLAND_SURFACE)
-              : cn('relative flex h-11 w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-left shadow-sm dark:border-slate-700 dark:bg-slate-900', FIELD_TEXT),
-            'cursor-text hover:border-slate-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:hover:border-slate-600',
+              // LC69: the pill of the bar, 40 px drawn (the menu button's line) and 44 px to the finger.
+              : cn('relative flex h-10 w-full min-w-0 items-center rounded-full pl-9 pr-3 text-left', ISLAND_SURFACE, ISLAND_TARGET, FIELD_TEXT),
+            'cursor-text', ISLAND_FOCUS,
           )}
         >
-          <Search size={compact ? 15 : 18} aria-hidden className="pointer-events-none absolute left-3 text-slate-400" />
+          <Search size={compact ? 15 : 16} aria-hidden className="pointer-events-none absolute left-3 text-slate-400" />
           <span className={cn('min-w-0 flex-1 truncate', value ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400')}>{value || placeholder}</span>
           {/* ⌘K (Ctrl K) opens it from anywhere on the page; said where a keyboard is likely: never on a phone, nor on a
               touch screen wider than md (M1), which has no such shortcut. */}

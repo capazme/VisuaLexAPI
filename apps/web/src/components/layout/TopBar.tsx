@@ -4,7 +4,7 @@ import { ChevronRight, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { FOCUS_RING } from '../../constants/interactions';
 import { pageName } from '../../features/sections/pageNames';
-import { PALETTE_SHORTCUT, SEARCH_ISLAND_ID, ISLAND_SURFACE } from '../../utils/searchFieldControl';
+import { PALETTE_SHORTCUT, SEARCH_ISLAND_ID, ISLAND_FOCUS, ISLAND_SURFACE } from '../../utils/searchFieldControl';
 import type { Section } from '../../features/sections/sections';
 
 /**
@@ -90,8 +90,8 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         aria-keyshortcuts="Meta+K Control+K"
         className={cn(
           'flex h-8 w-[22rem] items-center gap-2 rounded-full pl-3 pr-2 text-[13px] text-slate-600 transition-colors', ISLAND_SURFACE,
-          'hover:border-slate-300 dark:text-slate-400 dark:hover:border-slate-600',
-          FOCUS_RING,
+          'dark:text-slate-400',
+          ISLAND_FOCUS,
         )}
       >
         <Search aria-hidden size={15} strokeWidth={1.75} className="shrink-0" />

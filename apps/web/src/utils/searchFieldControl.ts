@@ -31,6 +31,13 @@ export const SEARCH_FIELD_FORM_ID = 'search-field-form';
 export const SEARCH_ISLAND_ID = 'search-island';
 /** The island's one surface (LC69), Pietra's card: the pill and the panel it grows into wear the same ground and edge. */
 export const ISLAND_SURFACE = 'border border-border bg-card';
+/**
+ * The pill's hover and focus (LC69, Luca: «è grossa la barra, va resa più elegante»): the one edge darkens, never a
+ * ring around it (the field's ring, the bar's and the base rule's offset ring, `index.css`, drew a second, thick outline).
+ */
+export const ISLAND_FOCUS = 'hover:border-foreground/30 focus:outline-none focus-visible:border-foreground focus-visible:ring-0 focus-visible:ring-offset-0';
+/** A pill thinner than a finger: its target reaches 44 px above and below it, past its drawn edge. */
+export const ISLAND_TARGET = "after:absolute after:inset-x-0 after:-inset-y-1 after:content-['']";
 
 let listener: Listener | null = null;
 let pending: { request: SearchFieldRequest; at: number } | null = null;
