@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ReadingToolbar, type ReadingToolbarProps } from './ReadingToolbar';
+import { StatusLineEnd } from './statusLineEnd';
 import { NOT_YET_REASON, READ_ONLY_REASON, UNRELIABLE_REASON } from '../../../utils/versionDisplay';
 import { appStore } from '../../../store/useAppStore';
 
@@ -540,5 +542,44 @@ describe('ReadingToolbar — the tabs\' ground under the pointer (LC72)', () => 
         } finally {
             appStore.setState({ readingTool: null });
         }
+    });
+});
+
+describe('ReadingToolbar — the selector on the status line (LC70)', () => {
+    const CURRENT = { tone: 'current' as const, label: 'In vigore dal 10 novembre 1944', title: '' };
+    const bar = (end: ReactNode) => render(
+        <StatusLineEnd.Provider value={end}>
+            <ReadingToolbar {...baseProps()} versionChip={CURRENT} />
+        </StatusLineEnd.Provider>,
+    );
+    function baseProps(): ReadingToolbarProps {
+        return {
+            normaData: { tipo_atto: 'codice civile', data: '1942-03-16', numero_articolo: '1' },
+            versionChip: null, articleText: 'testo', isNotesPeekOpen: false, notesCount: 0, isHighlightsPeekOpen: false,
+            highlightsCount: 0, isDiscussionOpen: false, isPinnedQuick: false, onToggleNotes: vi.fn(),
+            onToggleHighlightsPeek: vi.fn(), onToggleDiscussion: vi.fn(), onToggleQuickNorm: vi.fn(), onMobileCopy: vi.fn(),
+            onOpenStudyMode: vi.fn(), onOpenCopyModal: vi.fn(), onOpenDossier: vi.fn(), onShareLink: vi.fn(),
+            onOpenAdvancedExport: vi.fn(), onOpenVersionInput: vi.fn(), onCompare: vi.fn(),
+        };
+    }
+
+    it('the status, then the selector, on one line; the one rule under it; the tools after', () => {
+        const { container } = bar(<button type="button">Art. 1</button>);
+        const line = container.querySelector<HTMLElement>('[data-status-line]')!;
+        const status = within(line).getByRole('button', { name: CURRENT.label });
+        const selector = within(line).getByRole('button', { name: 'Art. 1' });
+        expect(status.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(line).toHaveClass('border-b');
+        expect(line.parentElement).not.toHaveClass('border-b');
+        expect(container.querySelectorAll('.border-b')).toHaveLength(1);
+        // The tools come after the line, not on it.
+        expect(within(line).queryByRole('button', { name: 'Altre azioni sull’articolo' })).toBeNull();
+        expect(line.compareDocumentPosition(desktopRow(container)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('without a selector the bar keeps its own rule and no status line', () => {
+        const { container } = bar(null);
+        expect(container.querySelector('[data-status-line]')).toBeNull();
+        expect(container.firstElementChild).toHaveClass('border-b');
     });
 });
