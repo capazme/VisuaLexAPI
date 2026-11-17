@@ -7,9 +7,9 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 
 /** What each scope lets an application do, as the consent page says it. */
 export const SCOPE_LABELS: Record<string, string> = {
-  'dossier:read': 'Leggere le tue pratiche: i nomi e le norme che contengono',
+  'dossier:read': 'Leggere le tue pratiche: i nomi, le norme che contengono, le istruzioni che scrivi per l’IA e i nomi dei file degli atti',
   'dossier:write':
-    'Creare pratiche, aggiungervi norme e note e glossarne i passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
+    'Creare pratiche, aggiungervi norme, note e atti (anche come versioni nuove: l’originale resta) e glossarne i passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
   'dossier:text':
     'Leggere il testo delle norme e delle sentenze delle tue pratiche, per citarlo alla lettera, le tue note e il testo dei loro atti, con i dati personali che contengono: il testo arriva al fornitore dell’applicazione collegata',
   'lingo:cards:read': 'Leggere le tue schede di studio',

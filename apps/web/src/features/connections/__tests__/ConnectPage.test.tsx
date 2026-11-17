@@ -17,7 +17,7 @@ const REQUEST = {
   id: 'req-1',
   client: { name: 'Claude Code', redirectHost: '127.0.0.1', registeredAutomatically: true },
   scopes: [
-    { scope: 'dossier:read', label: 'Leggere le tue pratiche: i nomi e le norme che contengono' },
+    { scope: 'dossier:read', label: 'Leggere le tue pratiche: i nomi, le norme che contengono, le istruzioni che scrivi per l’IA e i nomi dei file degli atti' },
     { scope: 'dossier:write', label: 'Creare dossier e aggiungervi norme (non può modificare né cancellare nulla)' },
   ],
   deletion: { label: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)' },
