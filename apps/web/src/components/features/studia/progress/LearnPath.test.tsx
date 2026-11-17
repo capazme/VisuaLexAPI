@@ -215,4 +215,10 @@ describe('LearnPath', () => {
       `Lezione breve di Diritto penale, chiusa: servono almeno ${LESSON_MIN_CARDS} schede (ne hai 2)`,
     );
   });
+
+  it('lets the keyboard reach the closed lesson, which says why it is closed', () => {
+    renderPath(ready([tappa('DIRITTO_PENALE', 'Furto', 1, { nuove: 1 })]));
+    const closed = within(unit('Diritto penale')).getByRole('group', { name: /^Lezione breve di Diritto penale, chiusa/ });
+    expect(closed).toHaveAttribute('tabindex', '0');
+  });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -158,5 +158,64 @@ describe('LessonSession', () => {
     renderLesson('DIRITTO_ROMANO');
     expect(await screen.findByText('Materia non riconosciuta.')).toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
+  });
+
+  describe('closing', () => {
+    const close = () => screen.getByRole('button', { name: 'Chiudi la lezione' });
+    const firstRight = async (user: ReturnType<typeof userEvent.setup>) => {
+      await screen.findByText('Che cos’è la mora?');
+      await user.click(screen.getByRole('button', { name: 'Il ritardo' }));
+      await screen.findByRole('status');
+    };
+
+    it('leaves at once before the first answer', async () => {
+      create.mockResolvedValue(LESSON);
+      const user = userEvent.setup();
+      renderLesson();
+      await screen.findByText('Che cos’è la mora?');
+      await user.click(close());
+      expect(screen.getByText('Oggi')).toBeInTheDocument();
+    });
+
+    it('asks first once an answer is given: «Continua la lezione» stays, «Interrompi» leaves', async () => {
+      create.mockResolvedValue(LESSON);
+      answer.mockResolvedValueOnce(graded(0, true, 0));
+      const user = userEvent.setup();
+      renderLesson();
+      await firstRight(user);
+      await user.click(close());
+      const dialog = screen.getByRole('alertdialog', { name: 'Interrompere la lezione?' });
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Continua la lezione' })).toHaveFocus());
+      await user.click(within(dialog).getByRole('button', { name: 'Continua la lezione' }));
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+      expect(screen.getByText('Che cos’è la mora?')).toBeInTheDocument();
+      await user.click(close());
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Interrompi' }));
+      expect(screen.getByText('Oggi')).toBeInTheDocument();
+    });
+
+    it('asks on Esc too, and an Esc in the question only closes the question', async () => {
+      create.mockResolvedValue(LESSON);
+      answer.mockResolvedValueOnce(graded(0, true, 0));
+      const user = userEvent.setup();
+      renderLesson();
+      await firstRight(user);
+      await user.keyboard('{Escape}');
+      expect(screen.getByRole('alertdialog', { name: 'Interrompere la lezione?' })).toBeInTheDocument();
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+      expect(screen.getByText('Che cos’è la mora?')).toBeInTheDocument();
+    });
+
+    it('leaves at once from the end', async () => {
+      create.mockResolvedValue({ ...LESSON, esercizi: LESSON.esercizi.slice(0, 1) });
+      answer.mockResolvedValueOnce(graded(0, true, 0, { giuste: 1, totale: 1, xp: xp(10) }));
+      const user = userEvent.setup();
+      renderLesson();
+      await firstRight(user);
+      await user.click(screen.getByRole('button', { name: 'Continua' }));
+      await user.click(close());
+      expect(screen.getByText('Oggi')).toBeInTheDocument();
+    });
   });
 });

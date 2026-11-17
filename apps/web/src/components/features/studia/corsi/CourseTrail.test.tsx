@@ -57,7 +57,8 @@ describe('CourseTrail', () => {
     expect(within(unit).getByRole('link', { name: /^Ripasso del percorso: 4 schede da ripassare/ })).toHaveAttribute('href', '/learn/ripasso/sessione?corso=corso-1');
     // The exam is closed while the server says so: no link.
     expect(within(unit).queryByRole('link', { name: /Esame/ })).toBeNull();
-    expect(within(unit).getByRole('group', { name: 'Esame del percorso, chiuso: prima i moduli che contano' })).toBeInTheDocument();
+    // Closed, yet reachable with Tab, so the keyboard hears why.
+    expect(within(unit).getByRole('group', { name: 'Esame del percorso, chiuso: prima i moduli che contano' })).toHaveAttribute('tabindex', '0');
   });
 
   it('opens the exam when the server does, and leaves out a withdrawn module', async () => {

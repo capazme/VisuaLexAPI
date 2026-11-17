@@ -466,6 +466,7 @@ async function settleLessonMission(
   if (event.tipo !== 'lezione') return dayTotal;
   const lesson = await tx.lingoLezione.findFirst({ where: { id: event.lezioneId, utenteId: userId, finitaIl: { not: null } }, select: { id: true, materia: true } });
   if (!lesson) return dayTotal;
+  // Race-safe: `settleMissions` holds the user's XP lock to commit, so two lessons ending together count in turn.
   if ((await tx.lingoCreditoXp.count({ where: { utenteId: userId, missione: 'LEZIONE', giorno: dayToDate(today) } })) >= LESSON_MISSION.alGiorno) return dayTotal;
   if (dayTotal + LESSON_MISSION.punti > XP_DAILY_CEILING) {
     console.warn('[xp] daily ceiling reached: «lezione» not credited');

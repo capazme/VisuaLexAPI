@@ -3,7 +3,7 @@ import type { LingoMateria } from '@prisma/client';
 import { delegated } from './delegatedHelper';
 import { app, createTestUser, credits, prisma, request, session, setClock, type Headers, type TestUser } from './xpHelpers';
 import { LESSONS_PER_DAY, LESSON_MIN_CARDS } from '../src/lingo/lessons';
-import { LESSON_MISSION } from '../src/lingo/missions';
+import { LESSON_MISSION, settleMissions } from '../src/lingo/missions';
 
 // LC63, the short lesson: 5–8 exercises built by the server from the cards of the review scope, graded by the server,
 // and 10 XP for a finished lesson, three a Rome day, settled by `settleMissions` and never sent by the browser.
@@ -192,6 +192,37 @@ describe('POST /api/lingo/lezioni/:id/risposte', () => {
     }
     const { id } = (await create(a)).body;
     expect((await finish(a, id)).body.fine.xp.crediti).toEqual([]);
+    expect(await credits(alice)).toHaveLength(LESSON_MISSION.alGiorno);
+  });
+
+  it(`credits at most ${LESSON_MISSION.alGiorno} lessons a Rome day when two lessons end at the same moment`, async () => {
+    await richCards(alice, 6);
+    for (let i = 0; i < LESSON_MISSION.alGiorno - 1; i++) await finish(a, (await create(a)).body.id);
+    const [first, second] = [(await create(a)).body.id as string, (await create(a)).body.id as string];
+    await prisma.lingoLezione.updateMany({ where: { id: { in: [first, second] } }, data: { finitaIl: new Date() } });
+    const end = (lezioneId: string) => ({ tipo: 'lezione' as const, lezioneId, materia: 'DIRITTO_CIVILE' as const });
+    // The first lesson's transaction settles and stays open; the second settles meanwhile. Only once the second has
+    // finished or is waiting on the XP lock does the first commit: without the lock both would count two and credit.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let settledFirst!: () => void;
+    const firstSettled = new Promise<void>((resolve) => (settledFirst = resolve));
+    const one = prisma.$transaction(async (tx) => {
+      const esito = await settleMissions(tx, alice.id, TODAY, end(first));
+      settledFirst();
+      await held;
+      return esito;
+    });
+    await firstSettled;
+    let secondDone = false;
+    const two = prisma.$transaction((tx) => settleMissions(tx, alice.id, TODAY, end(second))).finally(() => (secondDone = true));
+    for (let waiting = 0; !secondDone && waiting === 0; ) {
+      [{ waiting }] = await prisma.$queryRaw<{ waiting: number }[]>`SELECT count(*)::int AS waiting FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`;
+    }
+    release();
+    const [a1, a2] = await Promise.all([one, two]);
+    expect(a1.crediti).toEqual([{ missione: 'lezione', punti: LESSON_MISSION.punti }]);
+    expect(a2.crediti).toEqual([]);
     expect(await credits(alice)).toHaveLength(LESSON_MISSION.alGiorno);
   });
 
