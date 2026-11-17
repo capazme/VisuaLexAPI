@@ -106,6 +106,15 @@ describe('PracticeActBlock: the heading (spec §3.2)', () => {
     expect(h.onViewPdf).toHaveBeenCalledWith(CC_RD.urn);
   });
 
+  it("Studio, Struttura, PDF and «⋯» take the tabs' ground under the pointer (LC72)", () => {
+    const { practiceId, actId } = setUp(CC_RD, [article(CC_RD, '2043')]);
+    const { container } = render(<Block practiceId={practiceId} actId={actId} />);
+    const head = within(container.querySelector('header')!);
+    for (const name of ['Modalità studio', 'Struttura della norma', 'Esporta PDF della norma', /^Azioni su/]) {
+      expect(head.getByRole('button', { name })).toHaveClass('vlx-hover-tile');
+    }
+  });
+
   describe('the heading\'s height, for a reading toolbar to pin under it', () => {
     const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
     beforeEach(() => {

@@ -159,10 +159,10 @@ export function ArticleNavigation({
         onClick={handlePrev}
         disabled={isFirst || isLoading}
         className={cn(
-          "flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
+          "vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
           isFirst || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
         )}
         title={prevLabel}
         aria-label={prevLabel}
@@ -194,7 +194,7 @@ export function ArticleNavigation({
           type="button"
           onClick={startEditing}
           aria-label={activeArticleId ? `Art. ${activeArticleId}, scrivi un altro numero` : 'Scrivi il numero di un articolo'}
-          className="flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 text-sm font-medium tabular-nums text-slate-900 transition-colors hover:bg-slate-100 md:min-h-0 md:py-0.5 dark:text-white dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+          className="vlx-hover-tile flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 text-sm font-medium tabular-nums text-slate-900 md:min-h-0 md:py-0.5 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
         >
           Art. {activeArticleId ?? '…'}
         </button>
@@ -205,10 +205,10 @@ export function ArticleNavigation({
         onClick={handleNext}
         disabled={isLast || isLoading}
         className={cn(
-          "flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
+          "vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
           isLast || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
         )}
         title={nextLabel}
         aria-label={nextLabel}
