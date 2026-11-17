@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { Prisma, type LingoCorsoTipoDomanda } from '@prisma/client';
+import { Prisma, type LingoCorsoObiettivo, type LingoCorsoTipoDomanda } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { citeStoredItem } from '../norms/decisionCitation';
 import { rebuildDecisionEntry } from '../schemas/decisionItem';
-import { LIMITS, type CourseCreateInput, type ExamCreateInput, type ModuleCreateInput } from '../schemas/lingo/corso';
+import { LIMITS, type CourseCreateInput, type CoursePatch, type ExamCreateInput, type ModuleCreateInput } from '../schemas/lingo/corso';
 import { rebuildNormEntry } from '../schemas/normEntry';
 import { checkLessonText } from './courseFormat';
 import { masteryFor } from './courseProgress';
-import { addDays, romeDay } from './studyDay';
-import { dateToDay } from './studyDays';
+import { addDays, daysBetween, romeDay } from './studyDay';
+import { dateToDay, dayToDate } from './studyDays';
 import { currentText, hasAccepted, serializeText } from './texts';
 
 /**
@@ -46,6 +46,20 @@ export async function ownEnrolment(tx: Tx, userId: string, corsoId: string) {
   if (!enrolment) throw new AppError(404, NOT_FOUND);
   return enrolment;
 }
+
+/**
+ * The learner's goal and exam date as every answer carries them (G-488): `obiettivo` null when none, its sentence
+ * null when none; `dataEsame` a Rome day, kept once it passes.
+ */
+export function goalView(enrolment: { obiettivo: LingoCorsoObiettivo | null; obiettivoNota: string | null; dataEsame: Date | null }) {
+  return {
+    obiettivo: enrolment.obiettivo ? { tipo: enrolment.obiettivo, nota: enrolment.obiettivoNota } : null,
+    dataEsame: enrolment.dataEsame && dateToDay(enrolment.dataEsame),
+  };
+}
+
+/** The farthest an exam date may be set, in days from today: five years. */
+export const EXAM_DATE_MAX_DAYS = 5 * 366;
 
 interface ModuleLike {
   id: string;
@@ -615,6 +629,9 @@ export function exportCourse(read: ReadCourse) {
       id: enrolment.id,
       dossierId: enrolment.dossierId,
       superatoIl: enrolment.superatoIl && dateToDay(enrolment.superatoIl),
+      obiettivo: enrolment.obiettivo,
+      obiettivoNota: enrolment.obiettivoNota,
+      dataEsame: enrolment.dataEsame && dateToDay(enrolment.dataEsame),
       createdAt: enrolment.createdAt,
       stati: enrolment.stati.map(({ iscrizioneId: _e, fattoGiorno, ...s }) => ({ ...s, fattoGiorno: fattoGiorno && dateToDay(fattoGiorno) })),
       esiti: enrolment.esiti.map(({ iscrizioneId: _e, giorno, ...e }) => ({ ...e, giorno: dateToDay(giorno) })),
@@ -696,7 +713,7 @@ export async function listCourses(userId: string, today = romeDay(new Date())) {
   const enrolments = await prisma.lingoCorsoIscrizione.findMany({
     where: { utenteId: userId, corsoId: { in: courses.map((c) => c.id) } },
     select: {
-      id: true, corsoId: true, superatoIl: true,
+      id: true, corsoId: true, superatoIl: true, obiettivo: true, obiettivoNota: true, dataEsame: true,
       stati: { select: { moduloId: true, fattoGiorno: true, ritiratoIl: true } },
       tentativi: { select: { esameId: true, consegnatoIl: true } },
     },
@@ -720,6 +737,7 @@ export async function listCourses(userId: string, today = romeDay(new Date())) {
         },
         moduli: { contati: counting, previsti: corso.moduliPrevisti },
         prossimo,
+        ...goalView(enrolment),
         createdAt: corso.createdAt,
       },
     ];
@@ -730,26 +748,44 @@ export async function listCourses(userId: string, today = romeDay(new Date())) {
 
 /**
  * `PATCH /:id` (§10.5): rename, and «Il programma finisce qui», which lowers `moduliPrevisti` — never raises it,
- * never under the counting modules or 1. The user's own acts, in the web: not in the delegated table.
+ * never under the counting modules or 1; and the learner's goal and exam date, on their own enrolment (G-488): a
+ * date from today to five years on, null to clear. The user's own acts, in the web: not in the delegated table.
  */
-export async function patchCourse(userId: string, corsoId: string, body: { titolo?: string; moduliPrevisti?: number }) {
+export async function patchCourse(userId: string, corsoId: string, body: CoursePatch, today = romeDay(new Date())) {
+  if (body.dataEsame) {
+    const days = daysBetween(today, body.dataEsame);
+    if (days < 0) throw new AppError(400, 'La data dell’esame è già passata.');
+    if (days > EXAM_DATE_MAX_DAYS) throw new AppError(400, 'La data dell’esame è troppo lontana: al massimo fra cinque anni.');
+  }
   return prisma.$transaction(async (tx) => {
     if (!(await lockCourse(tx, userId, corsoId, 'UPDATE'))) throw new AppError(404, NOT_FOUND);
     const corso = await tx.lingoCorso.findUniqueOrThrow({ where: { id: corsoId } });
+    let enrolment = await ownEnrolment(tx, userId, corsoId);
     if (body.moduliPrevisti !== undefined && body.moduliPrevisti !== corso.moduliPrevisti) {
       if (body.moduliPrevisti > corso.moduliPrevisti) throw new AppError(400, 'Il programma si può solo accorciare: i moduli in più li aggiunge l’assistente.');
-      const enrolment = await ownEnrolment(tx, userId, corsoId);
       const modules = await tx.lingoCorsoModulo.findMany({ where: { corsoId }, select: { id: true, sostituisceId: true } });
       const counting = countingModules(modules, await withdrawnModules(tx, enrolment.id)).length;
       if (body.moduliPrevisti < Math.max(1, counting)) {
         throw new AppError(400, `Il programma non può finire prima dei moduli che ha già: ${counting}.`);
       }
     }
-    const updated = await tx.lingoCorso.update({
-      where: { id: corsoId },
-      data: { ...(body.titolo !== undefined ? { titolo: body.titolo } : {}), ...(body.moduliPrevisti !== undefined ? { moduliPrevisti: body.moduliPrevisti } : {}) },
-    });
-    return { id: updated.id, titolo: updated.titolo, moduliPrevisti: updated.moduliPrevisti };
+    // The course only when its own fields change: a goal alone leaves its `updatedAt`.
+    const updated = body.titolo !== undefined || body.moduliPrevisti !== undefined
+      ? await tx.lingoCorso.update({
+          where: { id: corsoId },
+          data: { ...(body.titolo !== undefined ? { titolo: body.titolo } : {}), ...(body.moduliPrevisti !== undefined ? { moduliPrevisti: body.moduliPrevisti } : {}) },
+        })
+      : corso;
+    if (body.obiettivo !== undefined || body.dataEsame !== undefined) {
+      enrolment = await tx.lingoCorsoIscrizione.update({
+        where: { id: enrolment.id },
+        data: {
+          ...(body.obiettivo !== undefined ? { obiettivo: body.obiettivo?.tipo ?? null, obiettivoNota: body.obiettivo?.nota ?? null } : {}),
+          ...(body.dataEsame !== undefined ? { dataEsame: body.dataEsame && dayToDate(body.dataEsame) } : {}),
+        },
+      });
+    }
+    return { id: updated.id, titolo: updated.titolo, moduliPrevisti: updated.moduliPrevisti, ...goalView(enrolment) };
   });
 }
 
