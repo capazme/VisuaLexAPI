@@ -42,10 +42,14 @@ export function describeUnexpectedError(err: unknown, req?: Pick<Request, 'metho
     if (named.length) parts.push(`fields ${named.join(',')}`);
   }
 
-  // V8 writes `${name}: ${message}` first, then one line per frame: keep only the frames.
-  const stack = err.stack ?? '';
+  // V8 writes `${name}: ${message}` first, then one line per frame: keep only the frames. A stack that does not start
+  // with that header (rewritten by a library, or a message changed after the stack was read) cannot be told apart from
+  // its message, so none of it is written.
+  const stack = typeof err.stack === 'string' ? err.stack : '';
   const header = String(err);
-  const frames = (stack.startsWith(header) ? stack.slice(header.length) : stack)
+  if (!stack.startsWith(header)) return `${parts.join(', ')}${where} (stack omitted)`;
+  const frames = stack
+    .slice(header.length)
     .split('\n')
     .filter((line) => /^\s+at /.test(line))
     .slice(0, 10)

@@ -59,6 +59,21 @@ describe('the log of an unexpected error', () => {
     expect(logged).toContain('POST /api/atti/123');
   });
 
+  it('cuts a message that spans lines, even one that looks like a stack frame', () => {
+    const { logged } = handle(new Error(`Salvataggio fallito\n    at Mario Rossi (studio legale)\n${CLIENT_TEXT}`));
+    expect(logged).not.toContain('Mario Rossi');
+    expect(logged).toMatch(/\bat /);
+  });
+
+  it('writes no stack it cannot tell apart from the message (a stack read before the message changed)', () => {
+    const err = new Error('x');
+    void err.stack;
+    err.message = `contesto\n    at Mario Rossi (studio legale)`;
+    const { logged } = handle(err);
+    expect(logged).not.toContain('Mario Rossi');
+    expect(logged).toContain('stack omitted');
+  });
+
   it('says what was thrown when it is not an Error', () => {
     const { logged, res } = handle(CLIENT_TEXT);
     expect(logged).not.toContain('Mario Rossi');
