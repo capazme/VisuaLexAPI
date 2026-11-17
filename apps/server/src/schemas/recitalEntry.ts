@@ -22,7 +22,7 @@ export type RecitalEntryCheck =
   | { ok: false; reason: string };
 
 const FIELDS = ['tipo_atto', 'numero_atto', 'data', 'considerando', '_dossierMeta'] as const;
-const NUMERO_ATTO = /^[0-9]{1,6}$/;
+const NUMERO_ATTO = /^[1-9][0-9]{0,5}$/;
 const DATA = /^[0-9]{4}(?:-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01]))?$/;
 const CONSIDERANDO = /^[1-9][0-9]{0,3}$/;
 
@@ -33,18 +33,26 @@ const isObject = (raw: unknown): raw is Record<string, unknown> =>
 const shown = (value: string): string => `«${value.length > 40 ? `${value.slice(0, 40)}…` : value}»`;
 const absent = (value: unknown): boolean => value === undefined || value === null || value === '';
 
-/** Whether a stored or sent content is a recital's: an object with an own key `considerando`. */
+const hasOwn = (raw: Record<string, unknown>, key: string): boolean => Object.prototype.hasOwnProperty.call(raw, key);
+
+/**
+ * Whether a stored or sent content is a recital's: an object with an own key `considerando`, or a
+ * Forum entry's `articleRef` wrapper holding one (the web and `normaOfContent` read inside it), which
+ * the check then refuses: a recital is never stored wrapped.
+ */
 export function isRecitalContent(raw: unknown): boolean {
-  return isObject(raw) && Object.prototype.hasOwnProperty.call(raw, 'considerando');
+  if (!isObject(raw)) return false;
+  return hasOwn(raw, 'considerando') || (isObject(raw.articleRef) && hasOwn(raw.articleRef, 'considerando'));
 }
 
 /** The recital a content names, rebuilt from its closed fields, or the Italian reason it is refused. */
 export function rebuildRecitalEntry(raw: unknown): RecitalEntryCheck {
   if (!isObject(raw)) return { ok: false, reason: 'Considerando non leggibile' };
-  const extra = Object.keys(raw).find((key) => !(FIELDS as readonly string[]).includes(key));
-  if (extra === 'numero_articolo') {
+  // The article's number first, wherever it sits among the keys: an entry is an article or a recital.
+  if (hasOwn(raw, 'numero_articolo')) {
     return { ok: false, reason: 'Campo «numero_articolo» non ammesso in un considerando: una voce è un articolo o un considerando' };
   }
+  const extra = Object.keys(raw).find((key) => !(FIELDS as readonly string[]).includes(key));
   if (extra !== undefined) return { ok: false, reason: `Campo «${extra}» non ammesso in un considerando` };
   const mistyped = (['tipo_atto', 'numero_atto', 'data', 'considerando'] as const).find(
     (field) => !absent(raw[field]) && typeof raw[field] !== 'string',

@@ -113,6 +113,16 @@ describe('omnilex_leggi_testo_voce', () => {
     await client.close();
   });
 
+  it('passes on the server’s refusal when glossing a recital (spec 2026-11-17 §6.4)', async () => {
+    const said = 'Il testo di un considerando non si legge ancora da qui: aprilo nel lettore di LexCraft.';
+    env.stub.apiOverride = (method, path) => (method === 'POST' && path === '/dossiers/d1/items/i1/glosses' ? [400, { detail: said }] : undefined);
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_glossa_voce', arguments: { dossier: 'd1', voce: 'i1', glosse: ONE } });
+    expect(result.isError).toBe(true);
+    expect((result.content as { text: string }[])[0].text).toContain(said);
+    await client.close();
+  });
+
   it('asks a connection made before the texts existed to sign in again for them', async () => {
     for (const name of ['omnilex_leggi_testo_voce', 'omnilex_glossa_voce']) {
       // The scope is checked before the tools, listed or not.

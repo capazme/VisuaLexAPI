@@ -27,6 +27,8 @@ describe('isRecitalContent: the key decides', () => {
   it('is a recital whatever the value', () => {
     expect(isRecitalContent({ considerando: null })).toBe(true);
     expect(isRecitalContent({ considerando: '', _dossierMeta: { important: true } })).toBe(true);
+    // A Forum entry's wrapper holding one: read as a recital, then refused (never stored wrapped).
+    expect(isRecitalContent({ articleRef: { considerando: '26' } })).toBe(true);
   });
   it('is an article without the key', () => {
     expect(isRecitalContent({ tipo_atto: 'regolamento ue', numero_articolo: '5' })).toBe(false);

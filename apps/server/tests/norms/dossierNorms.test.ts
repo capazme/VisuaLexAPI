@@ -376,6 +376,13 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(await prisma.dossierItem.count()).toBe(0);
   });
 
+  it('never takes a recital already in the dossier for an article (a pin: a recital has no urn)', async () => {
+    await prisma.dossierItem.create({ data: { dossierId, itemType: 'norm', title: 'considerando 5, reg. (UE) 2016/679', position: 0,
+      content: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '5' } } });
+    const response = await addNorms(alice, dossierId, ['art. 5 gdpr']);
+    expect(response.body.results[0].outcome).toBe('added');
+  });
+
   it('adds the same article once, in a call and across calls', async () => {
     const first = await addNorms(alice, dossierId, ['art. 2043 c.c.', 'art. 2043 c.c.']);
     expect(first.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'already_present']);

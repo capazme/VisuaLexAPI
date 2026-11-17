@@ -62,6 +62,16 @@ describe('a recital as a dossier entry (spec 2026-11-17 §6.2)', () => {
     expect((await prisma.dossierItem.findUniqueOrThrow({ where: { id: article } })).content).toEqual(ARTICLE);
   });
 
+  it('refuses a recital wrapped in articleRef, on a create and on an article\'s PUT (review of PR 3)', async () => {
+    const wrapped = { articleRef: RECITAL };
+    const created = await add({ itemType: 'norm', title: 'art. 5, reg. (UE) 2016/679', content: wrapped });
+    expect(created.status).toBe(400);
+    expect(JSON.stringify(created.body)).toMatch(/Campo «articleRef» non ammesso in un considerando/);
+    const article = (await add({ itemType: 'norm', title: 'regolamento ue', content: ARTICLE })).body.id;
+    expect((await put(article, { content: wrapped })).status).toBe(400);
+    expect((await prisma.dossierItem.findUniqueOrThrow({ where: { id: article } })).content).toEqual(ARTICLE);
+  });
+
   it('stores an article and titles it as before (a pin)', async () => {
     const res = await add({ itemType: 'norm', title: 'regolamento ue', content: ARTICLE });
     expect(res.status).toBe(201);

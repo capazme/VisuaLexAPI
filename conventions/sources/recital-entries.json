@@ -139,6 +139,84 @@
       "reason": "Campo «testo» non ammesso in un considerando"
     },
     {
+      "id": "an-article-after-another-key",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "allegato": "I",
+        "numero_articolo": "5"
+      },
+      "reason": "Campo «numero_articolo» non ammesso in un considerando: una voce è un articolo o un considerando"
+    },
+    {
+      "id": "a-part",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "parte": "1-2"
+      },
+      "reason": "Campo «parte» non ammesso in un considerando"
+    },
+    {
+      "id": "a-version-date",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "data_versione": "2020-01-01"
+      },
+      "reason": "Campo «data_versione» non ammesso in un considerando"
+    },
+    {
+      "id": "a-real-act-type",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "tipo_atto_reale": "regolamento ue"
+      },
+      "reason": "Campo «tipo_atto_reale» non ammesso in un considerando"
+    },
+    {
+      "id": "an-urn",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "urn": "https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita"
+      },
+      "reason": "Campo «urn» non ammesso in un considerando"
+    },
+    {
+      "id": "a-forum-wrapper",
+      "input": {
+        "articleRef": {
+          "tipo_atto": "regolamento ue",
+          "numero_atto": "679",
+          "data": "2016",
+          "considerando": "26"
+        }
+      },
+      "reason": "Campo «articleRef» non ammesso in un considerando"
+    },
+    {
+      "id": "act-number-leading-zero",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "0679",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "reason": "Numero dell'atto non valido («0679»)"
+    },
+    {
       "id": "an-italian-act",
       "input": {
         "tipo_atto": "legge",

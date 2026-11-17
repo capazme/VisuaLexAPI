@@ -36,6 +36,12 @@ describe('published content: environments, the study import, the recovery, «Agg
     expect((content.dossiers[0] as { items: unknown[] }).items[0]).toMatchObject({ type: 'norma', data: RECITAL });
   });
 
+  it('counts a malformed recital among the refused rows of a read, never stores it as an article', () => {
+    const { content, refused } = readableContent({ dossiers: [{ title: 'GDPR', items: [{ id: 'r1', type: 'norma', data: { ...RECITAL, considerando: '026' } }] }] });
+    expect(refused).toBe(1);
+    expect((content.dossiers[0] as { items: unknown[] }).items).toEqual([]);
+  });
+
   it('refuses one with an article beside it, in words', () => {
     expect(rebuildEntry({ id: 'r1', type: 'norma', data: { ...RECITAL, numero_articolo: '5' } })).toMatchObject({
       ok: false, reason: expect.stringMatching(/una voce è un articolo o un considerando/),
