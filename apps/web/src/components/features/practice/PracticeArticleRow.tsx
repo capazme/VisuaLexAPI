@@ -95,6 +95,8 @@ export function PracticeArticleRow({
       onOpenStudyMode={onOpenStudyMode}
       readingOrigin={readingOrigin}
       dossierItemId={dossier?.itemId}
+      // The row's header (or, in Lettura semplice of a dossier, the line over the text) has the add (LC61).
+      dossierCommandInRow={!simple || dossier !== undefined}
     />
   );
 
@@ -128,7 +130,8 @@ export function PracticeArticleRow({
               className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 font-medium text-slate-700 hover:bg-amber-50 md:min-h-0 md:py-0.5 dark:text-slate-200 dark:hover:bg-amber-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               <Star size={14} aria-hidden className={dossier.important ? 'fill-amber-400 text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'} />
-              {dossier.important ? 'Importante' : 'Segna come importante'}
+              {/* One name, the state in `aria-pressed` and the star's fill (LC61). */}
+              Importante
             </button>
           </p>
         )}

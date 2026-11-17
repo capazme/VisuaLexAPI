@@ -4,6 +4,7 @@ import { hasAssistantNote } from '../../../utils/aiReview';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { formatTimestampLong } from './dossierUtils';
 import { ROW_REMOVE } from './dossierStyles';
+import { useNoteRemovalFocus } from './useNoteRemovalFocus';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -12,6 +13,8 @@ type NoteItem = Extract<DossierItem, { type: 'note' }>;
  * (LC58): the words, when, and the bin; a note an application wrote has its state, the pencil and its bin (D7b).
  */
 export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; onRemoveNote?: (note: NoteItem) => void }) {
+  const { register, remove } = useNoteRemovalFocus(notes, onRemoveNote);
+
   return notes.map((note) => {
     const words = <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>;
     const meta = (
@@ -21,17 +24,20 @@ export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; on
     );
     const reviewed = hasAssistantNote(note) && onRemoveNote;
     return (
-      <div key={note.id} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+      <div
+        key={note.id}
+        ref={register(note.id)}
+        className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
         <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
         <div className="min-w-0 flex-1">
           {reviewed
-            ? <AiNoteEntryReview note={note} meta={meta} onRemove={() => onRemoveNote(note)}>{words}</AiNoteEntryReview>
+            ? <AiNoteEntryReview note={note} meta={meta} onRemove={() => remove(note)}>{words}</AiNoteEntryReview>
             : <>{words}{meta}</>}
         </div>
         {onRemoveNote && !reviewed && (
           <button
             type="button"
-            onClick={() => onRemoveNote(note)}
+            onClick={() => remove(note)}
             aria-label="Rimuovi nota"
             className={ROW_REMOVE}
           >

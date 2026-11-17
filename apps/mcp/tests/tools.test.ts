@@ -362,7 +362,7 @@ describe('omnilex_crea_dossier', () => {
       { onprogress: (p) => progress.push(p.message ?? '') },
     );
     expect(result.isError).toBeFalsy();
-    const landing = 'VisuaLex non ha risposto in tempo: la pratica d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
+    const landing = 'LexCraft non ha risposto in tempo: la pratica d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
     expect(json(result)).toEqual({
       dossier: { id: 'd4', nome: 'X', tipo: 'lavoro' },
       // The decision and the note on the dossier still went in; the norms are neither in nor out.
@@ -436,7 +436,7 @@ describe('omnilex_crea_dossier', () => {
     expect(answer.non_entrate).toEqual([]);
     expect(answer.errore).toContain('non crearlo di nuovo');
     expect(answer.in_sospeso).toEqual(['sentenze']);
-    expect(answer.note_non_entrate).toEqual([{ nota: 1, motivo: 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' }]);
+    expect(answer.note_non_entrate).toEqual([{ nota: 1, motivo: 'LexCraft non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' }]);
   });
 
   it('names both steps pending when neither answered, and reports none of their rows', async () => {
@@ -455,7 +455,7 @@ describe('omnilex_crea_dossier', () => {
       entrate: { norme: 0, sentenze: 0, note: 0 },
       non_entrate: [],
       // The same sentence once, the steps in the order they ran.
-      errore: 'VisuaLex non ha risposto in tempo: la pratica d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.',
+      errore: 'LexCraft non ha risposto in tempo: la pratica d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.',
       in_sospeso: ['norme', 'sentenze'],
     });
   });

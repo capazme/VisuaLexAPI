@@ -8,6 +8,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import { dragAnnouncements } from './dragAnnouncements';
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -76,14 +77,7 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
       const held = acts?.find((a) => a.id === String(id));
       return held ? actHeading(held.norma) : '';
     };
-    return {
-      onDragStart: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} iniziato.`,
-      onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? `${heading(active.id)} sopra ${heading(over.id)}.` : `${heading(active.id)} fuori dall'elenco degli atti.`,
-      onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? `${heading(active.id)} spostato al posto di ${heading(over.id)}.` : `${heading(active.id)} lasciato dov'era.`,
-      onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
-    };
+    return dragAnnouncements(heading);
   }, [acts]);
 
   if (!practice) return null;

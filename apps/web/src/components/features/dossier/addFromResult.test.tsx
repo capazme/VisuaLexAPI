@@ -53,7 +53,7 @@ describe('«Aggiungi alla pratica» on a row of the Ricerca (LC59)', () => {
     render(row({ norma: NORMA }));
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica art. 2043 c.c.' }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Aggiungi a una pratica')).toBeInTheDocument();
+    expect(within(dialog).getByText('Aggiungi alla pratica')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: /Sinistro Rossi/ }));
     const held = appStore.getState().dossiers.find((d) => d.id === 'a')!.items;
     expect(held).toHaveLength(1);

@@ -130,9 +130,11 @@ interface ArticleTabContentProps {
      * drawn and acted on here (D7b), as in the dossier's own reader; never in the reader's copies or exports.
      */
     dossierItemId?: string;
+    /** The row around the text offers the add itself (LC61): the bar's «Alla pratica» would be a second command. */
+    dossierCommandInRow?: boolean;
 }
 
-export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId, findHostId, variant = 'row', dossierItemId }: ArticleTabContentProps) {
+export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId, findHostId, variant = 'row', dossierItemId, dossierCommandInRow }: ArticleTabContentProps) {
     const isBeside = variant === 'beside';
     const { article_text, norma_data, url, versionInfo } = data;
     // Flattened to scalars so the citation listener effect below depends on
@@ -185,6 +187,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         const ids = new Set(articleItemIds(dossier, norma_data));
         return dossier.items.filter((i): i is NoteItem => i.type === 'note' && !!i.aboutItemId && ids.has(i.aboutItemId));
     }));
+
+    // Already in the hosting dossier (LC61): the bar offers no «Aggiungi a questa pratica»; «Togli» is in the act's «⋯».
+    const inHostDossier = useAppStore((s) => {
+        const dossier = hostDossier ? s.dossiers.find((d) => d.id === hostDossier.id) : undefined;
+        return articleItemIds(dossier, norma_data).length > 0;
+    });
 
     const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
     // State (not ref) so the popover re-reads the anchor when the button
@@ -898,6 +906,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     ? () => addToThisDossier(hostDossier.id, { norma: norma_data }, showToast)
                     : () => setDossierPopoverOpen(true)}
                 dossierLabel={hostDossier ? 'Aggiungi a questa pratica' : undefined}
+                hideDossier={dossierCommandInRow || inHostDossier}
                 dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
                 onCopyLink={handleCopyLink}

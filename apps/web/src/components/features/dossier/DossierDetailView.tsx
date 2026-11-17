@@ -33,6 +33,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { dragAnnouncements } from '../practice/dragAnnouncements';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
@@ -196,16 +197,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const fullLayout = useMemo(() => layoutDossier(dossier.items), [dossier.items]);
   const fullBlocks = useMemo(() => new Map(fullLayout.acts.map((a) => [a.key, a])), [fullLayout]);
   // What a screen reader hears while an act is dragged: its heading, never its key.
-  const dragAnnouncements = useMemo(() => {
+  const actAnnouncements = useMemo(() => {
     const heading = (id: string | number) => fullBlocks.get(String(id))?.heading ?? '';
-    return {
-      onDragStart: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} iniziato.`,
-      onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? `${heading(active.id)} sopra ${heading(over.id)}.` : `${heading(active.id)} fuori dall'elenco degli atti.`,
-      onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? `${heading(active.id)} spostato al posto di ${heading(over.id)}.` : `${heading(active.id)} lasciato dov'era.`,
-      onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
-    };
+    return dragAnnouncements(heading);
   }, [fullBlocks]);
   // What it holds, in one line, as the list's card says it (S7c).
   const dossierCounts = countsLine(dossier.items);
@@ -485,7 +479,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       collisionDetection={closestCenter}
       onDragEnd={handleActDragEnd}
       accessibility={{
-        announcements: dragAnnouncements,
+        announcements: actAnnouncements,
         screenReaderInstructions: { draggable: "Per spostare l'atto premi Spazio, poi le frecce su e giù, e di nuovo Spazio per lasciarlo; Esc annulla." },
       }}
     >

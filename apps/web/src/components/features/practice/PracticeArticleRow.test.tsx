@@ -176,3 +176,37 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     expect(container.querySelector('[data-practice-row]')?.getAttribute('data-practice-row')).toBe(key);
   });
 });
+
+describe('PracticeArticleRow: LC61', () => {
+  it('the reader is told the row has the add, so its bar does not repeat it; in Lettura semplice of the Ricerca it is not', async () => {
+    const { SimpleReadingContext } = await import('./simpleReading');
+    const { practiceId, actId } = setUp([CC_2043]);
+    act(() => { s().setRowOpen(articleRowKey(practiceId, actId, practiceArticleKey(CC_2043)), true); });
+    const { unmount } = render(row(practiceId, actId, CC_2043));
+    expect(readers.at(-1)?.dossierCommandInRow).toBe(true);
+    unmount();
+    render(<SimpleReadingContext.Provider value={{ simple: true, practiceItems: [] }}>{row(practiceId, actId, CC_2043)}</SimpleReadingContext.Provider>);
+    expect(readers.at(-1)?.dossierCommandInRow).toBe(false);
+  });
+
+  it('in Lettura semplice of a dossier the star keeps one name, its state in aria-pressed', async () => {
+    const { SimpleReadingContext } = await import('./simpleReading');
+    const { ReadingHostContext } = await import('./readingHost');
+    const { practiceId, actId } = setUp([CC_2043]);
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Sinistro Rossi', createdAt: '', items: [
+      { id: 'i1', type: 'norma', data: CC_2043.norma_data, addedAt: '' },
+    ] }] });
+    render(
+      <ReadingHostContext.Provider value={{ search: vi.fn(), dossier: { id: 'd1' } }}>
+        <SimpleReadingContext.Provider value={{ simple: true, practiceItems: [] }}>{row(practiceId, actId, CC_2043)}</SimpleReadingContext.Provider>
+      </ReadingHostContext.Provider>,
+    );
+    const star = screen.getByRole('button', { name: 'Importante' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+    act(() => { appStore.setState({ dossiers: [{ id: 'd1', title: 'Sinistro Rossi', createdAt: '', items: [
+      { id: 'i1', type: 'norma', data: CC_2043.norma_data, addedAt: '', status: 'important' },
+    ] }] }); });
+    // the same name, now pressed
+    expect(screen.getByRole('button', { name: 'Importante' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});

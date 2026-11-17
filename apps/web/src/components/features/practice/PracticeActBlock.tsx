@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronDown, FileDown, FolderMinus, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
+import { DRAG_ROLE_DESCRIPTION } from './dragAnnouncements';
 import { CSS } from '@dnd-kit/utilities';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
@@ -123,7 +124,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   const [studyKey, setStudyKey] = useState<string | null>(null);
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: act.id });
+    useSortable({ id: act.id, attributes: { roleDescription: DRAG_ROLE_DESCRIPTION } });
 
   const heading = actHeading(act.norma);
   const byKey = useMemo(() => new Map(act.articles.map((a) => [practiceArticleKey(a), a])), [act.articles]);

@@ -11,7 +11,7 @@ export const CONSENT_LEVELS: LevelMeta[] = [
   {
     level: 'none',
     title: 'Nessuna raccolta',
-    summary: 'MERL-T non riceve nulla della tua attività. Tutto il resto di VisuaLex funziona come prima.',
+    summary: 'MERL-T non riceve nulla della tua attività. Tutto il resto di LexCraft funziona come prima.',
   },
   {
     level: 'basic',

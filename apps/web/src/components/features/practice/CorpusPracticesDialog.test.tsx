@@ -11,10 +11,22 @@ vi.mock('../../../services/dossierService', () => ({
 
 import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
-import { CorpusPracticesDialog } from './CorpusPracticesDialog';
+import { CorpusPracticesDialog as Dialog } from './CorpusPracticesDialog';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { notificationStore, resetNotifications } from '../../ui/notifications/notifications';
 import type { Dossier, DossierItem } from '../../../types';
 import { isBoundPractice } from '../../../utils/practice';
 import { L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
+
+/** The dialog sits in the layout, inside the router: its toast's «Apri Pratiche» navigates (LC61). */
+const CorpusPracticesDialog = () => (
+  <MemoryRouter>
+    <Routes>
+      <Route path="/" element={<Dialog />} />
+      <Route path="/pratiche" element={<p>Pagina Pratiche</p>} />
+    </Routes>
+  </MemoryRouter>
+);
 
 /** LC60, §5 of the spec: the Corpus's practices left in the browser become pratiche, once, by the user's choice. */
 
@@ -66,7 +78,9 @@ describe('CorpusPracticesDialog (LC60)', () => {
     expect(within(dialog).getByText(/Nella Ricerca avevi 1 raccolta di norme e sentenze\./)).toBeInTheDocument();
     const box = within(dialog).getByRole('checkbox', { name: /IA Act/ });
     expect(box).toBeChecked();
-    expect(within(dialog).getByText(/1 atto · 1 articolo/)).toBeInTheDocument();
+    // LC61: no «atto» here, the lawyer's word in Pratiche; the articles and decisions say what is saved.
+    expect(within(dialog).getByText(/· 1 articolo$/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/atto/)).toBeNull();
     expect(within(dialog).queryByText(/Vuota/)).toBeNull();
     expect(within(dialog).queryByText(/Rossi/)).toBeNull();
     expect(s().practices.map((p) => p.label)).toEqual(['IA Act']);
@@ -82,6 +96,18 @@ describe('CorpusPracticesDialog (LC60)', () => {
     expect(s().dossiers.map((d) => d.title).sort()).toEqual(['IA Act', 'Rossi']);
     expect(s().practices).toEqual([]);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('LC61: a save that worked says so, with a way to Pratiche', async () => {
+    resetNotifications();
+    threeCollections();
+    render(<CorpusPracticesDialog />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Salva come pratiche' }));
+    await waitFor(() => expect(s().corpusPracticesPending).toBe(false));
+    const toast = notificationStore.getState().entries.at(-1);
+    expect(toast).toMatchObject({ type: 'success', message: 'Salvata in Pratiche: «IA Act».' });
+    act(() => toast!.action!.onClick());
+    expect(await screen.findByText('Pagina Pratiche')).toBeInTheDocument();
   });
 
   it('«Non salvare» asks first; confirmed, nothing is saved and the collections go', async () => {

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
@@ -10,6 +11,15 @@ interface PDFViewerProps {
 }
 
 export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -42,8 +52,9 @@ export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps
               onClick={onClose}
               className="bg-white text-slate-900 hover:bg-slate-200 p-2.5 rounded-lg transition-colors font-medium"
               title="Chiudi"
+              aria-label="Chiudi il PDF"
             >
-              <X size={20} />
+              <X size={20} aria-hidden />
             </button>
           </div>
         </div>
