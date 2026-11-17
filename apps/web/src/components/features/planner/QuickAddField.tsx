@@ -270,7 +270,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
       {/* Only once there is a task to sum up (LC83). Always mounted, empty when idle, and polite: what the line read is
           said aloud as it changes, since the chips come in silently. */}
       <p id={`${id}-summary`} aria-live="polite" className={cn(FIELD_HINT, 'px-4 pb-2 empty:p-0')}>
-        {task.title.trim() ? summary(task, today, dossierTitle) : ''}
+        {draft.title.trim() ? summary(task, today, dossierTitle) : ''}
         {line.lockedHash && ' · In una pratica il compito resta qui: «#» resta nel titolo.'}
       </p>
       <Collapsible

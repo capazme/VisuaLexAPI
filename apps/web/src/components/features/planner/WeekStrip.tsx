@@ -22,7 +22,7 @@ interface Props {
 export function WeekStrip({ today, days, selected, counts, onSelect }: Props) {
   return (
     // `data-week-strip`: the view scrolls a day's block to just under it (`UpcomingView`).
-    <div data-week-strip className={cn('sticky top-[var(--phone-bar-offset,0px)] md:top-16 -mx-1 bg-slate-50 px-1 transition-[top] duration-200 ease-out motion-reduce:transition-none dark:bg-slate-950', Z_INDEX.sticky)}>
+    <div data-week-strip className={cn('sticky top-[var(--phone-bar-offset,0px)] md:top-[calc(var(--phone-bar-offset,0px)+4rem)] -mx-1 bg-slate-50 px-1 transition-[top] duration-200 ease-out motion-reduce:transition-none dark:bg-slate-950', Z_INDEX.sticky)}>
       <ol aria-label={`Giorni da ${longDay(days[0], today)} a ${longDay(days[days.length - 1], today)}`} className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800">
         {days.map((day) => {
           const { weekday, date } = stripDay(day);

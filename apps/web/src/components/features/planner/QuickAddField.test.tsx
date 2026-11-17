@@ -194,5 +194,7 @@ describe('QuickAddField — the line read', () => {
     render(<QuickAddField view="inbox" today={TODAY} defaults={{}} />);
     await userEvent.type(title(), 'domani p1');
     expect(screen.getByRole('button', { name: /Aggiungi/ })).toBeDisabled();
+    // Still summed up, and said aloud: the line was read (LC83).
+    expect(summaryLine()).toHaveTextContent("Per domani · priorità urgente · nella lista d'ingresso");
   });
 });

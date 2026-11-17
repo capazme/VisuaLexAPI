@@ -18,9 +18,10 @@ const VIEWS = [
   { to: '/work/ingresso', label: "Lista d'ingresso", short: 'Ingresso', icon: Inbox },
 ];
 
-/** On a phone a framed square with the icon, the words for a screen reader (LC38); from `md` the words in full. */
-const HEADER_BUTTON = cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 max-md:w-11 max-md:justify-end max-md:px-0 max-md:no-underline');
-const HEADER_ICON = 'inline-flex items-center max-md:size-9 max-md:justify-center max-md:rounded-lg max-md:border max-md:border-slate-300 dark:max-md:border-slate-700';
+/** Below `lg` a framed square with the icon, the words for a screen reader (LC38): at 768 px the title, the tabs and
+ *  both options in words do not fit one row (LC83). From `lg` the words in full. */
+const HEADER_BUTTON = cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 max-lg:w-11 max-lg:justify-end max-lg:px-0 max-lg:no-underline');
+const HEADER_ICON = 'inline-flex items-center max-lg:size-9 max-lg:justify-center max-lg:rounded-lg max-lg:border max-lg:border-slate-300 dark:max-lg:border-slate-700';
 
 /** «Raggruppa: per data / per pratica», «Scadenziario»'s option, in the header beside the trash (LC83). */
 function GroupingMenu() {
@@ -29,7 +30,7 @@ function GroupingMenu() {
   return (
     <MenuButton
       label={`Raggruppa: ${label}`}
-      triggerClassName={cn(HEADER_BUTTON, 'font-normal no-underline hover:no-underline hover:bg-slate-100 max-md:hover:bg-transparent dark:hover:bg-slate-800')}
+      triggerClassName={cn(HEADER_BUTTON, 'font-normal no-underline hover:no-underline hover:bg-slate-100 max-lg:hover:bg-transparent dark:hover:bg-slate-800')}
       items={(['date', 'dossier'] as const).map((choice) => ({
         label: choice === 'date' ? 'Per data' : 'Per pratica',
         checked: choice === grouping,
@@ -37,7 +38,7 @@ function GroupingMenu() {
       }))}
     >
       <span className={HEADER_ICON}><ListFilter size={15} aria-hidden /></span>
-      <span className="max-md:sr-only">Raggruppa: {label}</span>
+      <span className="max-lg:sr-only">Raggruppa: {label}</span>
     </MenuButton>
   );
 }
@@ -75,7 +76,7 @@ export function OpusPage() {
       className="h-full"
       // On a phone the options are icons beside the title (LC33, after Todoist: the title, then the list).
       actionBeside
-      headerClassName={(inView || inTrash) ? 'md:sticky md:top-0 md:z-10 md:bg-slate-50 md:py-1.5 md:dark:bg-slate-950' : undefined}
+      headerClassName={(inView || inTrash) ? 'md:sticky md:top-[var(--phone-bar-offset,0px)] md:z-10 md:bg-slate-50 md:py-1.5 md:dark:bg-slate-950' : undefined}
       beside={(inView || inTrash) && (
         // Links, not `ui/SegmentedTabs` (buttons over one panel): each view has its address. On a phone the views are a
         // bar at the screen's foot, where the thumb is (LC33, after Todoist's «In arrivo · Oggi · Prossime»); from md
@@ -127,7 +128,7 @@ export function OpusPage() {
           <span className={HEADER_ICON}>
             <Trash2 size={15} aria-hidden />
           </span>
-          <span aria-hidden className="max-md:hidden">Cestino</span>
+          <span aria-hidden className="max-lg:hidden">Cestino</span>
         </Link>
       </>)}
     >
