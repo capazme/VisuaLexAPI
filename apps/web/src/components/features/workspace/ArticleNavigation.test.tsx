@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ArticleNavigation } from './ArticleNavigation';
 
@@ -74,5 +76,47 @@ describe('ArticleNavigation (LC68)', () => {
     nav();
     fireEvent.click(screen.getByRole('button', { name: /^Art\. 2043/ }));
     expect(screen.getByRole('textbox', { name: "Numero dell'articolo" })).toHaveClass('text-base', 'md:text-sm');
+  });
+
+  it('a real Enter (keydown, keypress, keyup) closes the field for good and stays on the number written (#556)', async () => {
+    const user = userEvent.setup();
+    const loads: string[] = [];
+    function Live() {
+      const [active, setActive] = useState('2045');
+      const [loaded, setLoaded] = useState(['2044', '2045']);
+      const go = (id: string) => { loads.push(id); setActive(id); setLoaded((l) => [...l, id]); };
+      return (
+        <ArticleNavigation
+          allArticleIds={['2043', '2044', '2045', '2046', '2047']}
+          loadedArticleIds={loaded}
+          activeArticleId={active}
+          onNavigate={setActive}
+          onLoadArticle={go}
+        />
+      );
+    }
+    render(<><Live /><p>fuori</p></>);
+    await user.click(screen.getByRole('button', { name: /^Art\. 2045/ }));
+    const field = screen.getByRole('textbox', { name: "Numero dell'articolo" });
+    await user.clear(field);
+    await user.type(field, '2046{Enter}');
+    expect(screen.queryByRole('textbox', { name: "Numero dell'articolo" })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Art\. 2046/ })).toHaveFocus();
+    // A click elsewhere sends nothing back.
+    await user.click(screen.getByText('fuori'));
+    await act(async () => {});
+    expect(loads).toEqual(['2046']);
+    expect(screen.getByRole('button', { name: /^Art\. 2046/ })).toBeInTheDocument();
+  });
+
+  it('a real Esc closes the field and loads nothing (#556)', async () => {
+    const user = userEvent.setup();
+    const { onNavigate, onLoadArticle } = nav();
+    await user.click(screen.getByRole('button', { name: /^Art\. 2043/ }));
+    await user.type(screen.getByRole('textbox', { name: "Numero dell'articolo" }), '{Escape}');
+    expect(screen.queryByRole('textbox', { name: "Numero dell'articolo" })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Art\. 2043/ })).toHaveFocus();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onLoadArticle).not.toHaveBeenCalled();
   });
 });

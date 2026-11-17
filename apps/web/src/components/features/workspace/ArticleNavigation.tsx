@@ -38,6 +38,8 @@ export function ArticleNavigation({
   const buttonRef = useRef<HTMLButtonElement>(null);
   // Set by Enter and Esc: the focus goes back to «Art. …» once the field is gone (LC70). Not after a blur, which went elsewhere.
   const refocus = useRef(false);
+  // Set once Enter or Esc has closed the field: a blur after it (the field leaving the page) sends nothing again.
+  const closed = useRef(false);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -108,6 +110,7 @@ export function ArticleNavigation({
 
   const startEditing = () => {
     setInputValue(activeArticleId || '');
+    closed.current = false;
     setIsEditing(true);
   };
 
@@ -139,13 +142,14 @@ export function ArticleNavigation({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      refocus.current = true;
-      handleInputSubmit();
-    } else if (e.key === 'Escape') {
-      refocus.current = true;
-      setIsEditing(false);
-    }
+    if (e.key !== 'Enter' && e.key !== 'Escape') return;
+    // The focus goes back to «Art. …» within this keydown: without this, a real Enter's keypress lands on the button as
+    // a click and opens the field again with the old number (LC70, Papiniano on #556).
+    e.preventDefault();
+    closed.current = true;
+    refocus.current = true;
+    if (e.key === 'Enter') handleInputSubmit();
+    else setIsEditing(false);
   };
 
   return (
@@ -176,7 +180,7 @@ export function ArticleNavigation({
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onBlur={handleInputSubmit}
+          onBlur={() => { if (!closed.current) handleInputSubmit(); }}
           onKeyDown={handleKeyDown}
           aria-label="Numero dell'articolo"
           enterKeyHint="go"
