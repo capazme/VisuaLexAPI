@@ -180,3 +180,19 @@ describe('a part of a split article (G-389, Q2)', () => {
     expect(citeArticle(ART_1)).toBe('art. 1, l. 27 dicembre 2006, n. 296');
   });
 });
+
+// EU acts before 2015 (G-540): the Community and the number as the Official Journal wrote them.
+describe('an EU act before 2015 is cited as the Official Journal numbered it (G-540)', () => {
+  it.each([
+    ['direttiva ue', '104', '1993-11-23', 'dir. 93/104/CE'],
+    ['direttiva ue', '13', '1993-04-05', 'dir. 93/13/CEE'],
+    ['regolamento ue', '1007', '2009-09-16', 'reg. (CE) n. 1007/2009'],
+    ['regolamento ue', '1259', '2010-12-20', 'reg. (UE) n. 1259/2010'],
+    ['direttiva ue', '13', '1993', 'dir. 93/13/CEE'],
+    ['regolamento ue', '1007', '2009', 'reg. (CE) n. 1007/2009'],
+    ['regolamento ue', '1', '2015', 'reg. (UE) 2015/1'],
+    ['regolamento ue', '679', '', 'reg. (UE)'],
+  ])('%s %s of %s is «%s»', (tipo_atto, numero_atto, data, act) => {
+    expect(citeAct({ tipo_atto, numero_atto, data })).toBe(act);
+  });
+});

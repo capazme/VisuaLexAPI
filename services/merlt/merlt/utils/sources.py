@@ -160,6 +160,26 @@ _HEADINGS = {
     "cdfue": "Carta dei diritti fondamentali dell'Unione europea",
 }
 _EU = {"regolamento ue": "reg. (UE)", "direttiva ue": "dir. (UE)"}
+
+
+def _eu_act(kind: str, date: str, number: str) -> str:
+    """An EU regulation or directive as cited (G-540), the API's `sources._eu_act`: since 2015
+    «reg. (UE) 2016/679»; before, «reg. (CE) n. 1907/2006», «dir. 2002/58/CE», the year in two
+    digits before 1999, CEE until 1 November 1993, CE until 1 December 2009 (a year alone: 1993
+    CEE, 2009 CE)."""
+    year = date[:4]
+    if not (number and len(year) == 4 and year.isdigit()):
+        return _EU[kind]
+    if int(year) >= 2015:
+        return f"{_EU[kind]} {year}/{number}"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        institution = "CEE" if date < "1993-11-01" else "CE" if date < "2009-12-01" else "UE"
+    else:
+        institution = "CEE" if int(year) <= 1993 else "CE" if int(year) <= 2009 else "UE"
+    short_year = year if int(year) >= 1999 else year[2:]
+    if kind == "regolamento ue":
+        return f"reg. ({institution}) n. {number}/{short_year}"
+    return f"dir. {short_year}/{number}/{institution}"
 _TYPES = {
     "legge": "l.",
     "decreto legislativo": "d.lgs.",
@@ -271,8 +291,7 @@ def _act(norm: Mapping[str, Any], short: bool) -> tuple[str, str]:
     if name:
         return name, " "
     if kind in _EU:
-        number, year = _text(norm, "numero_atto"), _text(norm, "data")[:4]
-        return (f"{_EU[kind]} {year}/{number}" if number and year.isdigit() else _EU[kind]), (" " if short else ", ")
+        return _eu_act(kind, _text(norm, "data"), _text(norm, "numero_atto")), (" " if short else ", ")
     real, date, number = _real_type(norm)
     act = _TYPES.get(real, real)
     day = _day(date)

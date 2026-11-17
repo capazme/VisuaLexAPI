@@ -126,6 +126,33 @@ _NAMED = {
     "cdfue": "CDFUE",
 }
 _EU = {"regolamento ue": "reg. (UE)", "direttiva ue": "dir. (UE)"}
+
+
+def _eu_institution(date: str) -> str:
+    """The Community an act before 2015 was adopted by, as its number names it: CEE until the
+    Maastricht Treaty (1 November 1993), CE until the Lisbon Treaty (1 December 2009), UE after.
+    A year alone counts 1993 as CEE and 2009 as CE, the year's most acts (G-540)."""
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return "CEE" if date < "1993-11-01" else "CE" if date < "2009-12-01" else "UE"
+    year = int(date[:4])
+    return "CEE" if year <= 1993 else "CE" if year <= 2009 else "UE"
+
+
+def _eu_act(kind: str, date: str, number: str) -> str:
+    """An EU regulation or directive as cited (G-540). Since 2015 the year comes first, «reg. (UE)
+    2016/679», «dir. (UE) 2022/2555». Before, as the Official Journal numbered them: a regulation
+    «reg. (CE) n. 1907/2006», a directive «dir. 2002/58/CE», with the year in two digits before
+    1999 («dir. 95/46/CE», «reg. (CEE) n. 1408/71»)."""
+    year = date[:4]
+    if not (number and len(year) == 4 and year.isdigit()):
+        return _EU[kind]
+    if int(year) >= 2015:
+        return f"{_EU[kind]} {year}/{number}"
+    institution = _eu_institution(date)
+    short_year = year if int(year) >= 1999 else year[2:]
+    if kind == "regolamento ue":
+        return f"reg. ({institution}) n. {number}/{short_year}"
+    return f"dir. {short_year}/{number}/{institution}"
 # In lower case, like the act (owner, 1 October 2026; D4 of 4 October). A type the table does
 # not know is written in full.
 _TYPES = {
@@ -212,8 +239,7 @@ def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
         return name, " "
     number, date, real = _text(norm, "numero_atto"), _text(norm, "data"), _text(norm, "tipo_atto_reale")
     if kind in _EU:
-        year = date[:4]
-        return (f"{_EU[kind]} {year}/{number}" if number and year.isdigit() else _EU[kind]), ", "
+        return _eu_act(kind, date, number), ", "
     if not real:
         # An act the codes table names (an aliased code, the regulation of the c.p.i.): cited by
         # its decree, with the table's date and number where the norm carries none.

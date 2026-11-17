@@ -170,3 +170,26 @@ async def test_parse_query_writes_artt_for_a_list_or_a_range():
     assert await _display("art 1453-1455 cc", nv) == "artt. 1453-1455 c.c."
     assert await _display("art 1453,1454 cc", nv) == "artt. 1453, 1454 c.c."
     assert await _display("art 2645-bis cc", nv) == "art. 2645-bis c.c."
+
+
+# --- EU acts before 2015 (G-540) -----------------------------------------------------------------
+
+from visualex_api.tools.sources import cite_act  # noqa: E402
+
+
+@pytest.mark.parametrize("kind,number,date,act", [
+    # A full date tells the Community at the boundaries: Maastricht (1 November 1993), Lisbon (1 December 2009).
+    ("direttiva ue", "104", "1993-11-23", "dir. 93/104/CE"),
+    ("direttiva ue", "13", "1993-04-05", "dir. 93/13/CEE"),
+    ("regolamento ue", "1007", "2009-09-16", "reg. (CE) n. 1007/2009"),
+    ("regolamento ue", "1259", "2010-12-20", "reg. (UE) n. 1259/2010"),
+    # A year alone: 1993 reads as CEE, 2009 as CE, the year's most acts.
+    ("direttiva ue", "13", "1993", "dir. 93/13/CEE"),
+    ("regolamento ue", "1007", "2009", "reg. (CE) n. 1007/2009"),
+    # From 2015 the year comes first, and nothing else changes.
+    ("regolamento ue", "1", "2015", "reg. (UE) 2015/1"),
+    # A year that is not one names the kind alone, as before.
+    ("regolamento ue", "679", "", "reg. (UE)"),
+])
+def test_an_eu_act_is_cited_as_the_official_journal_numbered_it(kind, number, date, act):
+    assert cite_act({"tipo_atto": kind, "numero_atto": number, "data": date}) == act

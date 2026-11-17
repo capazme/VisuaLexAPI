@@ -329,6 +329,55 @@
       "labels": {"citation": {"value": "art. 21, dir. (UE) 2022/2555", "status": "decided"}, "short": {"value": "art. 21 dir. (UE) 2022/2555", "status": "decided"}}
     },
     {
+      "id": "eprivacy-15",
+      "note": "An EU act before 2015 is cited as the Official Journal numbered it (G-540): a directive by year, number and Community, «dir. 2002/58/CE».",
+      "input": {"tipo_atto": "direttiva ue", "numero_atto": "58", "data": "2002", "numero_articolo": "15"},
+      "identity": {"act": {"value": "celex:32002L0058", "status": "current"}, "article": {"value": "celex:32002L0058~art15", "status": "current"}},
+      "labels": {"citation": {"value": "art. 15, dir. 2002/58/CE", "status": "decided"}, "short": {"value": "art. 15 dir. 2002/58/CE", "status": "proposed"}}
+    },
+    {
+      "id": "reach-1",
+      "note": "An EU act before 2015 is cited as the Official Journal numbered it (G-540): a regulation by its Community, then «n.» number/year, «reg. (CE) n. 1907/2006».",
+      "input": {"tipo_atto": "regolamento ue", "numero_atto": "1907", "data": "2006", "numero_articolo": "1"},
+      "identity": {"act": {"value": "celex:32006R1907", "status": "current"}, "article": {"value": "celex:32006R1907~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, reg. (CE) n. 1907/2006", "status": "decided"}, "short": {"value": "art. 1 reg. (CE) n. 1907/2006", "status": "proposed"}}
+    },
+    {
+      "id": "dpd-2",
+      "note": "An EU act before 2015 is cited as the Official Journal numbered it (G-540): before 1999 the year has two digits, «dir. 95/46/CE».",
+      "input": {"tipo_atto": "direttiva ue", "numero_atto": "46", "data": "1995", "numero_articolo": "2"},
+      "identity": {"act": {"value": "celex:31995L0046", "status": "current"}, "article": {"value": "celex:31995L0046~art2", "status": "current"}},
+      "labels": {"citation": {"value": "art. 2, dir. 95/46/CE", "status": "decided"}, "short": {"value": "art. 2 dir. 95/46/CE", "status": "proposed"}}
+    },
+    {
+      "id": "product-liability-1",
+      "note": "An EU act before 2015 is cited as the Official Journal numbered it (G-540): before the Maastricht Treaty (1 November 1993) the Community is the CEE, «dir. 85/374/CEE».",
+      "input": {"tipo_atto": "direttiva ue", "numero_atto": "374", "data": "1985", "numero_articolo": "1"},
+      "identity": {"act": {"value": "celex:31985L0374", "status": "current"}, "article": {"value": "celex:31985L0374~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, dir. 85/374/CEE", "status": "proposed"}, "short": {"value": "art. 1 dir. 85/374/CEE", "status": "proposed"}}
+    },
+    {
+      "id": "social-security-1408-2",
+      "note": "An EU act before 2015 is cited as the Official Journal numbered it (G-540): a regulation of the CEE with a two-digit year, «reg. (CEE) n. 1408/71».",
+      "input": {"tipo_atto": "regolamento ue", "numero_atto": "1408", "data": "1971", "numero_articolo": "2"},
+      "identity": {"act": {"value": "celex:31971R1408", "status": "current"}, "article": {"value": "celex:31971R1408~art2", "status": "current"}},
+      "labels": {"citation": {"value": "art. 2, reg. (CEE) n. 1408/71", "status": "proposed"}, "short": {"value": "art. 2 reg. (CEE) n. 1408/71", "status": "proposed"}}
+    },
+    {
+      "id": "brussels-1-bis-1",
+      "note": "An EU act before 2015 is cited as the Official Journal numbered it (G-540): after the Lisbon Treaty (1 December 2009) and before 2015 the Union, number first, «reg. (UE) n. 1215/2012».",
+      "input": {"tipo_atto": "regolamento ue", "numero_atto": "1215", "data": "2012", "numero_articolo": "1"},
+      "identity": {"act": {"value": "celex:32012R1215", "status": "current"}, "article": {"value": "celex:32012R1215~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, reg. (UE) n. 1215/2012", "status": "proposed"}, "short": {"value": "art. 1 reg. (UE) n. 1215/2012", "status": "proposed"}}
+    },
+    {
+      "id": "consumer-rights-6",
+      "note": "An EU act before 2015 is cited as the Official Journal numbered it (G-540): a directive of the Union before 2015, «dir. 2011/83/UE».",
+      "input": {"tipo_atto": "direttiva ue", "numero_atto": "83", "data": "2011", "numero_articolo": "6"},
+      "identity": {"act": {"value": "celex:32011L0083", "status": "current"}, "article": {"value": "celex:32011L0083~art6", "status": "current"}},
+      "labels": {"citation": {"value": "art. 6, dir. 2011/83/UE", "status": "proposed"}, "short": {"value": "art. 6 dir. 2011/83/UE", "status": "proposed"}}
+    },
+    {
       "id": "tfue-101",
       "note": "A treaty: cited like a code, by its abbreviation and with no comma.",
       "input": {"tipo_atto": "TFUE", "numero_articolo": "101"},
