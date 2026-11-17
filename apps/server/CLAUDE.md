@@ -628,7 +628,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   cleared when shown): `POST /forum/appeals { kind, itemId, text }` by the author of a hidden item, once per
   hiding (the `report` counter); the owners' `GET /moderation/appeals` and `POST /moderation/appeals/:id/decide
   { action: uphold | reject, reason }` (uphold shows the item, logged `unhide`; reject logged
-  `appeal_rejected`; the author told, `appeal`); showing an item by any route closes its pending appeal as
+  `appeal_rejected`; the author told, `appeal`; the queue's `hidingReason` is the log's, so after 12 months
+  it reads «(tolto dopo 12 mesi)» and only the category is left, G-550); showing an item by any route closes its pending appeal as
   upheld with a fixed note, never the moderator's free reason (it may name who reported); the author's deletion of the item deletes its appeals; the hidden notice carries `appeal`
   (`pending` | `rejected` | null). The profiles carry `roles` (public) and `validatedCount`; `GET
   /forum/profiles/:profileId/validated` lists the visible contributions at the threshold. The export
