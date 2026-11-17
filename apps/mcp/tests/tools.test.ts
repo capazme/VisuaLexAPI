@@ -120,6 +120,16 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
     }
   });
 
+  it('names a recital entry by the server’s citation, and a note about it by its id (spec 2026-11-17 §6.4)', async () => {
+    env.stub.dossiers[0].items.push(
+      { id: 'r1', item_type: 'norm', title: 'considerando 26, reg. (UE) 2016/679', citation: 'considerando 26, reg. (UE) 2016/679', content: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' }, created_by: null, about_item_id: null },
+      { id: 'r2', item_type: 'note', title: 'Nota', citation: null, content: 'Sul dato anonimo.', created_by: null, about_item_id: 'r1' },
+    );
+    const voci = json(await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } })).voci;
+    expect(voci.find((v: { id: string }) => v.id === 'r1')).toMatchObject({ tipo: 'norm', titolo: 'considerando 26, reg. (UE) 2016/679', riferimento: 'considerando 26, reg. (UE) 2016/679' });
+    expect(voci.find((v: { id: string }) => v.id === 'r2')).toMatchObject({ nota_su: 'r1' });
+  });
+
   it('gives the notes’ text only under the texts’ permission (G-381), cut at 500 characters, one whole on request', async () => {
     const long = `${'a'.repeat(499)}😀${'b'.repeat(600)}`;
     env.stub.dossiers[0].items.push({ id: 'i3', item_type: 'note', title: 'Nota', citation: null, content: long, created_by: null, about_item_id: null });

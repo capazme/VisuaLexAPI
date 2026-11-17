@@ -220,6 +220,18 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   owners, 29 October 2026: no active users yet); widening the words means raising the version, and a grant with a lower
   one reads no note until the user connects again. A grant made before `dossier:text` existed has it only
   once the user connects again.
+- **Recitals in a dossier** (spec `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §6, G-538): a
+  recital of an EU regulation or directive is a `norm` item whose content has the key `considerando`, with no
+  kind of its own and no migration. The key decides: such a content is checked by `schemas/recitalEntry.ts`
+  (the act's type, number and date, the recital's number, the web's star; anything else refused,
+  `numero_articolo` first; cases shared with the web in `conventions/sources/recital-entries.json`) on
+  `POST /items` and `PUT /items/:itemId`, and titled with its citation («considerando 26, reg. (UE)
+  2016/679», `norms/recital.ts`); a PUT never turns an article into a recital or back. Every reader of a
+  `norm` item reads the key (§6.3 of the spec): `citeStoredItem` cites it; `rebuildNormEntry` keeps it for
+  published content (environments, the study import, the recovery, «Aggiungi ai miei dossier»); Forum
+  suggestions and course citations refuse it in words; the assistant's text (`RecitalHasNoText`), the
+  add-by-reference route and the saved-norm watcher leave it out. Marks on a recital use its identity
+  `celex:32016R0679~rct26` as `normaKey`, with an empty `articleId`.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
   and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most
