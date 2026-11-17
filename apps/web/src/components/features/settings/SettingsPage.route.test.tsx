@@ -80,6 +80,16 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
     expect(where()).toHaveTextContent(/^\/pratiche$/);
   });
 
+  it('an Esc pressed outside the page (the drawer, a menu of the sidebar) is not the page\'s', () => {
+    app('dati');
+    enter();
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    fireEvent.keyDown(outside, { key: 'Escape' });
+    expect(where()).toHaveTextContent('/impostazioni#dati');
+    outside.remove();
+  });
+
   it('opened by its address, «Indietro» goes to the search page', () => {
     app(undefined, '/impostazioni');
     fireEvent.click(screen.getByRole('button', { name: 'Indietro' }));

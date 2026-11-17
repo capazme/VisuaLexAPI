@@ -156,12 +156,17 @@ describe('Impostazioni › «Significato dei colori»', () => {
     }
   });
 
-  it('opened from the user menu, a focus in its fields scrolls nothing', () => {
+  it('opened from the user menu, it opens at its top, and a focus in its fields scrolls nothing', () => {
     const scroller = document.createElement('div');
+    scroller.scrollTop = 300;
+    scroller.scrollTo = ((options: ScrollToOptions) => { scroller.scrollTop = options.top ?? 0; }) as typeof scroller.scrollTo;
     scrollParent.mockReturnValue(scroller);
     const { region } = open();
+    expect(scroller.scrollTop).toBe(0);
+    const asked = scrollParent.mock.calls.length;
     field(region, 'Giallo').focus();
-    expect(scrollParent).not.toHaveBeenCalled();
+    expect(scrollParent).toHaveBeenCalledTimes(asked);
+    expect(scroller.scrollTop).toBe(0);
   });
 
   it('is a page, not a dialog: nothing in it is drawn over the content (L-73)', () => {

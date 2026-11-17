@@ -100,11 +100,15 @@ export function SettingsPage() {
         else navigate('/');
     }, [from, navigate]);
 
-    // Esc goes back, unless something inside took it (a field giving up its change, an open `Expand`) or a dialog or
-    // the palette covers the page.
+    const root = useRef<HTMLDivElement>(null);
+    // Esc goes back, unless something inside took it (a field giving up its change, an open `Expand`), a dialog or the
+    // palette covers the page, or the key is another part's (the phone's drawer, a menu of the sidebar): only an Esc
+    // pressed in the page, or with the focus nowhere, is the page's.
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key !== 'Escape' || event.defaultPrevented || isWorkspaceCovered()) return;
+            const target = event.target as Node | null;
+            if (target instanceof Node && target !== document.body && target !== document.documentElement && !root.current?.contains(target)) return;
             event.preventDefault();
             goBack();
         };
@@ -112,24 +116,48 @@ export function SettingsPage() {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [goBack]);
 
-    // The part in the address comes in view, moving the page's scroller alone (gotcha 34); the colours' meanings give
-    // their first field the focus, as the reader's gear always did.
+    // The part in the address comes in view, moving the page's scroller alone (gotcha 34); with none, the page opens at
+    // its top. The colours' meanings give their first field the focus, as the reader's gear always did. What arrives
+    // later above the part (the aliases' catalog) would push it down: for a moment the part is brought back in view as
+    // the page grows, until the reader scrolls.
+    const [asked, setAsked] = useState(0);
     useEffect(() => {
+        const page = root.current;
+        const scroller = page ? scrollParentOf(page) : null;
         const id = decodeURIComponent(location.hash.slice(1));
         const part = id ? document.getElementById(id) : null;
-        if (!part) return;
-        const scroller = scrollParentOf(part);
-        if (scroller) {
+        if (id === 'colori') meaningsField.current?.focus({ preventScroll: true });
+        if (!scroller) return undefined;
+        if (!part) {
+            scroller.scrollTo({ top: 0 });
+            return undefined;
+        }
+        const bring = () => {
             const room = (parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0) + 16;
             scroller.scrollTo({ top: scroller.scrollTop + part.getBoundingClientRect().top - scroller.getBoundingClientRect().top - room });
-        }
-        if (id === 'colori') meaningsField.current?.focus({ preventScroll: true });
-    }, [location.hash]);
+        };
+        bring();
+        if (typeof ResizeObserver === 'undefined' || !page) return undefined;
+        const growing = new ResizeObserver(bring);
+        growing.observe(page);
+        const stop = () => growing.disconnect();
+        const timer = setTimeout(stop, 2000);
+        scroller.addEventListener('wheel', stop, { once: true, passive: true });
+        scroller.addEventListener('touchmove', stop, { once: true, passive: true });
+        return () => {
+            stop();
+            clearTimeout(timer);
+            scroller.removeEventListener('wheel', stop);
+            scroller.removeEventListener('touchmove', stop);
+        };
+    }, [location.hash, asked]);
 
-    // The index changes the anchor in place: «Indietro» still goes back where the page was opened from.
+    // The index changes the anchor in place: «Indietro» still goes back where the page was opened from. The same entry
+    // chosen again brings its part back in view.
     const goTo = (id: SettingsSection) => (event: MouseEvent<HTMLAnchorElement>) => {
         event.preventDefault();
         navigate({ hash: `#${id}` }, { replace: true, state: location.state });
+        setAsked((n) => n + 1);
     };
 
     useEffect(() => {
@@ -251,7 +279,7 @@ export function SettingsPage() {
     ];
 
     return (
-        <div className="flex flex-col gap-4 pb-12">
+        <div ref={root} className="flex flex-col gap-4 pb-12">
             <button
                 type="button"
                 onClick={goBack}

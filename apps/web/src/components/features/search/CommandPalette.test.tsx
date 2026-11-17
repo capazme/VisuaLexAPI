@@ -790,3 +790,13 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     unsubscribe();
   });
 });
+
+describe('CommandPalette — «Gestisci» of the frequent searches (LC84)', () => {
+  it('opens Impostazioni at its quick norms', () => {
+    openSettings.mockReset();
+    appStore.setState({ quickNorms: [] });
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gestisci' }));
+    expect(openSettings).toHaveBeenCalledWith('norme-rapide');
+  });
+});
