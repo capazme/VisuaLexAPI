@@ -120,3 +120,18 @@ describe('ArticleNavigation (LC68)', () => {
     expect(onLoadArticle).not.toHaveBeenCalled();
   });
 });
+
+describe('ArticleNavigation: the tabs\' ground under the pointer (LC72)', () => {
+  const ANSWERS = '.vlx-hover-tile:not(:disabled, [aria-pressed="true"], [aria-expanded="true"])';
+
+  it('the arrows and the number carry it; a disabled arrow does not answer', () => {
+    nav({ activeArticleId: '2042' });
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(3);
+    for (const button of buttons) expect(button).toHaveClass('vlx-hover-tile');
+    const before = buttons[0];
+    expect(before).toBeDisabled();
+    expect(before.matches(ANSWERS)).toBe(false);
+    expect(screen.getByRole('button', { name: /^Art\. 2042/ }).matches(ANSWERS)).toBe(true);
+  });
+});

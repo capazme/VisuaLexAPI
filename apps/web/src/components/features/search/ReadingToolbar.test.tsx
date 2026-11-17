@@ -511,6 +511,40 @@ describe('ReadingToolbar — «Copia link Normattiva»', () => {
     });
 });
 
+describe('ReadingToolbar — the tabs\' ground under the pointer (LC72)', () => {
+    /** The selector the ground answers to (`index.css`): what it does not match stays still. */
+    const ANSWERS = '.vlx-hover-tile:not(:disabled, [aria-pressed="true"], [aria-expanded="true"])';
+
+    it('is on every command of the bar, on a computer and on a phone', () => {
+        const { container } = setup();
+        const desktop = within(desktopRow(container)).getAllByRole('button');
+        // Note, Evidenziazioni, the highlighter, its inks, its meanings, the note tool, its kind, «Alla pratica», «⋯».
+        expect(desktop).toHaveLength(9);
+        for (const button of desktop) expect(button, button.getAttribute('aria-label') ?? button.textContent ?? '').toHaveClass('vlx-hover-tile');
+        for (const button of within(phoneRow(container)).getAllByRole('button')) expect(button).toHaveClass('vlx-hover-tile');
+    });
+
+    it('does not answer on a disabled command, nor on a pressed one', () => {
+        const { container } = setup({ lockedReason: READ_ONLY_REASON });
+        const notes = within(desktopRow(container)).getByRole('button', { name: /^Note/ });
+        expect(notes).toBeDisabled();
+        expect(notes.matches(ANSWERS)).toBe(false);
+        expect(within(desktopRow(container)).getByRole('button', { name: 'Altre azioni sull’articolo' }).matches(ANSWERS)).toBe(true);
+    });
+
+    it('stays still on the highlighter while it is on', () => {
+        appStore.setState({ readingTool: 'highlight' });
+        try {
+            const { container } = setup();
+            const toggle = within(desktopRow(container)).getByRole('button', { name: /^Evidenziatore/ });
+            expect(toggle).toHaveAttribute('aria-pressed', 'true');
+            expect(toggle.matches(ANSWERS)).toBe(false);
+        } finally {
+            appStore.setState({ readingTool: null });
+        }
+    });
+});
+
 describe('ReadingToolbar — the selector on the status line (LC70)', () => {
     const CURRENT = { tone: 'current' as const, label: 'In vigore dal 10 novembre 1944', title: '' };
     const bar = (end: ReactNode) => render(
