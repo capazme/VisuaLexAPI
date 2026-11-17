@@ -101,7 +101,7 @@ export function PracticeNameInput({ initial, onDone, className }: {
       ref={ref}
       type="text"
       value={value}
-      aria-label="Nome della pratica"
+      aria-label="Nome del tavolo"
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {

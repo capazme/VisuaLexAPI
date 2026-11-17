@@ -279,13 +279,13 @@ describe('the course page', () => {
 
   it('links the course\'s dossier, and says when it is gone', async () => {
     renderPage();
-    expect(await screen.findByRole('link', { name: 'Dossier «Segni distintivi»' })).toHaveAttribute('href', '/dossier?dossier=dossier-1');
+    expect(await screen.findByRole('link', { name: 'Pratica «Segni distintivi»' })).toHaveAttribute('href', '/pratiche?dossier=dossier-1');
   });
 
   it('says when the dossier is gone', async () => {
     get.mockResolvedValue(page({ dossier: null }));
     renderPage();
-    expect(await screen.findByText('Il dossier del percorso non c’è più.')).toBeInTheDocument();
+    expect(await screen.findByText('La pratica del percorso non c’è più.')).toBeInTheDocument();
   });
 
   it('renames from the menu', async () => {
@@ -312,7 +312,7 @@ describe('the course page', () => {
     await user.click(await screen.findByRole('button', { name: 'Azioni del percorso' }));
     await user.click(screen.getByRole('menuitem', { name: /Elimina/ }));
     expect(await screen.findByTestId('where')).toHaveTextContent('/learn/percorsi');
-    expect(lastMessage()).toBe('Percorso «Proprietà intellettuale: i segni distintivi» spostato nel cestino. Il dossier «Segni distintivi» resta in Dossier.');
+    expect(lastMessage()).toBe('Percorso «Proprietà intellettuale: i segni distintivi» spostato nel cestino. La pratica «Segni distintivi» resta in Pratiche.');
     await undoNotification(notificationStore.getState().entries.at(-1)!.id);
     expect(trashService.restore).toHaveBeenCalledWith('trash-1');
   });

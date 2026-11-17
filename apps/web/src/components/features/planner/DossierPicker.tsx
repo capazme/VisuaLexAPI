@@ -29,7 +29,7 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
   const [active, setActive] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const current = value ? dossiers.find((d) => d.id === value)?.title ?? 'Dossier' : INBOX;
+  const current = value ? dossiers.find((d) => d.id === value)?.title ?? 'Pratica' : INBOX;
 
   const options = useMemo(() => {
     const words = query.trim().toLocaleLowerCase('it');
@@ -111,13 +111,13 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
           <input
             autoFocus
             role="combobox"
-            aria-label="Cerca un dossier"
+            aria-label="Cerca una pratica"
             aria-expanded
             aria-controls={`${id}-list`}
             aria-activedescendant={options[active] ? `${id}-option-${active}` : undefined}
             aria-autocomplete="list"
             value={query}
-            placeholder="Cerca un dossier"
+            placeholder="Cerca una pratica"
             onChange={(e) => {
               setQuery(e.target.value);
               setActive(0);
@@ -126,7 +126,7 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
             autoComplete="off"
             className={FIELD}
           />
-          <ul id={`${id}-list`} role="listbox" aria-label="Dossier" className="mt-1 max-h-64 overflow-y-auto">
+          <ul id={`${id}-list`} role="listbox" aria-label="Pratiche" className="mt-1 max-h-64 overflow-y-auto">
             {options.map((option, index) => (
               <li
                 key={option.id || 'inbox'}
@@ -145,7 +145,7 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
                 {option.id === value && <Check size={15} aria-hidden className="shrink-0 text-primary-700 dark:text-primary-300" />}
               </li>
             ))}
-            {options.length === 0 && <li className="px-2 py-3 text-sm text-slate-600 dark:text-slate-400">Nessun dossier con queste parole.</li>}
+            {options.length === 0 && <li className="px-2 py-3 text-sm text-slate-600 dark:text-slate-400">Nessuna pratica con queste parole.</li>}
           </ul>
         </div>
       )}

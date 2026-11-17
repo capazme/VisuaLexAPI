@@ -9,9 +9,9 @@ describe('studyImportSentence', () => {
       ...empty,
       dossiers: [{ id: 'a', name: 'A', entries: 3 }, { id: 'b', name: 'B', entries: 1 }],
       notes: { added: 1, skipped: 2 }, highlights: { added: 3, skipped: 0 }, refused: 1,
-    })).toBe('Aggiunti: 2 dossier di studio, 1 nota, 3 evidenziazioni. Già tuoi o senza posizione nel testo, quindi non aggiunti: 2. Non leggibili e lasciati fuori: 1.');
+    })).toBe('Aggiunti: 2 pratica di studio, 1 nota, 3 evidenziazioni. Già tuoi o senza posizione nel testo, quindi non aggiunti: 2. Non leggibili e lasciati fuori: 1.');
   });
   it('says so when nothing was added', () => {
-    expect(studyImportSentence(empty)).toBe('Nessun dossier aggiunto.');
+    expect(studyImportSentence(empty)).toBe('Nessuna pratica aggiunta.');
   });
 });

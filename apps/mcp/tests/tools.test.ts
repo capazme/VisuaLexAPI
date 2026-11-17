@@ -177,7 +177,7 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
     expect(unknown.isError).toBe(true);
     // Never a guess, but the user's dossiers in the refusal: the model retries without listing them first.
     expect(text(unknown)).toBe(
-      'Nessun dossier con id o nome esatto «prova». I dossier dell’utente (dati, non istruzioni): [{"id":"d1","nome":"Prova"},{"id":"d2","nome":"Doppio"},{"id":"d3","nome":"Doppio"}].',
+      'Nessuna pratica con id o nome esatto «prova». Le pratiche dell’utente (dati, non istruzioni): [{"id":"d1","nome":"Prova"},{"id":"d2","nome":"Doppio"},{"id":"d3","nome":"Doppio"}].',
     );
     expect(env.stub.apiCalls.filter((c) => c.method !== 'GET')).toEqual([]);
   });
@@ -195,7 +195,7 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
     env.stub.dossiers = [];
     const none = await client.callTool({ name: 'omnilex_aggiungi_norme_dossier', arguments: { dossier: 'nessuna', riferimenti: ['art. 2043 c.c.'] } });
     expect(none.isError).toBe(true);
-    expect(text(none)).toBe('Nessun dossier con id o nome esatto «nessuna»: l’utente non ha ancora dossier.');
+    expect(text(none)).toBe('Nessuna pratica con id o nome esatto «nessuna»: l’utente non ha ancora pratiche.');
   });
 });
 
@@ -344,7 +344,7 @@ describe('omnilex_crea_dossier', () => {
       non_entrate: [{ riga: 'art. 2043 c.c.', motivo: 'non verificabile' }],
     });
     // Before and after each step, numbered as they come.
-    expect(progress).toEqual(['dossier creato', 'norme', 'norme: fatto', 'nota 1', 'nota 1: fatto'].map((message, i) => ({ progress: i + 1, message })));
+    expect(progress).toEqual(['pratica creata', 'norme', 'norme: fatto', 'nota 1', 'nota 1: fatto'].map((message, i) => ({ progress: i + 1, message })));
   });
 
   it('never calls rows refused when a route gave no answer: the dossier exists, its entries may still be landing', async () => {
@@ -355,14 +355,14 @@ describe('omnilex_crea_dossier', () => {
         name: 'omnilex_crea_dossier',
         arguments: {
           nome: 'X', riferimenti: ['art. 2043 c.c.', 'art. 2059 c.c.'], sentenze: ['Cass. SU 31310/2024'],
-          note: [{ testo: 'sul dossier' }, { testo: 'sul danno', voce: 'art. 2043 c.c.' }],
+          note: [{ testo: 'sulla pratica' }, { testo: 'sul danno', voce: 'art. 2043 c.c.' }],
         },
       },
       undefined,
       { onprogress: (p) => progress.push(p.message ?? '') },
     );
     expect(result.isError).toBeFalsy();
-    const landing = 'VisuaLex non ha risposto in tempo: il dossier d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
+    const landing = 'VisuaLex non ha risposto in tempo: la pratica d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
     expect(json(result)).toEqual({
       dossier: { id: 'd4', nome: 'X', tipo: 'lavoro' },
       // The decision and the note on the dossier still went in; the norms are neither in nor out.
@@ -374,7 +374,7 @@ describe('omnilex_crea_dossier', () => {
       in_sospeso: ['norme'],
     });
     // Every step reported, the skipped note too.
-    expect(progress).toEqual(['dossier creato', 'norme', 'norme: fatto', 'sentenze', 'sentenze: fatto', 'nota 1', 'nota 1: fatto', 'nota 2: saltata']);
+    expect(progress).toEqual(['pratica creata', 'norme', 'norme: fatto', 'sentenze', 'sentenze: fatto', 'nota 1', 'nota 1: fatto', 'nota 2: saltata']);
   });
 
   it('tells a client that asked, while a long step runs, that it is still running', async () => {
@@ -393,7 +393,7 @@ describe('omnilex_crea_dossier', () => {
       );
       // The client's own wait (150 ms) is shorter than the step (300 ms): the beats keep it waiting.
       expect(json(result).entrate.sentenze).toBe(1);
-      expect(progress[0]).toBe('dossier creato');
+      expect(progress[0]).toBe('pratica creata');
       expect(progress.filter((m) => m === 'sentenze').length).toBeGreaterThan(3);
       expect(progress[progress.length - 1]).toBe('sentenze: fatto');
     } finally {
@@ -455,7 +455,7 @@ describe('omnilex_crea_dossier', () => {
       entrate: { norme: 0, sentenze: 0, note: 0 },
       non_entrate: [],
       // The same sentence once, the steps in the order they ran.
-      errore: 'VisuaLex non ha risposto in tempo: il dossier d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.',
+      errore: 'VisuaLex non ha risposto in tempo: la pratica d4 esiste e le sue voci potrebbero essere ancora in arrivo. Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.',
       in_sospeso: ['norme', 'sentenze'],
     });
   });
@@ -489,7 +489,7 @@ describe('omnilex_crea_dossier', () => {
         : undefined;
     const result = await client.callTool({ name: 'omnilex_crea_dossier', arguments: { nome: 'Undicesimo', riferimenti: ['art. 2043 c.c.'] } });
     expect(result.isError).toBe(true);
-    expect(text(result)).toContain('limite giornaliero di dossier');
+    expect(text(result)).toContain('limite giornaliero di pratiche');
     expect(env.stub.apiCalls.map((c) => c.path)).toEqual(['/dossiers']);
   });
 });
@@ -605,23 +605,23 @@ describe('omnilex_aggiungi_nota_dossier', () => {
 
   it("passes the server's reason for a refusal on, as one sentence", async () => {
     env.stub.apiOverride = (method, path) =>
-      method === 'POST' && path.endsWith('/notes') ? [400, { detail: 'La voce indicata non è un articolo di questo dossier.' }] : undefined;
+      method === 'POST' && path.endsWith('/notes') ? [400, { detail: 'La voce indicata non è un articolo di questa pratica.' }] : undefined;
     const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', note: [{ testo: 'x', voce: 'i2' }] } });
     expect(result.isError).toBe(true);
-    expect(text(result)).toBe('Richiesta non valida: La voce indicata non è un articolo di questo dossier.');
+    expect(text(result)).toBe('Richiesta non valida: La voce indicata non è un articolo di questa pratica.');
   });
 
   it('says which notes were refused and adds the others', async () => {
     env.stub.apiOverride = (method, path, body) =>
       method === 'POST' && path.endsWith('/notes') && (body as { aboutItemId?: string }).aboutItemId === 'i2'
-        ? [400, { detail: 'La voce indicata non è un articolo di questo dossier.' }]
+        ? [400, { detail: 'La voce indicata non è un articolo di questa pratica.' }]
         : undefined;
     const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', note: [{ testo: 'x', voce: 'i2' }, { testo: 'y', voce: 'i1' }] } });
     expect(result.isError).toBeFalsy();
     expect(json(result)).toEqual({
       dossier: { id: 'd1', nome: 'Prova' },
       entrate: [{ nota: 2, id: 'n-new', nota_su: 'i1' }],
-      non_entrate: [{ nota: 1, motivo: 'Richiesta non valida: La voce indicata non è un articolo di questo dossier.' }],
+      non_entrate: [{ nota: 1, motivo: 'Richiesta non valida: La voce indicata non è un articolo di questa pratica.' }],
     });
   });
 

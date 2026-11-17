@@ -28,7 +28,7 @@ const shortcutGroups: ShortcutGroup[] = [
       { keys: [modKey, 'K'], description: 'Apri la ricerca veloce' },
       { keys: [modKey, 'F'], description: 'Cerca nel testo' },
       { keys: [modKey, 'B'], description: 'Mostra o nascondi la barra laterale' },
-      { keys: [modKey, 'D'], description: 'Vai ai Dossier' },
+      { keys: [modKey, 'D'], description: 'Vai alle Pratiche' },
       { keys: [modKey, 'Shift', 'S'], description: 'Mostra o nascondi il pannello di ricerca' },
     ],
   },
@@ -61,7 +61,7 @@ const shortcutGroups: ShortcutGroup[] = [
   {
     title: 'Compiti',
     shortcuts: [
-      { keys: ['C'], description: 'Nuovo compito (nella pagina di un dossier, in quel dossier)' },
+      { keys: ['C'], description: 'Nuovo compito (nella pagina di una pratica, in quella pratica)' },
       { keys: ['↑', '↓'], description: 'Compito precedente/successivo' },
       { keys: ['Spazio'], description: 'Segna come fatto' },
     ],

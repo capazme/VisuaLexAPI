@@ -12,6 +12,20 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-11-17
+
+«Dossier» becomes «Pratiche» everywhere a user reads it, and the Ricerca's own browser-only practices
+go, with a box that saves the old ones as practices. Web only, no migration.
+
+### Pratiche
+
+- Work's entry, page titles, cards, buttons and messages say «Pratiche» / «pratica» (LC60); the address
+  is `/pratiche`, and `/dossier` with everything under it leads there.
+- The Ricerca no longer keeps its own practices (no bar, no «Salva come dossier», no «Nuova pratica»):
+  what you read goes into a practice. Practices left in the browser by the old Ricerca are offered once,
+  in a box, to be saved as practices; nothing is lost before you answer.
+- The consent sentences name practices instead of dossiers; what is granted does not change (Brandeis).
+
 ## [1.30.0] - 2026-11-17
 
 Claude works on a case's acts through MCP: it reads the case and its files, PDFs included, and deposits an

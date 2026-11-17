@@ -6,7 +6,7 @@ import { NoAnswer, ToolError, formatRenewal } from './errors.js';
 /** What each daily counter of the API counts, as the 429 message names it (apps/server, middleware/delegated.ts). */
 const QUOTA_WORDS: Record<string, string> = {
   points: 'operazioni',
-  dossier_create: 'dossier creati',
+  dossier_create: 'pratiche create',
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
@@ -99,7 +99,7 @@ export async function callApi<T>(
       if (init.forbiddenSays && typeof body.detail === 'string') throw new ToolError(body.detail);
       throw new ToolError('VisuaLex non consente questa operazione alle applicazioni collegate.');
     case 404:
-      throw new ToolError(init.notFound ?? 'Non trovato: il dossier non esiste o non è tuo.');
+      throw new ToolError(init.notFound ?? 'Non trovato: la pratica non esiste o non è tua.');
     case 429: {
       const renewal = formatRenewal(typeof body.resetsAt === 'string' ? body.resetsAt : null);
       const what = typeof body.quota === 'string' ? QUOTA_WORDS[body.quota] ?? 'operazioni' : 'operazioni';

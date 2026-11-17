@@ -92,12 +92,12 @@ describe('EuCaseLawBlock', () => {
     appStore.setState({ openDecision: saved.openDecision, pushReadingBack: saved.pushReadingBack } as never);
   });
 
-  it('offers «Aggiungi al dossier» on a judgment, not on an order (LC59)', async () => {
+  it('offers «Aggiungi alla pratica» on a judgment, not on an order (LC59)', async () => {
     service.mockResolvedValue(found([judgment, order]));
     show();
     await screen.findByText('Corte giust. UE, C-97/23');
-    expect(screen.getByRole('button', { name: 'Aggiungi al dossier Corte giust. UE, C-97/23' })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /^Aggiungi al dossier/ })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Aggiungi alla pratica Corte giust. UE, C-97/23' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Aggiungi alla pratica/ })).toHaveLength(1);
   });
 
   it('opens an order on EUR-Lex by its CELEX, in a new tab, and says so', async () => {

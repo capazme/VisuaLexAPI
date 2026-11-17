@@ -34,7 +34,7 @@ describe('sectionForPath (spec S1)', () => {
     ['/work/cestino', 'opus'],
   ])('%s belongs to %s', (path, section) => expect(sectionForPath(path)).toBe(section));
 
-  it.each(['/', '/dossier', '/documents', '/history', '/collega-app', '/sentenze/cass/1/2024', '/studiare', '/forums', '/opuscolo'])(
+  it.each(['/', '/pratiche', '/documents', '/history', '/collega-app', '/sentenze/cass/1/2024', '/studiare', '/forums', '/opuscolo'])(
     '%s is a Corpus page, of no section',
     (path) => expect(sectionForPath(path)).toBeNull(),
   );
@@ -48,7 +48,7 @@ describe('useSection', () => {
   it('takes the section from a page of one section, and keeps it on the Corpus pages after it (S1)', () => {
     render('/forum');
     expect(sectionStore.getState().section).toBe('forum');
-    expect(render('/dossier').result.current.section).toBe('forum');
+    expect(render('/pratiche').result.current.section).toBe('forum');
   });
 
   it('offers Academia only with the development mode, and falls back to Opus without it (S12)', () => {
@@ -108,7 +108,7 @@ describe('useSection', () => {
     expect(sectionStore.getState().section).toBe('gymnasium');
     expect(result.current.pathname).toBe('/learn/ripasso');
     act(() => result.current.chooseSection('opus'));
-    // Opus opens on its planner's «Oggi» (P1b); the dossiers stay a Corpus page at /dossier.
+    // Opus opens on its planner's «Oggi» (P1b); the dossiers stay a Corpus page at /pratiche.
     expect(result.current.pathname).toBe('/work/scadenziario');
   });
 });

@@ -36,10 +36,10 @@ const ALL_SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:card
  * sources server should not bounce between the two to file an article, and a dossier is one call (D8 S1).
  */
 export const SERVER_INSTRUCTIONS =
-  'VisuaLex: i dossier dell’utente (pratiche e temi di studio, con norme, sentenze e note) e le sue schede di studio di Gymnasium. ' +
-  'Qui si leggono e si arricchiscono. Per un dossier basta una chiamata: omnilex_crea_dossier con l’elenco delle norme e delle sentenze a parole ' +
+  'VisuaLex: le pratiche dell’utente (casi di lavoro e temi di studio, con norme, sentenze e note) e le sue schede di studio di Gymnasium. ' +
+  'Qui si leggono e si arricchiscono. Per una pratica basta una chiamata: omnilex_crea_dossier con l’elenco delle norme e delle sentenze a parole ' +
   '(«art. 2043 c.c.», «Cass. civ., n. 31310/2024») e le note. Non verificare prima i riferimenti con altri strumenti: VisuaLex li verifica alla fonte. ' +
-  'Cercare o studiare il testo di norme e sentenze fuori da un dossier si fa con altri strumenti.';
+  'Cercare o studiare il testo di norme e sentenze fuori da una pratica si fa con altri strumenti.';
 
 /** The protected resource metadata URL for the endpoint (RFC 9728 §3.1). */
 export function resourceMetadataUrl(config: McpConfig): string {

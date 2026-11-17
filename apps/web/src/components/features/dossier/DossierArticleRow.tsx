@@ -183,7 +183,7 @@ export function DossierArticleRow({
         >
           <Star size={16} className={cn(isImportant && 'fill-amber-400')} />
         </button>
-        <button type="button" onClick={onRemove} aria-label="Rimuovi articolo dal dossier" className={ROW_REMOVE}>
+        <button type="button" onClick={onRemove} aria-label="Rimuovi articolo dalla pratica" className={ROW_REMOVE}>
           <Trash2 size={16} aria-hidden />
         </button>
       </div>

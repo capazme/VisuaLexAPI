@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 describe('PracticePhoneView (spec §8, P3)', () => {
-  it('the header names the practice, its name opens the list, and the column follows a switch (R3: no carousel)', async () => {
+  it('the header names the practice, no list behind it (LC60), and the column follows the active practice (R3: no carousel)', async () => {
     const first = s().createPractice('Prima');
     s().addArticlesToPractice(first, L24, [article(L24, '5')]);
     const second = s().createPractice('Seconda');
@@ -75,12 +75,10 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     expect(screen.queryByRole('button', { name: /^Pratica \d: / })).toBeNull();
     expect(screen.getByRole('region', { name: 'l. 8 marzo 2017, n. 24' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: /^Seconda/ }));
-    expect(s().activePracticeId).toBe(second);
+    expect(screen.queryByTitle('Elenco delle pratiche')).toBeNull();
+    act(() => { s().setActivePractice(second); });
     expect(screen.queryByRole('region', { name: 'l. 8 marzo 2017, n. 24' })).toBeNull();
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(title()).toBe('Seconda');
+    await waitFor(() => expect(title()).toBe('Seconda'));
   });
 
   it('rows open in place: a reveal from the store opens the row on the phone too', () => {
@@ -113,16 +111,14 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     // The column and the head add no side padding: the text starts 16 px from the screen's edges.
     expect(container.querySelector('.space-y-4')!.className).not.toMatch(/\bpx-/);
     expect(screen.getByRole('heading', { level: 2 }).parentElement!.parentElement!.className).not.toMatch(/\bpx-/);
-    // `-ml-1` and a cap of 100 % cut «c.c.» to «c…» beside free room: the cap gives the margin back.
-    expect(screen.getByTitle('Elenco delle pratiche')).toHaveClass('-ml-1', 'max-w-[calc(100%+0.25rem)]');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('c.c.');
   });
 
-  it('the header\'s controls are 44 px targets: the name, «Salva come dossier» and «⋯»', () => {
+  it('the header\'s one control is «⋯», a 44 px target; no «Salva come dossier» (LC60)', () => {
     s().createPractice('Prima');
     render(view());
-    expect(screen.getByTitle('Elenco delle pratiche')).toHaveClass('min-h-[44px]');
-    expect(screen.getByRole('button', { name: 'Salva come dossier' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
-    expect(screen.getByRole('button', { name: /^Altre azioni per la pratica/ })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(screen.queryByRole('button', { name: 'Salva come dossier' })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Altre azioni per / })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
   });
 });
 
@@ -271,28 +267,11 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     render(view());
     const count = screen.getByText(/1 atto · 1 articolo · 1 sentenza/);
     expect(count.parentElement).toContainElement(screen.getByRole('heading', { level: 2 }));
-    expect(count.parentElement).not.toContainElement(screen.getByRole('button', { name: 'Salva come dossier' }));
+    expect(count.parentElement).not.toContainElement(screen.getByRole('button', { name: /^Altre azioni per / }));
     expect(count.parentElement).toHaveClass('min-w-0', 'flex-1');
     // The name keeps its room; the count gives way, its words in its title.
     expect(screen.getByRole('heading', { level: 2 })).toHaveClass('shrink-0');
     expect(count).toHaveAttribute('title', '1 atto · 1 articolo · 1 sentenza');
-  });
-
-  it('Esc on the list\'s open «⋯» menu closes the menu and leaves «Le tue pratiche» visible', async () => {
-    s().createPractice('Prima');
-    render(view());
-    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
-    const dialog = screen.getByRole('dialog', { name: 'Le tue pratiche' });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Altre azioni per la pratica Prima' }));
-    const item = screen.getByRole('menuitem', { name: 'Rinomina' });
-    fireEvent.keyDown(item, { key: 'Escape' });
-    expect(screen.queryByRole('menu')).toBeNull();
-    // (a dialog that closed would still be in the DOM for its exit animation: wait it out)
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    expect(screen.getByRole('dialog', { name: 'Le tue pratiche' })).toBeInTheDocument();
-    // a second Esc, with no menu open, is the dialog's
-    fireEvent.keyDown(document.body, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('the dossier picker is one stable sibling: opening the reader does not remount it, its typed query survives', () => {
@@ -301,12 +280,12 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
       dossiers: Array.from({ length: 6 }, (_, i) => ({ id: `d${i}`, title: `Dossier ${i}`, createdAt: '', tags: [], items: [] })),
     });
     render(view());
-    fireEvent.click(screen.getByRole('button', { name: /^Altre azioni per la pratica/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
-    const search = screen.getByRole('textbox', { name: 'Cerca dossier' }) as HTMLInputElement;
+    fireEvent.click(screen.getByRole('button', { name: /^Altre azioni per / }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
+    const search = screen.getByRole('textbox', { name: 'Cerca una pratica' }) as HTMLInputElement;
     fireEvent.change(search, { target: { value: 'Dossier 3' } });
     act(() => { s().openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })); });
-    const after = screen.getByRole('textbox', { name: 'Cerca dossier' }) as HTMLInputElement;
+    const after = screen.getByRole('textbox', { name: 'Cerca una pratica' }) as HTMLInputElement;
     expect(after).toBe(search); // the same element: not remounted
     expect(after.value).toBe('Dossier 3');
   });
@@ -359,6 +338,8 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
   });
 
   it('a reload lands on the table: the reader is session state, not saved, whatever windows the desktop had', async () => {
+    // LC60: only the Corpus practices waiting for the riquadro are saved; the reader never is.
+    appStore.setState({ corpusPracticesPending: true });
     const { practiceId, actId, articleKey, decisionId } = withArticleAndDecision();
     const two = [
       besideRefFor({ kind: 'article', actId, articleKey }),
@@ -381,6 +362,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(screen.queryByText(/Aperto accanto/)).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Espandi/ })).toHaveLength(2);
     localStorage.removeItem('visualex-storage');
+    appStore.setState({ corpusPracticesPending: false });
   });
 
   it('a reader whose practice is not the one on screen is not drawn', () => {
@@ -411,68 +393,21 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
   it('the save\'s picker is not lost when the reader opens: it is mounted outside the column the reader replaces', () => {
     const { practiceId, articleKey, actId } = withArticleAndDecision();
     render(view());
-    fireEvent.click(screen.getByRole('button', { name: /^Altre azioni per la pratica/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
-    expect(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Altre azioni per / }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
+    expect(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).toBeInTheDocument();
     act(() => { s().openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })); });
     expect(screen.getByTestId('reading-full-screen')).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).toBeInTheDocument();
   });
 
-  it('a tap on the name lists the practices (44 px entries): it switches, and «Nuova pratica» creates one', async () => {
-    const first = s().createPractice('Prima');
-    const second = s().createPractice('Seconda');
-    s().addArticlesToPractice(second, L241, [article(L241, '2')]);
-    s().setActivePractice(first);
-    render(view());
-    const name = () => screen.getByTitle('Elenco delle pratiche');
-    expect(name()).toHaveClass('min-h-[44px]');
-
-    fireEvent.click(name());
-    const dialog = screen.getByRole('dialog', { name: 'Le tue pratiche' });
-    expect(within(dialog).getByRole('button', { name: /^Prima/ })).toHaveAttribute('aria-current', 'true');
-    expect(within(dialog).getByRole('button', { name: /^Seconda/ })).toHaveClass('min-h-[44px]');
-    fireEvent.click(within(dialog).getByRole('button', { name: /^Seconda/ }));
-    expect(s().activePracticeId).toBe(second);
-    expect(name()).toHaveTextContent('Seconda');
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-
-    fireEvent.click(name());
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Nuova pratica' }));
-    expect(s().practices.map((p) => p.label)).toEqual(['Prima', 'Seconda', 'Nuova pratica']);
-    expect(s().activePracticeId).toBe(s().practices[2].id);
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  });
-
-  it('each practice in the list has «⋯» (44 px) to rename it, in place', async () => {
-    const first = s().createPractice('Prima');
-    render(view());
-    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
-    const dialog = screen.getByRole('dialog', { name: 'Le tue pratiche' });
-    const more = within(dialog).getByRole('button', { name: 'Altre azioni per la pratica Prima' });
-    expect(more).toHaveClass('min-h-[44px]', 'min-w-[44px]');
-    fireEvent.click(more);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Rinomina' }));
-    const input = within(dialog).getByRole('textbox', { name: 'Nome della pratica' });
-    fireEvent.change(input, { target: { value: 'Rossi c. Bianchi' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(s().practices.find((p) => p.id === first)?.label).toBe('Rossi c. Bianchi');
-    expect(s().practices.find((p) => p.id === first)?.labelIsCustom).toBe(true);
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Rossi c\. Bianchi/ })).toBeInTheDocument());
-  });
-
-  it('«Chiudi la pratica» in the list closes it at once, with no confirmation, and the other becomes active (K1a)', () => {
+  it('«Chiudi il tavolo» in «⋯» closes it at once, with no confirmation (K1a)', () => {
     const { practiceId } = withArticleAndDecision();
-    const keep = s().createPractice('Resta');
-    s().setActivePractice(practiceId);
     render(view());
-    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
-    const label = s().practices.find((p) => p.id === practiceId)?.label ?? '';
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: `Altre azioni per la pratica ${label}` }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Altre azioni per / }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi il tavolo' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    expect(s().practices.map((p) => p.id)).toEqual([keep]);
-    expect(s().activePracticeId).toBe(keep);
+    expect(s().practices.some((p) => p.id === practiceId)).toBe(false);
   });
 
   it('no extracted article is drawn, and no topic band: a practice with only a desktop window is empty here', () => {
@@ -487,16 +422,14 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(screen.queryByTestId('topic-list')).toBeNull();
   });
 
-  it('«Salva come dossier» and its «⋯» entries are on the phone\'s header, 44 px', () => {
+  it('«⋯» on the phone\'s header adds to a pratica, never saves the table as one (LC60), 44 px', () => {
     withArticleAndDecision();
     render(view());
-    const save = screen.getByRole('button', { name: 'Salva come dossier' });
-    expect(save).toHaveClass('min-h-[44px]');
-    const more = screen.getByRole('button', { name: /^Altre azioni per la pratica/ });
+    const more = screen.getByRole('button', { name: /^Altre azioni per / });
     expect(more).toHaveClass('min-h-[44px]', 'min-w-[44px]');
     fireEvent.click(more);
-    expect(screen.getByRole('menuitem', { name: 'Salva come dossier' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Salva come dossier' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeInTheDocument();
     expect(screen.getByText(/1 atto · 1 articolo · 1 sentenza/)).toBeInTheDocument();
   });
 

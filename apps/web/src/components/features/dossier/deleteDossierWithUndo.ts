@@ -3,7 +3,7 @@ import { trashService } from '../../../services/trashService';
 import { appStore } from '../../../store/useAppStore';
 
 /** The toast after a dossier is deleted: where it went, and «Annulla». */
-export const deletedDossierMessage = (title: string) => `Dossier «${title}» spostato nel cestino`;
+export const deletedDossierMessage = (title: string) => `Pratica «${title}» spostata nel cestino`;
 
 /**
  * Deletes a dossier from the web app: the server moves it to the trash for 30 days
@@ -30,7 +30,7 @@ export function deleteDossierWithUndo(
         await appStore.getState().refreshDossier(dossier.id);
       } catch (err) {
         console.error('Failed to restore a deleted dossier:', dossier.id, err);
-        appStore.getState().pushSyncError(`Impossibile ripristinare «${dossier.title}» ora: è nel Cestino, ripristinalo da lì.`);
+        appStore.getState().pushSyncError(`Impossibile ripristinare «${dossier.title}» ora: è nel Cestino, ripristinala da lì.`);
         // Said: no «Ripristinato» after it.
         throw err;
       }

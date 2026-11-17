@@ -4,8 +4,8 @@ import { Button } from '../Button';
 
 describe('Button', () => {
   it('keeps its label while loading, busy and disabled, so its width does not jump', () => {
-    render(<Button loading>Salva il dossier</Button>);
-    const button = screen.getByRole('button', { name: 'Salva il dossier' });
+    render(<Button loading>Salva la pratica</Button>);
+    const button = screen.getByRole('button', { name: 'Salva la pratica' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
   });

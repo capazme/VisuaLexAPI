@@ -382,7 +382,7 @@ describe('ArticleTabContent — an article that did not exist yet', () => {
   it('switches off copying and the dossier', () => {
     show(notYet());
     const reason = 'Non disponibile: l’articolo non esisteva a quella data';
-    screen.getAllByRole('button', { name: 'Al dossier' }).forEach((b) => {
+    screen.getAllByRole('button', { name: 'Alla pratica' }).forEach((b) => {
       expect(b).toBeDisabled();
       expect(b.title).toContain(reason);
     });
@@ -467,7 +467,7 @@ describe('ArticleTabContent — copying a past text', () => {
 
   it('does not let that version be copied or put in a dossier: it would leave the page as the article in force', () => {
     const { container } = show(article({ ...MIDDLE, request_in_window: false }, { versione: 'vigente', data_versione: '2010-01-01' }));
-    screen.getAllByRole('button', { name: 'Al dossier' }).forEach((b) => {
+    screen.getAllByRole('button', { name: 'Alla pratica' }).forEach((b) => {
       expect(b).toBeDisabled();
       expect(b.title).toContain(UNRELIABLE_REASON);
     });
@@ -485,7 +485,7 @@ describe('ArticleTabContent — copying a past text', () => {
   it('keeps copying on for a reliable past text (the control)', () => {
     show(article(MIDDLE, PAST));
     expect(copyButton()).toBeEnabled();
-    screen.getAllByRole('button', { name: 'Al dossier' }).forEach((b) => expect(b).toBeEnabled());
+    screen.getAllByRole('button', { name: 'Alla pratica' }).forEach((b) => expect(b).toBeEnabled());
   });
 
   it('does not export a past text, an unreliable one or a missing article either', () => {

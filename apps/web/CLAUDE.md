@@ -37,7 +37,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   «Riprova», which reloads (the one mend for a file a deploy removed; before P1 no boundary held it and the app went
   blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
   entry chosen again, included).
-  In the signed-in layout: `/` (search), `/dossier`, `/work` (the planner, below: `OpusPage`
+  In the signed-in layout: `/` (search), `/pratiche` (the dossiers, «Pratiche» on screen since LC60; `/dossier` and
+  everything under it is an old address, `MovedTo` keeps its query and anchor), `/work` (the planner, below: `OpusPage`
   over `scadenziario`, `prossimi`, `ingresso` and `cestino`; `/work` redirects to `scadenziario`; LC48: `/work/oggi` and
   `/work/anonimizzatore` are old addresses, `MovedTo` sends them to `/work/scadenziario` and `/work/pseudonimizzatore`),
   `/learn` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
@@ -1087,6 +1088,18 @@ they are, inert: no code writes or reads them, a saved quick norm or link still 
 and the Python API ignores it. `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
 `set`. `clearUserData` empties the practices.
+**LC60, «Pratiche».** What a user reads says «pratica» / «Pratiche» for a dossier (the code keeps `dossier`;
+`pratiche.guard.test.ts` refuses the word in literals and JSX text outside the Forum, which keeps «Dossier pubblici»). The
+Ricerca is one reading bench of the session: no bar of practices (`PracticeBar` and `PracticeChip` are gone), no «Salva
+come dossier», «Nuova pratica», «Sposta in un'altra pratica», list of practices on the phone, «Apri tutto in Ricerca» or
+«Apri anche in Ricerca»; its table is closed with «Chiudi il tavolo» and added to a pratica with «Aggiungi a una pratica…».
+`partialize` saves no practice, except the Corpus practices a browser kept from before, while they wait for the riquadro
+(`corpusPracticesPending`, set by the load that finds them; parked at a sign-out as before). `CorpusPracticesDialog`
+(mounted by `Layout`, once `dossiersLoaded` says the dossiers were read) drops the empty ones and those holding exactly a
+dossier's articles and decisions, offers the rest ticked, saves each through `savePracticeAsDossier` and closes it, and
+then `endCorpusPractices`; a failed save takes nothing else away and the riquadro stays (a retry adds to the dossier a
+first, partial try made). No key of its own: the riquadro shows while such practices are in the browser.
+
 A practice with a `dossierId` (LC51: a reading table bound to a dossier, built by `openDossierPractice`, its articles
 without text until `setPracticeArticleText`, re-synced additively by `resyncDossierPractice`) is the session's: `partialize`
 leaves it out (`corpusPractices`), `sanitizePractices` drops one found saved, it is never the active practice, and

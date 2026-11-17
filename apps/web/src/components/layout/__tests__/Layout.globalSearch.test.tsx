@@ -45,7 +45,7 @@ function at(path: string) {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<p>Pagina di ricerca</p>} />
-          <Route path="dossier" element={<p>Pagina dossier</p>} />
+          <Route path="pratiche" element={<p>Pagina dossier</p>} />
           <Route path="history" element={<p>Pagina cronologia</p>} />
           <Route path="learn" element={<p>Pagina studia</p>} />
           <Route path="sentenze" element={<DecisionAddress />} />
@@ -91,7 +91,7 @@ afterEach(() => {
 
 describe('Layout — ⌘K opens the palette on every page', () => {
   it.each([
-    ['/dossier', 'Pagina dossier'],
+    ['/pratiche', 'Pagina dossier'],
     ['/history', 'Pagina cronologia'],
     ['/learn', 'Pagina studia'],
   ])('on %s, at once, without leaving the page', (path, page) => {
@@ -104,7 +104,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
 
   it('a decision opened from another page lands in the practices, on the search page', async () => {
     const user = userEvent.setup();
-    at('/dossier');
+    at('/pratiche');
     pressCmdK();
     await user.type(screen.getByPlaceholderText(PALETTE_BOX), 'Cass. civ. 10787/2024{Enter}');
     expect(openDecision).toHaveBeenCalledWith(expect.objectContaining({ corte: 'cassazione', numero: 10787, anno: 2024 }), { fromLink: true });
@@ -135,7 +135,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
     const norma = { tipo_atto: 'codice civile', urn: 'urn:test' };
     resolveAct.mockResolvedValue({ norma });
     const user = userEvent.setup();
-    at('/dossier');
+    at('/pratiche');
     pressCmdK();
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
     await user.click(screen.getByRole('button', { name: /Apri l'indice e sfoglia/ }));
@@ -151,7 +151,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
       selectQuickNorm: vi.fn(),
     });
     const user = userEvent.setup();
-    at('/dossier');
+    at('/pratiche');
     await user.click(screen.getByText('Danno ingiusto'));
     expect(triggerSearch).toHaveBeenCalledWith(params);
     expect(isTypedSearch(triggerSearch.mock.calls[0][0])).toBe(false);
@@ -216,7 +216,7 @@ describe('Layout — the search page\'s field', () => {
     expect(document.querySelector('main')).toHaveClass('[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]');
   });
 
-  it.each(['/dossier', '/history'])('is not drawn on %s', (path) => {
+  it.each(['/pratiche', '/history'])('is not drawn on %s', (path) => {
     at(path);
     expect(screen.queryByRole('search', { name: 'Ricerca' })).toBeNull();
   });

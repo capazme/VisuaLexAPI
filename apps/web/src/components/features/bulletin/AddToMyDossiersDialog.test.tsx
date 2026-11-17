@@ -35,7 +35,7 @@ describe('AddToMyDossiersDialog', () => {
   it('adds the dossiers with what stays ticked, then sends forum_download without the author', async () => {
     const onAdded = vi.fn();
     render(<AddToMyDossiersDialog sharedEnvironment={env} onClose={vi.fn()} onAdded={onAdded} />);
-    expect(screen.getByText(/diventa un tuo dossier di studio/)).toBeInTheDocument();
+    expect(screen.getByText(/diventa una tua pratica di studio/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Le note (1)' }));
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
     await waitFor(() => expect(onAdded).toHaveBeenCalledWith(report));

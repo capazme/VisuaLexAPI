@@ -15,7 +15,7 @@ const messageOf = (err: unknown) => (err as { message?: string } | null)?.messag
 const isCourseKind = (kind: TrashEntry['kind']) => kind === 'LINGO_CORSO' || kind === 'LINGO_CORSO_MODULO';
 
 export const GONE_FROM_TRASH = 'Non è più nel cestino: forse è già stato ripristinato o è scaduto.';
-const TARGET_GONE = 'Il dossier scelto non esiste più: scegline un altro.';
+const TARGET_GONE = 'La pratica scelta non esiste più: scegline un’altra.';
 
 /**
  * With a dossier chosen, a 404 is the entry gone or that dossier gone: the trash, read again, tells
@@ -94,7 +94,7 @@ export function useTrash() {
       // is no reason to ask.
       const ownGone = entry.kind === 'DOSSIER_ITEMS' && !appStore.getState().dossiers.some((d) => d.id === entry.dossierId);
       if (status === 409 && !targetDossierId && ownGone) {
-        return { kind: 'needs-target', message: messageOf(err) || 'Il dossier non esiste più: scegli dove ripristinare.' };
+        return { kind: 'needs-target', message: messageOf(err) || 'La pratica non esiste più: scegli dove ripristinare.' };
       }
       console.error('Failed to restore a trash entry:', entry.id, err);
       // The server's 409s are Italian by contract; anything else gets ours.

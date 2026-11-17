@@ -21,7 +21,7 @@ const note = { id: 'n', type: 'note', data: 'appunto', addedAt: '' };
 const badDecision = { id: 'b', type: 'sentenza', data: { ...SENTENZA, corte: 'tar' }, addedAt: '' };
 
 function link(items: unknown[], title = 'Da link') {
-  return `/dossier?import=${encodeDossierShare({ title, items } as unknown as Dossier)}`;
+  return `/pratiche?import=${encodeDossierShare({ title, items } as unknown as Dossier)}`;
 }
 
 async function importWith(items: unknown[], outcome: { id: string; imported: number; failed: number } | null, url = link(items)) {
@@ -36,16 +36,16 @@ async function importWith(items: unknown[], outcome: { id: string; imported: num
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe('DossierPage: the toast after an import', () => {
-  it('says "Dossier importato" as a success when nothing was lost', async () => {
+  it('says "Pratica importata" as a success when nothing was lost', async () => {
     const { importDossier, status } = await importWith([note], { id: 'srv', imported: 1, failed: 0 });
-    expect(status).toHaveTextContent('Dossier importato');
+    expect(status).toHaveTextContent('Pratica importata');
     expect(status).toHaveAttribute('data-type', 'success');
     expect(importDossier).toHaveBeenCalledOnce();
   });
 
   it('counts what the check left out together with what the server refused', async () => {
     const { importDossier, status } = await importWith([note, badDecision], { id: 'srv', imported: 1, failed: 1 });
-    expect(status).toHaveTextContent('Dossier importato in parte: 1 voce importata, 2 scartate');
+    expect(status).toHaveTextContent('Pratica importata in parte: 1 voce importata, 2 scartate');
     expect(status).toHaveAttribute('data-type', 'info');
     // the dossier sent to the store holds only what passed the check
     expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ items: [{ id: 'n' }] }]);
@@ -54,13 +54,13 @@ describe('DossierPage: the toast after an import', () => {
 
   it('is a warning when nothing came in', async () => {
     const { status } = await importWith([badDecision], { id: 'srv', imported: 0, failed: 0 });
-    expect(status).toHaveTextContent('Dossier importato in parte: 0 voci importate, 1 scartata');
+    expect(status).toHaveTextContent('Pratica importata in parte: 0 voci importate, 1 scartata');
     expect(status).toHaveAttribute('data-type', 'warning');
   });
 
   it('says the server failed when the dossier itself could not be created', async () => {
     const { status } = await importWith([note], null);
-    await waitFor(() => expect(status).toHaveTextContent('Impossibile importare il dossier: errore server'));
+    await waitFor(() => expect(status).toHaveTextContent('Impossibile importare la pratica: errore server'));
     expect(status).toHaveAttribute('data-type', 'error');
   });
 });
@@ -72,7 +72,7 @@ describe('DossierPage: share links', () => {
   });
 
   it('still imports a link made before the UTF-8 links', async () => {
-    const old = `/dossier?import=${encodeURIComponent(btoa(JSON.stringify({ title: 'Perché', items: [note] })))}`;
+    const old = `/pratiche?import=${encodeURIComponent(btoa(JSON.stringify({ title: 'Perché', items: [note] })))}`;
     const { importDossier } = await importWith([note], { id: 'srv', imported: 1, failed: 0 }, old);
     expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ title: 'Perché' }]);
   });

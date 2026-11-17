@@ -53,7 +53,7 @@ export function checkLessonText(text: string): FormatCheck {
     const [, bang, label, target] = match;
     if (bang) return { ok: false, reason: 'le immagini non sono ammesse' };
     if (!target.startsWith('#') || !CITATION_MARKER.test(target.slice(1))) {
-      return { ok: false, reason: `un link può solo citare una voce del dossier («[testo](#c1)»), non «${target.slice(0, 40)}»` };
+      return { ok: false, reason: `un link può solo citare una voce della pratica («[testo](#c1)»), non «${target.slice(0, 40)}»` };
     }
     if (label.trim() === '') return { ok: false, reason: `la citazione «#${target.slice(1)}» non ha testo` };
     if (!markers.includes(target.slice(1))) markers.push(target.slice(1));

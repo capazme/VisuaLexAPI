@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 // The addresses took their sections' names (D-235): /work, /learn, /labs. The old ones (/opus, /studia, /merlt,
-// /grafo, and Work's /work/oggi and /work/anonimizzatore since LC48) live only in `App.tsx`'s redirects (`MovedTo`). This refuses any other string or pattern of the sources
+// /grafo, Work's /work/oggi and /work/anonimizzatore since LC48, /dossier since LC60) live only in `App.tsx`'s redirects (`MovedTo`). This refuses any other string or pattern of the sources
 // that starts with an old address. The server's paths (`'/merlt/consent'`, `/api/…`) never match: an API path under
 // /merlt is never one of the app's pages.
 const src = __dirname; // apps/web/src
@@ -13,6 +13,8 @@ const OLD_ADDRESS = new RegExp([
   /['"`]\/merlt(?=['"`?#]|\/(contribuisci|valida|qa|chiedi)(?![\w-]))/.source,
   /(?<!labs)\\\/(opus|studia|merlt|grafo)(?![\w-])/.source,
   /\/work(\/|\\\/)(oggi|anonimizzatore)(?![\w-])/.source,
+  // LC60: «Dossier» is «Pratiche», at /pratiche; the server's `/dossiers` paths never match.
+  /['"`]\/dossier(?![\w-])|\\\/dossier(?![\w-])/.source,
 ].join('|'));
 
 function sources(dir: string): string[] {
@@ -31,10 +33,10 @@ describe('the old addresses', () => {
   });
 
   it('the pattern catches an old address and leaves the server\'s paths alone', () => {
-    for (const line of [`to="/opus/oggi"`, `navigate('/studia/ripasso')`, 'to={`/grafo?urn=${u}`}', `'/merlt'`, `"/merlt/valida"`, String.raw`/^\/studia\/schede/`, `to="/work/oggi"`, String.raw`/^\/work\/anonimizzatore(\/|$)/`]) {
+    for (const line of [`to="/opus/oggi"`, `navigate('/studia/ripasso')`, 'to={`/grafo?urn=${u}`}', `'/merlt'`, `"/merlt/valida"`, String.raw`/^\/studia\/schede/`, `to="/work/oggi"`, String.raw`/^\/work\/anonimizzatore(\/|$)/`, `to="/dossier"`, '`/dossier?dossier=${id}`', String.raw`[/^\/dossier(\/|$)/, X]`]) {
       expect(OLD_ADDRESS.test(line), line).toBe(true);
     }
-    for (const line of [`'/merlt/consent'`, `'/merlt/validate/pending'`, `'/api/studia/cards'`, `'/opuscolo'`, `import('./features/studia/x')`, String.raw`/^\/labs\/grafo(\/|$)/`, `'/work/oggetti'`, `'/work/scadenziario'`]) {
+    for (const line of [`'/merlt/consent'`, `'/merlt/validate/pending'`, `'/api/studia/cards'`, `'/opuscolo'`, `import('./features/studia/x')`, String.raw`/^\/labs\/grafo(\/|$)/`, `'/work/oggetti'`, `'/work/scadenziario'`, `apiClient.get('/dossiers')`, '`/dossiers/${id}/items`', `'/pratiche'`]) {
       expect(OLD_ADDRESS.test(line), line).toBe(false);
     }
   });

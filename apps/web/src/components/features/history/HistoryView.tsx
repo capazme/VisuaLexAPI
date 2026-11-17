@@ -206,7 +206,7 @@ export function HistoryView() {
         e.stopPropagation();
         const norma = historyToNormaVisitata(item);
         addToDossier(dossierId, norma, 'norma');
-        showFeedback('Aggiunto al dossier');
+        showFeedback('Aggiunto alla pratica');
         setOpenMenu(null);
         setShowDossierList(null);
     };
@@ -230,7 +230,7 @@ export function HistoryView() {
             addToDossier(id, norma, 'norma');
             showFeedback(`Creato "${title}" e aggiunta norma`);
         } else {
-            showFeedback('Errore nella creazione del dossier', 'error');
+            showFeedback('Errore nella creazione della pratica', 'error');
         }
     };
 
@@ -570,7 +570,7 @@ export function HistoryView() {
                                                                             >
                                                                                 <span className="flex items-center gap-2">
                                                                                     <FolderPlus size={16} className="text-primary-500" />
-                                                                                    <span>Aggiungi a dossier</span>
+                                                                                    <span>Aggiungi a una pratica</span>
                                                                                 </span>
                                                                                 <ArrowRight size={14} className="text-slate-400" />
                                                                             </button>
@@ -579,7 +579,7 @@ export function HistoryView() {
                                                                             {showDossierList === item.id && (
                                                                                 <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 max-h-64 overflow-y-auto">
                                                                                     {dossiers.length === 0 ? (
-                                                                                        <p className="px-3 py-2 text-sm text-slate-500">Nessun dossier</p>
+                                                                                        <p className="px-3 py-2 text-sm text-slate-500">Nessuna pratica</p>
                                                                                     ) : (
                                                                                         dossiers.map(dossier => (
                                                                                             <button
@@ -597,7 +597,7 @@ export function HistoryView() {
                                                                                             className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                                                                                         >
                                                                                             <Plus size={14} />
-                                                                                            <span>Nuovo dossier...</span>
+                                                                                            <span>Nuova pratica...</span>
                                                                                         </button>
                                                                                     </div>
                                                                                 </div>
@@ -657,7 +657,7 @@ export function HistoryView() {
                 open={clearConfirmOpen}
                 variant="danger"
                 title="Svuotare la cronologia?"
-                message="Tutte le ricerche salvate verranno rimosse. I dossier e i segnalibri non saranno toccati."
+                message="Tutte le ricerche salvate verranno rimosse. Le pratiche e i segnalibri non saranno toccati."
                 confirmLabel="Svuota"
                 focusCancel
                 onConfirm={handleConfirmClear}
@@ -670,7 +670,7 @@ export function HistoryView() {
                     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md p-5">
                         <div className="flex items-start justify-between mb-3">
                             <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                                Crea nuovo dossier
+                                Crea nuova pratica
                             </h2>
                             <button
                                 onClick={() => { setCreateDossierFor(null); setNewDossierTitle(''); }}
@@ -681,7 +681,7 @@ export function HistoryView() {
                             </button>
                         </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                            La norma verrà aggiunta automaticamente al nuovo dossier.
+                            La norma verrà aggiunta automaticamente alla nuova pratica.
                         </p>
                         <input
                             type="text"
@@ -692,7 +692,7 @@ export function HistoryView() {
                                 if (e.key === 'Enter' && newDossierTitle.trim()) handleConfirmCreateDossier();
                                 if (e.key === 'Escape') { setCreateDossierFor(null); setNewDossierTitle(''); }
                             }}
-                            placeholder="Nome del dossier"
+                            placeholder="Nome della pratica"
                             maxLength={120}
                             className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />

@@ -395,7 +395,7 @@ describe('AuthPage: two tabs on one page', () => {
   });
 
   it('keeps the way back after the login across changes of tab', async () => {
-    renderAuth({ pathname: '/login', state: { from: { pathname: '/dossier', search: '?dossier=7' } } });
+    renderAuth({ pathname: '/login', state: { from: { pathname: '/pratiche', search: '?dossier=7' } } });
     fireEvent.click(tab('Registrati'));
     fireEvent.click(tab('Accedi'));
     fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'a@b.it' } });
@@ -403,7 +403,7 @@ describe('AuthPage: two tabs on one page', () => {
     await act(async () => {
       fireEvent.click(within(panel()).getByRole('button', { name: 'Accedi' }));
     });
-    await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/dossier?dossier=7'), { timeout: 2000 });
+    await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/pratiche?dossier=7'), { timeout: 2000 });
   });
 });
 

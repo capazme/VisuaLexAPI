@@ -91,7 +91,7 @@ describe('entries removed from a dossier on the web app (question 181)', () => {
     svc.trashItems.mockRejectedValue(new Error('down'));
     const trashChanged = vi.fn();
     removeItemsWithUndo('d1', ['a', 'c'], '2 elementi rimossi', trashChanged);
-    await vi.waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dal dossier. Riprova.'));
+    await vi.waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dalla pratica. Riprova.'));
     expect(ids()).toEqual(['a', 'b', 'c']);
     expect(toast).toBeNull();
     expect(trashChanged).not.toHaveBeenCalled();

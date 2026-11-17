@@ -176,7 +176,7 @@ describe('App routing', () => {
 
   // The pages loaded with their route (P1): each at its address, inside the layout.
   it.each([
-    ['/dossier', 'dossier-page'],
+    ['/pratiche', 'dossier-page'],
     ['/history', 'history-page'],
     ['/documents', 'documents-page'],
     ['/collega-app', 'connect-ai-app-page'],
@@ -207,7 +207,7 @@ describe('App routing', () => {
   it('/work/atti leads to the dossiers, outside Opus’s frame', async () => {
     renderAt('/work/atti');
     expect(await screen.findByTestId('dossier-page')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/dossier');
+    expect(window.location.pathname).toBe('/pratiche');
   });
 
   it('/work/atti/42 goes to the act\'s redirect', async () => {
@@ -391,6 +391,9 @@ describe('App routing — old addresses', () => {
     ['/grafo?urn=urn%3Anir&depth=2#n1', '/labs/grafo', '?urn=urn%3Anir&depth=2', '#n1', { testId: 'graph-explorer' }],
     ['/merlt/qa?x=1#y', '/labs/grafo', '?x=1', '#y', { testId: 'graph-explorer' }],
     ['/merlt/chiedi', '/labs/grafo', '', '', { testId: 'graph-explorer' }],
+    // LC60: «Dossier» is «Pratiche»; a dossier's link and its view travel with it.
+    ['/dossier', '/pratiche', '', '', { testId: 'dossier-page' }],
+    ['/dossier?dossier=d1&vista=lettura#art-2', '/pratiche', '?dossier=d1&vista=lettura', '#art-2', { testId: 'dossier-page' }],
   ])('sends %s to %s', async (old, pathname, search, hash, page) => {
     const before = window.history.length;
     renderAt(old);

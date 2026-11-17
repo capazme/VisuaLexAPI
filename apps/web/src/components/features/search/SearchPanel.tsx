@@ -29,7 +29,6 @@ import { besideRefFor, corpusPractices, practiceArticleKey } from '../../../util
 import { actKeyOf } from '../dossier/dossierLayout';
 import { PracticeNotice, type PracticeStreaming } from '../practice/PracticeParts';
 import { ReadingRow } from '../practice/ReadingRow';
-import { PracticeBar } from '../practice/PracticeBar';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
 import { ReadingHostContext, type ReadingHost } from '../practice/readingHost';
 import { askerPracticeOf, crossReferenceParams, fetchActPdfUrl, openFromAsker, revealHeldCitation } from '../practice/hostGestures';
@@ -39,13 +38,11 @@ import { closeNotification, notify } from '../../ui/notifications/notifications'
 /** A row a search added to a practice (it was not there before): the annex auto-switch removes
  *  the stray rows of the first search, and only those (spec §5.2). */
 interface CreatedRow { practiceId: string; actId: string; articleKey: string }
-/** The bar of practices floats `bottom-6`: 24 px. */
+/** Where the bar of practices floated, `bottom-6`: 24 px (LC60: the bar is gone; the way back keeps its place). */
 const BAR_OFFSET = 24;
 /** Where the way back floats on a phone: above the feedback button (`bottom-6`, 48 px), which sits
  *  under it. (It also cleared the services pill, now in the user menu, S1.) */
 const PHONE_BACK_OFFSET = 80;
-/** On the desktop before the bar is measured: its least height (`--practice-bar-height`'s 3.75rem). */
-const BAR_MIN_HEIGHT = 60;
 
 /** The rows one search created, named by the search's own params (the object `handleSearch` got). */
 interface CreatedRows { search: SearchParams | null; rows: CreatedRow[] }
@@ -118,7 +115,6 @@ export function SearchPanel() {
     if (isDesktop) closePhoneReader();
   }, [isDesktop, closePhoneReader]);
   // The bar of practices floats over the table (§3.4): its height, measured, keeps the column clear.
-  const [practiceBarHeight, setPracticeBarHeight] = useState<number | null>(null);
 
   // R2 (streaming-ux): how many articles the current search is expected to
   // produce. When it's exactly 1, processResult opens the single result's
@@ -590,10 +586,10 @@ export function SearchPanel() {
       {/* One global control: the back-stack is global, so a per-practice copy would
           sit inside the very place an entry points at. */}
       <ReadingBackControl
-        // It floats above the bar, clear of the act's heading and the windows' headers. Going back
+        // It floats at the column's foot, clear of the act's heading and the windows' headers. Going back
         // already made the practice active and, on a phone, opened the reader on a subject read beside
         // or closed it for a row of the table (`walkBackTo`, in one update).
-        bottomOffset={isDesktop ? (practiceBarHeight ?? BAR_MIN_HEIGHT) + BAR_OFFSET + 12 : PHONE_BACK_OFFSET}
+        bottomOffset={isDesktop ? BAR_OFFSET + 12 : PHONE_BACK_OFFSET}
       />
 
       {/* The table and the bar on the desktop, the phone's table below md; one layout mounted (T4,
@@ -603,18 +599,10 @@ export function SearchPanel() {
       {/* The reading's host (LC52 c2): its search gestures are the Corpus's search, drained above, as before. */}
       <ReadingHostContext.Provider value={readingHost}>
       {isDesktop ? (
-        <>
-          {/* The practices' tabs, over the columns (LC21). */}
-          <PracticeBar onHeightChange={setPracticeBarHeight} />
-          <div
-            id={WORKSPACE_AREA_ID}
-            className="w-full"
-            // The column's bottom padding reads it (§3.4); without the bar, its fallback.
-            style={practiceBarHeight === null ? undefined : { ['--practice-bar-height' as string]: `${practiceBarHeight}px` }}
-          >
-            <ReadingRow onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
-          </div>
-        </>
+        // LC60: no bar of practices: the Ricerca is one reading bench of the session.
+        <div id={WORKSPACE_AREA_ID} className="w-full">
+          <ReadingRow onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
+        </div>
       ) : (
         <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
       )}

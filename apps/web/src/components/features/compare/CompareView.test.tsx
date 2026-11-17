@@ -62,7 +62,7 @@ describe('CompareView — the articles of the practices (spec §6.8)', () => {
     ]);
     expect(within(leftPanel()).getAllByText('Interessi')).toHaveLength(2);
     expect(within(leftPanel()).getByText('Originale')).toBeInTheDocument();
-    expect(within(leftPanel()).getByRole('button', { name: 'Dalle pratiche (3)' })).toBeInTheDocument();
+    expect(within(leftPanel()).getByRole('button', { name: 'Dal tavolo (3)' })).toBeInTheDocument();
   });
 });
 

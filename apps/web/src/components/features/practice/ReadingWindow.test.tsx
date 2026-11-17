@@ -132,7 +132,7 @@ describe('ReadingWindow (spec §4.1)', () => {
     draw(practiceId, [articleRef]);
     const window_ = windowOf(articleRef);
     // The compact bar: notes and highlights, «⋯» with discussions, the find window and copy; no dossier.
-    expect(within(window_).queryByRole('button', { name: 'Al dossier' })).not.toBeInTheDocument();
+    expect(within(window_).queryByRole('button', { name: 'Alla pratica' })).not.toBeInTheDocument();
     fireEvent.click(within(window_).getAllByRole('button', { name: 'Altre azioni sull’articolo' })[0]);
     expect(within(window_).queryByRole('menuitem', { name: /Modalità studio/ })).not.toBeInTheDocument();
     expect(within(window_).getByRole('menuitem', { name: 'Copia' })).toBeInTheDocument();
@@ -172,7 +172,7 @@ describe('ReadingWindow (spec §4.1)', () => {
     const { practiceId, actId } = practiceWithTwoWindows();
     const gone: BesideRef = { id: 'article:x', kind: 'article', actId, articleKey: 'nessuno|nessuno' };
     draw(practiceId, [gone]);
-    expect(within(windowOf(gone)).getByText('Questo testo non è più sul tavolo della pratica.')).toBeInTheDocument();
+    expect(within(windowOf(gone)).getByText('Questo testo non è più sul tavolo.')).toBeInTheDocument();
     expect(within(windowOf(gone)).getByRole('button', { name: /^Chiudi la finestra/ })).toBeInTheDocument();
   });
 
@@ -206,7 +206,7 @@ describe('ReadingWindow — what the find window sees (spec §6.6)', () => {
 
     findEntry(windowOf(articleRef), 'Cerca nel testo');
     expect(s().activePracticeId).toBe(practiceId);
-    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questo tavolo' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value: 'danno' } });
 
     // «danno» once in the article, once in the decision: the counter is the ranges drawn in the two roots.
