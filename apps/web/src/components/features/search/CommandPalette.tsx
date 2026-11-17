@@ -377,6 +377,8 @@ function IslandVeil({ onClick }: { onClick: () => void }) {
   const running = useRef<Animation | null>(null);
   useLayoutEffect(() => {
     const el = ref.current;
+    // Closing, it lets the pointer through: a tap on the pill opens the panel again from where it is.
+    if (el) el.style.pointerEvents = isPresent ? '' : 'none';
     if (!el || typeof el.animate !== 'function') {
       if (!isPresent) remove.current?.();
       return;
@@ -826,6 +828,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   }, [isOpen, isDesktop]);
   // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
   // (the field) when it closes. Placed only when the field is there.
+  // What the box hangs from now, for `size`, which may run with the last element floating-ui had.
+  const anchorRef = useRef(anchor);
+  useLayoutEffect(() => {
+    anchorRef.current = anchor;
+  });
   const { refs, floatingStyles, context, update } = useFloating({
     open: isOpen,
     elements: { reference: anchor },
@@ -841,6 +848,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
+          // Nothing to hang from now: floating-ui may still measure the last element it had (it keeps it, in
+          // `@floating-ui/react` and in `react-dom`), a computer's field hidden on a phone, 0 px wide.
+          if (elements.reference !== anchorRef.current) return;
           elements.floating.style.width = isIsland ? `${islandWidth}px` : `${rects.reference.width}px`;
           // On a phone what the keyboard leaves (the visual viewport), from the pill down. Read here, not from the
           // render: floating-ui keeps the first `apply` (same source text), so a captured height would stay stale.
@@ -856,14 +866,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   useEffect(() => {
     if (shownHeight !== null) update();
   }, [shownHeight, update]);
-  // The field gone while the menu is open (another page, Focus mode): what `size` wrote on the box goes with it, or
-  // the panel hung at the top would keep the field's width and height.
+  // Nothing to hang from (the field gone, another page, Focus mode, or a phone's search page after a computer's): what
+  // `size` wrote on the box goes with it, on a computer and on a phone alike, or the panel would keep a stale width
+  // (0 px, after a window narrowed from a computer's to a phone's).
   useLayoutEffect(() => {
     // Closing: the box stays where it is, so the island goes back into the pill (LC69).
-    if (anchor || !isDesktop || !isOpen) return;
+    if (anchor || !isOpen) return;
     const box = refs.floating.current;
     box?.style.removeProperty('width');
-    box?.style.removeProperty('--palette-max-h');
+    // A phone's height is React's own (the visual viewport's, in `style`): only a computer's is `size`'s.
+    if (isDesktop) box?.style.removeProperty('--palette-max-h');
   }, [anchor, isDesktop, isOpen, refs]);
   const role = useRole(context, { role: 'dialog' });
   // What had the focus as the palette opened (the field, a button elsewhere): it gets it back.

@@ -32,10 +32,12 @@ export const SEARCH_ISLAND_ID = 'search-island';
 /** The island's one surface (LC69), Pietra's card: the pill and the panel it grows into wear the same ground and edge. */
 export const ISLAND_SURFACE = 'border border-border bg-card';
 /**
- * The pill's hover and focus (LC69, Luca: «è grossa la barra, va resa più elegante»): the one edge darkens, never a
- * ring around it (the field's ring, the bar's and the base rule's offset ring, `index.css`, drew a second, thick outline).
+ * The pill's hover and focus (LC69, Luca: «è grossa la barra, va resa più elegante»). Hover: the one edge darkens. Focus
+ * from the keyboard: the edge in the text's colour and a 1 px ring against it, read as one 2 px edge (the anti-slop
+ * review: a tone alone is not seen); no offset, so never the second outline the field's ring and the base rule's
+ * offset ring (`index.css`) drew. A tap's focus keeps the 1 px edge.
  */
-export const ISLAND_FOCUS = 'hover:border-foreground/30 focus:outline-none focus-visible:border-foreground focus-visible:ring-0 focus-visible:ring-offset-0';
+export const ISLAND_FOCUS = 'hover:border-foreground/30 focus:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground focus-visible:ring-offset-0';
 /** A pill thinner than a finger: its target is 44 px tall, centred on its drawn edge (40 px: 2 above and below). */
 export const ISLAND_TARGET = "after:absolute after:inset-x-0 after:inset-y-[calc(50%-22px)] after:content-['']";
 

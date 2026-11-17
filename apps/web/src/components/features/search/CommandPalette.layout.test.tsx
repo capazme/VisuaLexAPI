@@ -346,6 +346,50 @@ describe('CommandPalette — the island (LC69)', () => {
     expect(box.style.getPropertyValue('--palette-max-h')).toBe('');
   });
 
+  it('lets the pointer through its veil while it closes: a tap on the pill opens it again', async () => {
+    asDesktop(true);
+    recordAnimations();
+    pillAndPanel();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const veil = () => document.querySelector<HTMLElement>('[data-palette-veil]')!;
+    expect(veil().style.pointerEvents).toBe('');
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(veil().style.pointerEvents).toBe('none');
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(veil().style.pointerEvents).toBe('');
+  });
+
+  it('opened on a phone after a computer, with nothing to hang from, keeps no width from the computer\'s field', async () => {
+    // A window that narrows: the media query tells its listeners.
+    let wide = true;
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      get matches() { return wide; }, media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
+      removeEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => listeners.delete(listener),
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList);
+    const form = document.createElement('form');
+    form.id = SEARCH_FIELD_FORM_ID;
+    form.setAttribute('data-compact', '');
+    document.body.append(form);
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Menu di ricerca' }).style.width).not.toBe(''));
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu di ricerca' })).toBeNull());
+    // The window narrowed to a phone's: the computer's field is hidden there (0 px), the phone's keyboard is watched.
+    act(() => {
+      wide = false;
+      listeners.forEach((listener) => listener({ matches: false } as MediaQueryListEvent));
+    });
+    vi.stubGlobal('visualViewport', { height: 700, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
+    await act(() => new Promise((done) => setTimeout(done, 50)));
+    expect(box.style.width).toBe('');
+  });
+
   it('without Web Animations draws the panel at once, nothing left hidden', () => {
     asDesktop(true);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);

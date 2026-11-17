@@ -45,6 +45,12 @@ describe('SearchField — the door to the search menu (R2)', () => {
     expect(field().className).not.toMatch(/(^|\s)(focus:)?ring-2|shadow-sm/);
   });
 
+  it('shows the keyboard\'s focus as one 2 px edge: the edge and a 1 px ring against it, no offset (LC69)', () => {
+    renderField();
+    expect(field()).toHaveClass('focus-visible:border-foreground', 'focus-visible:ring-1', 'focus-visible:ring-foreground', 'focus-visible:ring-offset-0');
+    expect(field().className).not.toMatch(/ring-offset-2|focus:ring/);
+  });
+
   it('is one field, with no «Opzioni»: it says it opens a dialog, and that ⌘K (Ctrl K) does too', () => {
     renderField();
     expect(field()).toHaveAttribute('aria-haspopup', 'dialog');
