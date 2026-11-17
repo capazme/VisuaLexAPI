@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, 
 import { Command, useCommandState } from 'cmdk';
 import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, shift, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
-import { ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { dur, ease, spring } from '../../../lib/motion';
@@ -21,6 +21,9 @@ import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQu
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
 import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
+import { useRassegneForTopic } from '../rassegne/useRassegneForTopic';
+import { rememberSearch } from '../rassegne/searchMemory';
+import { provenance } from '../rassegne/rassegnaFilters';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 interface CommandPaletteProps {
@@ -35,6 +38,8 @@ interface CommandPaletteProps {
   /** Called once a decision or a topic was put in the practices: the host shows the search page, which
    *  alone draws them. */
   onShowSearch?: () => void;
+  /** Open the page «Rassegne» on the search just remembered (`rememberSearch`), with the passage chosen, if any, by id. */
+  onOpenRassegne?: (passo?: string) => void;
 }
 
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
@@ -397,7 +402,7 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
   );
 }
 
-export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, onShowSearch }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, onShowSearch, onOpenRassegne }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
     customAliases, trackAliasUsage, openAliasManager, openDecision, openTopicSearch, takeCommandPaletteQuery, commandPaletteQuery
@@ -651,6 +656,20 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     done();
     onShowSearch?.();
   }, [topic, openTopicSearch, done, onShowSearch]);
+
+  // The reviews' passages on the topic (U3), under the decisions' row: asked only while the first step is shown.
+  const rassegne = useRassegneForTopic(isOpen && step === 'select_act' ? topic : null);
+  const rassegnePage = rassegne && rassegne.answer !== 'error' && rassegne.answer.volumi > 0 && rassegne.answer.total > 0 ? rassegne.answer : null;
+  const handleOpenRassegne = (passo?: string) => {
+    if (!rassegne || !rassegnePage || !topic) return;
+    // The page reads the search from memory: the words never go in an address nor in the history's state.
+    rememberSearch({
+      text: topic, q: rassegne.q, archivio: null, total: rassegnePage.total,
+      archivi: rassegnePage.archivi, items: rassegnePage.items, next: rassegnePage.next_cursor,
+    });
+    done();
+    onOpenRassegne?.(passo);
+  };
 
   const handleOpenDecision = useCallback(() => {
     if (!decisionRef) return;
@@ -1258,6 +1277,29 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             <span className="min-w-0 flex-1 truncate font-medium">
               Cerca "{topic}" nelle sentenze della Cassazione
             </span>
+          </PaletteRow>
+        </Command.Group>
+      )}
+      {topic && rassegne?.answer === 'error' && (
+        <Command.Group heading="Rassegne" className={cn('shrink-0', GROUP_WITH_HEADING)}>
+          <p className={QUIET_LINE}>Le rassegne non rispondono al momento.</p>
+        </Command.Group>
+      )}
+      {topic && rassegnePage && (
+        <Command.Group heading="Rassegne" className={cn('shrink-0', GROUP_WITH_HEADING)}>
+          {rassegnePage.items.slice(0, 3).map((passo) => (
+            <PaletteRow key={passo.id} value={`rassegna ${passo.id}`} onSelect={() => handleOpenRassegne(passo.id)} still={still}>
+              <BookOpen size={14} aria-hidden className={ROW_ICON} />
+              <span className="min-w-0 flex-1">
+                <span className={cn('block truncate text-xs', SUBTLE)}>{provenance(passo).split(' › ')[0]}</span>
+                <span className="line-clamp-2">{passo.testo}</span>
+              </span>
+            </PaletteRow>
+          ))}
+          <PaletteRow value="rassegne tutti i passi" onSelect={() => handleOpenRassegne()} still={still}>
+            <List size={14} aria-hidden className={ROW_ICON} />
+            <span className="min-w-0 flex-1 font-medium">Tutti i passi</span>
+            <span className={cn('shrink-0 text-xs', SUBTLE)}>{rassegnePage.total.toLocaleString('it-IT')}</span>
           </PaletteRow>
         </Command.Group>
       )}

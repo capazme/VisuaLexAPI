@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -12,7 +12,16 @@ vi.mock('../../../hooks/useTour', () => ({
   },
 }));
 
+// The reviews' call is its own (`searchRassegne`): the global fetch stubs below answer /parse_query only.
+const searchRassegne = vi.hoisted(() => vi.fn());
+vi.mock('../../../services/rassegneService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../services/rassegneService')>()),
+  searchRassegne: (...args: unknown[]) => searchRassegne(...args),
+}));
+
 import { CommandPalette } from './CommandPalette';
+import { rememberedSearch, rememberSearch } from '../rassegne/searchMemory';
+import { RassegneError } from '../../../services/rassegneService';
 import { appStore } from '../../../store/useAppStore';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { subscribeSearchField, type SearchFieldRequest } from '../../../utils/searchFieldControl';
@@ -45,6 +54,8 @@ const PARSE_QUERY_OK = {
 };
 
 beforeEach(() => {
+  searchRassegne.mockReset();
+  searchRassegne.mockResolvedValue({ total: 0, volumi: 63, archivi: [], items: [], next_cursor: null });
   vi.stubGlobal('fetch', vi.fn(async () => ({
     ok: true,
     status: 200,
@@ -495,6 +506,105 @@ describe('CommandPalette — a topic for the Cassazione', () => {
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
     await act(async () => { answer({ ok: true, status: 200, json: async () => ({ recognized: false }) }); });
     expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette — the reviews under a topic (U3)', () => {
+  const open = vi.fn(() => 'tab');
+  const original = appStore.getState().openTopicSearch;
+  /** Invented passages: no text of the reviews enters the repository. */
+  const passo = (id: string, anno: number) => ({
+    id, anno, archivio: 'civile',
+    volume: { id: anno, numero: 2, titolo: `Massimario ${anno}` },
+    parte: null, capitolo: { nome: 'CAPITOLO I', titolo: 'LA RESPONSABILITÀ' },
+    sezione: { id: 1, numero: '2', titolo: 'Il danno.' },
+    autori: [], url: `https://example.invalid/${id}`, testo: `Testo inventato del passo ${id}.`,
+    evidenziazioni: [], pronunce: [], fonte: 'Ufficio del Massimario', articoli: [],
+  });
+  const PAGE = {
+    total: 12, volumi: 63, archivi: [{ archivio: 'civile', passi: 12 }],
+    items: [passo('p1', 2024), passo('p2', 2023), passo('p3', 2022), passo('p4', 2021)], next_cursor: '20',
+  };
+  beforeEach(() => {
+    open.mockClear();
+    rememberSearch(null);
+    appStore.setState({ openTopicSearch: open } as never);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
+  });
+  afterEach(() => appStore.setState({ openTopicSearch: original }));
+
+  async function typeTopic(onOpenRassegne = vi.fn(), onClose = vi.fn()) {
+    const user = fakeTimeUser();
+    render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} onOpenRassegne={onOpenRassegne} />);
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'responsabilità medica');
+    await settle(); // the server says it is not an act: a topic
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    return { user, onOpenRassegne, onClose };
+  }
+
+  it('shows the first three passages under the decisions, in a group of its own, the decisions still first', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    await typeTopic();
+    expect(searchRassegne).toHaveBeenCalledWith({ q: 'responsabilità medica' });
+    const group = (await screen.findByText('Rassegne')).closest('[cmdk-group]') as HTMLElement;
+    const rows = within(group).getAllByRole('option');
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toHaveTextContent('Rassegna civile 2024 · vol. 2');
+    expect(rows[0]).toHaveTextContent('Testo inventato del passo p1.');
+    expect(rows[3]).toHaveTextContent('Tutti i passi');
+    expect(rows[3]).toHaveTextContent('12');
+    const options = screen.getAllByRole('option');
+    expect(options[0]).toHaveTextContent('nelle sentenze della Cassazione');
+    expect(options[1]).toBe(rows[0]);
+  });
+
+  it('keeps Enter in the box for the decisions', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    const { user } = await typeTopic();
+    await screen.findByText('Rassegne');
+    await user.keyboard('{Enter}');
+    expect(open).toHaveBeenCalledWith({ tema: 'responsabilità medica' }, 'Tema: responsabilità medica');
+  });
+
+  it('opens a passage on the page «Rassegne» with the search kept in memory, never handing over the words', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    const { user, onOpenRassegne, onClose } = await typeTopic();
+    await user.click(await screen.findByText('Testo inventato del passo p2.'));
+    expect(onOpenRassegne).toHaveBeenCalledWith('p2');
+    expect(onClose).toHaveBeenCalled();
+    expect(rememberedSearch()).toEqual({
+      text: 'responsabilità medica', q: 'responsabilità medica', archivio: null,
+      total: 12, archivi: PAGE.archivi, items: PAGE.items, next: '20',
+    });
+  });
+
+  it('«Tutti i passi» opens the page with the same search done', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    const { user, onOpenRassegne } = await typeTopic();
+    await user.click(await screen.findByText('Tutti i passi'));
+    expect(onOpenRassegne).toHaveBeenCalledWith(undefined);
+    expect(rememberedSearch()?.q).toBe('responsabilità medica');
+  });
+
+  it('says in one line that the reviews do not answer, and draws nothing when none is found', async () => {
+    searchRassegne.mockRejectedValueOnce(new RassegneError(503));
+    await typeTopic();
+    expect(await screen.findByText('Le rassegne non rispondono al momento.')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /nelle sentenze della Cassazione/ })).toBeInTheDocument();
+  });
+
+  it('draws no group when no passage holds the words', async () => {
+    await typeTopic();
+    expect(searchRassegne).toHaveBeenCalled();
+    expect(screen.queryByText('Rassegne')).toBeNull();
+  });
+
+  it('does not search the reviews for a citation', async () => {
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc');
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(searchRassegne).not.toHaveBeenCalled();
   });
 });
 
