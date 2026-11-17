@@ -37,11 +37,51 @@ type ItemRow = Prisma.DossierItemGetPayload<object>;
 const hidesNoteText = (req: Request): boolean => Boolean(req.delegation && !req.delegation.readsNotes);
 
 /**
+ * Whether a norm entry's content is cut to its identity in this answer: for a connected application whose token or
+ * grant lacks `dossier:text`. The consent page promises «il testo delle norme» only with that permission, and the web
+ * stores the article's text with the entry (`article_text`). The citation is computed from the whole content first,
+ * so it stays. The server is the gate, as for the notes; the MCP never reads a norm's content anyway.
+ */
+const hidesNormText = (req: Request): boolean => Boolean(req.delegation && !req.delegation.readsTexts);
+
+/** A norm entry's identity, as `schemas/normEntry.ts` reads it: nothing else. */
+const NORM_IDENTITY_KEYS = [
+  'tipo_atto', 'tipo_atto_reale', 'numero_atto', 'data', 'numero_articolo', 'allegato', 'versione', 'data_versione',
+  'parte', 'url', 'urn',
+] as const;
+
+type JsonObject = Record<string, Prisma.JsonValue | undefined>;
+const isObject = (value: unknown): value is JsonObject =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+function identityOf(norm: JsonObject): Record<string, Prisma.JsonValue> {
+  const kept: Record<string, Prisma.JsonValue> = {};
+  for (const key of NORM_IDENTITY_KEYS) {
+    const value = norm[key];
+    if (value !== undefined) kept[key] = value;
+  }
+  return kept;
+}
+
+/**
+ * A norm entry's content without its text: the identity, the older Forum shape's `articleRef` cut the same way, and the
+ * dossier's «important» mark rebuilt rather than copied. Anything that is not an object gives nothing: a gate that does
+ * not recognise what it holds lets none of it through.
+ */
+function normContentWithoutText(content: Prisma.JsonValue | null): Prisma.JsonValue | null {
+  if (!isObject(content)) return null;
+  const kept = identityOf(content);
+  if (isObject(content.articleRef)) kept.articleRef = identityOf(content.articleRef);
+  if (isObject(content._dossierMeta) && content._dossierMeta.important === true) kept._dossierMeta = { important: true };
+  return kept;
+}
+
+/**
  * A dossier entry as every route answers it. `view` carries the assistant's notes for the user's session
  * (`assistantViewFor`): without it (an exchanged token, the switch off) both fields are null. `hideNotes` drops a
  * note's content (null), never a norm's or a decision's identity.
  */
-function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false) {
+function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false, hideNormText = false) {
   return {
     id: i.id,
     item_type: i.itemType,
@@ -51,7 +91,7 @@ function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false
     citation: citeStoredItem(i.itemType, i.content),
     // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
     act_citation: citeStoredAct(i.itemType, i.content),
-    content: hideNotes && i.itemType === 'note' ? null : i.content,
+    content: hideNotes && i.itemType === 'note' ? null : hideNormText && i.itemType === 'norm' ? normContentWithoutText(i.content) : i.content,
     position: i.position,
     status: i.status,
     created_at: i.createdAt,
@@ -66,14 +106,15 @@ function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false
 
 /** One entry's answer, with its view of the assistant's notes. */
 export async function serializeItemFor(req: Request, item: ItemRow) {
-  return serializeItem(item, await assistantViewFor(req, [item]), hidesNoteText(req));
+  return serializeItem(item, await assistantViewFor(req, [item]), hidesNoteText(req), hidesNormText(req));
 }
 
 /** Dossiers' answers, with one view of the assistant's notes for all their entries. */
 async function serializeDossiersFor(req: Request, dossiers: Parameters<typeof serializeDossier>[0][]) {
   const view = await assistantViewFor(req, dossiers.flatMap((d) => d.items));
   const hideNotes = hidesNoteText(req);
-  return dossiers.map((d) => serializeDossier(d, view, hideNotes));
+  const hideNormText = hidesNormText(req);
+  return dossiers.map((d) => serializeDossier(d, view, hideNotes, hideNormText));
 }
 
 /**
@@ -94,6 +135,7 @@ function serializeDossier(
   d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null; _count: { tasks: number } },
   view: AssistantView | null,
   hideNotes = false,
+  hideNormText = false,
 ) {
   return {
     id: d.id,
@@ -118,7 +160,7 @@ function serializeDossier(
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),
-    items: d.items.map((item) => serializeItem(item, view, hideNotes)),
+    items: d.items.map((item) => serializeItem(item, view, hideNotes, hideNormText)),
     // Its planner tasks, done and trashed ones too: all go to the trash with the dossier. A count, never
     // a title: a connected application reads it to tell the user, in the deletion's confirmation.
     task_count: d._count.tasks,

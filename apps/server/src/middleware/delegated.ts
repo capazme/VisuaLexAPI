@@ -176,6 +176,7 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   let readsNotes = false;
   // And the text of a case's acts (LC56): only under the words that name them.
   let readsActs = false;
+  let readsTexts = false;
   try {
     const grant = await prisma.oAuthGrant.findUnique({
       where: { id: claims.grant },
@@ -195,6 +196,7 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     const texts = tokenScopes.includes(TEXT_SCOPE) && grant.scopes.includes(TEXT_SCOPE);
     readsNotes = texts && (grant.textConsentVersion ?? 0) >= NOTES_CONSENT_VERSION;
     readsActs = texts && (grant.textConsentVersion ?? 0) >= TEXT_CONSENT_VERSION;
+    readsTexts = texts;
   } catch (error) {
     console.error('delegatedAuth: could not read the grant:', error instanceof Error ? error.message : error);
     res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
@@ -254,6 +256,6 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   });
 
   req.user = user;
-  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: tokenScopes, clientName, readsNotes, readsActs };
+  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: tokenScopes, clientName, readsNotes, readsActs, readsTexts };
   next();
 }
