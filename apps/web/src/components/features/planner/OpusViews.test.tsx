@@ -295,7 +295,10 @@ describe('«Oggi» in groups', () => {
   it('folds a group by its heading; its «⋯» adds nothing, the field at the top does', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY })]));
     renderAt(<TodayView />);
-    const toggle = await screen.findByRole('button', { name: /^Oggi · mar 20\s*,\s*1 compito$/ });
+    await screen.findByRole('button', { name: /^Oggi · mar 20\s*,\s*1 compito$/ });
+    // The first answer sets the server's day, which reads again: click once the view is still.
+    await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull());
+    const toggle = screen.getByRole('button', { name: /^Oggi · mar 20\s*,\s*1 compito$/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByRole('button', { name: /Azioni del gruppo/ })).toBeNull();
     fireEvent.click(toggle);
