@@ -2,6 +2,7 @@ import copy
 import os
 import re
 import structlog
+from bs4.element import NavigableString, PreformattedString, Tag
 
 from . import eurlex_fetch
 from ..tools.map import EURLEX
@@ -38,21 +39,53 @@ _RECITAL_NUMBER_ONLY = re.compile(r"^\(\d+\)$")
 _LEGACY_RECITAL = re.compile(r"^\((\d+)\)\s+(.*)$", re.S)
 _LEGACY_PREAMBLE_MARKER = re.compile(r"considerando quanto segue", re.I)
 _LEGACY_ENACTING_FORMULA = re.compile(r"^HA(?:NNO)?\s+ADOTTAT[OA]\b", re.I)
+# Space, tab, CR and LF only: the no-break space is a character of the source and stays (spec
+# 2026-11-17 §7.2.4).
+_ASCII_WHITESPACE = re.compile(r"[ \t\r\n]+")
+_ASCII_EDGES = " \t\r\n"
+
+
+def _drop_trailing_whitespace(node) -> None:
+    """The whitespace that glues a footnote call to its word (a no-break space in the OJ) goes with the call."""
+    if isinstance(node, Tag):
+        strings = [s for s in node.find_all(string=True) if not isinstance(s, PreformattedString)]
+        node = strings[-1] if strings else None
+    if isinstance(node, NavigableString) and not isinstance(node, PreformattedString):
+        node.replace_with(node.rstrip())
 
 
 def _strip_footnote_marks(element) -> None:
-    """Remove "(18)"-style footnote call-outs in place.
+    """Remove "(18)"-style footnote call-outs in place, with the whitespace just before each.
 
     EUR-Lex renders them as <a>(<span class="oj-note-tag">18</span>)</a>; the
-    anchor's whole text is the parenthesised number, so dropping the anchor
-    leaves the sentence intact. The soup is built per request from the cached
-    HTML, so mutating it here is local to this call.
+    anchor's whole text is the parenthesised number, and the OJ glues it to the
+    word with a no-break space: «Consiglio\xa0(18), compresi». Dropping both
+    leaves the sentence as written, «Consiglio, compresi». The soup is built per
+    request from the cached HTML, so mutating it here is local to this call.
     """
     for span in element.find_all("span", class_="oj-note-tag"):
         anchor = span.find_parent("a")
         target = anchor if anchor is not None else span
         if _RECITAL_NUMBER_ONLY.match(target.get_text(strip=True) or ""):
+            _drop_trailing_whitespace(target.previous_sibling)
             target.decompose()
+
+
+def _paragraph_text(p) -> str:
+    """A paragraph's text with no space of our own (spec 2026-11-17 §7.2.1, root CLAUDE.md rule 23).
+
+    The text nodes are joined with no separator, so an italic or a link before a comma adds no
+    space; a ``<br>`` counts as whitespace; every run of ASCII whitespace becomes one space, so a
+    line break in the HTML never becomes a ``\n``; the edges are trimmed of ASCII whitespace only.
+    """
+    pieces = []
+    for node in p.descendants:
+        if isinstance(node, Tag):
+            if node.name == "br":
+                pieces.append(" ")
+        elif isinstance(node, NavigableString) and not isinstance(node, PreformattedString):
+            pieces.append(str(node))
+    return _ASCII_WHITESPACE.sub(" ", "".join(pieces)).strip(_ASCII_EDGES)
 
 
 def _extract_recitals_modern(soup) -> list[dict]:
@@ -62,7 +95,7 @@ def _extract_recitals_modern(soup) -> list[dict]:
         _strip_footnote_marks(div)
         paragraphs = []
         for p in div.find_all("p"):
-            text = p.get_text(" ", strip=True)
+            text = _paragraph_text(p)
             if not text or _RECITAL_NUMBER_ONLY.match(text):
                 continue  # the "(N)" cell
             paragraphs.append(text)
@@ -77,18 +110,27 @@ def _extract_recitals_legacy(soup) -> list[dict]:
         return []
     recitals = []
     expected = 1
+    # Paragraphs without «(N)» after recital N: they join it with "\n" only once recital N+1
+    # arrives, so whatever follows the last recital stays out even when the enacting formula is
+    # not recognised (spec 2026-11-17 §7.2.3).
+    pending: list[str] = []
     for p in marker.find_all_next("p"):
-        text = p.get_text(" ", strip=True)
+        text = _paragraph_text(p)
         if _LEGACY_ENACTING_FORMULA.match(text):
             break
         match = _LEGACY_RECITAL.match(text)
         if not match:
+            if text and recitals:
+                pending.append(text)
             continue
-        number, body = match.group(1), match.group(2).strip()
+        number, body = match.group(1), match.group(2).strip(_ASCII_EDGES)
         # Footnote paragraphs also read "(4) …"; a recital number is the next
         # one in the sequence, nothing else.
         if int(number) != expected:
             continue
+        if pending:
+            recitals[-1]["text"] += "\n" + "\n".join(pending)
+            pending = []
         recitals.append({"number": number, "text": body})
         expected += 1
     return recitals
