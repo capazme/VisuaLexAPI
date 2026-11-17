@@ -26,8 +26,9 @@ function contentKeys(practice: Practice): Set<string> | null {
   return new Set([...norms.map((n) => `n:${dossierArticleKey(n)}`), ...decisions.map((d) => `s:${decisionKey(d)}`)]);
 }
 
-function dossierKeys(dossier: Dossier): Set<string> {
-  return new Set(dossier.items.flatMap((i) => {
+/** A pratica's article and decision keys, as the server confirmed them: an item still on its way may yet be refused. */
+function dossierKeys(dossier: Dossier, pending: Record<string, true>): Set<string> {
+  return new Set(dossier.items.filter((i) => !pending[i.id]).flatMap((i) => {
     if (i.type === 'norma') return [`n:${dossierArticleKey(i.data)}`];
     if (i.type === 'sentenza') return [`s:${decisionKey(i.data)}`];
     return [];
@@ -37,8 +38,8 @@ function dossierKeys(dossier: Dossier): Set<string> {
 const sameKeys = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((k) => b.has(k));
 
 /** The collections the riquadro offers; the others (nothing to save, or a pratica's twin) can go without asking. */
-function offeredCollections(practices: Practice[], dossiers: Dossier[]): { offered: Practice[]; silent: string[] } {
-  const known = dossiers.map(dossierKeys);
+function offeredCollections(practices: Practice[], dossiers: Dossier[], pending: Record<string, true>): { offered: Practice[]; silent: string[] } {
+  const known = dossiers.map((d) => dossierKeys(d, pending));
   const offered: Practice[] = [];
   const silent: string[] = [];
   for (const practice of practices) {
@@ -63,14 +64,14 @@ export function CorpusPracticesDialog() {
   const [failed, setFailed] = useState(false);
 
   const offered = useMemo(
-    () => (pending && loaded ? offeredCollections(practices, appStore.getState().dossiers).offered : []),
+    () => (pending && loaded ? offeredCollections(practices, appStore.getState().dossiers, appStore.getState().pendingDossierItemIds).offered : []),
     [pending, loaded, practices],
   );
 
   // The collections nobody needs to be asked about go at once; with none left to offer, the browser keeps none.
   useEffect(() => {
     if (!pending || !loaded || busy) return;
-    const { offered: left, silent } = offeredCollections(corpusPractices(appStore.getState().practices), appStore.getState().dossiers);
+    const { offered: left, silent } = offeredCollections(corpusPractices(appStore.getState().practices), appStore.getState().dossiers, appStore.getState().pendingDossierItemIds);
     for (const id of silent) appStore.getState().closePractice(id);
     if (left.length === 0) appStore.getState().endCorpusPractices();
   }, [pending, loaded, practices, busy]);
@@ -94,7 +95,11 @@ export function CorpusPracticesDialog() {
       const earlier = madeFor.get(practice.id);
       const target = earlier && appStore.getState().dossiers.some((d) => d.id === earlier) ? { dossierId: earlier } : null;
       const outcome = await savePracticeAsDossier(practice.id, target);
-      if (outcome.ok) {
+      // The save stops waiting after a while: an item the server has not confirmed yet may still be refused, and the
+      // collection is the only copy, so it leaves the browser only once every item is confirmed.
+      const { dossiers, pendingDossierItemIds } = appStore.getState();
+      const unconfirmed = dossiers.find((d) => d.id === outcome.dossierId)?.items.some((i) => pendingDossierItemIds[i.id]) ?? false;
+      if (outcome.ok && !unconfirmed) {
         madeFor.delete(practice.id);
         appStore.getState().closePractice(practice.id);
       } else {

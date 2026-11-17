@@ -132,6 +132,23 @@ describe('CorpusPracticesDialog (LC60)', () => {
     expect(s().dossiers.map((d) => d.title).sort()).toEqual(['Due', 'Uno']);
   });
 
+  it('a save still waiting for the server when the wait ends is not a save: the collection stays', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      corpus('Uno', ['5']);
+      appStore.setState({ corpusPracticesPending: true });
+      svc.addItem.mockImplementation((() => new Promise(() => {})) as never);
+      render(<CorpusPracticesDialog />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Salva come pratiche' }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+      expect(await screen.findByText(/Non sono riuscito a salvare tutto/)).toBeInTheDocument();
+      expect(s().corpusPracticesPending).toBe(true);
+      expect(s().practices.map((p) => p.label)).toEqual(['Uno']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('waits for the pratiche to be read: with the list not known, nothing is compared and nothing goes', async () => {
     threeCollections();
     appStore.setState({ dossiersLoaded: false });

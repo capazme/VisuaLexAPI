@@ -61,7 +61,7 @@ describe('a dossier deleted from the web app (question 160)', () => {
     deleteDossierWithUndo({ id: 'a', title: 'Ricorso Rossi' });
     await vi.waitFor(() => expect(toast).not.toBeNull());
     await toast!.onUndo();
-    expect(appStore.getState().lastSyncError?.message).toBe('Impossibile ripristinare «Ricorso Rossi» ora: è nel Cestino, ripristinalo da lì.');
+    expect(appStore.getState().lastSyncError?.message).toBe('Impossibile ripristinare «Ricorso Rossi» ora: è nel Cestino, ripristinala da lì.');
   });
 
   it('refused by the server: put back where it was, an error, and no toast', async () => {
