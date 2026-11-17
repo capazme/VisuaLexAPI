@@ -20,7 +20,7 @@ function renderField() {
   );
 }
 
-const field = () => screen.getByRole('button', { name: /^Cerca una norma, una sentenza o un tema/ });
+const field = () => screen.getByRole('button', { name: /^Apri il menu di ricerca/ });
 
 beforeEach(() => {
   appStore.setState({ openCommandPaletteWith, openCommandPalette, commandPaletteOpen: false });

@@ -84,6 +84,19 @@ describe('glued headings, as Normattiva serves them', () => {
     expect(splitHeadings("((Sezione VI)) ((Dell'impresa familiare))")).toEqual(["((Sezione VI)) ((Dell'impresa familiare))"]);
   });
 
+  it('cuts before a capitalised level word only when it opens a level, not inside a name (LC73)', () => {
+    expect(splitHeadings('Modifiche al Titolo V della parte seconda della Costituzione')).toEqual([
+      'Modifiche al Titolo V della parte seconda della Costituzione',
+    ]);
+    // d.lgs. 36/2023 and the c.c., as Normattiva lists them.
+    expect(splitHeadings('PARTE V DELLO SVOLGIMENTO DELLE PROCEDURE Titolo I Gli atti preparatori')).toEqual([
+      'PARTE V DELLO SVOLGIMENTO DELLE PROCEDURE', 'Titolo I Gli atti preparatori',
+    ]);
+    expect(splitHeadings("Titolo XII ((Delle misure di protezione)) ((Capo I)) ((Dell'amministrazione di sostegno))")).toEqual([
+      'Titolo XII ((Delle misure di protezione))', "((Capo I)) ((Dell'amministrazione di sostegno))",
+    ]);
+  });
+
   it('nests the Libro IV: chapters under titles, sections under chapters, § under sections', () => {
     expect(outline(buildActTree(LIBRO_IV, '2', ['CODICE CIVILE']))).toEqual([
       { 'LIBRO QUARTO DELLE OBBLIGAZIONI': [
@@ -99,6 +112,33 @@ describe('glued headings, as Normattiva serves them', () => {
           ] },
         ] },
       ] },
+    ]);
+  });
+
+  it('takes the levels in the order the act first uses them: Parti inside Libri in the d.lgs. 36/2023 (LC73)', () => {
+    const DLGS_36 = [
+      'LIBRO I DEI PRINCIPI, DELLA DIGITALIZZAZIONE, DELLA PROGRAMMAZIONE, DELLA PROGETTAZIONE PARTE I DEI PRINCIPI Titolo I I principi generali',
+      { numero: '1' },
+      "Titolo II L'ambito di applicazione, il responsabile unico e le fasi dell'affidamento.",
+      { numero: '13' },
+      'PARTE II DELLA DIGITALIZZAZIONE DEL CICLO DI VITA DEI CONTRATTI',
+      { numero: '19' },
+      "LIBRO II DELL'APPALTO PARTE I DEI CONTRATTI DI IMPORTO INFERIORE ALLE SOGLIE EUROPEE",
+      { numero: '48' },
+    ];
+    expect(outline(buildActTree(DLGS_36, null))).toEqual([
+      { 'LIBRO I DEI PRINCIPI, DELLA DIGITALIZZAZIONE, DELLA PROGRAMMAZIONE, DELLA PROGETTAZIONE': [
+        { 'PARTE I DEI PRINCIPI': [
+          { 'Titolo I I principi generali': ['1'] },
+          { "Titolo II L'ambito di applicazione, il responsabile unico e le fasi dell'affidamento.": ['13'] },
+        ] },
+        { 'PARTE II DELLA DIGITALIZZAZIONE DEL CICLO DI VITA DEI CONTRATTI': ['19'] },
+      ] },
+      { "LIBRO II DELL'APPALTO": [{ 'PARTE I DEI CONTRATTI DI IMPORTO INFERIORE ALLE SOGLIE EUROPEE': ['48'] }] },
+    ]);
+    // Where the Parte comes first (Costituzione), the Titoli stay inside it.
+    expect(outline(buildActTree(['PARTE I DIRITTI E DOVERI DEI CITTADINI TITOLO I RAPPORTI CIVILI', { numero: '13' }, 'TITOLO II RAPPORTI ETICO-SOCIALI', { numero: '29' }], null))).toEqual([
+      { 'PARTE I DIRITTI E DOVERI DEI CITTADINI': [{ 'TITOLO I RAPPORTI CIVILI': ['13'] }, { 'TITOLO II RAPPORTI ETICO-SOCIALI': ['29'] }] },
     ]);
   });
 

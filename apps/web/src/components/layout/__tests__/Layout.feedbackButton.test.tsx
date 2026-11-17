@@ -107,7 +107,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
     at(path);
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toBeInTheDocument();
-    expect(within(bar).getByRole('button', { name: /Norma, sentenza o tema/ })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Apri il menu di ricerca' })).toBeInTheDocument();
     expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
     expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
     const fullScreen = within(bar).getByRole('button', { name: 'Tutto schermo' });
@@ -122,7 +122,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
   it('opens the command palette from the bar\'s search', () => {
     appStore.setState({ commandPaletteOpen: false });
     at('/pratiche');
-    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: /Norma, sentenza o tema/ }));
+    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: 'Apri il menu di ricerca' }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
     appStore.setState({ commandPaletteOpen: false });
   });

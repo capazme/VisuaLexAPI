@@ -1480,6 +1480,8 @@ const appStore = createStore<AppState>()(
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
                         state.dossiersLoaded = dossiersRead;
+                        // Unread pratiche are an error, not an empty list (LC73): the page says so and offers «Riprova».
+                        if (!dossiersRead) state.dataError = 'Non riesco a leggere le pratiche. Riprova tra poco.';
                     });
                 } catch (error) {
                     console.error('Failed to fetch user data:', error);
