@@ -40,10 +40,10 @@ describe('DecisionResultList', () => {
     expect(screen.getByRole('button', { name: 'Indice della Cassazione' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('offers «Aggiungi al dossier» on every hit, with its name (LC59)', async () => {
+  it('offers «Aggiungi alla pratica» on every hit, with its name (LC59)', async () => {
     mockSearch(PAGE);
     render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
-    expect(await screen.findByRole('button', { name: /^Aggiungi al dossier Cass\. civ\., sez\. lav\., n\. 24908\/2026/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Aggiungi alla pratica Cass\. civ\., sez\. lav\., n\. 24908\/2026/ })).toBeInTheDocument();
   });
 
   it('switches to the text and says so', async () => {

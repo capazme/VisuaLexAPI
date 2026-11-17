@@ -24,7 +24,7 @@ vi.mock('../../../utils/articleFetchCache', () => fetched);
 // The dossiers to add to: what it is handed is what is tested here (its own tests: `AddToDossierPopover.test.tsx`).
 vi.mock('./AddToDossierPopover', () => ({
   AddToDossierPopover: ({ norma }: { norma: { tipo_atto: string; numero_articolo: string } }) => (
-    <div role="dialog" aria-label="Scegli il dossier">{`${norma.tipo_atto} art. ${norma.numero_articolo}`}</div>
+    <div role="dialog" aria-label="Scegli la pratica">{`${norma.tipo_atto} art. ${norma.numero_articolo}`}</div>
   ),
 }));
 
@@ -48,7 +48,7 @@ vi.mock('./DossierDecisionReader', async () => {
           {link(CITED.held, 'art. 3 l. 247/2012')} {link(CITED.absent, 'art. 2043 c.c.')}
           <button type="button" onClick={() => cited?.open(CITED.held, null)}>anteprima: art. 3</button>
           <button type="button" onClick={() => cited?.open(CITED.absent, null)}>anteprima: art. 2043</button>
-          <span>{cited?.holds(CITED.held) ? 'art. 3 nel dossier' : ''}</span>
+          <span>{cited?.holds(CITED.held) ? 'art. 3 nella pratica' : ''}</span>
         </div>
       );
     },
@@ -74,9 +74,9 @@ const dossier: Dossier = {
 function renderView(start: Dossier = dossier) {
   appStore.setState({ dossiers: [structuredClone(start)], pendingDossierItemIds: {}, pendingDossierOrders: {}, searchTrigger: null });
   render(
-    <MemoryRouter initialEntries={['/dossier/d1']}>
+    <MemoryRouter initialEntries={['/pratiche/d1']}>
       <Routes>
-        <Route path="/dossier/:id" element={<DossierDetailView dossier={appStore.getState().dossiers[0]} onBack={() => {}} showToast={() => {}} />} />
+        <Route path="/pratiche/:id" element={<DossierDetailView dossier={appStore.getState().dossiers[0]} onBack={() => {}} showToast={() => {}} />} />
         <Route path="/" element={<p>Dashboard</p>} />
       </Routes>
     </MemoryRouter>,
@@ -135,7 +135,7 @@ describe('a norm a decision cites, in the dossier (D7d)', () => {
 
   it('clears the page’s search that hides it', () => {
     renderView();
-    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' });
+    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' });
     // the decision alone on screen, the acts still mounted
     fireEvent.change(search, { target: { value: 'Corte' } });
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
@@ -146,7 +146,7 @@ describe('a norm a decision cites, in the dossier (D7d)', () => {
 
   it('opens it from the preview’s button too, and says the dossier holds it', () => {
     const text = renderView();
-    expect(within(text).getByText('art. 3 nel dossier')).toBeInTheDocument();
+    expect(within(text).getByText('art. 3 nella pratica')).toBeInTheDocument();
     fireEvent.click(within(text).getByRole('button', { name: 'anteprima: art. 3' }));
     expect(articleToggle()).toHaveAttribute('aria-expanded', 'true');
   });
@@ -156,10 +156,10 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
   it('opens nothing by itself: it offers Dashboard or a dossier, by the link', async () => {
     const text = renderView();
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
-    const choice = screen.getByRole('dialog', { name: /art\. 2043 .* non è in questo dossier\./ });
+    const choice = screen.getByRole('dialog', { name: /art\. 2043 .* non è in questa pratica\./ });
     expect(appStore.getState().searchTrigger).toBeNull();
     await waitFor(() => expect(within(choice).getByRole('button', { name: 'Apri in Ricerca' })).toHaveFocus());
-    expect(within(choice).getByRole('button', { name: 'Aggiungi al dossier' })).toBeInTheDocument();
+    expect(within(choice).getByRole('button', { name: 'Aggiungi alla pratica' })).toBeInTheDocument();
   });
 
   it('«Apri in Ricerca» searches its text in force there, as before', () => {
@@ -170,13 +170,13 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
-  it('«Aggiungi al dossier» reads the norm from the source, then offers the dossiers', async () => {
+  it('«Aggiungi alla pratica» reads the norm from the source, then offers the dossiers', async () => {
     fetched.fetchArticleForNorma.mockResolvedValue({ norma_data: { tipo_atto: 'codice civile', data: '1942-03-16', numero_articolo: '2043', urn: 'urn:cc:2043' } });
     const text = renderView();
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
     expect(fetched.fetchArticleForNorma).toHaveBeenCalledExactlyOnceWith({ tipo_atto: 'codice civile', numero_atto: '', data: '', numero_articolo: '2043' });
-    expect(await screen.findByRole('dialog', { name: 'Scegli il dossier' })).toHaveTextContent('codice civile art. 2043');
+    expect(await screen.findByRole('dialog', { name: 'Scegli la pratica' })).toHaveTextContent('codice civile art. 2043');
   });
 
   it('says so when the source does not answer, and keeps both ways open', async () => {
@@ -186,15 +186,15 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
     // the dialog's own first focus, then the keyboard's on «Aggiungi al dossier»
     await waitFor(() => expect(screen.getByRole('button', { name: 'Apri in Ricerca' })).toHaveFocus());
-    const add = screen.getByRole('button', { name: 'Aggiungi al dossier' });
+    const add = screen.getByRole('button', { name: 'Aggiungi alla pratica' });
     add.focus();
     fireEvent.click(add);
     // read: the button says so and keeps the focus
     expect(screen.getByRole('button', { name: 'Cerco la norma…' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'Cerco la norma…' })).toHaveFocus();
     expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere la norma citata: riprova, o aprila in Ricerca.');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveAttribute('aria-disabled', 'false'));
-    expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Aggiungi alla pratica' })).toHaveAttribute('aria-disabled', 'false'));
+    expect(screen.getByRole('button', { name: 'Aggiungi alla pratica' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Apri in Ricerca' })).toBeInTheDocument();
   });
 

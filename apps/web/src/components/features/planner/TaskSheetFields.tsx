@@ -123,7 +123,7 @@ export function TaskSheetFields({ task, today, onSave }: Props) {
   const dossiers = useAppStore((s) => s.dossiers);
   const [newLabel, setNewLabel] = useState('');
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
-  const parentDossier = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.title ?? 'Dossier' : "Lista d'ingresso";
+  const parentDossier = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.title ?? 'Pratica' : "Lista d'ingresso";
 
   const moveTo = (dossierId: string) => {
     // A task moved to another dossier takes that dossier's kind as its origin (a dossier di studio: «studio»).
@@ -140,7 +140,7 @@ export function TaskSheetFields({ task, today, onSave }: Props) {
 
   return (
     <div className="grid min-w-0 grid-cols-1">
-      <FieldRow label="Dossier" labelId={`${id}-dossier`}>
+      <FieldRow label="Pratica" labelId={`${id}-dossier`}>
         {task.parentId ? (
           <p className="px-2 py-2 text-sm text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">
             {parentDossier}

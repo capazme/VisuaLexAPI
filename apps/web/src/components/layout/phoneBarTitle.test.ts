@@ -13,7 +13,7 @@ describe('phoneBarTitle', () => {
     ['/learn/schede', 'Le mie schede'],
     ['/learn/schede/c1', 'Le mie schede'],
     ['/learn/valida', 'Da validare'],
-    ['/dossier', 'Dossier'],
+    ['/pratiche', 'Pratiche'],
     ['/forum', 'Dossier pubblici'],
     ['/forum/community', 'Community'],
     ['/history', 'Cronologia'],
@@ -25,7 +25,7 @@ describe('phoneBarTitle', () => {
     expect(phoneBarTitle(path, 'Opus')).toBe(title);
   });
 
-  it.each(['/labs/contribuisci', '/pagina-che-non-esiste', '/dossierx', '/work'])('falls back to the section on %s', (path) => {
+  it.each(['/labs/contribuisci', '/pagina-che-non-esiste', '/pratichex', '/work'])('falls back to the section on %s', (path) => {
     expect(phoneBarTitle(path, 'Academia')).toBe('Academia');
   });
 });

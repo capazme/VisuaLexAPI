@@ -208,7 +208,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
   });
 
   // LC21: the bar of practices sits over the columns, in the flow, and reports no height: the way back keeps 24 + 12 px.
-  it('the way back floats at the column\'s foot (the bar of practices reports 0, + 24 + 12), not at the top over the act heading', async () => {
+  it('the way back floats at the column\'s foot (24 + 12; LC60: no bar of practices), not at the top over the act heading', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
       return this.id === 'tour-practice-bar' ? 138 : 0;
     });

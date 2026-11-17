@@ -48,7 +48,7 @@ describe('TrashEntryRow', () => {
 
   it('names a whole dossier and its size', () => {
     renderRow(dossierEntry);
-    expect(screen.getByText('Dossier «Vecchia pratica»')).toBeInTheDocument();
+    expect(screen.getByText('Pratica «Vecchia pratica»')).toBeInTheDocument();
     expect(screen.getByText('7 elementi')).toBeInTheDocument();
   });
 
@@ -81,12 +81,12 @@ describe('TrashEntryRow', () => {
 
   it('asks where to restore when the dossier is gone, then restores there', async () => {
     const onRestore = vi.fn()
-      .mockResolvedValueOnce({ kind: 'needs-target', message: 'Il dossier non esiste più: scegli dove ripristinare.' })
+      .mockResolvedValueOnce({ kind: 'needs-target', message: 'La pratica non esiste più: scegli dove ripristinare.' })
       .mockResolvedValueOnce({ kind: 'restored' });
     renderRow(items, { onRestore });
     fireEvent.click(screen.getByRole('button', { name: 'Ripristina Da «Ricorso Rossi»' }));
-    await screen.findByText('Il dossier non esiste più: scegli dove ripristinare.');
-    fireEvent.change(screen.getByLabelText('Dossier in cui ripristinare'), { target: { value: 'd2' } });
+    await screen.findByText('La pratica non esiste più: scegli dove ripristinare.');
+    fireEvent.change(screen.getByLabelText('Pratica in cui ripristinare'), { target: { value: 'd2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Ripristina qui' }));
     await waitFor(() => expect(onRestore).toHaveBeenLastCalledWith(items, 'd2'));
   });

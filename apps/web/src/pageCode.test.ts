@@ -25,7 +25,7 @@ function valueImports(file: string): string[] {
 
 describe('the pages loaded with their route (P1)', () => {
   it('knows the code each address waits for', () => {
-    expect(pageCodeFor('/dossier')).toBe(PAGE_CODE.dossier);
+    expect(pageCodeFor('/pratiche')).toBe(PAGE_CODE.dossier);
     expect(pageCodeFor('/history')).toBe(PAGE_CODE.history);
     expect(pageCodeFor('/forum')).toBe(PAGE_CODE.forum);
     expect(pageCodeFor('/forum/community')).toBe(PAGE_CODE.community);

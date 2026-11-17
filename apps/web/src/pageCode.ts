@@ -20,7 +20,7 @@ const under = (pathname: string, root: string) => pathname === root || pathname.
 
 /** The code an address's page waits for, if it is loaded with its route. */
 export function pageCodeFor(pathname: string): (() => Promise<unknown>) | null {
-  if (under(pathname, '/dossier')) return PAGE_CODE.dossier;
+  if (under(pathname, '/pratiche')) return PAGE_CODE.dossier;
   if (under(pathname, '/history')) return PAGE_CODE.history;
   if (under(pathname, '/forum/community')) return PAGE_CODE.community;
   if (under(pathname, '/forum')) return PAGE_CODE.forum;

@@ -8,7 +8,7 @@ import { SECTION_PHRASES, kickerOf, sectionKicker } from '../../features/section
 describe('PageFrame (W2)', () => {
   it('takes the layout\'s width, with nothing narrower, and heads it with the title, the sentence and the action', () => {
     const { container } = render(
-      <PageFrame title="Dossier pubblici" line="I dossier di studio pubblicati dalla comunità" action={<button type="button">Pubblica un dossier</button>}>
+      <PageFrame title="Dossier pubblici" line="Le pratiche di studio pubblicati dalla comunità" action={<button type="button">Pubblica una pratica</button>}>
         <p>corpo</p>
       </PageFrame>,
     );
@@ -18,8 +18,8 @@ describe('PageFrame (W2)', () => {
     // One size on every page: EB Garamond, 28 px on a phone, 30 px from `md`.
     expect(title).toHaveClass(...PAGE_TITLE.split(' '));
     expect(title.querySelector('svg')).toBeNull();
-    expect(screen.getByText('I dossier di studio pubblicati dalla comunità')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pubblica un dossier' })).toBeInTheDocument();
+    expect(screen.getByText('Le pratiche di studio pubblicati dalla comunità')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pubblica una pratica' })).toBeInTheDocument();
     expect(screen.getByText('corpo')).toBeInTheDocument();
   });
 

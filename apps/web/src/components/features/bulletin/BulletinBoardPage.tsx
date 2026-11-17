@@ -91,7 +91,7 @@ export function BulletinBoardPage() {
     setToast({
       message: studyImportSentence(report),
       type: report.dossiers.length ? 'success' : 'info',
-      ...(only ? { action: { label: 'Apri', onClick: () => navigate(`/dossier?dossier=${only.id}`) } } : {}),
+      ...(only ? { action: { label: 'Apri', onClick: () => navigate(`/pratiche?dossier=${only.id}`) } } : {}),
     });
   };
 

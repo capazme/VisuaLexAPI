@@ -44,7 +44,7 @@ export function CoursesEmpty() {
         </p>
         <p>
           Lo crea il tuo assistente AI collegato a LexCraft: dai a lui i file e digli l’obiettivo. Ti propone un programma, tu
-          lo correggi e lo confermi, e lui scrive qui il percorso e il suo dossier di studio.
+          lo correggi e lo confermi, e lui scrive qui il percorso e la sua pratica di studio.
         </p>
         <p>
           In LexCraft non si carica nessun file: i materiali li legge il fornitore del tuo assistente, alle sue condizioni.

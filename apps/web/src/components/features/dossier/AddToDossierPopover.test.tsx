@@ -100,9 +100,9 @@ describe('AddToDossierPopover', () => {
   });
   it('creates a dossier inline with the server id, then adds', async () => {
     const onAdded = renderPopover();
-    fireEvent.click(screen.getByRole('button', { name: /nuovo dossier/i }));
-    fireEvent.change(screen.getByPlaceholderText(/nome del dossier/i), { target: { value: 'Nuova pratica' } });
-    fireEvent.submit(screen.getByRole('form', { name: /crea dossier/i }));
+    fireEvent.click(screen.getByRole('button', { name: /nuova pratica/i }));
+    fireEvent.change(screen.getByPlaceholderText(/nome della pratica/i), { target: { value: 'Nuova pratica' } });
+    fireEvent.submit(screen.getByRole('form', { name: /crea una pratica/i }));
     await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('srv-new', 'Nuova pratica'));
     const created = appStore.getState().dossiers.find(d => d.id === 'srv-new')!;
     expect(created.items).toHaveLength(1);
@@ -111,9 +111,9 @@ describe('AddToDossierPopover', () => {
     sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     try {
       const onAdded = renderPopover();
-      fireEvent.click(screen.getByRole('button', { name: /nuovo dossier/i }));
-      fireEvent.change(screen.getByPlaceholderText(/nome del dossier/i), { target: { value: 'Nuova pratica' } });
-      fireEvent.submit(screen.getByRole('form', { name: /crea dossier/i }));
+      fireEvent.click(screen.getByRole('button', { name: /nuova pratica/i }));
+      fireEvent.change(screen.getByPlaceholderText(/nome della pratica/i), { target: { value: 'Nuova pratica' } });
+      fireEvent.submit(screen.getByRole('form', { name: /crea una pratica/i }));
       await vi.waitFor(() => expect(onAdded).toHaveBeenCalled());
       expect(appStore.getState().dossiers.find(d => d.id === 'srv-new')!.kind).toBe('studio');
     } finally {

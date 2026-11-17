@@ -52,7 +52,7 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
   const clearNotice = plannerStore((s) => s.clearNotice);
   const serverToday = plannerStore((s) => s.today);
   const { pathname, search } = useLocation();
-  const openDossierId = pathname === '/dossier' ? new URLSearchParams(search).get('dossier') : null;
+  const openDossierId = pathname === '/pratiche' ? new URLSearchParams(search).get('dossier') : null;
 
   useEffect(() => {
     if (!enabled) return;

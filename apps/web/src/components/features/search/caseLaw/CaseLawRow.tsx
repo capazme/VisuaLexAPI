@@ -154,14 +154,14 @@ export function CaseLawRow({
           <button
             type="button"
             onClick={(e) => adding.open(e.currentTarget)}
-            aria-label={estremi ? `Aggiungi al dossier ${estremi}` : undefined}
+            aria-label={estremi ? `Aggiungi alla pratica ${estremi}` : undefined}
             className={cn(
               'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
               TOUCH_TARGET_RESPONSIVE,
             )}
           >
             <FolderPlus size={14} aria-hidden />
-            Aggiungi al dossier
+            Aggiungi alla pratica
           </button>
         )}
       </div>

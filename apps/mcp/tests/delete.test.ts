@@ -86,10 +86,10 @@ describe('omnilex_elimina_voci_dossier', () => {
 
   it('entries gone between the question and the move are reported as such (review of PR 4, M2)', async () => {
     env.stub.apiOverride = (method, path) =>
-      method === 'POST' && path.endsWith('/trash-items') ? [404, { detail: 'Nessuna delle voci indicate è in questo dossier.' }] : undefined;
+      method === 'POST' && path.endsWith('/trash-items') ? [404, { detail: 'Nessuna delle voci indicate è in questa pratica.' }] : undefined;
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
-    expect(text(result)).toBe('Le voci indicate non sono più nel dossier: nulla è stato eliminato.');
+    expect(text(result)).toBe('Le voci indicate non sono più nella pratica: nulla è stato eliminato.');
     await client.close();
   });
 
@@ -114,7 +114,7 @@ describe('omnilex_elimina_voci_dossier', () => {
     expect(asked[0].message).toContain('art. 25, l. 31 dicembre 2012, n. 247');
     expect(asked[0].message).toMatch(/2 voci/);
     expect(asked[0].message).toMatch(/30 giorni/);
-    expect(asked[0].message).toMatch(/1 nota collegata resta nel dossier/);
+    expect(asked[0].message).toMatch(/1 nota collegata resta nella pratica/);
     await client.close();
   });
 
@@ -210,7 +210,7 @@ describe('omnilex_elimina_voci_dossier', () => {
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1', 'x9'] } });
     expect(result.isError).toBe(true);
-    expect(text(result)).toMatch(/Voci non trovate in questo dossier: x9/);
+    expect(text(result)).toMatch(/Voci non trovate in questa pratica: x9/);
     expect(asked).toEqual([]);
     await client.close();
   });
@@ -239,7 +239,7 @@ describe('omnilex_elimina_dossier', () => {
   it('asks, then moves the whole dossier to the trash', async () => {
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
-    expect(asked[0].message).toMatch(/dossier «Prova» con 3 voci/);
+    expect(asked[0].message).toMatch(/pratica «Prova» con 3 voci/);
     // The entries shown travel with the move: the server refuses it if the dossier changed meanwhile.
     expect(trashCalls()).toEqual([
       expect.objectContaining({ path: '/dossiers/d1/trash', bearer: 'api-token-for-content:delete', body: { itemIds: ['i1', 'i2', 'n1'], taskCount: 0 } }),
@@ -254,7 +254,7 @@ describe('omnilex_elimina_dossier', () => {
     env.stub.dossiers[0].task_count = 3;
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
-    expect(asked[0].message.split('\n')[0]).toBe('ELIMINAZIONE — Spostare nel cestino il dossier «Prova» con 3 voci e 3 compiti?');
+    expect(asked[0].message.split('\n')[0]).toBe('ELIMINAZIONE — Spostare nel cestino la pratica «Prova» con 3 voci e 3 compiti?');
     expect(trashCalls()).toEqual([expect.objectContaining({ path: '/dossiers/d1/trash', body: { itemIds: ['i1', 'i2', 'n1'], taskCount: 3 } })]);
     expect(JSON.parse(text(result))).toMatchObject({ voci: 3, compiti: 3 });
     await client.close();
@@ -262,27 +262,27 @@ describe('omnilex_elimina_dossier', () => {
 
   it('one task is «e 1 compito»; entries alone never mention tasks', () => {
     expect(deletionMessage({ dossierName: 'Prova', lines: [], total: 0, wholeDossier: true, tasks: 1 }).split('\n')[0]).toBe(
-      'ELIMINAZIONE — Spostare nel cestino il dossier «Prova» con 0 voci e 1 compito?',
+      'ELIMINAZIONE — Spostare nel cestino la pratica «Prova» con 0 voci e 1 compito?',
     );
     expect(deletionMessage({ dossierName: 'Prova', lines: ['Nota'], total: 1, tasks: 4 })).not.toMatch(/compit/);
   });
 
   it('a dossier that changed after the question is reported, and nothing is deleted', async () => {
     env.stub.apiOverride = (method, path) =>
-      method === 'POST' && path.endsWith('/trash') ? [409, { detail: 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.' }] : undefined;
+      method === 'POST' && path.endsWith('/trash') ? [409, { detail: 'La pratica è cambiata dopo la conferma: nulla è stato eliminato.' }] : undefined;
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
     expect(result.isError).toBe(true);
-    expect(text(result)).toBe('Il dossier è cambiato dopo la conferma: nulla è stato eliminato. Riprova.');
+    expect(text(result)).toBe('La pratica è cambiata dopo la conferma: nulla è stato eliminato. Riprova.');
     await client.close();
   });
 
   it('a conflict that already says to retry is not told twice (review of PR 4, M1)', async () => {
     env.stub.apiOverride = (method, path) =>
-      method === 'POST' && path.endsWith('/trash') ? [409, { detail: 'Il dossier è cambiato nel frattempo: riprova.' }] : undefined;
+      method === 'POST' && path.endsWith('/trash') ? [409, { detail: 'La pratica è cambiata nel frattempo: riprova.' }] : undefined;
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
-    expect(text(result)).toBe('Il dossier è cambiato nel frattempo: riprova.');
+    expect(text(result)).toBe('La pratica è cambiata nel frattempo: riprova.');
     await client.close();
   });
 
@@ -314,7 +314,7 @@ describe('the dialog cannot be spoofed by stored text (security review of 5c3bb3
     });
     // The name sits inside its quotes: no « or » of its own.
     expect(message.match(/[«»]/g)).toHaveLength(2);
-    expect(message.split('\n')[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 voce del dossier/);
+    expect(message.split('\n')[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 voce della pratica/);
   });
 
   it('strips invisible, direction-changing and quote-like characters from any stored text (review of 826d6f8f)', () => {
@@ -447,7 +447,7 @@ describe('the dialog text', () => {
     const quoted = message.match(/«([^»]*)»/)![1];
     expect(quoted.length).toBeLessThanOrEqual(60);
     expect(quoted.endsWith('…')).toBe(true);
-    expect(message.split('\n')[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino il dossier «/);
+    expect(message.split('\n')[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino la pratica «/);
   });
 
   it('lists exactly 20 lines without «e altre»', () => {

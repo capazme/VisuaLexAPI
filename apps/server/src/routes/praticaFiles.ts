@@ -156,10 +156,10 @@ const storeGuard = (_req: Request, _res: Response, next: NextFunction) => {
 /** The dossier is the caller's, or a 404 that says nothing of anyone else's. */
 const ownDossier = (req: Request, _res: Response, next: NextFunction) => {
   const { dossierId } = req.params;
-  if (!hasNoNul(dossierId)) return next(new AppError(404, 'Dossier non trovato.'));
+  if (!hasNoNul(dossierId)) return next(new AppError(404, 'Pratica non trovata.'));
   prisma.dossier
     .findFirst({ where: { id: dossierId, userId: req.user!.id }, select: { id: true } })
-    .then((dossier) => next(dossier ? undefined : new AppError(404, 'Dossier non trovato.')))
+    .then((dossier) => next(dossier ? undefined : new AppError(404, 'Pratica non trovata.')))
     .catch(() => next(new AppError(500, 'Errore interno.')));
 };
 

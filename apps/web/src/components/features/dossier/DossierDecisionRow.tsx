@@ -106,7 +106,7 @@ export function DossierDecisionRow({
         >
           <Star size={16} className={cn(isImportant && 'fill-amber-400')} />
         </button>
-        <button type="button" onClick={onRemove} aria-label={`Rimuovi ${citation} dal dossier`} className={ROW_REMOVE}>
+        <button type="button" onClick={onRemove} aria-label={`Rimuovi ${citation} dalla pratica`} className={ROW_REMOVE}>
           <Trash2 size={16} aria-hidden />
         </button>
       </div>

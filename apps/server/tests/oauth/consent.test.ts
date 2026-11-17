@@ -19,7 +19,7 @@ describe('the consent decision', () => {
       client: { name: 'Claude Code', redirectHost: '127.0.0.1', registeredAutomatically: true },
     });
     expect(response.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write']);
-    for (const s of response.body.scopes) expect(s.label).toMatch(/dossier/i);
+    for (const s of response.body.scopes) expect(s.label).toMatch(/pratiche/i);
     // Nothing the page does not need: no challenge, no state.
     expect(JSON.stringify(response.body)).not.toMatch(/challenge|state-123/);
   });

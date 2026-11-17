@@ -132,7 +132,7 @@ export function ConnectedAppsSection() {
                       disabled={switching === app.id}
                       onChange={() => void toggleDelete(app)}
                     />
-                    Può eliminare dossier, voci e schede
+                    Può eliminare pratiche, voci e schede
                   </label>
                 </div>
                 <button
