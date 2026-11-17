@@ -19,6 +19,7 @@ const CANCEL_FIRST: [string, string][] = [
   ['components/features/search/discussionControls.tsx', 'Segnalare ai moderatori?'],
   ['components/features/atti/PraticaFilesPanel.tsx', 'Eliminare il file?'],
   ['components/features/atti/PraticaFilesPanel.tsx', 'Prima di caricare il primo file'], // the notice is read before the first upload
+  ['components/features/studia/lezione/LessonSession.tsx', 'Interrompere la lezione?'], // a lesson left is not resumed
 ];
 /** Undone by another step, so the focus may start on the action. */
 const ACTION_FIRST: [string, string][] = [
