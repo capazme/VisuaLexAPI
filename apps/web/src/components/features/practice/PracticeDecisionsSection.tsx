@@ -13,18 +13,18 @@ import type { PracticeLayout } from './PracticeColumn';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 
 /**
- * The decisions' tint (U2): the emerald the search menu gives a decision (its gavel), as a quiet wash and a hairline;
- * the text stays ink. No colour of its own.
+ * The decisions' strip (U2), in Pietra since LC61: the acts' panel hairline, no wash; the gavel in the ink's grey.
+ * The mint wash and green gavel were a category colour, not a functional one.
  */
-const DECISIONS_STRIP = 'rounded-xl border border-emerald-200/70 bg-emerald-50/40 px-3 pb-2 dark:border-emerald-900/50 dark:bg-emerald-950/20';
-const DECISIONS_MARK = 'text-emerald-700 dark:text-emerald-400';
+const DECISIONS_STRIP = 'rounded-xl border border-slate-200 px-3 pb-2 dark:border-slate-800';
+const DECISIONS_MARK = 'text-slate-500 dark:text-slate-400';
 
 /**
  * «Giurisprudenza (n)» at the bottom of the practice's column (spec §3.3), only when the practice
  * holds a decision: one row per entry, newest first (`decisionOrder`, T7). A row opens in place on
  * the decision's reading surface (`DecisionEntryView`, hosted by the practice); closed, it mounts
  * nothing, so a decision «Apri tutto» added is not asked for until it is opened (T17). In the overview (U2) a strip of
- * the frame's width under the acts' panels, in the decisions' tint, its closed rows in columns and an open one across
+ * the frame's width under the acts' panels, its closed rows in columns and an open one across
  * the strip; in the reading view's index, its decisions one entry a line, each opening beside.
  */
 export function PracticeDecisionsSection({ practiceId, layout }: { practiceId: string; layout: PracticeLayout }) {
@@ -38,7 +38,7 @@ export function PracticeDecisionsSection({ practiceId, layout }: { practiceId: s
   const tinted = layout !== 'phone';
   return (
     // A section of the page as an act is (R3): its title in the reader's serif and a hairline, no card; on the desktop
-    // in the decisions' tint.
+    // a strip as an act's panel.
     <section
       aria-labelledby={headingId}
       data-testid="practice-decisions"
@@ -50,7 +50,7 @@ export function PracticeDecisionsSection({ practiceId, layout }: { practiceId: s
         id={headingId}
         className={cn(
           'flex items-center gap-2 border-b font-serif font-medium leading-tight text-slate-900 dark:text-white',
-          tinted ? 'border-emerald-200/70 dark:border-emerald-900/50' : 'border-slate-200 dark:border-slate-800',
+          'border-slate-200 dark:border-slate-800',
           isIndex ? 'py-1.5 text-[17px]' : 'py-2 text-[22px]',
         )}
       >

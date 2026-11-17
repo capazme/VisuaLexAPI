@@ -55,6 +55,8 @@ export interface ReadingToolbarProps {
     /** The dossier command's words; default «Al dossier» (a popover to choose one). «Aggiungi a questo dossier» in a
      *  dossier's «Lettura» (LC55). */
     dossierLabel?: string;
+    /** No dossier command in the bar (LC61): the row offers it, or the article is already in the hosting dossier. */
+    hideDossier?: boolean;
     onShareLink: () => void;
     /** «Copia link Normattiva» (the source's address, for a filing's hyperlinks); absent when the norm holds none. */
     onCopyLink?: () => void;
@@ -114,6 +116,7 @@ export function ReadingToolbar({
     onOpenCopyModal,
     onOpenDossier,
     dossierLabel,
+    hideDossier,
     onShareLink,
     onCopyLink,
     onOpenAdvancedExport,
@@ -249,7 +252,7 @@ export function ReadingToolbar({
                 {/* The note tool has no room here; turned on elsewhere (a decision's bar, Study Mode), its toggle shows,
                     so it can be turned off where there is no Esc (A4 §6). */}
                 {!lockedReason && noteToolOn && <NoteToolButton triggerClassName={ACTION} />}
-                {!compact && dossierButton(undefined, true)}
+                {!compact && !hideDossier && dossierButton(undefined, true)}
                 <div ref={phoneMoreRef} className="contents">
                     {/* Its list is long (the colours close it): capped under the bar, it scrolls on its own. */}
                     <MenuButton
@@ -280,7 +283,7 @@ export function ReadingToolbar({
                 {!lockedReason && <HighlighterButton triggerClassName={ACTION} />}
                 {/* The note tool (A4 §6): a personal note, or a gloss with colleagues. */}
                 {!lockedReason && <NoteToolButton gloss triggerClassName={ACTION} />}
-                {!compact && dossierButton(dossierButtonRef)}
+                {!compact && !hideDossier && dossierButton(dossierButtonRef)}
                 <div ref={desktopMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>
                         <MoreHorizontal size={18} aria-hidden />

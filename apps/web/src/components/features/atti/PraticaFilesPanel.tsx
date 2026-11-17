@@ -131,9 +131,13 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
   const download = (file: PraticaFile) =>
     run(async () => saveBlob(await praticaFilesService.download(dossierId, file.id), file.nome), 'Il file non è stato scaricato. Riprova.');
 
+  // Without the server key nothing can be uploaded (LC61): the button is off and a drop does nothing.
+  const filesOff = listError?.off === true;
+
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
     setDragging(false);
+    if (filesOff) return;
     take(event.dataTransfer.files?.[0]);
   };
 
@@ -228,7 +232,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
             dragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-slate-300 dark:border-slate-700',
           )}
         >
-          <Button icon={<Upload size={16} aria-hidden />} loading={busy} onClick={() => choose()}>Carica un file</Button>
+          <Button icon={<Upload size={16} aria-hidden />} loading={busy} disabled={filesOff} onClick={() => choose()}>Carica un file</Button>
           <span className="text-sm text-slate-600 max-md:hidden dark:text-slate-400">oppure trascinalo qui.</span>
           <input
             ref={input}
