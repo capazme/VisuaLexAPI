@@ -12,9 +12,10 @@ import { readRoles } from '../forum/roles';
 import { readReportReason } from '../forum/reportReasons';
 import {
   ACCEPTED_SELECT, LISTED_THREAD, NO_AUTHOR, VISIBLE, VISIBLE_REPLY, acceptedId, authorView, decisionLabel, excerpt,
-  isOwn, isPassageWithheld, isVisible, type Scores, type Viewer,
+  isOwn, isPassageWithheld, isVisible, type Authors, type Viewer,
 } from '../forum/views';
-import { castVote, personalScores, voteSummary, voteSummaryOf, type VoteValue } from '../forum/votes';
+import { castVote, voteSummary, voteSummaryOf, type VoteValue } from '../forum/votes';
+import { readAuthors, requireWriter } from '../forum/profiles';
 import { COMMENT_MAX, REPLY_MAX, materiaSchema, parsePaging } from './articleDiscussionController';
 
 // The Forum's Community (spec docs/superpowers/specs/2026-10-20-forum-community-glosse-design.md): the
@@ -99,7 +100,7 @@ function target(thread: { targetKind: string; decisionKey: string | null }) {
     : { kind: 'article' as const };
 }
 
-function feedItemView(thread: FeedRow, viewer: Viewer, scores: Scores) {
+function feedItemView(thread: FeedRow, viewer: Viewer, authors: Authors) {
   const withheld = isPassageWithheld(thread, viewer);
   return {
     id: thread.id,
@@ -113,7 +114,7 @@ function feedItemView(thread: FeedRow, viewer: Viewer, scores: Scores) {
     target: target(thread),
     decisionLabel: decisionLabel(thread),
     passage: thread.passageQuote === null ? null : { quote: withheld ? null : thread.passageQuote, withheld },
-    user: authorView(thread, scores),
+    user: authorView(thread, authors),
     materia: thread.materia,
     ...voteSummary(thread.score, thread._count.votes, thread.votes[0]?.value ?? 0),
     replyCount: thread._count.comments,
@@ -163,9 +164,9 @@ export const listFeed = async (req: Request, res: Response) => {
     prisma.articleThread.findMany({ where, select: feedSelect(viewer.id), orderBy, skip: (page - 1) * limit, take: limit }),
   ]);
 
-  const scores = await personalScores(prisma, threads.map(thread => thread.userId));
+  const authors = await readAuthors(prisma, threads.map(thread => thread.userId));
   res.json({
-    data: threads.map(thread => feedItemView(thread, viewer, scores)),
+    data: threads.map(thread => feedItemView(thread, viewer, authors)),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 };
@@ -177,14 +178,14 @@ type CommentRow = Prisma.ArticleCommentGetPayload<{ include: { user: { select: {
  * moderation's notice to its author and to moderators, else a bare place («removed»). Emptied by its
  * author: a bare place, without the author's name.
  */
-function itemView(item: CommentRow, viewer: { id: string; isModerator: boolean }, scores: Scores) {
+function itemView(item: CommentRow, viewer: { id: string; isModerator: boolean }, authors: Authors) {
   const own = isOwn(item.userId, viewer.id);
   const shown = item.deletedAt === null && (!item.isHidden || own || viewer.isModerator);
   return {
     id: item.id,
     parentId: item.parentId,
     body: shown ? item.body : '',
-    user: item.isHidden && !shown ? NO_AUTHOR : authorView(item, scores),
+    user: item.isHidden && !shown ? NO_AUTHOR : authorView(item, authors),
     createdAt: item.createdAt,
     editedAt: item.editedAt,
     deleted: item.deletedAt !== null,
@@ -248,7 +249,7 @@ export const getThread = async (req: Request, res: Response) => {
   if (thread.deletedAt !== null && !thread.comments.some(isVisible)) throw new AppError(404, 'Glossa non trovata');
 
   const withheld = isPassageWithheld(thread, viewer);
-  const scores = await personalScores(prisma, [thread.userId, ...thread.comments.map(comment => comment.userId)]);
+  const authors = await readAuthors(prisma, [thread.userId, ...thread.comments.map(comment => comment.userId)]);
   res.json({
     id: thread.id,
     normaKey: thread.normaKey,
@@ -267,7 +268,7 @@ export const getThread = async (req: Request, res: Response) => {
     passageReleased: thread.passageReleasedAt !== null,
     articleUrn: thread.articleUrn,
     textHash: thread.textHash,
-    user: authorView(thread, scores),
+    user: authorView(thread, authors),
     materia: thread.materia,
     createdAt: thread.createdAt,
     lastActivityAt: thread.lastActivityAt,
@@ -280,9 +281,9 @@ export const getThread = async (req: Request, res: Response) => {
     replyCount: thread.comments.filter(comment => comment.parentId === null && isVisible(comment)).length,
     isOwner: own,
     replies: replies.map(({ reply, comments }) => ({
-      ...itemView(reply, viewer, scores),
+      ...itemView(reply, viewer, authors),
       accepted: reply.id === accepted,
-      comments: comments.map(comment => ({ ...itemView(comment, viewer, scores), parentId: reply.id })),
+      comments: comments.map(comment => ({ ...itemView(comment, viewer, authors), parentId: reply.id })),
     })),
   });
 };
@@ -314,6 +315,7 @@ export const editThread = async (req: Request, res: Response) => {
     const thread = await tx.articleThread.findUniqueOrThrow({ where: { id: req.params.threadId } });
     if (!isVisible(thread)) throw new AppError(404, 'Glossa non trovata');
     if (!isOwn(thread.userId, userId)) throw new AppError(403, 'Puoi modificare solo le tue glosse');
+    await requireWriter(tx, userId, 'edit');
     const title = data.title ?? thread.title;
     if (thread.passageQuote === null && title.length < 3) {
       throw new AppError(400, 'Il titolo è obbligatorio (almeno 3 caratteri) per una glossa senza un passo citato');
@@ -346,6 +348,7 @@ export const editComment = async (req: Request, res: Response) => {
     const comment = await tx.articleComment.findUniqueOrThrow({ where: { id: req.params.commentId } });
     if (!isVisible(comment)) throw new AppError(404, 'Risposta non trovata');
     if (!isOwn(comment.userId, userId)) throw new AppError(403, 'Puoi modificare solo le tue risposte');
+    await requireWriter(tx, userId, 'edit');
     if (comment.parentId !== null && data.body.length > COMMENT_MAX) {
       throw new AppError(400, `Un commento può avere al massimo ${COMMENT_MAX} caratteri`);
     }

@@ -564,6 +564,35 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   released), each by id, then deletes the votes (`lingo/deleteUserAccount.ts`): left to the cascade and
   the SET NULLs, the rows would be locked in any order, a reply before its glossa, and could deadlock with
   a reply being written or voted.
+  **The minimal profile** (spec §B, D-246, D-247, D-249, G-477, G-479; migration
+  `20261116100001_forum_profiles`; `forum/profiles.ts`, `controllers/forumProfileController.ts`):
+  `forum_profiles`, one per person, deleted with the account, under the real name **or** a pseudonym, never
+  both (CHECKs); a declared qualification (closed list) and real name, nothing records a check; the subjects
+  (`LingoMateria[]`). Its `id` is the person's **public id in the Forum**: every author object in the
+  Community's answers and the reader's lists is `{ id: <profile id or null>, name, identity: real_name |
+  pseudonym | username | withdrawn | deleted, qualification, score, username }` (`username` repeats `name`
+  for the reader's panel) and never carries the account's id, which the published dossiers show with the
+  username. `GET`/`PUT /forum/profile` (one's own: `profile`, `required`, `canWrite`, `canSign`, `score`,
+  `contributions` not emptied, hidden included, `nameWithdrawn`), `GET /forum/profiles/:profileId` (name,
+  identity, qualification, subjects, score: nothing else). **A pseudonym never relabels what others read
+  under another name**: refused (409) while any glossa, reply or comment not emptied stands under the real
+  name or the username; leaving the real name renews the public id; unique against pseudonyms and usernames
+  without regard to case (an index on `lower(pseudonym)`; the check is an exact `lower() =`, never Prisma's
+  case-blind `equals`, an ILIKE where `_` is a wildcard); never one's own username (the published dossiers
+  show it); Latin letters only, in a real name too (no lookalike letter of another alphabet), counted in
+  characters as the CHECKs count them; reserved words. A pseudonym never signs a glossa;
+  the app switch **`forum_identity`** (off) makes a glossa need the real name and a reply any profile.
+  `requireWriter` runs inside each create and edit, after the glossa's and the reply's locks, holding the
+  account row for share; `PUT` holds it for update, so no write lands between the check and a change of name.
+  Writing refusals carry codes: `real_name_required`, `profile_required`, `name_withdrawn`.
+  **«Non è chi dice di essere»** (G-479): `POST /forum/profiles/:profileId/report { details? }`
+  (`forum_profile_reports`, the profile by a plain id, one pending per reporter, the `report` counter);
+  the owners (admins) alone: `GET /moderation/profile-reports?status=`, `POST
+  /moderation/profile-reports/:profileId/resolve { action: confirm | dismiss, reason }` (confirm withdraws
+  the name: «nome ritirato» everywhere, no writing, no change of profile) and `…/restore { reason }`; logged
+  as `withdraw_name`, `restore_name` (target `profile`) or `dismiss` (target `report`, `profile:<id>`). The
+  sweep erases a closed report's details after 90 days. The export carries the profile and the reports one
+  made.
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing

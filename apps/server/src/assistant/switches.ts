@@ -24,6 +24,11 @@ export const APP_SWITCHES = {
   // reference's comma is not sent on and the article is stored, as before (`norms/resolveReference.ts`); an entry
   // already stored as a part is still read as that part. Switch this on only once the web opens parts (3c).
   article_parts: 'Parti di un articolo diviso da Normattiva come voci a sé (G-387).',
+  // The Forum's profile (spec 2026-11-14-forum-community-server-design §B, D-246). Off: writing needs no profile,
+  // as before (a pseudonym never signs a glossa, and a withdrawn name writes nothing, either way). On: a glossa
+  // needs a profile under the real name, a reply or a comment any profile. Switch this on once the web shows the
+  // profile page: the reader's panel cannot make one.
+  forum_identity: 'Nel Forum si scrive con il profilo: nome vero per le glosse, nome o pseudonimo per le risposte (D-246).',
 } as const;
 
 export type AppSwitchKey = keyof typeof APP_SWITCHES;

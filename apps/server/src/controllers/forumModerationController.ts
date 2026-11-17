@@ -9,7 +9,7 @@ import { notify } from '../forum/notify';
 import { logModeration } from '../forum/moderationLog';
 import { readRoles, requireModerator } from '../forum/roles';
 import { REPORT_REASONS } from '../forum/reportReasons';
-import { decisionLabel } from '../forum/views';
+import { decisionLabel, profileFace } from '../forum/views';
 import { parsePaging } from './articleDiscussionController';
 
 // The Community's moderation (spec 2026-10-20-forum-community-glosse-design §5.7, G-266): the reports'
@@ -25,6 +25,10 @@ const kindSchema = z.enum(['thread', 'comment'], { message: 'Il tipo deve essere
 const queueSchema = z.object({
   status: z.enum(['pending', 'resolved', 'dismissed'], { message: 'Lo stato deve essere «pending», «resolved» o «dismissed»' }).default('pending'),
 });
+
+const AUTHOR_PROFILE = {
+  id: true, identity: true, realName: true, pseudonym: true, qualification: true, nameWithdrawnAt: true,
+} as const;
 
 type ReportRow = {
   itemId: string; threadId: string; reason: string; details: string | null; status: string;
@@ -60,9 +64,11 @@ export const listReports = async (req: Request, res: Response) => {
 
   const threadIds = [...new Set(pageRows.map(row => row.threadId))];
   const commentIds = pageRows.filter(row => row.kind === 'comment').map(row => row.itemId);
+  // The author's account username and, with a profile (spec 2026-11-14 §B), the public name.
+  const author = { select: { username: true, forumProfile: { select: AUTHOR_PROFILE } } } as const;
   const [threads, comments] = await Promise.all([
-    prisma.articleThread.findMany({ where: { id: { in: threadIds } }, include: { user: { select: { username: true } } } }),
-    prisma.articleComment.findMany({ where: { id: { in: commentIds } }, include: { user: { select: { username: true } } } }),
+    prisma.articleThread.findMany({ where: { id: { in: threadIds } }, include: { user: author } }),
+    prisma.articleComment.findMany({ where: { id: { in: commentIds } }, include: { user: author } }),
   ]);
   const threadById = new Map(threads.map(thread => [thread.id, thread]));
   const commentById = new Map(comments.map(comment => [comment.id, comment]));
@@ -88,6 +94,7 @@ export const listReports = async (req: Request, res: Response) => {
           title: kind === 'thread' && thread ? thread.title : null,
           body: item.body,
           author: item.user?.username ?? null,
+          authorName: item.user?.forumProfile ? profileFace(item.user.forumProfile).name : null,
           isHidden: item.isHidden,
           hiddenReason: item.hiddenReason,
           emptied: item.deletedAt !== null,

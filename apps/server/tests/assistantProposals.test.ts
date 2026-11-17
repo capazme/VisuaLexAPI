@@ -104,6 +104,7 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
         expect.objectContaining({ key: 'assistant_glosses', enabled: false }),
         expect.objectContaining({ key: 'lingo_courses', enabled: false }),
         expect.objectContaining({ key: 'article_parts', enabled: false }),
+        expect.objectContaining({ key: 'forum_identity', enabled: false }),
       ]);
       const glosses = await request(app).put('/api/admin/switches/assistant_glosses').set(authHeader(alice)).send({ enabled: true });
       expect(glosses.body).toMatchObject({ key: 'assistant_glosses', enabled: true });
