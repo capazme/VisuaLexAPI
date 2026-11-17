@@ -4,9 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { Progressi, TappaIstituto } from '../../../../types/studia';
 import { LearnPath, PATH_STOPS_SHOWN } from './LearnPath';
+import { LESSON_MIN_CARDS } from '../lezione/lessonPaths';
 import type { PercorsoState } from './usePercorso';
 
-// «Il tuo percorso» (LC23): a unit per subject with cards, its institutes as stops, «Sei qui» on the first to do.
+// «Il tuo sentiero» (LC23, LC62): a unit per subject with cards, its institutes as stops, «Sei qui» on the first to do.
 
 const tappa = (materia: TappaIstituto['materia'], istituto: string, dovute: number, over: Partial<TappaIstituto> = {}): TappaIstituto => ({
   materia, istituto, nuove: 1, apprendimento: dovute, consolidate: 0, dovute, ...over,
@@ -32,7 +33,7 @@ function renderPath(percorso: PercorsoState, materie: Progressi['materie'] | nul
 }
 
 const ready = (data: TappaIstituto[]): PercorsoState => ({ status: 'ready', data });
-const road = () => screen.getByRole('region', { name: 'Il tuo percorso' });
+const road = () => screen.getByRole('region', { name: 'Il tuo sentiero' });
 const units = () => within(road()).getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
 const unit = (label: string) => screen.getByRole('region', { name: label });
 
@@ -176,7 +177,7 @@ describe('LearnPath', () => {
 
   it('says it cannot read the road, with «Riprova», when the first read fails', async () => {
     const { onRetry } = renderPath({ status: 'error', data: null });
-    expect(road()).toHaveTextContent('Non riesco a leggere il tuo percorso.');
+    expect(road()).toHaveTextContent('Non riesco a leggere il tuo sentiero.');
     expect(road()).toHaveAttribute('aria-busy', 'false');
     expect(road().querySelector('.motion-safe\\:animate-pulse')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
@@ -186,7 +187,7 @@ describe('LearnPath', () => {
 
   it('keeps the road read before when a new read fails, and says so', async () => {
     const { onRetry } = renderPath({ status: 'error', data: [tappa('DIRITTO_CIVILE', 'Mora', 1)] });
-    expect(road()).toHaveTextContent('Non riesco ad aggiornare il percorso: resta quello letto prima.');
+    expect(road()).toHaveTextContent('Non riesco ad aggiornare il sentiero: resta quello letto prima.');
     expect(screen.getByRole('button', { name: (n: string) => n.startsWith('Ripassa Mora: 1 da ripassare') && n.endsWith(', sei qui') })).toBeInTheDocument();
     await userEvent.setup().click(within(road()).getByRole('button', { name: 'Riprova' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
@@ -197,5 +198,21 @@ describe('LearnPath', () => {
     expect(road()).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByRole('button', { name: (n: string) => n.startsWith('Ripassa Mora: 1 da ripassare') && n.endsWith(', sei qui') })).toBeInTheDocument();
     expect(road()).not.toHaveTextContent('Non riesco');
+  });
+
+  it('opens a short lesson as the first node of a subject with enough cards', () => {
+    renderPath(ready([tappa('DIRITTO_CIVILE', 'Mora', 2), tappa('DIRITTO_CIVILE', 'Usucapione', 0, { nuove: 2 })]));
+    const lesson = within(unit('Diritto civile')).getByRole('link', { name: /^Lezione breve di Diritto civile/ });
+    expect(lesson).toHaveAttribute('href', '/learn/lezione?materia=DIRITTO_CIVILE');
+  });
+
+  it('closes the lesson, saying why, when a subject has fewer cards than a lesson needs', () => {
+    renderPath(ready([tappa('DIRITTO_PENALE', 'Furto', 1, { nuove: 1 })]));
+    const penal = unit('Diritto penale');
+    expect(within(penal).queryByRole('link', { name: /Lezione breve/ })).toBeNull();
+    expect(within(penal).getByText('Lezione breve').closest('[aria-label]')).toHaveAttribute(
+      'aria-label',
+      `Lezione breve di Diritto penale, chiusa: servono almeno ${LESSON_MIN_CARDS} schede (ne hai 2)`,
+    );
   });
 });

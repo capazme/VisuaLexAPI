@@ -85,8 +85,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** «Il tuo percorso» (LC23), the road in the middle of the page. */
-const road = () => screen.getByRole('region', { name: 'Il tuo percorso' });
+/** «Il tuo sentiero» (LC23, LC62), the road in the middle of the page. */
+const road = () => screen.getByRole('region', { name: 'Il tuo sentiero' });
 const START = /^(Inizia|Continua) il ripasso$/;
 const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
@@ -562,7 +562,7 @@ describe('ReviewHome', () => {
       progress.mockResolvedValue(answer(18, 8));
       percorso.mockResolvedValue([{ materia: 'DIRITTO_CIVILE', istituto: 'Mora del debitore', nuove: 0, apprendimento: 2, consolidate: 0, dovute: 2 }]);
       renderHome();
-      expect(await screen.findAllByRole('region', { name: 'Il tuo percorso' })).toHaveLength(1);
+      expect(await screen.findAllByRole('region', { name: 'Il tuo sentiero' })).toHaveLength(1);
       expect(screen.queryByRole('region', { name: 'Le tue materie' })).toBeNull();
       expect(screen.queryByRole('region', { name: 'Cosa ripassi' })).toBeNull();
       expect(screen.queryByRole('group', { name: 'Materia' })).toBeNull();
@@ -729,7 +729,7 @@ describe('ReviewHome', () => {
     it('lays the page in the order fixed: the day, the numbers, today\'s missions, the road, the full list', async () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
-      const order = ['Il ripasso di oggi', 'I tuoi progressi', 'Le missioni di oggi', 'Il tuo percorso', 'Tutte le missioni'];
+      const order = ['Il ripasso di oggi', 'I tuoi progressi', 'Le missioni di oggi', 'Il tuo sentiero', 'Tutte le missioni'];
       const headings = await Promise.all(order.map((name) => screen.findByRole('heading', { name })));
       for (let i = 1; i < headings.length; i++) {
         expect(headings[i - 1].compareDocumentPosition(headings[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -739,7 +739,7 @@ describe('ReviewHome', () => {
     });
   });
 
-  describe('«Il tuo percorso» (LC23)', () => {
+  describe('«Il tuo sentiero» (LC23, LC62)', () => {
     const tappa = (materia: TappaIstituto['materia'], istituto: string, dovute: number): TappaIstituto => ({
       materia, istituto, nuove: 1, apprendimento: dovute, consolidate: 0, dovute,
     });
@@ -752,7 +752,7 @@ describe('ReviewHome', () => {
         tappa('DIRITTO_CIVILE', 'Mora del debitore', 4),
       ]);
       renderHome();
-      const units = await within(await screen.findByRole('region', { name: 'Il tuo percorso' })).findAllByRole('heading', { level: 3 });
+      const units = await within(await screen.findByRole('region', { name: 'Il tuo sentiero' })).findAllByRole('heading', { level: 3 });
       expect(units.map((h) => h.textContent)).toEqual(['Diritto civile', 'Diritto penale']);
       // The counts from the day's read (`answer` gives each subject 2 cards), the institutes and the cards due from the road's.
       expect(screen.getByRole('region', { name: 'Diritto civile' })).toHaveTextContent('2 schede · 2 istituti · 7 da ripassare');
@@ -802,7 +802,7 @@ describe('ReviewHome', () => {
       progress.mockResolvedValue(answer(3, 0));
       percorso.mockRejectedValueOnce(new Error('down'));
       renderHome();
-      expect(await within(await screen.findByRole('region', { name: 'Il tuo percorso' })).findByText('Non riesco a leggere il tuo percorso.')).toBeInTheDocument();
+      expect(await within(await screen.findByRole('region', { name: 'Il tuo sentiero' })).findByText('Non riesco a leggere il tuo sentiero.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Inizia il ripasso' })).toBeEnabled();
       expect(screen.queryByRole('alert')).toBeNull();
       percorso.mockResolvedValue([tappa('DIRITTO_CIVILE', 'Mora del debitore', 1)]);

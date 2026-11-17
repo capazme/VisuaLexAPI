@@ -70,7 +70,7 @@ describe('an exchanged token', () => {
 });
 
 describe('who calls settleMissions', () => {
-  it('is only the session’s grade, proposal, vote and reads, and the courses’ study routes and course page', () => {
+  it('is only the session’s grade, proposal, vote and reads, the courses’ study routes and course page, and the short lesson’s answer', () => {
     const root = join(__dirname, '../src');
     const files: string[] = [];
     const walk = (dir: string) => {
@@ -82,6 +82,6 @@ describe('who calls settleMissions', () => {
     };
     walk(root);
     const callers = files.filter((f) => !f.endsWith('lingo/missions.ts') && /import\s*{[^}]*\bsettleMissions\b[^}]*}\s*from/.test(readFileSync(f, 'utf8'))).map((f) => relative(root, f)).sort();
-    expect(callers).toEqual(['lingo/coursePage.ts', 'lingo/courseStudy.ts', 'lingo/progress.ts', 'routes/lingoCards.ts', 'routes/lingoSrs.ts', 'routes/lingoValidazione.ts']);
+    expect(callers).toEqual(['lingo/coursePage.ts', 'lingo/courseStudy.ts', 'lingo/lessons.ts', 'lingo/progress.ts', 'routes/lingoCards.ts', 'routes/lingoSrs.ts', 'routes/lingoValidazione.ts']);
   });
 });

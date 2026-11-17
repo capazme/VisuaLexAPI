@@ -86,6 +86,7 @@ model User {
   lingoPreferenzeStudio LingoPreferenzeStudio?
   lingoGiornateStudio   LingoGiornataStudio[]
   lingoCreditiXp        LingoCreditoXp[]
+  lingoLezioni          LingoLezione[]
   // Gymnasium's courses (Percorsi, A1): the ones this user wrote, and their enrolments.
   lingoCorsi            LingoCorso[]
   lingoIscrizioni       LingoCorsoIscrizione[]
@@ -1496,6 +1497,7 @@ enum LingoMissione {
   CONSOLIDA
   MODULO
   PERCORSO
+  LEZIONE
 }
 
 enum LingoFonteXp {
@@ -1505,13 +1507,14 @@ enum LingoFonteXp {
   LETTURA
   MODULO
   ESAME
+  LEZIONE
 }
 
 model LingoCreditoXp {
   id        String        @id @default(uuid())
   utenteId  String        @map("utente_id")
   missione  LingoMissione
-  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once)
+  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once), M:/C:/L:<uuid> (a module, a course, a lesson)
   giorno    DateTime      @db.Date
   punti     Int
   fonte     LingoFonteXp
@@ -1525,6 +1528,25 @@ model LingoCreditoXp {
   @@unique([missione, fonteId])
   @@index([utenteId, giorno])
   @@map("lingo_crediti_xp")
+}
+
+// Learn's short lesson (LC63): 5–8 exercises the server built from the review scope's cards, with their keys
+// (`esercizi`, copied), the outcomes (`esiti`, `{ indice, giusta }` in the order answered) and the end. The person's
+// alone; the CHECKs (5–8 exercises, no more outcomes than exercises) are in the migration.
+model LingoLezione {
+  id        String       @id @default(uuid())
+  utenteId  String       @map("utente_id")
+  giorno    DateTime     @db.Date
+  materia   LingoMateria
+  esercizi  Json
+  esiti     Json         @default("[]")
+  finitaIl  DateTime?    @map("finita_il")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@index([utenteId, giorno])
+  @@map("lingo_lezioni")
 }
 
 // The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the

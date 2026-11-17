@@ -439,7 +439,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications, atti] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications, atti, lingoLezioni] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -542,6 +542,13 @@ export const exportAccountData = async (req: Request, res: Response) => {
       select: { id: true, dossierId: true, titolo: true, tipo: true, testo: true, stato: true, createdAt: true, updatedAt: true, createdByClientName: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }),
+    // Learn's short lessons (LC63): when, the subject, the kinds and the person's outcomes. Not the exercises' words,
+    // which are cards' texts, often other people's.
+    prisma.lingoLezione.findMany({
+      where: { utenteId: userId },
+      select: { id: true, giorno: true, materia: true, esercizi: true, esiti: true, finitaIl: true, createdAt: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    }),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
   const others = await othersIn([
@@ -593,6 +600,9 @@ export const exportAccountData = async (req: Request, res: Response) => {
       lingoCreditiXp: lingoCreditiXp.map(({ giorno, ...credit }) => ({ ...credit, giorno: dateToDay(giorno) })),
       merltConsenso, merltConsensoStorico,
       lingoCorsi,
+      lingoLezioni: lingoLezioni.map(({ giorno, esercizi, ...lesson }) => ({
+        ...lesson, giorno: dateToDay(giorno), tipi: (esercizi as { tipo: string }[]).map((e) => e.tipo),
+      })),
       atti,
       // Rome civil days as 'YYYY-MM-DD' and times as 'HH:MM' (a DATE or a TIME travels as a UTC instant).
       tasks: tasks.map(({ plannedDate, plannedTime, dueDate, dueTime, ...task }) => ({
