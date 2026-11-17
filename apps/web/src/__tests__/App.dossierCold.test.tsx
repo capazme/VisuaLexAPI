@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 // A cold boot (Irnerio's repro, LC61): the browser remembers the Forum as the last section before the app mounts.
