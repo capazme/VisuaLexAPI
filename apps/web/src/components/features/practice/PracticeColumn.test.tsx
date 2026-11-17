@@ -122,6 +122,8 @@ describe('PracticeColumn (spec §3)', () => {
     const live = document.querySelector('[id^="DndLiveRegion"]');
     expect(live?.textContent).toMatch(/^Codice civile.* spostato al posto di l\. 8 marzo 2017, n\. 24/);
     expect(live?.textContent).not.toContain(ccId);
+    // The handle says what it is in Italian (LC61).
+    expect(handle).toHaveAttribute('aria-roledescription', 'riordinabile');
   });
 });
 

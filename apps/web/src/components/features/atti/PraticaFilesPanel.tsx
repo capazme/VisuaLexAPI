@@ -233,7 +233,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
           )}
         >
           <Button icon={<Upload size={16} aria-hidden />} loading={busy} disabled={filesOff} onClick={() => choose()}>Carica un file</Button>
-          <span className="text-sm text-slate-600 max-md:hidden dark:text-slate-400">oppure trascinalo qui.</span>
+          {!filesOff && <span className="text-sm text-slate-600 max-md:hidden dark:text-slate-400">oppure trascinalo qui.</span>}
           <input
             ref={input}
             type="file"
