@@ -43,4 +43,27 @@ describe('DossierPage', () => {
     expect(seen.every((search) => search === '?dossier=d1')).toBe(true);
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
   });
+
+  it('LC61: while the pratiche are being read, an address with ?dossier= never draws the list of another kind', () => {
+    sectionStore.setState({ section: 'forum', dossierKind: 'studio' });
+    appStore.setState({ dossiers: [{ id: 's1', title: 'Diritto penale', kind: 'studio', createdAt: '2026-10-01T00:00:00Z', items: [] }], dossiersLoaded: false, isDataLoaded: false, isLoadingData: true });
+    render(<MemoryRouter initialEntries={['/pratiche?dossier=w1']}><DossierPage /></MemoryRouter>);
+    expect(screen.getByRole('status')).toHaveTextContent('Apro la pratica…');
+    expect(screen.queryByText('Diritto penale')).toBeNull();
+    act(() => {
+      appStore.setState({
+        dossiers: [{ id: 'w1', title: 'Condominio', kind: 'lavoro', createdAt: '2026-10-01T00:00:00Z', items: [] }, { id: 's1', title: 'Diritto penale', kind: 'studio', createdAt: '2026-10-01T00:00:00Z', items: [] }],
+        dossiersLoaded: true, isDataLoaded: true, isLoadingData: false,
+      });
+    });
+    expect(screen.getByRole('heading', { level: 1, name: /Condominio/ })).toBeInTheDocument();
+    expect(sectionStore.getState().section).toBe('opus');
+  });
+
+  it('LC61: read, and not among the user\'s pratiche, it says so instead of a list', () => {
+    appStore.setState({ dossiers: [], dossiersLoaded: true, isDataLoaded: true, isLoadingData: false });
+    render(<MemoryRouter initialEntries={['/pratiche?dossier=zz']}><DossierPage /></MemoryRouter>);
+    expect(screen.getByText('Questa pratica non c’è o non è tua.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vai alle pratiche' })).toBeInTheDocument();
+  });
 });
