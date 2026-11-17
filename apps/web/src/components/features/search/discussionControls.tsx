@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AlertTriangle, Send, ThumbsUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -58,18 +58,38 @@ export function ReplyForm({ onSend, placeholder = 'Scrivi una risposta…', send
 }
 
 /** «Segnala», which asks first: one touch meant for the control beside it must not reach the moderators. */
-export function ReportButton({ onReport, label }: { onReport: () => void; label?: string }) {
+export function ReportButton({ onReport, label, inline = false }: { onReport: () => void; label?: string; inline?: boolean }) {
   const [asking, setAsking] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  // Answered in the margin, the focus goes back to «Segnala», not to the page.
+  const answer = (report: boolean) => {
+    setAsking(false);
+    if (report) onReport();
+    requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true }));
+  };
+  const question = 'La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto.';
   return (
     <>
-      <button type="button" onClick={() => setAsking(true)} aria-label={label} className={cn('inline-flex items-center gap-1 px-2 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 md:px-0', TOUCH)}>
+      <button ref={trigger} type="button" onClick={() => setAsking(true)} aria-label={label} aria-expanded={inline ? asking : undefined} className={cn('inline-flex items-center gap-1 px-2 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 md:px-0', TOUCH)}>
         <AlertTriangle size={12} aria-hidden /> Segnala
       </button>
+      {/* `inline` (the article's margin, L-73): the question under the row, in the page, not a dialog over it. The
+          parent row wraps, so it takes a line of its own. */}
+      {inline && asking && (
+        <div role="group" aria-label="Segnalare ai moderatori?" className="basis-full rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+          <p>{question}</p>
+          <div className="mt-2 flex justify-end gap-2">
+            {/* 44 px to touch at every width: the question is in the margin, on a phone too. */}
+            <button type="button" onClick={() => answer(false)} className="min-h-11 min-w-11 px-2 text-slate-600 dark:text-slate-300">Annulla</button>
+            <button type="button" onClick={() => answer(true)} className="min-h-11 min-w-11 rounded-md bg-red-600 px-2.5 font-semibold text-white hover:bg-red-700">Segnala</button>
+          </div>
+        </div>
+      )}
       <ConfirmDialog
-        open={asking}
+        open={asking && !inline}
         variant="danger"
         title="Segnalare ai moderatori?"
-        message="La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto."
+        message={question}
         confirmLabel="Segnala"
         focusCancel
         onCancel={() => setAsking(false)}

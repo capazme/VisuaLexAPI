@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback, useId } from 'react';
+import { createPortal } from 'react-dom';
+import { cn } from '../../../lib/utils';
 import type { ArticleData, SearchParams } from '../../../types';
 import { CaseLawSection } from './CaseLawSection';
 import { ExternalLink } from 'lucide-react';
@@ -66,6 +68,7 @@ import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
+import { useGlossMargin } from './useGlossMargin';
 import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
 import { plainText } from '../../../utils/threadPassages';
 import { PassageThreadsStatus } from './PassageThreadsStatus';
@@ -828,6 +831,24 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         (id: string, show: boolean) => (show ? showGloss(id) : hideGloss(id)),
         [showGloss, hideGloss],
     );
+    // The glosses at the margin (LC74): beside the text where the card can widen, in the notes' column where that is
+    // already there, else under the text. One margin per article, opened on its own.
+    const articleRootRef = useRef<HTMLDivElement>(null);
+    // As the side panel was: an article with an id, not a past text (a notice in place of the text keeps its glosses).
+    const glossesEnabled = Boolean(discussionAnchor.articleId) && !readOnly;
+    const [glossCount, setGlossCount] = useState(0);
+    const glossMargin = useGlossMargin({ open: discussion.open && glossesEnabled, rootRef: articleRootRef, columnShown: marginShown });
+    const glossBeside = glossMargin.shown && glossMargin.placement === 'beside';
+    const closeGlosses = discussion.panelProps.onClose;
+    // Closed from inside (its «Chiudi», Esc): the focus goes back to the button that opened it, the one on screen.
+    const closeGlossMargin = useCallback(() => {
+        const root = articleRootRef.current;
+        const inside = !!root && !!glossMargin.host?.contains(document.activeElement);
+        closeGlosses();
+        if (!inside || !root) return;
+        const button = [...root.querySelectorAll<HTMLElement>('[data-glosses-button]')].find((b) => b.getClientRects().length > 0);
+        button?.focus({ preventScroll: true });
+    }, [closeGlosses, glossMargin.host]);
     const sheetOpen = useSignTarget({ openBlock, blockAll, group: openGroup, marginShown, marginRef, closeBlock, openBlockAt });
     const openNoteBeside = useNoteOpener(marginRef, openBlockAt);
     useInlineNoteAnchors(contentRef, itemAnnotations, openNoteBeside);
@@ -878,7 +899,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     }, [display.textVisible, data.validity?.state, article_text, structure]);
 
     return (
-        <div className="animate-in fade-in duration-200 relative">
+        <div
+            ref={articleRootRef}
+            data-article-root=""
+            data-glosses-beside={glossBeside ? '' : undefined}
+            className={cn('animate-in fade-in duration-200 relative', glossBeside && 'flex items-start gap-6')}
+        >
+            {/* The article; beside its margin, at the width it had closed: the text does not move (LC74). */}
+            <div className="min-w-0" style={glossBeside && glossMargin.textWidth !== null ? { width: glossMargin.textWidth, flex: 'none' } : undefined}>
             <ReadingToolbar
                 normaData={norma_data}
                 versionChip={display.chip}
@@ -893,6 +921,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={readOnly ? 0 : allPanelHighlights.length}
                 isDiscussionOpen={discussion.open}
+                discussionCount={glossesEnabled ? glossCount : 0}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
                 onToggleDiscussion={discussion.toggle}
@@ -985,6 +1014,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     glossActions={proposalActions}
                     shownGlossId={shownGlossId}
                     onShowGlossPassage={showGlossPassage}
+                    aside={glossMargin.shown && glossMargin.placement === 'column' ? <div ref={glossMargin.setColumnSlot} /> : undefined}
                 >
                     <ArticleBody
                         contentRef={contentRef}
@@ -1024,6 +1054,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             {!discussion.open && (
                 <PassageThreadsStatus error={discussion.error} loading={discussion.loading} onRetry={discussion.reload} />
             )}
+
+            {/* The glosses under the text, where there is no room beside it; closed, the margin's empty home. */}
+            <div
+                ref={glossMargin.setBelowSlot}
+                className={cn(glossMargin.shown && glossMargin.placement === 'below' && 'mt-4 border-t border-slate-100 pt-4 dark:border-slate-800')}
+            />
 
             <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
             {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
@@ -1069,12 +1105,19 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            <ArticleDiscussionPanel
-                anchor={discussionAnchor}
-                label={`Art. ${discussionAnchor.articleLabel ?? discussionAnchor.articleId}`}
-                articleUrn={norma_data.urn}
-                {...discussion.panelProps}
-            />
+            {glossesEnabled && glossMargin.host && createPortal(
+                <ArticleDiscussionPanel
+                    layout="margin"
+                    anchor={discussionAnchor}
+                    label={`Art. ${discussionAnchor.articleLabel ?? discussionAnchor.articleId}`}
+                    articleUrn={norma_data.urn}
+                    {...discussion.panelProps}
+                    isOpen={glossMargin.shown}
+                    onClose={closeGlossMargin}
+                    onCountChange={setGlossCount}
+                />,
+                glossMargin.host,
+            )}
 
             {/* It asks about the article by its URN: on a past text the answer would describe the current one. */}
             {devMode && !readOnly && !isBeside && (
@@ -1206,7 +1249,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     hidePreview();
                 }}
             />
+            </div>
 
+            {/* The margin beside the text: its slot is there before it opens, hidden, so the opening finds it. */}
+            {glossMargin.placement === 'beside' && (
+                <div ref={glossMargin.setBesideSlot} hidden={!glossBeside} data-gloss-slot="" className="w-[21.25rem] shrink-0" />
+            )}
         </div>
     );
 }
