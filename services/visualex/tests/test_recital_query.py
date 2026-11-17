@@ -147,3 +147,18 @@ def test_the_consiglio_di_stato_is_still_a_decision():
     assert decision.riferimento["corte"] == "consiglio_di_stato"
     assert read_norm_query("Cons. St., sez. VI, n. 2270/2019")[0] is None or "recital" not in (
         read_norm_query("Cons. St., sez. VI, n. 2270/2019")[0])
+
+
+@pytest.mark.parametrize("typed,article", [
+    ("art. 2043 c.c. considerando 5 anni di prescrizione", "2043"),
+    ("considerando 30 giorni art. 1453 cc", "1453"),
+])
+def test_an_article_of_an_act_with_no_recitals_reads_as_before(typed, article):
+    # «considerando» is the gerund there (review of PR 1b): never a refusal that drops the article.
+    params, _ = read_norm_query(typed)
+    assert params["article"] == article
+    assert "recital" not in params and "refusal" not in params
+
+
+def test_an_article_with_no_act_beside_a_recital_is_refused():
+    assert read_norm_query("art. 4 e considerando 26") == ({"recital": "26", "refusal": "recital_with_article"}, "recital")

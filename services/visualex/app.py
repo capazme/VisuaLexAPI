@@ -1460,7 +1460,8 @@ class NormaController:
 
         Returns:
             { recognized: bool, parsed?: {...api params}, urn?: str,
-              display?: str, source?: 'alias' | 'nl_parser' }
+              display?: str, source?: 'alias' | 'nl_parser' | 'recital',
+              refusal?: 'recital_not_eu' | 'recital_with_article' }
         """
         try:
             data = await request.get_json() or {}
@@ -1926,9 +1927,14 @@ class NormaController:
         """
         try:
             data = await request.get_json() or {}
+            # A list or a scalar as the body, or a type that is not text: a 400 in words, never a 500.
+            if not isinstance(data, dict):
+                raise ValidationError("Corpo della richiesta non valido: atteso un oggetto JSON")
             act_type = data.get('act_type')
             if not act_type:
                 raise ValidationError("Campo obbligatorio mancante: act_type")
+            if not isinstance(act_type, str):
+                raise ValidationError("Campo act_type non valido: atteso un testo")
             if normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
                 raise ValidationError(
                     "fetch_recitals accetta solo atti EUR-Lex (regolamento ue, direttiva ue)"

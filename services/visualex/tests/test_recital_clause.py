@@ -56,3 +56,17 @@ def test_expand_a_range_and_a_list():
     assert expand_recital_spec("26-28") == ["26", "27", "28"]
     assert expand_recital_spec("26,30") == ["26", "30"]
     assert expand_recital_spec("26") == ["26"]
+
+
+def test_e_privacy_keeps_its_e():
+    assert split_recital_clause("considerando 2 e-privacy") == ("2", "e-privacy")
+
+
+@pytest.mark.parametrize("typed", [" " * 20000, "cons 1 ," + " " * 20000, "considerando " * 2000, "cons. 1 e " * 2000 + "x"])
+def test_a_long_query_is_read_in_linear_time(typed):
+    # /parse_query has no length limit and reads the clause first: a quadratic pattern would hold
+    # the process for seconds on 20 000 spaces (review of PR 1b).
+    import time
+    started = time.perf_counter()
+    split_recital_clause(typed)
+    assert time.perf_counter() - started < 0.5

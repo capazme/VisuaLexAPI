@@ -18,9 +18,12 @@ from typing import Optional
 
 from .config import MAX_ARTICLES_PER_REQUEST
 
-_NUMBER = r"\(?\s*[1-9][0-9]{0,3}\s*\)?"
+# No whitespace inside the brackets: the OJ prints «(26)», and a `\s*` here beside the list's own
+# would let two quantifiers share one run of spaces, a quadratic search (review of PR 1b).
+_NUMBER = r"\(?[1-9][0-9]{0,3}\)?"
+# Anchored on the head, so a search over a long query stays linear: nothing before the head is read
+# by the pattern (the «e» or comma before it is taken off by hand, below).
 _CLAUSE = re.compile(
-    r"(?P<before>\s*,\s*|\s+e\s+|\s*)"
     r"(?<![\w.])(?:considerando|consid\.|cons\.?)"
     r"\s*(?:(?:n\.|n°|nr\.)\s*)?"
     rf"(?P<spec>{_NUMBER}(?:\s*[-–]\s*{_NUMBER}|(?:\s*(?:,|\be\b)\s*{_NUMBER})*))"
@@ -29,8 +32,20 @@ _CLAUSE = re.compile(
     re.IGNORECASE | re.ASCII,
 )
 _DIGITS = re.compile(r"[0-9]+")
-# What a clause leaves at the rest's edges: a comma, a lone «e».
-_EDGES = re.compile(r"^(?:\s*(?:,|\be\b)\s*)+|(?:\s*(?:,|\be\b)\s*)+$", re.IGNORECASE)
+_WHITESPACE = re.compile(r"\s+")
+
+
+def _trim_joins(text: str) -> str:
+    """The rest without the comma or the lone «e» a clause leaves at its edges: «art. 4 e» → «art. 4»,
+    «, reg. (UE) 2016/679» → «reg. (UE) 2016/679». «e-privacy» keeps its «e». String methods, no
+    pattern: linear whatever the length."""
+    words = text.split(" ")
+    while words and (words[0] in ("", ",") or words[0].lower() == "e"):
+        words.pop(0)
+    while words and (words[-1] in ("", ",") or words[-1].lower() == "e"):
+        words.pop()
+    rest = " ".join(words)
+    return rest.strip(", ").strip()
 
 
 def _spec_of(raw: str) -> Optional[str]:
@@ -67,14 +82,12 @@ def split_recital_clause(text: str) -> tuple[Optional[str], str]:
             return None, text
     else:
         spec = specs[0]
-    rest, last = [], 0
+    pieces, last = [], 0
     for m in matches:
-        rest.append(text[last:m.start()])
-        rest.append(" ")
+        pieces.append(_trim_joins(_WHITESPACE.sub(" ", text[last:m.start()]).strip()))
         last = m.end()
-    rest.append(text[last:])
-    remainder = re.sub(r"\s+", " ", "".join(rest)).strip()
-    return spec, _EDGES.sub("", remainder).strip()
+    pieces.append(_trim_joins(_WHITESPACE.sub(" ", text[last:]).strip()))
+    return spec, " ".join(piece for piece in pieces if piece)
 
 
 def expand_recital_spec(spec: str) -> list[str]:

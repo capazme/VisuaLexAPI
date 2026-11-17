@@ -353,7 +353,9 @@ POST unless noted, JSON bodies.
   recognised with `parsed.recital` and no `urn`; `display` is the recital's citation
   (`sources.cite_recital`), «considerando 26» with no act, nothing when refused. A top-level
   `refusal` is `recital_not_eu` (not an EU regulation or directive) or `recital_with_article`; a
-  refused `parsed` keeps the act's fields only, never `article`
+  refused `parsed` keeps the act's fields only, never `article`. A clause with no act read is
+  `source: "recital"`. An article of an act with no recitals («art. 2043 c.c. considerando 5
+  anni») reads as before, the clause ignored: there «considerando» is the gerund
 - `/parse_query_batch` — `{"queries": [...]}`, 1 to 200 strings of 1 to 200 characters, the body
   at most 48 KB (anything else a 400 that names the limit) → `{"results": [{recognized, parsed,
   source, identifies_act}]}` in order: each read as `/parse_query` reads one (`read_norm_query`),
