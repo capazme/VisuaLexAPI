@@ -6,6 +6,7 @@ import { citeStoredItem } from '../norms/decisionCitation';
 import { rebuildDecisionEntry } from '../schemas/decisionItem';
 import { LIMITS, type CourseCreateInput, type ExamCreateInput, type ModuleCreateInput } from '../schemas/lingo/corso';
 import { rebuildNormEntry } from '../schemas/normEntry';
+import { isRecitalContent } from '../schemas/recitalEntry';
 import { checkLessonText } from './courseFormat';
 import { masteryFor } from './courseProgress';
 import { addDays, romeDay } from './studyDay';
@@ -175,6 +176,8 @@ async function resolveCitations(tx: Tx, dossierId: string | null, blocks: Module
       const where = `Blocco ${b + 1}, citazione ${marcatore}`;
       const item = byId.get(voce);
       if (!item) return refuse(where, 'la voce non è nella pratica del percorso');
+      // A course module cites articles; a recital waits for a later round (spec 2026-11-17 §6.2).
+      if (item.itemType === 'norm' && isRecitalContent(item.content)) return refuse(where, 'un considerando non si può ancora citare in un percorso');
       if (item.itemType === 'norm') {
         const rebuilt = rebuildNormEntry(item.content);
         if (!rebuilt.ok) return refuse(where, `la norma non si può citare (${rebuilt.reason})`);

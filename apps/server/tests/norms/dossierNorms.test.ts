@@ -25,7 +25,7 @@ const ART_2043 = {
 };
 const ccArticle = (n: string) => ({ ...ART_2043, numero_articolo: n, urn: `${CC_ACT}:2~art${n.replace('-', '')}` });
 
-const PARSED: Record<string, { parsed: Record<string, string> | null; recognized: boolean; display?: string }> = {
+const PARSED: Record<string, { parsed: Record<string, string> | null; recognized: boolean; display?: string; refusal?: string }> = {
   'art. 2043 c.c.': { parsed: { act_type: 'codice civile', article: '2043' }, recognized: true, display: 'Art. 2043 — codice civile' },
   'art 2059 cc': { parsed: { act_type: 'codice civile', article: '2059' }, recognized: true, display: 'Art. 2059 — codice civile' },
   'art. 2645-bis c.c.': { parsed: { act_type: 'codice civile', article: '2645-bis' }, recognized: true },
@@ -54,6 +54,9 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   'art. 1, comma 773, l. 296/2006': { parsed: { act_type: 'legge', act_number: '296', date: '2006', article: '1', comma: '773' }, recognized: true },
   'art. 1, comma 42, l. 296/2006': { parsed: { act_type: 'legge', act_number: '296', date: '2006', article: '1', comma: '42' }, recognized: true },
   'art. 1, comma 1400, l. 296/2006': { parsed: { act_type: 'legge', act_number: '296', date: '2006', article: '1', comma: '1400' }, recognized: true },
+  // What /parse_query reads since the recitals' PR 1b (spec 2026-11-17 §3.2).
+  'considerando 26 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', recital: '26' }, recognized: true },
+  'art. 4 e considerando 26 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', recital: '26' }, recognized: true, refusal: 'recital_with_article' },
 };
 
 // D.lgs. 104/2010: the codice del processo amministrativo is its annex, which Normattiva
@@ -361,6 +364,16 @@ describe('POST /api/dossiers/:id/norms', () => {
     ]);
     for (const r of response.body.results.slice(0, 3)) expect(r.detail).toEqual(expect.any(String));
     expect(await prisma.dossierItem.count()).toBe(1);
+  });
+
+  it('adds no recital by reference, refused or not, and asks for no norm (spec 2026-11-17 §6.3)', async () => {
+    const response = await addNorms(alice, dossierId, ['considerando 26 gdpr', 'art. 4 e considerando 26 gdpr']);
+    expect(response.body.results.map((r: { outcome: string; detail: string }) => [r.outcome, r.detail])).toEqual([
+      ['not_recognised', 'Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.'],
+      ['not_recognised', 'Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.'],
+    ]);
+    expect(calls['/fetch_norma_data'] ?? 0).toBe(0);
+    expect(await prisma.dossierItem.count()).toBe(0);
   });
 
   it('adds the same article once, in a call and across calls', async () => {

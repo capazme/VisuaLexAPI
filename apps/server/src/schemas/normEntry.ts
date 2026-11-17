@@ -11,6 +11,7 @@
 import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS } from '../norms/actTypes';
 import { PART_RANGE } from '../norms/parts';
 import { ARTICLE_SUFFIX_ALTERNATION } from '../utils/articleSuffixes';
+import { isRecitalContent, rebuildRecitalEntry, type RecitalEntry } from './recitalEntry';
 
 export interface NormEntry {
   tipo_atto: string;
@@ -74,7 +75,11 @@ export function sourceUrl(value: unknown): string | null {
   }
 }
 
-export type NormEntryCheck = { ok: true; entry: NormEntry } | { ok: false; reason: string };
+/** A norm entry is an article or, with the key `considerando`, an EU recital (spec 2026-11-17 §6.2, G-538). */
+export type NormEntryCheck = { ok: true; entry: NormEntry | RecitalEntry } | { ok: false; reason: string };
+
+/** Whether a rebuilt entry is a recital's. */
+export const isRecitalEntry = (entry: NormEntry | RecitalEntry): entry is RecitalEntry => 'considerando' in entry;
 
 /** What a refusal says of a value: short, quoted, never the whole of what was sent. */
 const shown = (value: string): string => `«${value.length > 40 ? `${value.slice(0, 40)}…` : value}»`;
@@ -93,6 +98,11 @@ const FIELD_REASONS = {
  */
 export function rebuildNormEntry(raw: unknown): NormEntryCheck {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { ok: false, reason: 'Norma non leggibile' };
+  // A recital keeps its closed shape, its field included: never rebuilt into the article or the act it is not.
+  if (isRecitalContent(raw)) {
+    const recital = rebuildRecitalEntry(raw);
+    return recital.ok ? { ok: true, entry: recital.entry } : { ok: false, reason: recital.reason };
+  }
   const r = raw as Record<string, unknown>;
   const FIELDS = ['tipo_atto', 'tipo_atto_reale', 'numero_articolo', 'numero_atto', 'data', 'allegato', 'versione', 'data_versione', 'parte'] as const;
   const mistyped = FIELDS.find((field) => wrongType(r[field]));
