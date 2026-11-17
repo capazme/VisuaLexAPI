@@ -183,6 +183,11 @@ from visualex_api.tools.sources import cite_act  # noqa: E402
     ("direttiva ue", "13", "1993-04-05", "dir. 93/13/CEE"),
     ("regolamento ue", "1007", "2009-09-16", "reg. (CE) n. 1007/2009"),
     ("regolamento ue", "1259", "2010-12-20", "reg. (UE) n. 1259/2010"),
+    # The full date decides where the year alone would not: December 2009 after Lisbon is UE.
+    ("regolamento ue", "1286", "2009-12-22", "reg. (UE) n. 1286/2009"),
+    # The year in four digits from 1999, two before.
+    ("direttiva ue", "44", "1999", "dir. 1999/44/CE"),
+    ("direttiva ue", "34", "1998", "dir. 98/34/CE"),
     # A year alone: 1993 reads as CEE, 2009 as CE, the year's most acts.
     ("direttiva ue", "13", "1993", "dir. 93/13/CEE"),
     ("regolamento ue", "1007", "2009", "reg. (CE) n. 1007/2009"),
