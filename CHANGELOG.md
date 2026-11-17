@@ -12,6 +12,34 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-11-17
+
+Learn's trail and a short lesson per subject; Rassegne in ⌘K and a passage into a pratica as a note;
+connected apps' notes drawn as Markdown; the small fixes from the tests of 16-11. Two migrations
+(lingo_lessons). The Percorsi stay off.
+
+### Learn
+
+- «Il tuo sentiero» (LC62): each subject opens with a «Lezione breve» node, closed with its reason when
+  the subject has fewer than 4 cards to review.
+- The short lesson (LC63): 5 to 8 exercises from the subject's cards, graded on the server, with an end
+  screen; at most three lessons a day give points. Migrations `20261117100000_lingo_lessons` and
+  `20261117100001_lingo_lessons_period` (rollback written in #540 and tried).
+- Fixes (LC62b): closing a lesson after the first answer asks to confirm; the trail first on a phone;
+  the closed node reachable with Tab.
+
+### Search and pratiche
+
+- ⌘K shows a «Rassegne» group for a topic, and a passage goes into a pratica as a note (U3).
+- A note written by a connected application is drawn as Markdown, folded when long, and printed in the
+  PDF without its marks (D4).
+
+### Fixes
+
+- The small fixes from the tests of 16-11 (LC61): «Carica un file» disabled while act files are off; the
+  PDF viewer closes with Esc; the MERL-T screens say LexCraft; a pratica opened by its address after the
+  Forum opens in Work, and an id that is not yours says so.
+
 ## [1.31.0] - 2026-11-17
 
 «Dossier» becomes «Pratiche» everywhere a user reads it, and the Ricerca's own browser-only practices
