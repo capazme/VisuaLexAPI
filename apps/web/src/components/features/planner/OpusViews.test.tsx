@@ -69,7 +69,9 @@ describe('«Oggi»', () => {
       ),
     );
     const groups = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(groups).toEqual(['Termini scaduti, 1 compito', 'In ritardo, 1 compito', 'Oggi, 1 compito']);
+    expect(groups).toEqual(['Termini scaduti, 1 compito', 'In ritardo, 1 compito', 'Oggi · mar 20, 1 compito']);
+    // Under «Oggi» the row does not say «Oggi» again (LC83).
+    expect(within(screen.getByRole('list', { name: 'Oggi · martedì 20 ottobre' })).queryByText(/^Oggi/)).toBeNull();
     expect(within(screen.getByRole('list', { name: 'In ritardo' })).getByRole('checkbox', { name: /Compito c/ })).toBeInTheDocument();
     const overdue = screen.getByRole('list', { name: 'Termini scaduti' });
     // Labels as the dossiers' tags: the first letter capitalised, the rest as typed.
@@ -83,21 +85,19 @@ describe('«Oggi»', () => {
     expect(service.list).toHaveBeenCalledWith('today', undefined);
   });
 
-  it('says under the title how many tasks, not their subtasks; «Aggiungi un compito» opens the quick add (LC33, the phone)', async () => {
-    service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-20' }), task('b', { plannedDate: '2026-10-20' }), task('c', { plannedDate: '2026-10-20', parentId: 'a' })]));
+  it('adds with one command, the field in the flow at every width: no button floats over the list, no sheet (LC83, L-73)', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY })]));
     // A phone: below md.
     const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true, addEventListener: () => {}, removeEventListener: () => {} } as unknown as MediaQueryList);
     renderAt(<TodayView />);
-    expect(await screen.findByText('martedì 20 ottobre · 2 compiti')).toBeInTheDocument();
-    const plus = screen.getByRole('button', { name: 'Aggiungi un compito' });
-    plus.focus();
-    fireEvent.click(plus);
-    const sheet = screen.getByRole('dialog', { name: 'Aggiungi un compito' });
-    await waitFor(() => expect(within(sheet).getByLabelText('Nuovo compito')).toHaveFocus());
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByRole('dialog', { name: 'Aggiungi un compito' })).toBeNull();
-    // The focus back on «+», the way it came (R-32).
-    await waitFor(() => expect(plus).toHaveFocus());
+    await screen.findByRole('button', { name: 'Compito a' });
+    const view = screen.getByRole('region', { name: 'Scadenziario' });
+    expect(within(view).getAllByLabelText('Nuovo compito')).toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: /^Aggiungi/ }).map((button) => button.textContent)).toEqual(['Aggiungi il compito']);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.body.querySelector('[class*="fixed"]')).toBeNull();
+    // No line that explains the view.
+    expect(screen.queryByText(/compiti$/)).toBeNull();
     media.mockRestore();
   });
 
@@ -107,7 +107,7 @@ describe('«Oggi»', () => {
     expect(await screen.findByText('Nessun compito per oggi')).toBeInTheDocument();
   });
 
-  it('offers, on an empty day, the dossiers last worked on and the next days, with no count (LC30)', async () => {
+  it('says an empty day on one line, no picture, then the dossiers last worked on in a compact list (LC30, LC83)', async () => {
     appStore.setState({
       dossiers: ['a', 'b', 'c', 'd'].map((id, i) => ({ id, title: `Dossier ${id}`, createdAt: `2026-11-0${i + 1}T10:00:00Z`, items: [], kind: 'lavoro' as const })),
     });
@@ -118,7 +118,7 @@ describe('«Oggi»', () => {
     expect(within(riprendi).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
       '/pratiche?dossier=d', '/pratiche?dossier=c', '/pratiche?dossier=b',
     ]);
-    expect(screen.getByRole('link', { name: /Vedi i prossimi giorni/ })).toHaveAttribute('href', '/work/prossimi');
+    expect(document.querySelector('svg[role="img"], img')).toBeNull();
     expect(service.list).toHaveBeenCalledTimes(1);
   });
 
@@ -174,14 +174,14 @@ describe('«Oggi»', () => {
   });
 
   it('follows a new day: a page left open overnight reads again and proposes the new date', async () => {
-    service.list.mockResolvedValue(answer([]));
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY })]));
     service.create.mockResolvedValue(task('n', { plannedDate: '2026-10-21' }));
     renderAt(<TodayView />);
-    expect(await screen.findByText('martedì 20 ottobre')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi · mar 20')).toBeInTheDocument();
     // The bar's count, read every two minutes, answers the next day.
-    service.list.mockResolvedValue({ today: '2026-10-21', tasks: [], truncated: false });
+    service.list.mockResolvedValue({ today: '2026-10-21', tasks: [task('a', { plannedDate: '2026-10-21' })], truncated: false });
     act(() => plannerStore.getState().setToday('2026-10-21'));
-    expect(await screen.findByText('mercoledì 21 ottobre')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi · mer 21')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Nuovo compito'), { target: { value: 'Telefonare' } });
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi il compito' }));
     await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ plannedDate: '2026-10-21' }));
@@ -284,27 +284,20 @@ describe('«Oggi»', () => {
 });
 
 describe('«Oggi» in groups', () => {
-  it("leads to Gymnasium's day on one line, and reads nothing of Gymnasium's (its reads mark the day)", async () => {
+  it("leaves Learn's review out: it is not a deadline, and nothing of Gymnasium's is read (LC83)", async () => {
     service.list.mockResolvedValue(answer([]));
     renderAt(<TodayView />);
-    expect(await screen.findByRole('link', { name: 'Learn: il ripasso di oggi' })).toHaveAttribute('href', '/learn/ripasso');
     await screen.findByText('Nessun compito per oggi');
-    // The session's read settles the day and the missions on the server: opening Opus must not.
+    expect(screen.queryByRole('link', { name: /Learn/ })).toBeNull();
     expect(study.session).not.toHaveBeenCalled();
-    // Not a task: no tick.
-    expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
-  it('folds a group by its heading, and adds a task under it with its day', async () => {
+  it('folds a group by its heading; its «⋯» adds nothing, the field at the top does', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY })]));
-    service.create.mockResolvedValue(task('n', { plannedDate: TODAY }));
     renderAt(<TodayView />);
-    const toggle = await screen.findByRole('button', { name: /^Oggi\s*,\s*1 compito$/ });
+    const toggle = await screen.findByRole('button', { name: /^Oggi · mar 20\s*,\s*1 compito$/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi compito' }));
-    fireEvent.change(screen.getAllByLabelText('Nuovo compito')[1], { target: { value: 'Telefonare' } });
-    fireEvent.submit(screen.getAllByLabelText('Nuovo compito')[1]);
-    await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ title: 'Telefonare', plannedDate: TODAY, dossierId: null }));
+    expect(screen.queryByRole('button', { name: /Azioni del gruppo/ })).toBeNull();
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('checkbox', { name: /Compito a/ })).toBeNull();
@@ -312,20 +305,21 @@ describe('«Oggi» in groups', () => {
     expect(plannerStore.getState().folded['today:today']).toBe(true);
   });
 
-  it('keeps «Oggi» and its «+ Aggiungi compito» when only late tasks are listed', async () => {
+  it('draws no empty «Oggi» when only late tasks are listed', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-19' })]));
     renderAt(<TodayView />);
-    const today = await screen.findByRole('region', { name: /^Oggi\s*,\s*0 compiti$/ });
-    expect(within(today).getByRole('button', { name: 'Aggiungi compito' })).toBeInTheDocument();
+    await screen.findByRole('region', { name: /^In ritardo/ });
+    expect(screen.queryByRole('region', { name: /^Oggi/ })).toBeNull();
   });
 
-  it('groups by dossier when asked, the inbox last, and remembers the choice', async () => {
+  it('groups by dossier when the header says so, the inbox last, and remembers the choice', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY, dossierId: 'd1' })]));
     renderAt(<TodayView />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Raggruppa: per data' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Per pratica' }));
+    await screen.findByRole('button', { name: 'Compito a' });
+    act(() => plannerStore.getState().setGrouping('dossier'));
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Ricorso Rossi, 1 compito', "Lista d'ingresso, 1 compito"]);
     expect(localStorage.getItem('visualex-opus-today-grouping')).toBe('dossier');
+    act(() => plannerStore.getState().setGrouping('date'));
     localStorage.removeItem('visualex-opus-today-grouping');
   });
 
@@ -347,64 +341,50 @@ describe('«Oggi» in groups', () => {
 });
 
 describe('the other views', () => {
-  it('«Prossimi giorni» draws a block for each day of the week it can show, an empty one too', async () => {
+  it('«Prossimi giorni» draws a block for each of the seven days, an empty one too, each named one way (LC83)', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-22', dossierId: 'd1' }), task('b', { dueDate: TODAY })]));
     renderAt(<UpcomingView />);
     await screen.findByRole('list', { name: 'Oggi · martedì 20 ottobre' });
-    // 20 October is a Tuesday: Monday has passed; the server's seven days run to Monday 26.
+    // The server's seven days, from today to Monday 26: no day gone by.
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      '20 ott · Oggi · martedì, 1 compito',
-      '21 ott · Domani · mercoledì, 0 compiti',
-      '22 ott · giovedì, 1 compito',
-      '23 ott · venerdì, 0 compiti',
-      '24 ott · sabato, 0 compiti',
-      '25 ott · domenica, 0 compiti',
+      'Oggi · mar 20, 1 compito',
+      'Domani · mer 21, 0 compiti',
+      'Gio 22, 1 compito',
+      'Ven 23, 0 compiti',
+      'Sab 24, 0 compiti',
+      'Dom 25, 0 compiti',
+      'Lun 26, 0 compiti',
     ]);
     expect(screen.getByText('Termine finale: scade oggi')).toBeInTheDocument();
     // The dossier at the row's right end.
     expect(within(screen.getByRole('list', { name: 'Giovedì 22 ottobre' })).getByRole('link', { name: /Ricorso Rossi/ })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Aggiungi compito' })).toHaveLength(6);
+    // One way to add: the field at the top.
+    expect(screen.getAllByLabelText('Nuovo compito')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Aggiungi compito' })).toBeNull();
     // The block names the day: the row does not repeat it.
     expect(within(screen.getByRole('list', { name: 'Giovedì 22 ottobre' })).queryByText(/giovedì/)).toBeNull();
   });
 
-  it('chooses the month from a menu when the seven days span two', async () => {
-    service.list.mockResolvedValue({ today: '2026-10-28', tasks: [], truncated: false });
+  it("draws the strip from today, each day on one line with its count, and scrolls to the day chosen (LC83)", async () => {
+    service.list.mockResolvedValue(answer([task('m', { plannedDate: '2026-10-26' }), task('n', { plannedDate: '2026-10-26' })]));
     renderAt(<UpcomingView />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Mese: ottobre 2026' }));
-    expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual(['ottobre 2026', 'novembre 2026']);
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'novembre 2026' }));
-    expect(screen.getByRole('button', { name: 'Mese: novembre 2026' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'domenica 1 novembre' })).toHaveAttribute('aria-pressed', 'true');
+    const strip = await screen.findByRole('list', { name: 'Giorni da martedì 20 ottobre a lunedì 26 ottobre' });
+    const days = within(strip).getAllByRole('button');
+    expect(days.map((day) => day.textContent)).toEqual(['mar20', 'mer21', 'gio22', 'ven23', 'sab24', 'dom25', 'lun262']);
+    expect(days[0]).toHaveAttribute('aria-current', 'date');
+    expect(days[0]).toHaveAttribute('aria-pressed', 'true');
+    // The count in place of the dot, and in the day's name.
+    fireEvent.click(within(strip).getByRole('button', { name: 'lunedì 26 ottobre, 2 compiti' }));
+    expect(days[6]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: /Settimana/ })).toBeNull();
   });
 
-  it("walks the week's strip: today marked, the days out of reach not chosen, the next week, back to today", async () => {
-    service.list.mockResolvedValue(answer([task('m', { plannedDate: '2026-10-26' })]));
-    service.create.mockResolvedValue(task('n', { plannedDate: '2026-10-23' }));
-    renderAt(<UpcomingView />);
-    const strip = await screen.findByRole('list', { name: /^Settimana da lunedì 19 ottobre a domenica 25 ottobre$/ });
-    expect(screen.getByText('ottobre 2026')).toBeInTheDocument();
-    expect(within(strip).getByRole('button', { name: 'lunedì 19 ottobre' })).toBeDisabled();
-    expect(within(strip).getByRole('button', { name: 'martedì 20 ottobre, oggi' })).toHaveAttribute('aria-current', 'date');
-    expect(within(strip).getByRole('button', { name: 'martedì 20 ottobre, oggi' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Settimana precedente' })).toBeDisabled();
-    // A day of the week: chosen, and its block gets «+ Aggiungi compito» for that day.
-    fireEvent.click(within(strip).getByRole('button', { name: 'venerdì 23 ottobre' }));
-    expect(within(strip).getByRole('button', { name: 'venerdì 23 ottobre' })).toHaveAttribute('aria-pressed', 'true');
-    const friday = screen.getByRole('region', { name: /^23 ott · venerdì/ });
-    fireEvent.click(within(friday).getByRole('button', { name: 'Aggiungi compito' }));
-    fireEvent.change(within(friday).getByLabelText('Nuovo compito'), { target: { value: 'Udienza' } });
-    fireEvent.submit(within(friday).getByLabelText('Nuovo compito'));
-    await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ title: 'Udienza', plannedDate: '2026-10-23' }));
-    // Monday 26 is in the server's seven days: said under this week, and its dot on nothing here.
-    expect(screen.getByRole('button', { name: /La settimana dopo: 1 compito fino a lunedì 26 ottobre/ })).toBeInTheDocument();
-    // The next week: only Monday 26 is in the server's seven days.
-    fireEvent.click(screen.getByRole('button', { name: 'Settimana successiva' }));
-    expect(screen.getByRole('button', { name: 'lunedì 26 ottobre, 1 compito' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['26 ott · lunedì, 1 compito']);
-    expect(screen.getByRole('button', { name: 'Settimana successiva' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Oggi' }));
-    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('20 ott · Oggi · martedì');
+  it("the inbox gives its count to its tab", async () => {
+    service.list.mockResolvedValue(answer([task('a'), task('b'), task('c', { parentId: 'a' })]));
+    const { unmount } = renderAt(<InboxView />);
+    await waitFor(() => expect(plannerStore.getState().inboxCount).toBe(2));
+    unmount();
+    expect(plannerStore.getState().inboxCount).toBeNull();
   });
 
   it("the inbox adds a task with no date and no dossier", async () => {
@@ -412,8 +392,8 @@ describe('the other views', () => {
     service.create.mockResolvedValue(task('n'));
     renderAt(<InboxView />);
     expect(await screen.findByText("La lista d'ingresso è vuota")).toBeInTheDocument();
-    expect(screen.getByText("Senza data · nella lista d'ingresso")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Nuovo compito'), { target: { value: '  Chiamare il cliente ' } });
+    expect(screen.getByText("Senza data · nella lista d'ingresso")).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi il compito' }));
     await waitFor(() => expect(service.create).toHaveBeenCalled());
     expect(service.create.mock.calls[0][0]).toMatchObject({ title: 'Chiamare il cliente', plannedDate: null, dueDate: null, dossierId: null, origin: 'lavoro' });

@@ -47,7 +47,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
 
   return (
     <li data-task-row data-task-id={task.id} className="relative min-w-0">
-      <div className="group relative flex items-start gap-1 border-b border-slate-200 py-0.5 pr-0.5 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/30">
+      <div className="group relative flex items-start gap-1 border-b @2xl:items-center border-slate-200 py-0.5 pr-0.5 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/30">
         <TaskCheckbox
           label={`Segna come fatto: ${task.title}${task.priority < 4 ? `, priorità ${PRIORITY_LABEL[task.priority].toLowerCase()}` : ''}`}
           priority={task.priority}
@@ -55,7 +55,10 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
           focusTarget
         />
 
-        <div className={cn('min-w-0 flex-1', hasSigns ? 'pb-2' : 'pb-0.5')}>
+        {/* A wide list (from 42 rem, the row's own width, so a dossier's narrow panel keeps two lines): one line, the
+            title at the left and the signs at the right before «⋯», 44–48 px tall (LC83). */}
+        <div className={cn('min-w-0 flex-1 @2xl:flex @2xl:items-center @2xl:gap-4 @2xl:pb-0', hasSigns ? 'pb-2' : 'pb-0.5')}>
+          <div className="min-w-0 @2xl:flex-1">
           <button
             type="button"
             data-task-title
@@ -69,8 +72,9 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
               <LinkedText text={task.description} />
             </p>
           )}
+          </div>
           {hasSigns && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 @2xl:mt-0 @2xl:max-w-[55%] @2xl:shrink-0 @2xl:justify-end">
               {task.plannedDate && plannedShown && (
                 <span className={cn(META, DAY_TONE[dayTone(task.plannedDate, today)])}>
                   <CalendarDays size={12} aria-hidden />
@@ -140,7 +144,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
                 <Link
                   to={`/pratiche?dossier=${encodeURIComponent(task.dossierId)}`}
                   // At the line's right end; 44 px tall for a finger, laid over the gaps where a pointer is precise.
-                  className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%]', FOCUS_RING)}
+                  className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%] @2xl:ml-0 @2xl:max-w-[14rem]', FOCUS_RING)}
                 >
                   <span className="sr-only">Pratica: </span>
                   <span className="truncate">{dossierTitle ?? 'Pratica'}</span>
