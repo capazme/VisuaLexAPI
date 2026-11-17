@@ -102,7 +102,7 @@ function show() {
     </MemoryRouter>,
   );
 }
-const glossesButton = () => screen.getAllByRole('button', { name: /^Glosse( \d+)?$/ })[0];
+const glossesButton = () => screen.getAllByRole('button', { name: /^Glosse(, \d+)?$/ })[0];
 
 describe('ArticleTabContent — the glosses at the margin (LC74)', () => {
   beforeEach(() => {
@@ -112,7 +112,7 @@ describe('ArticleTabContent — the glosses at the margin (LC74)', () => {
 
   it('the button carries the server\'s count before the margin is opened, from the one request the margin makes', async () => {
     show();
-    expect(await screen.findAllByRole('button', { name: 'Glosse 7' })).not.toHaveLength(0);
+    expect(await screen.findAllByRole('button', { name: 'Glosse, 7' })).not.toHaveLength(0);
     fireEvent.click(glossesButton());
     await screen.findByRole('region', { name: 'Glosse' });
     expect(listDiscussions).toHaveBeenCalledOnce();
@@ -124,7 +124,7 @@ describe('ArticleTabContent — the glosses at the margin (LC74)', () => {
     const margin = await screen.findByRole('region', { name: 'Glosse' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(container.querySelector('[data-article-root]')!.contains(margin)).toBe(true);
-    screen.getAllByRole('button', { name: /^Glosse( \d+)?$/ }).forEach((b) => expect(b).toHaveAttribute('aria-pressed', 'true'));
+    screen.getAllByRole('button', { name: /^Glosse(, \d+)?$/ }).forEach((b) => expect(b).toHaveAttribute('aria-pressed', 'true'));
     expect(within(margin).getByText('Le glosse sono pubbliche nel Forum: per un appunto privato usa una nota.')).toBeInTheDocument();
   });
 
@@ -178,6 +178,37 @@ describe('ArticleTabContent — the glosses at the margin (LC74)', () => {
     expect(within(margin).getByRole('group', { name: 'Segnalare ai moderatori?' })).toBeInTheDocument();
   });
 
+  it('Esc in the composer closes the composer first, its words kept; Esc again closes the margin', async () => {
+    show();
+    fireEvent.click(glossesButton());
+    const margin = await screen.findByRole('region', { name: 'Glosse' });
+    fireEvent.click(within(margin).getByRole('button', { name: 'Scrivi una glossa…' }));
+    const title = within(margin).getByRole('textbox', { name: 'Titolo della glossa' });
+    fireEvent.change(title, { target: { value: 'Una bozza' } });
+    fireEvent.keyDown(title, { key: 'Escape' });
+    expect(within(margin).queryByRole('textbox', { name: 'Titolo della glossa' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Glosse' })).toBeInTheDocument();
+    fireEvent.click(within(margin).getByRole('button', { name: 'Scrivi una glossa…' }));
+    expect(within(margin).getByRole('textbox', { name: 'Titolo della glossa' })).toHaveValue('Una bozza');
+    await act(async () => { fireEvent.keyDown(within(margin).getByRole('button', { name: 'Chiudi glosse' }), { key: 'Escape' }); });
+    expect(screen.queryByRole('region', { name: 'Glosse' })).not.toBeInTheDocument();
+  });
+
+  it('the report\'s question has 44 px buttons, and its answer gives the focus back to «Segnala»', async () => {
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0; });
+    show();
+    fireEvent.click(glossesButton());
+    const margin = await screen.findByRole('region', { name: 'Glosse' });
+    fireEvent.click(await within(margin).findByText('Sul primo comma'));
+    const report = within(margin).getByRole('button', { name: 'Segnala la glossa' });
+    fireEvent.click(report);
+    const question = within(margin).getByRole('group', { name: 'Segnalare ai moderatori?' });
+    for (const b of within(question).getAllByRole('button')) expect(b).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(within(question).getByRole('button', { name: 'Annulla' }));
+    expect(report).toHaveFocus();
+    raf.mockRestore();
+  });
+
   it('closes from its «Chiudi», the focus back on the button', async () => {
     show();
     fireEvent.click(glossesButton());
@@ -186,6 +217,6 @@ describe('ArticleTabContent — the glosses at the margin (LC74)', () => {
     close.focus();
     await act(async () => { fireEvent.click(close); });
     expect(screen.queryByRole('region', { name: 'Glosse' })).not.toBeInTheDocument();
-    screen.getAllByRole('button', { name: /^Glosse( \d+)?$/ }).forEach((b) => expect(b).toHaveAttribute('aria-pressed', 'false'));
+    screen.getAllByRole('button', { name: /^Glosse(, \d+)?$/ }).forEach((b) => expect(b).toHaveAttribute('aria-pressed', 'false'));
   });
 });

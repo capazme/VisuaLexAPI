@@ -207,14 +207,14 @@ export function ReadingToolbar({
             data-glosses-button=""
             onClick={onToggleDiscussion}
             aria-pressed={isDiscussionOpen}
-            aria-label={phone ? (discussionCount > 0 ? `Glosse, ${discussionCount}` : 'Glosse') : undefined}
+            aria-label={discussionCount > 0 ? `Glosse, ${discussionCount}` : phone ? 'Glosse' : undefined}
             title={tip('Glosse sull’articolo', lockedReason)}
             className={ACTION}
             {...lock(lockedReason)}
         >
             <MessageCircle size={phone ? 18 : 16} aria-hidden />
             {!phone && 'Glosse'}
-            {discussionCount > 0 && <span className="tabular-nums">{discussionCount}</span>}
+            {discussionCount > 0 && <span aria-hidden className="tabular-nums">{discussionCount}</span>}
         </button>
     );
 

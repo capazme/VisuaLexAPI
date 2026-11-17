@@ -227,9 +227,9 @@ describe('ReadingToolbar — «Glosse», a button of its own before «⋯» (LC7
         expect(props.onToggleDiscussion).toHaveBeenCalledTimes(1);
     });
 
-    it('carries the count: «Glosse 3» on a computer, the icon and the number on a phone, named in full', () => {
+    it('carries the count: «Glosse 3» on a computer, the icon and the number on a phone, named «Glosse, 3» on both', () => {
         const { container } = setup({ discussionCount: 3 });
-        expect(within(desktopRow(container)).getByRole('button', { name: 'Glosse 3' })).toHaveTextContent('Glosse3');
+        expect(within(desktopRow(container)).getByRole('button', { name: 'Glosse, 3' })).toHaveTextContent('Glosse3');
         const phone = within(phoneRow(container)).getByRole('button', { name: 'Glosse, 3' });
         expect(phone).toHaveTextContent('3');
         expect(phone).toHaveClass('min-h-[44px]', 'min-w-[44px]');

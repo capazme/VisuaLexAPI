@@ -130,19 +130,22 @@ export function AnnotationMargin({
     // rem of slack once it is there: the column's cards may bring a scrollbar, which narrows the wrapper by its width,
     // and the column must not take itself away.
     const [roomy, setRoomy] = useState(false);
-    useLayoutEffect(() => {
+    const checkRoom = useCallback(() => {
         const wrapper = wrapperRef.current;
         if (!wrapper) return;
-        const check = () => {
-            const width = wrapper.getBoundingClientRect().width;
-            setRoomy((was) => width >= (was ? MARGIN_MIN_REM - 1 : MARGIN_MIN_REM) * remPx());
-        };
-        check();
-        if (typeof ResizeObserver === 'undefined') return;
-        const observer = new ResizeObserver(check);
+        const width = wrapper.getBoundingClientRect().width;
+        setRoomy((was) => width >= (was ? MARGIN_MIN_REM - 1 : MARGIN_MIN_REM) * remPx());
+    }, []);
+    // Also after every render, before the paint: a host that changes the reader's layout in the same commit (LC74: the
+    // glosses' margin leaving the side of the text) gets the column in that commit, not a frame later.
+    useLayoutEffect(() => { checkRoom(); });
+    useLayoutEffect(() => {
+        const wrapper = wrapperRef.current;
+        if (!wrapper || typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(checkRoom);
         observer.observe(wrapper);
         return () => observer.disconnect();
-    }, []);
+    }, [checkRoom]);
 
     // What is written in a new note's editor: here, so it survives the move between the column and the sheet (the
     // reader crossing the room's threshold), and starts empty for other words.

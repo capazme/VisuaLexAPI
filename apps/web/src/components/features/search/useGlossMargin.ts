@@ -60,6 +60,9 @@ interface Options {
     columnShown: boolean;
 }
 
+/** The text's box (its first line's left edge is what the eye follows). */
+const textOf = (root: HTMLElement) => root.querySelector<HTMLElement>('.vlx-art');
+
 /**
  * The glosses' margin (LC74): where it goes, and its motion, with the search island's times and technique (Web
  * Animations, `ISLAND_OPEN` / `ISLAND_CLOSE`). Opening, beside: the card widens to the right while the margin is
@@ -78,7 +81,15 @@ export function useGlossMargin({ open, rootRef, columnShown }: Options) {
     const [besideSlot, setBesideSlot] = useState<HTMLElement | null>(null);
     const [columnSlot, setColumnSlot] = useState<HTMLElement | null>(null);
     const [belowSlot, setBelowSlot] = useState<HTMLElement | null>(null);
-    const placement: GlossPlacement = columnShown ? (room.column ? 'column' : 'below') : room.beside ? 'beside' : 'below';
+    // The text has things at its margin (a note, a gloss on a passage: `AnnotationMargin`'s `data-margin-content`): its
+    // card is the frame's, with the notes' column, and the glosses go there — at once when the first one is published.
+    const [marginContent, setMarginContent] = useState(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- after every render: the attribute is the child's, set in the same commit; it sets only on a change
+    useLayoutEffect(() => {
+        const has = !!rootRef.current?.querySelector('[data-margin-content]');
+        if (has !== marginContent) setMarginContent(has);
+    });
+    const placement: GlossPlacement = columnShown || marginContent ? (room.column ? 'column' : 'below') : room.beside ? 'beside' : 'below';
 
     useLayoutEffect(() => {
         const root = rootRef.current;
@@ -117,9 +128,93 @@ export function useGlossMargin({ open, rootRef, columnShown }: Options) {
         setShown(true);
     }, [open, shown, placement, rootRef]);
 
-    const running = useRef<Animation[]>([]);
     // The way last animated: a new place for the margin (the window resized) does not start it again.
     const way = useRef<boolean | null>(null);
+
+    // Beside, the card's width is the margin's, held inline: a note or a first gloss on a passage published meanwhile
+    // gives the card the notes' `max-w-none`, which would leave an empty band right of the margin. Inline, it yields to
+    // the animations. Let go when no margin of the card is beside any more.
+    const cappedRoom = useRef<HTMLElement | null>(null);
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        const room = root?.closest<HTMLElement>('[data-glosses-room]') ?? null;
+        if (shown && placement === 'beside' && room) {
+            room.style.maxWidth = `${44 + SPAN_REM}rem`;
+            cappedRoom.current = room;
+        } else if (cappedRoom.current && !cappedRoom.current.querySelector('[data-glosses-beside]')) {
+            cappedRoom.current.style.maxWidth = '';
+            cappedRoom.current = null;
+        }
+    });
+
+    // Where the card and the text are while the margin is beside: the place a move to the column starts from.
+    const besideAt = useRef<{ card: number; text: number } | null>(null);
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        const text = root && textOf(root);
+        const room = root?.closest<HTMLElement>('[data-glosses-room]');
+        if (shown && placement === 'beside' && text && room) {
+            besideAt.current = { card: room.getBoundingClientRect().width, text: text.getBoundingClientRect().left };
+        }
+    });
+
+    // The first gloss on a passage (or a note) published with the margin beside: the article takes the layout with the
+    // notes' column, and the glosses go into it. The card widens to the frame on the island's opening, and the text is
+    // held where it was until the column stands (it is drawn a few frames later), then glides to its place: it never
+    // jumps. The glosses come in again where they land.
+    const moves = useRef<{ frame: number; anims: Animation[] }>({ frame: 0, anims: [] });
+    const lastPlacement = useRef(placement);
+    useLayoutEffect(() => {
+        const was = lastPlacement.current;
+        lastPlacement.current = placement;
+        const root = rootRef.current;
+        const from = besideAt.current;
+        if (!shown || was !== 'beside' || placement !== 'column' || !root || !from) return;
+        way.current = null;
+        const room = root.closest<HTMLElement>('[data-glosses-room]');
+        const column = root.firstElementChild instanceof HTMLElement ? root.firstElementChild : null;
+        if (!room || !column || typeof room.animate !== 'function' || reduced()) return;
+        cancelAnimationFrame(moves.current.frame);
+        moves.current.anims.forEach((a) => a.cancel());
+        const anims: Animation[] = [room.animate([{ maxWidth: px(from.card) }, { maxWidth: px(room.getBoundingClientRect().width) }], { ...ISLAND_OPEN, fill: 'backwards' })];
+        moves.current = { frame: 0, anims };
+        // The text held: measured without the hold, then moved back to where it was. Again before every paint in which its
+        // frame changed size (a `ResizeObserver` is told after layout, before paint) and at every frame, until it stands.
+        const place = () => {
+            const text = textOf(root);
+            column.style.transform = '';
+            const x = text ? text.getBoundingClientRect().left : from.text;
+            const dx = from.text - x;
+            column.style.transform = Math.abs(dx) >= 0.5 ? `translateX(${px(dx)})` : '';
+            return { x, dx };
+        };
+        const frame = textOf(root)?.parentElement;
+        const observer = typeof ResizeObserver === 'undefined' || !frame ? null : new ResizeObserver(() => { place(); });
+        if (frame) observer?.observe(frame);
+        let still = 0;
+        let frames = 0;
+        let last = Number.NaN;
+        const hold = () => {
+            const { x, dx } = place();
+            still = Math.abs(x - last) < 0.5 && root.querySelector('.vlx-glossed') ? still + 1 : 0;
+            last = x;
+            frames += 1;
+            if (still < 3 && frames < 40) {
+                moves.current.frame = requestAnimationFrame(hold);
+                return;
+            }
+            observer?.disconnect();
+            column.style.transform = '';
+            if (Math.abs(dx) >= 0.5) anims.push(column.animate([{ transform: `translateX(${px(dx)})` }, { transform: 'none' }], ISLAND_OPEN));
+        };
+        hold();
+    }, [placement, shown, rootRef]);
+    useLayoutEffect(() => () => {
+        cancelAnimationFrame(moves.current.frame);
+        moves.current.anims.forEach((a) => a.cancel());
+    }, []);
+
+    const running = useRef<Animation[]>([]);
     useLayoutEffect(() => {
         if (!shown) {
             // Closed: the card's and the margin's own CSS again.
@@ -159,8 +254,15 @@ export function useGlossMargin({ open, rootRef, columnShown }: Options) {
             : null;
         running.current.forEach((a) => a.cancel());
         running.current = [];
-        // Only the last margin open in a card narrows it back.
-        const alone = !!room && room.querySelectorAll('[data-glosses-beside]').length === 1;
+        // Closing: the card goes to the width its CSS gives it once the margin is gone, measured now (another article's
+        // margin, or the notes' column, may keep it wide), not to the width it had when it opened.
+        const closedWidth = () => {
+            if (!room) return null;
+            root.removeAttribute('data-glosses-beside');
+            const width = room.getBoundingClientRect().width;
+            root.setAttribute('data-glosses-beside', '');
+            return width;
+        };
 
         let ran: Animation[];
         if (open) {
@@ -180,8 +282,10 @@ export function useGlossMargin({ open, rootRef, columnShown }: Options) {
         } else {
             const timing = { ...ISLAND_CLOSE, fill: 'forwards' as const };
             ran = rows.map((row, i) => row.animate([from?.rows[i] ?? { opacity: 1 }, { opacity: 0 }], timing));
-            if (room && alone && cardBefore.current !== null) {
-                ran.push(room.animate([from?.room ?? { maxWidth: px(room.getBoundingClientRect().width) }, { maxWidth: px(cardBefore.current) }], timing));
+            const to = closedWidth();
+            const at = room?.getBoundingClientRect().width;
+            if (room && to !== null && at !== undefined && Math.abs(to - at) >= 0.5) {
+                ran.push(room.animate([from?.room ?? { maxWidth: px(at) }, { maxWidth: px(to) }], timing));
             }
             if (besideEl) ran.push(besideEl.animate([from?.beside ?? { clipPath: whole }, { clipPath: shut }], timing));
         }

@@ -124,7 +124,7 @@ describe('ArticleTabContent passage discussions', () => {
     expect(container.querySelector('.vlx-sign[data-threads="1"]')).toBeNull();
 
     // «Glosse» is a button of its own before «⋯» (LC74); the margin is in the article, not a dialog over the page.
-    fireEvent.click(screen.getAllByRole('button', { name: /^Glosse( \d+)?$/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Glosse(, \d+)?$/ })[0]);
     const panel = await screen.findByRole('region', { name: 'Glosse' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(container.contains(panel)).toBe(true);

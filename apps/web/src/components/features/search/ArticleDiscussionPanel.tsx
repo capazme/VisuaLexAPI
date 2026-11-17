@@ -196,8 +196,16 @@ export function ArticleDiscussionPanel({
     panelRef.current?.focus({ preventScroll: true });
   }, [isMargin, isOpen, draft]);
 
+  // In the margin a notice («Segnalazione inviata…») is said, then goes by itself.
+  useEffect(() => {
+    if (!isMargin || !notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [isMargin, notice]);
+
   // In the margin the composer opens on a request (its line, or «Discuti» on words): the reader goes on writing in it.
   const composerRef = useRef<HTMLFormElement>(null);
+  const writeLineRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!isMargin || !isOpen || !composerOpen) return;
     composerRef.current?.querySelector<HTMLElement>(draft ? 'textarea' : 'input')?.focus({ preventScroll: true });
@@ -611,6 +619,12 @@ export function ArticleDiscussionPanel({
         onKeyDown={event => {
           if (event.key !== 'Escape') return;
           event.stopPropagation();
+          // Esc in two steps: the composer first (what is written stays), then the margin.
+          if (composerOpen && composerRef.current?.contains(event.target as Node)) {
+            setComposerOpen(false);
+            requestAnimationFrame(() => writeLineRef.current?.focus({ preventScroll: true }));
+            return;
+          }
           onClose();
         }}
       >
@@ -642,6 +656,7 @@ export function ArticleDiscussionPanel({
           {composerOpen ? composer : (
             // Closed until asked for: one line (Luca, 17-11: less in the way).
             <button
+              ref={writeLineRef}
               type="button"
               onClick={() => setComposerOpen(true)}
               className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-slate-200 px-3 text-left text-sm text-slate-500 hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-9 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
