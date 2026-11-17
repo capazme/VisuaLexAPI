@@ -1,4 +1,5 @@
-import { useRef, type Ref } from 'react';
+import { useContext, useRef, type Ref } from 'react';
+import { StatusLineEnd } from './statusLineEnd';
 import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, Link2, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -85,9 +86,9 @@ export interface ReadingToolbarProps {
 
 /** The article's visible actions (R3): quiet, neutral, the word with the icon; 36 px on a computer, 44 on a phone. */
 const ACTION = cn(
-    'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600 transition-colors',
-    'hover:bg-slate-100 hover:text-slate-900 aria-expanded:bg-slate-200/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
-    'dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:aria-expanded:bg-slate-800 dark:aria-expanded:text-white',
+    'vlx-hover-tile inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600',
+    'hover:text-slate-900 aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
+    'dark:text-slate-300 dark:hover:text-white dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white',
     'disabled:cursor-not-allowed disabled:opacity-40',
     FOCUS_RING,
 );
@@ -148,6 +149,7 @@ export function ReadingToolbar({
     const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
     const openSettings = useAppStore((s) => s.openSettings);
     const noteToolOn = useAppStore((s) => s.readingTool === 'note');
+    const statusEnd = useContext(StatusLineEnd);
     const meanings = useHighlightColorMeanings();
     const moreItems = (phone: boolean): MenuItem[] => [
         ...(compact ? [] : [{
@@ -216,13 +218,28 @@ export function ReadingToolbar({
         </button>
     );
 
+    const status = (
+        <div className={cn('flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-slate-600 dark:text-slate-400', statusEnd ? 'flex-initial' : 'flex-1 md:flex-initial')}>
+            {versionChip && <VersionStatusChip chip={versionChip} onClick={onOpenVersionInput} />}
+            {annex && (
+                // On a phone the annex has its own line under the status, so no dot ever leads a line or goes missing.
+                <span className="basis-full md:basis-auto">
+                    {versionChip && <span aria-hidden className="mr-2 hidden text-slate-400 md:inline dark:text-slate-600">·</span>}
+                    Allegato {annex}
+                </span>
+            )}
+        </div>
+    );
+
     return (
         // One line beside the text (R3: no box of its own), opaque while it is pinned over the text it heads, on the
         // ground it stands on: the page's paper in a practice's row, the window's (and the phone's reader's) when compact.
         <div
             data-pinned-head
             className={cn(
-                'glass-toolbar sticky top-[var(--reading-toolbar-top,0px)] mb-3 flex items-center justify-between gap-x-1 gap-y-1 border-b py-1 backdrop-blur-md md:flex-wrap md:gap-x-2',
+                'glass-toolbar sticky top-[var(--reading-toolbar-top,0px)] mb-3 flex items-center justify-between gap-x-1 gap-y-1 py-1 backdrop-blur-md md:flex-wrap md:gap-x-2',
+                // With the selector the rule is the status line's, over the tools: one rule, not two (LC70).
+                statusEnd ? 'flex-wrap' : 'border-b',
                 compact
                     ? 'border-slate-100 bg-white/95 dark:border-slate-700 dark:bg-slate-800/95'
                     : 'border-slate-200 bg-slate-50/95 dark:border-slate-800 dark:bg-slate-950/95',
@@ -231,16 +248,14 @@ export function ReadingToolbar({
         >
             {/* Which text this is, in words: the status, then the annex. */}
             {/* On a phone it takes what the tools leave (and wraps inside); from `md` its own width, so the tools wrap. */}
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-sm text-slate-600 md:flex-initial dark:text-slate-400">
-                {versionChip && <VersionStatusChip chip={versionChip} onClick={onOpenVersionInput} />}
-                {annex && (
-                    // On a phone the annex has its own line under the status, so no dot ever leads a line or goes missing.
-                    <span className="basis-full md:basis-auto">
-                        {versionChip && <span aria-hidden className="mr-2 hidden text-slate-400 md:inline dark:text-slate-600">·</span>}
-                        Allegato {annex}
-                    </span>
-                )}
-            </div>
+            {statusEnd ? (
+                // The status and the selector on one line, centred on it; on a phone too narrow for both, the selector
+                // goes under the status, to the right. The rule under both, the tools under it (LC70).
+                <div data-status-line className="flex basis-full flex-wrap items-center gap-x-2 border-b pb-1 [border-color:inherit]">
+                    {status}
+                    <div className="ml-auto flex shrink-0 items-center gap-2">{statusEnd}</div>
+                </div>
+            ) : status}
 
             {/* A phone: the dossier and «⋯», 44 px each. */}
             {/* Close together, the last one's 44 px reaching into the page's right margin (`-mr-3`): the status keeps one line

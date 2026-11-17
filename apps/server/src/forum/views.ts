@@ -7,14 +7,55 @@ export const DELETED_AUTHOR = 'utente cancellato';
 
 type Author = { id: string; username: string } | null;
 
-/** A contribution outlives its author's account: the author is then null, and nobody's own. */
-export function userView(user: Author) {
-  return user ? { id: user.id, username: user.username } : { id: null, username: DELETED_AUTHOR };
+/** What a view needs of an author's Forum profile (§B): never the account's id or username behind it. */
+export type AuthorProfile = {
+  id: string;
+  identity: string;
+  realName: string | null;
+  pseudonym: string | null;
+  qualification: string;
+  nameWithdrawnAt: Date | null;
+};
+
+/**
+ * A page's authors, by account id (`forum/profiles.ts` `readAuthors`): their personal scores (D-248) and
+ * their Forum profiles (D-246, D-249).
+ */
+export type Authors = { scores: ReadonlyMap<string, number>; profiles: ReadonlyMap<string, AuthorProfile> };
+
+/** What every view says for a profile whose name the owners withdrew (G-479). */
+export const WITHDRAWN_NAME = 'nome ritirato';
+
+/** A profile's public name and identity: the real name, the pseudonym, or the withdrawn name. */
+export function profileFace(profile: AuthorProfile) {
+  if (profile.nameWithdrawnAt) return { name: WITHDRAWN_NAME, identity: 'withdrawn', qualification: null };
+  const name = profile.identity === 'real_name' ? profile.realName! : profile.pseudonym!;
+  return { name, identity: profile.identity, qualification: profile.qualification };
 }
 
+/**
+ * An author as every view shows them (§B): the profile's public id, name, identity and qualification, and
+ * the personal score. Without a profile, the account's username (`identity: 'username'`, no id). A
+ * contribution outlives its author's account: the author is then null, and nobody's own. `username` repeats
+ * the name for the reader's panel.
+ */
+export function userView(user: Author, authors: Authors) {
+  if (!user) {
+    return { id: null, name: DELETED_AUTHOR, identity: 'deleted', qualification: null, score: null, username: DELETED_AUTHOR };
+  }
+  const score = authors.scores.get(user.id) ?? 0;
+  const profile = authors.profiles.get(user.id);
+  if (!profile) return { id: null, name: user.username, identity: 'username', qualification: null, score, username: user.username };
+  const face = profileFace(profile);
+  return { id: profile.id, ...face, score, username: face.name };
+}
+
+/** The place of a contribution shown without its author: emptied, or removed by moderation. */
+export const NO_AUTHOR = { id: null, name: '', identity: null, qualification: null, score: null, username: '' } as const;
+
 /** What its author emptied shows without the author's name (spec 2026-10-20 §5.5). */
-export function authorView(item: { deletedAt: Date | null; user: Author }) {
-  return item.deletedAt ? { id: null, username: '' } : userView(item.user);
+export function authorView(item: { deletedAt: Date | null; user: Author }, authors: Authors) {
+  return item.deletedAt ? NO_AUTHOR : userView(item.user, authors);
 }
 
 export function isOwn(authorId: string | null, userId: string) {

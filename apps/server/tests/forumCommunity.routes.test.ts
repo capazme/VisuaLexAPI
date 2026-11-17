@@ -5,8 +5,9 @@ import { delegated } from './delegatedHelper';
 
 // The Community's routes (spec 2026-10-20-forum-community-glosse-design, pull request 2): replies at two
 // levels, edit and deletion by the author, the accepted reply, reports on replies, moderation with its
-// log, notifications, the daily limits, the feed's new filters. Server only: the four rules the reader's
-// panel cannot meet yet stay lenient, each pinned below («pending PR2c»).
+// log, notifications, the daily limits, the feed's new filters. Server only: the rules the reader's
+// panel cannot meet yet stay lenient, each pinned below («pending PR2c»); the own vote is refused since
+// the votes up and down (spec 2026-11-14 §A).
 
 const ARTICLE = { normaKey: 'codice-civile--1453', articleId: '1453' };
 
@@ -237,12 +238,14 @@ describe('the Community', () => {
   });
 
   describe('votes', () => {
-    // Pending PR2c: the reader's panel shows the button on one's own glossa, so the vote is still taken.
-    it('still takes a vote on one’s own glossa or reply (lenient until PR2c)', async () => {
+    // D-248 (spec 2026-11-14 §A): no longer lenient. The reader's panel still shows the button on one's
+    // own glossa; the refusal carries a stable code beside the Italian message, for the web to show.
+    it('refuses a vote on one’s own glossa or reply, with the code `own_contribution`', async () => {
       const threadId = await glossa(alice);
       const replyId = await answer(bob, threadId, 'Risposta');
-      expect((await request(app).post(`/api/article-discussions/${threadId}/vote`).set(as(alice))).body).toEqual({ voted: true, voteCount: 1 });
-      expect((await request(app).post(`/api/article-discussion-comments/${replyId}/vote`).set(as(bob))).body).toEqual({ voted: true, voteCount: 1 });
+      const own = { detail: 'Non puoi votare un tuo contributo', error: 'own_contribution' };
+      expect((await request(app).post(`/api/article-discussions/${threadId}/vote`).set(as(alice))).body).toEqual(own);
+      expect((await request(app).post(`/api/article-discussion-comments/${replyId}/vote`).set(as(bob))).body).toEqual(own);
     });
 
     it('takes no new vote on a comment, and none on hidden content', async () => {
@@ -300,7 +303,7 @@ describe('the Community', () => {
       expect((await request(app).post(`/api/moderation/reports/thread/${threadId}/resolve`).set(as(mod)).send({ action: 'dismiss', reason: 'Di nuovo' })).status).toBe(404);
 
       // The author reads it with the category; others get a 404; the author was told, not by whom.
-      expect((await page(alice, threadId)).body.hidden).toEqual({ category: 'dati_personali' });
+      expect((await page(alice, threadId)).body.hidden).toEqual({ category: 'dati_personali', appeal: null });
       expect((await page(bob, threadId)).status).toBe(404);
       const told = await request(app).get('/api/forum/notifications').set(as(alice));
       expect(told.body.data[0]).toMatchObject({ kind: 'hidden', category: 'dati_personali', threadId });

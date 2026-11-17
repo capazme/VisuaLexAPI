@@ -32,13 +32,13 @@ export function SectionTabs({ forumCount, onChoose, inDrawer = false }: { forumC
               onChoose?.();
             }}
             className={cn(
-              'relative h-[30px] flex-auto whitespace-nowrap rounded px-1 text-center text-[13px] transition-colors duration-100',
+              'relative h-[30px] flex-auto whitespace-nowrap rounded px-1 text-center text-[13px]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
               // 44 px on a touch screen, which the drawer is; the desktop bar keeps the prototype's 30.
               inDrawer && 'h-11',
               active
-                ? 'bg-ink-300/70 font-semibold text-slate-900 dark:bg-ink-700/60 dark:text-slate-50'
-                : 'font-medium text-slate-600 hover:bg-ink-200/70 dark:text-slate-400 dark:hover:bg-ink-800/60',
+                ? 'bg-ink-300/70 font-semibold text-slate-900 transition-colors duration-100 dark:bg-ink-700/60 dark:text-slate-50'
+                : 'vlx-hover-tile font-medium text-slate-600 dark:text-slate-400',
             )}
           >
             {s.name}

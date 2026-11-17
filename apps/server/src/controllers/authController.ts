@@ -439,7 +439,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications, atti, lingoLezioni] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications, atti, lingoLezioni, forumProfile, forumProfileReports, forumSubjectRoles, forumValidations, forumAppeals] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -519,8 +519,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
     exportUserCourses(userId),
     // The Community (spec 2026-10-20-forum-community-glosse-design §7.4): what the user voted, reported and
     // was told. A report's copy of the reported text and its closing (who, why) are the moderators' record.
-    prisma.articleThreadVote.findMany({ where: { userId }, select: { threadId: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
-    prisma.articleCommentVote.findMany({ where: { userId }, select: { commentId: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleThreadVote.findMany({ where: { userId }, select: { threadId: true, value: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleCommentVote.findMany({ where: { userId }, select: { commentId: true, value: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
     prisma.articleThreadReport.findMany({
       where: { userId },
       select: { threadId: true, reason: true, details: true, status: true, createdAt: true },
@@ -548,6 +548,27 @@ export const exportAccountData = async (req: Request, res: Response) => {
       where: { utenteId: userId },
       select: { id: true, giorno: true, materia: true, esercizi: true, esiti: true, finitaIl: true, createdAt: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    }),
+    // The Forum's profile (spec 2026-11-14 §B), and the reports «non è chi dice di essere» the user made:
+    // never who closed them, why, or what the owners decided about someone else.
+    prisma.forumProfile.findUnique({
+      where: { userId },
+      select: { id: true, identity: true, realName: true, pseudonym: true, qualification: true, materie: true,
+        nameWithdrawnAt: true, nameWithdrawnReason: true, createdAt: true, updatedAt: true },
+    }),
+    prisma.forumProfileReport.findMany({
+      where: { userId }, select: { profileId: true, details: true, status: true, createdAt: true }, orderBy: { createdAt: 'asc' },
+    }),
+    // The communities (spec 2026-11-14 §C): the person's roles, the validations they gave, their appeals;
+    // never who appointed them or who decided an appeal.
+    prisma.forumSubjectRole.findMany({ where: { userId }, select: { materia: true, role: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.forumValidation.findMany({
+      where: { validatorId: userId }, select: { threadId: true, commentId: true, materia: true, createdAt: true }, orderBy: { createdAt: 'asc' },
+    }),
+    prisma.forumAppeal.findMany({
+      where: { userId },
+      select: { targetKind: true, targetId: true, text: true, status: true, createdAt: true, decidedAt: true, decisionNote: true },
+      orderBy: { createdAt: 'asc' },
     }),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
@@ -589,7 +610,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
       // The release and lock times are the author's; the admin's and the moderator's ids are other people's identifiers.
       threads: threads.map(({ passageReleasedById: _releasedBy, lockedById: _lockedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
       comments: comments.map(({ acceptedIn, ...comment }) => ({ ...comment, accepted: acceptedIn.length > 0 })),
-      threadVotes, commentVotes, threadReports, commentReports, forumNotifications,
+      threadVotes, commentVotes, threadReports, commentReports, forumNotifications, forumProfile, forumProfileReports,
+      forumSubjectRoles, forumValidations, forumAppeals,
       lingoCards: lingoCards.map(({ competenze, ...card }) => ({ ...card, competenze: competenze.map((c) => c.competenza.codice) })),
       lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),

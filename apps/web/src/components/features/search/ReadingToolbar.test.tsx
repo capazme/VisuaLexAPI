@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ReadingToolbar, type ReadingToolbarProps } from './ReadingToolbar';
+import { StatusLineEnd } from './statusLineEnd';
 import { NOT_YET_REASON, READ_ONLY_REASON, UNRELIABLE_REASON } from '../../../utils/versionDisplay';
 import { appStore } from '../../../store/useAppStore';
 
@@ -506,5 +508,78 @@ describe('ReadingToolbar — «Copia link Normattiva»', () => {
     it('is switched off with «Copia» when the text may not be copied', () => {
         const { container } = setup({ onCopyLink: vi.fn(), copyLockedReason: NOT_YET_REASON });
         expect(within(openMore(desktopRow(container))).getByRole('menuitem', { name: /Copia link Normattiva/ })).toBeDisabled();
+    });
+});
+
+describe('ReadingToolbar — the tabs\' ground under the pointer (LC72)', () => {
+    /** The selector the ground answers to (`index.css`): what it does not match stays still. */
+    const ANSWERS = '.vlx-hover-tile:not(:disabled, [aria-pressed="true"], [aria-expanded="true"])';
+
+    it('is on every command of the bar, on a computer and on a phone', () => {
+        const { container } = setup();
+        const desktop = within(desktopRow(container)).getAllByRole('button');
+        // Note, Evidenziazioni, the highlighter, its inks, its meanings, the note tool, its kind, «Alla pratica», «⋯».
+        expect(desktop).toHaveLength(9);
+        for (const button of desktop) expect(button, button.getAttribute('aria-label') ?? button.textContent ?? '').toHaveClass('vlx-hover-tile');
+        for (const button of within(phoneRow(container)).getAllByRole('button')) expect(button).toHaveClass('vlx-hover-tile');
+    });
+
+    it('does not answer on a disabled command, nor on a pressed one', () => {
+        const { container } = setup({ lockedReason: READ_ONLY_REASON });
+        const notes = within(desktopRow(container)).getByRole('button', { name: /^Note/ });
+        expect(notes).toBeDisabled();
+        expect(notes.matches(ANSWERS)).toBe(false);
+        expect(within(desktopRow(container)).getByRole('button', { name: 'Altre azioni sull’articolo' }).matches(ANSWERS)).toBe(true);
+    });
+
+    it('stays still on the highlighter while it is on', () => {
+        appStore.setState({ readingTool: 'highlight' });
+        try {
+            const { container } = setup();
+            const toggle = within(desktopRow(container)).getByRole('button', { name: /^Evidenziatore/ });
+            expect(toggle).toHaveAttribute('aria-pressed', 'true');
+            expect(toggle.matches(ANSWERS)).toBe(false);
+        } finally {
+            appStore.setState({ readingTool: null });
+        }
+    });
+});
+
+describe('ReadingToolbar — the selector on the status line (LC70)', () => {
+    const CURRENT = { tone: 'current' as const, label: 'In vigore dal 10 novembre 1944', title: '' };
+    const bar = (end: ReactNode) => render(
+        <StatusLineEnd.Provider value={end}>
+            <ReadingToolbar {...baseProps()} versionChip={CURRENT} />
+        </StatusLineEnd.Provider>,
+    );
+    function baseProps(): ReadingToolbarProps {
+        return {
+            normaData: { tipo_atto: 'codice civile', data: '1942-03-16', numero_articolo: '1' },
+            versionChip: null, articleText: 'testo', isNotesPeekOpen: false, notesCount: 0, isHighlightsPeekOpen: false,
+            highlightsCount: 0, isDiscussionOpen: false, isPinnedQuick: false, onToggleNotes: vi.fn(),
+            onToggleHighlightsPeek: vi.fn(), onToggleDiscussion: vi.fn(), onToggleQuickNorm: vi.fn(), onMobileCopy: vi.fn(),
+            onOpenStudyMode: vi.fn(), onOpenCopyModal: vi.fn(), onOpenDossier: vi.fn(), onShareLink: vi.fn(),
+            onOpenAdvancedExport: vi.fn(), onOpenVersionInput: vi.fn(), onCompare: vi.fn(),
+        };
+    }
+
+    it('the status, then the selector, on one line; the one rule under it; the tools after', () => {
+        const { container } = bar(<button type="button">Art. 1</button>);
+        const line = container.querySelector<HTMLElement>('[data-status-line]')!;
+        const status = within(line).getByRole('button', { name: CURRENT.label });
+        const selector = within(line).getByRole('button', { name: 'Art. 1' });
+        expect(status.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(line).toHaveClass('border-b');
+        expect(line.parentElement).not.toHaveClass('border-b');
+        expect(container.querySelectorAll('.border-b')).toHaveLength(1);
+        // The tools come after the line, not on it.
+        expect(within(line).queryByRole('button', { name: 'Altre azioni sull’articolo' })).toBeNull();
+        expect(line.compareDocumentPosition(desktopRow(container)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('without a selector the bar keeps its own rule and no status line', () => {
+        const { container } = bar(null);
+        expect(container.querySelector('[data-status-line]')).toBeNull();
+        expect(container.firstElementChild).toHaveClass('border-b');
     });
 });

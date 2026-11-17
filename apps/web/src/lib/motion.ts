@@ -12,3 +12,10 @@ export const spring = {
   snappy: { type: 'spring', duration: 0.3, bounce: 0 },
   gentle: { type: 'spring', duration: 0.45, bounce: 0.12 },
 } as const;
+
+/**
+ * The search island (LC69): one time and one curve for each way, for every layer (shape, content, veil, pill), as Web
+ * Animations timing. Opening on the drawer's curve, closing on the strong ease-out: it lands softly on the pill.
+ */
+export const ISLAND_OPEN = { duration: 280, easing: `cubic-bezier(${ease.drawer.join(', ')})` } as const;
+export const ISLAND_CLOSE = { duration: 220, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;

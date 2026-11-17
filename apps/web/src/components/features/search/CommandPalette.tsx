@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } 
 import { BookOpen, ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { dur, ease, spring } from '../../../lib/motion';
+import { ISLAND_CLOSE, ISLAND_OPEN, dur, ease, spring } from '../../../lib/motion';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -16,7 +16,7 @@ import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
-import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
+import { ISLAND_SURFACE, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
@@ -161,17 +161,6 @@ function Matched({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
-/** The search field's corner radius (`rounded-xl`) and the panel's (`rounded-2xl`): the growth goes from one to the other. */
-const FIELD_RADIUS = 12;
-const PANEL_RADIUS = 16;
-/** The growth: about 280 ms opening, 200 ms closing (the brief's), on the app's curves; no bounce. */
-const GROW_S = 0.28;
-const SHRINK_S = 0.2;
-/** The groups entering: the first four, 30 ms apart, from when the panel is half grown. */
-const GROUPS_ENTERING = 4;
-const GROUP_STAGGER_MS = 30;
-const GROUPS_AT_MS = 140;
-
 /** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
 const subscribeViewport = (change: () => void) => {
   window.visualViewport?.addEventListener('resize', change);
@@ -183,222 +172,239 @@ const subscribeNothing = () => () => {};
 const noHeight = () => null;
 
 /**
- * The panel growing out of the search page's field (R2), inspired by Animorio's «menu dei comandi», written from
- * scratch with Web Animations and Framer Motion: the same place and width, the height uncovered from the field's down
- * to the panel's (`clip-path`, the corners from the field's to a card's), then the clip goes and the card's shadow
- * shows; the content fades in as it grows. Closing, the same way back (`usePresence`); opened again meanwhile, it grows
- * back from where the closing was. Under reduced motion it only fades.
+ * The island (LC69, written again from scratch after a frame-by-frame look; Luca, 17 Nov: «mixa tutta una serie di
+ * stili diversi»). One way for every opening: the panel grows out of what opened it — the top bar's pill, the search
+ * page's field — and goes back into it. One technique, Web Animations; `usePresence` only keeps the panel mounted while
+ * it closes. Two layers moved by the same rectangle, the same time and the same curve: the shape (the card's ground,
+ * edge and shadow) and the content, clipped to the shape, fading in as it grows and out as it shrinks. The pill is
+ * hidden while the panel is out and shown again when the shape is back on it. Any change of mind (closed while it
+ * opens, opened while it closes) starts from where the layers are on screen. Nothing to grow from, or reduced motion:
+ * the panel only fades.
  */
 /**
- * The island (LC40; the anti-slop review of 16 Nov, Luca: «AI slop sia nella fluidità di apertura che di chiusura»): two
- * layers. The shape — the card's ground, edge, corners and shadow — changes from the pill into the panel; the content
- * sits over it and is never cut: hidden until the shape is nearly there, then it fades in whole. Opening: the shape
- * 300 ms, an ease-out with no overshoot; the content from 85 % of it, 120 ms. Closing: the content goes first (80 ms),
- * then the shape goes back onto the pill's rectangle and corners (180 ms, an ease-in), where the pill is again. The
- * shadow is the shape's from the first frame. Under reduced motion only a fade.
+ * Where along each way (as a share of the shape's way, not of the time) the content is seen: from a quarter of the
+ * opening; gone by four fifths of the closing. The closing ends in a crossfade: the shape, a few pixels off the pill,
+ * gives way to the pill itself.
  */
-const ISLAND_OPEN_MS = 300;
-const ISLAND_CONTENT_MS = 120;
-const ISLAND_CONTENT_AT = 0.85;
-const ISLAND_HIDE_MS = 80;
-const ISLAND_CLOSE_MS = 180;
-const ISLAND_OPEN_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)';
-const ISLAND_CLOSE_CURVE = 'cubic-bezier(0.4, 0, 1, 1)';
+const CONTENT_FROM = 0.25;
+const CONTENT_UNTIL = 0.8;
+const PILL_FROM = 0.99;
+/** The longest the opening waits for the mount's long frames to pass, so none of it is skipped. */
+const SETTLE_MS = 150;
+const SHAPE_KEYS = ['top', 'right', 'bottom', 'left', 'borderRadius', 'boxShadow', 'opacity'];
 
-function IslandGrowth({ still, from, className, children }: { still: boolean; from: { left: number; right: number; height: number; radius: number }; className: string; children: ReactNode }) {
+type Inset = { top: number; right: number; bottom: number; left: number; radius: number };
+const px = (n: number) => `${Math.round(n * 10) / 10}px`;
+const shapeAt = (i: Inset) => ({ top: px(i.top), right: px(i.right), bottom: px(i.bottom), left: px(i.left), borderRadius: px(i.radius) });
+const clipAt = (i: Inset) => `inset(${px(i.top)} ${px(i.right)} ${px(i.bottom)} ${px(i.left)} round ${px(i.radius)})`;
+/** The same shadow, every colour transparent: interpolates with the card's own (same layers, same lengths). */
+const noShadow = (shadow: string) => shadow.replace(/(?:rgba?|oklch|oklab|lab|lch|color)\([^)]*\)/g, 'rgba(0, 0, 0, 0)');
+
+/** The source's rectangle inside the panel's box, or null where there is none to grow from (gone, or not under it). */
+function insetOf(source: HTMLElement | null, box: DOMRect): Inset | null {
+  if (!source?.isConnected) return null;
+  const r = source.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  const inset = { top: r.top - box.top, right: box.right - r.right, bottom: box.bottom - r.bottom, left: r.left - box.left };
+  if (Object.values(inset).some((v) => v < -1)) return null;
+  // Its corners: its own, or those of what draws it inside (the search page's form holds a round field).
+  const drawn = [source, ...source.querySelectorAll<HTMLElement>('*')].find((el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) > 0 && Math.abs(el.getBoundingClientRect().height - r.height) < 1);
+  const radius = Math.min(drawn ? parseFloat(getComputedStyle(drawn).borderTopLeftRadius) : 0, r.height / 2);
+  return { ...inset, radius };
+}
+
+/** The values the layers show now (an animation running included), to go on from there. */
+function now(el: HTMLElement, keys: string[]): Keyframe {
+  const style = getComputedStyle(el) as unknown as Record<string, string>;
+  return Object.fromEntries(keys.map((key) => [key, style[key]]));
+}
+
+function IslandPanel({ still, source, className, children }: { still: boolean; source: HTMLElement | null; className: string; children: ReactNode }) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const shapeRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isPresent, safeToRemove] = usePresence();
   const remove = useRef(safeToRemove);
-  useEffect(() => {
+  // Before the effects that call it: the closing render's own (a removal at once happens in the same commit).
+  useLayoutEffect(() => {
     remove.current = safeToRemove;
   });
-  const asPill = { left: `${from.left}px`, right: `${from.right}px`, bottom: `calc(100% - ${from.height}px)`, borderRadius: `${from.radius}px` };
-  const asPanel = { left: '0px', right: '0px', bottom: '0px', borderRadius: `${PANEL_RADIUS}px` };
+  // What the pill was grown from, hidden while the panel is out; and the layers' running animations.
+  const hidden = useRef<HTMLElement | null>(null);
+  const running = useRef<Animation[]>([]);
+  const started = useRef(false);
+  const showPill = () => {
+    if (hidden.current) hidden.current.style.opacity = '';
+    hidden.current = null;
+  };
+  useEffect(() => showPill, []);
 
   useLayoutEffect(() => {
+    const root = rootRef.current;
     const shape = shapeRef.current;
     const content = contentRef.current;
-    if (!isPresent || !shape || !content || typeof shape.animate !== 'function') return undefined;
-    if (still) {
-      const fade = [shape, content].map((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur.pop * 1000 }));
-      return () => fade.forEach((animation) => animation.cancel());
+    if (!root || !shape || !content || typeof root.animate !== 'function') {
+      if (!isPresent) remove.current?.();
+      return undefined;
     }
-    const grow = shape.animate([asPill, asPanel], { duration: ISLAND_OPEN_MS, easing: ISLAND_OPEN_CURVE, fill: 'backwards' });
-    const show = content.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ISLAND_CONTENT_MS, delay: ISLAND_OPEN_MS * ISLAND_CONTENT_AT, easing: 'ease-out', fill: 'backwards' });
-    return () => {
-      grow.cancel();
-      show.cancel();
+    // Where the layers are now (the other way's animations included), then those animations stopped: the card's own
+    // shadow is read once nothing runs.
+    const take = () => {
+      const was = running.current.length > 0
+        ? { shape: now(shape, SHAPE_KEYS), content: now(content, ['clipPath', 'opacity']), root: now(root, ['opacity']) }
+        : null;
+      running.current.forEach((a) => a.cancel());
+      running.current = [];
+      const own = getComputedStyle(shape);
+      // The panel as its CSS draws it: its corners are the theme's `rounded-2xl`.
+      const full: Inset = { top: 0, right: 0, bottom: 0, left: 0, radius: parseFloat(own.borderTopLeftRadius) || 0 };
+      // No clip is the whole panel, as an inset: `none` does not interpolate with one (the clip would jump halfway).
+      if (was && (!was.content.clipPath || was.content.clipPath === 'none')) was.content.clipPath = clipAt(full);
+      return { was, shadow: own.boxShadow, full };
     };
-    // Once per opening: the panel's own re-renders do not grow it again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the pill's place is read as it opens
-  }, [still, isPresent]);
+    let frame = 0;
+    let idle = 0;
 
-  useEffect(() => {
-    if (isPresent) return;
-    const shape = shapeRef.current;
-    const content = contentRef.current;
-    if (!shape || !content || typeof shape.animate !== 'function') {
+    if (isPresent) {
+      const open = () => {
+        started.current = true;
+        const { was, shadow, full } = take();
+        root.style.opacity = '';
+        // Back from a closing, which took the pointer away.
+        root.style.pointerEvents = '';
+        const from = still ? null : insetOf(source, root.getBoundingClientRect());
+        const timing = { ...ISLAND_OPEN, fill: 'backwards' as const };
+        running.current = was
+          // Coming back while it closes: from where it is.
+          ? [
+            shape.animate([was.shape, { ...shapeAt(full), boxShadow: shadow, opacity: 1 }], timing),
+            content.animate([was.content, { clipPath: clipAt(full), opacity: 1 }], timing),
+            root.animate([was.root, { opacity: 1 }], timing),
+          ]
+          : from
+            ? [
+              shape.animate([{ ...shapeAt(from), boxShadow: noShadow(shadow) }, { ...shapeAt(full), boxShadow: shadow }], timing),
+              content.animate([{ clipPath: clipAt(from), opacity: 0 }, { opacity: 0, offset: CONTENT_FROM }, { clipPath: clipAt(full), opacity: 1 }], timing),
+            ]
+            : [root.animate([{ opacity: 0 }, { opacity: 1 }], timing)];
+        if (from && source) {
+          source.style.opacity = '0';
+          hidden.current = source;
+        }
+        // Open: nothing holds, the layers are their own CSS again.
+        const ran = running.current;
+        ran[0].onfinish = () => {
+          if (running.current !== ran) return;
+          ran.forEach((a) => a.cancel());
+          running.current = [];
+        };
+      };
+      // Coming back while it closes goes on at once; so does a fade, which has nothing to skip, and under reduced motion
+      // the app's rule gives every opacity change a CSS transition (`index.css`), which an inline wait would start.
+      if (running.current.length > 0 || still) open();
+      else {
+        // Hidden until it starts (the pill shows meanwhile): mounting the menu is long frames, and a way started under
+        // them is seen from a third of it. Started on the frame after the page is idle, at most `SETTLE_MS` later
+        // (no idle callback, Safari: after two frames).
+        root.style.opacity = '0';
+        const start = () => {
+          frame = requestAnimationFrame(open);
+        };
+        if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(start, { timeout: SETTLE_MS });
+        else frame = requestAnimationFrame(() => {
+          frame = requestAnimationFrame(start);
+        });
+      }
+      return () => {
+        cancelAnimationFrame(frame);
+        if (idle && typeof cancelIdleCallback === 'function') cancelIdleCallback(idle);
+      };
+    }
+
+    // Closing, from where it is, into the pill where it is now, or a fade. Closed before it started: gone at once.
+    root.style.pointerEvents = 'none';
+    if (!started.current) {
+      showPill();
       remove.current?.();
-      return;
+      return undefined;
     }
-    shape.style.pointerEvents = 'none';
-    content.style.pointerEvents = 'none';
-    if (still) {
-      const fade = [shape, content].map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' }));
-      fade[0].onfinish = () => remove.current?.();
-      return;
-    }
-    content.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ISLAND_HIDE_MS, easing: 'ease-in', fill: 'forwards' });
-    const back = shape.animate([asPanel, asPill], { duration: ISLAND_CLOSE_MS, delay: ISLAND_HIDE_MS, easing: ISLAND_CLOSE_CURVE, fill: 'forwards' });
-    back.onfinish = () => remove.current?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- closing once, from where it is
-  }, [isPresent, still]);
+    const { was, shadow, full } = take();
+    const pill = hidden.current;
+    const to = still ? null : insetOf(pill ?? source, root.getBoundingClientRect());
+    const timing = { ...ISLAND_CLOSE, fill: 'forwards' as const };
+    const shapeNow = was?.shape ?? { ...shapeAt(full), boxShadow: shadow, opacity: 1 };
+    const contentNow = was?.content ?? { clipPath: clipAt(full), opacity: 1 };
+    running.current = to
+      ? [
+        shape.animate([shapeNow, { opacity: 1, offset: PILL_FROM }, { ...shapeAt(to), boxShadow: noShadow(shadow), opacity: 0 }], timing),
+        content.animate([contentNow, { opacity: 0, offset: CONTENT_UNTIL }, { clipPath: clipAt(to), opacity: 0 }], timing),
+        // The pill comes back under the shape as it lands, by the same time and curve.
+        ...(pill ? [pill.animate([{ opacity: 0 }, { opacity: 0, offset: PILL_FROM }, { opacity: 1 }], timing)] : []),
+      ]
+      : [root.animate([was?.root ?? { opacity: 1 }, { opacity: 0 }], timing)];
+    const ran = running.current;
+    ran[0].onfinish = () => {
+      if (running.current !== ran) return;
+      // The pill's own CSS again (it ends where its CSS is); the panel's layers hold their end until it is removed.
+      showPill();
+      ran.filter((a) => a.effect && (a.effect as KeyframeEffect).target === pill).forEach((a) => a.cancel());
+      remove.current?.();
+    };
+    return undefined;
+    // Once per opening and per closing: the panel's own renders move nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the source is read as each way starts
+  }, [isPresent]);
 
   return (
-    <div className={cn(className, 'relative overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent')}>
-      <div ref={shapeRef} aria-hidden data-island-shape="" className="pointer-events-none absolute inset-0 border border-ink-200 bg-card shadow-lg dark:border-ink-700 dark:bg-ink-900" style={{ borderRadius: PANEL_RADIUS }} />
-      <div ref={contentRef} data-island-content="" className="relative flex min-h-0 flex-1 flex-col overflow-hidden" style={{ borderRadius: PANEL_RADIUS }}>
+    <div ref={rootRef} className={cn(className, 'relative')}>
+      <div ref={shapeRef} aria-hidden data-island-shape="" className={cn('pointer-events-none absolute inset-0 rounded-2xl shadow-lg', ISLAND_SURFACE)} />
+      <div ref={contentRef} data-island-content="" className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
         {children}
       </div>
     </div>
   );
 }
 
-function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
+/** The veil under the island: the same times and curves, by the same technique. */
+function IslandVeil({ onClick }: { onClick: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isPresent, safeToRemove] = usePresence();
-  // `safeToRemove` is a new function at every render: kept here, it does not start the closing again (one closing,
-  // one animation).
   const remove = useRef(safeToRemove);
-  useEffect(() => {
+  // Before the effects that call it: the closing render's own (a removal at once happens in the same commit).
+  useLayoutEffect(() => {
     remove.current = safeToRemove;
   });
-  // The closing on its way (or just finished, its end held), for a new opening to take over from where it is.
-  const closing = useRef<Animation | null>(null);
-  // An opening whose growth has not started yet (a close or StrictMode's second run before its first frames): when
-  // the panel comes back it is still an opening, with its groups' entrance, though a clip is already set.
-  const opening = useRef(false);
-  // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
-  // after it mounts, so it is never measured here. One template, so the two ends interpolate.
-  const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
-  const asField = clipFor(100, fromHeight, FIELD_RADIUS);
-  const asPanel = clipFor(0, 0, PANEL_RADIUS);
-  const curve = `cubic-bezier(${ease.out.join(', ')})`;
-  // Web Animations with no fill: once over, nothing holds the clip (the shadow outside it shows), and a closing
-  // interrupted by a new opening starts from where it was. (A DOM without them, a test's, draws the panel at once.)
-  const canAnimate = (el: HTMLElement) => typeof el.animate === 'function';
-
-  // Growing: from the field on an opening; from where a closing was, when the panel comes back before it went.
+  const running = useRef<Animation | null>(null);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || !isPresent) return;
-    el.style.pointerEvents = '';
-    // Coming back before it went (the layout effects run before the closing's cleanup), or before its removal once
-    // it ended: from where the closing is.
-    let left: { clipPath: string; opacity: string } | null = null;
-    if (closing.current) {
-      const now = getComputedStyle(el);
-      left = { clipPath: now.clipPath, opacity: now.opacity };
-      closing.current.onfinish = null;
-      closing.current.cancel();
-      closing.current = null;
-    }
-    if (still) {
-      el.style.clipPath = '';
-      opening.current = false;
-      const fade = canAnimate(el)
-        ? el.animate([{ opacity: left ? Number(left.opacity) : 0 }, { opacity: 1 }], { duration: dur.pop * 1000, easing: curve })
-        : null;
-      return () => fade?.cancel();
-    }
-    if (left && left.clipPath && left.clipPath !== 'none') el.style.clipPath = left.clipPath;
-    // An opening (nothing left by a closing or a growth cut short): set before the first paint, or the panel would
-    // flash open meanwhile.
-    const held = el.style.clipPath && el.style.clipPath !== 'none' ? el.style.clipPath : '';
-    const isOpening = opening.current || !held;
-    const from = held || asField;
-    if (!canAnimate(el)) {
-      el.style.clipPath = '';
+    // Closing, it lets the pointer through: a tap on the pill opens the panel again from where it is.
+    if (el) el.style.pointerEvents = isPresent ? '' : 'none';
+    if (!el || typeof el.animate !== 'function') {
+      if (!isPresent) remove.current?.();
       return;
     }
-    el.style.clipPath = from;
-    opening.current = isOpening;
-    // Started once the first frame is drawn: mounting the menu's rows is a long frame, and an animation started before
-    // it would run its time out unseen, the panel appearing whole — and so is the render that brings it back during a
-    // closing: started there, it was nine tenths over by the first frame drawn.
-    let grow: Animation | null = null;
-    let groups: Animation[] = [];
-    const start = () => {
-      // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px — on an opening only.
-      opening.current = false;
-      groups = isOpening
-        ? [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).map((group, i) =>
-          group.animate(
-            [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
-            { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
-          ))
-        : [];
-      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
-      // Grown, the clip goes: the card's own shadow shows.
-      grow.onfinish = () => {
-        el.style.clipPath = '';
-      };
+    const from = running.current ? now(el, ['opacity']) : { opacity: isPresent ? 0 : 1 };
+    running.current?.cancel();
+    const animation = el.animate([from, { opacity: isPresent ? 1 : 0 }], { ...(isPresent ? ISLAND_OPEN : ISLAND_CLOSE), fill: 'both' });
+    running.current = animation;
+    animation.onfinish = () => {
+      if (running.current !== animation) return;
+      if (isPresent) {
+        animation.cancel();
+        running.current = null;
+      } else remove.current?.();
     };
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(start);
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      // Cut short (a closing, mid-growth): the closing starts from here, not from the field or the full panel.
-      if (grow?.playState === 'running') el.style.clipPath = getComputedStyle(el).clipPath;
-      if (grow) {
-        grow.onfinish = null;
-        grow.cancel();
-      }
-      groups.forEach((animation) => animation.cancel());
-    };
-    // Once per opening (or coming back): the panel's own re-renders do not grow it again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the field's height is read as it opens
-  }, [still, isPresent]);
-
-  // Closing: the same way back, from where it is (a growth cut short included); it takes no pointer meanwhile.
-  useEffect(() => {
-    if (isPresent) return;
-    const el = ref.current;
-    if (!el || !canAnimate(el)) {
-      remove.current?.();
-      return;
-    }
-    el.style.pointerEvents = 'none';
-    const now = getComputedStyle(el).clipPath;
-    const run = still
-      ? el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' })
-      : el.animate([{ clipPath: now && now !== 'none' ? now : asPanel }, { clipPath: asField }], { duration: SHRINK_S * 1000, easing: `cubic-bezier(${ease.inOut.join(', ')})`, fill: 'forwards' });
-    // Its end is held (`forwards`) until the panel goes: kept in the ref, so a panel brought back before its removal
-    // drops it (a finished closing left on it would clip the panel to the field once the new growth is over).
-    run.onfinish = () => remove.current?.();
-    closing.current = run;
-    return () => {
-      // Taken over by a new opening already (see the growth: a second cancel does nothing), or gone with the panel.
-      run.onfinish = null;
-      run.cancel();
-      if (closing.current === run) closing.current = null;
-    };
-    // Once per closing: the field's height and the curves are read as it starts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `asField`/`asPanel` are strings rebuilt each render
-  }, [isPresent, still]);
-
+    // Once per way.
+  }, [isPresent]);
   return (
-    <div ref={ref} className={cn('rounded-2xl shadow-lg', className)}>
-      <motion.div
-        className="flex min-h-0 flex-1 flex-col"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1, transition: { duration: dur.press, delay: still ? 0 : 0.04, ease: ease.out } }}
-      >
-        {children}
-      </motion.div>
-    </div>
+    <div
+      ref={ref}
+      data-palette-veil=""
+      aria-hidden
+      // `touch-none`: a drag on it does not scroll the page under it (iOS).
+      className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
+      onClick={onClick}
+    />
   );
 }
 
@@ -799,19 +805,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       : document.getElementById(SEARCH_ISLAND_ID);
   const anchor = island?.isConnected ? island : field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
   const isIsland = anchor !== null && anchor === island;
-  // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
-  const growFrom = anchor?.offsetHeight || 44;
-  // From the island its width too, and its round ends: how far the panel (768 px, the window allowing, centred on the
-  // pill and kept 16 px inside the window) reaches past the pill on each side.
+  // What the panel grows out of: what it hangs from, or on a phone's search page (no pill there, and the panel hangs
+  // at the top by itself) the page's field, under it (LC69).
+  const growSource = anchor ?? (isOpen && !isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null);
+  // From the island the menu's own width, 768 px, the window allowing.
   const islandWidth = Math.min(768, (typeof window === 'undefined' ? 1024 : window.innerWidth) - 32);
-  const growFromSides = (() => {
-    if (!isIsland) return undefined;
-    const pill = anchor.getBoundingClientRect();
-    const width = pill.width || anchor.offsetWidth;
-    const centre = pill.left + width / 2;
-    const left = Math.min(Math.max(centre - islandWidth / 2, 16), window.innerWidth - 16 - islandWidth);
-    return { left: Math.max(0, pill.left - left), right: Math.max(0, left + islandWidth - (pill.left + width)) };
-  })();
   // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
   // did both).
   const watchViewport = isOpen && !isDesktop;
@@ -830,6 +828,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   }, [isOpen, isDesktop]);
   // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
   // (the field) when it closes. Placed only when the field is there.
+  // What the box hangs from now, for `size`, which may run with the last element floating-ui had.
+  const anchorRef = useRef(anchor);
+  useLayoutEffect(() => {
+    anchorRef.current = anchor;
+  });
   const { refs, floatingStyles, context, update } = useFloating({
     open: isOpen,
     elements: { reference: anchor },
@@ -842,9 +845,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       ...(isIsland ? [shift({ padding: 16 })] : []),
       // As wide as the field (from the island: the menu's own width, 768 px, the window allowing); as tall as what it
       // holds, up to the height it always had (Bill: one row is not a 640 px panel), the window allowing.
+      // eslint-disable-next-line react-hooks/refs -- `apply` runs as floating-ui places the box, after the render
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
+          // Nothing to hang from now: floating-ui may still measure the last element it had (it keeps it, in
+          // `@floating-ui/react` and in `react-dom`), a computer's field hidden on a phone, 0 px wide.
+          if (elements.reference !== anchorRef.current) return;
           elements.floating.style.width = isIsland ? `${islandWidth}px` : `${rects.reference.width}px`;
           // On a phone what the keyboard leaves (the visual viewport), from the pill down. Read here, not from the
           // render: floating-ui keeps the first `apply` (same source text), so a captured height would stay stale.
@@ -860,14 +867,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   useEffect(() => {
     if (shownHeight !== null) update();
   }, [shownHeight, update]);
-  // The field gone while the menu is open (another page, Focus mode): what `size` wrote on the box goes with it, or
-  // the panel hung at the top would keep the field's width and height.
+  // Nothing to hang from (the field gone, another page, Focus mode, or a phone's search page after a computer's): what
+  // `size` wrote on the box goes with it, on a computer and on a phone alike, or the panel would keep a stale width
+  // (0 px, after a window narrowed from a computer's to a phone's).
   useLayoutEffect(() => {
-    if (anchor || !isDesktop) return;
+    // Closing: the box stays where it is, so the island goes back into the pill (LC69).
+    if (anchor || !isOpen) return;
     const box = refs.floating.current;
     box?.style.removeProperty('width');
-    box?.style.removeProperty('--palette-max-h');
-  }, [anchor, isDesktop, refs]);
+    // A phone's height is React's own (the visual viewport's, in `style`): only a computer's is `size`'s.
+    if (isDesktop) box?.style.removeProperty('--palette-max-h');
+  }, [anchor, isDesktop, isOpen, refs]);
   const role = useRole(context, { role: 'dialog' });
   // What had the focus as the palette opened (the field, a button elsewhere): it gets it back.
   // Taken during render as the palette opens (own state, no effect), before the box takes the focus.
@@ -1470,22 +1480,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while open, so the
           mark goes with the click that closes, not with the veil's fade. */}
       {isOpen && <span data-find-overlay="" hidden />}
-      {/* LC40: the veil rises and falls with the island's shape, not at once. */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            key="command-palette-veil"
-            data-palette-veil=""
-            aria-hidden
-            initial={still ? false : { opacity: 0 }}
-            animate={{ opacity: 1, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
-            exit={{ opacity: 0, transition: { duration: 0.26, ease: [0.4, 0, 1, 1] } }}
-            // `touch-none`: a drag on it does not scroll the page under it (iOS).
-            className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
-            onClick={onClose}
-          />
-        )}
-      </AnimatePresence>
+      {/* The veil rises and falls with the island, by the same times and curves (LC69). */}
+      <AnimatePresence>{isOpen && <IslandVeil key="command-palette-veil" onClick={onClose} />}</AnimatePresence>
       {/* Outside the presence, so the focus goes back as the palette closes, not once its fade is over. */}
       <FloatingFocusManager
         context={context}
@@ -1500,7 +1496,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           // Two elements: the outer is placed by floating-ui, the inner moves (gotcha 10).
           <div
             key="command-palette"
-            // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
             ref={refs.setFloating}
             {...getFloatingProps()}
             aria-label="Menu di ricerca"
@@ -1522,17 +1517,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               Z_INDEX.commandPalette,
             )}
           >
-            {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
-                lists scroll inside it past that. */}
-            {isIsland && growFromSides ? (
-              <IslandGrowth still={still} from={{ ...growFromSides, height: growFrom, radius: growFrom / 2 }} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col">
-                {content}
-              </IslandGrowth>
-            ) : (
-              <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-card dark:border-ink-700 dark:bg-ink-900">
-                {content}
-              </PanelGrowth>
-            )}
+            {/* The panel grows out of the pill or the field it opens from (LC69, one way for both). As tall as its content,
+                up to `--palette-max-h`: the lists scroll inside it past that. */}
+            <IslandPanel still={still} source={growSource} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col">
+              {content}
+            </IslandPanel>
           </div>
         )}
       </AnimatePresence>

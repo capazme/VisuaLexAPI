@@ -8,13 +8,13 @@ import { PAGE_TITLE } from '../../layout/PageFrame';
 import { cn } from '../../../lib/utils';
 import { isBoundPractice, practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { isEmptyPractice } from './practiceView';
-import { closePracticeWithUndo } from './practiceUndo';
+import { CLOSE_TABLE, closePracticeWithUndo, tableItemsForAct } from './practiceUndo';
 import { PRACTICE_VT, practiceTransitionName } from './practiceSwitch';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
-import { SimpleReadingContext, isSimplePractice } from './simpleReading';
+import { SimpleReadingContext, isOneActPractice, isSimplePractice } from './simpleReading';
 import { useHostedPractice } from './readingHost';
-import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
+import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, TableNameLine, type PracticeStreaming } from './PracticeParts';
 
 export interface PracticeTableProps {
   onViewPdf: (urn: string) => void;
@@ -55,15 +55,18 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
   });
   if (!practice) return null;
   const simple = layout === 'overview' && isSimplePractice(practice);
+  // LC68: one act with more articles is named by its own heading too; the head would repeat it as «c.c.».
+  const headless = layout === 'overview' && isOneActPractice(practice) && practice.beside.length === 0;
   return (
     // The frame's width (U1): its rows widen, the text they open stays at the reading measure (`.vlx-art`).
     <div
       data-testid="practice-table"
       // Lettura semplice (LC28): the article takes the room it needs, the measure; the whole frame only when its margin
-      // has notes or glosses to set beside the text (`AnnotationMargin` needs 52rem for its column).
-      className={cn('w-full space-y-3', simple && 'max-w-[44rem] has-[[data-margin-content]]:max-w-none')}
+      // has notes or glosses to set beside the text (`AnnotationMargin` needs 52rem for its column). LC70: so does one
+      // act with more articles, the same card as with one (Luca: «se apro due articoli si scassa tutto»).
+      className={cn('w-full space-y-3', headless && 'max-w-[44rem] has-[[data-margin-content]]:max-w-none')}
     >
-      <PracticeHeader practice={practice} compact={layout === 'index'} simple={simple}>
+      <PracticeHeader practice={practice} compact={layout === 'index'} simple={simple} headless={headless}>
         <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
         {isEmptyPractice(practice) ? (
           <PracticeEmpty />
@@ -75,35 +78,40 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
   );
 }
 
-/** LC60: the Ricerca's table is not a «pratica» (that is a dossier now): it is closed as the reading table it is. */
-export const CLOSE_TABLE = 'Chiudi il tavolo';
-
 /** The index's title (U2): the act headings' serif, a step larger than theirs, so the name fits a 320 px column. */
 const INDEX_TITLE = 'font-serif text-[22px] font-medium leading-tight text-slate-900 dark:text-white';
 
 /** In the index (`compact`) the name is smaller. A dossier's table
  *  (LC54) draws none of it: the dossier's page already names it, and its name, count and actions are the Corpus's. */
-function PracticeHeader({ practice, compact, simple, children }: { practice: Practice; compact: boolean; simple: boolean; children: ReactNode }) {
+function PracticeHeader({ practice, compact, simple, headless, children }: { practice: Practice; compact: boolean; simple: boolean; headless: boolean; children: ReactNode }) {
   const renamePractice = useAppStore((s) => s.renamePractice);
   const [editing, setEditing] = useState(false);
   const countLine = practiceCountLine(practiceCounts(practice));
   const save = usePracticeSaveActions(practice.id);
   const bound = isBoundPractice(practice);
-  // Lettura semplice (LC28): the practice's actions ride the act's «⋯»; its name stays for a screen reader.
+  // One act (LC28, LC68): one head, the act's; the table's name small over its title, its actions in the act's «⋯».
+  const one = headless && !bound;
   const reading = useMemo(() => ({
     simple,
-    practiceItems: simple && !bound ? [
-      ...save.items.map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item)),
-      { label: CLOSE_TABLE, icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
-    ] : [],
-  }), [simple, bound, save.items, practice.id]);
+    practiceItems: one ? tableItemsForAct(save.items, practice.id, () => setEditing(true)) : [],
+    tableName: one ? (
+      <TableNameLine
+        id="tour-practice-header"
+        label={practice.label}
+        editing={editing}
+        onDone={(name) => {
+          setEditing(false);
+          if (name !== null) renamePractice(practice.id, name);
+        }}
+      />
+    ) : undefined,
+  }), [simple, one, save.items, practice.id, practice.label, editing, renamePractice]);
 
   if (bound) return <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>;
 
-  if (simple) {
+  if (headless) {
     return (
       <>
-        <h2 id="tour-practice-header" className="sr-only">{practice.label}</h2>
         {save.overlay}
         <SimpleReadingContext.Provider value={reading}>{children}</SimpleReadingContext.Provider>
       </>

@@ -1,8 +1,9 @@
-import type { Prisma } from '@prisma/client';
+import type { LingoMateria, Prisma } from '@prisma/client';
 
 export type ModerationAction =
   | 'hide' | 'unhide' | 'lock' | 'unlock' | 'dismiss' | 'release_passage' | 'withhold_passage'
-  | 'appoint_moderator' | 'revoke_moderator' | 'empty';
+  | 'appoint_moderator' | 'revoke_moderator' | 'empty' | 'withdraw_name' | 'restore_name'
+  | 'appoint_validator' | 'revoke_validator' | 'appeal_rejected';
 
 /**
  * Writes one act of a moderator or an administrator to the append-only log (spec 2026-10-20 §5.7), in
@@ -10,7 +11,10 @@ export type ModerationAction =
  */
 export async function logModeration(
   tx: Prisma.TransactionClient,
-  act: { actorId: string; action: ModerationAction; targetKind: 'thread' | 'comment' | 'report' | 'user'; targetId: string; reason: string | null },
+  act: {
+    actorId: string; action: ModerationAction; targetKind: 'thread' | 'comment' | 'report' | 'user' | 'profile';
+    targetId: string; reason: string | null; materia?: LingoMateria | null;
+  },
 ) {
   await tx.forumModerationLog.create({ data: act });
 }

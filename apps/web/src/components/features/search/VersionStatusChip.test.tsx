@@ -21,7 +21,7 @@ describe('VersionStatusChip', () => {
     it('is words in `text-sm`, not a pill, and keeps its 44px touch target (R3)', () => {
         render(<VersionStatusChip chip={chip()} onClick={() => {}} />);
         const button = screen.getByRole('button');
-        expect(button).toHaveClass('text-sm', 'min-h-[44px]', 'md:min-h-0');
+        expect(button).toHaveClass('text-sm', 'min-h-[44px]', 'md:min-h-0', 'vlx-hover-tile');
         expect(button.className).not.toMatch(/\bbg-|\bpx-|rounded-full/);
     });
 
@@ -41,5 +41,16 @@ describe('VersionStatusChip', () => {
     ] as const)('inks the %s state in its banner\'s tone (%s; the text in force neutral)', (tone, colour) => {
         render(<VersionStatusChip chip={chip({ tone, label: tone })} onClick={() => {}} />);
         expect(screen.getByRole('button', { name: tone }).className).toContain(colour);
+    });
+
+    it('on a phone the day in figures, on a computer in words; read in full either way (LC70)', () => {
+        render(<VersionStatusChip
+            chip={chip({ tone: 'current', label: 'In vigore dal 19 aprile 1942', short: 'In vigore dal 19/4/1942' })}
+            onClick={() => {}}
+        />);
+        const button = screen.getByRole('button', { name: 'In vigore dal 19 aprile 1942' });
+        expect(screen.getByText('In vigore dal 19/4/1942')).toHaveClass('md:hidden');
+        expect(screen.getByText('In vigore dal 19 aprile 1942')).toHaveClass('hidden', 'md:inline');
+        expect(button).toContainElement(screen.getByText('In vigore dal 19/4/1942'));
     });
 });

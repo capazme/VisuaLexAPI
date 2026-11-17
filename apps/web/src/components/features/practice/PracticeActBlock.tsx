@@ -29,7 +29,8 @@ import { useTour } from '../../../hooks/useTour';
 import { formatNormaMeta } from '../../../utils/normaMeta';
 import { actHeading } from '../../../utils/sources';
 import { READ_ONLY_REASON, describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
-import { filterLoadedIdsForAnnex } from '../../../utils/articleIds';
+import { filterLoadedIdsForAnnex, getUniqueArticleId } from '../../../utils/articleIds';
+import { structureTitle } from '../../../utils/actTree';
 import { findPracticeArticle, isBoundPractice, practiceArticleKey, type PracticeAct } from '../../../utils/practice';
 
 export interface PracticeActBlockProps {
@@ -46,9 +47,9 @@ export interface PracticeActBlockProps {
  * article's actions; 36 px, on a computer only (a phone has them in «⋯»). The 44 px below `md` is for a narrow window.
  */
 const TOOL_BUTTON =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40';
+  'vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40';
 const MENU_TRIGGER =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:bg-slate-800';
+  'vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2 text-slate-600 transition-colors hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300';
 
 /** A row's chip in the act's index: «2043», «All. A 1», «5 · testo al 29/12/2007». */
 function chipLabel(article: ArticleData): string {
@@ -85,7 +86,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     .filter((key) => key.startsWith(prefix))
     .map((key) => key.slice(prefix.length))));
   const isDesktop = useIsDesktop();
-  const { simple, practiceItems } = useSimpleReading();
+  const { simple, practiceItems, tableName } = useSimpleReading();
   const isIndex = layout === 'index';
   const isPanel = layout === 'overview';
   // Studio, Struttura and PDF as buttons beside the title: the overview's panel; on a phone and in the index they are
@@ -94,6 +95,10 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // The act's tour, on the practice's first act and once the table's own tour has been seen (when it
   // is done it hands over to this one, `PracticeTable`). Asked once: `tryStartTour` is new each render.
   const isFirstAct = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts[0]?.id === act.id);
+  // The table's only act (LC70): nothing to reorder, and folding it would leave its heading alone; as in Lettura
+  // semplice, no grip and no fold, whatever its articles. The index keeps its heading as an entry among the others.
+  const alone = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts.length === 1) && !isIndex;
+  const plain = simple || alone;
   // A dossier's table (LC54): no tour of the practice, and no other practice to move an act to.
   const bound = useAppStore((s) => s.practices.some((p) => p.id === practiceId && isBoundPractice(p)));
   // In a dossier's «Lettura» (LC55): the act's articles in the dossier. With some, «Rimuovi l'atto» becomes «Togli dal
@@ -128,14 +133,15 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
 
   const heading = actHeading(act.norma);
   const byKey = useMemo(() => new Map(act.articles.map((a) => [practiceArticleKey(a), a])), [act.articles]);
-  // The row the block reads from (Studio, the arrows, the annex): the last one opened, else the first.
-  const current = useMemo(() => {
+  // The row the block reads from (Studio, the arrows, the annex): the last one opened, else the first. Only an open one
+  // is the index's current chip (LC70): one chip marked, not every open row.
+  const activeKey = useMemo(() => {
     for (let i = openKeys.length - 1; i >= 0; i--) {
-      const hit = byKey.get(openKeys[i]);
-      if (hit) return hit;
+      if (byKey.has(openKeys[i])) return openKeys[i];
     }
-    return act.articles[0];
-  }, [openKeys, byKey, act.articles]);
+    return null;
+  }, [openKeys, byKey]);
+  const current = (activeKey && byKey.get(activeKey)) || act.articles[0];
   const studyArticle = (studyKey && byKey.get(studyKey)) || current;
   // Study Mode's tools write notes keyed by the article, not the version: never on a past text (gotcha 32).
   const isLocked = (article: ArticleData | undefined) =>
@@ -196,6 +202,31 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
 
   const annexes = treeMetadata?.annexes && treeMetadata.annexes.length > 1 ? treeMetadata.annexes : null;
   const showNavigation = (allArticleIds && allArticleIds.length > 1) || act.articles.length > 1;
+  // Where the selector stands (LC70, Luca): with one article at the end of its status line, the rule under both; with
+  // more, on a computer, at the right of the act's heading; on a phone with more, first in the index's line.
+  const navigation = (className: string) => (
+    <ArticleNavigation
+      className={className}
+      allArticleIds={allArticleIds}
+      loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
+      activeArticleId={current?.norma_data.numero_articolo || null}
+      loadingArticleId={loadingArticle}
+      onNavigate={(number) => {
+        revealPracticeArticle(practiceId, act.id, currentAnnex ? `all${currentAnnex}:${number}` : number);
+      }}
+      onLoadArticle={(number) => openArticle(number)}
+    />
+  );
+  const loadingStatus = loadingArticle && (
+    <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+      <Loader2 size={12} aria-hidden className="animate-spin text-primary-600 dark:text-primary-400" />
+      Caricamento…
+    </span>
+  );
+  const navInHead = showNavigation && !simple && toolsShown;
+  const statusEnd = simple && (showNavigation || loadingArticle)
+    ? <>{loadingStatus}{showNavigation && navigation('-mr-3 shrink-0 md:-mr-1')}</>
+    : undefined;
 
   return (
     <section
@@ -229,7 +260,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           // first; four 44 px buttons took a row of their own), from `md` the tools beside it. Sticky from `md`
           // only: on a phone, with an open row's toolbar pinned under it, the two took half the screen. In the index
           // it pins nothing: the acts are a few lines each, and their headings would stack.
-          'practice-act-head relative flex items-start gap-1 border-b border-slate-200 bg-slate-50 py-1 md:items-center md:gap-2 dark:border-slate-800 dark:bg-slate-950',
+          'practice-act-head relative flex items-start gap-1 border-slate-200 bg-slate-50 py-1 md:items-center md:gap-2 dark:border-slate-800 dark:bg-slate-950',
+          // Lettura semplice (LC70): the one rule is under the status line and the selector, not here.
+          !simple && 'border-b',
           isIndex ? 'md:py-1' : cn('md:sticky md:top-0 md:py-2', Z_INDEX.stickyHead),
         )}
       >
@@ -240,12 +273,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {...listeners}
           aria-label={`Sposta ${heading}`}
           // Lettura semplice (LC28): one act, nothing to reorder.
-          className={cn(simple ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
+          className={cn(plain ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
         {/* In the overview the title gives way and the tools follow it, not the row's far end (U2). */}
         <div className={cn('min-w-0 flex-1 py-1', isPanel && 'md:flex-initial')}>
+          {/* One act (LC68): the table's name, small, over the act's title; the act's head is the only one. */}
+          {!isIndex && tableName}
           {/* The accordion pattern: the heading holds the toggle, its name is the act's own words. */}
           <h3 className="min-w-0">
             <div
@@ -266,7 +301,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 isIndex ? 'text-[17px]' : 'text-[22px]',
               )}
             >
-              {!simple && (
+              {!plain && (
                 <ChevronDown
                   size={16}
                   aria-hidden
@@ -281,7 +316,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {/* On a phone only what the count does not say: the act's articles are its rows and its index, just below. The
               index says neither: its entries are the articles. */}
           {!isIndex && (
-            <p className={cn(simple ? 'ml-0' : 'ml-6', 'truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
+            <p className={cn(plain ? 'ml-0' : 'ml-6', 'truncate text-sm text-slate-600 dark:text-slate-400', !formatNormaMeta(act.norma) && 'hidden md:block')}>
               {formatNormaMeta(act.norma, act.articles.length)}
             </p>
           )}
@@ -290,6 +325,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             into the page's margin, as every icon on the column's right edge (R3b). */}
         <div className={cn('-mr-3 mt-1 flex flex-shrink-0 items-center gap-1 md:mr-0 md:mt-0', !isPanel && 'ml-auto')}>
           {/* The tools in the overview; on a phone and in the index they are entries of «⋯» (below), not drawn at all. */}
+          {navInHead && navigation('shrink-0')}
           {toolsShown && <div className="flex items-center gap-1">
             <button
               type="button"
@@ -310,7 +346,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   aria-label="Struttura della norma"
                   // It opens a window (the index): expanded, not pressed (R3b).
                   aria-expanded={isStructureWindowOpen}
-                  className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-slate-200/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-slate-800 dark:aria-expanded:text-white')}
+                  className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white')}
                 >
                   <GitBranch size={16} aria-hidden />
                   <span className="hidden lg:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>
@@ -389,11 +425,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
       {!act.isCollapsed && !isIndex && (
         <div className="py-1">
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
-          {(act.articles.length > 1 || loadingArticle || showNavigation) && (
+          {/* Lettura semplice (LC70): no line of its own; the selector and the loading are in the status line. */}
+          {!simple && (act.articles.length > 1 || loadingArticle || (showNavigation && !navInHead)) && (
             // On a phone one row: the chips scroll sideways beside the arrows (R3: two rows of chips came before the text).
+            // The arrows first, the left arrow's glyph on the text's edge (LC68: no empty half row before them).
             <div className="flex items-center gap-x-3 gap-y-1 py-1 md:flex-wrap md:py-1.5">
+              {showNavigation && !navInHead && navigation('-ml-3 shrink-0 md:-ml-1')}
               {/* A compact index, with more than one article: one alone says nothing it does not say below (R3). */}
-              {act.articles.length > 1 ? (
+              {act.articles.length > 1 && (
                 <ul aria-label={`Articoli sul tavolo di ${heading}`} className={cn('practice-act-index flex min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex-wrap md:overflow-visible', HIDDEN_SCROLLBAR)}>
                   {act.articles.map((article) => {
                     const key = practiceArticleKey(article);
@@ -402,14 +441,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                         <button
                           type="button"
                           onClick={() => revealPracticeRow(practiceId, act.id, key)}
-                          aria-current={openKeys.includes(key) ? 'true' : undefined}
+                          aria-current={key === activeKey ? 'true' : undefined}
                           className={cn(
                             'min-h-[44px] rounded-md px-2 font-medium transition-colors md:min-h-0 md:py-0.5',
                             // 14 px in a dossier's «Lettura» (LC55); the Corpus keeps its 12.
                             hostDossier ? 'text-sm' : 'text-xs',
                             // Inset: the row scrolls sideways on a phone and would clip a ring drawn outside the chip.
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
-                            openKeys.includes(key)
+                            key === activeKey
                               ? 'bg-slate-200/70 text-slate-900 dark:bg-slate-800 dark:text-white'
                               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                           )}
@@ -420,28 +459,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                     );
                   })}
                 </ul>
-              ) : (
-                // The place the index takes, so the arrows stay at the right.
-                <span aria-hidden className="flex-1" />
               )}
-              {loadingArticle && (
-                <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-                  <Loader2 size={12} aria-hidden className="animate-spin text-primary-600 dark:text-primary-400" />
-                  Caricamento…
-                </span>
-              )}
-              {showNavigation && (
-                <ArticleNavigation
-                  allArticleIds={allArticleIds}
-                  loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
-                  activeArticleId={current?.norma_data.numero_articolo || null}
-                  loadingArticleId={loadingArticle}
-                  onNavigate={(number) => {
-                    revealPracticeArticle(practiceId, act.id, currentAnnex ? `all${currentAnnex}:${number}` : number);
-                  }}
-                  onLoadArticle={(number) => openArticle(number)}
-                />
-              )}
+              {loadingStatus}
             </div>
           )}
 
@@ -471,6 +490,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 article={article}
                 onCrossReference={onCrossReference}
                 onOpenStudyMode={() => openStudy(article)}
+                statusEnd={statusEnd}
                 annexSuggestion={annexes && openKeys.includes(key) ? (
                   <AnnexSuggestion
                     className="mb-3"
@@ -500,8 +520,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         onClose={isDesktop ? closeStructureWindow : closeDrawer}
         treeData={treeData || []}
         urn={act.norma.urn || ''}
-        title="Struttura dell'atto"
+        title={structureTitle(heading)}
         loadedArticles={loadedArticleIds}
+        activeArticle={current ? getUniqueArticleId(current) : undefined}
         onArticleSelect={(articleNumber, targetAnnex) => openArticle(articleNumber, targetAnnex)}
         annexes={treeMetadata?.annexes}
         currentAnnex={currentAnnex}

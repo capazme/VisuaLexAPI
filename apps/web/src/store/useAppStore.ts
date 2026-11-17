@@ -20,11 +20,10 @@ import {
     addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
     findPracticeArticle, holdsSubject, labelOr, MAX_BESIDE, mergeDecisionEntries, practiceArticleKey,
     corpusPractices, isBoundPractice,
-    practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
+    practiceLabel, sameBesideSubject, searchTableLabel, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
     type PracticeAct, type PracticeDecision, type PracticeSubject,
 } from '../utils/practice';
-import { shortAct } from '../utils/sources';
-import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
+import { practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isDesktopViewport } from '../hooks/useIsDesktop';
 import { highlightColorName, isHighlightColor, sanitizeHighlightMeanings } from '../utils/highlightColors';
@@ -315,7 +314,7 @@ interface AppState {
     reorderPractices: (fromIndex: number, toIndex: number) => void;
     /**
      * A search's articles into a practice (T11, §5.1): `null` is the active practice, created when
-     * there is none (named `options.label ?? shortAct(norma)`) and made active; an id that names no
+     * there is none (named `options.label`, else «Ricerca del …» and today's date) and made active; an id that names no
      * practice (closed meanwhile) falls back to the same, with a `console.warn` naming it. The
      * articles join their act (`addArticles`, T2). `reveal`, `'first'` (the first article given) or
      * an article id (found through `findPracticeArticle`), opens that row and sets `pendingReveal`.
@@ -994,7 +993,7 @@ const appStore = createStore<AppState>()(
             },
 
             addArticlesToPractice: (practiceId, norma, articles, options = {}) => {
-                const landing = landingPractice(get(), practiceId, () => labelOr(options.label, shortAct(norma)), 'addArticlesToPractice');
+                const landing = landingPractice(get(), practiceId, options.label, 'addArticlesToPractice');
                 const id = landing.practice.id;
                 const { acts, actId } = addArticles(landing.practice.acts, norma, articles, uuidv4);
                 const act = acts.find((a) => a.id === actId);
@@ -1019,7 +1018,7 @@ const appStore = createStore<AppState>()(
             },
 
             addActIndexToPractice: (practiceId, norma) => {
-                const landing = landingPractice(get(), practiceId, () => shortAct(norma), 'addActIndexToPractice');
+                const landing = landingPractice(get(), practiceId, undefined, 'addActIndexToPractice');
                 const id = landing.practice.id;
                 const { acts, actId } = addArticles(landing.practice.acts, norma, [], uuidv4);
                 set((state) => {
@@ -1207,7 +1206,7 @@ const appStore = createStore<AppState>()(
                     ...(isDesktopViewport() ? { askerId: asked.askerId ?? windowIdOf(get(), asked.besideId) } : { reader: true }),
                 };
                 const before = get();
-                const landing = landingPractice(before, options.practiceId ?? null, () => DECISIONS_PRACTICE_LABEL, 'openDecision');
+                const landing = landingPractice(before, options.practiceId ?? null, undefined, 'openDecision');
                 const practiceId = landing.practice.id;
                 const existing = landing.practice.decisions.find((d) => sameDecision(d.reference, reference));
                 const decisionId = existing?.id ?? uuidv4();
@@ -1606,7 +1605,7 @@ const appStore = createStore<AppState>()(
                 // A topic-search window of the practice the link reads in,
                 // else the active one (T8); a phone shows it in the full-screen reader, beside nothing.
                 const before = get();
-                const landing = landingPractice(before, practiceOfPlace(before, options?.besideId), () => DECISIONS_PRACTICE_LABEL, 'openTopicSearch');
+                const landing = landingPractice(before, practiceOfPlace(before, options?.besideId), undefined, 'openTopicSearch');
                 const ref: BesideRef = { id: topicWindowId(landing.practice.id, query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
                 if (!isDesktopViewport()) {
                     const shown = before.phoneReader;
@@ -3091,12 +3090,12 @@ function newPractice(label: string, custom: boolean): Practice {
 /**
  * Where a search or the index lands (T11, §5.1): the practice `wanted` names; `null`, or an id that
  * names no practice (closed meanwhile, warned with its id), means the active practice, created when
- * there is none (named `label()`) and then made active. Pure over the plain state.
+ * there is none (named `label`, else «Ricerca del …» and today's date, LC68) and then made active. Pure over the plain state.
  */
 function landingPractice(
     state: Pick<AppState, 'practices' | 'activePracticeId'>,
     wanted: string | null,
-    label: () => string,
+    label: string | undefined,
     caller: string,
 ): { practices: Practice[]; practice: Practice; activePracticeId: string | null } {
     const { practices, activePracticeId } = state;
@@ -3107,7 +3106,7 @@ function landingPractice(
     }
     const active = practices.find((p) => p.id === activePracticeId);
     if (active) return { practices, practice: active, activePracticeId };
-    const created = newPractice(label(), false);
+    const created = newPractice(labelOr(label, searchTableLabel(new Date())), false);
     return { practices: [...practices, created], practice: created, activePracticeId: created.id };
 }
 

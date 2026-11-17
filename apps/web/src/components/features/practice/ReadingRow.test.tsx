@@ -50,7 +50,7 @@ import { closeFindWindow, openFindWindow, setFindWindowDefaultPlace } from '../.
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { CommandPalette } from '../search/CommandPalette';
 import { FOUND, L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
-import { besideRefFor, practiceArticleKey, type BesideRef } from '../../../utils/practice';
+import { besideRefFor, practiceArticleKey, searchTableLabel, type BesideRef } from '../../../utils/practice';
 import { ReadingRow } from './ReadingRow';
 import { FOCUS_BUTTON_CLEARANCE } from '../../layout/PageFrame';
 
@@ -455,7 +455,7 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     practiceWithWindows(2);
     render(row());
     const rail = screen.getByTestId('practice-rail');
-    expect(rail).toHaveAccessibleName('Pratica l. 24/2017');
+    expect(rail).toHaveAccessibleName(`Pratica ${searchTableLabel(new Date())}`);
     expect(rail).toHaveAttribute('aria-expanded', 'false');
     expect(within(rail).getByTestId('practice-rail-count')).toHaveTextContent('3');
     expect(screen.getByTestId('practice-table')).not.toBeVisible();

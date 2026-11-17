@@ -6,6 +6,7 @@ import { Star, Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { ArticleTabContent } from '../search/ArticleTabContent';
+import { StatusLineEnd } from '../search/statusLineEnd';
 import { articleLabel } from '../dossier/dossierLayout';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
@@ -25,6 +26,8 @@ export interface PracticeArticleRowProps {
   onOpenStudyMode: () => void;
   /** Drawn inside the open row, above the text: the annex suggestion that concerns this article. */
   annexSuggestion?: ReactNode;
+  /** Lettura semplice (LC70): the act's article selector, at the end of the text's status line. */
+  statusEnd?: ReactNode;
 }
 
 /**
@@ -34,7 +37,7 @@ export interface PracticeArticleRowProps {
  * (`practiceRows`, T15), so a reveal opens it from anywhere.
  */
 export function PracticeArticleRow({
-  practiceId, actId, article, onCrossReference, onOpenStudyMode, annexSuggestion,
+  practiceId, actId, article, onCrossReference, onOpenStudyMode, annexSuggestion, statusEnd,
 }: PracticeArticleRowProps) {
   const { simple } = useSimpleReading();
   const articleKey = practiceArticleKey(article);
@@ -136,7 +139,9 @@ export function PracticeArticleRow({
           </p>
         )}
         {annexSuggestion}
-        {reader}
+        {/* A text still coming has no status line: the selector waits on its own, to the right. */}
+        {textState && statusEnd && <div className="flex justify-end">{statusEnd}</div>}
+        <StatusLineEnd.Provider value={statusEnd ?? null}>{reader}</StatusLineEnd.Provider>
       </div>
     );
   }

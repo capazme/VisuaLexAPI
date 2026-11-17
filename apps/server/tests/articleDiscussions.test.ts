@@ -277,7 +277,7 @@ describe('article discussions', () => {
       articleUrn: 'urn:art10',
       textHash: 'c'.repeat(64),
       commentCount: 1, // Only 1 visible comment!
-      user: { id: alice.id, username: alice.username },
+      user: { id: null, name: alice.username, identity: 'username', username: alice.username },
     });
 
     expect(res.body.data[1]).toMatchObject({
@@ -287,7 +287,7 @@ describe('article discussions', () => {
       articleUrn: null,
       textHash: null,
       commentCount: 0,
-      user: { id: bob.id, username: bob.username },
+      user: { id: null, name: bob.username, identity: 'username', username: bob.username },
     });
   });
 });

@@ -1187,6 +1187,25 @@
   }
 }
 
+/* The ground under the pointer of the sections' tabs (Work, Learn, Forum, Labs; `SectionTabs`), the one source for a
+   row of commands (LC72): a colour, no slide. Unlayered, so it beats a button's own `hover:bg-*`. A pressed or open
+   button keeps its ground still; a disabled one does not answer; the keyboard's focus takes the same ground beside its
+   ring. Only colour moves, so reduced motion (the base layer's rule) leaves it as it is: nothing slides. */
+.vlx-hover-tile {
+  transition-property: color, background-color;
+  transition-duration: 100ms;
+  transition-timing-function: var(--ease-out);
+}
+.vlx-hover-tile:not(:disabled, [aria-pressed="true"], [aria-expanded="true"]):focus-visible {
+  @apply bg-ink-200/70 dark:bg-ink-800/60;
+}
+/* No ground left behind by a tap on a touch screen. */
+@media (hover: hover) {
+  .vlx-hover-tile:not(:disabled, [aria-pressed="true"], [aria-expanded="true"]):hover {
+    @apply bg-ink-200/70 dark:bg-ink-800/60;
+  }
+}
+
 @media print {
   .vlx-gloss-column {
     display: none;
@@ -1405,6 +1424,10 @@
    wins over the utilities' `--tw-shadow`. */
 .dark :is(.shadow-lg, .shadow-xl, .shadow-2xl) {
   --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px -12px rgb(0 0 0 / 0.7);
+}
+/* The search island (LC69): its own border is the hairline, the pill's; the ring would draw a second edge around it. */
+.dark [data-island-shape] {
+  --tw-shadow: 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px -12px rgb(0 0 0 / 0.7);
 }
 .dark .shadow-md {
   --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 2px 4px rgb(0 0 0 / 0.25), 0 10px 26px -10px rgb(0 0 0 / 0.6);

@@ -27,6 +27,7 @@ import { PracticeNotice } from './PracticeParts';
 import { subscribeSearchField } from '../../../utils/searchFieldControl';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FOUND, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
+import { searchTableLabel } from '../../../utils/practice';
 
 const s = () => appStore.getState();
 const table = (streaming: Parameters<typeof PracticeTable>[0]['streaming'] = null, layout: 'overview' | 'index' = 'overview') =>
@@ -50,10 +51,31 @@ describe('PracticeTable (spec §3.1)', () => {
     const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().openDecision(FOUND, { practiceId, open: false });
     render(table());
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('l. 24/2017');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
     expect(screen.getByText('1 atto · 2 articoli · 1 sentenza')).toBeInTheDocument();
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
+  });
+
+  it('one act: one head, the act\'s, the table\'s name small over its title, one «⋯» with both menus (LC68)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    render(table());
+    const head = screen.getByRole('region', { name: 'l. 8 marzo 2017, n. 24' }).querySelector('header')!;
+    expect(within(head).getAllByRole('button', { name: /^(Azioni su|Altre azioni per) / })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Altre azioni per / })).toBeNull();
+    expect(within(head).getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
+    fireEvent.click(within(head).getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
+    expect(screen.getByRole('menuitem', { name: 'Rinomina' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Chiudi il tavolo' })).toBeInTheDocument();
+    // The name's field: 16 px on a phone, so Safari does not zoom (LC70).
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rinomina' }));
+    expect(screen.getByRole('textbox', { name: 'Nome del tavolo' })).toHaveClass('text-base', 'md:text-xs');
+  });
+
+  it('one act of two articles keeps the card of one article: the same measure, not the whole frame (LC70)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    render(table());
+    expect(screen.getByTestId('practice-table')).toHaveClass('max-w-[44rem]');
   });
 
   it('switching the active practice switches the table', () => {
@@ -62,7 +84,7 @@ describe('PracticeTable (spec §3.1)', () => {
     render(table());
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Altra');
     act(() => { s().setActivePractice(s().practices[0].id); });
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('l. 24/2017');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
     void other;
   });
 
@@ -166,14 +188,16 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Responsabilità medica');
     const { unmount } = render(table());
     expect(screen.queryByRole('button', { name: 'Salva come dossier' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Responsabilità medica' }));
+    // One act (LC68): no head of the table; its «⋯» rides the act's.
+    expect(screen.queryByRole('button', { name: /^Altre azioni per / })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.queryByRole('menuitem', { name: 'Salva come dossier' })).toBeNull();
     expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeInTheDocument();
     unmount();
     s().closePractice(practiceId);
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: /^Azioni su / }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.queryByRole('menuitem', { name: 'Salva come dossier' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'Nuova pratica' })).toBeNull();
   });
@@ -183,7 +207,7 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).getByRole('button', { name: /Esistente/ }));
     expect(await screen.findByText('Salvato nella pratica «Esistente»: 2 articoli')).toBeInTheDocument();
@@ -198,10 +222,10 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Appalti');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Appalti' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).getByRole('button', { name: /Esistente/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Appalti' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeDisabled();
     await act(async () => { finish({ id: 'srv-i', item_type: 'norm', title: 't', content: {}, position: 0, status: 'unread', created_at: '2026-10-12T00:00:00Z' }); });
     const message = await screen.findByText(/^Salvato nella pratica «Esistente»/);
@@ -216,7 +240,7 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    const trigger = screen.getByRole('button', { name: 'Altre azioni per Pratica' });
+    const trigger = screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
     const dialog = screen.getByRole('dialog', { name: 'Aggiungi a una pratica' });

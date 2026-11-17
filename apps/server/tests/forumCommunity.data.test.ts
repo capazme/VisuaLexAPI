@@ -45,9 +45,11 @@ describe('the Community’s data', () => {
       const threadId = await writeGlossa(alice);
       await reply(bob, threadId, 'Risposta di Bob');
       await reply(alice, threadId, 'Alice risponde a Bob');
-      await request(app).post(`/api/article-discussions/${threadId}/vote`).set(authHeader(alice));
+      await request(app).post(`/api/article-discussions/${threadId}/vote`).set(authHeader(carla));
       await request(app).post(`/api/article-discussions/${threadId}/vote`).set(authHeader(bob));
       const bobThread = await writeGlossa(bob, 'La glossa di Bob');
+      // Alice's own vote, on Bob's glossa, goes with her account.
+      await request(app).post(`/api/article-discussions/${bobThread}/vote`).set(authHeader(alice));
       await request(app).post(`/api/article-discussions/${bobThread}/report`).set(authHeader(alice)).send({ reason: 'spam' });
 
       await deleteAccount(alice);
@@ -55,7 +57,8 @@ describe('the Community’s data', () => {
       const listed = await request(app).get('/api/article-discussions').set(authHeader(bob)).query(ARTICLE);
       expect(listed.status).toBe(200);
       const glossa = listed.body.data.find((thread: { id: string }) => thread.id === threadId);
-      expect(glossa).toMatchObject({ user: { id: null, username: 'utente cancellato' }, isOwner: false, voteCount: 1 });
+      expect(glossa).toMatchObject({ user: { id: null, username: 'utente cancellato', score: null }, isOwner: false, voteCount: 2 });
+      expect(listed.body.data.find((thread: { id: string }) => thread.id === bobThread)).toMatchObject({ voteCount: 0, score: 0 });
       expect(glossa.comments.map((comment: { body: string; user: { username: string }; isOwner: boolean }) => [comment.body, comment.user.username, comment.isOwner]))
         .toEqual([['Risposta di Bob', bob.username, true], ['Alice risponde a Bob', 'utente cancellato', false]]);
 
@@ -159,7 +162,7 @@ describe('the Community’s data', () => {
       const readRecently = await notification(daysAgo(10));
       const unread = await notification(null);
 
-      expect(await sweepCommunity(now)).toEqual({ reportCopies: 2, notifications: 1 });
+      expect(await sweepCommunity(now)).toEqual({ reportCopies: 2, notifications: 1, profileReportDetails: 0 });
 
       const copy = async (id: string) => (await prisma.articleThreadReport.findUniqueOrThrow({ where: { id } })).reportedText;
       expect(await copy(old.id)).toBeNull();

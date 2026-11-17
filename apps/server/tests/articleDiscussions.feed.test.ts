@@ -52,7 +52,7 @@ describe('the Forum feed of glosse', () => {
     expect(item).toMatchObject({
       title: 'Una glossa', excerpt: 'Il testo della glossa.', normaKey: 'codice-civile--2043', articleId: '2043',
       articleLabel: '2043', version: 'vigente', articleUrn: URN, target: { kind: 'article' }, decisionLabel: null,
-      passage: null, user: { id: alice.id, username: alice.username }, voteCount: 0, userVoted: false, replyCount: 0,
+      passage: null, user: { id: null, name: alice.username, identity: 'username', username: alice.username }, voteCount: 0, userVoted: false, replyCount: 0,
       isOwner: false,
     });
     expect(item.lastActivityAt).toBe(item.createdAt);
@@ -267,7 +267,7 @@ describe('one glossa', () => {
     // Its author still reads the hidden reply, with the moderation's notice (§5.7).
     const author = await get(bob, thread.id);
     expect(author.body.isOwner).toBe(false);
-    expect(author.body.replies.map((c: { body: string; hidden: unknown }) => [c.body, c.hidden])).toEqual([['Visibile.', null], ['Nascosta.', { category: null }]]);
+    expect(author.body.replies.map((c: { body: string; hidden: unknown }) => [c.body, c.hidden])).toEqual([['Visibile.', null], ['Nascosta.', { category: null, appeal: null }]]);
   });
 
   it('withholds a decision’s quotation as the feed does', async () => {
