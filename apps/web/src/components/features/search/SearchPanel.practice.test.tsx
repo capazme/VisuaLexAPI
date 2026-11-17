@@ -463,7 +463,8 @@ describe('SearchPanel with the practices: the phone\'s full-screen reader (spec 
     await screen.findByTestId('reading-full-screen');
     act(() => { s().triggerMultiSearch(searchesIntoOnePractice(dossier, computeNormaGroups(dossier.items), true)); });
     await waitFor(() => expect(screen.queryByTestId('reading-full-screen')).toBeNull());
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Ricorso Rossi');
+    // LC68: the table has no name on screen; the one shown is the active one.
+    expect(s().practices.find((x) => x.id === s().activePracticeId)?.label).toBe('Ricorso Rossi');
     await waitFor(() => expect(s().practices.find((x) => x.label === 'Ricorso Rossi')?.acts[0]?.articles).toHaveLength(1));
     expect(s().phoneReader).toBeNull();
   });

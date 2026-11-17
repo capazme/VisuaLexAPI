@@ -1,3 +1,5 @@
+import { X } from 'lucide-react';
+import type { MenuItem } from '../../ui/MenuButton';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { notify } from '../../ui/notifications/notifications';
 import { appStore } from '../../../store/useAppStore';
@@ -75,4 +77,15 @@ export function removePracticeActWithUndo(practiceId: string, actId: string): vo
     },
     message: 'Atto tolto dal tavolo',
   });
+}
+
+/** LC60: the Ricerca's table is not a «pratica» (that is a dossier now): it is closed as the reading table it is. */
+export const CLOSE_TABLE = 'Chiudi il tavolo';
+
+/** The table's «⋯» as entries of its one act's «⋯» (LC28, LC68): under the act's own commands, then «Chiudi il tavolo». */
+export function tableItemsForAct(saveItems: MenuItem[], practiceId: string): MenuItem[] {
+  return [
+    ...saveItems.map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item)),
+    { label: CLOSE_TABLE, icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practiceId) },
+  ];
 }

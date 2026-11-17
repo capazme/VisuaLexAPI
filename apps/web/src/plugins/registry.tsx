@@ -16,6 +16,9 @@ import type { PluginSlotName, SlotComponent } from './types';
 // `Record<string, unknown>` props at the registry boundary; the host
 // passes typed props at the call site (see <PluginSlot ... props={{...}}>),
 // and each slot component knows its own real prop shape.
+/** The article's graph side rail, «Grafo» on the reader's edge. */
+export const GRAPH_SIDE_RAIL = false;
+
 const slotComponents: SlotComponent<Record<string, unknown>>[] = [
     {
         id: 'merlt-article-tracker',
@@ -31,13 +34,15 @@ const slotComponents: SlotComponent<Record<string, unknown>>[] = [
         component: GlobalMerltSlot as unknown as React.ComponentType<Record<string, unknown>>,
         requiredFlag: 'VITE_FEATURE_MERLT',
     },
-    {
+    // shortcut: the graph is off for now (Luca, 17-11, LC68): its tab no longer sits on the reader. Set
+    // GRAPH_SIDE_RAIL to true to bring it back under its flags.
+    ...(GRAPH_SIDE_RAIL ? [{
         id: 'merlt-article-graph-side-rail',
         pluginId: 'visualex-merlt',
-        slot: 'article_sidebar',
+        slot: 'article_sidebar' as const,
         component: ArticleGraphSideRail as unknown as React.ComponentType<Record<string, unknown>>,
         requiredFlag: 'VITE_FEATURE_MERLT_GRAPH',
-    },
+    }] : []),
 ];
 
 /**

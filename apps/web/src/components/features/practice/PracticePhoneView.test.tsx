@@ -46,7 +46,6 @@ const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero:
 
 const s = () => appStore.getState();
 const view = () => <PracticePhoneView onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} />;
-const title = () => screen.getByRole('heading', { level: 2 }).textContent;
 
 beforeEach(() => {
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
@@ -63,14 +62,13 @@ afterEach(() => {
 });
 
 describe('PracticePhoneView (spec §8, P3)', () => {
-  it('the header names the practice, no list behind it (LC60), and the column follows the active practice (R3: no carousel)', async () => {
+  it('no list of practices behind the head (LC60), and the column follows the active practice (R3: no carousel)', async () => {
     const first = s().createPractice('Prima');
     s().addArticlesToPractice(first, L24, [article(L24, '5')]);
     const second = s().createPractice('Seconda');
     s().addArticlesToPractice(second, L241, [article(L241, '2')]);
     s().setActivePractice(first);
     render(view());
-    expect(title()).toBe('Prima');
     expect(screen.queryByRole('button', { name: 'Pratica precedente' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Pratica \d: / })).toBeNull();
     expect(screen.getByRole('region', { name: 'l. 8 marzo 2017, n. 24' })).toBeInTheDocument();
@@ -78,7 +76,28 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     expect(screen.queryByTitle('Elenco delle pratiche')).toBeNull();
     act(() => { s().setActivePractice(second); });
     expect(screen.queryByRole('region', { name: 'l. 8 marzo 2017, n. 24' })).toBeNull();
-    await waitFor(() => expect(title()).toBe('Seconda'));
+    await waitFor(() => expect(screen.getByRole('region', { name: /241/ })).toBeInTheDocument());
+  });
+
+  it('one act: no head of the table, its «⋯» entries in the act\'s «⋯», whatever the act\'s articles (LC68)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    render(view());
+    expect(screen.queryByRole('button', { name: /^Altre azioni per / })).toBeNull();
+    expect(screen.queryByText(/1 atto/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
+    expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Chiudi il tavolo' })).toBeInTheDocument();
+  });
+
+  it('two acts: one head, the count and «⋯», no abbreviation as a name (LC68)', () => {
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().addArticlesToPractice(practiceId, L241, [article(L241, '2')]);
+    render(view());
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+    expect(screen.getByText('2 atti · 2 articoli')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Altre azioni per / })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
+    expect(screen.queryByRole('menuitem', { name: 'Chiudi il tavolo' })).toBeNull();
   });
 
   it('rows open in place: a reveal from the store opens the row on the phone too', () => {
@@ -105,13 +124,12 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     expect(s().practiceNotice).toBe(notice);
   });
 
-  it('sits at the layout\'s edge, no step of its own, and writes a short name whole (R3b)', () => {
+  it('sits at the layout\'s edge, no step of its own (R3b)', () => {
     s().createPractice('c.c.');
     const { container } = render(view());
     // The column and the head add no side padding: the text starts 16 px from the screen's edges.
     expect(container.querySelector('.space-y-4')!.className).not.toMatch(/\bpx-/);
-    expect(screen.getByRole('heading', { level: 2 }).parentElement!.parentElement!.className).not.toMatch(/\bpx-/);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('c.c.');
+    expect(screen.getByRole('button', { name: /^Altre azioni per / }).closest('.border-b')!.className).not.toMatch(/\bpx-/);
   });
 
   it('the header\'s one control is «⋯», a 44 px target; no «Salva come dossier» (LC60)', () => {
@@ -262,15 +280,12 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(open.querySelector('span')).toHaveClass('hidden', 'md:inline');
   });
 
-  it('the count sits after the name, on its row, in the part that gives way to the buttons (R3)', () => {
+  it('the count fills its row and gives way to «⋯», its words in its title (R3)', () => {
     withArticleAndDecision();
     render(view());
     const count = screen.getByText(/1 atto · 1 articolo · 1 sentenza/);
-    expect(count.parentElement).toContainElement(screen.getByRole('heading', { level: 2 }));
-    expect(count.parentElement).not.toContainElement(screen.getByRole('button', { name: /^Altre azioni per / }));
-    expect(count.parentElement).toHaveClass('min-w-0', 'flex-1');
-    // The name keeps its room; the count gives way, its words in its title.
-    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('shrink-0');
+    expect(count).not.toContainElement(screen.getByRole('button', { name: /^Altre azioni per / }));
+    expect(count).toHaveClass('min-w-0', 'flex-1', 'truncate');
     expect(count).toHaveAttribute('title', '1 atto · 1 articolo · 1 sentenza');
   });
 
@@ -371,7 +386,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     appStore.setState({ phoneReader: { practiceId, ref: besideRefFor({ kind: 'article', actId, articleKey }) }, activePracticeId: other });
     render(view());
     expect(screen.queryByTestId('reading-full-screen')).toBeNull();
-    expect(title()).toBe('Altra');
+    expect(screen.getByText('Pratica vuota')).toBeInTheDocument();
   });
 
   it('the saved scroll belongs to its practice: another practice comes back from its reader at the top', () => {

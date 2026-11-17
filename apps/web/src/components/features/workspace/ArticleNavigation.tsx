@@ -20,9 +20,8 @@ interface ArticleNavigationProps {
 }
 
 /**
- * Navigation arrows with position counter for article navigation.
- * Supports navigation through full structure, loading articles on demand.
- * Double-click on the counter to manually enter an article number.
+ * Navigation arrows around the article's own number («Art. 2043»), through the full structure, loading articles on
+ * demand. A tap on the number opens a field to write another one (LC68: a phone has no double click).
  */
 export function ArticleNavigation({
   allArticleIds,
@@ -95,12 +94,13 @@ export function ArticleNavigation({
   const isLoading = !!loadingArticleId;
   const isPrevLoading = prevId && loadingArticleId && normalizeArticleId(prevId) === normalizeArticleId(loadingArticleId);
   const isNextLoading = nextId && loadingArticleId && normalizeArticleId(nextId) === normalizeArticleId(loadingArticleId);
+  // The arrows name the article they lead to; one not yet on the table says it is loaded (LC68: no dot).
+  const arrowLabel = (id: string | null, loading: unknown, willLoad: unknown, none: string) =>
+    loading ? 'Caricamento…' : !id ? none : willLoad ? `Carica Art. ${id}` : `Art. ${id}`;
+  const prevLabel = arrowLabel(prevId, isPrevLoading, prevWillLoad, 'Nessun articolo precedente');
+  const nextLabel = arrowLabel(nextId, isNextLoading, nextWillLoad, 'Nessun articolo successivo');
 
-  // Show structure info
-  const hasStructure = allArticleIds && allArticleIds.length > loadedArticleIds.length;
-
-  // Handle double-click to edit
-  const handleDoubleClick = () => {
+  const startEditing = () => {
     setInputValue(activeArticleId || '');
     setIsEditing(true);
   };
@@ -147,23 +147,17 @@ export function ArticleNavigation({
         onClick={handlePrev}
         disabled={isFirst || isLoading}
         className={cn(
-          "relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
+          "flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
           isFirst || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
-            : prevWillLoad
-              ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
-              : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
         )}
-        title={isPrevLoading ? 'Caricamento…' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
-        aria-label={isPrevLoading ? 'Caricamento…' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
+        aria-label={prevLabel}
       >
         {isPrevLoading ? (
           <Loader2 size={16} className="animate-spin text-primary-500" />
         ) : (
           <ChevronLeft size={16} aria-hidden />
-        )}
-        {prevWillLoad && !isPrevLoading && (
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />
         )}
       </button>
 
@@ -175,25 +169,20 @@ export function ArticleNavigation({
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleInputSubmit}
           onKeyDown={handleKeyDown}
-          className="w-16 text-xs font-medium text-center bg-white dark:bg-slate-800 border border-primary-500 rounded-md px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+          aria-label="Numero dell'articolo"
+          enterKeyHint="go"
+          className="h-11 w-20 rounded-md border border-slate-300 bg-white px-2 text-center text-sm font-medium tabular-nums text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 md:h-7 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           placeholder="Art."
         />
       ) : (
-        <span
-          onDoubleClick={handleDoubleClick}
-          className={cn(
-            "text-xs font-medium min-w-[50px] text-center tabular-nums cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-1 rounded-md transition-colors select-none",
-            hasStructure
-              ? "text-primary-600 dark:text-primary-400 font-semibold"
-              : "text-slate-500 dark:text-slate-400"
-          )}
-          title="Doppio click per inserire articolo"
+        <button
+          type="button"
+          onClick={startEditing}
+          aria-label={activeArticleId ? `Art. ${activeArticleId}, scrivi un altro numero` : 'Scrivi il numero di un articolo'}
+          className="flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 text-sm font-medium tabular-nums text-slate-900 transition-colors hover:bg-slate-100 md:min-h-0 md:py-0.5 dark:text-white dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
         >
-          {currentIndex + 1}
-          {/* The separator of «2133 / 3249», readable (M1: it was 1,4:1). */}
-          <span className="text-slate-500 dark:text-slate-400 mx-1">/</span>
-          {navigationIds.length}
-        </span>
+          Art. {activeArticleId ?? '…'}
+        </button>
       )}
 
       <button
@@ -201,23 +190,17 @@ export function ArticleNavigation({
         onClick={handleNext}
         disabled={isLast || isLoading}
         className={cn(
-          "relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
+          "flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
           isLast || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
-            : nextWillLoad
-              ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
-              : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
         )}
-        title={isNextLoading ? 'Caricamento…' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
-        aria-label={isNextLoading ? 'Caricamento…' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
+        aria-label={nextLabel}
       >
         {isNextLoading ? (
           <Loader2 size={16} className="animate-spin text-primary-500" />
         ) : (
           <ChevronRight size={16} aria-hidden />
-        )}
-        {nextWillLoad && !isNextLoading && (
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />
         )}
       </button>
     </div>

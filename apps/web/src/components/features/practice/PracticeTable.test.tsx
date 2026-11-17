@@ -166,14 +166,16 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Responsabilità medica');
     const { unmount } = render(table());
     expect(screen.queryByRole('button', { name: 'Salva come dossier' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Responsabilità medica' }));
+    // One act (LC68): no head of the table; its «⋯» rides the act's.
+    expect(screen.queryByRole('button', { name: /^Altre azioni per / })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.queryByRole('menuitem', { name: 'Salva come dossier' })).toBeNull();
     expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeInTheDocument();
     unmount();
     s().closePractice(practiceId);
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: /^Azioni su / }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.queryByRole('menuitem', { name: 'Salva come dossier' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'Nuova pratica' })).toBeNull();
   });
@@ -183,7 +185,7 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).getByRole('button', { name: /Esistente/ }));
     expect(await screen.findByText('Salvato nella pratica «Esistente»: 2 articoli')).toBeInTheDocument();
@@ -198,10 +200,10 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Appalti');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Appalti' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a una pratica' })).getByRole('button', { name: /Esistente/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per Appalti' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     expect(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' })).toBeDisabled();
     await act(async () => { finish({ id: 'srv-i', item_type: 'norm', title: 't', content: {}, position: 0, status: 'unread', created_at: '2026-10-12T00:00:00Z' }); });
     const message = await screen.findByText(/^Salvato nella pratica «Esistente»/);
@@ -216,7 +218,7 @@ describe('PracticeTable: «Aggiungi a una pratica…» (spec §7; LC60: no «Sal
     s().renamePractice(practiceId, 'Pratica');
     appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
     render(table());
-    const trigger = screen.getByRole('button', { name: 'Altre azioni per Pratica' });
+    const trigger = screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a una pratica…' }));
     const dialog = screen.getByRole('dialog', { name: 'Aggiungi a una pratica' });

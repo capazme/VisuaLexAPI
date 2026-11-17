@@ -19,7 +19,7 @@ vi.mock('../../features/merlt/graph/side-rail/ArticleGraphSideRail', () => ({
   ArticleGraphSideRail: () => null,
 }));
 
-import { getSlotComponents } from '../registry';
+import { GRAPH_SIDE_RAIL, getSlotComponents } from '../registry';
 import { PluginSlot } from '../PluginSlot';
 
 beforeEach(() => {
@@ -58,10 +58,9 @@ describe('getSlotComponents', () => {
     expect(getSlotComponents('article_content_after')).toHaveLength(0);
   });
 
-  it('hides the graph side rail with MERL-T off, even with its own flag on', () => {
+  it('mounts no graph side rail while the graph is off (LC68), whatever its flags', () => {
     vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'true');
-    expect(getSlotComponents('article_sidebar')).toHaveLength(1);
-    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    expect(GRAPH_SIDE_RAIL).toBe(false);
     expect(getSlotComponents('article_sidebar')).toHaveLength(0);
   });
 
@@ -70,13 +69,6 @@ describe('getSlotComponents', () => {
     expect(isMerltGraphEnabled()).toBe(true);
     vi.stubEnv('VITE_FEATURE_MERLT', 'false');
     expect(isMerltGraphEnabled()).toBe(false);
-  });
-
-  it('registers the graph side rail on article_sidebar gated by VITE_FEATURE_MERLT_GRAPH', () => {
-    const components = getSlotComponents('article_sidebar');
-    expect(components).toHaveLength(1);
-    expect(components[0].id).toBe('merlt-article-graph-side-rail');
-    expect(components[0].requiredFlag).toBe('VITE_FEATURE_MERLT_GRAPH');
   });
 
   it('excludes the side rail when VITE_FEATURE_MERLT_GRAPH=false', () => {

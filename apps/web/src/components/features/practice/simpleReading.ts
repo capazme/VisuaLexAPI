@@ -10,7 +10,13 @@ import type { Practice } from '../../../utils/practice';
  * the act's «⋯». A second article, act or decision brings the full table back.
  */
 export function isSimplePractice(practice: Practice): boolean {
-  return practice.acts.length === 1 && practice.acts[0].articles.length === 1 && practice.decisions.length === 0 && practice.beside.length === 0;
+  return isOneActPractice(practice) && practice.acts[0].articles.length === 1;
+}
+
+/** One act and nothing else (LC68): its heading names the table, so the table's own head is not drawn and its «⋯»
+ *  rides the act's, whatever the act's articles. */
+export function isOneActPractice(practice: Practice): boolean {
+  return practice.acts.length === 1 && practice.decisions.length === 0 && practice.beside.length === 0;
 }
 
 export interface SimpleReading {
