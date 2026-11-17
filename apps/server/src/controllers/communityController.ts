@@ -11,9 +11,10 @@ import { notify } from '../forum/notify';
 import { readRoles } from '../forum/roles';
 import { readReportReason } from '../forum/reportReasons';
 import {
-  ACCEPTED_SELECT, LISTED_THREAD, VISIBLE, VISIBLE_REPLY, acceptedId, authorView, decisionLabel, excerpt,
-  isOwn, isPassageWithheld, isVisible, type Viewer,
+  ACCEPTED_SELECT, LISTED_THREAD, NO_AUTHOR, VISIBLE, VISIBLE_REPLY, acceptedId, authorView, decisionLabel, excerpt,
+  isOwn, isPassageWithheld, isVisible, type Scores, type Viewer,
 } from '../forum/views';
+import { castVote, personalScores, voteSummary, voteSummaryOf, type VoteValue } from '../forum/votes';
 import { COMMENT_MAX, REPLY_MAX, materiaSchema, parsePaging } from './articleDiscussionController';
 
 // The Forum's Community (spec docs/superpowers/specs/2026-10-20-forum-community-glosse-design.md): the
@@ -77,6 +78,7 @@ const feedSelect = (viewerId: string) => ({
   body: true,
   userId: true,
   materia: true,
+  score: true,
   createdAt: true,
   lastActivityAt: true,
   editedAt: true,
@@ -85,7 +87,7 @@ const feedSelect = (viewerId: string) => ({
   acceptedCommentId: true,
   acceptedComment: ACCEPTED_SELECT,
   user: { select: { id: true, username: true } },
-  votes: { where: { userId: viewerId }, select: { id: true } },
+  votes: { where: { userId: viewerId }, select: { value: true } },
   _count: { select: { votes: true, comments: { where: VISIBLE_REPLY } } },
 }) satisfies Prisma.ArticleThreadSelect;
 
@@ -97,7 +99,7 @@ function target(thread: { targetKind: string; decisionKey: string | null }) {
     : { kind: 'article' as const };
 }
 
-function feedItemView(thread: FeedRow, viewer: Viewer) {
+function feedItemView(thread: FeedRow, viewer: Viewer, scores: Scores) {
   const withheld = isPassageWithheld(thread, viewer);
   return {
     id: thread.id,
@@ -111,10 +113,9 @@ function feedItemView(thread: FeedRow, viewer: Viewer) {
     target: target(thread),
     decisionLabel: decisionLabel(thread),
     passage: thread.passageQuote === null ? null : { quote: withheld ? null : thread.passageQuote, withheld },
-    user: authorView(thread),
+    user: authorView(thread, scores),
     materia: thread.materia,
-    voteCount: thread._count.votes,
-    userVoted: thread.votes.length > 0,
+    ...voteSummary(thread.score, thread._count.votes, thread.votes[0]?.value ?? 0),
     replyCount: thread._count.comments,
     acceptedCommentId: acceptedId(thread),
     createdAt: thread.createdAt,
@@ -152,7 +153,7 @@ export const listFeed = async (req: Request, res: Response) => {
   const where: Prisma.ArticleThreadWhereInput = { AND: and };
 
   const orderBy: Prisma.ArticleThreadOrderByWithRelationInput[] = query.sort === 'popular'
-    ? [{ votes: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }]
+    ? [{ score: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]
     : query.sort === 'active'
       ? [{ lastActivityAt: 'desc' }, { id: 'desc' }]
       : [{ createdAt: 'desc' }, { id: 'desc' }];
@@ -162,8 +163,9 @@ export const listFeed = async (req: Request, res: Response) => {
     prisma.articleThread.findMany({ where, select: feedSelect(viewer.id), orderBy, skip: (page - 1) * limit, take: limit }),
   ]);
 
+  const scores = await personalScores(prisma, threads.map(thread => thread.userId));
   res.json({
-    data: threads.map(thread => feedItemView(thread, viewer)),
+    data: threads.map(thread => feedItemView(thread, viewer, scores)),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 };
@@ -175,21 +177,20 @@ type CommentRow = Prisma.ArticleCommentGetPayload<{ include: { user: { select: {
  * moderation's notice to its author and to moderators, else a bare place («removed»). Emptied by its
  * author: a bare place, without the author's name.
  */
-function itemView(item: CommentRow, viewer: { id: string; isModerator: boolean }) {
+function itemView(item: CommentRow, viewer: { id: string; isModerator: boolean }, scores: Scores) {
   const own = isOwn(item.userId, viewer.id);
   const shown = item.deletedAt === null && (!item.isHidden || own || viewer.isModerator);
   return {
     id: item.id,
     parentId: item.parentId,
     body: shown ? item.body : '',
-    user: item.isHidden && !shown ? { id: null, username: '' } : authorView(item),
+    user: item.isHidden && !shown ? NO_AUTHOR : authorView(item, scores),
     createdAt: item.createdAt,
     editedAt: item.editedAt,
     deleted: item.deletedAt !== null,
     removed: item.isHidden && !shown,
     hidden: item.isHidden && shown ? { category: item.hiddenReason } : null,
-    voteCount: item.votes.length,
-    userVoted: item.votes.some(vote => vote.userId === viewer.id),
+    ...voteSummaryOf(item, viewer.id),
     isOwner: own,
   };
 }
@@ -242,11 +243,12 @@ export const getThread = async (req: Request, res: Response) => {
     .map(reply => ({ reply, comments: (commentsOf.get(reply.id) ?? []).filter(readable) }))
     .filter(({ reply, comments }) => readable(reply) || comments.length > 0)
     .sort((a, b) => (Number(b.reply.id === accepted) - Number(a.reply.id === accepted))
-      || (b.reply.votes.length - a.reply.votes.length)
+      || (b.reply.score - a.reply.score)
       || (a.reply.createdAt.getTime() - b.reply.createdAt.getTime()));
   if (thread.deletedAt !== null && !thread.comments.some(isVisible)) throw new AppError(404, 'Glossa non trovata');
 
   const withheld = isPassageWithheld(thread, viewer);
+  const scores = await personalScores(prisma, [thread.userId, ...thread.comments.map(comment => comment.userId)]);
   res.json({
     id: thread.id,
     normaKey: thread.normaKey,
@@ -265,7 +267,7 @@ export const getThread = async (req: Request, res: Response) => {
     passageReleased: thread.passageReleasedAt !== null,
     articleUrn: thread.articleUrn,
     textHash: thread.textHash,
-    user: authorView(thread),
+    user: authorView(thread, scores),
     materia: thread.materia,
     createdAt: thread.createdAt,
     lastActivityAt: thread.lastActivityAt,
@@ -274,14 +276,13 @@ export const getThread = async (req: Request, res: Response) => {
     locked: thread.lockedAt !== null,
     hidden: thread.isHidden ? { category: thread.hiddenReason } : null,
     acceptedCommentId: accepted,
-    voteCount: thread.votes.length,
-    userVoted: thread.votes.some(vote => vote.userId === viewerId),
+    ...voteSummaryOf(thread, viewerId),
     replyCount: thread.comments.filter(comment => comment.parentId === null && isVisible(comment)).length,
     isOwner: own,
     replies: replies.map(({ reply, comments }) => ({
-      ...itemView(reply, viewer),
+      ...itemView(reply, viewer, scores),
       accepted: reply.id === accepted,
-      comments: comments.map(comment => ({ ...itemView(comment, viewer), parentId: reply.id })),
+      comments: comments.map(comment => ({ ...itemView(comment, viewer, scores), parentId: reply.id })),
     })),
   });
 };
@@ -466,4 +467,23 @@ export const reportComment = async (req: Request, res: Response) => {
     update: report,
   }));
   res.status(204).send();
+};
+
+const VOTE_VALUE = 'Il voto deve essere 1, -1 o 0';
+const voteSchema = z.object({
+  value: z.custom<VoteValue>((value) => value === 1 || value === -1 || value === 0, { message: VOTE_VALUE }),
+}, { message: VOTE_VALUE });
+
+/**
+ * One person's vote on a glossa or a reply (spec 2026-11-14-forum-community-server-design §A, D-248): 1 up,
+ * -1 down, 0 withdrawn. Never on one's own (403, `own_contribution`); on a comment only 0.
+ */
+export const voteThread = async (req: Request, res: Response) => {
+  const { value } = parseItalian(voteSchema, req.body);
+  res.json(await castVote('thread', req.params.threadId, req.user!.id, () => value));
+};
+
+export const voteComment = async (req: Request, res: Response) => {
+  const { value } = parseItalian(voteSchema, req.body);
+  res.json(await castVote('comment', req.params.commentId, req.user!.id, () => value));
 };

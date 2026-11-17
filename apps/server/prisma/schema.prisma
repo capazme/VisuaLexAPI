@@ -670,6 +670,9 @@ model ArticleThread {
   materia             LingoMateria?
   // The version of CONTRIBUTO_COMMUNITY it was written under; null for what came before that text.
   licenceTextId       String?       @map("licence_text_id")
+  // The sum of its votes (+1 and -1), kept by a database trigger on the votes (migration
+  // 20261116100000_forum_votes_up_down): never written by the server.
+  score               Int           @default(0)
 
   user              User?               @relation("ArticleThreadAuthor", fields: [userId], references: [id], onDelete: SetNull)
   passageReleasedBy User?         @relation("ArticleThreadPassageReleasedBy", fields: [passageReleasedById], references: [id], onDelete: SetNull)
@@ -688,6 +691,7 @@ model ArticleThread {
   @@index([licenceTextId])
   @@index([isHidden, createdAt])
   @@index([isHidden, lastActivityAt])
+  @@index([isHidden, score])
   @@map("article_threads")
 }
 
@@ -706,6 +710,8 @@ model ArticleComment {
   // Emptied by its author while something visible hangs on it: body is '' (a CHECK).
   deletedAt     DateTime? @map("deleted_at")
   licenceTextId String?   @map("licence_text_id")
+  // The sum of its votes, kept by a database trigger, as the glossa's.
+  score         Int       @default(0)
 
   thread   ArticleThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
   parent   ArticleComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
@@ -723,10 +729,12 @@ model ArticleComment {
   @@map("article_comments")
 }
 
+// One vote per person per glossa: +1 or -1 (a CHECK), never on one's own (D-248). Goes with the account.
 model ArticleThreadVote {
   id        String   @id @default(uuid())
   threadId  String   @map("thread_id")
   userId    String   @map("user_id")
+  value     Int      @default(1) @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at")
 
   thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -737,10 +745,12 @@ model ArticleThreadVote {
   @@map("article_thread_votes")
 }
 
+// As `ArticleThreadVote`, on a reply (a comment's old votes stay; no new one is cast).
 model ArticleCommentVote {
   id        String   @id @default(uuid())
   commentId String   @map("comment_id")
   userId    String   @map("user_id")
+  value     Int      @default(1) @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at")
 
   comment ArticleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
