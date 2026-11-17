@@ -8,6 +8,7 @@ import { articleDiscussionService, type DiscussionAnchor } from '../../../servic
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../hooks/useAuth';
 import { ReplyForm, ReportButton, TOUCH, VoteButton } from './discussionControls';
+import { voteFailure } from './voteFailure';
 import { FormSelect } from '../../ui/FormSelect';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
 import type { Materia } from '../../../types/studia';
@@ -273,8 +274,8 @@ export function ArticleDiscussionPanel({
     try {
       const result = await articleDiscussionService.voteThread(thread.id);
       setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, userVoted: result.voted, voteCount: result.voteCount } : item));
-    } catch {
-      setError('Impossibile aggiornare il voto. Riprova.');
+    } catch (error) {
+      setError(voteFailure(error));
     }
   };
 
@@ -312,8 +313,8 @@ export function ArticleDiscussionPanel({
         ...thread,
         comments: thread.comments.map(comment => comment.id === commentId ? { ...comment, userVoted: result.voted, voteCount: result.voteCount } : comment),
       } : thread));
-    } catch {
-      setError('Impossibile aggiornare il voto. Riprova.');
+    } catch (error) {
+      setError(voteFailure(error));
     }
   };
 
@@ -499,7 +500,7 @@ export function ArticleDiscussionPanel({
                     </span>
                     {isExpanded ? <ChevronUp size={16} className="mt-1 shrink-0 text-slate-400" /> : <ChevronDown size={16} className="mt-1 shrink-0 text-slate-400" />}
                   </button>
-                  <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota glossa" onVote={() => void voteThread(thread)} />
+                  <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota glossa" own={thread.isOwner} onVote={() => void voteThread(thread)} />
                 </div>
 
                 {(isDetached || (withholdDetachedPassage && isUnknown)) && (
@@ -564,7 +565,7 @@ export function ArticleDiscussionPanel({
                         <div key={comment.id} className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
                           <div className="flex justify-between gap-2">
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{comment.user.username}</span>
-                            <VoteButton voted={comment.userVoted} count={comment.voteCount} label={`Vota la risposta di ${comment.user.username}`} onVote={() => void voteComment(thread.id, comment.id)} />
+                            <VoteButton voted={comment.userVoted} count={comment.voteCount} label={`Vota la risposta di ${comment.user.username}`} own={comment.isOwner} onVote={() => void voteComment(thread.id, comment.id)} />
                           </div>
                           <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{comment.body}</p>
                         </div>
