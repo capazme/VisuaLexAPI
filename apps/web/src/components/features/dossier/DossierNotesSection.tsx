@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { StickyNote, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { DossierItem } from '../../../types';
@@ -7,7 +7,7 @@ import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { hasAssistantNote } from '../../../utils/aiReview';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { useNoteRemovalFocus } from './useNoteRemovalFocus';
-import { NoteText } from './NoteText';
+import { NOTE_FOLDED_EM, NoteText } from './NoteText';
 import { ROW, ROW_LINE, ROW_REMOVE, ROW_TITLE, SECTION_COUNT, SECTION_HEADING, SECTION_TILE } from './dossierStyles';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
@@ -17,16 +17,35 @@ interface Props {
   onRemove: (item: DossierItem) => void;
 }
 
-// A note longer than this, or of more than three lines, is shown folded. An application's note counts the lines it
-// draws: its Markdown's blank lines only part blocks (D4).
+// A user's note longer than this, or of more than three lines, is shown folded.
 const FOLD_AT = 240;
-const isLong = ({ data, createdBy }: NoteItem) =>
-  data.length > FOLD_AT || (createdBy ? data.split('\n').filter((line) => line.trim()) : data.split('\n')).length > 3;
+const isLong = (text: string) => text.length > FOLD_AT || text.split('\n').length > 3;
+
+/**
+ * Whether an application's note, drawn, is taller than its folded box (D4): measured on its box, again as its width or
+ * its words change. Its Markdown's height cannot be counted from its characters.
+ */
+function useTallerThanFolded(text: string, measure: boolean) {
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [taller, setTaller] = useState(false);
+  useLayoutEffect(() => {
+    if (!measure || !box) return;
+    // 15 px, the row's size, where no style is computed (tests).
+    const check = () => setTaller(box.scrollHeight > (parseFloat(getComputedStyle(box).fontSize) || 15) * NOTE_FOLDED_EM + 1);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [box, measure, text]);
+  return [setBox, taller] as const;
+}
 
 function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => void; rowRef: (el: HTMLElement | null) => void }) {
   const [open, setOpen] = useState(false);
-  const long = isLong(note);
-  const words = <NoteText note={note} className={ROW_TITLE} folded={long && !open} />;
+  const fromApp = !!note.createdBy;
+  const [boxRef, taller] = useTallerThanFolded(note.data, fromApp);
+  const long = fromApp ? taller : isLong(note.data);
+  const words = <NoteText note={note} className={ROW_TITLE} folded={long && !open} boxRef={boxRef} />;
   // The grey line: when; under the words, never beside them, so a phone's narrow row keeps the note's width. Who wrote
   // it is not drawn (D7b): an application's note says it by its validation; the data and the PDF keep it.
   const meta = (

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DossierItem } from '../../../types';
 import { DossierNoteList } from './DossierNoteList';
 import { DossierNotesSection } from './DossierNotesSection';
@@ -59,8 +59,31 @@ describe('D4: the user\'s own note stays as written', () => {
   });
 });
 
+describe('D4: «---» in an application\'s note', () => {
+  it('is a rule between the blocks, not text', () => {
+    const { container } = render(<DossierNotesSection notes={[note('Prima\n\n---\n\nDopo', app)]} onRemove={() => {}} />);
+    expect(container.querySelectorAll('hr')).toHaveLength(1);
+    expect(container.textContent).not.toContain('---');
+  });
+});
+
+/** jsdom lays nothing out: the note's box says the height its content would take. */
+function contentHeight(px: number) {
+  const spy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(px);
+  return () => spy.mockRestore();
+}
+
 describe('D4: a long application note, folded', () => {
+  it('is folded only when its content is taller than the folded box (measured, not counted)', () => {
+    // 300 characters on three lines, which the estimate (over 240) folded at every width. Folded: 15 px × 7.5em = 112.5 px.
+    const restore = contentHeight(80);
+    render(<DossierNotesSection notes={[note(`${'a'.repeat(100)}\n${'b'.repeat(99)}\n${'c'.repeat(99)}`, app)]} onRemove={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Mostra tutto' })).toBeNull();
+    restore();
+  });
+
   it('shows its heading and first lines, and «Mostra tutto» opens it', () => {
+    const restore = contentHeight(400);
     const text = `## Scadenzario\n\n${Array.from({ length: 8 }, (_, i) => `- punto ${i + 1}`).join('\n')}`;
     render(<DossierNotesSection notes={[note(text, app)]} onRemove={() => {}} />);
     expect(screen.getByText('Scadenzario')).toBeInTheDocument();
@@ -71,10 +94,6 @@ describe('D4: a long application note, folded', () => {
     fireEvent.click(toggle);
     expect(screen.getByRole('button', { name: 'Mostra meno' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Scadenzario').closest('div')).not.toHaveClass('overflow-hidden');
-  });
-
-  it('a short one, its blocks apart by blank lines, is not folded', () => {
-    render(<DossierNotesSection notes={[note('## Titolo\n\nUna riga.\n\n- una voce', app)]} onRemove={() => {}} />);
-    expect(screen.queryByRole('button', { name: 'Mostra tutto' })).toBeNull();
+    restore();
   });
 });

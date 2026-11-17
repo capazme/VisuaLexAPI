@@ -2477,7 +2477,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
   the notes first (`DossierNotesSection`; a note an application wrote is drawn by `NoteText` as the lessons' closed
-  Markdown, its lines kept, never HTML or a link — the user's own as written, D4), then one `DossierActBlock` per act in
+  Markdown, its lines kept, `---` a rule, never HTML or a link; folded only when its drawn height is over the folded
+  box; the PDF prints it without its marks, `noteMarkdown` — the user's own as written, D4), then one `DossierActBlock` per act in
   the order the acts entered the dossier, then «Giurisprudenza»
   (`DossierDecisionsSection`, the decisions in stored order). With acts and decisions both (D7a) they are two
   columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
