@@ -100,9 +100,9 @@ describe('AddToDossierPopover', () => {
   });
   it('creates a dossier inline with the server id, then adds', async () => {
     const onAdded = renderPopover();
-    fireEvent.click(screen.getByRole('button', { name: /nuovo dossier/i }));
-    fireEvent.change(screen.getByPlaceholderText(/nome del dossier/i), { target: { value: 'Nuova pratica' } });
-    fireEvent.submit(screen.getByRole('form', { name: /crea dossier/i }));
+    fireEvent.click(screen.getByRole('button', { name: /nuova pratica/i }));
+    fireEvent.change(screen.getByPlaceholderText(/nome della pratica/i), { target: { value: 'Nuova pratica' } });
+    fireEvent.submit(screen.getByRole('form', { name: /crea una pratica/i }));
     await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('srv-new', 'Nuova pratica'));
     const created = appStore.getState().dossiers.find(d => d.id === 'srv-new')!;
     expect(created.items).toHaveLength(1);
@@ -111,9 +111,9 @@ describe('AddToDossierPopover', () => {
     sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     try {
       const onAdded = renderPopover();
-      fireEvent.click(screen.getByRole('button', { name: /nuovo dossier/i }));
-      fireEvent.change(screen.getByPlaceholderText(/nome del dossier/i), { target: { value: 'Nuova pratica' } });
-      fireEvent.submit(screen.getByRole('form', { name: /crea dossier/i }));
+      fireEvent.click(screen.getByRole('button', { name: /nuova pratica/i }));
+      fireEvent.change(screen.getByPlaceholderText(/nome della pratica/i), { target: { value: 'Nuova pratica' } });
+      fireEvent.submit(screen.getByRole('form', { name: /crea una pratica/i }));
       await vi.waitFor(() => expect(onAdded).toHaveBeenCalled());
       expect(appStore.getState().dossiers.find(d => d.id === 'srv-new')!.kind).toBe('studio');
     } finally {
@@ -152,5 +152,37 @@ describe('AddToDossierPopover with a decision', () => {
     expect(screen.getByRole('button', { name: /con un articolo/i })).not.toHaveTextContent(/già presente/i);
     fireEvent.click(screen.getByRole('button', { name: /con la sentenza/i }));
     expect(onDuplicate).toHaveBeenCalledWith('Con la sentenza');
+  });
+
+  it('LC61: its title is the command\'s, «1 elemento» is singular, a long name is whole in the tooltip, «già presente» is not faded', () => {
+    const long = 'Ricorso per decreto ingiuntivo Rossi contro Bianchi, secondo grado';
+    appStore.setState({ dossiers: [...appStore.getState().dossiers, { id: 'long', title: long, createdAt: '2026-03-01T00:00:00Z', items: [] }] });
+    renderPopover();
+    expect(screen.getByRole('heading', { name: 'Aggiungi alla pratica' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pratica recente/ })).toHaveTextContent('1 elemento');
+    expect(screen.getByRole('button', { name: /Pratica recente/ })).not.toHaveTextContent('1 elementi');
+    expect(screen.getByText(long)).toHaveAttribute('title', long);
+    expect(screen.getByText(long)).not.toHaveClass('truncate');
+    const present = screen.getByRole('button', { name: /Con duplicato/ });
+    expect(present).not.toHaveClass('opacity-60');
+    expect(screen.getByText('già presente').className).toMatch(/text-emerald-800/);
+  });
+
+  it('LC61: the new practice\'s name field has a label', () => {
+    renderPopover();
+    fireEvent.click(screen.getByRole('button', { name: /Nuova pratica/ }));
+    expect(screen.getByRole('textbox', { name: 'Nome della nuova pratica' })).toBeInTheDocument();
+  });
+
+  it('LC61: every control is 44 px to the touch on a phone', () => {
+    renderPopover();
+    fireEvent.click(screen.getByRole('button', { name: /Nuova pratica/ }));
+    const controls = [
+      screen.getByRole('button', { name: 'Chiudi' }),
+      screen.getByRole('button', { name: /Pratica recente/ }),
+      screen.getByRole('textbox', { name: 'Nome della nuova pratica' }),
+      screen.getByRole('button', { name: 'Crea e aggiungi' }),
+    ];
+    for (const control of controls) expect(control.className).toContain('min-h-[44px]');
   });
 });

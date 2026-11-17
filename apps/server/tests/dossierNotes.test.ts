@@ -70,7 +70,7 @@ describe('POST /api/dossiers/:id/notes', () => {
     for (const aboutItemId of [otherNorm, aNote, '00000000-0000-4000-8000-000000000000']) {
       const response = await note(authHeader(alice), { text: 'Sul danno.', aboutItemId });
       expect(response.status).toBe(400);
-      expect(response.body.detail).toBe('La voce indicata non è un articolo di questo dossier.');
+      expect(response.body.detail).toBe('La voce indicata non è un articolo di questa pratica.');
     }
     expect(await prisma.dossierItem.count({ where: { dossierId, itemType: 'note' } })).toBe(1);
   });
@@ -78,7 +78,7 @@ describe('POST /api/dossiers/:id/notes', () => {
   it('answers an id that is not even a uuid with the same Italian sentence', async () => {
     const response = await note(authHeader(alice), { text: 'Sul danno.', aboutItemId: 'art-2043' });
     expect(response.status).toBe(400);
-    expect(response.body.detail).toBe('La voce indicata non è un articolo di questo dossier.');
+    expect(response.body.detail).toBe('La voce indicata non è un articolo di questa pratica.');
   });
 
   it('a note moved to another dossier stops pointing at an article it left behind', async () => {
@@ -162,7 +162,7 @@ describe('PUT /api/dossiers/:id/items/:itemId — the article a note is about', 
     for (const aboutItemId of [otherNorm, noteId, 'art-2043']) {
       const response = await put(authHeader(alice), noteId, { aboutItemId });
       expect(response.status).toBe(400);
-      expect(response.body.detail).toBe('La voce indicata non è un articolo di questo dossier.');
+      expect(response.body.detail).toBe('La voce indicata non è un articolo di questa pratica.');
     }
     const onANorm = await put(authHeader(alice), normId, { aboutItemId: normId });
     expect(onANorm.status).toBe(400);

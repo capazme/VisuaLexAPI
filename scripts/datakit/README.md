@@ -21,6 +21,9 @@ the MERL-T api and worker write to them. Every store is checked before any is
 written; a database whose tables are empty (as `start.sh` leaves it after
 migrating) counts as empty, and each database loads in one transaction.
 Redis (cache and queues) and the model download cache are not saved.
+The `pratica_files` volume (a case's act files) is saved encrypted: restoring it is
+useful only with the same `PRATICA_FILES_KEY`, which lives in `apps/server/.env` and
+never in a backup; keep that key apart from the backups.
 
 `--stack NAME` works on another stack; `--pg-container`, `--falkor-container`,
 `--qdrant-url`, `--volume-prefix`, `--databases`, `--volumes` point at stores by

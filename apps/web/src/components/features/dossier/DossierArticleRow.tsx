@@ -7,8 +7,8 @@ import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
 import { AiReviewSignal } from '../../ui/AiReviewSignal';
-import { AiNoteEntryReview } from './AiNoteEntryReview';
-import { aiReviewSignal, aiReviewSummary, hasAssistantNote } from '../../../utils/aiReview';
+import { DossierNoteList } from './DossierNoteList';
+import { aiReviewSignal, aiReviewSummary } from '../../../utils/aiReview';
 import { formatTimestampLong } from './dossierUtils';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_SIGN, ROW_TITLE, ROW_TOGGLE } from './dossierStyles';
@@ -183,7 +183,7 @@ export function DossierArticleRow({
         >
           <Star size={16} className={cn(isImportant && 'fill-amber-400')} />
         </button>
-        <button type="button" onClick={onRemove} aria-label="Rimuovi articolo dal dossier" className={ROW_REMOVE}>
+        <button type="button" onClick={onRemove} aria-label="Rimuovi articolo dalla pratica" className={ROW_REMOVE}>
           <Trash2 size={16} aria-hidden />
         </button>
       </div>
@@ -192,36 +192,7 @@ export function DossierArticleRow({
           {/* The article's notes first, then its text (spec §6). */}
           {(notes.length > 0 || onAddNote) && (
             <div className="mb-2 mt-1 space-y-1.5">
-              {notes.map((note) => {
-                const words = <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>;
-                const meta = (
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span>{formatTimestampLong(note.addedAt)}</span>
-                  </div>
-                );
-                // A note an application wrote: its state, the pencil and its bin under it (D7b).
-                const reviewed = hasAssistantNote(note) && onRemoveNote;
-                return (
-                <div key={note.id} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
-                  <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
-                  <div className="min-w-0 flex-1">
-                    {reviewed
-                      ? <AiNoteEntryReview note={note} meta={meta} onRemove={() => onRemoveNote(note)}>{words}</AiNoteEntryReview>
-                      : <>{words}{meta}</>}
-                  </div>
-                  {onRemoveNote && !reviewed && (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveNote(note)}
-                      aria-label="Rimuovi nota"
-                      className={ROW_REMOVE}
-                    >
-                      <Trash2 size={14} aria-hidden />
-                    </button>
-                  )}
-                </div>
-                );
-              })}
+              <DossierNoteList notes={notes} onRemoveNote={onRemoveNote} />
               {onAddNote && (
                 <button
                   type="button"

@@ -187,7 +187,7 @@ describe('POST /lingo/corsi/:id/moduli', () => {
     const other = await studyDossier(alice);
     const body = (voce: string) => moduleBody(null, { blocchi: [{ testo: 'Vedi [qui](#c1).', citazioni: [{ marcatore: 'c1', voce }] }] });
     const foreign = await request(app).post(`${CORSI}/${id}/moduli`).set(token).send(body(other.ids.norm));
-    expect(foreign.body.detail ?? foreign.body.error).toMatch(/Blocco 1, citazione c1: la voce non è nel dossier del percorso/);
+    expect(foreign.body.detail ?? foreign.body.error).toMatch(/Blocco 1, citazione c1: la voce non è nella pratica del percorso/);
     const note = await request(app).post(`${CORSI}/${id}/moduli`).set(token).send(body(dossier.ids.note));
     expect(note.status).toBe(400);
     expect(JSON.stringify(note.body)).toMatch(/solo norme e sentenze/);

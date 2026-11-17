@@ -37,8 +37,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   «Riprova», which reloads (the one mend for a file a deploy removed; before P1 no boundary held it and the app went
   blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
   entry chosen again, included).
-  In the signed-in layout: `/` (search), `/dossier`, `/work` (the planner, below: `OpusPage`
-  over `oggi`, `prossimi`, `ingresso` and `cestino`; `/work` redirects to `oggi`),
+  In the signed-in layout: `/` (search), `/pratiche` (the dossiers, «Pratiche» on screen since LC60; `/dossier` and
+  everything under it is an old address, `MovedTo` keeps its query and anchor), `/work` (the planner, below: `OpusPage`
+  over `scadenziario`, `prossimi`, `ingresso` and `cestino`; `/work` redirects to `scadenziario`; LC48: `/work/oggi` and
+  `/work/anonimizzatore` are old addresses, `MovedTo` sends them to `/work/scadenziario` and `/work/pseudonimizzatore`),
   `/learn` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
@@ -514,7 +516,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   since D-253. **From `lg` (LC21) nothing floats**: `TopBar` (`components/layout/TopBar.tsx`, 52 px, every page but the search page,
   the lesson and the full screen) draws the path («Work › Dossier › Pratica …», the page's `h1` as its last step on a page deeper
   than its list), the compact search (it opens the palette), «Novità in vX» (`ChangelogNotification inBar`), «Commenti» and
-  «Tutto schermo», in line; on the search page too, with «Work › Corpus» («Ricerca» in the other sections) and the
+  «Tutto schermo», in line; on the search page too, with «Work › Ricerca» (in every section, LC48) and the
   search field itself, compact (`SearchField compact`), in the search button's place; the practice's columns then take
   the 52 px bar off their height (`--search-bar-height: 3.25rem`). Below `lg` the search page keeps its own bar, the field. What follows holds below
   `lg` and in full screen: the feedback button is «Commenti» at the top right (`FeedbackButton`, the house `Button`, 44 px, from `md`
@@ -581,7 +583,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
   so a choice made with a pointer (the entry's click in `SectionSwitcher`, `detail` above 0) marks the title
-  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Oggi» —, the dossier list's
+  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Scadenziario» —, the dossier list's
   `h1` — `opus` or `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier
   pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
@@ -591,14 +593,18 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
   carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), «Analizza documento» and «Rassegne» —, then the active
-  section's, in a group named after it: Work's five entries (D-315, LC8), exactly, in this order, «Oggi» (the home, `/work/oggi`,
-  with the count of overdue and today's tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Corpus» (the
-  search, named «Corpus», with its id `#tour-nav-search` and its ⌘K), Dossier, and «Atti» `soon` (since LC21 the web draws no «Anonimizzatore» entry: it is the desktop app's, D-324; its
-  address still answers) — as they were, «Atti» and
-  «Anonimizzatore» `soon` (`NavItem`: «in arrivo» under the word, 11 px, in the rail's hover label and in the name, «Atti, in
-  arrivo»; each opens a plain page, `/work/atti` and `/work/anonimizzatore`, two lines in Work's frame, `ComingSoon` in
-  `App.tsx`; the Anonimizzatore's says it will come in the desktop app, D-324). «Prossimi giorni» and «Lista d'ingresso»
-  are tabs of Work's page (`OpusPage`: «Oggi», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
+  section's, in a group named after it: Work's entries (D-315, LC8, LC48), exactly, in this order, «Scadenziario» (the home, `/work/scadenziario`,
+  with the count of overdue and today's tasks, named in words: «Scadenziario, 3 compiti per oggi o scaduti»), «Ricerca» (the
+  search, named «Ricerca» as in the other sections, with its id `#tour-nav-search` and its ⌘K), Dossier (no «Atti» since LC53: the acts are the dossier's «Atti» tab; `/work/atti` leads to `/dossier`, `/work/atti/:id` to the act's dossier with `?vista=atti`, `OldAttoRedirect`), then, after a hairline, in a group named «Strumenti sul documento» for a screen reader (LC47), «Analizza
+  documento» (`/documents`, `soon="dev"`: «in sviluppo», still a working link; «Ricerca» is no longer lit there),
+  «Pseudonimizzatore» `soon` (`NavItem`: «in arrivo» or «in sviluppo» under the word, 11 px, in the rail's hover label and in
+  the name, «Pseudonimizzatore, in arrivo»; the bar writes `shortLabel` «Pseudonimizza», as the whole word is cut at the
+  larger text sizes; `/work/pseudonimizzatore` is a plain page in Work's frame, `ComingSoon` in
+  `App.tsx`, saying it comes with the desktop app and works on the computer only, D-324), and «Grafo delle pratiche» `soon`
+  (`/work/grafo-pratiche`, «Grafo pratiche» in the bar, the same kind of page: the knowledge graph of the user's practices,
+  coming with the desktop app, LC48). In the other sections «Analizza
+  documento» stays a Corpus tool with no label. «Prossimi giorni» and «Lista d'ingresso»
+  are tabs of Work's page (`OpusPage`: «Scadenziario», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
   short word on a phone; on those three views and on the trash, its way back; the trash's link only on the three), «Analizza un documento» and «Rassegne» links
   of the search page's Scrivania, under the examples and drawn as them, underlined;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
@@ -611,15 +617,15 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
   `sectionKicker`'s «Work» (the name alone since 15 Nov 2026: the owner dropped the phrase over the titles), `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
-  d'ingresso», «Cestino dei compiti», «Atti», «Anonimizzatore», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
+  d'ingresso», «Cestino dei compiti», «Pseudonimizzatore», «Grafo delle pratiche», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
   fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Labs · il
-  laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
+  laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Scadenziario» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
   The active entry is marked by the logo's column (D-237, `BookMark` at 16 px, toga ink) in the 21 px between the bar's
   edge and the icon: 7.5 px left of the row (`-left-[7.5px]`), the column from 7.2 to 13.8 px of the bar, 7.2 px clear of
   the icon's box; the row has no `overflow-hidden`, which clipped it. One per section; it jumps from entry to entry, as the
   dash did (`layoutId` does not carry it, seen in the browser, #448). An entry is lit (background, column, `aria-current`)
-  on its address and on its `activeOn` ones: «Oggi» on `/work/prossimi`, `/work/ingresso`, `/work/cestino`, «Corpus» on
+  on its address and on its `activeOn` ones: «Scadenziario» on `/work/prossimi`, `/work/ingresso`, `/work/cestino`, «Ricerca» on
   `/documents` and `/rassegne` in Work, «Assistente» on `/labs/contribuisci` and `/labs/valida` (not on the graph's).
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Learn» and «Contribuisci»), the palette's
@@ -1031,7 +1037,7 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   sending and builds the input (a subtask's dossier is never sent: it is its parent's).
 - **The dossier's panel** (`DossierTasksPanel`, after the header of `DossierDetailView`): its open tasks and the quick
   add with the dossier fixed.
-- **The count** beside «Oggi» and on the switcher's Opus entry: the today view's length, set by `TodayView`'s read
+- **The count** beside «Scadenziario» and on the switcher's Opus entry: the today view's length, set by `TodayView`'s read
   and by `PlannerHost` every two minutes while the tab is visible and after every write.
 - **A new day**: every read stores the server's day (`plannerStore.today`); when one answers a different day (the
   count's, every two minutes) or the tab comes back into view, every view mounted reads again, and the quick add,
@@ -1082,6 +1088,69 @@ they are, inert: no code writes or reads them, a saved quick norm or link still 
 and the Python API ignores it. `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
 `set`. `clearUserData` empties the practices.
+**LC60, «Pratiche».** What a user reads says «pratica» / «Pratiche» for a dossier (the code keeps `dossier`;
+`pratiche.guard.test.ts` refuses the word in literals and JSX text outside the Forum, which keeps «Dossier pubblici»). The
+Ricerca is one reading bench of the session: no bar of practices (`PracticeBar` and `PracticeChip` are gone), no «Salva
+come dossier», «Nuova pratica», «Sposta in un'altra pratica», list of practices on the phone, «Apri tutto in Ricerca» or
+«Apri anche in Ricerca»; its table is closed with «Chiudi il tavolo» and added to a pratica with «Aggiungi a una pratica…».
+`partialize` saves no practice, except the Corpus practices a browser kept from before, while they wait for the riquadro
+(`corpusPracticesPending`, set by the load that finds them; parked at a sign-out as before). `CorpusPracticesDialog`
+(mounted by `Layout`, once `dossiersLoaded` says the dossiers were read) drops the empty ones and those holding exactly a
+dossier's articles and decisions, offers the rest ticked, saves each through `savePracticeAsDossier` and closes it, and
+then `endCorpusPractices`; a failed save takes nothing else away and the riquadro stays (a retry adds to the dossier a
+first, partial try made). No key of its own: the riquadro shows while such practices are in the browser.
+
+A practice with a `dossierId` (LC51: a reading table bound to a dossier, built by `openDossierPractice`, its articles
+without text until `setPracticeArticleText`, re-synced additively by `resyncDossierPractice`) is the session's: `partialize`
+leaves it out (`corpusPractices`), `sanitizePractices` drops one found saved, it is never the active practice, and
+`isBoundPractice` keeps it out of the bar, the moves, «Salva come dossier», the closings, «Annulla» and «Tutte le pratiche».
+The reading containers (`PracticeTable`, `ReadingRow`, `PracticePhoneView`, `ReadingFullScreen`) take an optional
+`practiceId` (LC52 c2; `useHostedPractice`, default the Corpus's active one), and the reader's search gestures go to
+`ReadingHostContext` (`practice/readingHost.ts`; `SearchPanel` provides the store's `triggerSearch`, no host falls back
+to it). A bound row read without text loads it once (`useRowText`). The phone's reader and a pending reveal never act
+across the line between a bound table and the Corpus (`readerGivesWay`, `revealWaits`).
+The dossier's «Lettura» tab (LC54 c3, `dossier/DossierReadingView`, `?vista=lettura`, mounted only once chosen) builds
+and re-syncs its table with `openDossierPractice` on every change of the page's dossier, and hosts the reading: a search
+gesture fetches its article as Ricerca does and puts it on the bound table, revealed or beside its window, never in the
+dossier (a failure leaves the row with its error); a norm of the same act and the PDF go through `practice/hostGestures.ts`,
+which `SearchPanel` shares. A bound table draws no practice header, «Salva come dossier», practice actions, «Sposta in
+un'altra pratica», tours or room for the bar (`isBoundPractice` inside the containers); its act takes a URN from the
+dossier item or from its first loaded text; a bound row without text says «Carico il testo…», after a failure «Non
+riesco a leggere il testo.» with «Riprova» (`RowTextStatus`, `retryRowText`); a decision read there is not recorded in
+the Cronologia (`DecisionEntryView`).
+In the «Lettura» (LC55 c4) the host carries the dossier (`ReadingHost.dossier`, `useHostDossier`) and every row, index
+entry and decision says whether it is in it, read from the store's dossier and never stored on the table
+(`practice/inDossier.ts`: an article by `dossierArticleKey`, a decision by `decisionKey`): nothing for what is, the word
+«Non nel dossier» for what is not. A row's «⋯» names its commands: «Togli dal dossier» (`removeItemsWithUndo`, the trash
+with «Annulla»; the row stays, marked) on a dossier row, «Aggiungi al dossier» (`addToDossier` with the row's own
+`norma_data`, as the reader's popover) and «Togli dal tavolo» on one that is not; on a computer «Aggiungi al dossier»
+also stands beside the mark. The act's «Rimuovi l'atto» becomes «Togli dal dossier» when it holds dossier articles;
+dragging an act of the dossier writes that one move on the dossier's own order (`writeActOrder`, `setDossierItemOrder`
+as «Fonti»; an act only on the table writes nothing, and a reorder made in «Fonti» meanwhile is kept). In «Lettura»
+«Apri tutto in Ricerca» moves into the header's «⋯» as «Apri anche in Ricerca», and «Apri accanto» and the act's article
+numbers are 14 px. The reader's dossier command
+(an article's, a decision's) reads «Aggiungi a questo dossier» and adds there without the popover. The re-sync stays
+additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, keeps none of
+this; there (LC59) every article and identified decision row (`PracticeRowShell`'s `corpusItem`) and every hit of case law
+our reader opens (`CaseLawRow`'s `dossierItem`: the Cassazione's hits, the Union's judgments; wherever drawn, a dossier's
+«Lettura» included, where it too opens the popover) says «Aggiungi al dossier» and opens the reader's `AddToDossierPopover`, nothing saved before a dossier is chosen (`dossier/addFromResult.tsx`); a row
+held says «Nel dossier «X»» or «In 2 dossier» by the popover's own rules (`dossierContainsArticle`, version included). On a
+phone a table row has it in its «⋯» with «Togli dal tavolo» (the popover is then the bottom sheet); a hit of case law, which
+has no «⋯», keeps the named button at every width. Massimario passages add nothing: a dossier holds no massima. The
+index entries of the reading view are not marked: the window they open beside has the reader's command.
+In the «Lettura» (LC58 c5) the dossier's own work is there too. A row of the dossier knows its entry (`RowDossier.itemId`;
+a window and the phone's reader through `useDossierItemId`) and gives it to `ArticleTabContent` and `DecisionEntryView`
+(`dossierItemId`): what an application proposed on it is drawn and acted on as in the dossier's readers (D7b,
+`useEntryProposals`, glosses, «Sposta», the lost lists), never in the reader's copies or exports. Under an article's
+text, «Note della pratica» lists the dossier's notes about any copy of it (`DossierNoteList`, shared with «Fonti»'s row).
+A row of the dossier's «⋯» has «Segna come importante» / «Rimuovi da importanti» (`updateDossierItemStatus`) and a starred
+row shows the star and says «importante» in its name; the simple reading, with no row «⋯», has the star over the text
+with its name («Segna come importante», pressed «Importante»). A decision's cited norms go through `useTableCitedNorms` (D7d):
+the preview knows the dossier's («Apri tra le norme», else «Apri nella Lettura»), a click puts the norm on the table,
+revealed or beside its window. «Aggiungi al dossier» from a row says «Aggiunto al dossier» («Aggiunta» for a
+decision); the dossier is read again on opening the tab and on every return of the window, without the page's 15 s
+window; the decision reader's «Aggiungi a questo dossier» is 14 px; the act's «⋯» draws no separator over its first
+command.
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
 browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
 with a logged warning «saved workspace too large to back up», when the value is over 1 000 000
@@ -1234,6 +1303,19 @@ last search and the passages loaded stay in memory for the session (`searchMemor
 storage), so the way back from an article finds the list; `clearRassegneCache` (the logout) forgets it. No store
 (`volumi: 0`) says «Le rassegne non sono ancora caricate su questa installazione.»; a 503 or no answer «Le rassegne non
 sono disponibili al momento.» with «Riprova», a 429 the quota's line. No anchors, notes or highlights (G-399's Q3).
+**In ⌘K** (U3, L-50): a topic (`useSearchQuery`'s `topic`, never a citation) asks `/search_rassegne` too, once the words
+have stood still for 350 ms (`useRassegneForTopic`, which drops an answer that comes after the words changed), and the
+group «Rassegne» under the decisions' row shows the first three passages (the review, year and volume, two lines of text)
+and «Tutti i passi» with the count; no passage or no store draws nothing, a failure one line («Le rassegne non
+rispondono al momento.»). A row remembers the first page (`rememberSearch`) and `GlobalSearch` opens `/rassegne`, the
+passage chosen as the navigation's state by its id (shown whole and focused): the words never in an address nor in the
+history. The page is drawn again on every navigation (`location.key`), so ⌘K used on it shows the new search.
+**A passage into a pratica** (U3, L-51): «Aggiungi alla pratica» (`AddPassageToPratica`, on `RassegnaResult` and on the
+panel's `RassegnaPassage`) opens `AddToDossierPopover` with neither a norm nor a decision — it then adds nothing and only
+reports the pratica chosen — and saves the passage as a note (`addNoteToDossier`; `passageNote`: provenance, source,
+text, the portal's link, the text cut with «…» at the server's 4000 UTF-16 units, the link whole, control characters
+dropped). The note is plain text: the link is not clickable in the pratica nor in the PDF. The toast names the pratica
+with «Apri la pratica».
 
 **«Giurisprudenza» under the article** (`CaseLawSection`, after the text): an accordion closed by default (state per host in
 `sessionStorage`) holding the Massimario's panel (`components/features/rassegne/RassegnePanel`, a block of
@@ -2385,6 +2467,16 @@ a decision the text cites is sent there; a host with norms of its own (the dossi
 
 ### Dossier
 
+**The «Atti» tab** (LC53, `components/features/atti/DossierAttiPanel.tsx`) is the case's: «Istruzioni per Claude»
+(`IstruzioniPerClaude`, Markdown with «Grassetto» and «Elenco», saved by itself after `SAVE_DELAY_MS`, the pending save
+flushed on unmount), «File» and «Carica un file» (`PraticaFilesPanel`, over LC50's `/api/dossiers/:id/files…` through
+`praticaFilesService`: originals the last changed first, versions under them, the case's trash with «Ripristina» and
+«Elimina», asked first; 25 MB checked before sending; the routes' ceilings reworded and a 503 said as «I file della
+pratica non sono attivi su questo server.», `praticaFilesError`). Before the first upload a notice (point 8 of the
+proposal, plus «È una prova: non caricare atti veri di clienti.»), remembered under `visualex.atti.avviso-visto` (a
+`user` key). The editor's old acts of the dossier, while `/api/atti` holds them, are listed above with «Scarica come
+Word» (`attoDocx.ts`: a DOCX built with the web's own ZIP writer).
+
 A dossier is where the articles needed for a task are aggregated and read.
 It is **di lavoro** (a practice: it may hold a client's data; the default, and what every older
 dossier is) or **di studio** (a topic studied) — `Dossier.kind`, chosen in `DossierModal` and
@@ -2397,7 +2489,9 @@ the detail's header line (`kindLabel`, `dossierKinds.ts`); `published` (its copy
 It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-atto-design.md`).
 
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
-  the notes first (`DossierNotesSection`), then one `DossierActBlock` per act in
+  the notes first (`DossierNotesSection`; a note an application wrote is drawn by `NoteText` as the lessons' closed
+  Markdown, its lines kept, `---` a rule, never HTML or a link; folded only when its drawn height is over the folded
+  box; the PDF prints it without its marks, `noteMarkdown` — the user's own as written, D4), then one `DossierActBlock` per act in
   the order the acts entered the dossier, then «Giurisprudenza»
   (`DossierDecisionsSection`, the decisions in stored order). With acts and decisions both (D7a) they are two
   columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own

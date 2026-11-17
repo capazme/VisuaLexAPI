@@ -10,6 +10,7 @@ import { searchEuCaseLawCached } from '../../../utils/euCaseLawCache';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { Button } from '../../ui/Button';
 import { CaseLawRow } from '../search/caseLaw/CaseLawRow';
+import { sentenzaFromDecision } from '../dossier/dossierUtils';
 import { useCaseLawFilters, useReportCaseLawYears } from '../search/caseLaw/caseLawFiltersContext';
 import { applyCaseLawFilters, isNarrowing } from '../search/caseLaw/caseLawFilter';
 import { rowYear, yearCounts, type YearsOf } from '../search/caseLaw/caseLawYears';
@@ -199,6 +200,8 @@ export function EuCaseLawBlock({ norma, besideId, backEntry }: EuCaseLawBlockPro
                     externalNote={eurLex ? 'su EUR-Lex' : undefined}
                     besideId={besideId}
                     backEntry={backEntry}
+                    // A judgment, as our reader holds it; an order or an opinion is not a decision we keep.
+                    dossierItem={d.tipo === 'JUDG' ? sentenzaFromDecision(d.identita, { data_decisione: d.data ?? undefined }) : undefined}
                   />
                 );
               })}

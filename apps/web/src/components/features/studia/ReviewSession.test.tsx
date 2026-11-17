@@ -224,7 +224,7 @@ describe('the review session', () => {
     // The last of the lesson's rows, in the flow of its frame: never fixed, never put back in the page from md up.
     expect(bar).toHaveClass('shrink-0', 'pb-[max(0.75rem,env(safe-area-inset-bottom))]', Z_INDEX.pinnedBar);
     expect(bar.className).not.toMatch(/\bfixed\b|md:static/);
-    expect(reveal).toHaveClass('min-h-[48px]');
+    expect(reveal).toHaveClass('min-h-[44px]');
     expect(within(reveal).getByText('Spazio')).toBeInTheDocument();
     await show();
     expect(bar).toContainElement(screen.getByRole('group', { name: 'Come è andata?' }));
@@ -546,7 +546,7 @@ describe('the review session', () => {
       renderSession([card('a'), card('b'), card('c')]);
       // a «Di nuovo», b «Bene», c «Bene», then a again «Bene» (not sent).
       await gradeAll([1, 3, 3, 3]);
-      expect(await screen.findByText('Hai ripassato 3 schede, 1 da rifare. Le prossime: domani.')).toBeInTheDocument();
+      expect(await screen.findByText('3 schede ripassate, 1 da rifare. Le prossime domani.')).toBeInTheDocument();
       expect(review).toHaveBeenCalledTimes(3);
       await userEvent.setup().click(screen.getByRole('button', { name: 'Torna a Oggi' }));
       expect(await screen.findByText('Landing')).toBeInTheDocument();
@@ -555,14 +555,14 @@ describe('the review session', () => {
     it('uses the singular for one card', async () => {
       renderSession([card('a')]);
       await gradeAll([1, 3]);
-      expect(await screen.findByText('Hai ripassato 1 scheda, 1 da rifare. Le prossime: domani.')).toBeInTheDocument();
+      expect(await screen.findByText('1 scheda ripassata, 1 da rifare. Le prossime domani.')).toBeInTheDocument();
     });
 
     it('says «nessuna da rifare» when every card went well', async () => {
       review.mockResolvedValue({ registrata: true, prossimoRipasso: '2026-10-19', scheduledDays: 8 });
       renderSession([card('a'), card('b')]);
       await gradeAll([3, 3]);
-      expect(await screen.findByText('Hai ripassato 2 schede, nessuna da rifare. Le prossime: 8 giorni.')).toBeInTheDocument();
+      expect(await screen.findByText('2 schede ripassate, nessuna da rifare. Le prossime 8 giorni.')).toBeInTheDocument();
     });
 
     it('shows today’s goal and the streak as they now stand', async () => {
@@ -570,7 +570,7 @@ describe('the review session', () => {
       renderSession([card('a')]);
       await gradeAll([3]);
       expect(await screen.findByRole('img', { name: 'Obiettivo di oggi: 11 di 10 ripassi, raggiunto' })).toBeInTheDocument();
-      expect(screen.getByRole('group', { name: 'Serie: 6 giorni di fila, record 9' })).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'Serie: 6 giorni di fila, record 9' })).toBeInTheDocument();
     });
 
     it('does not claim a review when the session was empty', async () => {
@@ -683,7 +683,7 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await show();
     await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
     const notice = await screen.findByTestId('session-celebration');
-    expect(within(notice).getByTestId('goal-mark')).toBeInTheDocument();
+    expect(notice.querySelector('[data-illustration="learn-giorno-chiuso"]')).not.toBeNull();
     expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
   });
 
@@ -700,7 +700,7 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
     const notice = await screen.findByTestId('session-celebration');
     expect(within(notice).getByText('Serie di 3 giorni')).toBeInTheDocument();
-    expect(within(notice).queryByTestId('goal-mark')).toBeNull();
+    expect(notice.querySelector('[data-illustration="learn-giorno-chiuso"]')).toBeNull();
     // Not celebrated for this browser: «Oggi» writes the mark, the first time, once the mission is done.
     expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
   });
@@ -727,7 +727,7 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
     const notice = await screen.findByTestId('session-celebration');
     // The goal's mark, small, beside the words (G9): the red stamp is gone.
-    expect(within(notice).getByTestId('goal-mark')).toBeInTheDocument();
+    expect(notice.querySelector('[data-illustration="learn-giorno-chiuso"]')).not.toBeNull();
     expect(within(notice).queryByTestId('goal-stamp')).toBeNull();
     expect(notice.className).toContain('absolute');
     expect(notice.className).not.toContain('fixed');
@@ -813,7 +813,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       renderSession([card('a')]);
       await show();
       await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
-      await screen.findByText(/Hai ripassato 1 scheda/);
+      await screen.findByText(/1 scheda ripassata/);
       expect(bar()).toHaveAttribute('aria-valuenow', '1');
       expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '100%' });
     });
@@ -855,7 +855,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 21 giorni');
       await show();
       await user.click(screen.getByRole('button', { name: 'Bene' }));
-      await screen.findByText(/Hai ripassato 2 schede/);
+      await screen.findByText(/2 schede ripassate/);
       expect(screen.queryByTestId('grade-note')).not.toBeInTheDocument();
     });
 
@@ -1027,7 +1027,7 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       renderSession([card('a')]);
       await show();
       await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
-      const sentence = await screen.findByText('Hai ripassato 1 scheda, nessuna da rifare. Le prossime: domani.');
+      const sentence = await screen.findByText('1 scheda ripassata, nessuna da rifare. Le prossime domani.');
       await screen.findByRole('img', { name: /Obiettivo di oggi/ });
       expect(screen.queryByRole('button', { name: 'Continua' })).not.toBeInTheDocument();
       // One card, centred, holds the sentence, the ring, the streak (with its strip of the last seven days, the week: no
@@ -1035,8 +1035,9 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       const end = screen.getByTestId('lesson-end');
       expect(end).toContainElement(sentence);
       expect(end).toContainElement(screen.getByRole('img', { name: /Obiettivo di oggi/ }));
-      expect(end).toContainElement(screen.getByRole('group', { name: /^Serie:/ }));
-      expect(within(end).getByRole('list', { name: 'Ultimi sette giorni' })).toBeInTheDocument();
+      expect(end).toContainElement(screen.getByRole('img', { name: /^Serie:/ }));
+      // LC39: no week of boxes at the end.
+      expect(within(end).queryByRole('list', { name: 'Ultimi sette giorni' })).toBeNull();
       expect(within(end).queryByRole('list', { name: 'Questa settimana' })).toBeNull();
       expect(within(end).getByRole('button', { name: 'Torna a Oggi' })).toHaveClass(...LESSON_PRIMARY.split(' '));
       expect(screen.getAllByRole('button', { name: 'Torna a Oggi' })).toHaveLength(1);

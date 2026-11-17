@@ -1,8 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RassegneSearchPage } from '../RassegneSearchPage';
 import { clearRassegneCache } from '../useRassegne';
+import { rememberSearch } from '../searchMemory';
 import { RassegneError } from '../../../../services/rassegneService';
 import type { RassegnaRisultato, RassegneSearchResponse } from '../types';
 
@@ -74,7 +76,7 @@ describe('RassegneSearchPage', () => {
   });
 
   it('opens with the field focused and a line on what it does, asking nothing', () => {
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     expect(screen.getByRole('heading', { level: 1, name: 'Rassegne' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Cerca nelle rassegne' })).toHaveFocus();
     expect(screen.getByText(/Ogni parola vale come inizio di parola/)).toBeInTheDocument();
@@ -83,7 +85,7 @@ describe('RassegneSearchPage', () => {
 
   it('searches on submit and lists the passages with the words marked and their articles', async () => {
     searchRassegne.mockResolvedValue(answer([passo('a', 2024, 'Il danno da perdita di chance è risarcibile.')]));
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     await search('perdita  chance, perdita');
     expect(searchRassegne).toHaveBeenCalledWith({ q: 'perdita chance' }); // each word once, as the API reads them
     const item = (await screen.findAllByRole('listitem'))[0];
@@ -102,7 +104,7 @@ describe('RassegneSearchPage', () => {
   it('opens a long passage on the lines around the first word found, and shows it whole on request', async () => {
     const testo = `${'premessa '.repeat(40)}qui la clausola penale conta.`;
     searchRassegne.mockResolvedValue(answer([passo('a', 2024, testo)]));
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     const user = await search('clausola');
     const item = (await screen.findAllByRole('listitem'))[0];
     const text = item.querySelector('p[id]')!;
@@ -116,7 +118,7 @@ describe('RassegneSearchPage', () => {
   });
 
   it('refuses words past the limits without asking, and says why', async () => {
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     await search('uno due tre quattro cinque sei sette otto nove');
     expect(screen.getByRole('alert')).toHaveTextContent('Al massimo 8 parole e 200 caratteri.');
     expect(screen.getByRole('searchbox')).toHaveAttribute('aria-invalid', 'true');
@@ -128,7 +130,7 @@ describe('RassegneSearchPage', () => {
 
   it('says when nothing is found, when no store is built, and when the reviews cannot answer', async () => {
     searchRassegne.mockResolvedValueOnce(answer([], { archivi: [] }));
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     await search('zzqx');
     expect(await screen.findByText('Nessun passo contiene tutte queste parole.')).toBeInTheDocument();
 
@@ -154,7 +156,7 @@ describe('RassegneSearchPage', () => {
     const penale = passo('p1', 2023, 'Il danno penale.', 'penale');
     const archivi = [{ archivio: 'civile', passi: 3 }, { archivio: 'penale', passi: 1 }];
     searchRassegne.mockResolvedValueOnce(answer([civile, penale], { total: 4, archivi, next_cursor: '2' }));
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     const user = await search('danno');
     expect(await screen.findByText('4 passi')).toBeInTheDocument();
     const group = screen.getByRole('group', { name: 'Archivio' });
@@ -185,19 +187,19 @@ describe('RassegneSearchPage', () => {
 
   it('finds the last search as it was on the way back from an article, and forgets it at logout', async () => {
     searchRassegne.mockResolvedValue(answer([passo('a', 2024, 'Il danno ingiusto.')]));
-    const first = render(<RassegneSearchPage />);
+    const first = render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     await search('ingiusto');
     await screen.findByText('1 passo');
     first.unmount();
 
-    const back = render(<RassegneSearchPage />);
+    const back = render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     expect(screen.getByRole('searchbox')).toHaveValue('ingiusto');
     expect(screen.getByText('1 passo')).toBeInTheDocument();
     expect(searchRassegne).toHaveBeenCalledTimes(1);
     back.unmount();
 
     clearRassegneCache(); // what the logout runs
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     expect(screen.getByRole('searchbox')).toHaveValue('');
     expect(screen.queryByText('1 passo')).toBeNull();
   });
@@ -205,10 +207,36 @@ describe('RassegneSearchPage', () => {
   it('never writes the words to the console when a search fails', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     searchRassegne.mockRejectedValueOnce(new RassegneError(503));
-    render(<RassegneSearchPage />);
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
     await search('parolasegretissima');
     await screen.findByText('Le rassegne non sono disponibili al momento.');
     expect(JSON.stringify(error.mock.calls)).not.toContain('parolasegretissima');
     error.mockRestore();
+  });
+
+  it('opened from ⌘K, shows the search done there with the passage chosen whole and focused', () => {
+    const long = `${'premessa '.repeat(60)}fine.`;
+    rememberSearch({
+      text: 'danno', q: 'danno', archivio: null, total: 2, archivi: [{ archivio: 'civile', passi: 2 }],
+      items: [passo('a', 2024, 'Primo.'), passo('b', 2023, long)], next: null,
+    });
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/rassegne', state: { passo: 'b' } }]}>
+        <RassegneSearchPage />
+      </MemoryRouter>,
+    );
+    expect(searchRassegne).not.toHaveBeenCalled();
+    expect(screen.getByRole('searchbox')).toHaveValue('danno');
+    const items = screen.getAllByRole('listitem');
+    expect(items[1]).toHaveFocus();
+    expect(within(items[1]).getByRole('button', { name: 'Mostra meno' })).toBeInTheDocument();
+  });
+
+  it('offers to add each passage to a pratica', async () => {
+    searchRassegne.mockResolvedValue(answer([passo('a', 2024, 'Il danno.')]));
+    render(<MemoryRouter><RassegneSearchPage /></MemoryRouter>);
+    await search('danno');
+    const item = (await screen.findAllByRole('listitem'))[0];
+    expect(within(item).getByRole('button', { name: 'Aggiungi alla pratica' })).toBeInTheDocument();
   });
 });

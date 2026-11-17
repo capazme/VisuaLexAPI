@@ -352,7 +352,7 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCoun
         const isChecked = s.id === checked;
         const badge = s.id === 'forum' ? forumCount : s.id === 'opus' ? opusCount : 0;
         const badgeLabel = s.id === 'opus' ? todayCountLabel(badge) : `${badge} notifiche`;
-        // Labs with its tools off (A7) stays, said «in arrivo» as the sidebar says Atti and Anonimizzatore.
+        // Labs with its tools off (A7) stays, said «in arrivo» as the sidebar says the tools that are coming.
         const soon = s.id === 'academia' && !isMerltEnabled();
         return (
           <button

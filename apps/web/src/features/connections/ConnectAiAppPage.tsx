@@ -5,6 +5,7 @@ import { getErrorMessage } from '../../utils/errors';
 import { connectionsService, type ConnectionInfo } from './connectionsService';
 import { ConnectedAppsSection } from './ConnectedAppsSection';
 import { CopyableCode } from './CopyableCode';
+import { AiWaysDiagram } from './AiWaysDiagram';
 import { PageFrame } from '../../components/layout/PageFrame';
 import { AI_TOOLS, UNSUPPORTED_CLIENTS, aiClients, type AiClient } from './aiClients';
 import {
@@ -206,14 +207,16 @@ export function ConnectAiAppPage() {
     <PageFrame title="Collega un’app AI" width="reading">
       <div className="space-y-8 pb-12">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Un’app di intelligenza artificiale collegata a LexCraft può leggere i tuoi dossier, crearne di nuovi e aggiungervi
+          Un’app di intelligenza artificiale collegata a LexCraft può leggere le tue pratiche, crearne di nuove e aggiungervi
           norme, sentenze, note e schede di studio, con il tuo account. Il collegamento usa il protocollo MCP: copi
           l’indirizzo nell’app, accedi a LexCraft e scegli tu i permessi.
         </p>
 
+        <AiWaysDiagram />
+
         <nav aria-label="Le due parti della pagina" className="space-y-2">
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Sono due cose diverse: LexCraft collega l’app AI al tuo account e ai tuoi dossier, online; mcp-legal-it si installa sul
+            Sono due cose diverse: LexCraft collega l’app AI al tuo account e alle tue pratiche, online; mcp-legal-it si installa sul
             tuo computer e dà all’app AI strumenti di diritto italiano, senza account.
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
@@ -248,7 +251,7 @@ export function ConnectAiAppPage() {
                 Dati personali e app AI
               </h2>
               <p>
-                Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci, le tue note, le tue schede e i tuoi percorsi di studio, e li
+                Un’app AI collegata legge i nomi delle tue pratiche, i titoli e i riferimenti delle voci, le tue note, il testo degli atti delle tue pratiche, le tue schede e i tuoi percorsi di studio, e li
                 passa al servizio di intelligenza artificiale che usa. Non scrivere lì dati personali dei clienti, oppure collega
                 solo app AI di cui ti fidi.
               </p>
@@ -343,7 +346,7 @@ export function ConnectAiAppPage() {
                 </li>
               </ol>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Ciò che viene eliminato finisce nel cestino per 30 giorni: lo trovi in Dossier → Cestino e puoi ripristinarlo.
+                Ciò che viene eliminato finisce nel cestino per 30 giorni: lo trovi in Pratiche → Cestino e puoi ripristinarlo.
               </p>
             </div>
           </section>

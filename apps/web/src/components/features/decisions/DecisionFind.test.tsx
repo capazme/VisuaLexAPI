@@ -84,7 +84,7 @@ describe('«Cerca nel testo» on a decision', () => {
     fireEvent.click(magnifier());
     expect(screen.getByRole('search').closest('.glass-toolbar')).toBeNull();
     expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questo tavolo' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('finds a word typed without its accent, and the same word with it', async () => {

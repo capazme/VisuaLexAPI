@@ -72,13 +72,13 @@ beforeEach(() => {
 describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () => {
   it('as its entry is pointed at, touched or focused', () => {
     renderSidebar('/');
-    const dossier = screen.getAllByRole('link', { name: 'Dossier' })[0];
+    const dossier = screen.getAllByRole('link', { name: 'Pratiche' })[0];
     fireEvent.pointerEnter(dossier, { pointerType: 'mouse' });
-    expect(prepared.paths).toEqual(['/dossier']);
-    fireEvent.pointerDown(screen.getByRole('link', { name: 'Atti' }));
-    expect(prepared.paths).toEqual(['/dossier', '/work/atti']);
-    fireEvent.focus(screen.getByRole('link', { name: 'Corpus' }));
-    expect(prepared.paths).toEqual(['/dossier', '/work/atti', '/']);
+    expect(prepared.paths).toEqual(['/pratiche']);
+    fireEvent.pointerDown(screen.getByRole('link', { name: /^Scadenziario/ }));
+    expect(prepared.paths).toEqual(['/pratiche', '/work/scadenziario']);
+    fireEvent.focus(screen.getByRole('link', { name: 'Ricerca' }));
+    expect(prepared.paths).toEqual(['/pratiche', '/work/scadenziario', '/']);
   });
 });
 
@@ -97,7 +97,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar('/');
-    expect(navHrefs()).toEqual(['/work/oggi', '/', '/dossier', '/work/atti']);
+    expect(navHrefs()).toEqual(['/work/scadenziario', '/', '/pratiche', '/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -113,13 +113,13 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
 // «Percorsi», second in «Studia», behind the switch `lingo_courses` (courses spec §6.1, §10.10).
 describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
   afterEach(() => coursesSwitchStore.setState({ state: 'unknown' }));
-  const studia = () => navHrefs().filter((h) => h.startsWith('/learn') || h === '/dossier');
+  const studia = () => navHrefs().filter((h) => h.startsWith('/learn') || h === '/pratiche');
 
   it('is absent while the switch is off or not yet read', () => {
     for (const state of ['unknown', 'off'] as const) {
       coursesSwitchStore.setState({ state });
       const { unmount } = renderSidebar('/learn/ripasso');
-      expect(studia()).toEqual(['/learn/ripasso', '/learn/progressi', '/dossier', '/learn/schede']);
+      expect(studia()).toEqual(['/learn/ripasso', '/learn/progressi', '/pratiche', '/learn/schede']);
       unmount();
     }
   });
@@ -127,7 +127,7 @@ describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
   it('comes second, Oggi · Percorsi · Progressi · Dossier, once the switch is on', () => {
     coursesSwitchStore.setState({ state: 'on' });
     renderSidebar('/learn/ripasso');
-    expect(studia()).toEqual(['/learn/ripasso', '/learn/percorsi', '/learn/progressi', '/dossier', '/learn/schede']);
+    expect(studia()).toEqual(['/learn/ripasso', '/learn/percorsi', '/learn/progressi', '/pratiche', '/learn/schede']);
     expect(screen.getByRole('link', { name: 'Percorsi' })).toBeInTheDocument();
   });
 });

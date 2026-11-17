@@ -53,6 +53,22 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     expect(screen.queryByText(/All\./)).toBeNull();
   });
 
+  it('in the Ricerca it says «Aggiungi alla pratica» and which dossier holds it (LC59)', () => {
+    const { practiceId, actId } = setUp([CC_2043]);
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Sinistro Rossi', createdAt: '2026-11-01T00:00:00Z', items: [
+      { id: 'i1', type: 'norma', data: CC_2043.norma_data, addedAt: '2026-11-02T00:00:00Z' },
+    ] }] });
+    try {
+      render(row(practiceId, actId, CC_2043));
+      expect(screen.getByRole('button', { name: /^Aggiungi alla pratica art\. 2043/ })).toBeInTheDocument();
+      const mark = screen.getByText('Nella pratica «Sinistro Rossi»');
+      // Under the name, not beside it in the toggle: a narrow column never cuts the row's name for it (#536).
+      expect(screen.getByRole('button', { name: /^(Espandi|Comprimi) art\. 2043/ })).not.toContainElement(mark);
+    } finally {
+      appStore.setState({ dossiers: [] });
+    }
+  });
+
   it('says in its header that the article is among the quick norms, open or folded (R3b)', () => {
     const { practiceId, actId } = setUp([CC_2043]);
     appStore.setState({ quickNorms: [] });
@@ -158,5 +174,39 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     const { container } = render(row(practiceId, actId, CC_2043));
     const key = articleRowKey(practiceId, actId, practiceArticleKey(CC_2043));
     expect(container.querySelector('[data-practice-row]')?.getAttribute('data-practice-row')).toBe(key);
+  });
+});
+
+describe('PracticeArticleRow: LC61', () => {
+  it('the reader is told the row has the add, so its bar does not repeat it; in Lettura semplice of the Ricerca it is not', async () => {
+    const { SimpleReadingContext } = await import('./simpleReading');
+    const { practiceId, actId } = setUp([CC_2043]);
+    act(() => { s().setRowOpen(articleRowKey(practiceId, actId, practiceArticleKey(CC_2043)), true); });
+    const { unmount } = render(row(practiceId, actId, CC_2043));
+    expect(readers.at(-1)?.dossierCommandInRow).toBe(true);
+    unmount();
+    render(<SimpleReadingContext.Provider value={{ simple: true, practiceItems: [] }}>{row(practiceId, actId, CC_2043)}</SimpleReadingContext.Provider>);
+    expect(readers.at(-1)?.dossierCommandInRow).toBe(false);
+  });
+
+  it('in Lettura semplice of a dossier the star keeps one name, its state in aria-pressed', async () => {
+    const { SimpleReadingContext } = await import('./simpleReading');
+    const { ReadingHostContext } = await import('./readingHost');
+    const { practiceId, actId } = setUp([CC_2043]);
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Sinistro Rossi', createdAt: '', items: [
+      { id: 'i1', type: 'norma', data: CC_2043.norma_data, addedAt: '' },
+    ] }] });
+    render(
+      <ReadingHostContext.Provider value={{ search: vi.fn(), dossier: { id: 'd1' } }}>
+        <SimpleReadingContext.Provider value={{ simple: true, practiceItems: [] }}>{row(practiceId, actId, CC_2043)}</SimpleReadingContext.Provider>
+      </ReadingHostContext.Provider>,
+    );
+    const star = screen.getByRole('button', { name: 'Importante' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+    act(() => { appStore.setState({ dossiers: [{ id: 'd1', title: 'Sinistro Rossi', createdAt: '', items: [
+      { id: 'i1', type: 'norma', data: CC_2043.norma_data, addedAt: '', status: 'important' },
+    ] }] }); });
+    // the same name, now pressed
+    expect(screen.getByRole('button', { name: 'Importante' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

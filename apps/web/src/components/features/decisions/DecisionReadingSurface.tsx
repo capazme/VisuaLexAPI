@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
+import { useReadingSearch } from '../practice/readingHost';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { useCitationLinks } from '../../../hooks/useCitationLinks';
 import { useDecisionLinks } from '../../../hooks/useDecisionLinks';
@@ -53,6 +54,8 @@ export interface CitedNorms {
   holds: (citation: ParsedCitationData) => boolean;
   /** A click on a cited norm, with the link clicked; the preview's button, with none. */
   open: (citation: ParsedCitationData, link: HTMLElement | null) => void;
+  /** The preview's button for a norm the host does not hold; «Apri in Ricerca» when absent (the dossier's «Fonti»). */
+  elsewhere?: string;
 }
 
 export interface DecisionReadingSurfaceProps {
@@ -288,6 +291,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     setToast({ message: 'Passaggi chiave nascosti: li riaccendi da «Passaggi chiave» nella barra', type: 'info' });
   };
 
+  // A cited norm goes to whoever hosts the reading (LC52 c2); without a host, the store's search.
+  const search = useReadingSearch(triggerSearch);
+
   const origin = useMemo<ReadingBackEntry | undefined>(
     () => hostTabId ? { tabId: hostTabId, blockId: hostBlockId ?? hostTabId, articleId: '', label } : undefined,
     [hostTabId, hostBlockId, label],
@@ -295,7 +301,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
 
   const openCitation = useCallback((citation: ParsedCitationData, link: HTMLElement | null = null) => {
     if (citedNorms) return citedNorms.open(citation, link);
-    triggerSearch({
+    search({
       act_type: citation.act_type,
       act_number: citation.act_number || '',
       date: citation.date || '',
@@ -304,7 +310,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       ...(hostTabId ? { besideId: hostTabId } : {}),
     });
     onLeave?.();
-  }, [triggerSearch, hostTabId, onLeave, citedNorms]);
+  }, [search, hostTabId, onLeave, citedNorms]);
 
   const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin, onOpened: onLeave });
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
@@ -519,7 +525,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         position={preview.position}
         onClose={hidePreview}
         // In the dossier: «Apri tra le norme» for a norm it holds, else Dashboard, as the dossier's own buttons say.
-        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : 'Apri nel Corpus') : undefined}
+        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : citedNorms.elsewhere ?? 'Apri in Ricerca') : undefined}
         onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);

@@ -12,9 +12,10 @@ export function SessionEndProgress({ data }: { data: Progressi | null }) {
   if (!data) return null;
   const { oggi, serie } = data;
   return (
-    <div className="flex w-full flex-wrap items-center justify-center gap-x-8 gap-y-4">
+    // LC39: the goal as a line and its bar, the streak as one line with its lamp; no week of boxes here.
+    <div className="grid w-full justify-items-center gap-4">
       <GoalRing giorno={oggi.giorno} ripassi={oggi.ripassi} obiettivo={oggi.obiettivo} raggiunto={oggi.raggiunto} />
-      <StreakBadge attuale={serie.attuale} record={serie.record} ultimiGiorni={serie.ultimiGiorni} />
+      <StreakBadge compact attuale={serie.attuale} record={serie.record} ultimiGiorni={serie.ultimiGiorni} />
     </div>
   );
 }

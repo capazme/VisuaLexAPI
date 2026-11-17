@@ -33,7 +33,7 @@ describe('the permission to delete', () => {
     const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
     expect(shown.status).toBe(200);
     expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write']);
-    expect(shown.body.deletion.label).toMatch(/^Eliminare dossier, voci e schede/);
+    expect(shown.body.deletion.label).toMatch(/^Eliminare pratiche, voci e schede/);
   });
 
   it('tells the consent page when the connection already may delete, so a reconnect does not drop it unseen (final review)', async () => {

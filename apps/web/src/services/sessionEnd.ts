@@ -43,7 +43,7 @@ export const BROWSER_STORAGE: readonly StorageEntry[] = [
   { area: 'local', key: OWNER_KEY, kind: 'auth', what: 'the id of the person whose data this browser holds' },
   { area: 'session', key: 'vlx:return-to', kind: 'auth', what: 'the page to go back to after signing in again' },
   // the store
-  { area: 'local', key: 'visualex-storage', kind: 'store', what: 'settings, panel positions, and the practices (only copy: parked, see PARKED_STORE_FIELDS)' },
+  { area: 'local', key: 'visualex-storage', kind: 'store', what: 'settings, panel positions, and the Ricerca practices of before LC60 until the riquadro is answered (only copy: parked, see PARKED_STORE_FIELDS)' },
   // only copy
   { area: 'local', key: 'visualex.parked.*', kind: 'auth', what: 'the only-copy work of a person, parked when their session ended' },
   // user
@@ -56,6 +56,7 @@ export const BROWSER_STORAGE: readonly StorageEntry[] = [
   { area: 'local', key: 'visualex.studia.valida.materia', kind: 'user', what: 'Gymnasium: the subject chosen for validation' },
   { area: 'local', key: 'visualex.studia.percorsi.passo', kind: 'user', what: 'Gymnasium: the step reached in each module' },
   { area: 'session', key: 'visualex.studia.percorsi.lavoro', kind: 'user', what: 'Gymnasium: the work on a module in this tab' },
+  { area: 'local', key: 'visualex.atti.avviso-visto', kind: 'user', what: 'the notice before the first upload of a case file, seen (shown again after a sign-out)' },
   { area: 'local', key: 'visualex.merlt.consent', kind: 'user', what: 'legacy: the MERL-T consent level, no longer written' },
   { area: 'local', key: 'visualex.merlt.consent-snooze', kind: 'user', what: 'legacy: the old consent banner snoozed, no longer written' },
   { area: 'local', key: 'visualex.merlt.ask-teaser-dismissed', kind: 'user', what: 'legacy: the old teaser dismissed, no longer written' },
@@ -95,7 +96,8 @@ function storageOf(area: StorageArea): Storage | null {
 }
 
 const STORE_KEY = 'visualex-storage';
-/** The fields of the store's persisted value that are only-copy work (spec D6: the practices live in the browser). */
+/** The fields of the store's persisted value that are only-copy work: the Corpus practices a browser kept, saved only
+ *  until the LC60 riquadro is answered (`corpusPracticesPending`); parked work of before is still given back. */
 export const PARKED_STORE_FIELDS = ['practices', 'activePracticeId'] as const;
 const PARKED_PREFIX = 'visualex.parked.';
 /** Parked work whose owner is unknown (a browser from before the owner mark): never given back automatically. */

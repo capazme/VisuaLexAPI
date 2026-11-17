@@ -4,6 +4,7 @@ import type { ToastProps } from '../../ui/Toast';
 import { dossierContainsDecision } from '../dossier/dossierUtils';
 import { discardEmptyDossier } from '../dossier/deleteDossierWithUndo';
 import { dossierHoldsArticle, practiceDossierItems } from './practiceDossierItems';
+import { isBoundPractice } from '../../../utils/practice';
 
 export interface SaveNotice {
   message: string;
@@ -62,13 +63,7 @@ export function useSavePracticeAsDossier() {
   const [notice, setNotice] = useState<SaveNotice | null>(null);
 
   const save = useCallback(async (practiceId: string, target: { dossierId: string } | null) => {
-    if (saving.has(practiceId)) return;
-    setSaving(practiceId, true);
-    try {
-      await saveOnce(practiceId, target, setNotice);
-    } finally {
-      setSaving(practiceId, false);
-    }
+    await savePracticeAsDossier(practiceId, target, setNotice);
   }, []);
 
   return {
@@ -79,13 +74,38 @@ export function useSavePracticeAsDossier() {
   };
 }
 
+/** What a save did: `ok` when everything it had to save is in the dossier; the dossier it wrote to, once there is one. */
+export interface SaveOutcome {
+  ok: boolean;
+  dossierId?: string;
+}
+
+/**
+ * The save itself, outside React (LC60: the riquadro of the Corpus's practices uses it too). One save at a time per
+ * practice: a second one started meanwhile does nothing and is not `ok`.
+ */
+export async function savePracticeAsDossier(
+  practiceId: string,
+  target: { dossierId: string } | null,
+  setNotice: (notice: SaveNotice | null) => void = () => {},
+): Promise<SaveOutcome> {
+  if (saving.has(practiceId)) return { ok: false };
+  setSaving(practiceId, true);
+  try {
+    return await saveOnce(practiceId, target, setNotice);
+  } finally {
+    setSaving(practiceId, false);
+  }
+}
+
 async function saveOnce(
   practiceId: string,
   target: { dossierId: string } | null,
   setNotice: (notice: SaveNotice | null) => void,
-): Promise<void> {
+): Promise<SaveOutcome> {
   const practice = appStore.getState().practices.find((p) => p.id === practiceId);
-  if (!practice) return;
+  // A bound table is its dossier already: «Salva come dossier» is the Corpus's.
+  if (!practice || isBoundPractice(practice)) return { ok: false };
   const { norms, decisions, unidentified } = practiceDossierItems(practice);
   const unidentifiedText = unidentified > 0
     ? `${plural(unidentified, 'sentenza non identificata non è stata', 'sentenze non identificate non sono state')} salvat${unidentified === 1 ? 'a' : 'e'}`
@@ -98,7 +118,7 @@ async function saveOnce(
   let already = 0;
   if (target) {
     const dossier = appStore.getState().dossiers.find((d) => d.id === target.dossierId);
-    if (!dossier) return;
+    if (!dossier) return { ok: false };
     dossierId = dossier.id;
     title = dossier.title;
     wantedNorms = norms.filter((n) => !dossierHoldsArticle(dossier, n));
@@ -116,17 +136,17 @@ async function saveOnce(
       unidentifiedText,
     ].filter(Boolean);
     const message = target
-      ? `Il dossier «${title}» ha già tutto${parts.length ? `: ${parts.join('. ')}` : ''}`
-      : `La pratica non ha nulla da salvare${unidentifiedText ? `. ${unidentifiedText}` : '.'}`;
+      ? `La pratica «${title}» ha già tutto${parts.length ? `: ${parts.join('. ')}` : ''}`
+      : `Non c’è nulla da salvare${unidentifiedText ? `. ${unidentifiedText}` : '.'}`;
     setNotice({ message, type: 'info' });
-    return;
+    return { ok: true, ...(target ? { dossierId: target.dossierId } : {}) };
   }
 
   const store = appStore.getState();
   if (!target) {
     // createDossier shows its own sync error when refused; nothing else was done yet.
     const created = await store.createDossier(title);
-    if (!created) return;
+    if (!created) return { ok: false };
     dossierId = created;
   }
 
@@ -145,16 +165,17 @@ async function saveOnce(
     if (saved <= 0 && !target) {
       // Nothing made it: no half-made dossier is left behind, nor in the trash (the user deleted nothing).
       void discardEmptyDossier(dossierId);
-      appStore.getState().pushSyncError('Impossibile salvare la pratica come dossier: nessun elemento è stato salvato. Riprova.');
+      dossierId = '';
+      appStore.getState().pushSyncError('Impossibile salvare come pratica: nessun elemento è stato salvato. Riprova.');
     } else {
       appStore.getState().pushSyncError(
-        `Dossier «${title}»: ${plural(missing, 'elemento non è stato salvato', 'elementi non sono stati salvati')}. Riprova.`,
+        `Pratica «${title}»: ${plural(missing, 'elemento non è stato salvato', 'elementi non sono stati salvati')}. Riprova.`,
       );
       setNotice(saved <= 0
-        ? { message: `Nessun elemento è stato salvato nel dossier «${title}»`, type: 'error' }
-        : { message: `Salvato solo in parte nel dossier «${title}»`, type: 'warning' });
+        ? { message: `Nessun elemento è stato salvato nella pratica «${title}»`, type: 'error' }
+        : { message: `Salvato solo in parte nella pratica «${title}»`, type: 'warning' });
     }
-    return;
+    return { ok: false, ...(dossierId ? { dossierId } : {}) };
   }
 
   const savedNorms = wantedNorms.length;
@@ -167,5 +188,6 @@ async function saveOnce(
     unidentifiedText,
     already > 0 ? `${already} già ${already === 1 ? 'presente' : 'presenti'}` : null,
   ].filter(Boolean);
-  setNotice({ message: [`Salvato nel dossier «${title}»: ${counts}`, ...extras].join('. '), type: 'success' });
+  setNotice({ message: [`Salvato nella pratica «${title}»: ${counts}`, ...extras].join('. '), type: 'success' });
+  return { ok: true, dossierId };
 }

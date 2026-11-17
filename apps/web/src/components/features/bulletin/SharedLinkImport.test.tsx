@@ -32,7 +32,7 @@ describe('SharedLinkImport', () => {
 
   it('previews an old link and recovers its dossiers, never its quick norms, then clears the address', async () => {
     const onRecovered = show(`?import=${encode(shared)}`);
-    expect(screen.getByRole('dialog', { name: 'Recupera i dossier' })).toHaveTextContent('Il link condiviso «GDPR» diventa un tuo dossier di studio.');
+    expect(screen.getByRole('dialog', { name: 'Recupera i dossier' })).toHaveTextContent('Il link condiviso «GDPR» diventa una tua pratica di studio.');
     fireEvent.click(screen.getByRole('button', { name: 'Recupera i dossier' }));
     await waitFor(() => expect(onRecovered).toHaveBeenCalled());
     expect(service.importStudy).toHaveBeenCalledWith(

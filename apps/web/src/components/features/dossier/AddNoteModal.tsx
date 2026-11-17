@@ -15,7 +15,7 @@ interface Props {
 // The cap the MCP round sets for Claude's notes too (S11): one cap for every note of a dossier.
 const MAX_NOTE_LENGTH = 4000;
 
-export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al dossier', confirmLabel = 'Aggiungi al dossier' }: Props) {
+export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota alla pratica', confirmLabel = 'Aggiungi alla pratica' }: Props) {
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -88,7 +88,7 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
             onChange={(e) => setText(e.target.value.slice(0, MAX_NOTE_LENGTH))}
             onKeyDown={handleKeyDown}
             rows={6}
-            placeholder="Scrivi un appunto, una riflessione o un promemoria da allegare al dossier…"
+            placeholder="Scrivi un appunto, una riflessione o un promemoria da allegare alla pratica…"
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 resize-y min-h-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           />
           <div className="flex justify-between text-xs text-slate-400">

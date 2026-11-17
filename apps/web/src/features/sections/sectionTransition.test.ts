@@ -37,7 +37,7 @@ function newPage() {
 const title = () => document.querySelector<HTMLElement>('[data-section-title]')!;
 
 beforeEach(() => {
-  document.body.innerHTML = '<main><h2 data-section-title="opus" tabindex="-1">I tuoi dossier di lavoro</h2></main>';
+  document.body.innerHTML = '<main><h2 data-section-title="opus" tabindex="-1">Le tue pratiche di lavoro</h2></main>';
 });
 
 afterEach(() => {
@@ -88,7 +88,7 @@ describe('playSectionTransition (T1)', () => {
   it('waits for the new section\'s title on the element already there (the dossier list from Gymnasium to Opus)', async () => {
     reducedMotion(false);
     stubViewTransition();
-    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">I tuoi dossier di studio</h2>';
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">Le tue pratiche di studio</h2>';
     const heading = title();
     playSectionTransition({ section: 'opus', swap: () => queueMicrotask(() => heading.setAttribute('data-section-title', 'opus')) });
     expect(heading).not.toHaveFocus();
@@ -160,7 +160,7 @@ describe('playSectionTransition (T1)', () => {
   it('does not stop on a heading that already said the section: the dossier list from the Forum, before Gymnasium\'s page', async () => {
     reducedMotion(false);
     stubViewTransition();
-    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">I tuoi dossier di studio</h2>';
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">Le tue pratiche di studio</h2>';
     const stale = title();
     let draw = () => {};
     playSectionTransition({ section: 'gymnasium', swap: () => { draw = newPage; } });
@@ -175,7 +175,7 @@ describe('playSectionTransition (T1)', () => {
   it('takes that heading after the hold if the page did not change (the same address)', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reducedMotion(true);
-    document.querySelector('main')!.innerHTML = '<h2 data-section-title="opus" tabindex="-1">I tuoi dossier di lavoro</h2>';
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="opus" tabindex="-1">Le tue pratiche di lavoro</h2>';
     playSectionTransition({ section: 'opus', swap: () => {} });
     await Promise.resolve();
     expect(title()).not.toHaveFocus();
@@ -224,7 +224,7 @@ describe('playSectionTransition (T1)', () => {
     reducedMotion(false);
     const { state } = stubViewTransition();
     // The dossier list said Gymnasium already: the heading the hold would take.
-    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">I tuoi dossier di studio</h2>';
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">Le tue pratiche di studio</h2>';
     const swap = vi.fn();
     playSectionTransition({ section: 'gymnasium', swap });
     await updateRuns();
@@ -238,7 +238,7 @@ describe('playSectionTransition (T1)', () => {
   it('under reduced motion, Back stops the wait for the title too', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reducedMotion(true);
-    document.querySelector('main')!.innerHTML = '<h2 data-section-title="opus" tabindex="-1">I tuoi dossier di lavoro</h2>';
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="opus" tabindex="-1">Le tue pratiche di lavoro</h2>';
     playSectionTransition({ section: 'opus', swap: () => {} });
     window.dispatchEvent(new PopStateEvent('popstate'));
     vi.advanceTimersByTime(HOLD_MAX * 2);
@@ -285,7 +285,7 @@ describe('playSectionTransition (T1)', () => {
     title().blur();
     expect(title()).not.toHaveAttribute('data-pointer-focus');
 
-    document.body.innerHTML = '<main><h2 data-section-title="opus" tabindex="-1">I tuoi dossier di lavoro</h2></main>';
+    document.body.innerHTML = '<main><h2 data-section-title="opus" tabindex="-1">Le tue pratiche di lavoro</h2></main>';
     playSectionTransition({ section: 'gymnasium', swap: newPage });
     await waitFor(() => expect(title()).toHaveFocus());
     expect(title()).not.toHaveAttribute('data-pointer-focus');

@@ -33,13 +33,14 @@ const TAG_MAX = 30;
 const INPUT = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const LINK_BUTTON = `rounded px-2 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`;
 
-// The owner's wording (14 October 2026, question 186), with his added sentence on manuals.
+// The owner's wording (14 October 2026, question 186), with his added sentence on manuals. LC60: what travels, first.
 const WARNING = [
+  'Si pubblicano le fonti della pratica, non i suoi atti né le istruzioni per Claude; delle note e delle evidenziazioni, solo quelle che spunti qui sopra.',
   'Chiunque abbia un account VisuaLex potrà leggerlo e scaricarne una copia: il titolo, la descrizione, le voci, le note e le evidenziazioni spuntate qui sopra, con il tuo nome utente.',
-  'Le note appartengono all’articolo, non al dossier: controlla anche quelle scritte per altre pratiche.',
+  'Le note appartengono all’articolo, non alla pratica: controlla anche quelle scritte per altre pratiche.',
   'Non pubblicare dati personali dei clienti o di altre persone, né fatti di una pratica che le rendano riconoscibili.',
   'Non copiare testi di manuali o commentari.',
-  'Se ritiri il dossier, chi l’ha già scaricato ne conserva la copia.',
+  'Se ritiri la pratica, chi l’ha già scaricata ne conserva la copia.',
 ];
 
 /** A text with the personal data the machine found marked, every character kept (plain text, never HTML). */
@@ -320,8 +321,8 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
         <section aria-labelledby="publish-warning" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
           <ShieldAlert size={18} className="mt-0.5 shrink-0" aria-hidden />
           <div className="space-y-1">
-            <h3 id="publish-warning" className="font-semibold">Stai per rendere pubblico questo dossier.</h3>
-            {dossier.kind !== 'studio' && <p className="font-medium">È un dossier di lavoro: controlla con attenzione titolo e note.</p>}
+            <h3 id="publish-warning" className="font-semibold">Stai per rendere pubblica questa pratica.</h3>
+            {dossier.kind !== 'studio' && <p className="font-medium">È una pratica di lavoro: controlla con attenzione titolo e note.</p>}
             {WARNING.map((line) => <p key={line}>{line}</p>)}
             <label className={`mt-2 flex items-start gap-2 font-medium ${TOUCH_TARGET_RESPONSIVE}`}>
               <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" />
@@ -373,7 +374,7 @@ function RowGroup({ heading, hint, rows, ticked, onToggle, onAll }: {
                 {row.text && <span className="block whitespace-pre-wrap break-words text-slate-800 dark:text-slate-200"><Flagged text={row.text} /></span>}
                 {row.overlap.length > 0 && (
                   <span className="block text-xs font-medium text-amber-700 dark:text-amber-300">
-                    Anche nel dossier di lavoro {row.overlap.map((n) => `«${n}»`).join(', ')}
+                    Anche nella pratica di lavoro {row.overlap.map((n) => `«${n}»`).join(', ')}
                   </span>
                 )}
               </span>

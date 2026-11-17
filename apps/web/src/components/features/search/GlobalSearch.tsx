@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useSearchActions } from '../../../hooks/useSearchActions';
@@ -18,6 +19,7 @@ export function GlobalSearch() {
     closeQuickNormsManager: s.closeQuickNormsManager,
   })));
   const actions = useSearchActions();
+  const navigate = useNavigate();
 
   return (
     <>
@@ -27,6 +29,7 @@ export function GlobalSearch() {
         onSearch={actions.search}
         onBrowseStructure={(params) => void actions.browse(params)}
         onShowSearch={actions.goToSearch}
+        onOpenRassegne={(passo) => navigate('/rassegne', passo ? { state: { passo } } : undefined)}
       />
       {/* A quick norm used from the manager runs as it always did (a trigger, checked for an annex), and
           from another page brings the reader to the search page. */}

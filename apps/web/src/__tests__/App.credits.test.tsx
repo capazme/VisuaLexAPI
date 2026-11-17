@@ -27,7 +27,7 @@ describe('App routing — /crediti', () => {
   });
 
   it('still sends a signed-out reader of the app to the login', async () => {
-    window.history.pushState({}, '', '/dossier');
+    window.history.pushState({}, '', '/pratiche');
     render(<App />);
     expect(await screen.findByTestId('login')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');

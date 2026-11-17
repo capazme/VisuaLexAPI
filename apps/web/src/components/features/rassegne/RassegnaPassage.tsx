@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { DecisionChip } from './DecisionChip';
+import { AddPassageToPratica } from './AddPassageToPratica';
 import { CaseLawRow } from '../../../components/features/search/caseLaw/CaseLawRow';
 import { provenance } from './rassegnaFilters';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
@@ -59,6 +60,7 @@ export function RassegnaPassage({ passo, besideId, backEntry }: { passo: Rassegn
               Apri sul portale del Massimario
             </a>
           </p>
+          <AddPassageToPratica passo={passo} />
         </>
       )}
     >

@@ -41,7 +41,7 @@ vi.mock('../../../hooks/useTour', () => ({
 import { appStore } from '../../../store/useAppStore';
 import { Layout } from '../Layout';
 
-const at = (path = '/dossier') => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
+const at = (path = '/pratiche') => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
 const dot = () => document.querySelector('[data-service-health-dot]');
 
 beforeEach(() => {

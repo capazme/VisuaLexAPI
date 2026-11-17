@@ -52,12 +52,12 @@ describe('useTrash', () => {
   it('asks for a dossier when the entry’s own is gone', async () => {
     appStore.setState({ dossiers: [] });
     list.mockResolvedValue([entry()]);
-    restoreCall.mockRejectedValue({ status: 409, message: 'Il dossier non esiste più: scegli dove ripristinare.' });
+    restoreCall.mockRejectedValue({ status: 409, message: 'La pratica non esiste più: scegli dove ripristinare.' });
     const { result } = renderHook(() => useTrash());
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     let outcome;
     await act(async () => { outcome = await result.current.restore(entry()); });
-    expect(outcome).toEqual({ kind: 'needs-target', message: 'Il dossier non esiste più: scegli dove ripristinare.' });
+    expect(outcome).toEqual({ kind: 'needs-target', message: 'La pratica non esiste più: scegli dove ripristinare.' });
   });
 
   it('says the trash is out of reach when it cannot be read', async () => {
@@ -137,7 +137,7 @@ describe('useTrash — what can go wrong', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     let outcome;
     await act(async () => { outcome = await result.current.restore(entry(), 'd2'); });
-    expect(outcome).toEqual({ kind: 'needs-target', message: 'Il dossier scelto non esiste più: scegline un altro.' });
+    expect(outcome).toEqual({ kind: 'needs-target', message: 'La pratica scelta non esiste più: scegline un’altra.' });
     expect(result.current.entries).toHaveLength(1);
   });
 

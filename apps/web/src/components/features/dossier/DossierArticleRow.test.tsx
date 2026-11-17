@@ -89,7 +89,7 @@ describe('DossierArticleRow expansion', () => {
     const toggle = screen.getByRole('button', { name: /espandi codice civile/i });
     expect(within(toggle).queryAllByRole('button')).toHaveLength(0);
     expect(screen.getByRole('button', { name: /segna come importante/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /rimuovi articolo dal dossier/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /rimuovi articolo dalla pratica/i })).toBeInTheDocument();
   });
 
   it('fires onToggleExpand when the row is activated, by click and by keyboard', () => {

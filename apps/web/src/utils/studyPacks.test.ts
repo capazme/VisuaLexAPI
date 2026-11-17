@@ -38,7 +38,7 @@ describe('the ready-made study dossiers', () => {
     expect(content.dossiers).toBe(STUDY_PACKS[0].dossiers);
   });
 
-  it('are marked as added when a dossier di studio holds each of their names', async () => {
+  it('are marked as added when a pratica di studio holds each of their names', async () => {
     const STUDY_PACKS = await loadStudyPacks();
     const pack = STUDY_PACKS[0];
     const mine = (kind: 'lavoro' | 'studio') => pack.dossiers.map((d): Pick<Dossier, 'title' | 'kind'> => ({ title: d.title, kind }));

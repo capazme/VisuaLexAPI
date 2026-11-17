@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -12,7 +12,16 @@ vi.mock('../../../hooks/useTour', () => ({
   },
 }));
 
+// The reviews' call is its own (`searchRassegne`): the global fetch stubs below answer /parse_query only.
+const searchRassegne = vi.hoisted(() => vi.fn());
+vi.mock('../../../services/rassegneService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../services/rassegneService')>()),
+  searchRassegne: (...args: unknown[]) => searchRassegne(...args),
+}));
+
 import { CommandPalette } from './CommandPalette';
+import { rememberedSearch, rememberSearch } from '../rassegne/searchMemory';
+import { RassegneError } from '../../../services/rassegneService';
 import { appStore } from '../../../store/useAppStore';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { subscribeSearchField, type SearchFieldRequest } from '../../../utils/searchFieldControl';
@@ -45,6 +54,8 @@ const PARSE_QUERY_OK = {
 };
 
 beforeEach(() => {
+  searchRassegne.mockReset();
+  searchRassegne.mockResolvedValue({ total: 0, volumi: 63, archivi: [], items: [], next_cursor: null });
   vi.stubGlobal('fetch', vi.fn(async () => ({
     ok: true,
     status: 200,
@@ -63,7 +74,7 @@ describe('CommandPalette — act names the client does not carry', () => {
     const user = fakeTimeUser();
     renderPalette();
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 18 statuto dei lavoratori');
     await settle();
 
     expect(fetch).toHaveBeenCalledWith('/parse_query', expect.objectContaining({ method: 'POST' }));
@@ -78,7 +89,7 @@ describe('CommandPalette — act names the client does not carry', () => {
 
     // "cc" is in the client ABBREVIATION_MAP, so the fallback must stay quiet —
     // the local result has to keep winning or behaviour that works today shifts.
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc');
     // Step over the 250 ms wait: without it the assertion below can run before the fallback
     // could have fired, and a slow typist (a loaded machine) could fire it on a half-typed query.
     await settle();
@@ -96,7 +107,7 @@ describe('CommandPalette — act names the client does not carry', () => {
 
     const user = fakeTimeUser();
     renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 18 statuto dei lavoratori');
     await settle();
 
     // A backend that stopped answering must not be silent (CLAUDE.md gotcha 18).
@@ -110,7 +121,7 @@ describe('CommandPalette — the annex a citation names', () => {
     const user = fakeTimeUser();
     const onSearch = renderPalette();
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 d.lgs. 81/2008 (All. A){Enter}');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 1 d.lgs. 81/2008 (All. A){Enter}');
 
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'decreto legislativo', act_number: '81', annex: 'A' }));
   });
@@ -124,7 +135,7 @@ describe('CommandPalette — the annex a citation names', () => {
     const user = fakeTimeUser();
     const onSearch = renderPalette();
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 tusl (All. A)');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 1 tusl (All. A)');
     await settle();
     await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     await user.keyboard('{Enter}');
@@ -203,7 +214,7 @@ describe('CommandPalette — naming an act the server resolved', () => {
     const user = fakeTimeUser();
     renderPalette();
 
-    const input = screen.getByPlaceholderText(/art 2043 cc/i);
+    const input = screen.getByPlaceholderText(/^Atto o citazione/);
     await user.type(input, 'ai act');
     await settle();
     expect(fetch).toHaveBeenCalledWith('/parse_query', expect.anything());
@@ -257,7 +268,7 @@ describe('CommandPalette — presets the server already understands', () => {
     renderPalette();
     await screen.findByText(/2 già pronti/i);
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'codice appalti');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'codice appalti');
 
     // The "Codice Contratti Pubblici" tile covers this; a preset row beside it
     // is the duplication that made the section feel redundant.
@@ -269,7 +280,7 @@ describe('CommandPalette — presets the server already understands', () => {
     renderPalette();
     await screen.findByText(/2 già pronti/i);
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'gdpr');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'gdpr');
 
     expect(await screen.findByText('gdpr')).toBeInTheDocument();
     expect(screen.getByText(/In dotazione/i)).toBeInTheDocument();
@@ -285,7 +296,7 @@ describe('CommandPalette — presets the server already understands', () => {
     const user = userEvent.setup();
     renderPalette();
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'gdpr');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'gdpr');
 
     // The custom one resolves first, so advertising the preset would point at
     // a shortcut that no longer runs.
@@ -313,7 +324,7 @@ describe('CommandPalette — a decision named in the box', () => {
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={onClose} onSearch={onSearch} />);
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'Cass. civ. 99999/2024');
 
     // the visible line, and the one live region (mounted from the start) that announces it
     // One row says it, the chosen one (Bill: no second line saying the same).
@@ -336,11 +347,11 @@ describe('CommandPalette — a decision named in the box', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
 
     // a norm query is answered by the server first, then the box turns into a decision
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 18 statuto dei lavoratori');
     await settle();
     await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
-    await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
+    await user.clear(screen.getByPlaceholderText(/^Atto o citazione/));
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'Cass. civ. 99999/2024');
     await user.keyboard('{Enter}');
 
     expect(openDecision).toHaveBeenCalledTimes(1);
@@ -352,7 +363,7 @@ describe('CommandPalette — a decision named in the box', () => {
     renderPalette();
     const region = screen.getByRole('status');
     expect(region).toBeEmptyDOMElement();
-    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    const box = screen.getByPlaceholderText(/^Atto o citazione/);
     await user.type(box, 'Cass. civ. 99999/2024');
     expect(screen.getByRole('status')).toBe(region);
     expect(region).toHaveTextContent('Sentenza: Cass. civ., n. 99999/2024');
@@ -364,7 +375,7 @@ describe('CommandPalette — a decision named in the box', () => {
   it('still previews a norm as before', async () => {
     const user = userEvent.setup();
     renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc');
     await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     expect(screen.queryByText(/Apri la sentenza/)).toBeNull();
   });
@@ -380,7 +391,7 @@ describe('CommandPalette — a decision named in the box', () => {
     const user = userEvent.setup();
     renderPalette();
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'cass 99999/2024');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'cass 99999/2024');
 
     expect(screen.queryByText(/Apri la sentenza/)).toBeNull();
     await user.keyboard('{Enter}');
@@ -391,12 +402,12 @@ describe('CommandPalette — a decision named in the box', () => {
 describe('CommandPalette — focus on opening', () => {
   it('puts the cursor in the box, so typing goes somewhere', () => {
     renderPalette();
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveFocus();
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toHaveFocus();
   });
 
   it('gives the box its focus back when the first-open tour ends', async () => {
     renderPalette();
-    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    const box = screen.getByPlaceholderText(/^Atto o citazione/);
     // the tour took the focus (driver.js moves it into its popover)
     vi.useFakeTimers();
     box.blur();
@@ -408,7 +419,7 @@ describe('CommandPalette — focus on opening', () => {
 
   it('leaves the focus alone when another tour ends', async () => {
     renderPalette();
-    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    const box = screen.getByPlaceholderText(/^Atto o citazione/);
     vi.useFakeTimers();
     box.blur();
     act(() => { tour.onComplete?.('welcome'); });
@@ -421,7 +432,7 @@ describe('CommandPalette — a citation handed over as it opens', () => {
   it('puts it in the box, reads it as a decision, and takes it once', async () => {
     appStore.setState({ commandPaletteQuery: 'Cass. civ., n. 99999/2024' });
     renderPalette();
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('Cass. civ., n. 99999/2024');
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toHaveValue('Cass. civ., n. 99999/2024');
     expect(await screen.findByText(/Apri la sentenza/)).toBeInTheDocument();
     expect(appStore.getState().commandPaletteQuery).toBeNull();
   });
@@ -441,7 +452,7 @@ describe('CommandPalette — a topic for the Cassazione', () => {
     const user = fakeTimeUser();
     const onClose = vi.fn();
     render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'perdita di chance');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'perdita di chance');
     await settle();
     expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Cerca "perdita di chance" nelle sentenze della Cassazione.');
@@ -453,7 +464,7 @@ describe('CommandPalette — a topic for the Cassazione', () => {
   it('is not offered for a norm citation', async () => {
     const user = fakeTimeUser();
     renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc');
     await settle();
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
   });
@@ -467,7 +478,7 @@ describe('CommandPalette — a topic for the Cassazione', () => {
       }],
     } as never);
     renderPalette();
-    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    const box = screen.getByPlaceholderText(/^Atto o citazione/);
     await user.type(box, 'Cass. civ. 99999/2024');
     await settle();
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
@@ -480,7 +491,7 @@ describe('CommandPalette — a topic for the Cassazione', () => {
   it('is not offered for a box with no letter or digit', async () => {
     const user = fakeTimeUser();
     renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), '…');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), '…');
     await settle();
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
   });
@@ -490,11 +501,110 @@ describe('CommandPalette — a topic for the Cassazione', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { answer = resolve; })));
     const user = fakeTimeUser();
     renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'perdita di chance');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'perdita di chance');
     await settle();
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
     await act(async () => { answer({ ok: true, status: 200, json: async () => ({ recognized: false }) }); });
     expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette — the reviews under a topic (U3)', () => {
+  const open = vi.fn(() => 'tab');
+  const original = appStore.getState().openTopicSearch;
+  /** Invented passages: no text of the reviews enters the repository. */
+  const passo = (id: string, anno: number) => ({
+    id, anno, archivio: 'civile',
+    volume: { id: anno, numero: 2, titolo: `Massimario ${anno}` },
+    parte: null, capitolo: { nome: 'CAPITOLO I', titolo: 'LA RESPONSABILITÀ' },
+    sezione: { id: 1, numero: '2', titolo: 'Il danno.' },
+    autori: [], url: `https://example.invalid/${id}`, testo: `Testo inventato del passo ${id}.`,
+    evidenziazioni: [], pronunce: [], fonte: 'Ufficio del Massimario', articoli: [],
+  });
+  const PAGE = {
+    total: 12, volumi: 63, archivi: [{ archivio: 'civile', passi: 12 }],
+    items: [passo('p1', 2024), passo('p2', 2023), passo('p3', 2022), passo('p4', 2021)], next_cursor: '20',
+  };
+  beforeEach(() => {
+    open.mockClear();
+    rememberSearch(null);
+    appStore.setState({ openTopicSearch: open } as never);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
+  });
+  afterEach(() => appStore.setState({ openTopicSearch: original }));
+
+  async function typeTopic(onOpenRassegne = vi.fn(), onClose = vi.fn()) {
+    const user = fakeTimeUser();
+    render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} onOpenRassegne={onOpenRassegne} />);
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'responsabilità medica');
+    await settle(); // the server says it is not an act: a topic
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    return { user, onOpenRassegne, onClose };
+  }
+
+  it('shows the first three passages under the decisions, in a group of its own, the decisions still first', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    await typeTopic();
+    expect(searchRassegne).toHaveBeenCalledWith({ q: 'responsabilità medica' });
+    const group = (await screen.findByText('Rassegne')).closest('[cmdk-group]') as HTMLElement;
+    const rows = within(group).getAllByRole('option');
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toHaveTextContent('Rassegna civile 2024 · vol. 2');
+    expect(rows[0]).toHaveTextContent('Testo inventato del passo p1.');
+    expect(rows[3]).toHaveTextContent('Tutti i passi');
+    expect(rows[3]).toHaveTextContent('12');
+    const options = screen.getAllByRole('option');
+    expect(options[0]).toHaveTextContent('nelle sentenze della Cassazione');
+    expect(options[1]).toBe(rows[0]);
+  });
+
+  it('keeps Enter in the box for the decisions', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    const { user } = await typeTopic();
+    await screen.findByText('Rassegne');
+    await user.keyboard('{Enter}');
+    expect(open).toHaveBeenCalledWith({ tema: 'responsabilità medica' }, 'Tema: responsabilità medica');
+  });
+
+  it('opens a passage on the page «Rassegne» with the search kept in memory, never handing over the words', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    const { user, onOpenRassegne, onClose } = await typeTopic();
+    await user.click(await screen.findByText('Testo inventato del passo p2.'));
+    expect(onOpenRassegne).toHaveBeenCalledWith('p2');
+    expect(onClose).toHaveBeenCalled();
+    expect(rememberedSearch()).toEqual({
+      text: 'responsabilità medica', q: 'responsabilità medica', archivio: null,
+      total: 12, archivi: PAGE.archivi, items: PAGE.items, next: '20',
+    });
+  });
+
+  it('«Tutti i passi» opens the page with the same search done', async () => {
+    searchRassegne.mockResolvedValue(PAGE);
+    const { user, onOpenRassegne } = await typeTopic();
+    await user.click(await screen.findByText('Tutti i passi'));
+    expect(onOpenRassegne).toHaveBeenCalledWith(undefined);
+    expect(rememberedSearch()?.q).toBe('responsabilità medica');
+  });
+
+  it('says in one line that the reviews do not answer, and draws nothing when none is found', async () => {
+    searchRassegne.mockRejectedValueOnce(new RassegneError(503));
+    await typeTopic();
+    expect(await screen.findByText('Le rassegne non rispondono al momento.')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /nelle sentenze della Cassazione/ })).toBeInTheDocument();
+  });
+
+  it('draws no group when no passage holds the words', async () => {
+    await typeTopic();
+    expect(searchRassegne).toHaveBeenCalled();
+    expect(screen.queryByText('Rassegne')).toBeNull();
+  });
+
+  it('does not search the reviews for a citation', async () => {
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc');
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(searchRassegne).not.toHaveBeenCalled();
   });
 });
 
@@ -552,7 +662,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
   it('waits for the server when Enter comes first, then searches the act it named', async () => {
     const user = fakeTimeUser();
     const onSearch = renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori{Enter}');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 18 statuto dei lavoratori{Enter}');
     expect(onSearch).not.toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('la ricerca parte appena lo trovo');
     await settle();
@@ -563,7 +673,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
   it('a new Enter is needed once the words changed while it waited, even back to the same words', async () => {
     const user = fakeTimeUser();
     const onSearch = renderPalette();
-    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    const box = screen.getByPlaceholderText(/^Atto o citazione/);
     await user.type(box, 'art 18 statuto dei lavoratori{Enter}');
     await user.type(box, 'x{Backspace}');
     await settle();
@@ -582,7 +692,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
     const user = fakeTimeUser();
     const onSearch = renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'mioatto');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'mioatto');
     await settle();
     await user.keyboard('{Enter}');
     expect(trackAliasUsage).toHaveBeenCalledTimes(1);
@@ -595,7 +705,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
   it('says a ready citation once, in its row with «↵», not again in a line under the box (Bill)', async () => {
     const user = userEvent.setup();
     renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc');
     expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument();
     expect(screen.queryByText(/Invio cerca/)).toBeNull();
     // The line under the box keeps its help, seen: no preview of the citation in its place.
@@ -607,7 +717,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
   it('an Enter that ends an IME composition searches nothing', async () => {
     const user = userEvent.setup();
     const onSearch = renderPalette();
-    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    const box = screen.getByPlaceholderText(/^Atto o citazione/);
     await user.type(box, 'art 2043 cc');
     fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
     expect(onSearch).not.toHaveBeenCalled();
@@ -617,7 +727,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     const user = fakeTimeUser();
     const onSearch = vi.fn();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori{Enter}');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 18 statuto dei lavoratori{Enter}');
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={onSearch} />);
     await settle();
     expect(onSearch).not.toHaveBeenCalled();
@@ -627,7 +737,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
     const user = fakeTimeUser();
     const onSearch = renderPalette();
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'procedura');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'procedura');
     await user.keyboard('{ArrowDown}{Enter}');
     // An act was picked: its next step, not a wait that would end in a topic search.
     expect(await screen.findByRole('button', { name: /^Torna indietro:/ })).toBeInTheDocument();
@@ -652,7 +762,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('');
+    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toHaveValue('');
     expect(screen.queryByRole('button', { name: /^Torna indietro:/ })).toBeNull();
   });
 
@@ -662,13 +772,13 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     const user = userEvent.setup();
     const onClose = vi.fn();
     const { rerender } = render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc');
     rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
     expect(heard).toEqual([{ text: 'art 2043 cc', open: false }]);
 
     rerender(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
-    await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc{Enter}');
+    await user.clear(screen.getByPlaceholderText(/^Atto o citazione/));
+    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'art 2043 cc{Enter}');
     expect(onClose).toHaveBeenCalled();
     rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
     expect(heard.at(-1)).toEqual({ text: '', open: false });

@@ -238,7 +238,7 @@ export type MissioneId = 'dovute' | 'nuove' | 'obiettivo' | 'materia-ferma' | 's
  * percorso», «Percorsi» S2) are credited too, never listed among the day's missions.
  */
 export interface XpCredito {
-  missione: MissioneId | 'modulo' | 'percorso';
+  missione: MissioneId | 'modulo' | 'percorso' | 'lezione';
   punti: number;
 }
 
@@ -294,4 +294,32 @@ export interface TappaIstituto extends ConteggiStati {
   materia: Materia;
   istituto: string;
   dovute: number;
+}
+
+/**
+ * An exercise of a short lesson (LC63, `POST /lingo/lezioni`), as the server sends it: never its key, which comes
+ * with the answer (`EsitoEsercizio.soluzione`). Every word is a card's.
+ */
+export type EsercizioLezione =
+  | { tipo: 'scelta'; domanda: string; opzioni: string[] }
+  | { tipo: 'vero-falso'; domanda: string; affermazione: string }
+  | { tipo: 'abbina'; norme: string[]; istituti: string[] }
+  | { tipo: 'completa'; domanda: string; testo: string; opzioni: string[] };
+
+export interface Lezione {
+  id: string;
+  materia: Materia;
+  esercizi: EsercizioLezione[];
+}
+
+/** An answer: an option's index, true or false, or for each article the index of its institute. */
+export type RispostaEsercizio = number | boolean | number[];
+
+/** The server's grading of one answer; `fine` with the answer that ended the lesson, with what the server credited. */
+export interface EsitoEsercizio {
+  registrata: boolean;
+  indice: number;
+  giusta: boolean;
+  soluzione: RispostaEsercizio;
+  fine?: { giuste: number; totale: number; xp: XpEsito };
 }
