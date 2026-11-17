@@ -1006,8 +1006,18 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   for it and its two buttons — a phone — the buttons go under it, at the right); «c» (as in «compito») from anywhere opens
   `TaskDialog` (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
-  «Prossimi giorni»; a task the page will not list is announced, as from the field; listed in the «?» dialog. No date
-  is read from the words (wave 2). The origin follows the dossier's kind (`studio` or `lavoro`).
+  «Prossimi giorni»; a task the page will not list is announced, as from the field; listed in the «?» dialog. The
+  origin follows the dossier's kind (`studio` or `lavoro`).
+- **The line read** (LC78): the quick add's line is read as it is typed (`quickAddLine.ts`): a date in words, Italian
+  or English (`datePhrase.ts`: oggi, domani, a weekday — today's is next week's —, «tra 3 giorni», «20 novembre»,
+  «20/11» — a past day is next year's —, «alle 10», and the five repetitions only, «ogni! …» or «dopo il
+  completamento» counting from the day it is done; any other «ogni …» stays text whole; a time alone is today's),
+  `#pratica` (a whole title, the longest, or one word that begins one title only; never in the dossier's panel),
+  `@etichetta`, `p1`–`p4`, `{termine}` (the deadline, with its time). Symbols count at the start of a word only. What
+  was read is a row of chips under the field, in the flow (L-73), and a chip clicked turns its words back into text;
+  the dossiers a `#…` may mean are listed there too (the arrows and Enter choose, Esc closes the list, the next Esc
+  empties the title). The title saved is the line without what was read; what was read wins over «Dettagli». The
+  dialog («c») reads no words. `datePhrase` is pure and shared with the CSV import (LC80).
 - **The task's sheet** (`TaskSheet`, P2a; a `ui/Modal` with its own header, `labelledBy`, the whole screen below
   `sm`, `phoneFullScreen`): the path (the dossier, a link, or «Lista d'ingresso»; a subtask's parent, which opens it),
   «Compito precedente» and «Compito successivo» (and j, k, not in a field or a menu: `aria-keyshortcuts`), «⋯»
@@ -3397,7 +3407,7 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/planner/` — Opus's planner: pages and views (`OpusPage`, `OpusViews`), the row and its list, the
   task sheet (`TaskSheet`, `TaskSheetFields`, `DossierPicker`, `TaskSheetScope`), the groups (`TaskGroup`,
   `InlineAddTask`), `WeekStrip`, `StudyTodayRow`, the new task's dialog, the quick add, `PlannerHost` (mounted by `Layout`), the dossier's panel; the pure helpers
-  (`taskDates`, `taskTree`, `taskDraft`, `splitLinks`, `moveBetweenRows`) apart from the components. See «The planner».
+  (`taskDates`, `taskTree`, `taskDraft`, `datePhrase`, `quickAddLine`, `splitLinks`, `moveBetweenRows`) apart from the components. See «The planner».
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
   `NormaChangesSection.tsx` (see History above). The page is in the sections' frame (W2): one `h1`, «Cronologia», on
   every width, with the one search field (`#tour-history-search`, «/» focuses it) and «Svuota cronologia» beside it
