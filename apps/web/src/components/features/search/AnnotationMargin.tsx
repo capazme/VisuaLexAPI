@@ -71,6 +71,11 @@ export interface AnnotationMarginProps {
     onWideChange?: (wide: boolean) => void;
     /** Whether the reader has room for the column at all, cards or not (Study Mode writes a note elsewhere without). */
     onRoomChange?: (roomy: boolean) => void;
+    /**
+     * Shown in the column in place of the cards while it is given (LC74: the article's glosses, opened where the column
+     * already is, so the text does not move). The cards come back when it goes.
+     */
+    aside?: ReactNode;
     /** Classes for the wrapper (Study Mode keeps the column off the scroller's edge). */
     className?: string;
     /** The text (`ArticleBody`): always the first child, so adding or removing cards never mounts it again. */
@@ -114,7 +119,7 @@ const remPx = () => Number.parseFloat(getComputedStyle(document.documentElement)
 export function AnnotationMargin({
     plain, textRootRef, contentKey, notes = [], onUpdateNote, onRemoveNote, draft = null, onSaveDraft, onCancelDraft,
     threads = [], onOpenThread, textHash, glosses = [], glossActions, shownGlossId = null, onShowGlossPassage,
-    onWideChange, onRoomChange, className, children, ref,
+    onWideChange, onRoomChange, aside, className, children, ref,
 }: AnnotationMarginProps) {
     const owner = useId();
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -125,19 +130,22 @@ export function AnnotationMargin({
     // rem of slack once it is there: the column's cards may bring a scrollbar, which narrows the wrapper by its width,
     // and the column must not take itself away.
     const [roomy, setRoomy] = useState(false);
-    useLayoutEffect(() => {
+    const checkRoom = useCallback(() => {
         const wrapper = wrapperRef.current;
         if (!wrapper) return;
-        const check = () => {
-            const width = wrapper.getBoundingClientRect().width;
-            setRoomy((was) => width >= (was ? MARGIN_MIN_REM - 1 : MARGIN_MIN_REM) * remPx());
-        };
-        check();
-        if (typeof ResizeObserver === 'undefined') return;
-        const observer = new ResizeObserver(check);
+        const width = wrapper.getBoundingClientRect().width;
+        setRoomy((was) => width >= (was ? MARGIN_MIN_REM - 1 : MARGIN_MIN_REM) * remPx());
+    }, []);
+    // Also after every render, before the paint: a host that changes the reader's layout in the same commit (LC74: the
+    // glosses' margin leaving the side of the text) gets the column in that commit, not a frame later.
+    useLayoutEffect(() => { checkRoom(); });
+    useLayoutEffect(() => {
+        const wrapper = wrapperRef.current;
+        if (!wrapper || typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(checkRoom);
         observer.observe(wrapper);
         return () => observer.disconnect();
-    }, []);
+    }, [checkRoom]);
 
     // What is written in a new note's editor: here, so it survives the move between the column and the sheet (the
     // reader crossing the room's threshold), and starts empty for other words.
@@ -205,20 +213,22 @@ export function AnnotationMargin({
         cancelAnimationFrame(frame.current);
         frame.current = requestAnimationFrame(measure);
     }, [measure]);
+    // The cards are drawn again when the aside goes: measured and observed anew.
+    const asideShown = aside != null;
     useLayoutEffect(() => {
-        if (!active) return;
+        if (!active || asideShown) return;
         schedule();
         return () => cancelAnimationFrame(frame.current);
-    }, [active, schedule, contentKey]);
+    }, [active, asideShown, schedule, contentKey]);
 
     useEffect(() => {
-        if (!active || typeof ResizeObserver === 'undefined') return;
+        if (!active || asideShown || typeof ResizeObserver === 'undefined') return;
         const observer = new ResizeObserver(schedule);
         if (wrapperRef.current) observer.observe(wrapperRef.current);
         if (textRootRef.current) observer.observe(textRootRef.current);
         for (const card of cards.current.values()) observer.observe(card);
         return () => observer.disconnect();
-    }, [active, schedule, textRootRef, entries, contentKey]);
+    }, [active, asideShown, schedule, textRootRef, entries, contentKey]);
 
     // The cards placed once take their moves smoothly; a card's first place is taken at once (it would slide down from
     // the column's top). Marked a frame after it was drawn there.
@@ -388,9 +398,28 @@ export function AnnotationMargin({
                         ref={columnRef}
                         aria-label="A margine del testo"
                         className="vlx-gloss-column"
-                        style={layout ? { height: layout.height } : undefined}
+                        style={layout && !aside ? { height: layout.height } : undefined}
                     >
-                        {entries.map((entry) => {
+                        {aside != null ? (
+                            <>
+                                {/* A note being written stays in the column, in the flow, over the aside. */}
+                                {hasDraft && draft && (
+                                    <div className="mb-3">
+                                        <NoteDraftCard
+                                            key={draftKey}
+                                            ref={(el: HTMLElement | null) => keepCard('draft', el)}
+                                            text={draft.text}
+                                            value={draftText}
+                                            onChange={writeDraft}
+                                            onSave={saveDraft}
+                                            onCancel={cancelDraft}
+                                            placed
+                                        />
+                                    </div>
+                                )}
+                                {aside}
+                            </>
+                        ) : entries.map((entry) => {
                             const top = layout?.tops[entry.key];
                             return (
                                 <div
