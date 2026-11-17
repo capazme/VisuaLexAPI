@@ -510,7 +510,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes and checked hourly by
   a timer `index.ts` starts, also deletes notifications read 90 days ago, and erases a closed report's
   `details` and `resolution_note` 12 months after it was closed, G-503, and turns a moderation log
-  entry's `reason` into «(tolto dopo 12 mesi)» 12 months after it was written, G-550); `article_comment_reports`, `forum_notifications`,
+  entry's `reason` into «(tolto dopo 12 mesi)» 12 months after it was written, G-550, and names a
+  deleted account «utente cancellato» in the log's `user` targets, G-504); `article_comment_reports`, `forum_notifications`,
   `forum_moderation_log`, `users.forum_moderator`; accepted answer, edit/delete marks (emptied text is
   `''`, a CHECK), lock, `materia`, `licence_text_id` (the version of `CONTRIBUTO_COMMUNITY` a row was
   written under). `GET /auth/export` adds the user's votes, reports (never their copy, who closed them or
@@ -565,7 +566,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   locks every glossa and then every reply the deletion writes (the ones the person voted, wrote, locked or
   released), each by id, then deletes the votes (`lingo/deleteUserAccount.ts`): left to the cascade and
   the SET NULLs, the rows would be locked in any order, a reply before its glossa, and could deadlock with
-  a reply being written or voted.
+  a reply being written or voted. In the same transaction the moderation log keeps every act on the person
+  and names them «utente cancellato» (`target_id` of kind `user` and `profile`, and `profile:<id>` on
+  report rows; G-504); the sweep repairs the `user` rows of accounts deleted any other way, never the
+  profile rows, since a profile takes a new id on a move to a pseudonym.
   **The minimal profile** (spec §B, D-246, D-247, D-249, G-477, G-479; migration
   `20261116100001_forum_profiles`; `forum/profiles.ts`, `controllers/forumProfileController.ts`):
   `forum_profiles`, one per person, deleted with the account, under the real name **or** a pseudonym, never

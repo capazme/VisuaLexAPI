@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { DELETED_AUTHOR } from './views';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How long a closed report keeps its copy of the reported text, and a read notification lives. */
@@ -21,7 +22,11 @@ let lastSweep = 0;
  * a report was closed, it also loses the details its reporter wrote and the moderator's note (G-503);
  * its reason, status and dates stay. Twelve months after an entry of the moderation log was written, its
  * reason becomes «(tolto dopo 12 mesi)» (G-550): the reason may name people, and the moderator's note on a
- * report is written there too. Returns what it touched.
+ * report is written there too. A log entry about an account that no longer exists names it «utente
+ * cancellato» (G-504): `deleteUserAccount` does so at once, with the entries about the person's Forum
+ * profile, and this catches accounts deleted before it did, or by any other way. Not the profiles: a
+ * profile takes a new id when its owner moves to a pseudonym, so a profile id that no longer exists may
+ * be a living person's old one. Returns what it touched.
  */
 export async function sweepCommunity(now: Date = new Date()) {
   const before = new Date(now.getTime() - COMMUNITY_RETENTION_DAYS * DAY_MS);
@@ -33,6 +38,7 @@ export async function sweepCommunity(now: Date = new Date()) {
   const noWords = { details: null, resolutionNote: null };
   const [
     threadReports, commentReports, notifications, profileReports, threadWords, commentWords, profileNotes, logReasons,
+    goneUsers,
   ] = await prisma.$transaction([
       prisma.articleThreadReport.updateMany({ where: closedLongAgo, data: { reportedText: null } }),
       prisma.articleCommentReport.updateMany({ where: closedLongAgo, data: { reportedText: null } }),
@@ -50,11 +56,16 @@ export async function sweepCommunity(now: Date = new Date()) {
         where: { createdAt: { lt: yearBefore }, AND: [{ reason: { not: null } }, { reason: { not: LOG_REASON_ERASED } }] },
         data: { reason: LOG_REASON_ERASED },
       }),
+      // An account's id never changes, so an account that no longer exists is a deleted person.
+      prisma.$executeRaw`UPDATE forum_moderation_log l SET target_id = ${DELETED_AUTHOR}
+        WHERE l.target_kind = 'user' AND l.target_id <> ${DELETED_AUTHOR}
+          AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = l.target_id)`,
     ]);
   return {
     reportCopies: threadReports.count + commentReports.count, notifications: notifications.count,
     profileReportDetails: profileReports.count, reportDetails: threadWords.count + commentWords.count,
     profileReportNotes: profileNotes.count, moderationReasons: logReasons.count,
+    moderationTargets: goneUsers,
   };
 }
 
