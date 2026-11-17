@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
 import { StickyNote, Trash2 } from 'lucide-react';
 import type { DossierItem } from '../../../types';
 import { hasAssistantNote } from '../../../utils/aiReview';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { formatTimestampLong } from './dossierUtils';
 import { ROW_REMOVE } from './dossierStyles';
+import { useNoteRemovalFocus } from './useNoteRemovalFocus';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -13,34 +13,7 @@ type NoteItem = Extract<DossierItem, { type: 'note' }>;
  * (LC58): the words, when, and the bin; a note an application wrote has its state, the pencil and its bin (D7b).
  */
 export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; onRemoveNote?: (note: NoteItem) => void }) {
-  const els = useRef(new Map<string, HTMLDivElement>());
-  // Where the focus goes once a note removed from the keyboard leaves the list (LC61): the next note, else the one
-  // before, else the row the notes belong to; never the page's body.
-  const pending = useRef<{ removed: string; targets: HTMLElement[] } | null>(null);
-  const settle = () => {
-    const next = pending.current?.targets.find((el) => el.isConnected);
-    pending.current = null;
-    (next?.querySelector<HTMLElement>('button') ?? next)?.focus();
-  };
-  useEffect(() => {
-    if (pending.current && !notes.some((n) => n.id === pending.current?.removed)) settle();
-  }, [notes]);
-  // The last note gone can take the list away with it (the «Lettura»'s section).
-  useEffect(() => () => { if (pending.current) settle(); }, []);
-
-  const remove = (note: NoteItem) => {
-    const el = els.current.get(note.id);
-    if (el?.contains(document.activeElement)) {
-      const at = notes.indexOf(note);
-      const around = [...notes.slice(at + 1), ...notes.slice(0, at).reverse()];
-      const row = el.closest('[data-dossier-item], [data-practice-row]')?.querySelector<HTMLElement>('[aria-expanded]');
-      pending.current = {
-        removed: note.id,
-        targets: [...around.flatMap((n) => els.current.get(n.id) ?? []), ...(row ? [row] : [])],
-      };
-    }
-    onRemoveNote?.(note);
-  };
+  const { register, remove } = useNoteRemovalFocus(notes, onRemoveNote);
 
   return notes.map((note) => {
     const words = <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>;
@@ -53,7 +26,7 @@ export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; on
     return (
       <div
         key={note.id}
-        ref={(el) => { if (el) els.current.set(note.id, el); else els.current.delete(note.id); }}
+        ref={register(note.id)}
         className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
         <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
         <div className="min-w-0 flex-1">

@@ -13,8 +13,8 @@ import type { PracticeLayout } from './PracticeColumn';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 
 /**
- * The decisions' strip (U2), in Pietra since LC61: the acts' panel hairline, no wash; the gavel in the ink's grey.
- * The mint wash and green gavel were a category colour, not a functional one.
+ * The decisions' strip (U2), in Pietra since LC61: the acts' panel hairline, no wash; the gavel in the ink's grey
+ * (the mint wash and the green gavel were left over from before LC37).
  */
 const DECISIONS_STRIP = 'rounded-xl border border-slate-200 px-3 pb-2 dark:border-slate-800';
 const DECISIONS_MARK = 'text-slate-500 dark:text-slate-400';
