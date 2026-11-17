@@ -86,7 +86,7 @@ export function MerltDataSection() {
       <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati MERL-T</h3>
       <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
         <p className="text-xs text-slate-500">
-          MERL-T impara da come usi VisuaLex solo se acconsenti. Qui puoi cambiare scelta, leggere l’informativa,
+          MERL-T impara da come usi LexCraft solo se acconsenti. Qui puoi cambiare scelta, leggere l’informativa,
           scaricare o eliminare i dati raccolti.
         </p>
         <p data-testid="merlt-consent-status" className="text-sm text-slate-700 dark:text-slate-200">
