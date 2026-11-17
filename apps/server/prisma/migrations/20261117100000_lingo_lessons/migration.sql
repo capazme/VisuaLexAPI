@@ -4,8 +4,8 @@
 -- moment it ended. The mission «Lezione» credits a finished lesson; its values are used by 20261117100001, since
 -- Postgres refuses an enum value in the transaction that adds it.
 
-ALTER TYPE "LingoMissione" ADD VALUE 'LEZIONE';
-ALTER TYPE "LingoFonteXp" ADD VALUE 'LEZIONE';
+ALTER TYPE "LingoMissione" ADD VALUE IF NOT EXISTS 'LEZIONE';
+ALTER TYPE "LingoFonteXp" ADD VALUE IF NOT EXISTS 'LEZIONE';
 
 -- CreateTable
 CREATE TABLE "lingo_lezioni" (
