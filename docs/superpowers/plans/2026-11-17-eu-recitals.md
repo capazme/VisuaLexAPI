@@ -82,12 +82,12 @@ in a pull request of its own, outside this plan (G-540).
 4. **A part that reads a `norma` entry and was not taught `considerando`** shows the recital as an article
    (G-538's cost). The spec's §6.3 lists every part with its test; Task 10's and Task 18's last step greps for
    any part the table misses.
+5. **A recital moved through every door** (export and import, share link, publication, trash, study import,
+   suggestions, «Salva come dossier») stays a recital or is refused in words, never an article or the whole act.
+   Pinned in Task 10 (server) and Task 16 (web).
 6. **A recital and an article in one query** («art. 4 e considerando 26 GDPR») is refused and never opens art.
    4. Pinned in Task 5 (the rest keeps the article), Task 6 (`refusal`) and Task 15 (Enter does not call
    `actions.search`).
-5. **A recital moved through every door** (export and import, share link, publication, trash, study import,
-   suggestions) stays a recital or is refused in words, never an article. Pinned in Task 10 (server) and Task
-   18 (web).
 
 ---
 
@@ -668,78 +668,120 @@ changes. The whole PR is the server's rows of the spec's §6.3 table, each with 
 
 ## PR 4b — Web: the dossier (`apps/web`) — **web owner's side**
 
-### Task 16: The entry's shape and adding a recital
+A recital is a `norma` entry with `considerando` (G-538). The tasks are the web rows of the spec's §6.3 table:
+each row gets its test. Paths are under `apps/web/src`.
+
+### Task 16: The entry's type, its checks, and the moves that keep the field
 
 **Files:**
-- Create: `apps/web/src/utils/sources/recitalEntry.ts`, which asserts `conventions/sources/recital-entries.json`
+- Create: `utils/sources/recitalEntry.ts`, which asserts `conventions/sources/recital-entries.json`
 - Modify:
-  - `apps/web/src/types/index.ts` (the dossier item union: `type: 'considerando'`);
-  - `apps/web/src/components/features/dossier/dossierUtils.ts` (`serverItemFor`, `itemContentFor`,
-    `dossierItemFromApi`, `validateImportedDossier`, `dossierContainsRecital`);
-  - `AddToDossierPopover.tsx` (from `RecitalReader`).
-- Test: `apps/web/src/utils/sources/__tests__/recitalEntry.test.ts`,
-  `apps/web/src/components/features/dossier/dossierUtils.test.ts`
+  - `types/index.ts` (`DossierNormaData` becomes `ArticleNormaData | RecitalNormaData`);
+  - `utils/sources/normEntry.ts` (`rebuildNormEntry` keeps the recital shape);
+  - `components/features/dossier/dossierUtils.ts` (`dossierItemFromApi`, `validateImportedDossier`,
+    `normaForDossier`, `dossierSuggestionPayload`);
+  - `components/features/practice/practiceDossierItems.ts` (`itemOf`, `dossierArticleKey`);
+  - `utils/normaChanges.ts` (`normaFromChangeNotification`: null for a recital);
+  - `AddToDossierPopover.tsx` (from `RecitalReader`, 4a).
+- Test: `utils/sources/__tests__/recitalEntry.test.ts`, `dossierUtils.test.ts`, `practiceDossierItems.test.ts`,
+  `utils/__tests__/normaChanges.test.ts`
 
 **Interfaces:**
-- Consumes: Task 12, and PR 3's routes.
-- Produces: `readRecitalEntry(raw: unknown): RecitalEntry | { reason: string }`.
-- Produces: an entry `{ type: 'considerando', data: RecitalEntry }` sent as `{itemType: 'considerando',
-  content}`.
+- Consumes: Task 12 (`recitalIdentity`, `citeRecital`, `shortRecital`, `recitalUnitLabel`), PR 3's routes.
+- Produces:
+  - `isRecitalNorma(d: DossierNormaData): d is RecitalNormaData` (the own key `considerando` decides);
+  - `rebuildRecitalEntry(raw: unknown): { ok: true; entry: RecitalNormaData } | { ok: false; reason: string }`;
+  - `entryMarksKey(d: DossierNormaData): { normaKey: string; articleId: string }`: for a recital
+    `{ normaKey: recitalIdentity(d), articleId: '' }`, for an article today's `buildItemKey` and
+    `uniqueArticleIdFromNorma`;
+  - adding a recital sends `{ itemType: 'norm', content: { tipo_atto, numero_atto, data, considerando } }`.
 
 - [ ] **Step 1: Write the failing tests.**
   - Every case of `recital-entries.json` is kept or refused with the server's reason.
-  - The JSON export of a dossier holding a recital imports back to an equal dossier.
-  - Adding the same recital twice shows «Questo considerando è già nel dossier».
-- [ ] **Step 2: Run** the two files. Expected: FAIL.
-- [ ] **Step 3: Implement**, then let `npm --prefix apps/web run build` list every `assertNever` switch, and
-  extend each.
+  - The JSON export of a dossier holding recital 26 and art. 5 of the GDPR imports back equal, `considerando`
+    kept; the share link the same.
+  - `normaForDossier` and «Salva come dossier» (`itemOf`) keep `considerando`, and recitals 26 and 27 of one act
+    stay two entries.
+  - `dossierArticleKey` of recitals 26 and 27 differ, and differ from art. 26's.
+  - A suggestion payload leaves a recital out with «I considerando non si possono ancora proporre nel Forum.»
+  - `normaFromChangeNotification` is null for a recital.
+  - Adding recital 26 twice shows the article's «Già presente».
+- [ ] **Step 2: Run** `npm --prefix apps/web run test -- --run src/utils/sources/__tests__/recitalEntry.test.ts
+  src/components/features/dossier/dossierUtils.test.ts
+  src/components/features/practice/practiceDossierItems.test.ts src/utils/__tests__/normaChanges.test.ts`.
+  Expected: FAIL.
+- [ ] **Step 3: Implement**, then let `npm --prefix apps/web run build` list every reader of `numero_articolo` on
+  a `DossierNormaData`. Each one either takes `isRecitalNorma` first or belongs to Task 17 or 18.
 - [ ] **Step 4: Run** the files and the build. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(web): a recital becomes a dossier entry (spec §6.2)`
+- [ ] **Step 5: Commit** `feat(web): a recital is a norma entry that keeps its field (spec §6.2, G-538)`
 
-### Task 17: Where it shows: layout, reader, PDF, trash, publication
+### Task 17: Where it shows: labels, layout, reader, «Lettura», PDF, trash
 
 **Files:**
-- Modify:
-  - `dossierLayout.ts` (a «Considerando» group first in its act's block; the counts line);
-  - `DossierItemReader.tsx` (the §5.2 line and the marks);
-  - `dossierPdf.ts` and `dossierPdfMarks.ts` (as an article: the text, the line, the «solo le parti evidenziate
-    e annotate» mode);
-  - `trashSummary.ts`, `dossierPublication.ts`, `publicationMarks.ts`.
-
-  All are in `apps/web/src/components/features/dossier/`.
-- Test: `dossierLayout.test.ts`, `dossierPdf.test.ts`, `dossierPdfMarks.test.ts`, `trashSummary.test.ts`,
-  `dossierPublication.test.ts`
+- Modify, in `components/features/dossier/` unless said:
+  - `dossierLayout.ts` (`articleLabel`, `foldedArticleList`, `compareArticles`, `layoutDossier`, `countsParts`);
+  - `DossierArticleRow.tsx`, `DossierDetailView.tsx` (note heading, search filter), `DossierListView.tsx`
+    (search filter);
+  - `DossierItemReader.tsx` (text from `recitalsCache.ts`, the §5.2 line, marks under `entryMarksKey`, «Copia
+    citazione», «Apri in Ricerca» through `openRecitals`);
+  - `utils/citation.ts`, `utils/storeApiMappers.ts` (`articleRootOf` never reached for a recital);
+  - `dossierUtils.ts` (`computeItemCounts`, `searchParamsFromNorma`), `utils/environmentUtils.ts` (counts);
+  - «Lettura»: `utils/practice.ts` (`addArticles`, `isStoredArticle`), `useRowText.ts`, `syncFromDossier`
+    (`store/useAppStore.ts`);
+  - `features/practice/PracticeActBlock.tsx` (`chipLabel`), `PracticeArticleRow.tsx`;
+  - `dossierPdf.ts`, `dossierPdfMarks.ts`, `trashSummary.ts`.
+- Test: the test beside each file (`dossierLayout.test.ts`, `DossierItemReader.test.tsx`, `dossierPdf.test.ts`,
+  `dossierPdfMarks.test.ts`, `trashSummary.test.ts`, `practice.test.ts`, …)
 
 **Interfaces:**
 - Consumes: Task 16.
 
-- [ ] **Step 1: Write the failing tests.**
-  - The layout puts recital 26 before art. 5 inside the GDPR block, and the counts read «1 considerando».
-  - The PDF prints «Considerando 26», the line and the text, and in the marks-only mode only the marked
-    passages.
-  - The trash summary is the citation.
-  - A published dossier keeps the entry.
-- [ ] **Step 2: Run** the five files. Expected: FAIL.
+- [ ] **Step 1: Write the failing tests**, one per row of the table this task owns:
+  - the layout puts «Considerando 26» and «Considerando 27», in that order, before art. 5 in the GDPR's block;
+    the counts read «2 considerando, 1 articolo»;
+  - no label anywhere reads «art. undefined» or «art. »: the row, its accessible name, the note heading and the
+    chip read «Considerando 26»;
+  - the reader of recital 26 shows recital 26's text (not 27's), the §5.2 line, and loads its marks under
+    `celex:32016R0679~rct26::art::` without throwing;
+  - «Copia citazione» copies «considerando 26, reg. (UE) 2016/679»;
+  - «Lettura» has one row per recital;
+  - the PDF prints «Considerando 26», the line and its own text, and the «solo le parti evidenziate e annotate»
+    export does not fail and prints only its marked passages;
+  - the trash's summary of a recital is its citation, never «1 voce»;
+  - the dossier's search finds «considerando 26».
+- [ ] **Step 2: Run** the files. Expected: FAIL.
 - [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** them. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(web): recitals in the dossier's layout, reader, PDF and trash`
+- [ ] **Step 4: Run** them and `npm --prefix apps/web run build`. Expected: PASS.
+- [ ] **Step 5: Commit** `feat(web): recitals in the dossier's labels, layout, reader, PDF and trash`
 
-### Task 18: The `type === 'norma'` filters, and the browser pass
+### Task 18: Publication, «already there», the `type === 'norma'` filters, and the browser pass
 
 **Files:**
-- Modify: each file that `grep -rn "type === 'norma'" apps/web/src` lists (about twenty: «Apri tutto»
-  `dossierUtils.ts`, `environmentUtils.ts`, `inDossier.ts`, …). For each one, decide: include recitals (opening,
-  counting, «già nel dossier») or leave them out on purpose (comparing, watching). Write the choice in one line
-  in the PR body.
-- Test: the existing test file beside each changed file. Add one case per changed filter.
+- Modify:
+  - `components/features/dossier/publicationMarks.ts`, `dossierPublication.ts` (`locate`, `markKeyOf`),
+    `PublishDossierDialog.tsx`;
+  - `dossierUtils.ts` (`dossierContainsArticle`), `inDossier.ts`, `useActItemIds`, `ArticleTabContent.tsx`,
+    `CorpusPracticesDialog.tsx`;
+  - each other file that `grep -rn "type === 'norma'\|numero_articolo" apps/web/src` lists and Tasks 16–17 did
+    not take.
+- Test: the test beside each changed file.
 
-- [ ] **Step 1: Write the failing cases**, one per filter whose behaviour changes. For example, «Apri tutto»
-  opens recital 26 with the GDPR's articles, and `inDossier` says a recital is in the dossier.
-- [ ] **Step 2: Run** them. Expected: FAIL.
-- [ ] **Step 3: Implement.**
+- [ ] **Step 1: Write the failing tests:**
+  - a dossier holding a recital publishes, with `considerando` and its marks, and two recitals' marks do not
+    collide;
+  - «Togli dalla pratica» on recital 26 trashes recital 26 alone;
+  - «Nel dossier» says recital 26 is there and recital 27 is not;
+  - the notes of recital 26 in `ArticleTabContent` are its own;
+  - pins for the unchanged rows: `actKeyOf`, `citedNorm.ts`, the MERL-T event, `compareKindOf`.
+- [ ] **Step 2: Run** them. Expected: FAIL, except the pins.
+- [ ] **Step 3: Implement.** For each `type === 'norma'` filter, decide whether recitals are included (opening,
+  counting, «already there») or left out on purpose (comparing, watching). Write the choice in one line in the PR
+  body, beside the §6.3 web table.
 - [ ] **Step 4: Run** them, then `npm --prefix apps/web run build`, `lint`, and the dossier folder's tests
   (`npm --prefix apps/web run test -- --run src/components/features/dossier`). Expected: PASS.
-- [ ] **Step 5: Browser pass** on `http://localhost:5173`: the spec's Verification list for 4b.
-- [ ] **Step 6: Docs.** `apps/web/CLAUDE.md`: the dossier's recital entries, the PDF, the trash, the moves.
+- [ ] **Step 5: Browser pass** on `http://localhost:5173`: the spec's Verification list for 4b, plus «Togli dalla
+  pratica» on one recital, «Lettura», and publishing a dossier holding a recital.
+- [ ] **Step 6: Docs.** `apps/web/CLAUDE.md`: a recital is a `norma` entry with `considerando`, and the readers
+  of §6.3.
 - [ ] **Step 7: Commit** `feat(web): recitals through every dossier filter`, then open **PR 4b** for the web
   owner's approval.

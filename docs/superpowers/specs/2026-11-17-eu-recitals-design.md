@@ -453,7 +453,29 @@ the «norme», the owner's own word for what a recital is part of). *Call*.
 
 **Web (PR 4a and 4b).**
 
-WEB_TABLE_PLACEHOLDER
+Measured on `develop` (17 November 2026): with no change, a recital entry crashes the dossier's reader, makes
+the PDF in «solo le parti evidenziate e annotate» fail, blocks the dossier's publication, and shares one key
+with every other recital of its act, so «Togli dalla pratica» on one sends them all to the trash. All rows are
+PR 4b's, except where the row says 4a. Paths are under `apps/web/src`.
+
+| Part | Today, given a recital entry | After |
+|---|---|---|
+| The entry's type: `DossierNormaData` (`types/index.ts`), `dossierItemFromApi` (`dossierUtils.ts`) | cast as an article (`numero_articolo: string`) | a union, article or recital: the build lists every reader of `numero_articolo` |
+| The marks' key of an entry: `buildItemKey`, `uniqueArticleIdFromNorma` (`utils/normaKeys.ts`), `articleRootOf` (`utils/storeApiMappers.ts`) | an act-level key; `articleRootOf(undefined)` throws | the recital's identity, `articleId` `""` (§2.1), never through `buildItemKey` |
+| Labels: `articleLabel`, `foldedArticleList` (`dossierLayout.ts`), `DossierArticleRow.tsx` (title, accessible name), the note heading in `DossierDetailView.tsx`, `chipLabel` (`PracticeActBlock.tsx`), `PracticeArticleRow.tsx` | «art. undefined», «art. », an empty chip | the unit «Considerando 26»; the citation where an article shows its own |
+| Citations: `citeNorm`, `shortNorm`, `inForceCitation` (`utils/sources/normLabels.ts`), through `utils/citation.ts` («Copia citazione»), the link label (`normattivaLink.ts`), `dossierPublication.ts` | «art. , reg. (UE) 2016/679» | `citeRecital`, `shortRecital` (4a's `recital.ts`); the link is the act's EUR-Lex page (§5.2) |
+| Checks of a norm from elsewhere: `rebuildNormEntry` (`utils/sources/normEntry.ts`), `validateImportedDossier` (share link, JSON import) | refused («Numero di articolo mancante»), or the field stripped | the shape of §2.4 kept, its refusals in the fixture's words |
+| Rebuilt from named fields: `normaForDossier` (`dossierUtils.ts`), `itemOf` (`practiceDossierItems.ts`, «Salva come dossier»), `normaFromChangeNotification` (`utils/normaChanges.ts`) | the field dropped, leaving the whole act; recitals of one act merged into one | the field kept; a change notification never concerns a recital (no watch, server table) and answers null for one |
+| Layout and counts: `compareArticles`, `layoutDossier`, `countsParts` (`dossierLayout.ts`), `computeItemCounts` (`dossierUtils.ts`), the counts in `utils/environmentUtils.ts` | an article ranked last, counted among the «articoli» | a «Considerando» group before the articles, by number; counted «N considerando» |
+| The dossier's search filters (`DossierDetailView.tsx`, `DossierListView.tsx`) | «considerando 26» finds nothing | matched on the recital's citation |
+| Opening: «Apri in Ricerca» (`searchParamsFromNorma`), the text and marks of `DossierItemReader.tsx` (`utils/articleFetchCache.ts`) | asks for article `''`: one act-level text for every recital; the marks load throws | opens through `openRecitals` (4a); the text from `recitalsCache.ts` (4a); the §5.2 line; the marks under the identity |
+| «Lettura», the dossier's table: `syncFromDossier` (`useAppStore.ts`), `addArticles`, `isStoredArticle` (`utils/practice.ts`), `useRowText.ts` | one row per act, an empty-article fetch | a row per recital, its text from `recitalsCache.ts` |
+| The PDF: `loadDossierTexts`, its labels and counts (`dossierPdf.ts`), `dossierPdfMarks.ts` | the same text for every recital; «solo le parti» throws and the export fails | as an article (§6.2): heading, line, text, marks |
+| The trash's summary (`trashSummary.ts`) | «1 voce» unless the citation starts with «art. » | the server's citation |
+| Publication: `publicationMarks.ts`, `locate` and `markKeyOf` (`dossierPublication.ts`), `PublishDossierDialog.tsx` | publishing blocked (the marks load throws); the field stripped; marks of two recitals collide | published with the field and its marks |
+| Forum suggestions: `dossierSuggestionPayload` (`dossierUtils.ts`) | sent whole; the server refuses the proposal | left out before sending, with the server's sentence |
+| «Already there» and the practice keys: `dossierContainsArticle` (`dossierUtils.ts`), `dossierArticleKey` (`practiceDossierItems.ts`), `inDossier.ts` («Togli dalla pratica», «Nel dossier», «Già presente»), `useActItemIds`, `ArticleTabContent.tsx`, `CorpusPracticesDialog.tsx` | every recital of an act is one key: «Togli dalla pratica» trashes them all | the recital's identity is its key |
+| Unchanged: `actKeyOf` (act fields only), `citedNorm.ts` (never matches a recital), the MERL-T event (needs a `urn`), `studyPacks.ts` (static data), `compareKindOf` (no recital reaches «Confronta articoli», non-goals) | right already | unchanged, pinned |
 
 - **Order.** Between PR 3 and PR 4b the server accepts a recital entry, but no client creates one: the MCP
   refuses (above), and the web learns to in 4b. No recital entry exists before 4b, so no web reader meets one
@@ -600,8 +622,9 @@ rendered text nodes spell the projection, with marks and signs on.
     - «considerando 3 l. 241/1990» refused, and «Cons. St., sez. VI, n. 2270/2019» still a decision;
   - **the GDPR's index:** the part, its count, a click;
   - **marks:** a highlight and a note on recital 173 that survive a reload;
-  - **dossier (4b):** into a dossier; the dossier's reader; its PDF; the trash and back; the JSON export and
-    import; a star.
+  - **dossier (4b):** recitals 26 and 27 and art. 5 of the GDPR into a dossier; the dossier's reader of each;
+    «Lettura»; its PDF, in both modes; the trash and back; the JSON export and import; a star; publishing it;
+    «Togli dalla pratica» on recital 26 alone.
 
 ## Pull requests
 
