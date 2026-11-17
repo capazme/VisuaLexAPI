@@ -148,6 +148,16 @@ for each, the norm kept or the Italian reason it is refused; the server's
 `apps/server/src/schemas/normEntry.ts` and the web's `apps/web/src/utils/sources/normEntry.ts`
 both assert it.
 
+## `recital-entries.json`
+
+A recital of an EU act in a dossier is a `norma` entry whose content has the key `considerando`
+(spec `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §2.4, §6.2, G-538). Its content is
+closed: the act's type (a regulation or a directive of the Union), number and date, the recital's
+number, and the web's star. The file holds the inputs and, for each, the entry kept (`entry`, with
+the star apart in `star`) or the Italian reason it is refused; the server's
+`apps/server/src/schemas/recitalEntry.ts` asserts it, and the web's `utils/sources/recitalEntry.ts`
+will (PR 4b of the plan).
+
 ## `decision-keys.json`
 
 A decision's key (`cassazione:civile:99999:2024`, `corte_costituzionale:99999:2020`) read back to
