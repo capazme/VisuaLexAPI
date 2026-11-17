@@ -90,20 +90,25 @@ export function buildActTree(data: ActTreeItem[], annex: string | null, annexLab
 }
 
 const KEYWORD = /^(PARTE|LIBRO|TITOLO|CAPO|SEZIONE|ALLEGATO)$/i;
-const ROMAN = /^([IVXLCDM]+)(\b.*)?$/;
+// After a level word: a numeral («IX», «II-BIS») or a letter id («A», «A.4»).
+const LEVEL_ID = /^([IVXLCDM]+|[A-Z](?:\.\d+)*)(\b.*)?$/;
 
 /**
  * A heading in sentence case, as the reader writes it: «LIBRO PRIMO DELLE PERSONE» → «Libro primo delle persone»,
- * «CAPO II-BIS» → «Capo II-bis». Only words wholly in capitals are lowered; a numeral is kept only right after a
- * level word, since «DI», «CI» and «LI» are numerals too. Mixed-case source text is left as it is.
- * shortcut: an acronym in capitals («UE») is lowered with the rest; a list of them if a heading needs one.
+ * «CAPO II-BIS» → «Capo II-bis», «ALLEGATO A» → «Allegato A». Only the leading run of words wholly in capitals is
+ * lowered («LIBRO QUARTO Delle obbligazioni» → «Libro quarto Delle obbligazioni»); the source's own mixed case is
+ * left as it is. An id is kept only right after a level word, since «DI», «CI» and «LI» are numerals too.
+ * shortcut: an acronym in an all-capitals heading («UE») is lowered with the rest; a list of them if one needs it.
  */
 export function headingLabel(raw: string): string {
   const words = cleanSectionTitle(raw).split(' ');
+  const capitals = (word: string) => word === word.toUpperCase();
+  let run = 0;
+  while (run < words.length && capitals(words[run])) run++;
   const out = words.map((word, i) => {
-    if (word !== word.toUpperCase() || word === word.toLowerCase()) return word;
-    const roman = i > 0 && KEYWORD.test(words[i - 1]) ? ROMAN.exec(word) : null;
-    if (roman) return roman[1] + (roman[2] ?? '').toLowerCase();
+    if (i >= run || word === word.toLowerCase()) return word;
+    const id = i > 0 && KEYWORD.test(words[i - 1]) ? LEVEL_ID.exec(word) : null;
+    if (id) return id[1] + (id[2] ?? '').toLowerCase();
     return word.toLowerCase();
   });
   const text = out.join(' ');

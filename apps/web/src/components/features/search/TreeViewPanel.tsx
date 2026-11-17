@@ -16,13 +16,16 @@ import { spring } from '../../../lib/motion';
 
 /** The window's width on a computer; its place is the store's (`structureWindow.position`), kept inside the viewport. */
 const WINDOW_WIDTH = 420;
-/** How much of the window must stay on screen vertically. */
-const WINDOW_MIN_VISIBLE = 160;
+/** The window is at most 76vh tall (`max-h-[76vh]`): no higher than the rest of the screen, less a margin. */
+const WINDOW_MAX_TOP = 0.24;
+const WINDOW_MARGIN = 8;
 
+// The window no longer moves (LC71): a place stored by the old drag, low on the screen, would leave the list cut off,
+// so the whole window is kept on screen.
 function clampToViewport(position: { x: number; y: number }) {
   return {
     x: Math.min(Math.max(0, position.x), Math.max(0, window.innerWidth - WINDOW_WIDTH)),
-    y: Math.min(Math.max(0, position.y), Math.max(0, window.innerHeight - WINDOW_MIN_VISIBLE)),
+    y: Math.min(Math.max(0, position.y), Math.max(0, window.innerHeight * WINDOW_MAX_TOP - WINDOW_MARGIN)),
   };
 }
 
@@ -355,8 +358,8 @@ export function TreeViewPanel({
         )}
         {loaded && !active && (
           <>
-            <Check size={13} aria-hidden className="ml-auto shrink-0 self-center text-slate-400" />
             <span className="sr-only">, sul tavolo</span>
+            <Check size={13} aria-hidden className="ml-auto shrink-0 self-center text-slate-400" />
           </>
         )}
       </button>

@@ -65,6 +65,11 @@ describe('headingLabel', () => {
     // «DI» is a numeral too: kept as one only after a level word.
     ['DISPOSIZIONI DI ATTUAZIONE', 'Disposizioni di attuazione'],
     ['((§ 3 DEL SISTEMA))', '§ 3 del sistema'],
+    // A d.lgs. with annexes: the letter is the annex's id, kept.
+    ['ALLEGATO A', 'Allegato A'],
+    ['Allegato A.4 Regole deontologiche', 'Allegato A.4 Regole deontologiche'],
+    ['Allegato C', 'Allegato C'],
+    ['ALLEGATO A.4 REGOLE DEONTOLOGICHE', 'Allegato A.4 regole deontologiche'],
   ])('%s → %s', (raw, label) => {
     expect(headingLabel(raw)).toBe(label);
   });

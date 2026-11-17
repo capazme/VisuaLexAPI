@@ -397,7 +397,7 @@ describe('TreeViewPanel — collapsible sections', () => {
     );
 
     // On the table: its name says so to a screen reader.
-    expect(screen.getByRole('button', { name: 'Art. 401, sul tavolo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Art\. 401 ?, sul tavolo$/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Art. 101' })).not.toBeInTheDocument();
   });
 
@@ -824,5 +824,16 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
     fireEvent.click(x);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(opener).toHaveFocus();
+  });
+});
+
+describe('TreeViewPanel — a place stored by the old drag', () => {
+  it('keeps the whole window on screen, since it no longer moves', () => {
+    setViewport(true);
+    appStore.setState({ structureWindow: { blockId: 'block-a', position: { x: 5000, y: 5000 } } });
+    render(<TreeViewPanel variant="window" isOpen onClose={vi.fn()} treeData={['1']} urn="urn:test" title="Struttura" />);
+    const panel = screen.getByLabelText('Struttura, finestra');
+    expect(parseFloat(panel.style.top)).toBeLessThanOrEqual(window.innerHeight * 0.24);
+    expect(parseFloat(panel.style.left)).toBeLessThanOrEqual(window.innerWidth - 420);
   });
 });
