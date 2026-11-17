@@ -4,7 +4,7 @@ import { FOCUS_RING } from '../../constants/interactions';
 import { Z_INDEX } from '../../constants/zIndex';
 import { cn } from '../../lib/utils';
 import { ServiceHealthDot } from '../ui/ServiceHealthMenuEntry';
-import { SEARCH_ISLAND_ID, ISLAND_FOCUS, ISLAND_SURFACE, ISLAND_TARGET } from '../../utils/searchFieldControl';
+import { SEARCH_ISLAND_ID, ISLAND_FOCUS, ISLAND_HINT, ISLAND_LENS, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TARGET, ISLAND_TEXT } from '../../utils/searchFieldControl';
 
 /** A 44 px icon button of the bar: no frame of its own, the bar is the frame. */
 const BAR_BUTTON = cn(
@@ -112,12 +112,13 @@ export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, 
           id={SEARCH_ISLAND_ID}
           data-compact=""
           className={cn(
-            'relative mr-3 flex h-9 w-40 shrink-0 items-center gap-2 rounded-full pl-3 pr-3 text-sm text-slate-600 transition-colors', ISLAND_SURFACE, ISLAND_TARGET,
-            'active:bg-slate-100 dark:text-slate-300 dark:active:bg-slate-800',
+            // LC81: the panel's field's shape, type and lens (40 px and 16 px, as the search page's pill).
+            'mr-3 w-40 shrink-0 transition-colors', ISLAND_SHAPE, ISLAND_TEXT, ISLAND_HINT, ISLAND_SURFACE, ISLAND_TARGET,
+            'active:bg-slate-100 dark:active:bg-slate-800',
             ISLAND_FOCUS,
           )}
         >
-          <Search size={16} aria-hidden className="shrink-0" />
+          <Search aria-hidden className={ISLAND_LENS} />
           <span aria-hidden>Cerca</span>
         </button>
       </div>

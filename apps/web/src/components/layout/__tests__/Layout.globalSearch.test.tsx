@@ -36,7 +36,7 @@ import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
 
 // The palette's box: its placeholder is shorter on a phone (jsdom's width), so its start.
-const PALETTE_BOX = /^Atto o citazione/;
+const PALETTE_BOX = /^Norma, sentenza o tema/;
 
 /** The layout over a few pages; each page says which it is, so a test sees where the reader is. */
 function at(path: string) {

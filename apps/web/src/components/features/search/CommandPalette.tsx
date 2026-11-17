@@ -16,7 +16,7 @@ import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
-import { ISLAND_SURFACE, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
+import { ISLAND_FIELD_FOCUS, ISLAND_LENS, ISLAND_PLACEHOLDER, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TEXT, ISLAND_WORDS, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
@@ -65,8 +65,9 @@ const ROW = 'relative isolate flex min-h-[44px] w-full cursor-pointer items-cent
 const ROW_ICON = 'shrink-0 text-ink-500 dark:text-ink-400';
 const SUBTLE = 'text-ink-600 dark:text-ink-400';
 // A group's heading, drawn by cmdk (`heading`), which also names the group for a screen reader.
-const GROUP_WITH_HEADING = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-600 dark:[&_[cmdk-group-heading]]:text-ink-400';
-const COLUMN_TITLE = 'px-3 pt-3 font-serif text-base font-medium text-ink-900 dark:text-ink-50';
+const GROUP_WITH_HEADING = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:text-ink-600 dark:[&_[cmdk-group-heading]]:text-ink-400';
+// Pietra's type (LC81): a serif title at 18 px and weight 400, as its headings; a group's name 12 px, weight 600.
+const COLUMN_TITLE = 'px-3 pt-3 font-serif text-lg font-normal text-ink-900 dark:text-ink-50';
 const QUIET_LINE = 'px-3 py-2 text-sm text-ink-600 dark:text-ink-400';
 const FIELD_INPUT = cn(
   'h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-ink-900 placeholder:text-ink-500',
@@ -213,6 +214,26 @@ function insetOf(source: HTMLElement | null, box: DOMRect): Inset | null {
   return { ...inset, radius };
 }
 
+/**
+ * LC81: the field the pill becomes, and the rest of the panel's content (the siblings along the way up from it), which
+ * fades around it. The field is seen from the first frame, on the pill's box, and goes to its place (FLIP: a move and
+ * its width; the lens and the words keep their place in it). Without the field (a later step), the content fades whole.
+ */
+function fieldAndRest(content: HTMLElement): { field: HTMLElement | null; rest: HTMLElement[] } {
+  const field = content.querySelector<HTMLElement>('[data-island-field]');
+  const rest: HTMLElement[] = [];
+  for (let el = field; el && el !== content; el = el.parentElement) {
+    for (const sibling of Array.from(el.parentElement?.children ?? [])) if (sibling !== el && sibling instanceof HTMLElement) rest.push(sibling);
+  }
+  return { field, rest };
+}
+/** The field on a box (the pill's, or its own place): measured with no animation on it. */
+const FIELD_KEYS = ['transform', 'minWidth', 'maxWidth', 'opacity'];
+function fieldOn(field: HTMLElement, box: DOMRect): Keyframe {
+  const r = field.getBoundingClientRect();
+  return { transform: `translate(${px(box.left - r.left)}, ${px(box.top - r.top)})`, minWidth: px(box.width), maxWidth: px(box.width) };
+}
+
 /** The values the layers show now (an animation running included), to go on from there. */
 function now(el: HTMLElement, keys: string[]): Keyframe {
   const style = getComputedStyle(el) as unknown as Record<string, string>;
@@ -250,8 +271,15 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
     // Where the layers are now (the other way's animations included), then those animations stopped: the card's own
     // shadow is read once nothing runs.
     const take = () => {
+      const { field, rest } = fieldAndRest(content);
       const was = running.current.length > 0
-        ? { shape: now(shape, SHAPE_KEYS), content: now(content, ['clipPath', 'opacity']), root: now(root, ['opacity']) }
+        ? {
+          shape: now(shape, SHAPE_KEYS),
+          content: now(content, ['clipPath', 'opacity']),
+          root: now(root, ['opacity']),
+          field: field && now(field, FIELD_KEYS),
+          rest: { opacity: rest[0] ? getComputedStyle(rest[0]).opacity : '1' },
+        }
         : null;
       running.current.forEach((a) => a.cancel());
       running.current = [];
@@ -260,7 +288,7 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
       const full: Inset = { top: 0, right: 0, bottom: 0, left: 0, radius: parseFloat(own.borderTopLeftRadius) || 0 };
       // No clip is the whole panel, as an inset: `none` does not interpolate with one (the clip would jump halfway).
       if (was && (!was.content.clipPath || was.content.clipPath === 'none')) was.content.clipPath = clipAt(full);
-      return { was, shadow: own.boxShadow, full };
+      return { was, shadow: own.boxShadow, full, field, rest };
     };
     let frame = 0;
     let idle = 0;
@@ -268,13 +296,26 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
     if (isPresent) {
       const open = () => {
         started.current = true;
-        const { was, shadow, full } = take();
+        const { was, shadow, full, field, rest } = take();
         root.style.opacity = '';
         // Back from a closing, which took the pointer away.
         root.style.pointerEvents = '';
         const from = still ? null : insetOf(source, root.getBoundingClientRect());
         const timing = { ...ISLAND_OPEN, fill: 'backwards' as const };
-        running.current = was
+        // LC81: the field, at its place now (nothing runs on it), and where it starts: on the pill, or where it is.
+        const fieldHome = field && fieldOn(field, field.getBoundingClientRect());
+        const fieldFrom = field && (was?.field ?? (from && source ? { ...fieldOn(field, source.getBoundingClientRect()), opacity: 1 } : null));
+        running.current = fieldHome && fieldFrom && (was || from)
+          ? [
+            was
+              ? shape.animate([was.shape, { ...shapeAt(full), boxShadow: shadow, opacity: 1 }], timing)
+              : shape.animate([{ ...shapeAt(from!), boxShadow: noShadow(shadow) }, { ...shapeAt(full), boxShadow: shadow }], timing),
+            content.animate([{ clipPath: was ? was.content.clipPath : clipAt(from!) }, { clipPath: clipAt(full) }], timing),
+            field!.animate([fieldFrom, { ...fieldHome, opacity: 1 }], timing),
+            ...rest.map((el) => el.animate(was ? [was.rest, { opacity: 1 }] : [{ opacity: 0 }, { opacity: 0, offset: CONTENT_FROM }, { opacity: 1 }], timing)),
+            ...(was ? [root.animate([was.root, { opacity: 1 }], timing)] : []),
+          ]
+          : was
           // Coming back while it closes: from where it is.
           ? [
             shape.animate([was.shape, { ...shapeAt(full), boxShadow: shadow, opacity: 1 }], timing),
@@ -328,13 +369,23 @@ function IslandPanel({ still, source, className, children }: { still: boolean; s
       remove.current?.();
       return undefined;
     }
-    const { was, shadow, full } = take();
+    const { was, shadow, full, field, rest } = take();
     const pill = hidden.current;
     const to = still ? null : insetOf(pill ?? source, root.getBoundingClientRect());
     const timing = { ...ISLAND_CLOSE, fill: 'forwards' as const };
     const shapeNow = was?.shape ?? { ...shapeAt(full), boxShadow: shadow, opacity: 1 };
     const contentNow = was?.content ?? { clipPath: clipAt(full), opacity: 1 };
-    running.current = to
+    // LC81: the field goes back onto the pill, seen to the end, and gives way to it in the same crossfade as the shape.
+    const back = pill ?? source;
+    running.current = to && field && back
+      ? [
+        shape.animate([shapeNow, { opacity: 1, offset: PILL_FROM }, { ...shapeAt(to), boxShadow: noShadow(shadow), opacity: 0 }], timing),
+        content.animate([{ clipPath: contentNow.clipPath }, { clipPath: clipAt(to) }], timing),
+        field.animate([was?.field ?? { ...fieldOn(field, field.getBoundingClientRect()), opacity: 1 }, { opacity: 1, offset: PILL_FROM }, { ...fieldOn(field, back.getBoundingClientRect()), opacity: 0 }], timing),
+        ...rest.map((el) => el.animate([was?.rest ?? { opacity: 1 }, { opacity: 0, offset: CONTENT_UNTIL }, { opacity: 0 }], timing)),
+        ...(pill ? [pill.animate([{ opacity: 0 }, { opacity: 0, offset: PILL_FROM }, { opacity: 1 }], timing)] : []),
+      ]
+      : to
       ? [
         shape.animate([shapeNow, { opacity: 1, offset: PILL_FROM }, { ...shapeAt(to), boxShadow: noShadow(shadow), opacity: 0 }], timing),
         content.animate([contentNow, { opacity: 0, offset: CONTENT_UNTIL }, { clipPath: clipAt(to), opacity: 0 }], timing),
@@ -430,6 +481,24 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // the ref is empty once the palette has closed or moved on to another step.
   const boxRef = useRef<HTMLInputElement>(null);
   const numberRef = useRef<HTMLInputElement>(null);
+  // LC81: how the focus came, for the field's frame (`ISLAND_FIELD_FOCUS`), the pill's rule: 1 px from a pointer, 2 px
+  // from the keyboard. Read by a listener on the whole page because a text field always matches `:focus-visible`, a
+  // tap's focus included (the pill, a button, does not): CSS alone cannot tell the two apart. Tab, a shortcut (⌘K), an arrow, or Enter or Space on a control count as the keyboard; the words
+  // typed in the field, an on-screen keyboard's included, do not.
+  const [keyboard, setKeyboard] = useState(false);
+  useEffect(() => {
+    const onPointer = () => setKeyboard(false);
+    const onKey = (event: KeyboardEvent) => {
+      const onControl = !(event.target instanceof HTMLInputElement) && (event.key === 'Enter' || event.key === ' ');
+      if (event.key === 'Tab' || event.metaKey || event.ctrlKey || event.key.startsWith('Arrow') || onControl) setKeyboard(true);
+    };
+    document.addEventListener('pointerdown', onPointer, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, []);
   const { tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (tour) => {
@@ -964,14 +1033,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     <div className="flex items-center gap-2 px-3 pt-2" onKeyDown={keepKeys}>
       <motion.div key={step} {...stepMotion} className="flex min-w-0 flex-1 items-center gap-3">
         {step === 'select_act' && (
-          // The field's border carries the focus ring (`focus-within`); the box inside draws none, or the
-          // global `input:focus-visible` ring would stand out around it, over the icon.
-          <div className={cn(
-            'flex h-12 min-w-0 flex-1 items-center gap-3 rounded-lg border border-ink-200 bg-white px-3',
-            'focus-within:border-toga-500 focus-within:ring-2 focus-within:ring-toga-500/30',
-            'dark:border-ink-700 dark:bg-ink-950 dark:focus-within:border-toga-400',
-          )}>
-            <Search size={20} aria-hidden className="shrink-0 text-ink-500 dark:text-ink-400" />
+          // LC81: the pill it grew from, the same object: its shape, type, lens, ground and edge, and its focus on the
+          // frame (`ISLAND_FIELD_FOCUS`). The box inside draws none, or the global `input:focus-visible` ring would
+          // stand out around it.
+          <div data-island-field="" data-keyboard={keyboard ? '' : undefined} className={cn('flex-1', ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_FIELD_FOCUS)}>
+            <Search aria-hidden className={ISLAND_LENS} />
             <Command.Input
               ref={boxRef}
               autoFocus
@@ -984,11 +1050,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               }}
               enterKeyHint="search"
               aria-describedby="command-palette-help"
-              // On a phone the example would be cut at «art 20» (consultant 16-11): the words alone.
-              placeholder={isDesktop ? 'Atto o citazione, es. art 2043 cc' : 'Atto o citazione'}
-              // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
-              // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
-              className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-500 dark:placeholder:text-ink-400"
+              // LC81: the pill's words, so nothing changes as it grows; the examples are on the line under the field.
+              placeholder={ISLAND_PLACEHOLDER}
+              // The pill's type (16 px at least on a phone: Safari on an iPhone zooms into a field under 16 px).
+              className={cn('h-full w-full min-w-0 bg-transparent outline-none placeholder:text-slate-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:placeholder:text-slate-400', ISLAND_TEXT, ISLAND_WORDS)}
               onKeyDown={(e) => {
                 // The field's order (R2): a decision, then the server still naming the act (the search runs when it
                 // answers), then a norm — unless the arrows chose another row, which Enter then picks.
@@ -1075,7 +1140,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         type="button"
         onClick={onClose}
         aria-label="Chiudi"
-        className={cn('inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100', FOCUS_RING)}
+        // LC81: as tall as the field (40 px, 32 from lg), 44 px to the finger.
+        className={cn("relative inline-flex size-10 shrink-0 items-center justify-center rounded-full text-ink-500 after:absolute after:-inset-0.5 after:content-[''] hover:bg-ink-100 hover:text-ink-800 lg:size-8 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100", FOCUS_RING)}
       >
         <X size={18} aria-hidden />
       </button>
@@ -1083,15 +1149,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   );
 
   // The help line, or what the box was read as, 10 px under the field and on the line of its text: the
-  // field's edge (12 px of row, 1 of border, 12 of padding), then on the first step the icon's 20 px and
-  // the gap's 12. The visible line is aria-hidden: the status region says it.
+  // lens's edge (12 px of row, 1 of border, 12 in), then on the first step the lens's 16 px and a gap of 8, to the
+  // words' 36 px in (`ISLAND_SHAPE`). The visible line is aria-hidden: the status region says it.
   // The line under the box says what no row says: the wait for the server. A decision, a norm or a topic read in the
   // box is its row, the chosen one, with «↵» — a second line saying the same was one too many (Bill).
   const lineSays = step === 'select_act' && preview && (waiting || resolvingRemotely) ? preview : null;
   const fieldLine = (
-    <div aria-hidden className="flex min-h-5 items-center gap-3 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
+    <div aria-hidden className="flex min-h-5 items-center gap-2 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
       {step === 'select_act' && (
-        <span className="flex w-5 shrink-0 justify-center">
+        <span className="flex w-4 shrink-0 justify-center">
           {lineSays && <lineSays.icon size={14} className={lineSays.tone} />}
         </span>
       )}
