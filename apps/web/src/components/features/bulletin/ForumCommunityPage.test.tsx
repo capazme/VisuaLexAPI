@@ -419,6 +419,23 @@ describe('ForumCommunityPage: the open discussion', () => {
     expect(await screen.findByText('Segnalazione inviata ai moderatori.')).toBeInTheDocument();
   });
 
+  it('shows only the count on one\'s own discussion and reply, and the server\'s words if a vote is refused as one\'s own', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread({ isOwner: true, replies: [reply({ id: 'r1', isOwner: true }), reply({ id: 'r2' })] }));
+    service.voteComment.mockRejectedValue({ status: 403, message: 'Non puoi votare un tuo contributo', data: { detail: 'Non puoi votare un tuo contributo', error: 'own_contribution' } });
+    renderAt('/forum/community/t1');
+    await screen.findAllByText('Serve un inadempimento grave.');
+    expect(screen.queryByRole('button', { name: /^Vota la discussione/ })).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Vota la risposta/ })).toHaveLength(1);
+    // The count stays, said as such to a screen reader.
+    const counts = screen.getAllByText((_, el) => el?.tagName === 'SPAN' && el.textContent?.trim() === '4 voti');
+    expect(counts[0].closest('button')).toBeNull();
+    // A vote the server still refuses as one's own (an `isOwner` out of date): its words, not «Riprova».
+    fireEvent.click(screen.getByRole('button', { name: 'Vota la risposta di luigi, 1 voto' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Non puoi votare un tuo contributo');
+    expect(screen.queryByText(/Riprova/)).toBeNull();
+  });
+
   it('says when the discussion is not there any more', async () => {
     service.feed.mockResolvedValue(page([]));
     service.get.mockRejectedValue({ status: 404, message: 'Glossa non trovata' });

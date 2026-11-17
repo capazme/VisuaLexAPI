@@ -55,9 +55,14 @@ const fold = (value: string) => cleanSectionTitle(value).toLowerCase();
 const GLUED =
   /\s+(?=(?:\(\()?(?:(?:PARTE|LIBRO|TITOLO|CAPO|SEZIONE)\s+[IVXLCDM]+\b|(?:Parte|Libro|Titolo|Capo|Sezione)\s+[IVXLCDM]+(?:-?[a-z]+)?(?:\)\))?\s+(?:\(\()?[A-ZÀ-Ý]|§\s*\d))/;
 
+// The Costituzione's first row carries the act's own name before its first heading: «COSTITUZIONE DELLA REPUBBLICA
+// ITALIANA PRINCIPI FONDAMENTALI». The name is the panel's title already («Struttura della Costituzione»), not a heading.
+// shortcut: this one act's name only; a rule on the source's header if another act glues its name the same way.
+const ACT_NAME = /^COSTITUZIONE DELLA REPUBBLICA ITALIANA\s+(?=PRINCIPI FONDAMENTALI\b)/;
+
 /** One string of the listing as the headings it holds. */
 export function splitHeadings(raw: string): string[] {
-  return raw.split(GLUED).map((part) => part.trim()).filter(Boolean);
+  return raw.replace(ACT_NAME, '').split(GLUED).map((part) => part.trim()).filter(Boolean);
 }
 
 /** «Art. 2043», but a row the source lists that is not an article («Indice allegati») as it is. */

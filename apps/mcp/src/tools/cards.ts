@@ -46,7 +46,7 @@ const STATO_WORDS: Record<string, string> = {
 };
 
 const SCHEMA_TEXT = [
-  'Una scheda di studio di VisuaLex Gymnasium ha questi campi:',
+  'Una scheda di studio di Learn ha questi campi:',
   `- materia (obbligatoria): ${MATERIE.join(', ')};`,
   '- istituto (obbligatorio, fino a 200 caratteri): l’istituto giuridico, es. «Risoluzione per inadempimento»;',
   `- tipo (facoltativo, ISTITUTO_DEFINIZIONE se manca): ${TIPI.join(', ')};`,
@@ -177,10 +177,10 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_schema_card',
     {
-      title: 'Come si scrive una scheda di VisuaLex Gymnasium',
+      title: 'Come si scrive una scheda di Learn',
       description: courseRules
-        ? 'La forma di una scheda di studio di VisuaLex Gymnasium e di un percorso, e le loro regole: da leggere prima di lingolex_salva_card e degli strumenti dei percorsi.'
-        : 'La forma di una scheda di studio di VisuaLex Gymnasium e le regole delle ancore, da leggere prima di lingolex_salva_card.',
+        ? 'La forma di una scheda di studio di Learn e di un percorso, e le loro regole: da leggere prima di lingolex_salva_card e degli strumenti dei percorsi.'
+        : 'La forma di una scheda di studio di Learn e le regole delle ancore, da leggere prima di lingolex_salva_card.',
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -204,14 +204,14 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   if (!courseRules) {
     server.registerTool(
       'lingolex_salva_card',
-      { title: 'Salva schede di VisuaLex Gymnasium', description, inputSchema: { schede: z.array(cardInput).min(1).max(10).describe('Le schede, da 1 a 10') }, annotations },
+      { title: 'Salva schede di Learn', description, inputSchema: { schede: z.array(cardInput).min(1).max(10).describe('Le schede, da 1 a 10') }, annotations },
       ({ schede }, extra) => run('lingolex_salva_card', extra, async (caller) => data({ esiti: (await save(caller, schede)).results })),
     );
   } else {
     server.registerTool(
       'lingolex_salva_card',
       {
-        title: 'Salva schede di VisuaLex Gymnasium',
+        title: 'Salva schede di Learn',
         description,
         inputSchema: {
           schede: z
@@ -230,7 +230,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_le_mie_card',
     {
-      title: 'Le mie schede di VisuaLex Gymnasium',
+      title: 'Le mie schede di Learn',
       description:
         `Le schede di studio dell’utente in breve, le più recenti prima, filtrabili per materia e stato (${CARDS_PER_PAGE} per pagina). ` +
         'Risposta e spiegazione con lingolex_leggi_card.',
@@ -254,7 +254,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_leggi_card',
     {
-      title: 'Leggi schede di VisuaLex Gymnasium',
+      title: 'Leggi schede di Learn',
       description: 'Da 1 a 10 schede dell’utente per intero, con domanda, risposta, spiegazione e ancore (gli id da lingolex_le_mie_card).',
       inputSchema: { schede: z.array(z.string().min(1).max(64)).min(1).max(10).describe('Gli id delle schede') },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -270,7 +270,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_elimina_card',
     {
-      title: 'Elimina schede di VisuaLex Gymnasium',
+      title: 'Elimina schede di Learn',
       description:
         `Sposta nel cestino da 1 a 10 schede dell’utente (gli id da lingolex_le_mie_card), solo bozze o archiviate: una scheda proposta alla community non si elimina. ` +
         `Prima chiede conferma all’utente con una finestra che il modello non può compilare; le schede restano ripristinabili da VisuaLex per ${TRASH_DAYS} giorni.`,

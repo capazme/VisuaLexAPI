@@ -1,14 +1,15 @@
-import { useId, useRef, useState, type FormEvent } from 'react';
-import { ChevronDown, Plus, SlidersHorizontal } from 'lucide-react';
+import { useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { ChevronDown, Folder, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { FIELD_TEXT } from '../../../constants/interactions';
 import { Collapsible } from '../../ui/Collapsible';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
 import type { TaskView } from '../../../types/tasks';
-import { INK_BUTTON } from '../studia/progress/tokens';
+import { FOCUS_RING, INK_BUTTON } from '../studia/progress/tokens';
 import { belongsTo, draftProblem, emptyDraft, inputFromDraft, MAX_TITLE, type TaskDraft } from './taskDraft';
-import { PRIORITY_LABEL, shortDay } from './taskDates';
+import { PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
+import { draftWithLine, readQuickAddLine, suggestDossiers, type DossierName, type FoundPart } from './quickAddLine';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
 import { FIELD_HINT, ICON_BUTTON } from './plannerStyles';
@@ -33,10 +34,33 @@ function summary(draft: TaskDraft, today: string, dossierTitle: string | undefin
   return parts.join(' · ');
 }
 
+/** A part read from the line, in words, on its chip. */
+function partLabel(part: FoundPart, today: string): string {
+  const at = (time: string | null) => (time ? ` alle ${time}` : '');
+  switch (part.kind) {
+    case 'date': {
+      const { date, time, recurrence, recurrenceFrom } = part.value;
+      if (!recurrence) return `${shortDay(date, today)}${at(time)}`;
+      const from = recurrenceFrom === 'completamento' ? ', dal completamento' : '';
+      return `${RECURRENCE_LABEL[recurrence]}${at(time)}${from}, da ${shortDay(date, today).toLowerCase()}`;
+    }
+    case 'due':
+      return `Termine finale ${shortDay(part.value.date, today).toLowerCase()}${at(part.value.time)}`;
+    case 'dossier':
+      return `Pratica «${part.title}»`;
+    case 'label':
+      return `Etichetta «${part.label}»`;
+    case 'priority':
+      return `Priorità ${PRIORITY_LABEL[part.priority].toLowerCase()}`;
+  }
+}
+
 /**
- * The field at the top of each view: a title and Enter. «Dettagli» opens the dates, the priority and the dossier in a
- * `ui/Collapsible` under the row (U1b: the box grows, never a jump); the full set (labels, repetition, description) is
- * the task's dialog. No date is read from the words (wave 2).
+ * The field at the top of each view: a title and Enter. The line is read as it is typed (LC78, `quickAddLine.ts`): a
+ * date in words, `#pratica`, `@etichetta`, `p1`–`p4` and `{termine}`; what was read shows as chips in a row under the
+ * field, in the flow (L-73: nothing over the content), and a chip clicked turns its words back into text. The
+ * dossiers a `#` may mean are listed there too. «Dettagli» opens the dates, the priority and the dossier in a
+ * `ui/Collapsible` under the row (U1b: the box grows, never a jump); what the line says wins over them.
  */
 export function QuickAddField({ view, today, defaults, dossierLocked = false }: Props) {
   const id = useId();
@@ -45,13 +69,76 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
   const detailsButton = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dossierTitle = useAppStore((s) => (draft.dossierId ? s.dossiers.find((d) => d.id === draft.dossierId)?.title : undefined));
-  const dossierKind = useAppStore((s) => (draft.dossierId ? s.dossiers.find((d) => d.id === draft.dossierId)?.kind : undefined));
+  const titleRef = useRef<HTMLInputElement>(null);
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
+  const [caret, setCaret] = useState(0);
+  const [active, setActive] = useState(-1);
+  // The `#…` whose list Esc closed, until it changes.
+  const [closedQuery, setClosedQuery] = useState<string | null>(null);
+  const caretTo = useRef<number | null>(null);
+  const dossiers = useAppStore((s) => s.dossiers);
+  const line = useMemo(
+    () => readQuickAddLine(draft.title, today, { dossiers, dossierLocked, dismissed, caret }),
+    [draft.title, today, dossiers, dossierLocked, dismissed, caret],
+  );
+  const task = useMemo(() => draftWithLine(draft, line), [draft, line]);
+  const queryKey = line.dossierQuery ? `${line.dossierQuery.start}:${line.dossierQuery.query}` : null;
+  const listOpen = line.dossierQuery !== null && queryKey !== closedQuery;
+  const suggestions: DossierName[] = listOpen ? suggestDossiers(line.dossierQuery!.query, dossiers) : [];
+  const dossierTitle = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.title : undefined;
+  const dossierKind = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.kind : undefined;
+
+  // A dossier chosen from the list puts the caret after its name.
+  useLayoutEffect(() => {
+    if (caretTo.current === null) return;
+    titleRef.current?.setSelectionRange(caretTo.current, caretTo.current);
+    caretTo.current = null;
+  });
+
+  const setTitle = (title: string, at: number) => {
+    setDraft((current) => ({ ...current, title }));
+    setCaret(at);
+    setActive(-1);
+    if (!title) setDismissed(new Set());
+  };
+
+  const choose = (dossier: DossierName) => {
+    const query = line.dossierQuery!;
+    const rest = draft.title.slice(query.end);
+    const inserted = `#${dossier.title}${/^\s/.test(rest) ? '' : ' '}`;
+    caretTo.current = query.start + inserted.length;
+    setTitle(draft.title.slice(0, query.start) + inserted + rest, caretTo.current);
+    titleRef.current?.focus();
+  };
+
+  const dismiss = (part: FoundPart) => {
+    setDismissed((current) => new Set(current).add(part.key));
+    titleRef.current?.focus();
+  };
+
+  const onTitleKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!listOpen) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (suggestions.length === 0) return;
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setActive((at) => (at < 0 && step < 0 ? suggestions.length - 1 : (at + step + suggestions.length) % suggestions.length));
+    } else if (event.key === 'Enter' && suggestions[active]) {
+      event.preventDefault();
+      choose(suggestions[active]);
+    } else if (event.key === 'Escape') {
+      // This Esc closes the list; the next one empties the title.
+      event.preventDefault();
+      event.stopPropagation();
+      setClosedQuery(queryKey);
+      setActive(-1);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy || !draft.title.trim()) return;
-    const problem = draftProblem(draft);
+    if (busy || !task.title.trim()) return;
+    const problem = draftProblem(task);
     if (problem) {
       setError(problem);
       setOpen(true);
@@ -60,8 +147,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
     setBusy(true);
     setError(null);
     try {
-      const created = await taskService.create(inputFromDraft(draft, { withDossier: true, origin: dossierKind === 'studio' ? 'studio' : 'lavoro' }));
-      setDraft((current) => ({ ...current, title: '' }));
+      const created = await taskService.create(inputFromDraft(task, { withDossier: true, origin: dossierKind === 'studio' ? 'studio' : 'lavoro' }));
+      setTitle('', 0);
       plannerStore.getState().changed();
       if (!belongsTo(created, view, today, defaults.dossierId || undefined)) plannerStore.getState().notify('Compito aggiunto: non è in questa vista', 'info');
     } catch (failure) {
@@ -77,7 +164,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
       onKeyDown={(e) => {
         if (e.key === 'Escape' && draft.title && e.target instanceof HTMLInputElement && e.target.id === `${id}-title`) {
           e.preventDefault();
-          setDraft((current) => ({ ...current, title: '' }));
+          setTitle('', 0);
         }
       }}
       className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
@@ -91,12 +178,20 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           <Plus size={18} aria-hidden className="ml-2 shrink-0 text-slate-500 dark:text-slate-400" />
           <label htmlFor={`${id}-title`} className="sr-only">Nuovo compito</label>
           <input
+            ref={titleRef}
             id={`${id}-title`}
             value={draft.title}
             maxLength={MAX_TITLE}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            onChange={(e) => setTitle(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
+            onKeyDown={onTitleKey}
             placeholder="Aggiungi un compito"
             aria-describedby={`${id}-summary`}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={suggestions.length > 0}
+            aria-controls={suggestions.length > 0 ? `${id}-dossiers` : undefined}
+            aria-activedescendant={suggestions[active] ? `${id}-dossier-${active}` : undefined}
             autoComplete="off"
             className={cn('min-h-[44px] min-w-[min(12em,100%)] flex-1 rounded-lg bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400', FIELD_TEXT)}
           />
@@ -116,12 +211,60 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
             {/* Turns as the panel opens, with its height: the button's state at every width. */}
             <ChevronDown size={14} aria-hidden className={cn('shrink-0 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
           </button>
-          <button type="submit" disabled={busy || !draft.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
+          <button type="submit" disabled={busy || !task.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
             {busy ? 'Aggiungo…' : <>Aggiungi<span className="sr-only"> il compito</span></>}
           </button>
         </div>
       </div>
-      <p id={`${id}-summary`} className={cn(FIELD_HINT, 'px-4 pb-2')}>{summary(draft, today, dossierTitle)}</p>
+      {/* What the line says, in the flow under the field: a chip clicked turns its words back into text. */}
+      {line.parts.length > 0 && (
+        <ul aria-label="Letto nella riga" className="flex flex-wrap gap-x-1 px-2.5">
+          {line.parts.map((part) => (
+            <li key={part.key}>
+              <button
+                type="button"
+                onClick={() => dismiss(part)}
+                aria-label={`${partLabel(part, today)}: togli, «${part.raw}» resta nel titolo`}
+                className={cn('group inline-flex min-h-[44px] max-w-full items-center rounded-lg px-0.5', FOCUS_RING)}
+              >
+                <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-900 group-hover:border-primary-400 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-100">
+                  <span className="truncate">{partLabel(part, today)}</span>
+                  <X size={12} aria-hidden className="shrink-0" />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {listOpen && (
+        suggestions.length > 0 ? (
+          <ul id={`${id}-dossiers`} role="listbox" aria-label="Pratiche" className="mx-1.5 mb-1 border-t border-slate-200 pt-1 dark:border-slate-800">
+            {suggestions.map((dossier, index) => (
+              <li
+                key={dossier.id}
+                id={`${id}-dossier-${index}`}
+                role="option"
+                aria-selected={index === active}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => choose(dossier)}
+                onMouseEnter={() => setActive(index)}
+                className={cn(
+                  'flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm text-slate-800 dark:text-slate-100',
+                  index === active && 'bg-slate-100 dark:bg-slate-800',
+                )}
+              >
+                <Folder size={15} aria-hidden className="shrink-0 text-slate-500" />
+                <span className="min-w-0 truncate">{dossier.title}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={cn(FIELD_HINT, 'px-4 pb-1')}>
+            {line.dossierQuery!.query.trim() ? `Nessuna pratica «${line.dossierQuery!.query.trim()}»: resta nel titolo.` : 'Nessuna pratica.'}
+          </p>
+        )
+      )}
+      <p id={`${id}-summary`} className={cn(FIELD_HINT, 'px-4 pb-2')}>{summary(task, today, dossierTitle)}</p>
       <Collapsible
         id={`${id}-details`}
         open={open}

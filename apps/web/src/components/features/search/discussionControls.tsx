@@ -12,8 +12,18 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 /** At least 44 px to touch below `md`, the compact size from it. */
 export const TOUCH = 'min-h-11 md:min-h-0';
 
-/** The vote, named by what is voted and its count: «Vota la risposta di luigi, 1 voto». */
-export function VoteButton({ voted, count, label, onVote }: { voted: boolean; count: number; label: string; onVote: () => void }) {
+/**
+ * The vote, named by what is voted and its count: «Vota la risposta di luigi, 1 voto». On one's own contribution
+ * (`own`) only the count: the server refuses that vote (G-476).
+ */
+export function VoteButton({ voted, count, label, onVote, own = false }: { voted: boolean; count: number; label: string; onVote: () => void; own?: boolean }) {
+  if (own) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 px-3 py-1 text-xs text-slate-600 md:px-2 dark:text-slate-300">
+        <ThumbsUp size={13} aria-hidden /> {count}<span className="sr-only"> {count === 1 ? 'voto' : 'voti'}</span>
+      </span>
+    );
+  }
   return (
     <button
       type="button"
