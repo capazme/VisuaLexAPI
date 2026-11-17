@@ -94,7 +94,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, searchTrigger: null,
     practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null,
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } }, dossiers: [TWO],
+    structureWindow: { blockId: null }, dossiers: [TWO],
   });
   corpus = s().createPractice('Del Corpus');
   s().addArticlesToPractice(corpus, L241, [article(L241, '2')]);

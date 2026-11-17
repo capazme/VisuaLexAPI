@@ -23,7 +23,7 @@ const s = () => appStore.getState();
 function setUp() {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [],
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    structureWindow: { blockId: null },
   });
   const cc = s().addArticlesToPractice(null, CC_RD, [article(CC_RD, '2043', { allegato: '2' })]);
   const l24 = s().addArticlesToPractice(cc.practiceId, L24, [article(L24, '5'), article(L24, '7')]);

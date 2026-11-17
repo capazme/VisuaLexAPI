@@ -99,7 +99,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, searchTrigger: null, searchQueue: [], pendingDecision: null,
-    readingBackStack: [], commandPaletteOpen: false, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    readingBackStack: [], commandPaletteOpen: false, structureWindow: { blockId: null },
   });
 });
 afterEach(() => {

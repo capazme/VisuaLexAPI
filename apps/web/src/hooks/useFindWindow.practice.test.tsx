@@ -53,7 +53,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [], phoneReader: null,
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    structureWindow: { blockId: null },
   });
   saved = {
     css: g.CSS, highlight: g.Highlight, matchMedia: window.matchMedia,

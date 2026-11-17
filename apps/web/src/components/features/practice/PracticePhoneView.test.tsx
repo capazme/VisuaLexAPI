@@ -53,7 +53,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null,
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    structureWindow: { blockId: null },
   });
 });
 afterEach(() => {
@@ -444,18 +444,18 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(screen.getByText(/1 atto · 1 articolo · 1 sentenza/)).toBeInTheDocument();
   });
 
-  it('the index drawer stays open across picks', async () => {
+  it('the index stays open across picks', async () => {
     h.legalFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([article(L24, '9')]) });
     const { actId } = s().addArticlesToPractice(null, { ...L24, urn: 'urn:nir:stato:legge:2017-03-08;24' }, [article(L24, '5')]);
     render(view());
     fireEvent.click(screen.getByRole('button', { name: /^Azioni su/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Struttura della norma' }));
-    const tree = () => h.trees.at(-1) as { variant: string; isOpen: boolean; onArticleSelect: (n: string, a: string | null) => void };
-    await waitFor(() => expect(tree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
+    const tree = () => h.trees.at(-1) as { isOpen: boolean; onArticleSelect: (n: string, a: string | null) => void };
+    await waitFor(() => expect(tree()).toEqual(expect.objectContaining({ isOpen: true })));
     await act(async () => { tree().onArticleSelect('9', null); });
     await waitFor(() => expect(s().practices[0].acts.find((a) => a.id === actId)?.articles).toHaveLength(2));
-    expect(tree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true }));
+    expect(tree()).toEqual(expect.objectContaining({ isOpen: true }));
     await act(async () => { tree().onArticleSelect('5', null); });
-    expect(tree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true }));
+    expect(tree()).toEqual(expect.objectContaining({ isOpen: true }));
   });
 });
