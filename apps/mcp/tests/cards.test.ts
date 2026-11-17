@@ -59,18 +59,18 @@ const CARD = {
 };
 
 describe('the card tools\' words', () => {
-  it('say VisuaLex Gymnasium, never LingoLex, in what the user and the model read', async () => {
+  it('say Learn, never Gymnasium nor LingoLex, in what the user and the model read (L-70)', async () => {
     const client = await connect();
     const tools = (await client.listTools()).tools.filter((t) => t.name.startsWith('lingolex_'));
     expect(tools.map((t) => t.title)).toEqual([
-      'Come si scrive una scheda di VisuaLex Gymnasium',
-      'Salva schede di VisuaLex Gymnasium',
-      'Le mie schede di VisuaLex Gymnasium',
-      'Leggi schede di VisuaLex Gymnasium',
-      'Elimina schede di VisuaLex Gymnasium',
+      'Come si scrive una scheda di Learn',
+      'Salva schede di Learn',
+      'Le mie schede di Learn',
+      'Leggi schede di Learn',
+      'Elimina schede di Learn',
     ]);
-    for (const tool of tools) expect(`${tool.title} ${tool.description}`).not.toMatch(/LingoLex/);
-    expect(text(await client.callTool({ name: 'lingolex_schema_card', arguments: {} }))).not.toMatch(/LingoLex/);
+    for (const tool of (await client.listTools()).tools) expect(`${tool.title} ${tool.description}`).not.toMatch(/LingoLex|Gymnasium/);
+    expect(text(await client.callTool({ name: 'lingolex_schema_card', arguments: {} }))).not.toMatch(/LingoLex|Gymnasium/);
     await client.close();
   });
 });

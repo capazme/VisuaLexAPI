@@ -23,7 +23,6 @@ export type ActTreeNode =
   | { type: 'heading'; key: string; title: string; children: ActTreeNode[] }
   | { type: 'article'; numero: string };
 
-const LEVELS = ['parte', 'libro', 'titolo', 'capo', 'sezione'];
 const HEADING = /^(PARTE|LIBRO|TITOLO|CAPO|SEZIONE)\b/i;
 
 /** An article number, numeric or roman, with any single lowercase suffix («669-terdecies», «II bis»). */
@@ -35,21 +34,35 @@ export function isArticleString(str: string): boolean {
   return /^\d+(?:[-\s][a-z]+)?$/.test(trimmed) || /^[IVXLCDM]+(?:[-\s][a-z]+)?$/.test(trimmed);
 }
 
-function rankOf(title: string): number {
+/**
+ * A heading's level, in the order the act first uses each level word: the d.lgs. 36/2023 puts its Parti inside its Libri,
+ * other acts their Libri or Titoli inside Parti. A heading of no known level is the deepest.
+ */
+function rankOf(title: string, order: string[]): number {
   const match = HEADING.exec(cleanSectionTitle(title));
-  return match ? LEVELS.indexOf(match[1].toLowerCase()) : LEVELS.length;
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  const word = match[1].toLowerCase();
+  if (!order.includes(word)) order.push(word);
+  return order.indexOf(word);
 }
 
 const fold = (value: string) => cleanSectionTitle(value).toLowerCase();
 
 // Normattiva reads a heading off its `<li>` with the levels opened there glued on: «TITOLO III DEI SINGOLI CONTRATTI
 // CAPO I Della vendita Sezione I Disposizioni generali», «Disposizioni sulla legge in generale CAPO I …». Split before a
-// level word (capitals or capitalised) followed by its numeral, or before a «§ n», amendment markers «((» included.
-const GLUED = /\s+(?=(?:\(\()?(?:(?:PARTE|LIBRO|TITOLO|CAPO|SEZIONE|Parte|Libro|Titolo|Capo|Sezione)\s+[IVXLCDM]+\b|§\s*\d))/;
+// level word followed by its numeral, or before a «§ n», amendment markers «((» included. A capitalised level word
+// splits only when it opens a level, its name capitalised after the numeral: «Modifiche al Titolo V della …» is a name.
+const GLUED =
+  /\s+(?=(?:\(\()?(?:(?:PARTE|LIBRO|TITOLO|CAPO|SEZIONE)\s+[IVXLCDM]+\b|(?:Parte|Libro|Titolo|Capo|Sezione)\s+[IVXLCDM]+(?:-?[a-z]+)?(?:\)\))?\s+(?:\(\()?[A-ZÀ-Ý]|§\s*\d))/;
+
+// The Costituzione's first row carries the act's own name before its first heading: «COSTITUZIONE DELLA REPUBBLICA
+// ITALIANA PRINCIPI FONDAMENTALI». The name is the panel's title already («Struttura della Costituzione»), not a heading.
+// shortcut: this one act's name only; a rule on the source's header if another act glues its name the same way.
+const ACT_NAME = /^COSTITUZIONE DELLA REPUBBLICA ITALIANA\s+(?=PRINCIPI FONDAMENTALI\b)/;
 
 /** One string of the listing as the headings it holds. */
 export function splitHeadings(raw: string): string[] {
-  return raw.split(GLUED).map((part) => part.trim()).filter(Boolean);
+  return raw.replace(ACT_NAME, '').split(GLUED).map((part) => part.trim()).filter(Boolean);
 }
 
 /** «Art. 2043», but a row the source lists that is not an article («Indice allegati») as it is. */
@@ -65,6 +78,7 @@ export function buildActTree(data: ActTreeItem[], annex: string | null, annexLab
   const labels = new Set(annexLabels.map(fold));
   const root: ActTreeNode[] = [];
   const stack: { rank: number; children: ActTreeNode[] }[] = [];
+  const order: string[] = [];
   let pending: string[] = [];
   let inside = false;
   let count = 0;
@@ -79,7 +93,7 @@ export function buildActTree(data: ActTreeItem[], annex: string | null, annexLab
     }
     if (!inside) stack.length = 0;
     for (const title of pending) {
-      const rank = rankOf(title);
+      const rank = rankOf(title, order);
       while (stack.length && stack[stack.length - 1].rank >= rank) stack.pop();
       const node: ActTreeNode = { type: 'heading', key: `h${count++}`, title, children: [] };
       (stack.length ? stack[stack.length - 1].children : root).push(node);

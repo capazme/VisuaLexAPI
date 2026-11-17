@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 // A cold boot (Irnerio's repro, LC61): the browser remembers the Forum as the last section before the app mounts.
@@ -48,6 +48,8 @@ describe('App — a pratica opened by its address on a cold boot after the Forum
     render(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: /Condominio/ }, { timeout: 5000 })).toBeInTheDocument();
     expect(window.location.search).toBe('?dossier=w1');
-    expect(sectionStore.getState().section).toBe('opus');
+    // The section follows the pratica in an effect after the commit that draws its heading (`DossierPage`): the heading
+    // can be found before that effect has run, more so on a busy machine, so the section is awaited, not read at once.
+    await waitFor(() => expect(sectionStore.getState().section).toBe('opus'));
   });
 });

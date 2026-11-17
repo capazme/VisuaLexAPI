@@ -209,11 +209,13 @@ describe('ArticleTabContent — a past text is a reading', () => {
       expect(button).toBeDisabled();
       expect(button.title).toContain(LOCKED);
     }
-    const menu = openMore();
-    for (const name of ['Glosse sull’articolo', 'Aggiungi alle norme rapide']) {
-      expect(entry(menu, name)).toBeDisabled();
-      expect(entry(menu, name)).toHaveTextContent(LOCKED);
+    for (const glosses of screen.getAllByRole('button', { name: 'Glosse' })) {
+      expect(glosses).toBeDisabled();
+      expect(glosses.title).toContain(LOCKED);
     }
+    const menu = openMore();
+    expect(entry(menu, 'Aggiungi alle norme rapide')).toBeDisabled();
+    expect(entry(menu, 'Aggiungi alle norme rapide')).toHaveTextContent(LOCKED);
   });
 
   it('shows nothing of Brocardi, even when an older answer carried it (D-078)', () => {

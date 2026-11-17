@@ -67,7 +67,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, searchTrigger: null,
     practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null,
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    structureWindow: { blockId: null },
     dossiers: [dossierOf([norma('5', { status: 'important' }), norma('7'), sentenza])],
     pendingDossierItemIds: {}, pendingDossierOrders: {}, lastSyncError: null,
   });
