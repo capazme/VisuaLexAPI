@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appStore } from '../../../../store/useAppStore';
 import { isEditableTarget } from '../../../ui/notifications/undoShortcut';
 import { SearchField } from '../SearchField';
-import { PALETTE_SHORTCUT, focusSearchField, openSearchMenu, resetSearchFieldControl, returnWordsToSearchField } from '../../../../utils/searchFieldControl';
+import { ISLAND_FOCUS, ISLAND_SURFACE, ISLAND_TARGET, PALETTE_SHORTCUT, focusSearchField, openSearchMenu, resetSearchFieldControl, returnWordsToSearchField } from '../../../../utils/searchFieldControl';
 
 const original = appStore.getState();
 const openCommandPaletteWith = vi.fn();
@@ -37,6 +37,18 @@ describe('SearchField — the door to the search menu (R2)', () => {
     renderField();
     expect(field()).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
     expect(field()).not.toHaveClass('text-base');
+  });
+
+  it('is a thin pill with one edge: 40 px drawn, 44 to the finger, no ring at rest nor on focus (LC69)', () => {
+    renderField();
+    expect(field()).toHaveClass('h-10', 'rounded-full', ...ISLAND_SURFACE.split(' '), ...ISLAND_TARGET.split(' '), ...ISLAND_FOCUS.split(' '));
+    expect(field().className).not.toMatch(/(^|\s)(focus:)?ring-2|shadow-sm/);
+  });
+
+  it('shows the keyboard\'s focus as one 2 px edge: the edge and a 1 px ring against it, no offset (LC69)', () => {
+    renderField();
+    expect(field()).toHaveClass('focus-visible:border-foreground', 'focus-visible:ring-1', 'focus-visible:ring-foreground', 'focus-visible:ring-offset-0');
+    expect(field().className).not.toMatch(/ring-offset-2|focus:ring/);
   });
 
   it('is one field, with no «Opzioni»: it says it opens a dialog, and that ⌘K (Ctrl K) does too', () => {
