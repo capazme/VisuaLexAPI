@@ -199,7 +199,8 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
                 onClick={(event) => { close(true); item.onSelect(event); }}
                 className={cn(
                   'flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left text-sm md:min-h-0',
-                  'focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40',
+                  // The app's ring drawn inside the item: outside it, the list's scroll would cut its sides off.
+                  'focus-visible:outline-none focus-visible:ring-inset focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-40',
                   item.danger
                     ? 'text-red-600 hover:bg-red-50 focus-visible:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 dark:focus-visible:bg-red-900/20'
                     : 'text-slate-700 hover:bg-slate-100 focus-visible:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:bg-slate-700',
