@@ -48,13 +48,14 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     const initial = first.current;
     first.current = false;
 
-    if (open) {
+    // Drawn already open (a page that opens on its last article, LC86), it takes no focus: the focus follows an opening.
+    if (open && !initial) {
       const active = document.activeElement;
       if (!(outer?.contains(active))) openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
       const target = initialFocusRef?.current ?? inner?.querySelector<HTMLElement>(FIELD) ?? inner?.querySelector<HTMLElement>(FOCUSABLE);
       // The page does not jump to a field that is still a line high.
       target?.focus({ preventScroll: true });
-    } else {
+    } else if (!open) {
       const active = document.activeElement;
       const opener = openerRef.current;
       if (opener?.isConnected && (active === document.body || active === null || outer?.contains(active))) opener.focus({ preventScroll: true });

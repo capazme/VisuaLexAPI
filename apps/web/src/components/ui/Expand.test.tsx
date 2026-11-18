@@ -109,6 +109,12 @@ describe('Expand', () => {
     expect(button).toHaveFocus();
   });
 
+  it('drawn already open, takes no focus: the focus follows an opening (LC86)', () => {
+    render(<Harness initial />);
+    expect(screen.getByRole('textbox', { name: 'Campo' })).not.toHaveFocus();
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it('leaves an Esc already taken inside it alone', () => {
     render(<Harness initial />);
     const field = screen.getByRole('textbox', { name: 'Campo' });
