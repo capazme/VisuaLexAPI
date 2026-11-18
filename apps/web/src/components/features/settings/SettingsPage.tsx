@@ -110,6 +110,11 @@ export function SettingsPage() {
             const target = event.target as Node | null;
             if (target instanceof Node && target !== document.body && target !== document.documentElement && !root.current?.contains(target)) return;
             event.preventDefault();
+            // In a field, the first Esc leaves the field; the next one goes back.
+            if (target instanceof HTMLElement && target.matches('input, textarea, select, [contenteditable="true"]')) {
+                target.blur();
+                return;
+            }
             goBack();
         };
         window.addEventListener('keydown', onKeyDown);
@@ -121,12 +126,21 @@ export function SettingsPage() {
     // later above the part (the aliases' catalog) would push it down: for a moment the part is brought back in view as
     // the page grows, until the reader scrolls.
     const [asked, setAsked] = useState(0);
+    // Coming in, the focus goes to the page's title (the colours' first field when they were asked for): what was
+    // focused stays on the page left behind, and Esc works at once.
+    const entered = useRef(false);
     useEffect(() => {
         const page = root.current;
         const scroller = page ? scrollParentOf(page) : null;
         const id = decodeURIComponent(location.hash.slice(1));
         const part = id ? document.getElementById(id) : null;
         if (id === 'colori') meaningsField.current?.focus({ preventScroll: true });
+        else if (!entered.current) {
+            const title = document.getElementById('impostazioni-title');
+            title?.setAttribute('tabindex', '-1');
+            title?.focus({ preventScroll: true });
+        }
+        entered.current = true;
         if (!scroller) return undefined;
         if (!part) {
             scroller.scrollTo({ top: 0 });
@@ -283,7 +297,7 @@ export function SettingsPage() {
     ];
 
     return (
-        <div ref={root} className="flex flex-col gap-4 pb-12">
+        <div ref={root} className="flex flex-col gap-4 pb-12 [&_h1:focus]:outline-none">
             <button
                 type="button"
                 onClick={goBack}
@@ -292,7 +306,7 @@ export function SettingsPage() {
             >
                 <ArrowLeft size={16} aria-hidden /> Indietro
             </button>
-            <PageFrame title="Impostazioni">
+            <PageFrame title="Impostazioni" titleId="impostazioni-title">
                 <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
                     {/* The index: a list at the top below lg, a column that stays in sight from lg. */}
                     <nav aria-label="Parti delle impostazioni" className="lg:sticky lg:top-0 lg:self-start">

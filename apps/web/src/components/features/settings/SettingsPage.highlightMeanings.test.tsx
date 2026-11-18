@@ -83,7 +83,7 @@ describe('Impostazioni › «Significato dei colori»', () => {
     expect(within(region).getByRole('status')).toHaveTextContent('Il significato non può essere vuoto: il giallo resta «Tesi».');
   });
 
-  it('Esc gives up a change and keeps Impostazioni open; the next Esc goes back', () => {
+  it('Esc gives up a change and keeps Impostazioni open; then leaves the field, then goes back', () => {
     const { region } = open();
     const red = field(region, 'Rosso');
     red.focus();
@@ -93,7 +93,11 @@ describe('Impostazioni › «Significato dei colori»', () => {
     expect(screen.queryByText('Pagina di ricerca')).toBeNull();
     fireEvent.blur(red);
     expect(own()).toEqual({});
+    // In the field the next Esc leaves the field and stays; one more goes back.
     fireEvent.keyDown(red, { key: 'Escape' });
+    expect(screen.queryByText('Pagina di ricerca')).toBeNull();
+    expect(red).not.toHaveFocus();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(screen.getByText('Pagina di ricerca')).toBeInTheDocument();
   });
 

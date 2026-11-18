@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
-import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
+import { useState, useEffect, useRef, useContext, useMemo, lazy, Suspense, Component, type ReactNode } from 'react';
+import { UNSAFE_LocationContext, useLocation, useNavigate, useOutlet, type Location } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
@@ -91,6 +91,18 @@ function CompareWaiting() {
   );
 }
 
+/**
+ * The address a page was drawn at, kept for it (LC84): `PageSlide` keeps the leaving page's element, whose route is its
+ * own (`useOutlet`), but whatever in it reads `useLocation` (a title from the address, Opus's) would read the new one
+ * and draw the coming page twice. The router has no public way to give a subtree its own location (`<Routes location>`
+ * starts a new tree of routes), hence its context.
+ */
+function AtLocation({ location, children }: { location: Location; children: ReactNode }) {
+  const context = useContext(UNSAFE_LocationContext);
+  const value = useMemo(() => ({ ...context, location }), [context, location]);
+  return <UNSAFE_LocationContext.Provider value={value}>{children}</UNSAFE_LocationContext.Provider>;
+}
+
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
     settings: s.settings,
@@ -126,7 +138,8 @@ export function Layout() {
   const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname, search } = location;
   const onSearchPage = pathname === '/';
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
@@ -512,11 +525,13 @@ export function Layout() {
             {/* Impostazioni comes in as a page of its own and goes back the other way (LC84); every other change of page
                 keeps its own transition, so the key changes only entering and leaving it. */}
             <PageSlide pageKey={pathname === SETTINGS_PATH ? 'impostazioni' : 'app'} back={pathname !== SETTINGS_PATH}>
-              <div data-page-place className="contents">
-                <RoutePage>
-                  {outlet}
-                </RoutePage>
-              </div>
+              <AtLocation location={location}>
+                <div data-page-place className="contents">
+                  <RoutePage>
+                    {outlet}
+                  </RoutePage>
+                </div>
+              </AtLocation>
             </PageSlide>
           </div>
         </div>

@@ -73,6 +73,12 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
     expect(where()).toHaveTextContent(/^\/pratiche$/);
   });
 
+  it('coming in, the focus goes to the page\'s title', () => {
+    app();
+    enter();
+    expect(screen.getByRole('heading', { level: 1, name: 'Impostazioni' })).toHaveFocus();
+  });
+
   it('Esc goes back to the page it was opened from', () => {
     app('scorciatoie');
     enter();
@@ -104,5 +110,22 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
     fireEvent.keyDown(password, { key: 'Escape' });
     expect(screen.queryByLabelText('Password corrente per eliminare account')).toBeNull();
     expect(where()).toHaveTextContent('/impostazioni#dati');
+  });
+});
+
+describe('Impostazioni — the aliases deleted with «Annulla» (L-35)', () => {
+  it('an alias leaves the list at once, and «Annulla» brings it back without telling the server', async () => {
+    const { appStore } = await import('../../../store/useAppStore');
+    const { NotificationHost } = await import('../../ui/Toast');
+    const alias = { id: 'a1', trigger: 'cdc', type: 'reference' as const, expandTo: 'Codice civile', searchParams: { act_type: 'codice civile' }, createdAt: '', usageCount: 0 };
+    const remove = vi.fn();
+    appStore.setState({ customAliases: [alias], removeCustomAlias: remove });
+    render(<MemoryRouter initialEntries={['/impostazioni#alias']}><SettingsPage /><NotificationHost /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina l’alias cdc' }));
+    expect(screen.queryByRole('button', { name: 'Elimina l’alias cdc' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: /Annulla/ }));
+    expect(await screen.findByRole('button', { name: 'Elimina l’alias cdc' })).toBeInTheDocument();
+    expect(remove).not.toHaveBeenCalled();
+    appStore.setState({ customAliases: [] });
   });
 });

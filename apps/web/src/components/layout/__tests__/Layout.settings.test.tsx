@@ -66,3 +66,36 @@ describe('Layout — Impostazioni is a page (LC84), opened from anywhere', () =>
     expect(where()).toHaveTextContent('/impostazioni#scorciatoie');
   });
 });
+
+// The leaving layer draws the page it was (LC84, Papiniano and the consultant on #573): a title read from the address,
+// as Opus's, said the new page there, and «Impostazioni» was drawn twice for the whole movement.
+describe('Layout — the page that leaves keeps its own address', () => {
+  function TitleFromAddress() {
+    const { pathname } = useLocation();
+    return <h1>{pathname === '/work/scadenziario' ? 'Scadenziario' : `Pagina ${pathname}`}</h1>;
+  }
+
+  it('entering Impostazioni, the leaving layer still says the page left; the coming one, Impostazioni', () => {
+    const original = Element.prototype.animate;
+    Element.prototype.animate = (() => ({ cancel: vi.fn(), onfinish: null })) as unknown as typeof Element.prototype.animate;
+    try {
+      render(
+        <MemoryRouter initialEntries={['/work/scadenziario']}>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route path="work/scadenziario" element={<TitleFromAddress />} />
+              <Route path="impostazioni" element={<h1>Impostazioni</h1>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+      fireEvent.click(screen.getAllByRole('button', { name: 'Impostazioni' })[0]);
+      const titles = screen.getAllByRole('heading', { level: 1, hidden: true });
+      expect(titles.map((t) => t.textContent)).toEqual(['Scadenziario', 'Impostazioni']);
+      expect(titles[0].closest('[inert]')).not.toBeNull();
+      expect(titles[1].closest('[inert]')).toBeNull();
+    } finally {
+      Element.prototype.animate = original;
+    }
+  });
+});
