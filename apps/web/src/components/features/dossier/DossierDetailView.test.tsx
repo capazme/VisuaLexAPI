@@ -477,6 +477,23 @@ describe('DossierDetailView — one «Fonti» for the sources and the reading (L
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
+  it('opens «Modifica» under the header, in the page, and Esc gives the focus back to its menu (LC107)', () => {
+    renderView();
+    const more = screen.getByRole('button', { name: 'Altre azioni' });
+    fireEvent.click(more);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Modifica' }));
+    const region = screen.getByRole('region', { name: 'Modifica pratica' });
+    expect(region).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Under the header's actions, before the dossier's views.
+    expect(more.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(region.compareDocumentPosition(screen.getByRole('tablist', { name: 'Viste della pratica' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Titolo' })).toHaveValue(dossier.title);
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Modifica pratica' })).toBeNull();
+    expect(more).toHaveFocus();
+  });
+
   it('an empty dossier says so, with its two ways to fill it', () => {
     renderView({ ...dossier, items: [] });
     expect(screen.getByText('Pratica vuota')).toBeInTheDocument();

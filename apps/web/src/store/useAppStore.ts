@@ -176,7 +176,20 @@ export interface ImportOutcome {
     id: string;
     imported: number;
     failed: number;
+    /** The server's own words for a cap it hit (409, G-576), each once: «Una pratica può contenere al massimo …». */
+    refusals?: string[];
 }
+
+/** An import the server refused whole, a cap on the dossiers (409): its words. */
+export interface ImportRefused {
+    refused: string;
+}
+
+/** A 409's Italian words, as `services/api.ts` rejects them; anything else is not a cap. */
+const capRefusal = (err: unknown): string | null => {
+    const e = err as { status?: number; message?: unknown } | null;
+    return e?.status === 409 && typeof e.message === 'string' && e.message ? e.message : null;
+};
 
 interface AppState {
     settings: AppSettings;
@@ -579,7 +592,7 @@ interface AppState {
     flushDossierOrder: (dossierId: string) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
-    importDossier: (dossier: Dossier) => Promise<ImportOutcome | null>; // null when the dossier itself could not be created
+    importDossier: (dossier: Dossier) => Promise<ImportOutcome | ImportRefused | null>; // null when the dossier itself could not be created
 
     addAnnotation: (normaKey: string, articleId: string, text: string, anchor?: { anchorText: string; startOffset: number }) => void;
     removeAnnotation: (id: string) => void;
@@ -2313,10 +2326,12 @@ const appStore = createStore<AppState>()(
                             ...serverFieldsFromApi(r.value.serverItem),
                         }));
 
-                    const failedCount = itemResults.filter((r) => r.status === 'rejected').length;
+                    const rejected = itemResults.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+                    const failedCount = rejected.length;
                     if (failedCount > 0) {
                         console.warn(`importDossier: ${failedCount}/${dossier.items.length} items failed to sync`);
                     }
+                    const refusals = [...new Set(rejected.map((r) => capRefusal(r.reason)).filter((m): m is string => m !== null))];
 
                     set((state) => {
                         upsertById(state.dossiers, {
@@ -2329,10 +2344,11 @@ const appStore = createStore<AppState>()(
                             isPinned: !!dossier.isPinned,
                         });
                     });
-                    return { id: created.id, imported: items.length, failed: failedCount };
+                    return { id: created.id, imported: items.length, failed: failedCount, ...(refusals.length > 0 && { refusals }) };
                 } catch (err) {
                     console.error('Failed to import dossier:', err);
-                    return null;
+                    const refused = capRefusal(err);
+                    return refused ? { refused } : null;
                 }
             },
 

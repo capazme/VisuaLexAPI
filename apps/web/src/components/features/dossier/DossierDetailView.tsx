@@ -48,7 +48,7 @@ import { scrollParentOf } from '../practice/practiceView';
 const VIEW_PANEL = 'dossier-view';
 type DossierView = 'fonti' | 'atti' | 'compiti';
 import type { useTrash } from './useTrash';
-import { EditDossierModal } from './EditDossierModal';
+import { EditDossierPanel } from './EditDossierPanel';
 import { kindLabel } from './dossierKinds';
 import { DossierForumActions } from './DossierForumActions';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
@@ -101,7 +101,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // `?vista=atti` opens on the acts; `?vista=lettura` (LC54), the reading, is «Fonti» now (LC86).
   const [view, setView] = useState<DossierView>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
   const [attiCount, setAttiCount] = useState<number | null>(null);
-  const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
+  const [editing, setEditing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selecting, setSelecting] = useState(false);
   // undefined = closed; null = open on a blank form; an act = open on that act's index.
@@ -346,9 +346,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   const handleUpdateDossier = (title: string, description: string, tags: string[], kind: DossierKind) => {
-    if (editingDossier) {
-      updateDossier(editingDossier.id, { title, description, tags, kind });
-    }
+    updateDossier(dossier.id, { title, description, tags, kind });
   };
 
   // The header's actions in one row (D3), with `Button`'s heights (LC106). A label never wraps inside its
@@ -387,7 +385,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         label="Altre azioni"
         triggerClassName={HEADER_ICON_BUTTON}
         items={[
-          { label: 'Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
+          { label: 'Modifica', icon: Edit2, onSelect: () => setEditing(true) },
           { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
           { label: 'Elimina la pratica', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => {
             // No confirmation: the dossier goes to the trash and the notification's «Annulla» restores it (K1a).
@@ -470,6 +468,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           <div className="pt-2">{actions}</div>
         </div>
 
+        {/* «Modifica» opens here, under the header, in the page (LC107, L-73). */}
+        <EditDossierPanel dossier={editing ? dossier : null} onClose={() => setEditing(false)} onSave={handleUpdateDossier} className="mb-6" />
+
         {/* LC21: the dossier's views as tabs, as the prototype: «Fonti» (its norms, decisions and notes), «Atti» (Luca, 15-11) and «Compiti».
             Both stay mounted, the other hidden, so a selection or a task being written survives the switch. */}
         {/* LC27 (Luca, 15 Nov): the tabs stay at the top while the view scrolls, and a change of view starts the new
@@ -534,14 +535,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           {trash && recentlyRemoved}
         </div>
         </div>
-
-        {editingDossier && (
-          <EditDossierModal
-            dossier={editingDossier}
-            onClose={() => setEditingDossier(null)}
-            onSave={handleUpdateDossier}
-          />
-        )}
 
         {treeNavigatorAct !== undefined && (
           <TreeNavigatorModal

@@ -382,6 +382,26 @@ describe('decision items in the store', () => {
     expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', { itemType: 'sentenza', title: current.etichetta, content: current });
   });
 
+  // G-576: past a cap the server answers 409 with its limit in Italian, as `services/api.ts` rejects it.
+  it('importDossier keeps the server\'s words for the items refused at a cap, once', async () => {
+    const words = 'Una pratica può contenere al massimo 2.000 voci. Questa ne ha già 2.000.';
+    vi.mocked(dossierService.addItem)
+      .mockResolvedValueOnce(fakeDossierItemApi('ok'))
+      .mockRejectedValueOnce({ status: 409, message: words, data: { detail: words, error: 'dossier_items_limit' } })
+      .mockRejectedValueOnce({ status: 409, message: words, data: { detail: words, error: 'dossier_items_limit' } })
+      .mockRejectedValueOnce({ status: 500, message: 'Richiesta non riuscita (errore 500). Riprova tra poco.' });
+    const notes = ['a', 'b', 'c', 'd'].map((id) => ({ id, type: 'note' as const, data: id, addedAt: '' }));
+    const outcome = await appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes });
+    expect(outcome).toEqual({ id: 'srv-1', imported: 1, failed: 3, refusals: [words] });
+  });
+
+  it('importDossier gives the server\'s words when the dossier itself is refused at the cap', async () => {
+    const words = 'Hai raggiunto il limite di 500 pratiche: eliminane qualcuna per crearne di nuove.';
+    vi.mocked(dossierService.create).mockRejectedValueOnce({ status: 409, message: words, data: { detail: words, error: 'dossier_limit' } });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: [] })).toEqual({ refused: words });
+  });
+
 });
 
 describe('notes through the notes route', () => {
