@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../services/taskService', () => ({ taskService: { create: vi.fn() } }));
@@ -8,6 +8,7 @@ import { QuickAddField } from './QuickAddField';
 import { taskService } from '../../../services/taskService';
 import { appStore } from '../../../store/useAppStore';
 import type { Dossier } from '../../../types';
+import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 
 // «Dettagli» of the task's quick add (U1b): its fields in a panel in place under the row, the box growing.
 describe('QuickAddField — «Dettagli»', () => {
@@ -15,14 +16,14 @@ describe('QuickAddField — «Dettagli»', () => {
     render(<QuickAddField view="today" today="2026-10-22" defaults={{}} />);
     const user = userEvent.setup();
     const details = screen.getByRole('button', { name: 'Dettagli' });
-    const panel = document.getElementById(details.getAttribute('aria-controls')!)!;
+    const panelId = details.getAttribute('aria-controls')!;
     expect(details).toHaveAttribute('aria-expanded', 'false');
-    expect(panel).toHaveAttribute('inert');
-    expect(panel).toHaveClass('grid-rows-[0fr]');
+    // Closed, the space is not drawn (`ui/Expand`, LC105).
+    expect(document.getElementById(panelId)).toBeNull();
     await user.click(details);
     expect(details).toHaveAttribute('aria-expanded', 'true');
+    const panel = document.getElementById(panelId)!;
     expect(panel).not.toHaveAttribute('inert');
-    expect(panel).toHaveClass('grid-rows-[1fr]');
     // Its arrow turns with it.
     expect(details.querySelector('svg.rotate-180')).not.toBeNull();
     // Esc from one of its fields (a date, a select).
@@ -31,6 +32,47 @@ describe('QuickAddField — «Dettagli»', () => {
     await user.keyboard('{Escape}');
     expect(details).toHaveAttribute('aria-expanded', 'false');
     expect(details).toHaveFocus();
+  });
+
+  // LC105: «Dettagli» opens and closes as every row of the app, on `ui/Expand` and the island's tokens.
+  describe('its motion', () => {
+    const calls: Array<{ frames: Keyframe[]; timing: KeyframeAnimationOptions; anim: { cancel: () => void; onfinish: (() => void) | null } }> = [];
+    const originalMatchMedia = window.matchMedia;
+    beforeEach(() => {
+      calls.length = 0;
+      Element.prototype.animate = function (frames: Keyframe[], timing: KeyframeAnimationOptions) {
+        const anim = { cancel: vi.fn(), onfinish: null as (() => void) | null };
+        calls.push({ frames, timing, anim });
+        return anim as unknown as Animation;
+      } as unknown as typeof Element.prototype.animate;
+    });
+    afterEach(() => {
+      delete (Element.prototype as Partial<Element>).animate;
+      window.matchMedia = originalMatchMedia;
+    });
+    const heights = () => calls.filter((c) => 'height' in c.frames[0]);
+
+    it('grows on the island\'s opening and shrinks on its closing', async () => {
+      render(<QuickAddField view="today" today="2026-10-22" defaults={{}} />);
+      const user = userEvent.setup();
+      const details = screen.getByRole('button', { name: 'Dettagli' });
+      await user.click(details);
+      expect(heights()).toHaveLength(1);
+      expect(heights()[0].timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+      await user.click(details);
+      expect(heights()[1].timing).toEqual(expect.objectContaining(ISLAND_CLOSE));
+      act(() => calls.forEach((c) => c.anim.onfinish?.()));
+      expect(document.getElementById(details.getAttribute('aria-controls')!)).toBeNull();
+    });
+
+    it('under reduced motion moves no height, only the fade', async () => {
+      window.matchMedia = ((query: string) => ({ matches: query.includes('reduce'), media: query })) as unknown as typeof window.matchMedia;
+      render(<QuickAddField view="today" today="2026-10-22" defaults={{}} />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Dettagli' }));
+      expect(heights()).toHaveLength(0);
+      expect(calls.filter((c) => 'opacity' in c.frames[0])).toHaveLength(1);
+    });
   });
 
   it('writes the title at 16 px on a phone, whatever the text size (Safari zooms under it)', () => {

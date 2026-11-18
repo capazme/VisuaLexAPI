@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { Collapsible } from '../../ui/Collapsible';
+import { Expand } from '../../ui/Expand';
 import { studiaService } from '../../../services/studiaService';
 import type { Materia, PreferenzeStudio } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
@@ -123,7 +123,6 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
   const [disclosed, setOpen] = useState(false);
   const open = alwaysOpen || disclosed;
   const [community, setCommunity] = useState(communityRequest > 0);
-  const communityButton = useRef<HTMLButtonElement>(null);
   // A new request opens the subjects, whatever the reader left them as (state adjusted while rendering, not in an effect).
   const [answered, setAnswered] = useState(communityRequest);
   if (communityRequest !== answered) {
@@ -215,7 +214,6 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
             {/* One level down, closed at first (G6): the first level stays short, the card no longer runs past the missions. */}
             <div>
               <button
-                ref={communityButton}
                 type="button"
                 aria-expanded={community}
                 aria-controls={communityId}
@@ -226,7 +224,7 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
                 {`Schede della comunità · ${preferences.materieComunita.length} di ${subjects.length}`}
               </button>
               {/* A panel in place too (U1b), one level down. */}
-              <Collapsible id={communityId} open={community} onClose={() => setCommunity(false)} triggerRef={communityButton}>
+              <Expand id={communityId} open={community} onClose={() => setCommunity(false)}>
                 <fieldset className="pt-1">
                   <legend className="sr-only">Schede della comunità</legend>
                   <p className="mb-1 text-sm text-slate-500 dark:text-slate-400">Schede validate dalla comunità, per materia</p>
@@ -256,7 +254,7 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
                     })}
                   </ul>
                 </fieldset>
-              </Collapsible>
+              </Expand>
             </div>
           </>
         )}

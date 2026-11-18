@@ -19,6 +19,8 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
   onClose?: () => void;
   /** What takes the focus on opening; else its first field, else its first focusable. */
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /** Closed, its content stays drawn, `hidden`: what it reads is read once, before the first opening (LC105). */
+  keepMounted?: boolean;
   children: ReactNode;
 }
 
@@ -30,7 +32,7 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
  *
  * On opening the focus goes to its first field; on closing it goes back to what opened it. Esc inside closes it.
  */
-export function Expand({ id, open, onClose, initialFocusRef, className, children, onKeyDown, ...rest }: ExpandProps) {
+export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, className, children, onKeyDown, ...rest }: ExpandProps) {
   // Still drawn while it closes; derived during render where no animation will run (react-hooks/set-state-in-effect).
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
@@ -98,7 +100,8 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     const last = anims[anims.length - 1];
     last.onfinish = () => {
       if (running.current !== anims) return;
-      running.current = [];
+      // Kept mounted, the closing's fill holds the space at no height until the next opening starts from it and cancels it.
+      if (open || !keepMounted) running.current = [];
       if (!open) setMounted(false);
     };
     // `initialFocusRef` is a ref: reading it at the change is enough.
@@ -141,7 +144,7 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     return () => observer.disconnect();
   }, [open]);
 
-  if (!mounted) return null;
+  if (!mounted && !keepMounted) return null;
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
@@ -162,6 +165,7 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
       // Closing, it is going: no longer read, no longer reached.
       inert={!open}
       aria-hidden={open ? undefined : true}
+      hidden={!mounted}
       onKeyDown={handleKeyDown}
       className={cn('overflow-hidden', className)}
     >

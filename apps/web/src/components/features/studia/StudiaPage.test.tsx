@@ -148,7 +148,7 @@ describe('StudiaPage', () => {
     const community = await within(panel).findByRole('button', { name: /^Schede della comunità · / });
     await user.click(community);
     expect(community).toHaveAttribute('aria-expanded', 'true');
-    await user.tab();
+    // Opened, the focus goes to its first switch (`ui/Expand`, LC105).
     expect(within(panel).getAllByRole('switch')[0]).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(community).toHaveAttribute('aria-expanded', 'false');

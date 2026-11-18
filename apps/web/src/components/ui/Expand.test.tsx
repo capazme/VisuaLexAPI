@@ -204,4 +204,35 @@ describe('Expand', () => {
     fireEvent.click(button);
     expect(screen.queryByRole('textbox', { name: 'Campo', hidden: true })).toBeNull();
   });
+
+  // LC105: the study settings, read once before the first opening.
+  it('kept mounted, is drawn hidden while closed and opens again from no height', () => {
+    function Kept() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen((o) => !o)}>Apri</button>
+          <Expand id="kept" open={open} keepMounted><input aria-label="Campo" /></Expand>
+        </>
+      );
+    }
+    render(<Kept />);
+    const space = document.getElementById('kept')!;
+    expect(space).toHaveAttribute('hidden');
+    expect(screen.getByRole('textbox', { name: 'Campo', hidden: true })).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Apri' });
+    fireEvent.click(button);
+    expect(space).not.toHaveAttribute('hidden');
+    finishAll();
+    fireEvent.click(button);
+    finishAll();
+    expect(space).toHaveAttribute('hidden');
+    const closing = heights()[1].anim;
+    // The closing's fill is cancelled by the next opening, which starts where it held the space.
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 0 } as DOMRect);
+    fireEvent.click(button);
+    rect.mockRestore();
+    expect(closing.cancel).toHaveBeenCalled();
+    expect(heights()[2].frames).toEqual([{ height: '0px' }, { height: '120px' }]);
+  });
 });
