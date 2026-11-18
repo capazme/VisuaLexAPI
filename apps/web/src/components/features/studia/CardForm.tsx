@@ -4,7 +4,7 @@ import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { Input } from '../../ui/Input';
 import { FIELD_LABEL as LABEL } from '../../ui/controlStyles';
-import { SegmentedControl } from '../../ui/SegmentedControl';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { studiaService } from '../../../services/studiaService';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { cn } from '../../../lib/utils';
@@ -382,14 +382,13 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
         <div className="space-y-1.5 w-full">
           <span id={fieldId('tipo')} className={LABEL}>Tipo di scheda</span>
           {desktop ? (
-            <div role="group" aria-labelledby={fieldId('tipo')}>
-              <SegmentedControl
-                layoutId="studia-card-kind"
-                options={(Object.keys(TIPO_LABEL) as TipoScheda[]).map((value) => ({ value, label: TIPO_LABEL[value] }))}
-                value={tipo}
-                onChange={(value) => setTipo(value as TipoScheda)}
-              />
-            </div>
+            <SegmentedTabs
+              label="Tipo di scheda"
+              tabs={(Object.keys(TIPO_LABEL) as TipoScheda[]).map((id) => ({ id, label: TIPO_LABEL[id] }))}
+              value={tipo}
+              onChange={setTipo}
+              tabClassName="flex-1 px-3"
+            />
           ) : (
             <Select
               aria-labelledby={fieldId('tipo')}
