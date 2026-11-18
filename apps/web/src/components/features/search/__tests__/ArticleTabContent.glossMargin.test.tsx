@@ -29,6 +29,8 @@ vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 
 import { ArticleTabContent } from '../ArticleTabContent';
+import { ArticleDiscussionPanel } from '../ArticleDiscussionPanel';
+import { articleDiscussionService } from '../../../../services/articleDiscussionService';
 import { appStore } from '../../../../store/useAppStore';
 import { buildPassage, plainText } from '../../../../utils/threadPassages';
 
@@ -207,6 +209,60 @@ describe('ArticleTabContent — the glosses at the margin (LC74)', () => {
     fireEvent.click(within(question).getByRole('button', { name: 'Annulla' }));
     expect(report).toHaveFocus();
     raf.mockRestore();
+  });
+
+  it('a gloss chosen lights its passage in the text; the passage chosen from the text lights its gloss (LC90)', async () => {
+    const { container } = show();
+    fireEvent.click(glossesButton());
+    const margin = await screen.findByRole('region', { name: 'Glosse' });
+    const card = () => margin.querySelector('#article-thread-thread-passage-1')!;
+    // From the margin: its words light up, the gloss is marked.
+    fireEvent.click(await within(margin).findByText('Chiarimento sul pagamento'));
+    expect(container.querySelector('.vlx-thread-focus')).toHaveTextContent(QUOTE);
+    expect(card()).toHaveAttribute('data-lit');
+    // Closed again: neither.
+    fireEvent.click(within(margin).getByText('Chiarimento sul pagamento'));
+    expect(container.querySelector('.vlx-thread-focus')).toBeNull();
+    expect(card()).not.toHaveAttribute('data-lit');
+    // From the text: the passage's sign, then its gloss.
+    fireEvent.click(await screen.findByRole('button', { name: '1 glossa in questo passo' }));
+    fireEvent.click(await screen.findByRole('button', { name: /apri glossa/i }));
+    expect(card()).toHaveAttribute('data-lit');
+    expect(container.querySelector('.vlx-thread-focus')).toHaveTextContent(QUOTE);
+  });
+
+  it('after «Pubblica» the focus goes to the gloss published, not to the page (LC90)', async () => {
+    const published = { ...wholeThread, id: 'thread-new', title: 'Una glossa nuova', isOwner: true };
+    vi.mocked(articleDiscussionService.create).mockResolvedValue(published);
+    show();
+    fireEvent.click(glossesButton());
+    const margin = await screen.findByRole('region', { name: 'Glosse' });
+    fireEvent.click(within(margin).getByRole('button', { name: 'Scrivi una glossa…' }));
+    fireEvent.change(within(margin).getByRole('textbox', { name: 'Titolo della glossa' }), { target: { value: 'Una glossa nuova' } });
+    fireEvent.change(within(margin).getByRole('textbox', { name: 'Testo della glossa' }), { target: { value: 'Il testo.' } });
+    await act(async () => { fireEvent.click(within(margin).getByRole('button', { name: 'Pubblica' })); });
+    expect(document.activeElement?.closest('article')).toHaveAttribute('id', 'article-thread-thread-new');
+  });
+
+  it('a gloss with the focus keeps it as the glosses on a passage are drawn again aligned (under the text, then beside it)', async () => {
+    const anchor = { normaKey: 'legge--241--1990-08-07--1', articleId: '1', articleLabel: '1', version: 'vigente' };
+    const textRootRef = { current: document.createElement('div') };
+    const panel = (aligned: boolean) => (
+      <ArticleDiscussionPanel
+        layout="margin"
+        isOpen
+        anchor={anchor}
+        onClose={vi.fn()}
+        align={aligned ? { textRootRef, located: [{ thread: passageSummary, start: START, end: START + QUOTE.length }], contentKey: 'v1' } : undefined}
+      />
+    );
+    const { rerender } = render(panel(false));
+    const toggle = await screen.findByRole('button', { name: /Chiarimento sul pagamento/ });
+    toggle.focus();
+    rerender(panel(true));
+    // Another element (the aligned list), the same gloss.
+    expect(document.activeElement).not.toBe(toggle);
+    expect(document.activeElement?.closest('article')).toHaveAttribute('id', 'article-thread-thread-passage-1');
   });
 
   it('closes from its «Chiudi», the focus back on the button', async () => {

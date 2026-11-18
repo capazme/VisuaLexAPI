@@ -80,6 +80,14 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(screen.getByTestId('practice-table')).toHaveClass('max-w-[44rem]');
   });
 
+  it('the card with the notes\' column keeps the width of the glosses\' margin beside the text, not the whole frame (LC90)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    render(table());
+    const card = screen.getByTestId('practice-table');
+    expect(card).toHaveClass('has-[[data-margin-content]]:max-w-[66.75rem]', 'has-[[data-glosses-beside]]:max-w-[66.75rem]');
+    expect(card.className).not.toMatch(/max-w-none/);
+  });
+
   it('switching the active practice switches the table', () => {
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     const other = s().createPractice('Altra');
