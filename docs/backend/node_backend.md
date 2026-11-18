@@ -559,8 +559,8 @@ apps/server/
 - `dotenv` - Environment variables
 - `zod` - Schema validation
 - `express-async-errors` - Async error handling
+- `prisma` - Prisma CLI: it applies the migrations to the production database (the `migrate` one-shot), so it is a production dependency and the blocking `npm audit` covers it (G-555)
 
 **Development:**
 - `typescript` - TypeScript compiler
 - `tsx` - TypeScript executor
-- `prisma` - Prisma CLI
