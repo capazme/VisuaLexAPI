@@ -2,23 +2,18 @@ import { Request, Response } from 'express';
 import type { User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { atLeastUnits } from '../utils/utf16Length';
-import { hashPassword, verifyPassword } from '../utils/password';
+import { hashPassword, passwordSchema, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
 import { exportUserCourses } from '../lingo/courses';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
 import { dateToDay } from '../lingo/studyDays';
 
-// Password validation regex: min 8 chars, at least 1 uppercase, 1 lowercase, 1 number
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const passwordErrorMessage = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
-
 // Validation schemas
 const registerSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50),
-  password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
+  password: passwordSchema(),
 });
 
 const loginSchema = z.object({
@@ -32,7 +27,7 @@ const refreshSchema = z.object({
 
 const changePasswordSchema = z.object({
   current_password: z.string(),
-  new_password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
+  new_password: passwordSchema(),
 });
 
 // Strict on purpose: an extra key (`devModeAllowed` above all) is refused, not stripped.

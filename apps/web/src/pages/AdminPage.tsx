@@ -10,6 +10,7 @@ import type { AdminUserResponse } from '../types/api';
 import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType, AdminSharedEnvironment } from '../services/adminService';
 import type { SharedEnvironmentReport, ReportStatus } from '../types';
 import { getErrorMessage } from '../utils/errors';
+import { PASSWORD_RULE, PASSWORD_RULE_ERROR, PASSWORD_RULE_HINT } from '../services/api';
 import { isMerltEnabled } from '../features/merlt/featureFlag';
 import { isStudiaEnabled } from '../features/studia/featureFlag';
 import { IngestionAdminPanel } from '../features/merlt/ops/ingestion/IngestionAdminPanel';
@@ -329,6 +330,11 @@ export function AdminPage() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    // The server holds an account the administrator opens to the sign-up rule: say it before sending.
+    if (!PASSWORD_RULE.test(newUser.password)) {
+      setActionError(PASSWORD_RULE_ERROR);
+      return;
+    }
     try {
       setActionLoading(true);
       setActionError(null);
@@ -393,6 +399,10 @@ export function AdminPage() {
 
   const handleResetPassword = async () => {
     if (!showResetPasswordModal || !newPassword) return;
+    if (!PASSWORD_RULE.test(newPassword)) {
+      setActionError(PASSWORD_RULE_ERROR);
+      return;
+    }
     try {
       setActionLoading(true);
       setActionError(null);
@@ -1292,8 +1302,12 @@ export function AdminPage() {
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   required
-                  minLength={3}
+                  minLength={8}
+                  aria-describedby="admin-new-user-password-rule"
                 />
+                <p id="admin-new-user-password-rule" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {PASSWORD_RULE_HINT}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -1354,8 +1368,12 @@ export function AdminPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  minLength={3}
+                  minLength={8}
+                  aria-describedby="admin-reset-password-rule"
                 />
+                <p id="admin-reset-password-rule" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {PASSWORD_RULE_HINT}
+                </p>
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button

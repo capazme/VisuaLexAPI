@@ -17,7 +17,7 @@
  */
 
 import { prisma } from '../lib/prisma';
-import { hashPassword } from './password';
+import { hashPassword, meetsPasswordRule } from './password';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -32,8 +32,8 @@ async function main() {
     process.exit(1);
   }
 
-  if (newPassword.length < 8) {
-    console.error('Error: password must be at least 8 characters');
+  if (!meetsPasswordRule(newPassword)) {
+    console.error('Error: password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number');
     process.exit(1);
   }
 
