@@ -6,6 +6,7 @@ import { AppError } from '../middleware/errorHandler';
 import { dossierItemFromEntry, rebuildDossierPayload, type EntryItem } from '../utils/suggestionEntries';
 import { publishedContent, readableContent, type PublishedContent } from '../utils/publishedContent';
 import { importStudyDossiers, spendStudyImport, wireNormaKey } from '../services/studyImport';
+import { assertDossierRoom } from '../utils/dossierCaps';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -1322,6 +1323,7 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
               if (!made.ok) throw new AppError(400, `Voce ${idx + 1}: ${made.reason}: la proposta non è stata applicata`);
               items.push(made.item);
             }
+            await assertDossierRoom(tx, req.user!.id, { dossiers: 1, items: items.length, largestNewDossier: items.length });
             return tx.dossier.create({
               data: {
                 userId: req.user!.id,
