@@ -4,6 +4,7 @@ import { NotificationHost, Toast } from '../Toast';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { closeNotification, notificationStore, notify, offerShortcutUndo, resetNotifications } from '../notifications/notifications';
 import { setFootBarRoom } from '../notifications/footBar';
+import { stackRoomStore } from '../notifications/stackRoom';
 
 // jsdom runs no animation to its end on its own: an exit is ended by hand, as the card would at its end.
 const endExits = () => act(() => notificationStore.getState().entries.filter((e) => e.closing).forEach((e) => notificationStore.setState((s) => ({ entries: s.entries.filter((x) => x.id !== e.id) }))));
@@ -17,6 +18,17 @@ const list = () => screen.getByRole('list');
 const cards = () => within(list()).queryAllByRole('listitem');
 
 describe('NotificationHost (K1a)', () => {
+  it('says how much of the window\'s foot the bottom stack takes while it shows, so the page keeps it free (LC85)', async () => {
+    render(<NotificationHost />);
+    expect(stackRoomStore.getState().room).toBe(0);
+    let id = 0;
+    act(() => { id = notify({ type: 'success', message: 'Nota salvata', duration: 0 }); });
+    // jsdom lays nothing out: the stack's top is at 0, so it takes the whole window's height.
+    expect(stackRoomStore.getState().room).toBe(window.innerHeight);
+    act(() => closeNotification(id, 'dismiss'));
+    await vi.waitFor(() => expect(stackRoomStore.getState().room).toBe(0));
+  });
+
   it('keeps the bottom stack 32 px from the foot from `md`, with nothing floating there to clear', async () => {
     render(<NotificationHost />);
     await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
