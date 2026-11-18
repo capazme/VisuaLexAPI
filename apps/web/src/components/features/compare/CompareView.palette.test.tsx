@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 vi.mock('../../../hooks/useTour', () => ({
   useTour: () => ({ tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true }),
@@ -10,11 +10,11 @@ import { CommandPalette } from '../search/CommandPalette';
 import { Modal } from '../../ui/Modal';
 import { closeCompare, getCompareState, setCompareState } from '../../../hooks/useCompare';
 import { appStore } from '../../../store/useAppStore';
+import { openSearchMenu } from '../../../utils/searchFieldControl';
 
 /**
- * ⌘K over the comparison (`Layout` opens the search menu whatever covers the page): the palette's box is portalled to
- * the body, outside the comparison's dialog, so the comparison's trap must leave its Tab and Esc to it — the palette
- * takes its place on `dialogStack` while open.
+ * The search menu and the dialogs: under the comparison (a modal dialog over the page) ⌘K opens nothing, the menu being
+ * a band in the page (L-75); a dialog opened over the menu keeps its own Esc (`dialogStack`).
  */
 
 function asDesktop(desktop: boolean) {
@@ -44,35 +44,14 @@ afterEach(() => {
 });
 
 describe('CompareView — the search menu opened over it', () => {
-  it.each([['on a computer', true], ['on a phone', false]])('%s, leaves Tab, Shift+Tab and Esc to the menu', async (_, desktop) => {
+  // L-75: the menu is a band in the page, under the comparison, which covers the page: ⌘K there would open it unseen.
+  it.each([['on a computer', true], ['on a phone', false]])('%s, ⌘K opens nothing while the comparison covers the page', (_, desktop) => {
     asDesktop(desktop);
-    const onClose = vi.fn();
-    render(<><CompareView /><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
-    // Under the menu, which hides the rest of the page from a screen reader while it is open.
-    const comparison = screen.getByRole('dialog', { name: 'Confronta articoli', hidden: true });
-    const menu = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    expect(comparison).not.toContainElement(menu);
-    const field = screen.getByRole('combobox');
-    await waitFor(() => expect(field).toHaveFocus());
-    // The comparison's own first focus (50 ms after it opens) is given before the keys below.
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    field.focus();
-
-    // The comparison's trap would take the key (`defaultPrevented`, the check that tells the two apart: jsdom moves no
-    // focus on Tab) and send the focus to its own first control.
-    const intoComparison = vi.fn();
-    comparison.addEventListener('focusin', intoComparison);
-    for (const shiftKey of [false, true]) {
-      const tab = createEvent.keyDown(field, { key: 'Tab', shiftKey });
-      fireEvent(field, tab);
-      expect(tab.defaultPrevented).toBe(false);
-      expect(intoComparison).not.toHaveBeenCalled();
-      expect(menu).toContainElement(document.activeElement as HTMLElement);
-    }
-
-    // Esc closes the menu, not the comparison under it.
-    fireEvent.keyDown(field, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    render(<CompareView />);
+    expect(screen.getByRole('dialog', { name: 'Confronta articoli', hidden: true })).toHaveAttribute('aria-modal', 'true');
+    appStore.setState({ commandPaletteOpen: false });
+    openSearchMenu();
+    expect(appStore.getState().commandPaletteOpen).toBe(false);
     expect(getCompareState().isOpen).toBe(true);
   });
 

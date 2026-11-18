@@ -612,14 +612,27 @@ describe('CommandPalette — the reviews under a topic (U3)', () => {
   });
 });
 
-describe('CommandPalette — over the workspace', () => {
-  it('leaves Cmd/Ctrl+F to the browser while it is open', () => {
-    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(isWorkspaceCovered()).toBe(true);
-    // Not a dialog in ARIA terms: the mark is all it gains.
-    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
-    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+describe('CommandPalette — in the page, not over it (L-75)', () => {
+  it('covers nothing: no veil, no dialog, no mark over the workspace, so Cmd/Ctrl+F stays the app\'s', () => {
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(isWorkspaceCovered()).toBe(false);
+    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+    expect(document.querySelector('[data-palette-veil]')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // The band, where it is drawn, and nothing in it fixed over the page.
+    const band = screen.getByRole('region', { name: 'Menu di ricerca' });
+    expect(band.querySelector('.fixed')).toBeNull();
+    expect(band.closest('.fixed')).toBeNull();
+  });
+
+  it('closes on a click outside the field and the band, not on one inside', () => {
+    const onClose = vi.fn();
+    render(<><button type="button">Fuori</button><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    fireEvent.pointerDown(screen.getByRole('combobox'));
+    fireEvent.pointerDown(screen.getByRole('region', { name: 'Menu di ricerca' }));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Fuori' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 

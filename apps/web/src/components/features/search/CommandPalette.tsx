@@ -617,6 +617,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const inBar = place.slot !== null;
   const overBar = place.slot?.closest('[data-palette-bar="over"]') != null;
 
+  // The bar it grew in gone while open (the page changed under it, /sentenze → /): the field moves to the new bar's slot.
+  // After every render on purpose: the bar goes in a commit of the page, not of this menu; only a detached slot sets.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!isOpen || !place.slot || place.slot.isConnected) return;
+    const source = sourceNow();
+    setPlace({ source, slot: source?.closest('[data-palette-bar]')?.querySelector<HTMLElement>('[data-palette-slot]') ?? null });
+  });
+
   const bandRef = useRef<HTMLDivElement>(null);
   const fieldBoxRef = useRef<HTMLDivElement>(null);
   // A click outside the field and the band closes it, as the veil's did; the page under takes the click as well.
