@@ -176,8 +176,8 @@ describe('NotificationHost (K1a)', () => {
   it('with «Annulla» and a second button, lets them go under the text when the row has no room; one button keeps one row (LC91)', () => {
     render(<NotificationHost />);
     act(() => {
-      notify({ type: 'success', message: 'Scheda nel cestino', onUndo: vi.fn(), action: { label: 'Apri il cestino', onClick: vi.fn() } });
-      notify({ type: 'success', message: 'Nota rimossa', onUndo: vi.fn() });
+      notify({ type: 'success', message: 'Scheda nel cestino', duration: 10000, onUndo: vi.fn(), action: { label: 'Apri il cestino', onClick: vi.fn() } });
+      notify({ type: 'success', message: 'Nota rimossa', duration: 10000, onUndo: vi.fn() });
     });
     const textOf = (message: string) => within(list()).getByText(message);
     // The text keeps 13 rem of its own; the buttons and ✕ wrap as one group, at the right (jsdom lays nothing out).
