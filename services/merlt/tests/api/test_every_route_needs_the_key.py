@@ -113,14 +113,29 @@ async def test_the_key_records_its_use_at_most_every_five_minutes():
         async def commit(self):
             commits.append(key.last_used_at)
 
+    recent = key.last_used_at
     assert await verify_api_key("k", _Session()) is key
-    assert commits == []
-    key.last_used_at = datetime.utcnow() - timedelta(minutes=6)
+    assert key.last_used_at == recent  # not written: used less than five minutes ago
+    old = datetime.utcnow() - timedelta(minutes=6)
+    key.last_used_at = old
     await verify_api_key("k", _Session())
-    assert len(commits) == 1
+    assert key.last_used_at > old  # written: the last use was six minutes ago
+    # The lookup's transaction is ended every time, so the connection goes back to the pool.
+    assert len(commits) == 2
 
 
 def test_there_is_no_websocket(client):
-    with pytest.raises(Exception):
-        with client.websocket_connect("/api/v1/ws?token=x"):
+    from starlette.websockets import WebSocketDisconnect
+
+    # A websocket behind the key would refuse with a denial response; a missing one just closes.
+    with pytest.raises(WebSocketDisconnect) as refused:
+        with client.websocket_connect("/api/v1/ws?token=x", headers={"X-API-Key": "not-a-key"}):
             pass
+    assert type(refused.value) is WebSocketDisconnect
+
+
+def test_the_health_check_and_the_root_stay_open():
+    operations = {path: op for path, _, op in _operations() if path in OPEN}
+    assert set(operations) == OPEN
+    for path, op in operations.items():
+        assert not any(p["name"] == "X-API-Key" for p in op.get("parameters", [])), path

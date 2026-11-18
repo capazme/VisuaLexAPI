@@ -82,11 +82,14 @@ async def verify_api_key(
     if api_key.is_expired():
         raise HTTPException(status_code=401, detail="API key has expired")
 
-    # Update last_used_at, at most every LAST_USED_EVERY
+    # Update last_used_at, at most every LAST_USED_EVERY. The commit runs either way: it ends
+    # the lookup's transaction, so the connection goes back to the pool at once instead of
+    # staying idle in a transaction for the whole request (with nothing changed it writes
+    # nothing; the sessions keep their objects on commit).
     now = datetime.utcnow()
     if api_key.last_used_at is None or now - api_key.last_used_at >= LAST_USED_EVERY:
         api_key.last_used_at = now
-        await session.commit()
+    await session.commit()
 
     return api_key
 

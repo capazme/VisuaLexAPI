@@ -1,9 +1,9 @@
 """The key seeded at boot is the one key that opens MERL-T (scan A.2).
 
 A key minted earlier (the old bootstrap route, the previous value after a rotation) stays in
-the table, deactivated: kept for the record, never deleted. Without a configured key the seed
-leaves KEY_READY false, which /health reports, so a stack that refuses everything does not look
-healthy.
+the table, deactivated: kept for the record, never deleted. Without a configured key no key stays
+active, and the seed leaves KEY_READY false, which /health reports, so a stack that refuses
+everything does not look healthy.
 """
 
 import os
@@ -24,15 +24,7 @@ needs_db = pytest.mark.skipif(
 )
 
 
-async def test_without_a_configured_key_nothing_opens_and_health_knows(monkeypatch):
-    monkeypatch.delenv(seed.ENV_VAR, raising=False)
-    seed.KEY_READY = True
-    assert await seed.ensure_admin_api_key() is False
-    assert seed.KEY_READY is False
-
-
-@needs_db
-async def test_the_configured_key_is_the_only_active_one(monkeypatch):
+async def _database(monkeypatch):
     import merlt.experts.models  # noqa: F401  (registers the api_keys table)
     from merlt.rlcf.database import Base as RlcfBase
     from merlt.rlcf.database import get_async_database_url
@@ -48,6 +40,67 @@ async def test_the_configured_key_is_the_only_active_one(monkeypatch):
             yield s
 
     monkeypatch.setattr(seed, "get_async_session", session)
+    return engine, maker
+
+
+async def _insert(maker, key_id, raw, *, expires=False):
+    async with maker() as s:
+        await s.execute(
+            text("INSERT INTO api_keys (key_id, api_key_hash, role, rate_limit_tier, is_active, user_id, expires_at) "
+                 "VALUES (:k, :h, 'admin', 'unlimited', true, 'someone', "
+                 + ("NOW() - interval '1 day'" if expires else "NULL") + ")"),
+            {"k": key_id, "h": hash_api_key(raw)},
+        )
+        await s.commit()
+
+
+async def _active(maker, key_id) -> bool:
+    async with maker() as s:
+        return (await s.execute(text("SELECT is_active FROM api_keys WHERE key_id = :k"), {"k": key_id})).scalar_one()
+
+
+@needs_db
+async def test_without_a_configured_key_no_key_opens_and_health_knows(monkeypatch):
+    engine, maker = await _database(monkeypatch)
+    old = f"key_left_{uuid.uuid4().hex[:8]}"
+    try:
+        await _insert(maker, old, f"left-{old}")
+        monkeypatch.delenv(seed.ENV_VAR, raising=False)
+        seed.KEY_READY = True
+        assert await seed.ensure_admin_api_key() is False
+        assert seed.KEY_READY is False
+        # A key left from before (the old bootstrap route, an earlier value) opens nothing.
+        assert await _active(maker, old) is False
+    finally:
+        async with maker() as s:
+            await s.execute(text("DELETE FROM api_keys WHERE key_id = :k"), {"k": old})
+            await s.commit()
+        await engine.dispose()
+
+
+@needs_db
+async def test_a_configured_key_that_had_expired_is_made_usable(monkeypatch):
+    engine, maker = await _database(monkeypatch)
+    key_id = f"key_expired_{uuid.uuid4().hex[:8]}"
+    raw = f"expired-{key_id}"
+    try:
+        await _insert(maker, key_id, raw, expires=True)
+        monkeypatch.setenv(seed.ENV_VAR, raw)
+        assert await seed.ensure_admin_api_key() is False
+        assert seed.KEY_READY is True
+        async with maker() as s:
+            expires = (await s.execute(text("SELECT expires_at FROM api_keys WHERE key_id = :k"), {"k": key_id})).scalar_one()
+        assert expires is None and await _active(maker, key_id) is True
+    finally:
+        async with maker() as s:
+            await s.execute(text("DELETE FROM api_keys WHERE key_id = :k"), {"k": key_id})
+            await s.commit()
+        await engine.dispose()
+
+
+@needs_db
+async def test_the_configured_key_is_the_only_active_one(monkeypatch):
+    engine, maker = await _database(monkeypatch)
     tag = uuid.uuid4().hex[:8]
     configured = f"configured-{tag}"
     minted, rotated = f"key_minted_{tag}", f"key_rotated_{tag}"

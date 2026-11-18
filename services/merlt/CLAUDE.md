@@ -140,7 +140,9 @@ admin. There is no open mode: with no key configured every route answers 401.
 - In development, set `MERLT_API_KEY` in `apps/server/.env` (any long random
   string): `start.sh` passes it to MERL-T as `MERLT_ADMIN_API_KEY`.
 - A new router is covered by `tests/api/test_every_route_needs_the_key.py`, which
-  walks the app's routes.
+  reads the app's OpenAPI schema (FastAPI 0.164 no longer lists included routes in
+  `app.routes`): a websocket or a route with `include_in_schema=False` escapes it,
+  so a new one needs its own test.
 
 **Callbacks to the BFF.** They carry `X-Internal-Secret` (`MERLT_INTERNAL_SECRET`):
 
