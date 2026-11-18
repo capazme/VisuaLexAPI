@@ -23,7 +23,7 @@ import type { Scheda, StatoScheda } from '../../../types/studia';
 import { MyCardsView } from './MyCardsView';
 import { trashService } from '../../../services/trashService';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
-import { resetNotifications } from '../../ui/notifications/notifications';
+import { notificationStore, resetNotifications } from '../../ui/notifications/notifications';
 import { CARD_GRID_COLUMNS } from '../../layout/frame';
 
 const list = vi.mocked(studiaService.list);
@@ -62,7 +62,8 @@ function setDesktop(matches: boolean) {
 }
 
 function Where() {
-  return <p data-testid="where">{useLocation().pathname}</p>;
+  const { pathname, search } = useLocation();
+  return <p data-testid="where">{pathname + search}</p>;
 }
 
 function renderView(path = '/learn/schede') {
@@ -70,6 +71,7 @@ function renderView(path = '/learn/schede') {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/" element={<Where />} />
+        <Route path="/pratiche" element={<Where />} />
         <Route path="/learn/schede" element={<><MyCardsView /><Where /></>} />
         <Route path="/learn/schede/:id" element={<><MyCardsView /><Where /></>} />
       </Routes>
@@ -371,7 +373,6 @@ describe('«Le mie schede», the act filter after a deletion', () => {
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     const user = userEvent.setup();
     await user.click(within(detail).getByRole('button', { name: 'Elimina' }));
-    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina' }));
     await waitFor(() => expect(trash).toHaveBeenCalledWith([id]));
   };
 
@@ -543,20 +544,36 @@ describe('«Le mie schede», delete', () => {
     if (listAfter) list.mockResolvedValue(page(listAfter));
     const user = userEvent.setup();
     await user.click(within(detail).getByRole('button', { name: 'Elimina' }));
-    await user.click(within(await screen.findByRole('alertdialog', { name: 'Eliminare la scheda?' })).getByRole('button', { name: 'Elimina' }));
   };
+  /** The notification's own button beside «Annulla». */
+  const link = () => notificationStore.getState().entries.find((e) => e.undoable && !e.closing)?.action;
 
-  it('once confirmed moves the card to the trash, with «Annulla», and returns to the list (K1a, #457)', async () => {
+  it('moves the card to the trash with no confirmation, with «Annulla» and «Apri il cestino», and returns to the list (K1a, LC89)', async () => {
     trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
     await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
-    expect(trash).toHaveBeenCalledWith(['r1']);
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(trash).toHaveBeenCalledWith(['r1']));
     await waitFor(() => expect(shown?.message).toBe('Scheda nel cestino'));
+    expect(link()?.label).toBe('Apri il cestino');
     // The row under the article must not go on counting it.
     expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede');
     await waitFor(() => expect(screen.queryByRole('link', { name: /Domanda r1\?/ })).not.toBeInTheDocument());
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
+  });
+
+  it('gives the focus to the next card of the list, never to the body (LC89)', async () => {
+    trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
+    await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
+    await waitFor(() => expect(screen.getByRole('link', { name: /Domanda r2\?/ })).toHaveFocus());
+  });
+
+  it('«Apri il cestino» leads to the trash, where the card can be restored once the notification is gone', async () => {
+    trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
+    await pressDelete();
+    await waitFor(() => expect(link()).toBeDefined());
+    act(() => link()!.onClick());
+    expect(screen.getByTestId('where')).toHaveTextContent('/pratiche?trash=1');
   });
 
   it('«Annulla» takes the card back out of the trash and lists it again', async () => {

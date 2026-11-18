@@ -66,12 +66,14 @@ export function RowNoteComposer({ name, onSave, onDone }: { name: string; onSave
  * «Sposta in un'altra pratica» from a row's «⋯» in «Fonti» (LC86): the other dossiers under the row, most recent first,
  * in the page (L-73), as `MoveToDossierModal` lists them over it.
  */
-export function RowMovePicker({ onMove, onDone }: { onMove: (targetId: string) => void; onDone: () => void }) {
+export function RowMovePicker({ onMove, onDone, from }: { onMove: (targetId: string) => void; onDone: () => void; from?: string }) {
   const host = useHostDossier();
+  // The dossier moved from: the reading's host, or the page's (the selection bar, LC88, stands outside the reading).
+  const current = from ?? host?.id;
   const dossiers = useAppStore((s) => s.dossiers);
   const others = useMemo(
-    () => dossiers.filter((d) => d.id !== host?.id).sort((a, b) => dossierRecency(b) - dossierRecency(a)),
-    [dossiers, host?.id],
+    () => dossiers.filter((d) => d.id !== current).sort((a, b) => dossierRecency(b) - dossierRecency(a)),
+    [dossiers, current],
   );
   return (
     <div className={PANEL}>

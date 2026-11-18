@@ -18,6 +18,8 @@ export function removeItemsWithUndo(
   message: string,
   /** The page's trash, read again after the move and after «Annulla» (its counts). */
   onTrashChanged?: () => void,
+  /** Once «Annulla» is out of time and the removal stands (LC88: the rows leave the dossier's table then). */
+  onStands?: () => void,
 ): void {
   // The page's order before the removal, for «Annulla».
   const orderBefore = appStore.getState().dossiers.find((d) => d.id === dossierId)?.items.map((i) => i.id) ?? [];
@@ -44,6 +46,8 @@ export function removeItemsWithUndo(
       }
     },
     message,
+  }).then((stands) => {
+    if (stands) onStands?.();
   }).catch(() => {
     // Refused: the store already put the entries back, logged it and told the user.
   });

@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useMemo } from 'react';
 import { Gavel } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -7,10 +7,12 @@ import { besideRefFor, decisionOrder, decisionRowKey, decisionWindowId, type Pra
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
 import { PracticeDecisionEntry } from './PracticeIndexEntry';
-import { decisionEntrySentenza, useDecisionInDossier } from './inDossier';
+import { decisionEntrySentenza, decisionItemIds, useDecisionInDossier } from './inDossier';
+import { useHostDossier } from './readingHost';
 import { PRACTICE_VT, openPracticeWindow, practiceTransitionName } from './practiceSwitch';
 import type { PracticeLayout } from './PracticeColumn';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
+import { matchesQuery, useFontiTools } from './fontiTools';
 
 /**
  * The decisions' strip (U2), in Pietra since LC61: the acts' panel hairline, no wash; the gavel in the ink's grey
@@ -29,7 +31,19 @@ const DECISIONS_MARK = 'text-slate-500 dark:text-slate-400';
  */
 export function PracticeDecisionsSection({ practiceId, layout }: { practiceId: string; layout: PracticeLayout }) {
   const decisions = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.decisions);
-  const ordered = useMemo(() => decisionOrder(decisions ?? []), [decisions]);
+  const all = useMemo(() => decisionOrder(decisions ?? []), [decisions]);
+  // «Fonti»'s filter (LC88): a decision by its citation, as the row writes it, and its deposit.
+  const tools = useFontiTools();
+  const query = tools?.query ?? '';
+  const ordered = useMemo(() => all.filter((entry) => matchesQuery(
+    query, entry.label, formatDecisionDeposit({ tipo: entry.tipo, data_deposito: entry.depositDate }),
+  )), [all, query]);
+  const host = useHostDossier();
+  const held = useAppStore((s) => (host ? s.dossiers.find((d) => d.id === host.id) : undefined));
+  const shownKey = ordered.flatMap((entry) => decisionItemIds(held, entry)).join('|');
+  const report = tools?.report;
+  useEffect(() => { report?.('decisions', shownKey ? shownKey.split('|') : []); }, [report, shownKey]);
+  useEffect(() => () => report?.('decisions', []), [report]);
   const headingId = useId();
 
   if (ordered.length === 0) return null;
