@@ -56,7 +56,6 @@ function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => v
       {long && (
         <Button
           variant="link"
-          size="sm"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           // The note's colour (a functional one): the words and the line under them.

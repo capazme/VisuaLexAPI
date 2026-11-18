@@ -198,7 +198,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
                 <span className="text-sm text-slate-600 dark:text-slate-400">
                   {tree.length} articoli trovati • {selectedArticles.size} selezionati
                 </span>
-                <Button variant="link" size="sm" onClick={toggleSelectAll}>
+                <Button variant="link" onClick={toggleSelectAll}>
                   {allSelected ? 'Deseleziona tutti' : 'Seleziona tutti'}
                 </Button>
               </div>

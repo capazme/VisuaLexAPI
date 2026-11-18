@@ -317,9 +317,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             tabs={SORT_CHOICES}
             value={sortBy}
             onChange={setSortBy}
+            // Small: as tall as the category menu beside it, 44 px on a phone and 36 from md, with its corners.
+            size="sm"
             className="shrink-0"
-            // Small: 44 px to the touch on a phone; from md the track as tall as the fields beside it (36 px).
-            tabClassName="min-h-11 px-3 text-xs md:min-h-7"
           />
           {categories.length > 0 && (
             <div className="min-w-[8rem] flex-1 md:max-w-[16rem] md:flex-none">

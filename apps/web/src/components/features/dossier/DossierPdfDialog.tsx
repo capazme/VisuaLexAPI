@@ -56,14 +56,12 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
       initialFocusRef={firstRadio}
       footer={(
         <>
-          <Button variant="secondary" size="sm" className={TOUCH_TARGET_RESPONSIVE} disabled={busy} onClick={onClose}>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
             Annulla
           </Button>
           <Button
             variant="primary"
-            size="sm"
             icon={<Download size={16} aria-hidden />}
-            className={TOUCH_TARGET_RESPONSIVE}
             disabled={busy}
             onClick={() => onExport({ excerpts, decisionIds: chosen.map((d) => d.id) })}
           >
@@ -109,8 +107,8 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
           <fieldset className="space-y-1">
             <legend className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">Sentenze</legend>
             <div className="flex items-center gap-4">
-              <Button type="button" variant="link" size="sm" disabled={busy} onClick={() => setLeft(new Set())}>Tutte</Button>
-              <Button type="button" variant="link" size="sm" disabled={busy} onClick={() => setLeft(new Set(decisions.map((d) => d.id)))}>Nessuna</Button>
+              <Button type="button" variant="link" disabled={busy} onClick={() => setLeft(new Set())}>Tutte</Button>
+              <Button type="button" variant="link" disabled={busy} onClick={() => setLeft(new Set(decisions.map((d) => d.id)))}>Nessuna</Button>
             </div>
             <ul className="space-y-1">
               {decisions.map((item) => (

@@ -216,10 +216,10 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
       initialFocusRef={titleRef}
       footer={(
         <>
-          <Button variant="secondary" size="sm" className={TOUCH_TARGET_RESPONSIVE} disabled={busy} onClick={onClose}>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
             Annulla
           </Button>
-          <Button size="sm" className={TOUCH_TARGET_RESPONSIVE} disabled={!canPublish} loading={busy} onClick={() => void submit()}>
+          <Button disabled={!canPublish} loading={busy} onClick={() => void submit()}>
             {updating ? 'Aggiorna' : 'Pubblica'}
           </Button>
         </>
@@ -352,8 +352,8 @@ function RowGroup({ heading, hint, rows, ticked, onToggle, onAll }: {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{heading}</h4>
         <div className="flex gap-4">
-          <Button type="button" variant="link" size="sm" onClick={() => onAll(true)}>Tutte</Button>
-          <Button type="button" variant="link" size="sm" onClick={() => onAll(false)}>Nessuna</Button>
+          <Button type="button" variant="link" onClick={() => onAll(true)}>Tutte</Button>
+          <Button type="button" variant="link" onClick={() => onAll(false)}>Nessuna</Button>
         </div>
       </div>
       {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}

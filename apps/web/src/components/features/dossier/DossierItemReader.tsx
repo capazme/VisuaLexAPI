@@ -289,7 +289,6 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         <Button
           type="button"
           variant="link"
-          size="sm"
           onClick={() => setRetryTick(t => t + 1)}
           className="font-semibold text-red-700 decoration-red-300 hover:text-red-800 dark:text-red-300 dark:decoration-red-700 dark:hover:text-red-200"
         >
@@ -389,14 +388,13 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         />
       )}
       <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-        <Button type="button" variant="quiet" size="sm" onClick={handleCopyCitation} disabled={citeLocked} className="gap-1.5 px-2" icon={<Copy size={13} aria-hidden />}>
+        <Button type="button" variant="quiet" onClick={handleCopyCitation} disabled={citeLocked} className="gap-1.5 px-2" icon={<Copy size={13} aria-hidden />}>
           Copia citazione
         </Button>
         {hasLink && (
           <Button
             type="button"
             variant="quiet"
-            size="sm"
             onClick={handleCopyLink}
             disabled={citeLocked}
             title={european ? EUROPEAN_LINK_NOTE : 'L’indirizzo dell’articolo su Normattiva; incollato in Word, la citazione con il collegamento'}
@@ -406,7 +404,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
             {normLinkActionLabel(norma)}
           </Button>
         )}
-        <Button type="button" variant="quiet" size="sm" onClick={onOpenOnDashboard} className="gap-1.5 px-2" icon={<ExternalLink size={13} aria-hidden />}>
+        <Button type="button" variant="quiet" onClick={onOpenOnDashboard} className="gap-1.5 px-2" icon={<ExternalLink size={13} aria-hidden />}>
           Apri in Ricerca
         </Button>
         {/* The highlighter (H1, A4): the dossier's reader has no bar of its own, so it sits with its actions; not on a text

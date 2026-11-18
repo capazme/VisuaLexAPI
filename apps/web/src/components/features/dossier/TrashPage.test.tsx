@@ -108,3 +108,31 @@ describe('TrashPage, «Elimina definitivamente» (LC85, Papiniano on #585)', () 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Indietro' })).toHaveFocus());
   });
 });
+
+// LC106, the consultant on #640: one height for the trash's controls, and no focus left on the body after a restore.
+describe('TrashPage, the controls and the restore (LC106)', () => {
+  it('gives every control `Button`\'s height: 44 px on a phone, 36 from md', () => {
+    render(<TrashPage trash={trash([entry])} onBack={() => {}} showToast={() => {}} />);
+    for (const button of screen.getAllByRole('button')) {
+      if (button.textContent?.includes('Indietro')) continue;
+      expect(button).toHaveClass('min-h-11', 'md:min-h-9');
+    }
+  });
+
+  it('restored, the entry leaves and the focus goes to the title, never the body', async () => {
+    function Page() {
+      const [entries, setEntries] = useState<TrashEntry[]>([entry]);
+      const restore = vi.fn(async () => {
+        setEntries([]);
+        return { kind: 'restored' as const };
+      });
+      return <main><TrashPage trash={{ entries, error: null, reload: vi.fn(), restore, purge: vi.fn() }} onBack={() => {}} showToast={() => {}} /></main>;
+    }
+    render(<Page />);
+    const button = screen.getByRole('button', { name: 'Ripristina Pratica «Vecchia pratica»' });
+    button.focus();
+    await act(async () => { fireEvent.click(button); });
+    await waitFor(() => expect(screen.queryByText('Pratica «Vecchia pratica»')).toBeNull());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Cestino' })).toHaveFocus());
+  });
+});

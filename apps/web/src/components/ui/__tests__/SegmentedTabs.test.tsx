@@ -180,3 +180,15 @@ describe('SegmentedTabLinks', () => {
     expect(prossimi.querySelector('[data-segmented-mark]')).not.toBeNull();
   });
 });
+
+// LC106: the small row stands among the fields at their height and corners.
+describe('SegmentedTabs, small', () => {
+  it('makes the row 44 px on a phone and 36 from md, with 4 px corners', () => {
+    render(<SegmentedTabs size="sm" label="Ordina" tabs={[{ id: 'a', label: 'Data' }, { id: 'b', label: 'Nome' }]} value="a" onChange={() => {}} />);
+    const row = screen.getByRole('radiogroup', { name: 'Ordina' });
+    // 2 px of track round segments of 40 and 32 px.
+    expect(row).toHaveClass('p-0.5', 'rounded-md');
+    expect(row).not.toHaveClass('p-1', 'rounded-lg');
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveClass('min-h-10', 'md:min-h-8', 'rounded-md');
+  });
+});

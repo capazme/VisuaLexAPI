@@ -6,6 +6,7 @@ import { IconButton } from '../../ui/IconButton';
 import { Select } from '../../ui/Select';
 import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
 import { cn } from '../../../lib/utils';
+import { focusLanding } from '../../../utils/focusPage';
 import type { TrashEntry } from '../../../services/trashService';
 import type { Dossier } from '../../../types';
 import { trashCardsSummary, trashItemsSummary, trashWhen } from './trashSummary';
@@ -61,8 +62,14 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
     setBusy(true);
     const outcome = await onRestore(entry, targetDossierId);
     setBusy(false);
-    if (outcome.kind === 'restored') showToast('Ripristinato', 'success');
-    else if (outcome.kind === 'needs-target') setNeedsTarget(outcome.message);
+    if (outcome.kind === 'restored') {
+      showToast('Ripristinato', 'success');
+      // The pressed button was disabled while it worked, and the row leaves the list: the focus would rest on the
+      // body. It goes to the page's title, where what came back is listed (LC106, the consultant on #640).
+      requestAnimationFrame(() => {
+        if (!rowRef.current?.isConnected || document.activeElement === document.body) focusLanding(false);
+      });
+    } else if (outcome.kind === 'needs-target') setNeedsTarget(outcome.message);
     else showToast(outcome.message, 'error');
   };
 
@@ -99,7 +106,6 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
           <Button
             type="button"
             variant="secondary"
-            size="sm"
             onClick={() => void restore()}
             disabled={busy}
             aria-label={`Ripristina ${title}`}
@@ -108,7 +114,6 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
             Ripristina
           </Button>
           <IconButton
-            size="sm"
             onClick={(event) => { setPurgeFrom(event.currentTarget); setConfirmPurge(true); }}
             disabled={busy}
             aria-label={`Elimina definitivamente ${title}`}
@@ -122,12 +127,12 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
           <p role="alert" className="text-sm text-amber-800 dark:text-amber-300">{needsTarget}</p>
           <label className="sr-only" htmlFor={`trash-target-${entry.id}`}>Pratica in cui ripristinare</label>
           <div className="md:w-64">
-            <Select size="sm" id={`trash-target-${entry.id}`} value={target} onChange={(e) => setTarget(e.target.value)}>
+            <Select id={`trash-target-${entry.id}`} value={target} onChange={(e) => setTarget(e.target.value)}>
               <option value="">Scegli una pratica…</option>
               {dossiers.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
             </Select>
           </div>
-          <Button type="button" size="sm" onClick={() => void restore(target)} disabled={!target || busy}>
+          <Button type="button" onClick={() => void restore(target)} disabled={!target || busy}>
             Ripristina qui
           </Button>
         </div>
