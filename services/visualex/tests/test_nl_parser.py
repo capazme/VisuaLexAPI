@@ -218,54 +218,6 @@ class TestInputLimits:
         assert parse_nl_query(long_input) is None
 
 
-class TestResolveNlQuery:
-    """Test _resolve_nl_query integration logic."""
-
-    def _make_controller(self):
-        from visualex_api.app import NormaController
-        return NormaController.__new__(NormaController)
-
-    def test_none_data_returns_none(self):
-        ctrl = self._make_controller()
-        assert ctrl._resolve_nl_query(None) is None
-
-    def test_empty_dict_returns_empty(self):
-        ctrl = self._make_controller()
-        assert ctrl._resolve_nl_query({}) == {}
-
-    def test_no_query_field_passthrough(self):
-        ctrl = self._make_controller()
-        data = {"act_type": "codice civile", "article": "2043"}
-        assert ctrl._resolve_nl_query(data) == data
-
-    def test_query_parsed_into_fields(self):
-        ctrl = self._make_controller()
-        result = ctrl._resolve_nl_query({"query": "art. 2043 cc"})
-        assert result["act_type"] == "codice civile"
-        assert result["article"] == "2043"
-
-    def test_the_annex_is_merged_too(self):
-        ctrl = self._make_controller()
-        result = ctrl._resolve_nl_query({"query": "art. 1 d.lgs. 81/2008 (All. A)"})
-        assert (result["act_number"], result["annex"]) == ("81", "A")
-
-    def test_explicit_act_type_skips_nl_merge(self):
-        ctrl = self._make_controller()
-        result = ctrl._resolve_nl_query({
-            "query": "art. 2043 cc",
-            "act_type": "codice penale",
-        })
-        assert result["act_type"] == "codice penale"
-        # NL parser fields not merged because act_type conflicts
-        assert "article" not in result
-
-    def test_unrecognized_query_passthrough(self):
-        ctrl = self._make_controller()
-        data = {"query": "gibberish text", "act_type": "legge"}
-        result = ctrl._resolve_nl_query(data)
-        assert result == data
-
-
 class TestResolverInNlParser:
     def test_denominato_fills_type_number_and_date_together(self):
         got = parse_nl_query("art. 18 statuto dei lavoratori")

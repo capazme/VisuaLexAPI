@@ -47,12 +47,11 @@ open, not oversights:
   since 27 October 2026 only when CELLAR does not serve the act) checks the host
   of the URL before it starts, but no browser re-checks the hosts a page then
   loads or redirects to.
-- **Redirects.** Every `ThrottledHttpClient` (the shared one and the
-  court-decision readers') checks the host of the URL it is given. `aiohttp`
-  follows redirects by default and none of them re-checks the target, so an
-  allowed host that answers with a 302 can move the request somewhere unlisted.
-  The one exception is an EU act's page from CELLAR (`eurlex_fetch.fetch_from_cellar`):
-  its 303 is followed by hand, over https, and only to CELLAR's own host.
+- **Redirects in a browser.** A redirect that a page makes inside Playwright is not re-checked
+  (see above). The HTTP client's redirects are: every `ThrottledHttpClient` (the shared one and the
+  court-decision readers') checks each redirect against the allow-list before it follows it
+  (`http_client.redirect_guard`, since 18 November 2026), and an EU act's page from CELLAR is
+  followed by hand, over https, and only to CELLAR's own host.
 
 `POST /fetch_tree` was a third path until 21 October 2026: its caller-supplied
 `urn` was fetched by `tools/treextractor.get_tree` on an `aiohttp` session of its
@@ -78,7 +77,7 @@ checks none of them.
 | Destination | What it is | What it receives |
 |---|---|---|
 | MERL-T (`merlt-api`, `merlt-worker`) | FastAPI + RQ containers on the same host (`docker-compose.merlt.yml`). Every port is bound to `127.0.0.1` | Everything listed per consent level below, stored in its own Postgres, FalkorDB, Qdrant and the `merlt_uploads` volume |
-| OpenRouter (`openrouter.ai`) | The LLM API the experts, the synthesizer and the note extractor call, with `OPENROUTER_API_KEY` | Q&A questions with the retrieved legal context, and the text of uploaded notes during extraction |
+| OpenRouter (`openrouter.ai`) | The LLM API the experts, the synthesizer and the note extractor call, with `OPENROUTER_API_KEY`. Every call asks for providers that neither train on the text nor keep it (`provider.data_collection: "deny"`, `provider.zdr: true`, G-456); a model with no such provider is refused | Q&A questions with the retrieved legal context, and the text of uploaded notes during extraction |
 | `mcp-legal-it` | An MCP server of Italian legal tools, vendored as the git submodule `vendor/mcp-legal-it` and run as a container | Tool arguments the LLM derives from the question (search terms, references). The public sources it queries in turn are defined by the submodule, not by this repository |
 
 What leaves depends on the consent level. The BFF stores it

@@ -30,7 +30,6 @@ from tests.test_validity_wire import (  # noqa: F401 - fixtures
     ask,
     brocardi,
     controller,
-    _no_history_writes,
     requested,
 )
 

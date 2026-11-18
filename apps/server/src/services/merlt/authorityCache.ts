@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import { MerltClient, MerltClientError } from './merltClient';
+import { MerltAuthError, MerltClient, MerltClientError } from './merltClient';
 
 /**
  * Authority cache: avoids round-tripping to MERL-T on every event.
@@ -80,8 +80,10 @@ export async function getOrSyncAuthority(
 
     return updated;
   } catch (err) {
-    // MERL-T down or 4xx: serve stale cache if any, else null.
+    // MERL-T down or 4xx: serve stale cache if any, else null. A refused key with no cache
+    // goes up, so the profile route names it (503 merlt_auth_misconfigured).
     if (cached) return cached;
+    if (err instanceof MerltAuthError) throw err;
     if (err instanceof MerltClientError) return null;
     throw err;
   }

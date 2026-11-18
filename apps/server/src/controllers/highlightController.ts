@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { boundedText, parseBody } from '../utils/bodyLimits';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 
@@ -9,12 +10,12 @@ const offset = z.number().int().min(0).max(2_147_483_647);
 
 // Validation schemas
 const createHighlightSchema = z.object({
-  normaKey: z.string().min(1),
-  text: z.string().min(1),
+  normaKey: boundedText(500, 'norma').min(1),
+  text: boundedText(500_000, 'testo evidenziato').min(1),
   color: z.enum(['yellow', 'green', 'blue', 'red', 'purple']).default('yellow'),
   startOffset: offset,
   endOffset: offset,
-  note: z.string().optional(),
+  note: boundedText(50_000, 'nota').optional(),
   bookmarkId: z.string().guid().optional().nullable(),
   // G-418 (the owner's decision of 3 November 2026): the highlight this one is a part of, when the web's highlighter cuts
   // a piece out of the middle of a highlight (A4) — the first part shrinks in place (`PUT`), this second one is created
@@ -31,8 +32,8 @@ const createHighlightSchema = z.object({
 const updateHighlightSchema = z
   .object({
     color: z.enum(['yellow', 'green', 'blue', 'red', 'purple']).optional(),
-    note: z.string().optional().nullable(),
-    text: z.string().min(1).optional(),
+    note: boundedText(50_000, 'nota').optional().nullable(),
+    text: boundedText(500_000, 'testo evidenziato').min(1).optional(),
     startOffset: offset.optional(),
     endOffset: offset.optional(),
   })
@@ -56,7 +57,7 @@ export const createHighlight = async (req: Request, res: Response) => {
     throw new AppError(401, 'Not authenticated');
   }
 
-  const data = createHighlightSchema.parse(req.body);
+  const data = parseBody(createHighlightSchema, req.body);
 
   // Check if bookmark exists and belongs to user (if bookmarkId provided)
   if (data.bookmarkId) {
@@ -171,7 +172,7 @@ export const updateHighlight = async (req: Request, res: Response) => {
   }
 
   const { id } = req.params;
-  const data = updateHighlightSchema.parse(req.body);
+  const data = parseBody(updateHighlightSchema, req.body);
 
   // Check if highlight exists and belongs to user
   // The user's own highlights only: an assistant's mark changes through its entry's routes, which keep

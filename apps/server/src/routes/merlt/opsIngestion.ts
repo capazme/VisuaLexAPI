@@ -6,7 +6,7 @@ import {
   createOpsIngestionClient,
   OpsIngestionClient,
 } from '../../services/merlt/opsIngestionClient';
-import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
+import { MerltClientError, MerltBadRequestError, merltUnavailableDetail } from '../../services/merlt/merltClient';
 import {
   runIngestionBodySchema,
   promoteBatchBodySchema,
@@ -66,7 +66,7 @@ function handleMerltError(err: unknown, res: Response): void {
     return;
   }
   if (err instanceof MerltClientError) {
-    res.status(503).json({ detail: 'merlt_unavailable' });
+    res.status(503).json({ detail: merltUnavailableDetail(err) });
     return;
   }
   throw err;

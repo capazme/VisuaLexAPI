@@ -17,7 +17,6 @@ from visualex_api.services.normattiva_scraper import AknArticleText, NormattivaS
 from visualex_api.tools.selectors import NormattivaSelectors
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
     ARTICLE_ENDPOINTS, FakeCache, TEXT, URN, ask, brocardi, controller, normattiva_serving, requested,
-    _no_history_writes,
 )
 from tests.validity_pages import page, synthetic
 

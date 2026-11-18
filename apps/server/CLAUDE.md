@@ -32,7 +32,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `SESSION_CHECK_POINTS` (600) a minute per user or address, mounted in `app.ts`
   after `delegatedAuth` and before the general limiter, which it skips.
 - `src/routes/auth.ts` — failed sign-ins and registrations: 5 per 15 minutes per
-  address (shared, as before); failed sign-ins per account (the SHA-256 of the
+  address (shared, as before, with the wrong passwords of `PUT /auth/change-password`,
+  `POST /auth/contributions/remove` and `DELETE /auth/account`); failed attempts on those three
+  (a wrong password, or any other refusal) per signed-in user (`rl:password-checks-user`, the
+  user's id): 10 an hour from any address, a count of its own, so it never blocks the owner's
+  sign-in; ending every session (`POST /auth/logout-all`) needs no password, and ends the
+  sessions the server holds (cookie sessions, #517); failed sign-ins per account (the SHA-256 of the
   email as typed, trimmed and lower-cased, existing or not): 10 an hour from any
   address; refreshes: 30 a minute per address. Counted on arrival (a burst is
   held too) and given back on success. A refusal is 429 with `Retry-After`.
@@ -396,6 +401,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
+  The older controllers' free-text fields have a maximum length (`utils/bodyLimits.ts`: `boundedText`,
+  `boundedTags`, `parseBody`; item 14 of the security inventory): a text or a list over it is a 400
+  `{ detail: "Campo «nota»: al massimo 50.000 caratteri.", error: "too_long" }`, every other failure
+  as above. An error nobody caught (`utils/processGuards.ts`): a rejection is logged and the server keeps
+  running; an exception is logged, then the graceful shutdown ends the process; neither logs its message.
 - **The Forum's content** (`SharedEnvironment.content`; spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D6–D7). The server trusts
   none of it: `utils/publishedContent.ts` rebuilds every row from an allow-list — a dossier's
@@ -776,7 +786,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must name that version's id and the acceptance is stored with the proposal; otherwise 409
   `{ detail, richiedeTesto }` with the current version, nothing written. The card records the
   version in `propostaTestoId`. `POST /:id/ritira`: proposed → draft at any time, deleting the
-  card's votes and clearing `propostaTestoId`. `routes/lingoValidazione.ts`:
+  card's votes and clearing `propostaTestoId`. `POST /:id/togli` (G-556, session only): the author
+  removes a validated or under-review card — deleted when nobody else uses it (no one else has it in
+  review, and it is in no course someone else wrote or follows) and answered `{ esito: "cancellata" }`,
+  otherwise its author becomes null and the answer is `{ esito: "senza_nome", detail }`; another state is
+  a 409, another person's card a 404; the card row is locked first
+  (`lingo/removeOwnContributions.ts`). `DELETE /api/lingo/validazione/:cardId/motivazione` (G-557,
+  session only): the validator erases the reason of their vote, the judgement stays; a remark whose
+  reason was erased reaches the card's author as `motivazione: ""`. `routes/lingoValidazione.ts`:
   `GET /api/lingo/validazione/coda?materia=&limit=` (1–20) and `POST /api/lingo/validazione/:cardId
   { giudizio, motivazione? }` (reason 1–2,000 characters, required unless `APPROVATA`), for
   validators only: `User.lingoValidatore`, set by an administrator through `PUT /admin/users/:id`
@@ -1016,7 +1033,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   finishes before the states are read (plan, decision 14). Their votes outlive them, anonymous
   (`LingoValidazioneCard.utenteId` `SET NULL`), as do the text versions they wrote
   (`autoreId` `SET NULL`); their acceptances go. A card's votes go with the card: one
-  restored from the trash comes back without them. `GET /auth/export` includes the user's cards
+  restored from the trash comes back without them. Before leaving, the person can remove
+  everything they wrote for others at once (G-558): `POST /auth/contributions/remove { password }`,
+  session only, one transaction (`account/removeAllContributions.ts`) — their glosse, then their
+  replies and comments, newest first, by the author's own delete rule (`deleteOwnThreadIn`,
+  `deleteOwnCommentIn` in `controllers/communityController.ts`); the Forum validations they gave;
+  their proposed cards withdrawn; their validated or under-review cards by G-556; their votes' reasons
+  erased (G-557). It answers `{ glosse: {cancellate, svuotate}, risposte: {cancellate, svuotate},
+  validazioniForum, schede: {ritirate, cancellate, senzaNome}, motivazioni }`; a wrong password is a
+  400 and changes nothing. `GET /auth/export` includes the user's cards
   as `data.lingoCards`, their votes as `data.lingoValidazioni` (card id, verdict, reason, time)
   and their acceptances as `data.lingoAccettazioni` (key, version, time). Review data is personal: `LingoStatoRipasso`
   (`lingo_stato_ripasso`, one row per user and card, indexed by `(utente_id, due_at)`),

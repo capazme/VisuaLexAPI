@@ -4,18 +4,19 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 
 ### Python API (`services/visualex`)
 
-- **`app.py`** (this folder): main server, UI + API. **`services/visualex/visualex_api/app.py`**:
-  alternative server with `/api/*` prefix and Swagger. It is not deployed (`asgi.py` serves
-  the root app) and it does **not** apply the in-force rules: no `validity`, no
-  `reject_future_version_date`, an undated request served as Normattiva answers it (G-355,
-  G-357, G-358 are the root app's). Never deploy it as it is; its `/api/export_pdf` follows
-  the root app's. Retiring or porting it goes with the move to the mcp-legal-it shell.
+- **`app.py`** (this folder): the server, UI + API, served by `asgi.py`. The alternative
+  `/api/*` server with Swagger (`visualex_api/app.py`) was removed on 18 November 2026: nothing
+  ran it, it missed the in-force rules, and it kept a global search history with no login
+  (item 15 of the security inventory).
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`, `eurlex_fetch.py` (where an
   EU act's page comes from: CELLAR first, by CELEX through the shared client — `source="cellar"`,
   the 303 followed by hand over https and re-checked against the allow-list — and EUR-Lex's site
   through Playwright second, since eur-lex.europa.eu answers a server with an AWS WAF challenge,
   202 plus `x-amzn-waf-action` (`is_waf_challenge`); a page with no act's marker, `is_act_page`, is
-  neither served nor kept; the URL the app holds and the copies' key stay EUR-Lex's),
+  neither served nor kept; the URL the app holds and the copies' key stay EUR-Lex's; at most
+  `BROWSER_SLOTS` (2) browsers at once per process; a call that finds none free within
+  `BROWSER_WAIT_SECONDS` (20) raises a `NetworkError` (`status_code` 503) whose words say to retry:
+  the reader sees them as the article's error, `/fetch_tree` as a 500; `tests/test_eurlex_browser_slots.py`),
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
   `request(..., session=s)` sends one request on the caller's own session, for a page that
@@ -253,7 +254,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
     and the check before EUR-Lex's browser (`eurlex_fetch.fetch_with_playwright`, for the
     scraper and the tree alike) — `SECURITY.md` lists what it does not cover (the PDF
-    export's Playwright, what a page then loads, redirect targets except CELLAR's).
+    export's Playwright, what a page then loads); the client re-checks every redirect before it
+    follows it (`http_client.redirect_guard`, on every session `new_session` makes).
   - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
     the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
     pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
@@ -307,9 +309,6 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     («615 bis», «615bis», «615-bis») and always emitted as `615-bis`; before
     2026-10-07 only the hyphen was read and the other two came out as art. 615,
     so MERL-T's citation edges built from them may point at the wrong article
-  - `circuit_breaker.py` — per-source breaker. **State is in-memory
-    per-instance** — single-instance deployment only. Status at
-    `GET /api/circuit-breakers`
   - `redis_cache.py` + `cache_manager.py` — Redis cache with automatic
     filesystem fallback; startup warns when Redis is disabled or missing. The filesystem
     cache deletes an expired entry only when its key is read again, so a namespace nobody
@@ -558,7 +557,6 @@ POST unless noted, JSON bodies.
   October without the authority and with «:» and «;» read alike); a name over 150
   characters is a 400, never cut. The PDFs there older than two days are deleted on the
   six-hour sweep (`sweep_exported_pdfs`, top-level `.pdf` files only)
-- `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex's site and CELLAR **for
   real**, on the shared client, one request each and no browser. `services.eurlex` is
   `error` only when both EU hosts are down (the acts are read from either), and carries each
@@ -764,7 +762,7 @@ The manager owns the lifecycle; don't tear browsers down yourself.
 
 ## Environment Variables
 
-**Python API** — `HOST` (`0.0.0.0`), `PORT` (`5000`), `REDIS_ENABLED` (`false`;
+**Python API** — `HOST` (`127.0.0.1`: `python app.py` in development serves this machine alone; `start.sh` passes `0.0.0.0` when `MERLT_ENABLED=true`, since MERL-T's containers reach it from the Docker network; production runs `hypercorn asgi:app`, which binds inside its container), `PORT` (`5000`), `REDIS_ENABLED` (`false`;
 filesystem cache when off, warned at startup), `REDIS_URL`,
 `REDIS_CACHE_PREFIX` (`vlx`), `PERSISTENT_CACHE_TTL` (`86400`),
 `HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
@@ -798,13 +796,14 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
 `version.txt`): `docker build -f services/visualex/Dockerfile -t visualex-scrapers .`.
 `infra/compose.scrapers.yml` is the module that runs it.
 
-- **Hypercorn, one worker** (`asgi:app`). The rate limiter, the circuit breaker and the
-  fetch queue keep their state in memory, per process: more workers would each have
+- **Hypercorn, one worker** (`asgi:app`). The rate limiter and the fetch queue keep their
+  state in memory, per process: more workers would each have
   their own. `python app.py` is still the development server.
 - **It mirrors the repository layout** (`/repo/services/visualex`, `/repo/version.txt`)
   because `/version` and the `data/` and `download/` paths are computed relative to the
-  source tree. `data/` (the search history and dossier file this service keeps) and
-  `download/` (the cache and the exported PDFs) are volumes.
+  source tree. `data/` (it held the global search history and dossier files, removed on
+  18 November 2026; nothing writes there now) and `download/` (the cache and the exported PDFs)
+  are volumes.
 - **Chromium runs as a normal user** with every capability dropped and no `--shm-size`.
   Measured: about 280 MiB idle, about 1.06 GiB and 195 processes with four PDF exports at
   once; Docker's default 64 MB `/dev/shm` is enough (Playwright's Chromium avoids it).
@@ -861,7 +860,7 @@ no panel, and a deploy never waits on the portal.
 
 Breaking one of these breaks the product. Read before editing.
 
-**Python** — `services/visualex/visualex_api/app.py` (controller) · `tools/norma.py` (models) ·
+**Python** — `services/visualex/app.py` (controller) · `tools/norma.py` (models) ·
 `tools/text_op.py` (parsing + dates) · `tools/sys_op.py` (browser pool) ·
 `services/*_scraper.py` (fragile HTML parsers).
 

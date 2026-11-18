@@ -51,7 +51,7 @@ All environment variables are optional and have sensible defaults.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Server bind address |
+| `HOST` | `127.0.0.1` | Server bind address for `python app.py` (development): this machine alone. `start.sh` passes `0.0.0.0` when `MERLT_ENABLED=true`; production runs `hypercorn asgi:app` in its container. |
 | `PORT` | `5000` | Server port |
 
 ### HTTP Client Configuration
@@ -92,16 +92,6 @@ python app.py
 - **Web Interface**: http://localhost:5000
 - **API Endpoints**: Available at root paths (e.g., `/fetch_article_text`)
 
-### Alternative Server with Swagger UI
-
-```bash
-python -m visualex_api.app
-```
-
-- **Swagger Documentation**: http://localhost:5000/api/docs
-- **OpenAPI Spec**: http://localhost:5000/api/openapi.json
-- **API Endpoints**: Prefixed with `/api/` (e.g., `/api/fetch_article_text`)
-
 ### Using the Start Script
 
 The project includes a convenient start script that launches all services:
@@ -120,8 +110,6 @@ This starts:
 | File | Description |
 |------|-------------|
 | `services/visualex/visualex_api/tools/config.py` | Environment variable defaults and configuration |
-| `data/history.json` | Search history persistence (auto-created) |
-| `data/dossiers.json` | Dossier persistence (auto-created) |
 | `download/cache/` | Persistent cache directory (auto-created) |
 
 ## Rate Limiting
@@ -177,9 +165,6 @@ If you experience stale data:
 ```bash
 # Clear persistent cache
 rm -rf download/cache/*
-
-# Clear history
-rm data/history.json
 ```
 
 ## Health Checks

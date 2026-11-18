@@ -1263,6 +1263,14 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
   let createdRow: unknown = null;
   try {
     createdRow = await prisma.$transaction(async (tx) => {
+      // The item is claimed first, in one conditional write (item 15 of the security inventory): of two takes, or a
+      // take and a decline or revoke, at the same moment, only one finds it pending. If anything below fails, the
+      // transaction rolls back and the item is pending again.
+      const claimed = await tx.suggestionItem.updateMany({
+        where: { id: itemId, status: 'pending' },
+        data: { status: 'taken', reviewedAt: new Date() },
+      });
+      if (claimed.count === 0) throw new AppError(409, 'Item already reviewed');
       const payload = item.payload as any;
       // The article view loads notes/highlights by the wire-encoded key
       // `${itemKey}::art::${articleId}` (storeApiMappers.buildWireNormaKey). A
@@ -1354,11 +1362,6 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
         }
       })();
 
-      await tx.suggestionItem.update({
-        where: { id: itemId },
-        data: { status: 'taken', reviewedAt: new Date() },
-      });
-
       return row;
     });
   } catch (err: unknown) {
@@ -1411,10 +1414,13 @@ export const declineSuggestionItem = async (req: Request, res: Response) => {
     throw new AppError(409, 'Item already reviewed');
   }
 
-  const updated = await prisma.suggestionItem.update({
-    where: { id: itemId },
+  // Claimed in one conditional write, as a take is: a take at the same moment wins or loses, never both.
+  const claimed = await prisma.suggestionItem.updateMany({
+    where: { id: itemId, status: 'pending' },
     data: { status: 'declined', reviewNote: data.reviewNote, reviewedAt: new Date() },
   });
+  if (claimed.count === 0) throw new AppError(409, 'Item already reviewed');
+  const updated = await prisma.suggestionItem.findUniqueOrThrow({ where: { id: itemId } });
 
   res.json({
     id: updated.id,
@@ -1445,7 +1451,9 @@ export const revokeSuggestionItem = async (req: Request, res: Response) => {
     throw new AppError(403, 'Only pending items can be revoked');
   }
 
-  await prisma.suggestionItem.delete({ where: { id: itemId } });
+  // Only while still pending, in the same write: a take that claimed it meanwhile keeps it.
+  const removed = await prisma.suggestionItem.deleteMany({ where: { id: itemId, status: 'pending' } });
+  if (removed.count === 0) throw new AppError(403, 'Only pending items can be revoked');
   res.status(204).send();
 };
 

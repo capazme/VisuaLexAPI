@@ -119,14 +119,14 @@ Un voto che chiude il consenso aggiorna la cache authority del votante.
 | `/ops/ingestion/batches/:batchId/promote` | POST | `auth` + `admin` | `POST /api/v1/ingestion/mechanical/batches/{id}/promote` | **ADMIN** | `IngestionAdminPanel` |
 | `/ops/ingestion/batches/:batchId/reject` | POST | `auth` + `admin` | `POST /api/v1/ingestion/mechanical/batches/{id}/reject` | **ADMIN** | `IngestionAdminPanel` |
 
-Come rispondono le route ops quando MERL-T rifiuta la chiave:
+Come rispondono le route quando MERL-T rifiuta la chiave:
 
-- `ops.ts` risponde 503 `merlt_auth_misconfigured` a un 401/403 upstream.
+- ogni route, ops comprese, risponde 503 `merlt_auth_misconfigured` a un 401/403 upstream (ogni client lancia `MerltAuthError`): è un difetto di configurazione del server, mai un 401 dell'utente. L'esportazione dei dati (`userData.ts`, che chiama MERL-T per conto suo) risponde il proprio 503 «MERL-T non è raggiungibile».
 - `opsIngestion.ts` lascia passare solo 404 e 409; ogni altro 4xx diventa 503 `merlt_unavailable`.
 
 ## Note di contratto
 
-- **Errori.** Un errore di rete, un timeout o un 5xx di MERL-T diventa 503 `merlt_unavailable`. I 4xx di MERL-T passano invariati sulle route experts. I corpi invalidi rispondono 400 `invalid_body`, con gli `issues` di Zod.
+- **Errori.** Un errore di rete, un timeout o un 5xx di MERL-T diventa 503 `merlt_unavailable`. I 4xx di MERL-T passano invariati sulle route experts, tranne 401 e 403: la chiave del server rifiutata diventa 503 `merlt_auth_misconfigured`. I corpi invalidi rispondono 400 `invalid_body`, con gli `issues` di Zod.
 - **Consenso.** È persistito lato server (Prisma `MerltUserPreference` più l'audit append-only `MerltConsentAudit`). Il `localStorage` del frontend è solo una cache di avvio. L'audit non è consultabile da alcuna route.
 - **Upload.** È multipart: multer lo valida nel BFF, che poi lo inoltra a MERL-T come `multipart/form-data`.
 - **Callback verso il BFF.** Le tre route `/internal/*` vogliono lo stesso `MERLT_INTERNAL_SECRET` che compose passa a merlt-api e a merlt-worker (default `dev-internal-secret`).
