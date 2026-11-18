@@ -23,7 +23,6 @@ vi.mock('../../../hooks/useServiceHealth', async () => {
     },
   };
 });
-vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 // The planner's host reads the tasks from the server: not under test here.
