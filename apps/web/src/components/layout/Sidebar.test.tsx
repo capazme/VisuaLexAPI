@@ -779,8 +779,7 @@ describe('Sidebar — the services\' status in the user menu (S1)', () => {
     vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({ top: 300, bottom: 344, left: 10, right: 54 } as DOMRect);
     openUserMenu();
     const menu = screen.getByRole('menu', { name: 'Menu utente' });
-    // It scrolls inside the surface (`IslandSurface`, LC85): the box would clip the shape growing from the avatar.
-    expect(menu.querySelector('[data-island-content]')).toHaveClass('overflow-y-auto');
+    expect(menu).toHaveClass('overflow-y-auto');
     // The rail's menu is aligned to the avatar's foot.
     expect(menu.style.maxHeight).toBe('336px');
   });
