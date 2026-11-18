@@ -13,7 +13,6 @@ import os
 from types import SimpleNamespace
 
 import pytest
-from fastapi.routing import APIRoute, APIWebSocketRoute
 from fastapi.testclient import TestClient
 
 from merlt.api.auth import verify_api_key
@@ -28,24 +27,24 @@ def _app():
     return app
 
 
-def _calls(dependant) -> list:
-    """Every callable a route depends on, at any depth (require_role depends on verify_api_key)."""
-    found, stack = [], [dependant]
-    while stack:
-        current = stack.pop()
-        for sub in current.dependencies:
-            found.append(sub.call)
-            stack.append(sub)
-    return found
+def _operations():
+    """Every HTTP operation of the app, from its OpenAPI schema: a public view that does not
+    depend on how FastAPI stores included routers (0.164 keeps them as _IncludedRouter, so
+    app.routes no longer lists their routes)."""
+    schema = _app().openapi()
+    return [(path, method, op) for path, ops in schema["paths"].items() for method, op in ops.items()]
+
+
+def test_the_schema_sees_the_routers():
+    assert len({path for path, _, _ in _operations()}) > 50
 
 
 def test_every_route_but_the_health_check_needs_the_key():
     unguarded = [
-        route.path
-        for route in _app().routes
-        if isinstance(route, (APIRoute, APIWebSocketRoute))
-        and route.path not in OPEN
-        and verify_api_key not in _calls(route.dependant)
+        f"{method.upper()} {path}"
+        for path, method, op in _operations()
+        if path not in OPEN
+        and not any(p["name"] == "X-API-Key" and p["in"] == "header" for p in op.get("parameters", []))
     ]
     assert unguarded == []
 
@@ -55,12 +54,7 @@ def test_the_key_is_never_made_optional():
 
 
 def test_no_route_hands_out_a_key():
-    paths = {getattr(route, "path", "") for route in _app().routes}
-    assert not any(path.endswith("/api-keys/bootstrap") for path in paths)
-
-
-def test_there_is_no_websocket():
-    assert not [route for route in _app().routes if isinstance(route, APIWebSocketRoute)]
+    assert not [path for path, _, _ in _operations() if path.endswith("/api-keys/bootstrap")]
 
 
 @pytest.mark.skipif(os.getenv("MERLT_DOCS") is not None, reason="MERLT_DOCS is set in this environment")
@@ -103,3 +97,30 @@ def test_a_request_without_a_key_is_refused(client, path):
 
 def test_a_request_with_an_unknown_key_is_refused(client):
     assert client.get("/api/v1/api-keys/", headers={"X-API-Key": "not-a-key"}).status_code == 401
+
+
+async def test_the_key_records_its_use_at_most_every_five_minutes():
+    """Every route checks the key: writing last_used_at each time would be one UPDATE per request."""
+    from datetime import datetime, timedelta
+
+    key = SimpleNamespace(is_active=True, is_expired=lambda: False, last_used_at=datetime.utcnow())
+    commits = []
+
+    class _Session:
+        async def execute(self, *_args, **_kwargs):
+            return SimpleNamespace(scalar_one_or_none=lambda: key)
+
+        async def commit(self):
+            commits.append(key.last_used_at)
+
+    assert await verify_api_key("k", _Session()) is key
+    assert commits == []
+    key.last_used_at = datetime.utcnow() - timedelta(minutes=6)
+    await verify_api_key("k", _Session())
+    assert len(commits) == 1
+
+
+def test_there_is_no_websocket(client):
+    with pytest.raises(Exception):
+        with client.websocket_connect("/api/v1/ws?token=x"):
+            pass
