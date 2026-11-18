@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ShieldAlert, Upload } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
+import { Select } from '../../ui/Select';
+import { Input } from '../../ui/Input';
+import { Textarea } from '../../ui/Textarea';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { Dossier, EnvironmentCategory, SharedEnvironmentContent } from '../../../types';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
@@ -30,8 +33,6 @@ const DESCRIPTION_MAX = 500;
 const TAGS_MAX = 10;
 const TAG_MAX = 30;
 
-const INPUT = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
-const LINK_BUTTON = `rounded px-2 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`;
 
 // The owner's wording (14 October 2026, question 186), with his added sentence on manuals. LC60: what travels, first.
 const WARNING = [
@@ -215,10 +216,10 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
       initialFocusRef={titleRef}
       footer={(
         <>
-          <Button variant="secondary" size="sm" className={TOUCH_TARGET_RESPONSIVE} disabled={busy} onClick={onClose}>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
             Annulla
           </Button>
-          <Button size="sm" className={TOUCH_TARGET_RESPONSIVE} disabled={!canPublish} loading={busy} onClick={() => void submit()}>
+          <Button disabled={!canPublish} loading={busy} onClick={() => void submit()}>
             {updating ? 'Aggiorna' : 'Pubblica'}
           </Button>
         </>
@@ -234,7 +235,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
         <div className="grid gap-3">
           <div>
             <label htmlFor="publish-title" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Titolo nel Forum</label>
-            <input id="publish-title" ref={titleRef} value={title} maxLength={TITLE_MAX} onChange={(e) => edit(setTitle)(e.target.value)} className={INPUT} aria-describedby="publish-title-help" />
+            <Input id="publish-title" ref={titleRef} value={title} maxLength={TITLE_MAX} onChange={(e) => edit(setTitle)(e.target.value)} aria-describedby="publish-title-help" />
             <p id="publish-title-help" className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {titleError ?? 'È il nome che vedranno gli altri: non usare il nome di una pratica o di un cliente.'}
             </p>
@@ -242,19 +243,19 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
           </div>
           <div>
             <label htmlFor="publish-description" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Descrizione</label>
-            <textarea id="publish-description" value={description} maxLength={DESCRIPTION_MAX} rows={2} onChange={(e) => edit(setDescription)(e.target.value)} className={`${INPUT} resize-none`} />
+            <Textarea id="publish-description" value={description} maxLength={DESCRIPTION_MAX} rows={2} onChange={(e) => edit(setDescription)(e.target.value)} className="resize-none" />
             {descriptionFlag && <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">{descriptionFlag}</p>}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="publish-category" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Categoria</label>
-              <select id="publish-category" value={category} onChange={(e) => edit(setCategory)(e.target.value as EnvironmentCategory)} className={`${INPUT} min-h-[44px] md:min-h-0`}>
+              <Select id="publish-category" value={category} onChange={(e) => edit(setCategory)(e.target.value as EnvironmentCategory)}>
                 {FORUM_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label htmlFor="publish-tags" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Tag (separati da virgola)</label>
-              <input id="publish-tags" value={tagsInput} onChange={(e) => edit(setTagsInput)(e.target.value)} className={INPUT} />
+              <Input id="publish-tags" value={tagsInput} onChange={(e) => edit(setTagsInput)(e.target.value)} />
               {tagsError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{tagsError}</p>}
               {tagsFlag && <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">{tagsFlag}</p>}
             </div>
@@ -350,9 +351,9 @@ function RowGroup({ heading, hint, rows, ticked, onToggle, onAll }: {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{heading}</h4>
-        <div className="flex gap-1">
-          <button type="button" className={LINK_BUTTON} onClick={() => onAll(true)}>Tutte</button>
-          <button type="button" className={LINK_BUTTON} onClick={() => onAll(false)}>Nessuna</button>
+        <div className="flex gap-4">
+          <Button type="button" variant="link" onClick={() => onAll(true)}>Tutte</Button>
+          <Button type="button" variant="link" onClick={() => onAll(false)}>Nessuna</Button>
         </div>
       </div>
       {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}

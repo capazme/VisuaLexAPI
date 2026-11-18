@@ -246,7 +246,7 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
       {/* LC86: no sentence over the blocks; a row only on the table says «Non nella pratica» itself (§14). */}
       {pending > 0 && <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Carico il testo…</p>}
       {practiceId && (empty ? (
-        <p className="rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+        <p className="rounded-[8px] border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
           Questa pratica non ha ancora norme o sentenze da leggere.
         </p>
       ) : (

@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { EmptyState } from '../../ui/EmptyState';
-import { PAGE_TITLE } from '../../layout/PageFrame';
+import { PageFrame } from '../../layout/PageFrame';
+import { BackLink } from '../../ui/BackLink';
 import { TrashEntryRow } from './TrashEntryRow';
 import type { useTrash } from './useTrash';
 
@@ -24,40 +24,33 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
   useEffect(() => { void reload(); }, [reload]);
 
   return (
-    <div>
-      <button
-        onClick={onBack}
-        className="mb-4 inline-flex min-h-[44px] items-center gap-2 rounded text-sm text-slate-500 hover:text-primary-600 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+    <div className="flex flex-col gap-4">
+      <BackLink onBack={onBack} />
+      {/* The section pages' frame (W2): its title is where the focus lands coming from the list (LC98, `ViewSlide`). */}
+      <PageFrame
+        title="Cestino"
+        line="Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni, come ciò che elimini tu: le pratiche, le voci che togli da una pratica, le schede di studio."
       >
-        <ArrowLeft size={16} /> Torna alle pratiche
-      </button>
-      {/* The title as on every section page (W2), under the way back. */}
-      <header className="mb-6">
-        {/* Where the focus lands coming from the list (LC98, `ViewSlide`). */}
-        <h1 data-page-title="" className={PAGE_TITLE}>Cestino</h1>
-        <p className="mt-1 max-w-prose text-sm text-slate-500 dark:text-slate-400">
-          Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni, come ciò che elimini tu: le pratiche, le voci che togli da una pratica, le schede di studio.
-        </p>
-      </header>
-      {error && <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {entries && entries.length === 0 && !error && (
-        <EmptyState variant="generic" title="Il cestino è vuoto" description="Nessun elemento eliminato da un’applicazione collegata, nessuna pratica, voce o scheda di studio eliminati da te." />
-      )}
-      {entries && entries.length > 0 && (
-        <ul className="space-y-2">
-          {entries.map((entry) => (
-            <TrashEntryRow
-              key={entry.id}
-              entry={entry}
-              showSource
-              dossiers={dossiers}
-              onRestore={restore}
-              onPurge={purge}
-              showToast={showToast}
-            />
-          ))}
-        </ul>
-      )}
+        {error && <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {entries && entries.length === 0 && !error && (
+          <EmptyState variant="generic" title="Il cestino è vuoto" description="Nessun elemento eliminato da un’applicazione collegata, nessuna pratica, voce o scheda di studio eliminati da te." />
+        )}
+        {entries && entries.length > 0 && (
+          <ul className="space-y-2">
+            {entries.map((entry) => (
+              <TrashEntryRow
+                key={entry.id}
+                entry={entry}
+                showSource
+                dossiers={dossiers}
+                onRestore={restore}
+                onPurge={purge}
+                showToast={showToast}
+              />
+            ))}
+          </ul>
+        )}
+      </PageFrame>
     </div>
   );
 }

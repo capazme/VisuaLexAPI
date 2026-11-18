@@ -5,10 +5,12 @@ import type { DossierItem } from '../../../types';
 import { formatTimestampLong } from './dossierUtils';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { hasAssistantNote } from '../../../utils/aiReview';
-import { FOCUS_RING } from '../studia/progress/tokens';
 import { useNoteRemovalFocus } from './useNoteRemovalFocus';
 import { NOTE_FOLDED_EM, NoteText } from './NoteText';
-import { ROW, ROW_LINE, ROW_REMOVE, ROW_TITLE, SECTION_COUNT, SECTION_HEADING, SECTION_TILE } from './dossierStyles';
+import { ROW, ROW_LINE, ROW_REMOVE, ROW_TITLE, SECTION_COUNT, SECTION_HEADING } from './dossierStyles';
+import { IconButton } from '../../ui/IconButton';
+import { Button } from '../../ui/Button';
+import { Card } from '../../ui/Card';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -52,14 +54,15 @@ function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => v
     <p className={cn(ROW_LINE, 'mt-1 flex flex-wrap items-center gap-x-2 gap-y-1')}>
       <span>{formatTimestampLong(note.addedAt)}</span>
       {long && (
-        <button
-          type="button"
+        <Button
+          variant="link"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className={cn('-my-3 min-h-[44px] rounded px-1 font-medium text-amber-800 hover:underline dark:text-amber-300', FOCUS_RING)}
+          // The note's colour (a functional one): the words and the line under them.
+          className="-my-3 text-[13px] text-amber-800 decoration-amber-400 hover:text-amber-900 dark:text-amber-300 dark:decoration-amber-700 dark:hover:text-amber-200"
         >
           {open ? 'Mostra meno' : 'Mostra tutto'}
-        </button>
+        </Button>
       )}
     </p>
   );
@@ -79,9 +82,7 @@ function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => v
         {words}
         {meta}
       </div>
-      <button type="button" onClick={onRemove} aria-label="Rimuovi nota" className={ROW_REMOVE}>
-        <Trash2 size={15} aria-hidden />
-      </button>
+      <IconButton size="lg" onClick={onRemove} aria-label="Rimuovi nota" className={ROW_REMOVE} icon={<Trash2 aria-hidden />} />
     </li>
   );
 }
@@ -95,7 +96,7 @@ export function DossierNotesSection({ notes, onRemove }: Props) {
   const focus = useNoteRemovalFocus(notes, onRemove);
   if (notes.length === 0) return null;
   return (
-    <section aria-labelledby="dossier-notes-heading" className={cn(SECTION_TILE, 'px-3 pb-1 pt-3 md:px-4')}>
+    <Card role="region" aria-labelledby="dossier-notes-heading" className="px-3 pb-1 pt-3 md:px-4">
       <h2 id="dossier-notes-heading" className={cn(SECTION_HEADING, 'flex items-center gap-2')}>
         <StickyNote size={16} aria-hidden className="text-amber-600 dark:text-amber-400" />
         Note <span className={SECTION_COUNT}>({notes.length})</span>
@@ -105,6 +106,6 @@ export function DossierNotesSection({ notes, onRemove }: Props) {
           <NoteRow key={note.id} note={note} rowRef={focus.register(note.id)} onRemove={() => focus.remove(note)} />
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }

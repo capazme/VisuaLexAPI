@@ -4,6 +4,7 @@ import { hasAssistantNote } from '../../../utils/aiReview';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { formatTimestampLong } from './dossierUtils';
 import { ROW_REMOVE } from './dossierStyles';
+import { IconButton } from '../../ui/IconButton';
 import { useNoteRemovalFocus } from './useNoteRemovalFocus';
 import { NoteText } from './NoteText';
 
@@ -28,7 +29,7 @@ export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; on
       <div
         key={note.id}
         ref={register(note.id)}
-        className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+        className="flex items-start gap-2 rounded-[8px] border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
         <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
         <div className="min-w-0 flex-1">
           {reviewed
@@ -36,14 +37,7 @@ export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; on
             : <>{words}{meta}</>}
         </div>
         {onRemoveNote && !reviewed && (
-          <button
-            type="button"
-            onClick={() => remove(note)}
-            aria-label="Rimuovi nota"
-            className={ROW_REMOVE}
-          >
-            <Trash2 size={14} aria-hidden />
-          </button>
+          <IconButton size="lg" onClick={() => remove(note)} aria-label="Rimuovi nota" className={ROW_REMOVE} icon={<Trash2 aria-hidden />} />
         )}
       </div>
     );

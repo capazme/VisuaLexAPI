@@ -1,6 +1,12 @@
 import { useRef, useState } from 'react';
 import { RotateCcw, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Select } from '../../ui/Select';
+import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
+import { cn } from '../../../lib/utils';
+import { focusLanding } from '../../../utils/focusPage';
 import type { TrashEntry } from '../../../services/trashService';
 import type { Dossier } from '../../../types';
 import { trashCardsSummary, trashItemsSummary, trashWhen } from './trashSummary';
@@ -56,8 +62,14 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
     setBusy(true);
     const outcome = await onRestore(entry, targetDossierId);
     setBusy(false);
-    if (outcome.kind === 'restored') showToast('Ripristinato', 'success');
-    else if (outcome.kind === 'needs-target') setNeedsTarget(outcome.message);
+    if (outcome.kind === 'restored') {
+      showToast('Ripristinato', 'success');
+      // The pressed button was disabled while it worked, and the row leaves the list: the focus would rest on the
+      // body. It goes to the page's title, where what came back is listed (LC106, the consultant on #640).
+      requestAnimationFrame(() => {
+        if (!rowRef.current?.isConnected || document.activeElement === document.body) focusLanding(false);
+      });
+    } else if (outcome.kind === 'needs-target') setNeedsTarget(outcome.message);
     else showToast(outcome.message, 'error');
   };
 
@@ -67,7 +79,11 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
     // Where the focus goes once this row has left the list: the next row, else the one before, else the list's page.
     const row = rowRef.current;
     const neighbour = (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector<HTMLElement>('button:not([disabled])');
-    const page = row?.parentElement?.parentElement?.querySelector<HTMLElement>('button:not([disabled])');
+    // The nearest control outside the row, however deep the list sits in its page (the trash's `PageFrame`).
+    let page: HTMLElement | undefined;
+    for (let up = row?.parentElement?.parentElement; up && !page; up = up.parentElement) {
+      page = [...up.querySelectorAll<HTMLElement>('button:not([disabled])')].find((b) => !row?.contains(b));
+    }
     const done = await onPurge(entry);
     setBusy(false);
     // Once the list has drawn itself without this row.
@@ -78,7 +94,8 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
   };
 
   return (
-    <li ref={rowRef} tabIndex={-1} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+    // `Card`'s box (8 px, its border, the paper) on a list item.
+    <li ref={rowRef} tabIndex={-1} className={cn('bg-card px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500', CARD_RADIUS, CONTROL_BORDER)}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-900 dark:text-white">{title}</p>
@@ -86,47 +103,38 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{trashWhen(entry)}</p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => void restore()}
             disabled={busy}
             aria-label={`Ripristina ${title}`}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            icon={<RotateCcw size={14} aria-hidden />}
           >
-            <RotateCcw size={14} aria-hidden /> Ripristina
-          </button>
-          <button
-            type="button"
+            Ripristina
+          </Button>
+          <IconButton
             onClick={(event) => { setPurgeFrom(event.currentTarget); setConfirmPurge(true); }}
             disabled={busy}
             aria-label={`Elimina definitivamente ${title}`}
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-red-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-          >
-            <Trash2 size={15} />
-          </button>
+            className="text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+            icon={<Trash2 aria-hidden />}
+          />
         </div>
       </div>
       {needsTarget && (
         <div className="mt-2 flex flex-col gap-2 rounded-md bg-amber-50 p-2 md:flex-row md:items-center dark:bg-amber-950/20">
           <p role="alert" className="text-sm text-amber-800 dark:text-amber-300">{needsTarget}</p>
           <label className="sr-only" htmlFor={`trash-target-${entry.id}`}>Pratica in cui ripristinare</label>
-          <select
-            id={`trash-target-${entry.id}`}
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            className="min-h-[44px] rounded-md border border-slate-300 bg-white px-2 text-sm md:min-h-0 md:py-1 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-          >
-            <option value="">Scegli una pratica…</option>
-            {dossiers.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
-          </select>
-          <button
-            type="button"
-            onClick={() => void restore(target)}
-            disabled={!target || busy}
-            className="min-h-[44px] rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-          >
+          <div className="md:w-64">
+            <Select id={`trash-target-${entry.id}`} value={target} onChange={(e) => setTarget(e.target.value)}>
+              <option value="">Scegli una pratica…</option>
+              {dossiers.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+            </Select>
+          </div>
+          <Button type="button" onClick={() => void restore(target)} disabled={!target || busy}>
             Ripristina qui
-          </button>
+          </Button>
         </div>
       )}
       <ConfirmDialog

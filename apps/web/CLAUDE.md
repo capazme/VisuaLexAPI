@@ -2549,8 +2549,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   which the list's card says alike) and the header's actions in one row (D3) under the title at every width — beside it,
   a long name was squeezed into a narrow column, and before S7c pushed the actions off the page at 1366 px: «Apri
   tutto su Dashboard», «Aggiungi», «Esporta», the Forum's and «⋯» (`ui/MenuButton`; «Seleziona elementi» lives
-  there). Every control is 44 px at every width, as the planner's (the search is the planner's `FIELD`); the act
-  blocks, the free notes and «Giurisprudenza» are tiles (`SECTION_TILE`, no shadow) headed in the reader's serif, no
+  there). The header's buttons have `Button`'s heights since LC106 (44 px on a phone, 36 from md), a row's icons
+  44 px at every width (`IconButton size="lg"`); the search is `ui/Input`. The free notes are a `ui/Card` (8 px, no
+  shadow), the act blocks and «Giurisprudenza» tiles of their own (`practice/`), headed in the reader's serif, no
   small capitals, and their entries rows of two levels, as the planner's tasks (`ROW`, a rule under each): a title
   (15 px), a grey line (13 px: an article's rubric, else «Aggiunto il …», nothing when neither is known; a note's date
   and who wrote it, under its words; a decision's «Aggiunta il …»), the signs, then the star and the removal (44 px,
@@ -3170,7 +3171,7 @@ re-applying a saturated background behind the text.
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
 `min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly. The pages in the
 planner's shape keep 44 px at every width instead: the planner, and the dossier's
-page since S7c (`dossierStyles.ts`: `ROW_ICON` for a row's star and removal). A text field or a select is at least 16 px below
+page since S7c (`dossierStyles.ts`: `ROW_REMOVE` on an `IconButton size="lg"` for a row's removal). A text field or a select is at least 16 px below
 `md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
 Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
 `text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
@@ -3205,10 +3206,12 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
   `?dossier=<id>`; `DossierListView.tsx` (a grid of cards of at least 20rem, `CARD_GRID_COLUMNS` — U1: as many
   columns as the frame holds, four at 1920 px, seven at 2560 in full screen —, context menu, shortcuts `n` `/`
-  `i`; the search, then two menus — the order and «Filtra per categoria», one
-  category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
-  there are none — on one row on a computer, half and half under the search on
-  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: an EB Garamond title, the
+  `i`; the search (`ui/Input`), then the order — a choice in a row since LC106, «Data · Nome · Elementi», a small
+  `ui/SegmentedTabs` with no panel (`radiogroup`, named «Ordina le pratiche», no «Ordina» in sight) — and «Filtra per
+  categoria» (`ui/Select`), one category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
+  there are none — on one row on a computer; on a phone under the search, side by side while they fit, else the menu
+  wraps under the order; every button and menu of `features/dossier/` is a common one (`pratiche.guard.test.ts`: a
+  bare `<button>` or `<select>` only with `bare-button: <reason>` on the line above); on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: an EB Garamond title, the
   counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
   always there at 44 px; with no dossier, a composed empty state, words and two actions, no drawing since LC21), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),

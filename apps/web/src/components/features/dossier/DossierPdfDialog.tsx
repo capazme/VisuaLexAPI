@@ -26,7 +26,6 @@ interface Props {
 
 const RADIO = 'h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const OPTION = `flex items-start gap-2 rounded text-sm text-slate-700 dark:text-slate-300 ${TOUCH_TARGET_RESPONSIVE}`;
-const LINK_BUTTON = `rounded px-2 text-sm font-medium text-primary-600 hover:underline disabled:opacity-50 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`;
 
 /**
  * «Esporta → PDF»: what to print (the full texts or only the marked passages) and which decisions
@@ -57,14 +56,12 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
       initialFocusRef={firstRadio}
       footer={(
         <>
-          <Button variant="secondary" size="sm" className={TOUCH_TARGET_RESPONSIVE} disabled={busy} onClick={onClose}>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
             Annulla
           </Button>
           <Button
             variant="primary"
-            size="sm"
             icon={<Download size={16} aria-hidden />}
-            className={TOUCH_TARGET_RESPONSIVE}
             disabled={busy}
             onClick={() => onExport({ excerpts, decisionIds: chosen.map((d) => d.id) })}
           >
@@ -109,9 +106,9 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
         {decisions.length > 0 && (
           <fieldset className="space-y-1">
             <legend className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">Sentenze</legend>
-            <div className="-ml-2 flex items-center">
-              <button type="button" className={LINK_BUTTON} disabled={busy} onClick={() => setLeft(new Set())}>Tutte</button>
-              <button type="button" className={LINK_BUTTON} disabled={busy} onClick={() => setLeft(new Set(decisions.map((d) => d.id)))}>Nessuna</button>
+            <div className="flex items-center gap-4">
+              <Button type="button" variant="link" disabled={busy} onClick={() => setLeft(new Set())}>Tutte</Button>
+              <Button type="button" variant="link" disabled={busy} onClick={() => setLeft(new Set(decisions.map((d) => d.id)))}>Nessuna</Button>
             </div>
             <ul className="space-y-1">
               {decisions.map((item) => (
