@@ -95,4 +95,12 @@ describe('Work\'s page', () => {
     expect(views.closest('.max-md\\:fixed')).toHaveClass('max-md:bottom-0');
     expect(screen.getByRole('link', { name: 'Cestino dei compiti' })).toHaveClass(...CONTROL_HEIGHT.md.split(' '), 'rounded-md');
   });
+
+  // LC111 (the consultant): the views' words at 13 px from md, as the section tabs; 12 under the icons on a phone.
+  it('writes the views at 13 px on a computer and at 12 under the icons of the bar at the foot', () => {
+    renderAt('/work/scadenziario');
+    for (const link of screen.getByRole('navigation', { name: 'Viste di Work' }).querySelectorAll('a')) {
+      expect(link).toHaveClass('md:text-[13px]', 'max-md:text-xs');
+    }
+  });
 });

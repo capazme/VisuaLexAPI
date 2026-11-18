@@ -99,7 +99,8 @@ export function OpusPage() {
             footBar
             onNavigate={keepPlace}
             className="w-full md:w-fit"
-            tabClassName="whitespace-nowrap md:px-4"
+            // 13 px from md, as the section tabs; 12 under the icons of the bar at the foot (the consultant, LC111).
+            tabClassName="whitespace-nowrap md:px-4 md:text-[13px]"
             links={VIEWS.map((view) => ({
               to: view.to,
               icon: <view.icon size={20} strokeWidth={1.75} />,

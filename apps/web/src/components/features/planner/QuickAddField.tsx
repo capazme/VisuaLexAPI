@@ -8,7 +8,7 @@ import { taskService } from '../../../services/taskService';
 import type { TaskView } from '../../../types/tasks';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { Button } from '../../ui/Button';
-import { CARD_RADIUS, CONTROL_BORDER, CONTROL_RADIUS, FIELD_HELP } from '../../ui/controlStyles';
+import { CARD_RADIUS, CONTROL_BORDER, CONTROL_RADIUS, FIELD_HELP, FIELD_SURFACE } from '../../ui/controlStyles';
 import { belongsTo, draftProblem, emptyDraft, inputFromDraft, MAX_TITLE, type TaskDraft } from './taskDraft';
 import { PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
 import { draftWithLine, readQuickAddLine, suggestDossiers, type DossierName, type FoundPart } from './quickAddLine';
@@ -152,6 +152,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
     try {
       const created = await taskService.create(inputFromDraft(task, { withDossier: true, origin: dossierKind === 'studio' ? 'studio' : 'lavoro' }));
       setTitle('', 0);
+      // Back in the field, for the next task: the disabled button had dropped the focus on the body (LC111).
+      titleRef.current?.focus();
       plannerStore.getState().changed();
       if (!belongsTo(created, view, today, defaults.dossierId || undefined)) plannerStore.getState().notify('Compito aggiunto: non è in questa vista', 'info');
     } catch (failure) {
@@ -170,8 +172,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           setTitle('', 0);
         }
       }}
-      // A box that holds things: `Card`'s paper, corners and outline (LC110).
-      className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER)}
+      // A box that holds things, with `Card`'s corners and outline, on a field's ground: a field must look like a field (LC111).
+      className={cn(FIELD_SURFACE, CARD_RADIUS, CONTROL_BORDER)}
     >
       {/* The field keeps its hint whole — 12 em of its own text, «Aggiungi un compito» and its padding with some room,
           whatever the reader's text size (the field stays 16 px on a phone while the page's rem shrinks) — but never
