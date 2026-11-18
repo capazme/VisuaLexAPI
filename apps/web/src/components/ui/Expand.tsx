@@ -8,8 +8,10 @@ import { prefersReducedMotion } from '../../features/sections/sectionTransition'
 const REDUCED_FADE = { duration: 150, easing: 'linear' } as const;
 const canAnimate = () => typeof Element.prototype.animate === 'function';
 
-const FIELD = 'input:not([type="hidden"]), select, textarea, [contenteditable="true"]';
-const FOCUSABLE = `${FIELD}, button, a[href], [tabindex]:not([tabindex="-1"])`;
+// Clipped only while its height moves, and on the height alone (`clip`, no scroll container): at rest nothing is cut, a
+// focus ring at its edges, a sticky toolbar inside it, a gloss's margin at the side.
+const clip = (el: HTMLElement) => el.style.setProperty('overflow-y', 'clip');
+const unclip = (el: HTMLElement) => el.style.removeProperty('overflow-y');
 
 export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'> {
   /** For the command's `aria-controls`; the command itself carries `aria-expanded={open}`. */
@@ -17,8 +19,10 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
   open: boolean;
   /** Esc inside it. */
   onClose?: () => void;
-  /** What takes the focus on opening; else its first field, else its first focusable. */
+  /** What takes the focus on opening, never a text, number or date field (LC105); else the space itself. */
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /** Closed, its content stays drawn, `hidden`: what it reads is read once, before the first opening (LC105). */
+  keepMounted?: boolean;
   children: ReactNode;
 }
 
@@ -28,9 +32,11 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
  * (`ISLAND_OPEN`, 280 ms on the drawer's curve), closing the island's other (`ISLAND_CLOSE`, 220 ms ease-out); a change
  * of mind halfway turns back from where the height and the fade are. Under reduced motion only the fade remains.
  *
- * On opening the focus goes to its first field; on closing it goes back to what opened it. Esc inside closes it.
+ * On opening the focus goes to the space itself (`tabIndex={-1}`), or to `initialFocusRef`: never by itself into a
+ * field, whose keyboard would rise over the page on a phone (LC105). On closing it goes back to what opened it. Esc
+ * inside closes it.
  */
-export function Expand({ id, open, onClose, initialFocusRef, className, children, onKeyDown, ...rest }: ExpandProps) {
+export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, className, children, onKeyDown, ...rest }: ExpandProps) {
   // Still drawn while it closes; derived during render where no animation will run (react-hooks/set-state-in-effect).
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
@@ -54,8 +60,8 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     if (open && !initial) {
       const active = document.activeElement;
       if (!(outer?.contains(active))) openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
-      const target = initialFocusRef?.current ?? inner?.querySelector<HTMLElement>(FIELD) ?? inner?.querySelector<HTMLElement>(FOCUSABLE);
-      // The page does not jump to a field that is still a line high.
+      const target = initialFocusRef?.current ?? outer;
+      // The page does not jump to a space that is still a line high.
       target?.focus({ preventScroll: true });
     } else if (!open) {
       const active = document.activeElement;
@@ -70,6 +76,8 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
       if (open && !initial) reveal();
       return;
     }
+    // Closed already (kept mounted and hidden, the effect run again by StrictMode): there is nothing to close.
+    if (!open && outer.hidden) return;
     // Where the last movement is now, read before it is cancelled: the new one starts there.
     const moving = running.current.length > 0;
     const fromHeight = moving ? outer.getBoundingClientRect().height : open ? 0 : outer.offsetHeight;
@@ -78,6 +86,7 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     running.current = [];
     // A height a growth held (below) gives way to this movement, read above.
     outer.style.removeProperty('height');
+    clip(outer);
     if (open) reveal();
 
     // Under reduced motion the closing is the app's own fade (`index.css`: 150 ms): the island's 220 ms ease-out had the
@@ -98,7 +107,9 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     const last = anims[anims.length - 1];
     last.onfinish = () => {
       if (running.current !== anims) return;
-      running.current = [];
+      // Kept mounted, the closing's fill holds the space at no height until the next opening starts from it and cancels it.
+      if (open || !keepMounted) running.current = [];
+      if (open) unclip(outer);
       if (!open) setMounted(false);
     };
     // `initialFocusRef` is a ref: reading it at the change is enough.
@@ -128,12 +139,16 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
       // An animation started here applies from the next frame: this frame, already styled, would be painted at the new
       // height. The space is held where it was until the animation takes over.
       outer.style.height = `${from}px`;
+      clip(outer);
       const grow = outer.animate([{ height: `${from}px` }, { height: `${next}px` }], ISLAND_OPEN);
       heightAnim.current = grow;
       const anims = [...running.current.filter((a) => a !== replaced), grow];
       running.current = anims;
       grow.onfinish = () => {
-        if (heightAnim.current === grow) outer.style.removeProperty('height');
+        if (heightAnim.current === grow) {
+          outer.style.removeProperty('height');
+          unclip(outer);
+        }
         if (running.current === anims) running.current = [];
       };
     });
@@ -141,7 +156,7 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     return () => observer.disconnect();
   }, [open]);
 
-  if (!mounted) return null;
+  if (!mounted && !keepMounted) return null;
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
@@ -156,14 +171,16 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
 
   return (
     <div
+      tabIndex={-1}
       {...rest}
       ref={outerRef}
       id={id}
       // Closing, it is going: no longer read, no longer reached.
       inert={!open}
       aria-hidden={open ? undefined : true}
+      hidden={!mounted}
       onKeyDown={handleKeyDown}
-      className={cn('overflow-hidden', className)}
+      className={cn('focus:outline-none', className)}
     >
       <div ref={innerRef}>{children}</div>
     </div>

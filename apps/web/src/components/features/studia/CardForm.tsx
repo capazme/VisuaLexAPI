@@ -3,8 +3,9 @@ import { X } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { Input } from '../../ui/Input';
+import { Textarea } from '../../ui/Textarea';
 import { FIELD_LABEL as LABEL } from '../../ui/controlStyles';
-import { SegmentedControl } from '../../ui/SegmentedControl';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { studiaService } from '../../../services/studiaService';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { cn } from '../../../lib/utils';
@@ -115,39 +116,18 @@ interface TextareaFieldProps {
 
 function TextareaField({ id, label, value, onChange, limit, rows, error, inputRef }: TextareaFieldProps) {
   const left = countdown(value.trim().length, limit);
-  const messageId = `${id}-message`;
   return (
-    <div className="space-y-1.5 w-full">
-      <label htmlFor={id} className={LABEL}>{label}</label>
-      <textarea
-        id={id}
-        ref={inputRef}
-        rows={rows}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error || left ? messageId : undefined}
-        className={cn(
-          'w-full px-4 py-2.5 border rounded-lg resize-y text-sm leading-relaxed outline-none',
-          'text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400',
-          'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700',
-          'transition-colors duration-200',
-          'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50 focus:border-primary-500',
-          error && 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10',
-        )}
-      />
-      {(error || left) && (
-        <p
-          id={messageId}
-          className={cn(
-            'text-xs ml-1',
-            error || value.trim().length > limit ? 'text-red-500 dark:text-red-400 font-medium' : 'text-slate-500 dark:text-slate-400',
-          )}
-        >
-          {error ?? left}
-        </p>
-      )}
-    </div>
+    <Textarea
+      id={id}
+      ref={inputRef}
+      label={label}
+      rows={rows}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      error={error}
+      helperText={left ?? undefined}
+      warning={value.trim().length > limit}
+    />
   );
 }
 
@@ -382,14 +362,13 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
         <div className="space-y-1.5 w-full">
           <span id={fieldId('tipo')} className={LABEL}>Tipo di scheda</span>
           {desktop ? (
-            <div role="group" aria-labelledby={fieldId('tipo')}>
-              <SegmentedControl
-                layoutId="studia-card-kind"
-                options={(Object.keys(TIPO_LABEL) as TipoScheda[]).map((value) => ({ value, label: TIPO_LABEL[value] }))}
-                value={tipo}
-                onChange={(value) => setTipo(value as TipoScheda)}
-              />
-            </div>
+            <SegmentedTabs
+              label="Tipo di scheda"
+              tabs={(Object.keys(TIPO_LABEL) as TipoScheda[]).map((id) => ({ id, label: TIPO_LABEL[id] }))}
+              value={tipo}
+              onChange={setTipo}
+              tabClassName="flex-1 px-3"
+            />
           ) : (
             <Select
               aria-labelledby={fieldId('tipo')}

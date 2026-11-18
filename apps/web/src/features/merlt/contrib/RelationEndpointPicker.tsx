@@ -1,6 +1,6 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { BookOpen, Link2, Network, X } from 'lucide-react';
-import { SegmentedControl } from '../../../components/ui/SegmentedControl';
+import { SegmentedTabs } from '../../../components/ui/SegmentedTabs';
 import { NormaPicker } from './NormaPicker';
 import { EntitySearchPicker } from './EntitySearchPicker';
 import { isNormReference, isResolvedRelationEndpoint } from './relationEndpoints';
@@ -41,7 +41,6 @@ export function RelationEndpointPicker({
   promotedEntities,
 }: RelationEndpointPickerProps) {
   const labels = END_LABELS[end];
-  const layoutId = `relation-endpoint-${useId()}`;
   const [mode, setMode] = useState<Mode>('grafo');
   const [normaError, setNormaError] = useState(false);
   const activeMode: Mode = mode === 'proposta' && promotedEntities.length === 0 ? 'grafo' : mode;
@@ -74,10 +73,10 @@ export function RelationEndpointPicker({
     );
   }
 
-  const options = [
-    { value: 'grafo', label: 'Nel grafo' },
-    { value: 'norma', label: 'Norma' },
-    ...(promotedEntities.length > 0 ? [{ value: 'proposta', label: 'Proposta promossa' }] : []),
+  const options: Array<{ id: Mode; label: string }> = [
+    { id: 'grafo', label: 'Nel grafo' },
+    { id: 'norma', label: 'Norma' },
+    ...(promotedEntities.length > 0 ? [{ id: 'proposta' as const, label: 'Proposta promossa' }] : []),
   ];
 
   return (
@@ -86,14 +85,13 @@ export function RelationEndpointPicker({
         <span className="font-medium">{labels.title}:</span> «{rawText || 'non indicata'}». Non è ancora
         collegata al grafo: scegli a cosa si riferisce.
       </p>
-      <SegmentedControl
-        size="sm"
-        variant="outline"
-        layoutId={layoutId}
-        options={options}
+      <SegmentedTabs
+        label={labels.title}
+        tabs={options}
         value={activeMode}
+        tabClassName="flex-1 px-2.5"
         onChange={(next) => {
-          setMode(next as Mode);
+          setMode(next);
           setNormaError(false);
         }}
       />

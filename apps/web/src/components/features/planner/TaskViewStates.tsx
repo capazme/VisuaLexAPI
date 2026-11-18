@@ -1,6 +1,7 @@
 import { cn } from '../../../lib/utils';
 import { SECONDARY_BUTTON } from '../studia/progress/tokens';
 import { Illustration, type IllustrationName } from '../../ui/Illustration';
+import { Skeleton } from '../../ui/Skeleton';
 
 const MUTED_TEXT = 'text-slate-600 dark:text-slate-400';
 
@@ -10,10 +11,10 @@ export function TaskListSkeleton({ rows = 3 }: { rows?: number }) {
     <div aria-hidden className="grid gap-2">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-start gap-3 rounded-xl px-2 py-3">
-          <span className="mt-0.5 h-5 w-5 shrink-0 rounded-md bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800" />
+          <Skeleton className="mt-0.5 h-5 w-5 shrink-0 rounded-md" />
           <span className="grid flex-1 gap-2">
-            <span className="h-4 w-2/3 rounded bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800" />
-            <span className="h-3 w-1/3 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800/60" />
+            <Skeleton variant="text" className="w-2/3" />
+            <Skeleton variant="text" className="h-3 w-1/3" />
           </span>
         </div>
       ))}

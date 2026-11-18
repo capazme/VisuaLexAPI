@@ -16,8 +16,9 @@ import { SubjectChips } from './SubjectChips';
 import { SubjectProgress } from './SubjectProgress';
 import { BLOCK_HEADING, MUTED_TEXT, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
 import { useProgress } from './useProgress';
+import { Arrive } from '../../../ui/Arrive';
+import { Skeleton } from '../../../ui/Skeleton';
 
-const PULSE = 'rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800';
 const UNREAD = 'I numeri tornano appena riesco a leggerli.';
 
 interface BlockProps {
@@ -69,9 +70,9 @@ function Summary({ data }: { data: Progressi }) {
 function SummarySkeleton() {
   return (
     <div aria-hidden className="flex flex-wrap items-center gap-x-10 gap-y-5">
-      <div className={cn(PULSE, 'h-10 w-40')} />
-      <div className={cn(PULSE, 'h-10 w-24')} />
-      <div className={cn(PULSE, 'h-[4.5rem] w-full lg:max-w-md')} />
+      <Skeleton className="h-10 w-40" />
+      <Skeleton className="h-10 w-24" />
+      <Skeleton className="h-[4.5rem] w-full lg:max-w-md" />
     </div>
   );
 }
@@ -139,7 +140,10 @@ export function ProgressPage() {
       {!nothing && (
         <>
           <section aria-label="Riepilogo" aria-busy={dayBusy} className={cn(TILE, 'p-4 md:p-6 transition-opacity', dayBusy && day.data !== null && 'opacity-60')}>
-            {day.data ? <Summary data={day.data} /> : <SummarySkeleton />}
+            {/* The day's numbers come in once read (LC98). */}
+            <Arrive loading={day.data === null} placeholder={<SummarySkeleton />}>
+              {day.data && <Summary data={day.data} />}
+            </Arrive>
           </section>
 
           <div className="grid gap-2">
@@ -187,7 +191,7 @@ export function ProgressPage() {
             ) : (
               <div aria-hidden className={cn('grid gap-2', CARD_GRID_COLUMNS)}>
                 {[0, 1, 2, 3, 4].map((n) => (
-                  <div key={n} className={cn(PULSE, 'h-28 rounded-xl')} />
+                  <Skeleton key={n} className="h-28 rounded-xl" />
                 ))}
               </div>
             )}

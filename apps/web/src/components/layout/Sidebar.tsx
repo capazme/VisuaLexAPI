@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { IslandSurface } from '../ui/IslandSurface';
+import { MenuSurface } from '../ui/MenuSurface';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, Bug, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, EyeOff, type LucideIcon } from 'lucide-react';
@@ -19,7 +19,8 @@ import { ServiceHealthDot, ServiceHealthMenuEntry } from '../ui/ServiceHealthMen
 import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { Z_INDEX } from '../../constants/zIndex';
 import { preparePage } from '../../pageCode';
-import { spring } from '../../lib/motion';
+import { focusLanding } from '../../utils/focusPage';
+import { dur, ease, spring } from '../../lib/motion';
 import { BookMark } from '../ui/BookMark';
 import { LexCraftLogo } from '../ui/LexCraftLogo';
 import type { SidebarLayout } from './sidebarWidth';
@@ -134,7 +135,7 @@ function SidebarTooltip({ anchor, label, hint, onDismiss }: { anchor: HTMLElemen
       initial={{ opacity: 0, x: -8, scale: 0.95 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: -8, scale: 0.95 }}
-      transition={{ duration: 0.15 }}
+      transition={{ duration: dur.pop, ease: ease.out }}
       aria-hidden
       data-sidebar-tooltip
       style={{ left: rect.right + 12, top: rect.top + rect.height / 2, translateY: '-50%' }}
@@ -209,7 +210,7 @@ function NavItem({ to, icon: Icon, label, shortLabel, onClick, id, badgeCount, b
       // hear «current page» twice (on `/work/prossimi`, here and on the planner's tab, #448).
       aria-current={pathname === to ? 'page' : isActive ? 'true' : undefined}
       className={cn(
-        "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
+        "relative flex shrink-0 items-center rounded-xl transition-colors duration-(--dur-pop)",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
         // The icon keeps the same 44 px box in every layout, so widening the bar moves no icon. No `overflow-hidden`:
         // it clipped the active column, which sits left of the row; the words truncate on their own.
@@ -221,6 +222,9 @@ function NavItem({ to, icon: Icon, label, shortLabel, onClick, id, badgeCount, b
       onClick={() => {
         hide();
         onClick?.();
+        // From the phone's drawer (LC98): the focus goes to the title of the page reached, as on a computer, not to the
+        // menu button the closing drawer parks it on.
+        if (layout === 'drawer') focusLanding(to !== pathname);
       }}
       // With its words written, the row needs no label of its own.
       {...(words ? {} : handlers)}
@@ -232,12 +236,12 @@ function NavItem({ to, icon: Icon, label, shortLabel, onClick, id, badgeCount, b
       <>
           {/* A navigation entry is seen tens of times a day: its hover is the colour alone. The press is CSS: framer-motion's
               `whileTap` gave this box `tabindex="0"`, a second Tab stop in every entry (#448). */}
-          <div className={cn("grid shrink-0 place-items-center transition-transform duration-100 motion-safe:active:scale-95", words ? "h-5 w-5" : "h-11 w-11")}>
+          <div className={cn("grid shrink-0 place-items-center transition-transform duration-(--dur-press) motion-safe:active:scale-95", words ? "h-5 w-5" : "h-11 w-11")}>
             <Icon
               size={words ? 18 : 22}
               aria-hidden
               className={cn(
-                "transition-colors duration-200",
+                "transition-colors duration-(--dur-pop)",
                 words
                   ? cn("stroke-[1.5px]", isActive ? "text-slate-900 dark:text-slate-50" : "text-slate-600 dark:text-slate-400")
                   : isActive
@@ -323,7 +327,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
       }}
       {...(wide ? {} : handlers)}
       className={cn(
-        "flex shrink-0 items-center rounded-xl transition-colors duration-200",
+        "flex shrink-0 items-center rounded-xl transition-colors duration-(--dur-pop)",
         wide ? "h-9 rounded-lg pl-3 gap-3" : "h-11",
         SIDEBAR_TOGGLE_TEXT,
         "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
@@ -357,8 +361,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  // The button the menu grows from and goes back into (`IslandSurface`, LC85), taken as it opens.
-  const [menuFrom, setMenuFrom] = useState<HTMLElement | null>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0, maxHeight: 0 });
 
   const logoReduce = useReducedMotion();
@@ -404,7 +406,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const openMenu = (at: 'first' | 'last') => {
     placeMenu();
     setOpenAt(at);
-    setMenuFrom(userButtonRef.current);
     setShowUserMenu(true);
   };
   const closeMenu = (returnFocus: boolean) => {
@@ -470,7 +471,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         "bg-slate-100 dark:bg-slate-950",
         "border-r border-slate-200 dark:border-slate-800",
         // Mobile slide
-        "transform transition-transform duration-300 ease-smooth-out",
+        "transform transition-transform duration-(--dur-scene) ease-drawer",
         // `relative`, not `static`: the transform makes this aside a stacking
         // context, so anything inside it (hover tooltips) is trapped at the
         // aside's own level. Static would leave z-50 inert and page content
@@ -504,8 +505,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 className="grid place-items-center"
                 initial={logoReduce ? false : { opacity: 0, scaleY: 0.7 }}
                 animate={{ opacity: 1, scaleY: 1 }}
-                exit={logoReduce ? undefined : { opacity: 0, transition: { duration: 0.08 } }}
-                transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+                exit={logoReduce ? undefined : { opacity: 0, transition: { duration: dur.press } }}
+                transition={{ duration: dur.panel, ease: ease.out }}
               >
                 <BookMark size={32} />
               </motion.span>
@@ -517,7 +518,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 initial={logoReduce ? false : { opacity: 0, scaleX: 0.08 }}
                 animate={{ opacity: 1, scaleX: 1 }}
                 exit={logoReduce ? undefined : { opacity: 0, scaleX: 0.08 }}
-                transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+                transition={{ duration: dur.panel, ease: ease.out }}
               >
                 <LexCraftLogo motion={logoSweep ? 'sweep' : 'still'} className="h-auto w-[150px]" />
               </motion.span>
@@ -631,7 +632,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
           onKeyDown={onTriggerKeyDown}
           className={cn(
-            "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
+            "relative flex shrink-0 items-center rounded-xl transition-colors duration-(--dur-pop)",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
             // The avatar is 36 px below `md` and 32 px from it: inset as in the rail, so widening moves it not.
             words ? cn("w-full gap-2.5 overflow-hidden px-2 text-left", layout === 'drawer' ? "h-11" : "h-10") : "justify-center w-11 h-11",
@@ -674,7 +675,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               openSettings();
             }}
             className={cn(
-              "flex min-w-0 flex-1 items-center gap-3 rounded-lg pl-3 text-left transition-colors duration-200",
+              "flex min-w-0 flex-1 items-center gap-3 rounded-lg pl-3 text-left transition-colors duration-(--dur-pop)",
               layout === 'drawer' ? "h-11" : "h-9",
               SIDEBAR_TOGGLE_TEXT,
               "hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
@@ -695,7 +696,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               aria-label="Segnala un problema"
               title="Segnala un problema"
               className={cn(
-                "grid shrink-0 place-items-center rounded-lg transition-colors duration-200",
+                "grid shrink-0 place-items-center rounded-lg transition-colors duration-(--dur-pop)",
                 layout === 'drawer' ? "h-11 w-11" : "h-9 w-9",
                 SIDEBAR_TOGGLE_TEXT,
                 "hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
@@ -719,20 +720,18 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 onClick={() => closeMenu(false)}
               />
             )}
-            {/* Menu popup: it grows out of the user button and goes back into it (LC85). */}
+            {/* Menu popup: it appears over the user button by a fade and a 4 px shift (`MenuSurface`, LC102). */}
             <AnimatePresence>
             {showUserMenu && (
-            <IslandSurface
+            <MenuSurface
               key="user-menu"
               ref={menuRef}
-              source={menuFrom}
+              above
               role="menu"
               aria-label="Menu utente"
               onKeyDown={onMenuKeyDown}
               style={{ bottom: menuPosition.bottom, left: menuPosition.left, maxHeight: menuPosition.maxHeight > 0 ? menuPosition.maxHeight : undefined }}
-              className={cn("fixed flex w-56 flex-col", Z_INDEX.menuPanel)}
-              surfaceClassName="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700"
-              contentClassName="relative min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl py-2"
+              className={cn("fixed w-56 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-2 shadow-md dark:border-slate-700 dark:bg-slate-800", Z_INDEX.menuPanel)}
             >
               {/* User Info */}
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
@@ -816,7 +815,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   Esci
                 </button>
               </div>
-            </IslandSurface>
+            </MenuSurface>
             )}
             </AnimatePresence>
           </>,

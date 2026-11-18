@@ -5,9 +5,9 @@ API Key Authentication Middleware
 Provides FastAPI dependencies for API key verification and role-based access.
 
 Dependencies:
-- verify_api_key: Validates X-API-Key header, checks active/expired, updates last_used_at
+- verify_api_key: Validates X-API-Key header, checks active/expired, updates last_used_at.
+  merlt.app puts it on every router: no route but /health and / answers without a key.
 - require_role: Factory for role-based authorization (403 if insufficient)
-- optional_api_key: Returns ApiKey or None for public endpoints
 
 Usage:
     from merlt.api.auth import verify_api_key, require_role
@@ -23,8 +23,7 @@ Usage:
 
 import hashlib
 import structlog
-import jwt as pyjwt
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Union
 
 from fastapi import Depends, Header, HTTPException
@@ -37,13 +36,18 @@ from merlt.rlcf.database import get_async_session_dep
 log = structlog.get_logger()
 
 
+# How often a key's last_used_at is written: every route checks the key, so writing it on each
+# request would be one UPDATE per tracking event or graph read.
+LAST_USED_EVERY = timedelta(minutes=5)
+
+
 def hash_api_key(key: str) -> str:
     """Compute SHA-256 hex digest of an API key."""
     return hashlib.sha256(key.encode()).hexdigest()
 
 
 async def verify_api_key(
-    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     session: AsyncSession = Depends(get_async_session_dep),
 ) -> ApiKey:
     """
@@ -54,11 +58,14 @@ async def verify_api_key(
     2. Key is active
     3. Key is not expired
 
-    Updates last_used_at on success.
+    Updates last_used_at on success, at most every five minutes.
 
     Raises:
-        HTTPException 401: Invalid, inactive, or expired key
+        HTTPException 401: Missing, invalid, inactive, or expired key
     """
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key required")
+
     key_hash = hash_api_key(x_api_key)
 
     result = await session.execute(
@@ -75,8 +82,13 @@ async def verify_api_key(
     if api_key.is_expired():
         raise HTTPException(status_code=401, detail="API key has expired")
 
-    # Update last_used_at
-    api_key.last_used_at = datetime.utcnow()
+    # Update last_used_at, at most every LAST_USED_EVERY. The commit runs either way: it ends
+    # the lookup's transaction, so the connection goes back to the pool at once instead of
+    # staying idle in a transaction for the whole request (with nothing changed it writes
+    # nothing; the sessions keep their objects on commit).
+    now = datetime.utcnow()
+    if api_key.last_used_at is None or now - api_key.last_used_at >= LAST_USED_EVERY:
+        api_key.last_used_at = now
     await session.commit()
 
     return api_key
@@ -113,50 +125,3 @@ def require_role(roles: Union[str, list]) -> object:
         return api_key
 
     return _check_role
-
-
-async def get_current_user_id(
-    authorization: Optional[str] = Header(None, alias="Authorization"),
-) -> Optional[str]:
-    """Extract user_id from JWT Bearer token. Returns None if no/invalid token."""
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    token = authorization[7:]
-    try:
-        payload = pyjwt.decode(
-            token,
-            options={"verify_signature": False, "verify_exp": False},
-            algorithms=["HS256"],
-        )
-        return payload.get("userId") or payload.get("user_id") or payload.get("sub")
-    except Exception:
-        return None
-
-
-async def optional_api_key(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    session: AsyncSession = Depends(get_async_session_dep),
-) -> Optional[ApiKey]:
-    """
-    Optional API key validation for public endpoints.
-
-    Returns ApiKey if a valid key is provided, None otherwise.
-    Does not raise on missing/invalid key.
-    """
-    if x_api_key is None:
-        return None
-
-    key_hash = hash_api_key(x_api_key)
-
-    result = await session.execute(
-        select(ApiKey).where(ApiKey.api_key_hash == key_hash)
-    )
-    api_key = result.scalar_one_or_none()
-
-    if api_key is None or not api_key.is_active or api_key.is_expired():
-        return None
-
-    api_key.last_used_at = datetime.utcnow()
-    await session.commit()
-
-    return api_key

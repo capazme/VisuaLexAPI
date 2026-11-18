@@ -263,11 +263,11 @@ export function PracticeRowShell({
       )}
       {dossier ? (
         // A dossier's «Fonti» (LC86, L-73): the row opens in place, the space growing under its heading and pushing the
-        // rest down (`Expand`, the island's times). The focus stays where it was; no Esc, which is the reader's. Clipped
-        // on the height alone, and with `clip`, not `hidden`: the reader's toolbar keeps sticking to the page's
-        // scroller and the glosses' margin is not cut at the side. Brought into view on opening, it keeps the row's heading
-        // (its 44 px, the command that closes it) clear under the act's sticky head.
-        <Expand open={isOpen} initialFocusRef={focusWhereItIs} className="scroll-mt-[calc(var(--practice-head,0px)+3rem)] overflow-x-visible overflow-y-clip">
+        // rest down (`Expand`, the island's times). The focus stays where it was; no Esc, which is the reader's. `Expand`
+        // clips only the height and only while it moves, so the reader's toolbar keeps sticking to the page's scroller
+        // and the glosses' margin is not cut at the side. Brought into view on opening, it keeps the row's heading (its
+        // 44 px, the command that closes it) clear under the act's sticky head.
+        <Expand open={isOpen} initialFocusRef={focusWhereItIs} className="scroll-mt-[calc(var(--practice-head,0px)+3rem)]">
           <div id={regionId} className="pb-3 pt-1 md:pl-6 md:pr-2" style={regionStyle}>
             {children}
           </div>

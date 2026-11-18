@@ -4,8 +4,11 @@ API Keys Management Router
 
 CRUD endpoints for API key management (FR45).
 
+No route hands out a key: the one key that opens MERL-T is seeded at boot from
+MERLT_ADMIN_API_KEY (api_key_seed.py), which also deactivates every other active key,
+so a key created here lasts until the next boot.
+
 Endpoints:
-- POST /api-keys/bootstrap: Create first admin key (no auth, only if table empty)
 - POST /api-keys/: Create new key (admin only)
 - GET /api-keys/: List all keys (admin only)
 - GET /api-keys/{key_id}: Get key details (admin only)
@@ -25,7 +28,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from merlt.experts.models import ApiKey
@@ -110,54 +113,6 @@ def _key_to_info(key: ApiKey) -> ApiKeyInfo:
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
-
-@router.post("/bootstrap", response_model=CreateApiKeyResponse)
-async def bootstrap_admin_key(
-    session: AsyncSession = Depends(get_async_session_dep),
-):
-    """
-    Create the first admin API key.
-
-    Only works if the api_keys table is empty (chicken-and-egg bootstrap).
-    Returns the raw key once — store it securely.
-    """
-    result = await session.execute(select(func.count()).select_from(ApiKey))
-    count = result.scalar_one()
-
-    if count > 0:
-        raise HTTPException(
-            status_code=409,
-            detail="API keys already exist. Use POST /api-keys/ with an admin key.",
-        )
-
-    raw_key = "merlt_" + secrets.token_hex(24)
-    key_id = f"key_{uuid4().hex[:12]}"
-    key_hash = hash_api_key(raw_key)
-
-    api_key = ApiKey(
-        key_id=key_id,
-        api_key_hash=key_hash,
-        role="admin",
-        rate_limit_tier="unlimited",
-        is_active=True,
-        user_id="bootstrap_admin",
-        description="Bootstrap admin key",
-    )
-    session.add(api_key)
-    await session.commit()
-
-    log.info("Bootstrap admin key created", key_id=key_id)
-
-    return CreateApiKeyResponse(
-        key_id=key_id,
-        raw_key=raw_key,
-        role="admin",
-        rate_limit_tier="unlimited",
-        user_id="bootstrap_admin",
-        description="Bootstrap admin key",
-        created_at=api_key.created_at,
-    )
-
 
 @router.post("/", response_model=CreateApiKeyResponse)
 async def create_api_key(

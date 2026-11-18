@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // ---- mocks (hoisted) ----
 const isMerltEnabledMock = vi.fn();
@@ -83,6 +83,34 @@ describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () =>
 });
 
 // The MERL-T entries are Academia's, a section offered only in the development mode (sections spec S6, S12).
+describe('Sidebar — the phone\'s drawer (LC98)', () => {
+  it('after an entry, puts the focus on the title of the page reached, as on a computer', async () => {
+    render(
+      <MemoryRouter initialEntries={['/work/scadenziario']}>
+        <main>
+          <Sidebar
+            theme="light"
+            toggleTheme={vi.fn()}
+            isOpen={true}
+            layout="drawer"
+            closeMobile={vi.fn()}
+            openSettings={vi.fn()}
+            openKeyboardShortcuts={vi.fn()}
+            serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }}
+          />
+          <Routes>
+            <Route path="/work/scadenziario" element={<h1 data-page-title="">Scadenze</h1>} />
+            {/* Another page, another element (as in the app): not the same h1 with new words. */}
+            <Route path="/pratiche" element={<section><h1 data-page-title="">Le pratiche</h1></section>} />
+          </Routes>
+        </main>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Pratiche' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Le pratiche' })).toHaveFocus());
+  });
+});
+
 describe('Sidebar navigation (MERL-T single entry)', () => {
   it('development mode on → Academia holds "Assistente" (hub) plus "Grafo" (the deliberation surface)', () => {
     // Slice 3 D1 had a single entry; Slice 4 Decision A (absorb) made /labs/grafo

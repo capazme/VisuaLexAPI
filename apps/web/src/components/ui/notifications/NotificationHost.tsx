@@ -5,7 +5,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { spring } from '../../../lib/motion';
 import { useWorkspaceCovered } from '../../../hooks/useWorkspaceCovered';
 import { NotificationCard } from './NotificationCard';
-import { footBarStore } from './footBar';
+import { FOOT_STACK_BOTTOM, footBarStore } from './footBar';
 import { stackRoomStore } from './stackRoom';
 import { isEditableTarget, isUndoCovered, isUndoShortcut, undoShortcutKeys, undoShortcutLabel } from './undoShortcut';
 import {
@@ -122,9 +122,7 @@ function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'b
         // On a phone the width less a 16 px gutter; from `md` at the right, as wide as a sentence, 32 px from the bottom.
         // A bar held at the foot of the window (`footBarStore`, its room there: «Sposta l'evidenziazione») keeps them over it.
         'absolute inset-x-4 md:inset-x-auto md:right-8 md:w-[26rem]',
-        position === 'bottom'
-          ? 'bottom-[calc(1rem+var(--foot-bar,0px))] md:bottom-[max(2rem,calc(1rem+var(--foot-bar,0px)))]'
-          : 'top-4',
+        position === 'bottom' ? FOOT_STACK_BOTTOM : 'top-4',
       )}
     >
       <LayoutGroup id={`notifications-${position}`}>

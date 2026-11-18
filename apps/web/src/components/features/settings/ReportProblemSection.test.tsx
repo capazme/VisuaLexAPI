@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReportProblemSection } from './ReportProblemSection';
 
@@ -40,9 +40,11 @@ describe('ReportProblemSection (LC92)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.change(screen.getByLabelText('Descrizione'), { target: { value: '  La ricerca non risponde  ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invia' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Grazie, la segnalazione è arrivata.');
+    const confirmation = await screen.findByRole('status');
+    expect(confirmation).toHaveTextContent('Grazie, la segnalazione è arrivata.');
     // The focus follows the flow: to the confirmation, then back to the text, never the body.
-    expect(screen.getByRole('status')).toHaveFocus();
+    // It comes in a passive effect, which may run after the confirmation is drawn (a busy machine): wait for it.
+    await waitFor(() => expect(confirmation).toHaveFocus());
     expect(submitFeedback).toHaveBeenCalledWith({ type: 'bug', message: 'La ricerca non risponde' });
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: "Scrivi un'altra segnalazione" }));

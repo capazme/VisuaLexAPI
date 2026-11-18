@@ -378,7 +378,7 @@ describe('CandidateCard', () => {
 
       // Target: the entity promoted a moment ago from the same document.
       const target = screen.getByTestId('endpoint-target-picker');
-      fireEvent.click(within(target).getByRole('tab', { name: /proposta promossa/i }));
+      fireEvent.click(within(target).getByRole('radio', { name: /proposta promossa/i }));
       fireEvent.click(within(target).getByRole('button', { name: /risoluzione del contratto/i }));
       expect(screen.getByTestId('endpoint-target-selected')).toHaveTextContent('Risoluzione del contratto');
 
@@ -401,7 +401,7 @@ describe('CandidateCard', () => {
     it('resolves an end to a norm through the NL norma picker', async () => {
       render(<CandidateCard candidate={unresolved} articleUrn="" onPromoted={() => {}} />);
       const source = screen.getByTestId('endpoint-source-picker');
-      fireEvent.click(within(source).getByRole('tab', { name: /^norma$/i }));
+      fireEvent.click(within(source).getByRole('radio', { name: /^norma$/i }));
       fireEvent.change(screen.getByLabelText(/norma di origine/i), {
         target: { value: 'urn:nir:stato:regio.decreto:1942-03-16;262~art1453' },
       });

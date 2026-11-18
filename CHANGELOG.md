@@ -12,6 +12,70 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-11-18
+
+The «⋯» menus fade in under their trigger, as Luca chose (variant A), across the app. Web only, no migration.
+
+### Interface
+
+- The «⋯» menus fade in under the button that opens them (LC102, variant A).
+- The «⋯» of Cronologia and Forum use the same menu; no «⋯» opens an empty menu (LC103).
+
+## [1.40.0] - 2026-11-18
+
+Loading and a change of view with one movement, «Novità» with the rule of the notifications, steadier tests,
+and MERL-T behind its key on every route. No migration. MERL-T stays off.
+
+### Interface
+
+- Loading and a change of view move with one movement in Pratiche, Learn and Opus (LC98, alignment 4 of 14).
+- «Novità» stands above the bottom bar and follows the same rule as the notifications (LC101).
+
+### MERL-T
+
+- Every route needs the key, except /health and /; no key route, no websocket, no API pages in production
+  (#623). MERL-T stays off until G-575.
+
+### Tests
+
+- Two flaky focus tests made steady, ReportProblemSection and MyCardsView (LC100).
+
+## [1.39.0] - 2026-11-18
+
+EU acts before 2015 cited in the Official Journal's form, the first shared components of the interface
+alignment, and a round of security and clean-up on the server, the Python API and MERL-T. No migration.
+MERL-T stays off.
+
+### Sources
+
+- EU acts before 2015 are cited as the Official Journal numbered them, «dir. 95/46/CE»,
+  «reg. (CE) n. 1907/2006», in the web, the server and the API (G-540, #581, #617).
+
+### Interface
+
+- Shared components with one language, the first of the alignment's fourteen parts (LC97).
+
+### Server
+
+- Failed password checks count per account too, from any address, and a wrong password at password change or
+  account deletion counts as a failed attempt (#620, #602).
+- «Togli i miei contributi»: one call that removes what a person wrote for others (G-558, #601); an author
+  removes a validated card, a validator erases a vote's reason (G-556, G-557, #600).
+- The server survives an error nobody caught; free-text fields have a length limit (#598).
+- A Forum suggestion item is taken, declined or revoked once (#609).
+
+### Python API
+
+- At most two browsers at once for EUR-Lex; the rest wait, then retry (#596).
+- Every redirect the scrapers follow is checked against the allow-list first (#610).
+- The old global /history and /dossiers, the unused twin server and the code nothing called are gone
+  (#611, #612, #618, #621).
+
+### MERL-T
+
+- Every call to a language model refuses providers that keep or train on the text (#622); a key MERL-T refuses
+  is the server's 503, never the user's 401 (#624). MERL-T stays off until G-575.
+
 ## [1.38.0] - 2026-11-18
 
 The search island in the flow, glosses at the height of their words, Amministrazione as a page inside the
