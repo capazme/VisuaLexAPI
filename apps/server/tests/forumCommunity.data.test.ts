@@ -164,7 +164,7 @@ describe('the Community’s data', () => {
 
       expect(await sweepCommunity(now)).toEqual({
         reportCopies: 2, notifications: 1, profileReportDetails: 0, reportDetails: 0, profileReportNotes: 0,
-        moderationReasons: 0,
+        moderationReasons: 0, moderationTargets: 0,
       });
 
       const copy = async (id: string) => (await prisma.articleThreadReport.findUniqueOrThrow({ where: { id } })).reportedText;
