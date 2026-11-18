@@ -27,7 +27,7 @@ in a pull request of its own, outside this plan (G-540).
 **Status (18 November 2026):**
 - **Merged into `develop`:** PR 1a (#577), PR 2 (#578), PR 1b (#579) and PR 3 (#580). Tasks 1–11 are done.
 - **Waiting for the web owner's plan:** PR 4a and 4b (Tasks 12–18).
-- **G-540, #581, open:** it merges after the web owner's PR on `normLabels.ts`. Whichever of #581 and that PR merges second gives the golden case `eprivacy-cons-2` its labels.
+- **G-540:** the web owner's `normLabels.ts` (#617) is merged; #581 carries the API, server and MERL-T side, and gives the golden case `eprivacy-cons-2` its labels, since it merges after PR 1b.
 
 ## Global Constraints
 

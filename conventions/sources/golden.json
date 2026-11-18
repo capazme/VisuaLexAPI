@@ -402,10 +402,10 @@
     },
     {
       "id": "eprivacy-cons-2",
-      "note": "A recital of a directive from before 2015: its identity only. Its labels borrow the act's citation, whose form for acts before 2015 is fixed by a pull request of its own (G-540); they go in with whichever of the two merges second.",
+      "note": "A recital of a directive from before 2015. Its labels borrow the act's citation in the form G-540 fixed for acts before 2015 (\"dir. 2002/58/CE\"), and went in with that pull request, the second of the two to merge.",
       "input": {"tipo_atto": "direttiva ue", "numero_atto": "58", "data": "2002", "considerando": "2"},
       "identity": {"act": {"value": "celex:32002L0058", "status": "current"}, "recital": {"value": "celex:32002L0058~rct2", "status": "proposed"}},
-      "labels": {}
+      "labels": {"citation": {"value": "considerando 2, dir. 2002/58/CE", "status": "proposed"}, "short": {"value": "considerando 2 dir. 2002/58/CE", "status": "proposed"}, "unit": {"value": "Considerando 2", "status": "proposed"}}
     }
   ],
   "decisions": [
