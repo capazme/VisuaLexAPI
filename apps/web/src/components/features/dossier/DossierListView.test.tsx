@@ -232,19 +232,20 @@ describe('DossierListView — the category menu (D1)', () => {
     expect(values()).toEqual(['', 'penale']);
   });
 
-  it('draws the category menu with the common `Select`, half the row on a phone (LC106)', () => {
+  it('draws the category menu with the common `Select`, beside the order while it fits (LC106)', () => {
     appStore.setState({ dossiers: listed });
     renderList();
     const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
     expect(menu).toHaveClass('appearance-none', 'rounded-md', 'min-h-11');
-    expect(menu.closest('.flex-1')).toHaveClass('min-w-0');
+    expect(menu.closest('.flex-1')).toHaveClass('min-w-[8rem]');
+    expect(menu.closest('.flex-wrap')).toContainElement(screen.getByRole('radiogroup', { name: 'Ordina le pratiche' }));
   });
 
   it('has no menu when no dossier has a category, and the order menu stays', () => {
     appStore.setState({ dossiers: [dossier([CIVIL])] });
     renderList();
     expect(screen.queryByRole('combobox', { name: 'Filtra per categoria' })).toBeNull();
-    expect(screen.getByRole('combobox', { name: 'Ordina le pratiche' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Ordina le pratiche' })).toBeInTheDocument();
   });
 
   it('shows «Tutte le categorie» again when the chosen category leaves the list', () => {
@@ -273,6 +274,50 @@ describe('DossierListView — the category menu (D1)', () => {
 });
 
 // On a phone the title keeps its row (M1): «⋯» with «Importa» and «Cestino», and «+» for a new dossier, beside it.
+// LC106 (Luca, 18-11): the order is a choice in a row, «Data · Nome · Elementi», not a menu saying «Ordina».
+describe('DossierListView — the order, a choice in a row', () => {
+  const at = (id: string, title: string, createdAt: string, items: number): Dossier => ({
+    ...dossier(Array.from({ length: items }, () => CIVIL)), id, title, createdAt,
+  });
+  const order = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+
+  it('is a radio group of three, the chosen one alone in the Tab order, with no «Ordina» in sight', () => {
+    appStore.setState({ dossiers: [at('a', 'Alfa', '2026-01-01T00:00:00Z', 1)] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const group = screen.getByRole('radiogroup', { name: 'Ordina le pratiche' });
+    expect(group).toHaveAttribute('id', 'tour-dossier-sort');
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map((r) => r.textContent)).toEqual(['Data', 'Nome', 'Elementi']);
+    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+    expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1]);
+    expect(screen.queryByText(/Ordina/)).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Ordina le pratiche' })).toBeNull();
+  });
+
+  it('reorders the list: by date, by name, by items, with the arrows as with a click', () => {
+    appStore.setState({
+      dossiers: [
+        at('a', 'Bravo', '2026-03-01T00:00:00Z', 1),
+        at('b', 'Charlie', '2026-01-01T00:00:00Z', 3),
+        at('c', 'Alfa', '2026-02-01T00:00:00Z', 2),
+      ],
+    });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(order()).toEqual(['Bravo', 'Alfa', 'Charlie']);
+    fireEvent.click(screen.getByRole('radio', { name: 'Nome' }));
+    expect(order()).toEqual(['Alfa', 'Bravo', 'Charlie']);
+    const name = screen.getByRole('radio', { name: 'Nome' });
+    name.focus();
+    fireEvent.keyDown(name, { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: 'Elementi' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Elementi' })).toHaveFocus();
+    expect(order()).toEqual(['Charlie', 'Alfa', 'Bravo']);
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Elementi' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: 'Data' })).toHaveAttribute('aria-checked', 'true');
+    expect(order()).toEqual(['Bravo', 'Alfa', 'Charlie']);
+  });
+});
+
 describe('DossierListView — the heading on a phone', () => {
   const page = (trashCount = 0, onOpenTrash = vi.fn()) => {
     appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });

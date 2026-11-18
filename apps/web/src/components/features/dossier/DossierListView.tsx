@@ -31,6 +31,7 @@ import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { Card } from '../../ui/Card';
 import { buttonClassName } from '../../ui/buttonStyles';
 import { FOCUS_RING } from '../studia/progress/tokens';
@@ -55,6 +56,12 @@ interface Props {
 }
 
 type SortBy = 'date' | 'name' | 'items';
+
+const SORT_CHOICES: { id: SortBy; label: string }[] = [
+  { id: 'date', label: 'Data' },
+  { id: 'name', label: 'Nome' },
+  { id: 'items', label: 'Elementi' },
+];
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
   const { dossiers, updateDossier, importDossier } = useAppStore();
@@ -301,21 +308,21 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             aria-keyshortcuts="/"
           />
         </div>
-        <div className="flex gap-3 md:gap-4">
-          <div className="min-w-0 flex-1 md:flex-none">
-            <Select
-              id="tour-dossier-sort"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
-              aria-label="Ordina le pratiche"
-            >
-              <option value="date">Ordina per data</option>
-              <option value="name">Ordina per nome</option>
-              <option value="items">Ordina per elementi</option>
-            </Select>
-          </div>
+        {/* The order as a choice in a row, its three words alone (Luca, 18-11: «Ordina» with its choices in a row), then
+            the category: one row on a phone while they fit, else the menu wraps under it, whole. */}
+        <div className="flex flex-wrap items-center gap-3 md:flex-nowrap md:gap-4">
+          <SegmentedTabs
+            id="tour-dossier-sort"
+            label="Ordina le pratiche"
+            tabs={SORT_CHOICES}
+            value={sortBy}
+            onChange={setSortBy}
+            className="shrink-0"
+            // Small: 44 px to the touch on a phone; from md the track as tall as the fields beside it (36 px).
+            tabClassName="min-h-11 px-3 text-xs md:min-h-7"
+          />
           {categories.length > 0 && (
-            <div className="min-w-0 flex-1 md:max-w-[16rem] md:flex-none">
+            <div className="min-w-[8rem] flex-1 md:max-w-[16rem] md:flex-none">
               <Select
                 id="tour-dossier-filters"
                 value={selectedCategory?.key ?? ''}
