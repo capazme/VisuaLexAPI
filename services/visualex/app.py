@@ -25,8 +25,6 @@ from visualex_api.tools.config import (
     FETCH_QUEUE_WORKERS,
     FETCH_QUEUE_DELAY,
 )
-from visualex_api.tools.history_manager import history_manager
-from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper, text_source_of
 from visualex_api.services.eurlex_scraper import EurlexScraper
@@ -297,12 +295,6 @@ else:
     ALLOWED_ORIGINS = _default_allowed_origins
 
 
-def add_to_history(data: dict):
-    """Aggiunge ricerca alla history con persistenza."""
-    if history_manager.add(data):
-        log.debug("Added to history", data=data)
-
-
 # Inizializzazione degli scraper
 normattiva_scraper = NormattivaScraper()
 eurlex_scraper = EurlexScraper()
@@ -500,7 +492,6 @@ class NormaController:
         if not data:
             return jsonify({'error': 'Request body required'}), 400
         log.info("Received data for stream_article_text", data=data)
-        add_to_history(data)
         # This is the endpoint the search box actually calls. Nothing caught the
         # exceptions raised while building the NormaVisitata list, so a rejected
         # article ("non presente in ...") or a missing act_type reached Quart's
@@ -700,20 +691,9 @@ class NormaController:
         # Internal: the server's POST /api/dossiers/:id/decisions only (design 2026-10-12 §2.1).
         # Not routed by the ingress (/parse_query* does not cover it) nor proxied by Vite.
         self.app.add_url_rule('/parse_decision', view_func=self.parse_decision, methods=['POST'])
-        self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
-        self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
-        self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
-        # Dossier endpoints
-        self.app.add_url_rule('/dossiers', view_func=self.get_dossiers, methods=['GET'])
-        self.app.add_url_rule('/dossiers', view_func=self.create_dossier, methods=['POST'])
-        self.app.add_url_rule('/dossiers/sync', view_func=self.sync_dossiers, methods=['PUT'])
-        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.get_dossier, methods=['GET'])
-        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.update_dossier, methods=['PUT'])
-        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.delete_dossier, methods=['DELETE'])
-        self.app.add_url_rule('/dossiers/<dossier_id>/items', view_func=self.add_dossier_item, methods=['POST'])
-        self.app.add_url_rule('/dossiers/<dossier_id>/items/<item_id>', view_func=self.remove_dossier_item, methods=['DELETE'])
-        self.app.add_url_rule('/dossiers/<dossier_id>/items/<item_id>/status', view_func=self.update_item_status, methods=['PUT'])
-        self.app.add_url_rule('/dossiers/import', view_func=self.import_dossier, methods=['POST'])
+        # No /history nor /dossiers here (item 15 of the security inventory): they were global, with no
+        # login, one search history and one set of dossiers for whoever reached the port; nothing called
+        # them. The history and the dossiers are the server's, per user (/api/history, /api/dossiers).
         self.app.add_url_rule('/export_pdf', view_func=self.export_pdf, methods=['POST'])
         self.app.add_url_rule('/health', view_func=self.health, methods=['GET'])
         self.app.add_url_rule('/health/detailed', view_func=self.health_detailed, methods=['GET'])
@@ -1765,7 +1745,6 @@ class NormaController:
             if not data:
                 return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_article_text", data=data)
-            add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
             upcoming_asked, until = _upcoming_of(data)
@@ -2256,7 +2235,6 @@ class NormaController:
             if not data:
                 return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_all_data", data=data)
-            add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
             upcoming_asked, until = _upcoming_of(data)
@@ -2303,156 +2281,6 @@ class NormaController:
             return jsonify(processed_results)
         except Exception as e:
             return self._error_response(e, 'fetch_all_data')
-
-    async def get_history(self):
-        try:
-            return jsonify({'history': history_manager.get_all()})
-        except Exception as e:
-            log.error("Error in get_history", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def clear_history(self):
-        """Svuota tutta la history."""
-        try:
-            history_manager.clear()
-            return jsonify({'success': True, 'message': 'History cleared'})
-        except Exception as e:
-            log.error("Error in clear_history", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def delete_history_item(self, timestamp):
-        """Elimina un singolo item dalla history."""
-        try:
-            success = history_manager.remove(timestamp)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Item not found'}), 404
-        except Exception as e:
-            log.error("Error in delete_history_item", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    # ==================== Dossier Endpoints ====================
-
-    async def get_dossiers(self):
-        """Restituisce tutti i dossier."""
-        try:
-            return jsonify({'dossiers': dossier_manager.get_all()})
-        except Exception as e:
-            log.error("Error in get_dossiers", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def get_dossier(self, dossier_id):
-        """Restituisce un dossier specifico."""
-        try:
-            dossier = dossier_manager.get_by_id(dossier_id)
-            if dossier:
-                return jsonify(dossier)
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in get_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def create_dossier(self):
-        """Crea un nuovo dossier."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            title = data.get('title', 'Nuovo Dossier')
-            description = data.get('description', '')
-            dossier = dossier_manager.create(title, description)
-            return jsonify(dossier), 201
-        except Exception as e:
-            log.error("Error in create_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def update_dossier(self, dossier_id):
-        """Aggiorna un dossier."""
-        try:
-            data = await request.get_json()
-            dossier = dossier_manager.update(dossier_id, data)
-            if dossier:
-                return jsonify(dossier)
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in update_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def delete_dossier(self, dossier_id):
-        """Elimina un dossier."""
-        try:
-            success = dossier_manager.delete(dossier_id)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in delete_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def add_dossier_item(self, dossier_id):
-        """Aggiunge un item a un dossier."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            item_data = data.get('data')
-            item_type = data.get('type', 'norma')
-            item = dossier_manager.add_item(dossier_id, item_data, item_type)
-            if item:
-                return jsonify(item), 201
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in add_dossier_item", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def remove_dossier_item(self, dossier_id, item_id):
-        """Rimuove un item da un dossier."""
-        try:
-            success = dossier_manager.remove_item(dossier_id, item_id)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Item not found'}), 404
-        except Exception as e:
-            log.error("Error in remove_dossier_item", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def update_item_status(self, dossier_id, item_id):
-        """Aggiorna lo status di un item."""
-        try:
-            data = await request.get_json()
-            status = data.get('status', 'unread')
-            success = dossier_manager.update_item_status(dossier_id, item_id, status)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Item not found'}), 404
-        except Exception as e:
-            log.error("Error in update_item_status", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def import_dossier(self):
-        """Importa un dossier (da share link)."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            dossier = dossier_manager.import_dossier(data)
-            return jsonify(dossier), 201
-        except Exception as e:
-            log.error("Error in import_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def sync_dossiers(self):
-        """Sincronizza tutti i dossier (sovrascrive dal frontend)."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            dossiers = data.get('dossiers', [])
-            dossier_manager.sync_all(dossiers)
-            return jsonify({'success': True, 'count': len(dossiers)})
-        except Exception as e:
-            log.error("Error in sync_dossiers", error=str(e))
-            return jsonify({'error': str(e)}), 500
 
     # ==================== Health Endpoints ====================
 
@@ -2695,7 +2523,11 @@ class NormaController:
 def main():
     controller = NormaController()
     app = controller.app
-    host = os.getenv('HOST', '0.0.0.0')
+    # Development only (production runs `hypercorn asgi:app` in its container): this machine alone by
+    # default, so a laptop on a café's network does not serve the API to the room. MERL-T's containers
+    # reach it from the Docker network, so `start.sh` passes HOST=0.0.0.0 when MERLT_ENABLED=true; by
+    # hand, `HOST=0.0.0.0 python app.py` gives the old behaviour.
+    host = os.getenv('HOST', '127.0.0.1')
     port = int(os.getenv('PORT', 5000))
     app.run(host=host, port=port)
 

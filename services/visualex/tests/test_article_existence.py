@@ -255,11 +255,6 @@ class TestHttpStatusAndBody:
     with a 500 HTML error page carrying no message whatsoever.
     """
 
-    @pytest.fixture(autouse=True)
-    def _no_history_writes(self):
-        with patch("app.add_to_history"):
-            yield
-
     @pytest.mark.asyncio
     @pytest.mark.parametrize("endpoint", [
         "/fetch_norma_data",

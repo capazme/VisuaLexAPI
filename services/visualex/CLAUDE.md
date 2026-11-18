@@ -558,7 +558,6 @@ POST unless noted, JSON bodies.
   October without the authority and with «:» and «;» read alike); a name over 150
   characters is a 400, never cut. The PDFs there older than two days are deleted on the
   six-hour sweep (`sweep_exported_pdfs`, top-level `.pdf` files only)
-- `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex's site and CELLAR **for
   real**, on the shared client, one request each and no browser. `services.eurlex` is
   `error` only when both EU hosts are down (the acts are read from either), and carries each
@@ -764,7 +763,7 @@ The manager owns the lifecycle; don't tear browsers down yourself.
 
 ## Environment Variables
 
-**Python API** — `HOST` (`0.0.0.0`), `PORT` (`5000`), `REDIS_ENABLED` (`false`;
+**Python API** — `HOST` (`127.0.0.1`: `python app.py` in development serves this machine alone; `start.sh` passes `0.0.0.0` when `MERLT_ENABLED=true`, since MERL-T's containers reach it from the Docker network; production runs `hypercorn asgi:app`, which binds inside its container), `PORT` (`5000`), `REDIS_ENABLED` (`false`;
 filesystem cache when off, warned at startup), `REDIS_URL`,
 `REDIS_CACHE_PREFIX` (`vlx`), `PERSISTENT_CACHE_TTL` (`86400`),
 `HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
@@ -803,8 +802,9 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
   their own. `python app.py` is still the development server.
 - **It mirrors the repository layout** (`/repo/services/visualex`, `/repo/version.txt`)
   because `/version` and the `data/` and `download/` paths are computed relative to the
-  source tree. `data/` (the search history and dossier file this service keeps) and
-  `download/` (the cache and the exported PDFs) are volumes.
+  source tree. `data/` (it held the global search history and dossier files, removed on
+  18 November 2026; nothing writes there now) and `download/` (the cache and the exported PDFs)
+  are volumes.
 - **Chromium runs as a normal user** with every capability dropped and no `--shm-size`.
   Measured: about 280 MiB idle, about 1.06 GiB and 195 processes with four PDF exports at
   once; Docker's default 64 MB `/dev/shm` is enough (Playwright's Chromium avoids it).
