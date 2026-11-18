@@ -522,6 +522,19 @@ describe('DocumentReviewPage — one recognizer with the search (design 2026-10-
     });
   });
 
+  it('says the batch\'s notice once, in the API\'s words, in the flow of the list (G-577)', async () => {
+    const NOTICE = 'Dal 1° gennaio 2027 si applica il testo unico delle imposte sui redditi (d.lgs. 19 giugno 2026, n. 117, allegato 1).';
+    server.readOnServer.mockImplementationOnce(async (queries: string[]) => {
+      const { answers, unanswered } = await answerAsRecorded(queries);
+      return { answers: new Map([...answers].map(([q, a]) => [q, (a as { recognized?: boolean }).recognized ? { ...a, notice: NOTICE } : a])), unanswered };
+    });
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, BRIEF, 'memoria.txt');
+    const lines = await screen.findAllByText(NOTICE);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].closest('aside')).toHaveAttribute('aria-labelledby', 'doc-citations');
+  });
+
   it('when the server is silent, keeps what the browser reads, says so, and asks again with «Riprova» for the rest only', async () => {
     server.readOnServer.mockImplementationOnce(async (queries: string[]) => ({ answers: new Map(), unanswered: queries }));
     const { container } = render(<DocumentReviewPage />);

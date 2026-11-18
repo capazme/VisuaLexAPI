@@ -148,6 +148,80 @@ describe('CommandPalette — the annex a citation names', () => {
   });
 });
 
+describe('CommandPalette — G-577: regional laws, dated names, ambiguous names', () => {
+  const answering = (payload: unknown) => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => payload })));
+  const REFUSAL = 'Le leggi regionali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla banca dati della Regione.';
+
+  it.each(['art. 1 l.r. 65/2014', 'art. 1 l. reg. 3/2015', 'art. 1 L. 65/2014 (Toscana)'])(
+    'refuses «%s» with the API\'s sentence, asks nothing and searches nothing', async (words) => {
+      const user = fakeTimeUser();
+      const onSearch = renderPalette();
+      await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), `${words}{Enter}`);
+      await settle();
+
+      expect(screen.getByText(REFUSAL, { selector: 'p:not([role="status"])' })).toBeInTheDocument();
+      expect(onSearch).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalledWith('/parse_query', expect.anything());
+      expect(screen.queryByText(/nelle sentenze della Cassazione/)).not.toBeInTheDocument();
+    });
+
+  it('says the server\'s refusal of a regional law the client did not see', async () => {
+    answering({ recognized: false, parsed: null, refusal: 'regional_law' });
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), 'art 1 statuto regionale');
+    await settle();
+
+    await waitFor(() => expect(screen.getByText(REFUSAL, { selector: 'p:not([role="status"])' })).toBeInTheDocument());
+  });
+
+  it('shows the notice of a dated name in the flow, under the reading', async () => {
+    const NOTICE = 'Dal 1° gennaio 2027 si applica il testo unico delle imposte sui redditi (d.lgs. 19 giugno 2026, n. 117, allegato 1).';
+    answering({ recognized: true, parsed: { act_type: 'decreto del presidente della repubblica', act_number: '917', date: '1986-12-22', article: '10' }, notice: NOTICE });
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), 'art. 10 tuir');
+    await settle();
+
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    const line = screen.getByText(NOTICE, { selector: 'p:not([role="status"])' });
+    expect(line.closest('[role="dialog"], [aria-modal="true"]')).toBeNull();
+  });
+
+  it('does not open a reading with a notice on an Enter typed before the answer: the line is read, a second Enter opens', async () => {
+    const NOTICE = 'Dal 1° gennaio 2027 si applica il testo unico delle imposte sui redditi (d.lgs. 19 giugno 2026, n. 117, allegato 1).';
+    answering({ recognized: true, parsed: { act_type: 'decreto del presidente della repubblica', act_number: '917', date: '1986-12-22', article: '10' }, notice: NOTICE });
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), 'art. 10 tuir{Enter}');
+    await settle();
+
+    await waitFor(() => expect(screen.getByText(NOTICE, { selector: 'p:not([role="status"])' })).toBeInTheDocument());
+    expect(onSearch).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_number: '917', article: '10' }));
+  });
+
+  it('offers the two acts of «art. 1 tua», and each opens as it is', async () => {
+    answering({
+      recognized: false, parsed: null, identifies_act: false,
+      ambiguous: [
+        { name: 'codice dell\'ambiente', parsed: { act_type: 'decreto legislativo', act_number: '152', date: '2006-04-03', article: '1' }, display: 'd.lgs. 3 aprile 2006, n. 152' },
+        { name: 'testo unico accise', parsed: { act_type: 'decreto legislativo', act_number: '504', date: '1995-10-26', article: '1' }, display: 'd.lgs. 26 ottobre 1995, n. 504' },
+      ],
+    });
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), 'art. 1 tua');
+    await settle();
+
+    await waitFor(() => expect(screen.getByText('art. 1, d.lgs. 3 aprile 2006, n. 152')).toBeInTheDocument());
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).not.toBeInTheDocument();
+    await user.click(screen.getByText('art. 1, d.lgs. 26 ottobre 1995, n. 504'));
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'decreto legislativo', act_number: '504', article: '1' }));
+  });
+});
+
 /**
  * The alias section used to be gated on `sortedAliases.length > 0`. That hid
  * the only route to the alias manager behind already owning an alias — the

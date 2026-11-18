@@ -597,3 +597,10 @@ describe('extractCitations — long runs in linear time', () => {
     expect(r.parsed).toMatchObject({ act_type: 'Regolamento UE', act_number: '679', date: '2016', article: '5' });
   });
 });
+
+describe('regional laws (G-577)', () => {
+  it('reads no regional law as the State law of that number', () => {
+    const text = "l'art. 3 L. 65/2014 (Toscana), l'art. 4 della legge 65/2014 della Regione Toscana, l'art. 1 l. reg. 3/2015 e l'art. 5 l. 241/1990";
+    expect(extractCitations(text).map((m) => m.text)).toEqual(['art. 5 l. 241/1990']);
+  });
+});

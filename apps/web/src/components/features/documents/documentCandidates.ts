@@ -23,6 +23,7 @@ import { CLIENT_ACT_NAMES, isSearchReady, toApiArticleNumber, type ParsedCitatio
 import { extractCitations, type CitationMatch } from '../../../utils/citationMatcher';
 import { EU_PAIR_SOURCE, buildEuHeadSource } from '../../../utils/euCitation';
 import { citationFromServer, readNormQuery, type ServerNormReading } from '../../../utils/normQuery';
+import { regionalLawSpans } from '../../../utils/regionalLaw';
 import { identifiesAct, isNumberedActType } from '../../../utils/sources/numberedActTypes';
 
 /** A query string is at most this long (the server's own limit); a longer span is not a candidate. */
@@ -760,10 +761,15 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
   let degraded = false;
   const actsNamed: NonNullable<DocumentAnalysis['actsNamed']> = [];
 
+  // A regional law's words, its Region included («L. 65/2014 (Toscana)», which the candidate leaves out): an
+  // explicit candidate that holds one is to complete, never read as the State's law of that number (G-577).
+  const regional = regionalLawSpans(text);
+  const holdsRegionalLaw = (c: Candidate) => regional.some(([start]) => start >= c.start && start < c.end);
+
   for (const candidate of candidates) {
     const at = lineAt(candidate.start);
     if (candidate.query) {
-      const reading = readings.settled.get(candidate.query);
+      const reading = holdsRegionalLaw(candidate) ? undefined : readings.settled.get(candidate.query);
       if (reading) {
         const act = actOf(reading);
         remember(act, candidate.actPhrase ? writtenKind(candidate.actPhrase) : null, candidate, at);
@@ -774,7 +780,7 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
         continue;
       }
       history = [];
-      if (readings.unanswered.has(candidate.query)) {
+      if (readings.unanswered.has(candidate.query) && !holdsRegionalLaw(candidate)) {
         degraded = true;
         fallbackMatches ??= extractCitations(text);
         const inside = fallbackMatches.filter((m) => m.startIndex >= candidate.start && m.endIndex <= candidate.end);
