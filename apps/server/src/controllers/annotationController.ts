@@ -2,22 +2,23 @@ import { Request, Response } from 'express';
 import { AnnotationType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { boundedText, parseBody } from '../utils/bodyLimits';
 import { AppError } from '../middleware/errorHandler';
 
 // Validation schemas
 const createAnnotationSchema = z.object({
-  normaKey: z.string().min(1),
-  content: z.string().min(1),
+  normaKey: boundedText(500, 'norma').min(1),
+  content: boundedText(50_000, 'nota').min(1),
   annotationType: z.enum(['note', 'question', 'important', 'follow_up', 'summary']).default('note'),
-  textContext: z.string().optional(),
+  textContext: boundedText(500_000, 'contesto').optional(),
   position: z.number().int().min(0).optional().nullable(),
   bookmarkId: z.string().guid().optional().nullable(),
 });
 
 const updateAnnotationSchema = z.object({
-  content: z.string().min(1).optional(),
+  content: boundedText(50_000, 'nota').min(1).optional(),
   annotationType: z.enum(['note', 'question', 'important', 'follow_up', 'summary']).optional(),
-  textContext: z.string().optional().nullable(),
+  textContext: boundedText(500_000, 'contesto').optional().nullable(),
   position: z.number().int().min(0).optional().nullable(),
 });
 
@@ -27,7 +28,7 @@ export const createAnnotation = async (req: Request, res: Response) => {
     throw new AppError(401, 'Not authenticated');
   }
 
-  const data = createAnnotationSchema.parse(req.body);
+  const data = parseBody(createAnnotationSchema, req.body);
 
   // Check if bookmark exists and belongs to user (if bookmarkId provided)
   if (data.bookmarkId) {
@@ -104,7 +105,7 @@ export const updateAnnotation = async (req: Request, res: Response) => {
   }
 
   const { id } = req.params;
-  const data = updateAnnotationSchema.parse(req.body);
+  const data = parseBody(updateAnnotationSchema, req.body);
 
   // Check if annotation exists and belongs to user
   const existingAnnotation = await prisma.annotation.findFirst({

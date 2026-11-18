@@ -396,6 +396,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
+  The older controllers' free-text fields have a maximum length (`utils/bodyLimits.ts`: `boundedText`,
+  `boundedTags`, `parseBody`; item 14 of the security inventory): a text or a list over it is a 400
+  `{ detail: "Campo «nota»: al massimo 50.000 caratteri.", error: "too_long" }`, every other failure
+  as above. An error nobody caught (`utils/processGuards.ts`): a rejection is logged and the server keeps
+  running; an exception is logged, then the graceful shutdown ends the process; neither logs its message.
 - **The Forum's content** (`SharedEnvironment.content`; spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D6–D7). The server trusts
   none of it: `utils/publishedContent.ts` rebuilds every row from an allow-list — a dossier's
