@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useMemo } from 'react';
 import { Gavel } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -11,6 +11,7 @@ import { decisionEntrySentenza, useDecisionInDossier } from './inDossier';
 import { PRACTICE_VT, openPracticeWindow, practiceTransitionName } from './practiceSwitch';
 import type { PracticeLayout } from './PracticeColumn';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
+import { matchesQuery, useFontiTools } from './fontiTools';
 
 /**
  * The decisions' strip (U2), in Pietra since LC61: the acts' panel hairline, no wash; the gavel in the ink's grey
@@ -29,7 +30,16 @@ const DECISIONS_MARK = 'text-slate-500 dark:text-slate-400';
  */
 export function PracticeDecisionsSection({ practiceId, layout }: { practiceId: string; layout: PracticeLayout }) {
   const decisions = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.decisions);
-  const ordered = useMemo(() => decisionOrder(decisions ?? []), [decisions]);
+  const all = useMemo(() => decisionOrder(decisions ?? []), [decisions]);
+  // «Fonti»'s filter (LC88): a decision by its citation, as the row writes it, and its deposit.
+  const tools = useFontiTools();
+  const query = tools?.query ?? '';
+  const ordered = useMemo(() => all.filter((entry) => matchesQuery(
+    query, entry.label, formatDecisionDeposit({ tipo: entry.tipo, data_deposito: entry.depositDate }),
+  )), [all, query]);
+  const report = tools?.report;
+  useEffect(() => { report?.('decisions', ordered.length, all.length); }, [report, ordered.length, all.length]);
+  useEffect(() => () => report?.('decisions', 0, 0), [report]);
   const headingId = useId();
 
   if (ordered.length === 0) return null;

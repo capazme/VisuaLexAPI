@@ -37,6 +37,8 @@ export interface RowDossier {
   inDossier: boolean;
   /** The dossier entry read in the row (LC58): what an application proposed on it (D7b), its notes. */
   itemId?: string;
+  /** Every dossier entry the row reads (an article may be in it more than once): what a selection takes (LC88). */
+  itemIds: string[];
   /** Starred in the dossier («importante», as «Fonti»'s star). */
   important: boolean;
   /** «Aggiungi al dossier»; absent for what cannot be added (a decision never identified). */
@@ -66,6 +68,7 @@ function useRowDossier(find: (d: Dossier | undefined) => string[], add: ((dossie
   return {
     inDossier: ids.length > 0,
     ...(ids.length > 0 ? { itemId: ids[0] } : {}),
+    itemIds: ids,
     important,
     ...(add ? { add: () => { add(host.id); host.showToast?.(added, 'success'); } } : {}),
     remove: () => removeItemsWithUndo(host.id, ids, removed, host.onTrashChanged),

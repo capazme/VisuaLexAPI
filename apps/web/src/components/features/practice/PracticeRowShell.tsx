@@ -7,6 +7,7 @@ import { MenuButton } from '../../ui/MenuButton';
 import { Expand } from '../../ui/Expand';
 import { rowDossierItems, type RowDossier } from './inDossier';
 import { RowMovePicker, RowNoteComposer } from './RowDossierPanels';
+import { useFontiTools } from './fontiTools';
 
 const ICON_BUTTON =
   'flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20';
@@ -90,6 +91,10 @@ export function PracticeRowShell({
       : heldIn ? `${shownName}, ${heldIn.charAt(0).toLowerCase()}${heldIn.slice(1)}` : shownName)
     + (notes > 0 ? `, ${notesWords}` : '');
   const regionId = `practice-row-${rowKey}`;
+  // «Seleziona» on in «Fonti» (LC88): a row of the dossier carries a checkbox, and the Space on its heading ticks it.
+  const tools = useFontiTools();
+  const selectable = tools?.selecting === true && dossier !== undefined && dossier.itemIds.length > 0;
+  const ticked = selectable && dossier.itemIds.some((id) => tools.selected.has(id));
   // One subject, one mounted reading surface (T5): a row shown in a window folds, whatever its stored
   // state, and comes back as it was when the window closes. Its header then points at the window.
   const folded = beside?.shown === true;
@@ -104,18 +109,35 @@ export function PracticeRowShell({
       className="group @container scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-lg py-1 md:pl-2 md:pr-1"
     >
       <div className="flex items-center gap-1 rounded-lg transition-colors hover:bg-slate-50 md:gap-2 dark:hover:bg-slate-800/60">
+        {/* Outside the toggle (gotcha 22): its own control, 44 px to touch. */}
+        {selectable && (
+          <label className="-ml-2 flex min-h-[44px] min-w-[44px] flex-shrink-0 cursor-pointer items-center justify-center md:ml-0 md:min-h-0 md:min-w-0 md:p-1">
+            <input
+              type="checkbox"
+              checked={ticked}
+              onChange={() => tools.toggle(dossier.itemIds)}
+              aria-label={`Seleziona ${removeName}`}
+              className="h-4 w-4 rounded border-slate-300 text-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600"
+            />
+          </label>
+        )}
         {/* The toggle wraps only text: the remove button stays outside it (gotcha 22). */}
         <div
           role="button"
           tabIndex={0}
           // Folded because a window shows the subject, the header does not expand: it goes to the window.
-          aria-label={folded ? `Vai alla finestra su ${name}` : `${isOpen ? 'Comprimi' : 'Espandi'} ${name}`}
+          // While selecting, the heading says whether the row is ticked: the Space on it ticks it.
+          aria-label={(folded ? `Vai alla finestra su ${name}` : `${isOpen ? 'Comprimi' : 'Espandi'} ${name}`)
+            + (selectable ? (ticked ? ', selezionato' : ', non selezionato') : '')}
           aria-expanded={folded ? undefined : isOpen}
           aria-controls={isOpen ? regionId : undefined}
           onClick={folded ? beside.onOpen : onToggle}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === ' ' && selectable) {
+              e.preventDefault();
+              tools.toggle(dossier.itemIds);
+            } else if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               (folded ? beside.onOpen : onToggle)();
             }
