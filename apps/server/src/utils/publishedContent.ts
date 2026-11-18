@@ -18,6 +18,7 @@
 import { AppError } from '../middleware/errorHandler';
 import { sourceUrl } from '../schemas/normEntry';
 import { rebuildEntry } from './environmentDossiers';
+import { MAX_ITEMS_PER_DOSSIER } from './dossierCaps';
 
 export type ContentMode = 'publish' | 'update' | 'restore' | 'read';
 
@@ -30,7 +31,8 @@ const ACTION: Record<Exclude<ContentMode, 'read'>, string> = {
 // Bounds: generous for real work, small enough that one item cannot fill the table.
 export const LIMITS = {
   dossiers: 100,
-  entries: 2000,
+  // The cap on a dossier's entries everywhere (G-576), so a published dossier always fits back in one.
+  entries: MAX_ITEMS_PER_DOSSIER,
   annotations: 5000,
   highlights: 5000,
   quickNorms: 500,

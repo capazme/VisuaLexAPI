@@ -8,6 +8,7 @@ import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 import { countingModules } from '../lingo/courses';
 import { LIMITS } from '../schemas/lingo/corso';
 import { deleteDossierFileRows, removeDossierDir } from '../pratica/fileStore';
+import { assertDossierRoom } from '../utils/dossierCaps';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
@@ -566,6 +567,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
           items: StoredItem[];
           snapshots: { id: string; dossierId: string; version: number; label: string | null; content: unknown; fingerprint: string | null; createdAt: string }[];
         };
+        await assertDossierRoom(tx, userId, { dossiers: 1, items: items.length, largestNewDossier: items.length });
         await tx.dossier.create({
           data: {
             id: dossier.id,
@@ -675,6 +677,8 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       if (entry.kind === 'DOSSIER_ITEMS') {
         const { items, proposals = [] } = payload as unknown as { items: StoredItem[]; proposals?: StoredProposal[] };
         const targetId = targetDossierId ?? entry.dossierId;
+        // The caps (G-576) first: the account's row is locked before the dossier's, as on every other path.
+        if (targetId) await assertDossierRoom(tx, userId, { items: items.length, into: { dossierId: targetId, items: items.length } });
         // Locked, so a dossier going to the trash meanwhile is waited for and found gone, not half-written to.
         const target = targetId && (await lockDossier(tx, userId, targetId)) ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
         if (!target) {

@@ -152,6 +152,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and never from a body; answered as `created_by: { clientName } | null`.
   Every dossier and item answer goes through `serializeDossier`/`serializeItem`
   in `dossierController.ts`: add a field there, not in a route.
+  Caps (G-576, `utils/dossierCaps.ts`): 500 dossiers per account, 2,000 entries per
+  dossier, 10,000 entries in all per account. Every path that creates dossiers or
+  entries calls `assertDossierRoom` first in its transaction (it locks the account's
+  row, as the Atti do): create, add an entry, notes, norms, decisions, move, the study
+  import (and the Forum download and environment recovery through it), a taken
+  suggestion, and both trash restores. A refusal is 409 with an Italian `detail` that
+  names the cap and `error` `dossier_limit`, `dossier_items_limit` or
+  `account_items_limit`. A new creation path must call it too.
   A dossier has a `kind`, `lavoro` (a practice: it may hold a client's data; the default, and
   what every dossier older than the column became) or `studio` (a topic studied: a dossier
   taken from a Forum suggestion is one); `POST`/`PUT /dossiers` take it. Each dossier answer

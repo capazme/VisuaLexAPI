@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { boundedTags, boundedText, parseBody } from '../utils/bodyLimits';
 import { atMostUnits } from '../utils/utf16Length';
 import { AppError } from '../middleware/errorHandler';
+import { assertDossierRoom } from '../utils/dossierCaps';
 import { resolveReferences } from '../norms/resolveReference';
 import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '../norms/resolveDecisions';
 import { citeStoredAct } from '../norms/citation';
@@ -251,17 +252,20 @@ export const getDossier = async (req: Request, res: Response) => {
 export const createDossier = async (req: Request, res: Response) => {
   const data = parseBody(createDossierSchema, req.body);
 
-  const dossier = await prisma.dossier.create({
-    data: {
-      name: data.name,
-      description: data.description,
-      color: data.color,
-      tags: data.tags ?? [],
-      kind: data.kind ?? 'lavoro',
-      userId: req.user!.id,
-      ...provenanceFromRequest(req),
-    },
-    include: DOSSIER_INCLUDE,
+  const dossier = await prisma.$transaction(async (tx) => {
+    await assertDossierRoom(tx, req.user!.id, { dossiers: 1 });
+    return tx.dossier.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        color: data.color,
+        tags: data.tags ?? [],
+        kind: data.kind ?? 'lavoro',
+        userId: req.user!.id,
+        ...provenanceFromRequest(req),
+      },
+      include: DOSSIER_INCLUDE,
+    });
   });
 
   res.status(201).json((await serializeDossiersFor(req, [dossier]))[0]);
@@ -376,22 +380,23 @@ export const addDossierItem = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  // Get max position
-  const maxPos = await prisma.dossierItem.aggregate({
-    where: { dossierId: id },
-    _max: { position: true },
-  });
-
-  const item = await prisma.dossierItem.create({
-    data: {
-      dossierId: id,
-      itemType: data.itemType as DossierItemType,
-      title: decision ? decision.etichetta : recital ? recital.title : data.title,
-      content: decision ?? recital?.content ?? (data.content || null),
-      position: data.position ?? (maxPos._max.position ?? -1) + 1,
-      ...(data.status !== undefined && { status: data.status }),
-      ...provenanceFromRequest(req),
-    },
+  const item = await prisma.$transaction(async (tx) => {
+    await assertDossierRoom(tx, req.user!.id, { items: 1, into: { dossierId: id, items: 1 } });
+    const maxPos = await tx.dossierItem.aggregate({
+      where: { dossierId: id },
+      _max: { position: true },
+    });
+    return tx.dossierItem.create({
+      data: {
+        dossierId: id,
+        itemType: data.itemType as DossierItemType,
+        title: decision ? decision.etichetta : recital ? recital.title : data.title,
+        content: decision ?? recital?.content ?? (data.content || null),
+        position: data.position ?? (maxPos._max.position ?? -1) + 1,
+        ...(data.status !== undefined && { status: data.status }),
+        ...provenanceFromRequest(req),
+      },
+    });
   });
 
   res.status(201).json(await serializeItemFor(req, item));
@@ -440,6 +445,7 @@ export const addDossierNote = async (req: Request, res: Response) => {
   if (aboutItemId) await assertArticleOfDossier(id, aboutItemId);
 
   const item = await prisma.$transaction(async (tx) => {
+    await assertDossierRoom(tx, req.user!.id, { items: 1, into: { dossierId: id, items: 1 } });
     const last = await tx.dossierItem.aggregate({ where: { dossierId: id }, _max: { position: true } });
     return tx.dossierItem.create({
       data: {
@@ -591,6 +597,8 @@ export const moveDossierItem = async (req: Request, res: Response) => {
 
   try {
     const item = await prisma.$transaction(async (tx) => {
+      // Moved within the account: the target's cap counts, the account's total does not change.
+      await assertDossierRoom(tx, req.user!.id, { into: { dossierId: target.id, items: 1 } });
       // Read the append slot in the same transaction as the write. Under
       // Postgres' default isolation two moves arriving together can still read
       // the same max and claim the same position — the client sends one move at
@@ -770,6 +778,7 @@ export const addDossierNorms = async (req: Request, res: Response) => {
 
   if (toCreate.length > 0) {
     const created = await prisma.$transaction(async (tx) => {
+      await assertDossierRoom(tx, req.user!.id, { items: toCreate.length, into: { dossierId: dossier.id, items: toCreate.length } });
       const last = await tx.dossierItem.aggregate({ where: { dossierId: dossier.id }, _max: { position: true } });
       let position = (last._max.position ?? -1) + 1;
       const rows = [];
@@ -871,6 +880,10 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
         const parsed = decisionItemContentSchema.safeParse(item.content);
         return parsed.success ? [decisionKeyOf(parsed.data)] : [];
       }));
+      // The caps, on what this call will add: a decision already present adds nothing. The reads above take no lock,
+      // so the account's row is still the first lock of this transaction.
+      const adding = toCreate.filter((index) => !kept.has(resolutions[index].key!)).length;
+      await assertDossierRoom(tx, req.user!.id, { items: adding, into: { dossierId: dossier.id, items: adding } });
       const last = await tx.dossierItem.aggregate({ where: { dossierId: dossier.id }, _max: { position: true } });
       let position = (last._max.position ?? -1) + 1;
       const rows: { index: number; id: string }[] = [];
