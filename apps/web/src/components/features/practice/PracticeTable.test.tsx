@@ -52,6 +52,8 @@ describe('PracticeTable (spec §3.1)', () => {
     s().openDecision(FOUND, { practiceId, open: false });
     render(table());
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
+    // The search page's title, an h2: where the focus lands after a choice in ⌘K (L-75, Papiniano, #599).
+    expect(screen.getByRole('heading', { level: 2 })).toHaveAttribute('data-page-title');
     expect(screen.getByText('1 atto · 2 articoli · 1 sentenza')).toBeInTheDocument();
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
@@ -76,6 +78,14 @@ describe('PracticeTable (spec §3.1)', () => {
     s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     render(table());
     expect(screen.getByTestId('practice-table')).toHaveClass('max-w-[44rem]');
+  });
+
+  it('the card with the notes\' column keeps the width of the glosses\' margin beside the text, not the whole frame (LC90)', () => {
+    s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    render(table());
+    const card = screen.getByTestId('practice-table');
+    expect(card).toHaveClass('has-[[data-margin-content]]:max-w-[66.75rem]', 'has-[[data-glosses-beside]]:max-w-[66.75rem]');
+    expect(card.className).not.toMatch(/max-w-none/);
   });
 
   it('switching the active practice switches the table', () => {

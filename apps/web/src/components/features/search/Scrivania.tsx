@@ -60,7 +60,7 @@ export function Scrivania() {
     >
       <div className="mx-auto w-full max-w-[760px]">
         <p className="text-sm font-medium first-letter:uppercase text-slate-500 dark:text-slate-400">{day}</p>
-        <h1 className="mt-1 font-serif text-[34px] font-medium leading-tight tracking-tight text-slate-900 dark:text-slate-50 md:mt-2 md:text-6xl">
+        <h1 data-page-title="" className="mt-1 font-serif text-[34px] font-medium leading-tight tracking-tight text-slate-900 dark:text-slate-50 md:mt-2 md:text-6xl">
           {greeting(hour)}
         </h1>
 

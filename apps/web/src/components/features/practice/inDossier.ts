@@ -42,13 +42,17 @@ export function dropFromTable(dossierId: string, items: DossierItem[]): void {
   const table = s.practices.find((p) => p.dossierId === dossierId);
   const dossier = s.dossiers.find((d) => d.id === dossierId);
   if (!table) return;
+  const emptied = new Set<string>();
   items.forEach((item) => {
     if (item.type === 'norma') {
       if (articleItemIds(dossier, item.data).length > 0) return;
       const key = dossierArticleKey(item.data);
       table.acts.forEach((a) => a.articles
         .filter((r) => dossierArticleKey(r.norma_data) === key)
-        .forEach((r) => s.removePracticeArticle(table.id, a.id, practiceArticleKey(r))));
+        .forEach((r) => {
+          s.removePracticeArticle(table.id, a.id, practiceArticleKey(r));
+          emptied.add(a.id);
+        }));
     } else if (item.type === 'sentenza') {
       const key = decisionKey(item.data);
       if (dossier?.items.some((i) => i.type === 'sentenza' && decisionKey(i.data) === key)) return;
@@ -56,6 +60,11 @@ export function dropFromTable(dossierId: string, items: DossierItem[]): void {
         .filter((d) => d.identified && decisionKey(identityOf(d.reference)) === key)
         .forEach((d) => s.removePracticeDecision(table.id, d.id));
     }
+  });
+  // An act whose last article left goes too, as its rows did: no empty block with «0 articoli» until a reload.
+  const after = appStore.getState().practices.find((p) => p.id === table.id);
+  emptied.forEach((actId) => {
+    if (after?.acts.find((a) => a.id === actId)?.articles.length === 0) s.removePracticeAct(table.id, actId);
   });
 }
 

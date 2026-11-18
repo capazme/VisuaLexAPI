@@ -1187,6 +1187,26 @@
   }
 }
 
+/* LC90: an article's text starts at the left of its reader, not centred, and the notes' column comes right after it, in
+   the room on its right: when the first note or gloss on a passage brings the column, the text's left edge does not move
+   (centred in a wide card, a table of more acts, it jumped by half the column). Where the reader is as wide as the
+   measure (the one-act card) nothing changes. */
+[data-article-root] [data-annotation-margin] .vlx-art {
+  margin-inline: 0 auto;
+}
+[data-article-root] .vlx-glossed .vlx-glossed-grid {
+  /* The text's own measure (`--vlx-text-max`, read by AnnotationMargin: the grid's `ch` is not the text's) and the room
+     of its signs (the 14rem of the `vlx-frame` query), no more: the column stays next to the text. */
+  grid-template-columns: minmax(0, calc(var(--vlx-text-max, 100%) + 14rem)) 17.5rem;
+  justify-content: start;
+}
+
+/* LC90: in the one-act card of the Ricerca the column is as wide as the glosses' margin beside the text (21.25rem), so the
+   text keeps its width when the glosses go from beside it into the column (the first gloss on a passage). */
+[data-glosses-room] .vlx-glossed .vlx-glossed-grid {
+  grid-template-columns: minmax(0, calc(var(--vlx-text-max, 100%) + 14rem)) 21.25rem;
+}
+
 /* LC74: a card widened by one article's glosses (`useGlossMargin`) keeps the text of every other article in it where it
    was, at the width the card gave it closed. */
 [data-glosses-room]:has([data-glosses-beside]) [data-article-root]:not([data-glosses-beside]) {

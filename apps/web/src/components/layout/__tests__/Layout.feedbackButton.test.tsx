@@ -3,10 +3,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
-vi.mock('../../ui/FeedbackButton', () => ({
-  FeedbackButton: ({ className }: { className?: string; onOpen: () => void }) => <button type="button" data-testid="feedback" className={className}>Commenti</button>,
-}));
-vi.mock('../../ui/FeedbackModal', () => ({ FeedbackModal: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({
   ChangelogNotification: ({ inBar }: { inBar?: boolean }) => <span data-testid={inBar ? 'news-in-bar' : 'news-floating'} />,
 }));
@@ -28,40 +24,36 @@ import { appStore } from '../../../store/useAppStore';
 
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
 
-describe('Layout — «Commenti» at the top right (D-253)', () => {
+const noComments = () => expect(screen.queryByRole('button', { name: /Commenti|Segnala un problema/ })).toBeNull();
+
+// LC92: «Commenti» left the top right for the bug beside «Impostazioni» in the sidebar, at every width.
+describe('Layout — no «Commenti» at the top right (LC92)', () => {
   afterEach(() => {
     auth.isAuthenticated = true;
   });
 
-  // Below md it is the user menu's «Commenti» (M1).
   it.each(['/', '/learn/ripasso', '/learn/ripasso/sessione?materia=DIRITTO_CIVILE', '/learn/valida', '/learn/schede', '/pratiche'])(
-    'shows it from md only on %s, left of «Tutto schermo», which Tab reaches after it',
+    'draws no «Commenti» on %s, below lg',
     (path) => {
       at(path);
-      const feedback = screen.getByTestId('feedback');
-      expect(feedback).toHaveClass('hidden', 'md:inline-flex', 'fixed', 'top-4', 'right-[4.25rem]');
-      expect(feedback.compareDocumentPosition(screen.getByRole('button', { name: 'Tutto schermo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      noComments();
+      expect(screen.getByRole('button', { name: 'Tutto schermo' })).toBeInTheDocument();
     },
   );
 
-  it("sits in the bar's right end between md and lg, as «Tutto schermo», and at the window's top right in full screen", async () => {
-    at('/pratiche');
-    expect(screen.getByTestId('feedback')).toHaveClass('max-lg:right-14');
-    cleanup();
-    const { appStore } = await import('../../../store/useAppStore');
+  it('keeps the top rows clear of «Tutto schermo» in full screen below lg', () => {
     const before = appStore.getState().settings;
     appStore.setState({ settings: { ...before, focusMode: true } });
     try {
       at('/pratiche');
-      expect(screen.getByTestId('feedback')).not.toHaveClass('max-lg:right-14');
-      // The top rows keep clear of both buttons from md, which draws no bar in full screen.
+      noComments();
       expect(screen.getByTestId('layout-content')).toHaveClass('md:[--focus-button-room:11rem]');
     } finally {
       appStore.setState({ settings: before });
     }
   });
 
-  // LC21: from lg it sits in the top bar (or the search page's bar), so no top row keeps room for it outside full screen.
+  // LC21: from lg the controls sit in the top bar (or the search page's bar), so no top row keeps room outside full screen.
   it('asks no room of the top rows outside full screen; the search page\'s field ends before the controls', () => {
     at('/pratiche');
     expect(screen.getByTestId('layout-content').className).not.toMatch(/--focus-button-room/);
@@ -74,12 +66,6 @@ describe('Layout — «Commenti» at the top right (D-253)', () => {
   it("leaves the page's foot its own padding: nothing floats there any more", () => {
     at('/pratiche');
     expect(screen.getByTestId('layout-content').className).not.toMatch(/page-foot/);
-  });
-
-  it('is not drawn for someone signed out', () => {
-    auth.isAuthenticated = false;
-    at('/pratiche');
-    expect(screen.queryByTestId('feedback')).toBeNull();
   });
 
   // The services pill covered the foot of the page on a phone: it is the user menu's «Stato dei servizi» (S1).
@@ -101,18 +87,17 @@ describe('Layout — the top bar from lg (LC21)', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
   });
 
-  it.each(['/pratiche', '/work/scadenziario', '/forum', '/learn/schede'])('draws the bar on %s, with the path, the search and the three controls, none floating', (path) => {
+  it.each(['/pratiche', '/work/scadenziario', '/forum', '/learn/schede'])('draws the bar on %s, with the path, the search and its controls, none floating, and no «Commenti»', (path) => {
     at(path);
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toBeInTheDocument();
     expect(within(bar).getByRole('button', { name: 'Apri il menu di ricerca' })).toBeInTheDocument();
-    expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
+    noComments();
     expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
     const fullScreen = within(bar).getByRole('button', { name: 'Tutto schermo' });
     expect(fullScreen).toHaveAttribute('aria-pressed', 'false');
     expect(fullScreen).not.toHaveClass('fixed');
     // One of each: nothing left floating over the page.
-    expect(screen.getAllByTestId('feedback')).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Tutto schermo' })).toHaveLength(1);
     expect(screen.queryByTestId('news-floating')).toBeNull();
   });
@@ -137,7 +122,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toHaveTextContent('WorkRicerca');
     expect(within(bar).getByRole('search', { name: 'Ricerca' })).toBeInTheDocument();
-    expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
+    noComments();
     expect(within(bar).getByRole('button', { name: 'Tutto schermo' })).toBeInTheDocument();
     expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
     expect(screen.queryByTestId('news-floating')).toBeNull();
@@ -155,7 +140,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
     at('/pratiche');
     const bar = screen.getByTestId('top-bar');
-    expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
+    noComments();
     expect(within(bar).getByRole('button', { name: 'Tutto schermo' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByTestId('news-floating')).toBeNull();
     expect(screen.getByTestId('layout-content')).not.toHaveClass('md:[--focus-button-room:11rem]');
@@ -166,8 +151,20 @@ describe('Layout — below lg the controls float as before', () => {
   it('draws no top bar, and the news floats', () => {
     at('/pratiche');
     expect(screen.queryByTestId('top-bar')).toBeNull();
-    expect(screen.getByTestId('feedback')).toHaveClass('fixed');
+    noComments();
     expect(screen.getByTestId('news-floating')).toBeInTheDocument();
     expect(screen.queryByTestId('news-in-bar')).toBeNull();
+  });
+
+  // LC92 (Papiniano, 390 px): the news covered the drawer's foot and took its clicks; it hides while the drawer is open.
+  it("hides the news while the phone's drawer is open, and shows it again once it closes", () => {
+    at('/pratiche');
+    const host = screen.getByTestId('news-floating-host');
+    expect(host).not.toHaveAttribute('hidden');
+    fireEvent.click(within(screen.getByTestId('phone-top-bar')).getByRole('button', { name: 'Apri il menu' }));
+    expect(host).toHaveAttribute('hidden');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(host).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('news-floating')).toBeInTheDocument();
   });
 });

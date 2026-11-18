@@ -103,7 +103,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
   const t = plan?.fromTitles;
   const fromTitles = t
     ? [
-        t.labels > 0 && `${plural(t.labels, '«@…» diventa un\'etichetta', '«@…» diventano etichette')}`,
+        t.labels > 0 && `${plural(t.labels, '«@…» diventa un\'etichetta', '«@…» diventano etichette')} (${plan!.titleLabels.join(', ')})`,
         t.deadlines > 0 && `${plural(t.deadlines, '«{…}» diventa il termine finale', '«{…}» diventano termini finali')}`,
         t.durations > 0 && `${plural(t.durations, 'durata «!…» va', 'durate «!…» vanno')} nella descrizione`,
         t.links > 0 && `${plural(t.links, 'link resta', 'link restano')} come testo, con l'indirizzo nella descrizione`,

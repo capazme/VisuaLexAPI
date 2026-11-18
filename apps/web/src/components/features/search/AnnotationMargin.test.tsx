@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AnnotationMargin, type AnnotationMarginHandle, type NoteDraft } from './AnnotationMargin';
 import type { Annotation } from '../../../types';
@@ -57,13 +57,15 @@ interface HarnessProps {
   onWide?: (wide: boolean) => void;
   /** The block draws its sign once it holds a note, drawn again (a new element) with the text. */
   signs?: boolean;
+  aside?: ReactNode;
+  onAsideFocus?: (keys: readonly string[]) => boolean;
 }
 
 let handle: AnnotationMarginHandle | null = null;
 let openDraft: (draft: NoteDraft) => void = () => {};
 /** The server's answer to the new note: its id in place of the temporary one, and the text drawn again. */
 let savedOnServer: (id: string) => void = () => {};
-function Harness({ notes = [], threads = [], initialDraft = null, onSave = vi.fn(), onUpdate = vi.fn(), onRemove = vi.fn(), onOpenThread, onWide, signs = false }: HarnessProps) {
+function Harness({ notes = [], threads = [], initialDraft = null, onSave = vi.fn(), onUpdate = vi.fn(), onRemove = vi.fn(), onOpenThread, onWide, signs = false, aside, onAsideFocus }: HarnessProps) {
   const textRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<NoteDraft | null>(initialDraft);
   const [list, setList] = useState(notes);
@@ -96,6 +98,8 @@ function Harness({ notes = [], threads = [], initialDraft = null, onSave = vi.fn
       onOpenThread={onOpenThread}
       textHash="h"
       onWideChange={onWide}
+      aside={aside}
+      onAsideFocus={onAsideFocus}
     >
       <div ref={textRef} className="vlx-art">
         <div className="vlx-b">
@@ -134,6 +138,17 @@ describe('AnnotationMargin — the notes beside the text, as a word processor\'s
     expect(within(cards[1]).getByText('@marta · 2 risposte')).toBeInTheDocument();
     await placed(cards[0]);
     await waitFor(() => expect(onWide).toHaveBeenLastCalledWith(true));
+  });
+
+  it('with the glosses in the column (its aside), a sign pressed goes to them: the gloss on its passage is chosen there (LC90)', async () => {
+    room(1200);
+    const onAsideFocus = vi.fn(() => true);
+    const onWide = vi.fn();
+    render(<Harness threads={[thread]} onOpenThread={vi.fn()} onWide={onWide} aside={<p>Glosse</p>} onAsideFocus={onAsideFocus} />);
+    await column();
+    await waitFor(() => expect(onWide).toHaveBeenLastCalledWith(true));
+    expect(handle!.focus(['thread:t1'])).toBe(true);
+    expect(onAsideFocus).toHaveBeenCalledWith(['thread:t1']);
   });
 
   it('without room, no column: the reader is told, and the sign goes to the sheet', async () => {

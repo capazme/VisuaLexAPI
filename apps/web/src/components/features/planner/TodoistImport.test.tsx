@@ -34,10 +34,11 @@ describe('TodoistImport', () => {
     render(<TodoistImport id="imp" open onClose={() => {}} dossierId="d1" today={TODAY} />);
 
     chooseFile(example);
-    expect(await screen.findByText(/Nasceranno 13 compiti, di cui 3 sottocompiti, con 3 etichette/)).toBeInTheDocument();
+    expect(await screen.findByText('Nasceranno 13 compiti, di cui 3 sottocompiti, con 2 etichette dalle sezioni: Studio della pratica 📚, Adempimenti ⭐️.')).toBeInTheDocument();
     expect(screen.getByText(/Date non capite/)).toBeInTheDocument();
-    expect(screen.getByText(/Dai titoli: 1 «@…» diventa un'etichetta; 1 «\{…\}» diventa il termine finale; 1 durata «!…» va nella descrizione; 1 link resta come testo/)).toBeInTheDocument();
+    expect(screen.getByText(/Dai titoli: 1 «@…» diventa un'etichetta \(udienza\); 1 «\{…\}» diventa il termine finale; 1 durata «!…» va nella descrizione; 1 link resta come testo/)).toBeInTheDocument();
     expect(screen.getByText(/Ripetizioni che diventano compiti non ricorrenti/)).toBeInTheDocument();
+    expect(screen.getByText(/Report al socio — «ogni 2 settimane»: qui un compito si ripete solo ogni giorno/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Importa 13 compiti' }));
     expect(await screen.findByText(/Import interrotto: 3 compiti entrati su 13/)).toBeInTheDocument();

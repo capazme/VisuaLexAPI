@@ -67,7 +67,7 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTo
           clearTopRight && 'md:pr-12',
         )}
       >
-        <h3 title={title} className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">
+        <h3 title={title} data-page-title="" className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">
           {title}
         </h3>
         <button
