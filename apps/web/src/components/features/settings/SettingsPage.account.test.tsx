@@ -62,11 +62,12 @@ describe('Impostazioni — «Elimina l’account…» (Y1)', () => {
     expect(screen.queryByRole('button', { name: /Elimina definitivamente/ })).toBeNull();
   });
 
-  it('opens the password, the confirmation and «Annulla», the cursor in the password', () => {
+  it('opens the password, the confirmation and «Annulla», the focus on the space, not in the password (LC105)', () => {
     render(view());
     fireEvent.click(opener());
     expect(opener()).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByLabelText('Password corrente per eliminare account')).toHaveFocus();
+    expect(document.activeElement).toContainElement(screen.getByLabelText('Password corrente per eliminare account'));
+    expect(document.activeElement).toHaveAttribute('tabindex', '-1');
     expect(screen.getByLabelText('Conferma eliminazione account')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Elimina definitivamente/ })).toBeDisabled();
   });
