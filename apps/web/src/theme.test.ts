@@ -732,6 +732,14 @@ describe('the motion tokens for CSS (LC98)', () => {
       expect(css, `--dur-${name}`).toMatch(new RegExp(`--dur-${name}:\\s*${Math.round(seconds * 1000)}ms`));
     }
   }, 30000);
+
+  it('compile in the sidebar\'s classes: durations from `--dur-*`, the drawer on its own curve', async () => {
+    const css = await compile(['duration-(--dur-press)', 'duration-(--dur-pop)', 'duration-(--dur-scene)', 'ease-drawer']);
+    for (const name of ['press', 'pop', 'scene']) {
+      expect(css).toMatch(new RegExp(`\\.duration-\\\\\\(--dur-${name}\\\\\\)\\s*\\{[^}]*transition-duration:\\s*var\\(--dur-${name}\\)`));
+    }
+    expect(css).toMatch(/\.ease-drawer\s*\{[^}]*transition-timing-function:\s*var\(--ease-drawer\)/);
+  }, 30000);
 });
 
 describe('the section change (T1)', () => {
