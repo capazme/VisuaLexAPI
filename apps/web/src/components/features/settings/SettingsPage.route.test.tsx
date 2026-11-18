@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
-vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn(), isAuthenticated: true }) }));
 vi.mock('../../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
 vi.mock('../../../features/merlt/privacy/MerltDataSection', () => ({ MerltDataSection: () => null }));
 vi.mock('../../../services/accountService', () => ({ accountService: {} }));
@@ -50,6 +50,18 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
     enter();
     expect(where()).toHaveTextContent('/impostazioni#dati');
     expect(document.getElementById('dati')).toContainElement(screen.getByRole('heading', { name: 'Dati e privacy' }));
+  });
+
+  // LC92: the bug beside «Impostazioni» and the user menu open «Segnala un problema», a part of the page, not a dialog.
+  it('opens at «Segnala un problema», the form that was «Commenti»\'s dialog', () => {
+    app('segnala');
+    enter();
+    expect(where()).toHaveTextContent('/impostazioni#segnala');
+    const part = document.getElementById('segnala');
+    expect(part).toContainElement(screen.getByRole('heading', { level: 3, name: 'Segnala un problema' }));
+    expect(part).toContainElement(screen.getByRole('button', { name: 'Invia' }));
+    expect(within(screen.getByRole('navigation', { name: 'Parti delle impostazioni' })).getByRole('link', { name: 'Segnala un problema' })).toHaveAttribute('href', '#segnala');
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('has a part for each of the former dialogs: the quick norms, the aliases, the shortcuts', () => {

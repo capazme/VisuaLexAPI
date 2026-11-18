@@ -21,6 +21,7 @@ import { scrollParentOf } from '../../../utils/scrollParent';
 import { KeyboardShortcutsSection } from './KeyboardShortcutsSection';
 import { AliasSection } from './AliasSection';
 import { QuickNormsSection } from './QuickNormsSection';
+import { ReportProblemSection } from './ReportProblemSection';
 import type { SettingsState } from './settingsRoute';
 
 interface CommitInfo {
@@ -63,7 +64,7 @@ function Part({ id, children }: { id: SettingsSection; children: ReactNode }) {
 export function SettingsPage() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { isAdmin, canUseDevMode, devMode, setDevMode } = useAuth();
+    const { isAdmin, canUseDevMode, devMode, setDevMode, isAuthenticated } = useAuth();
     const { settings, updateSettings } = useAppStore();
     const { resetAndStartTour } = useTour();
     // MERL-T's part is drawn only where MerltDataSection draws (the flag and its consent's context).
@@ -293,6 +294,7 @@ export function SettingsPage() {
         { id: 'dati', name: 'Dati e privacy' },
         { id: 'merlt', name: 'Dati MERL-T', shown: merltShown },
         { id: 'app-collegate', name: 'Applicazioni collegate' },
+        { id: 'segnala', name: 'Segnala un problema', shown: isAuthenticated },
         { id: 'informazioni', name: 'Informazioni' },
     ];
 
@@ -547,6 +549,14 @@ export function SettingsPage() {
                 <Part id="merlt"><MerltDataSection /></Part>
 
                 <Part id="app-collegate"><ConnectedAppsSection /></Part>
+
+                {/* LC92: the form that was «Commenti»'s dialog, for a signed-in user as it was. */}
+                {isAuthenticated && (
+                    <Part id="segnala">
+                        <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Segnala un problema</h3>
+                        <ReportProblemSection />
+                    </Part>
+                )}
 
                 <Part id="informazioni">
                 {/* Version Info */}
