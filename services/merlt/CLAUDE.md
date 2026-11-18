@@ -205,6 +205,17 @@ BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
   MERL-T must have one. Do not add a client that calls a model another way: the
   unused multi-provider package `experts/llm/` was removed for that reason.
 
+**Logs carry lengths, never text.** A question, a search someone typed, a proposed
+entity, the search strings an expert builds, the model's «thought» and answer, and a
+provider's raw error stay out of the logs; log `query_chars=len(query)` and the like.
+`tests/unit/test_logs_carry_no_user_text.py` reads every log call in `merlt/` and
+fails when one carries a name of its `TEXT` list other than as `len(...)`: a new name
+for a person's text must be added there. Its `ALLOWED` names the few expressions kept
+on purpose, each with its reason. A provider error is logged as its status,
+OpenRouter's code and its short message (`ai_service._provider_error`), never the
+error's metadata. uvicorn's access log drops query strings (`api/access_log.py`,
+installed in `app.py`): a search sent as `?q=` stays out of the logs.
+
 Never call the user id «anonymous», «opaque» or «pseudonymous», and never log
 it next to a payload. The research export (`export_router`) pseudonymises with a
 salted hash, which is still personal data for whoever holds the salt.

@@ -605,7 +605,7 @@ class ReActMixin:
                 log.info(
                     f"ReAct loop finished at iteration {iteration + 1}",
                     reason="LLM decided to finish",
-                    thought=decision.get("thought", "")[:100]
+                    thought_chars=len(decision.get("thought") or "")
                 )
                 history.append(ThoughtActionObservation(
                     iteration=iteration + 1,
@@ -633,7 +633,7 @@ class ReActMixin:
 
             log.debug(
                 f"ReAct iteration {iteration + 1}",
-                thought=decision.get("thought", "")[:100],
+                thought_chars=len(decision.get("thought") or ""),
                 tool=tool_name,
                 params=list(tool_params.keys())
             )

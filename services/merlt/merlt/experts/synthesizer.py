@@ -290,7 +290,7 @@ class AdaptiveSynthesizer:
 
         log.info(
             "Synthesizing responses",
-            query=query[:50],
+            query_chars=len(query),
             num_responses=len(responses),
             trace_id=trace_id,
             profile=profile.value,

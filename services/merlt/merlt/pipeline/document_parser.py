@@ -439,7 +439,7 @@ class DocumentParserService:
                                 if dres.best_match:
                                     potential_dup = dres.best_match.entity_id
                             except Exception as dup_exc:  # dedup is best-effort
-                                log.warning("dedup check failed", entity=entity_data.nome, exc=str(dup_exc))
+                                log.warning("dedup check failed", entity_chars=len(entity_data.nome), exc=str(dup_exc))
                             row = ExtractionCandidate(
                                 document_id=document_id,
                                 contributor_id=user_id,
@@ -478,10 +478,10 @@ class DocumentParserService:
                         entities_count += 1
 
                         log.debug(
-                            f"Extracted entity: {entity_data.nome} ({entity_data.tipo})"
+                            f"Extracted entity ({entity_data.tipo}, {len(entity_data.nome)} chars)"
                         )
                         log.info(
-                            f"✅ Added to session: {entity_id} - {entity_data.nome}"
+                            f"✅ Added to session: {entity_id}"
                         )
 
                 except Exception as e:
@@ -706,7 +706,7 @@ class DocumentParserService:
                     )
                     resolved = strong[0].entity_id
             except Exception as exc:  # resolution is best-effort
-                log.warning("relation endpoint dedup failed", endpoint=raw, exc=str(exc))
+                log.warning("relation endpoint dedup failed", endpoint_chars=len(str(raw)), exc=str(exc))
 
         if resolved is not None and len(resolved) > ENDPOINT_MAX_LEN:
             resolved = None

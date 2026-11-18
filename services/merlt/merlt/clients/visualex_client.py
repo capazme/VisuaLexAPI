@@ -240,7 +240,7 @@ class VisuaLexClient:
                 return None
             return data
         except Exception as e:
-            log.warning("parse_query failed", error=str(e), query=query[:80])
+            log.warning("parse_query failed", error=str(e), query_chars=len(query))
             return None
 
     async def extract_citations(self, text, context_act_type=None, raise_on_error=False):
@@ -264,7 +264,7 @@ class VisuaLexClient:
             data = response.json()
             return data.get("citations") or []
         except Exception as e:
-            log.warning("extract_citations failed", error=str(e), text=text[:80])
+            log.warning("extract_citations failed", error=str(e), text_chars=len(text))
             if raise_on_error:
                 raise
             return []

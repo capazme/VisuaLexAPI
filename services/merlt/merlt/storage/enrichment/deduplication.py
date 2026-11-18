@@ -369,8 +369,8 @@ class EntityDeduplicator:
 
         log.debug(
             "Deduplication result",
-            query=entity_text,
-            normalized=normalized,
+            query_chars=len(entity_text),
+            normalized_chars=len(normalized),
             duplicates_found=len(candidates),
             recommendation=result.recommendation,
         )

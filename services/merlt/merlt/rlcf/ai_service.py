@@ -63,6 +63,19 @@ def _openrouter_headers(api_key: str) -> Dict[str, str]:
     }
 
 
+def _provider_error(status: int, body: str) -> str:
+    """What may be logged of a failed call: the status, OpenRouter's error code and its own short
+    message, never the error's metadata, where the provider's raw text sits (it may echo the
+    request, the person's question included)."""
+    code, message = None, ""
+    try:
+        error = json.loads(body).get("error") or {}
+        code, message = error.get("code"), str(error.get("message") or "")
+    except (ValueError, AttributeError):
+        pass
+    return f"{status} (code {code}): {message[:200]}" if message else f"{status} (code {code})"
+
+
 @dataclass
 class AIModelConfig:
     """Configuration for AI model settings."""
@@ -248,14 +261,15 @@ Please provide a concise legal summary highlighting key points, obligations, and
             ) as response:
                 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
                 
                 data = await response.json()
                 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
                 
                 ai_content = data["choices"][0]["message"]["content"]
@@ -439,14 +453,15 @@ Please provide a concise legal summary highlighting key points, obligations, and
             ) as response:
 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
@@ -597,18 +612,19 @@ JSON:"""
             ) as response:
 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
-                log.info(f"Raw completion: {completion[:200]}...")
+                log.info("JSON completion received", chars=len(completion))
 
                 # Prova a parsare direttamente
                 try:
@@ -668,7 +684,8 @@ JSON:"""
                 return result
 
         except json.JSONDecodeError as e:
-            log.error(f"Failed to parse JSON response: {e}. Raw: {completion[:500] if 'completion' in dir() else 'N/A'}")
+            # The model's text stays out of the log: only where the parse failed.
+            log.error("Failed to parse JSON response", error=type(e).__name__, position=e.pos)
             raise
         except Exception as e:
             log.error(f"Error generating JSON completion: {str(e)}")
