@@ -76,12 +76,13 @@ export function focusLanding(left: boolean): () => void {
     if (!(event.relatedTarget instanceof Element)) window.setTimeout(look, 0);
   };
   focusPage();
-  look();
   const observer = new MutationObserver(look);
   observer.observe(document.body, { childList: true, subtree: true });
   document.addEventListener('focusout', fell);
   document.addEventListener('pointerdown', stop);
   const timer = window.setTimeout(() => stop(), LANDING_MS);
+  // After the watch is set: a first look that stops at once (something already holds the focus) must find it to undo.
+  look();
   function stop() {
     observer.disconnect();
     document.removeEventListener('focusout', fell);
