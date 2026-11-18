@@ -747,9 +747,12 @@ describe('TreeViewPanel — LC71, the panel redone', () => {
     opener.focus();
     fireEvent.click(opener);
 
+    // The space takes the focus, never the filter: no keyboard rising on a phone (LC105). The arrows start from it.
     const filter = screen.getByLabelText('Filtra gli articoli per numero o rubrica');
-    expect(filter).toHaveFocus();
-    fireEvent.keyDown(filter, { key: 'ArrowDown' });
+    const space = document.activeElement as HTMLElement;
+    expect(space).toContainElement(filter);
+    expect(space).toHaveAttribute('tabindex', '-1');
+    fireEvent.keyDown(space, { key: 'ArrowDown' });
     expect(screen.getByRole('button', { name: 'Art. 1' })).toHaveFocus();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Art. 1' }), { key: 'ArrowDown' });
     expect(screen.getByRole('button', { name: 'Art. 2' })).toHaveFocus();

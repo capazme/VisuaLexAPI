@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ChevronDown, Folder, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { FIELD_TEXT } from '../../../constants/interactions';
-import { Collapsible } from '../../ui/Collapsible';
+import { Expand } from '../../ui/Expand';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
@@ -63,13 +63,12 @@ function partLabel(part: FoundPart, today: string): string {
  * date in words, `#pratica`, `@etichetta`, `p1`–`p4` and `{termine}`; what was read shows as chips in a row under the
  * field, in the flow (L-73: nothing over the content), and a chip clicked turns its words back into text. The
  * dossiers a `#` may mean are listed there too. «Dettagli» opens the dates, the priority and the dossier in a
- * `ui/Collapsible` under the row (U1b: the box grows, never a jump); what the line says wins over them.
+ * `ui/Expand` under the row (U1b: the box grows, never a jump); what the line says wins over them.
  */
 export function QuickAddField({ view, today, defaults, dossierLocked = false }: Props) {
   const id = useId();
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(defaults));
   const [open, setOpen] = useState(false);
-  const detailsButton = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -202,7 +201,6 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
-            ref={detailsButton}
             type="button"
             aria-expanded={open}
             aria-controls={`${id}-details`}
@@ -275,15 +273,11 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
         {draft.title.trim() ? summary(task, today, dossierTitle) : ''}
         {line.lockedHash && ' · In una pratica il compito resta qui: «#» resta nel titolo.'}
       </p>
-      <Collapsible
-        id={`${id}-details`}
-        open={open}
-        onClose={() => setOpen(false)}
-        triggerRef={detailsButton}
-        contentClassName="border-t border-slate-200 p-3 dark:border-slate-800"
-      >
-        <TaskFields draft={draft} onChange={setDraft} dossierLocked={dossierLocked} />
-      </Collapsible>
+      <Expand id={`${id}-details`} open={open} onClose={() => setOpen(false)}>
+        <div className="border-t border-slate-200 p-3 dark:border-slate-800">
+          <TaskFields draft={draft} onChange={setDraft} dossierLocked={dossierLocked} />
+        </div>
+      </Expand>
       {error && (
         <p role="alert" className="border-t border-slate-200 px-4 py-2 text-sm text-red-800 dark:border-slate-800 dark:text-red-200">
           {error}

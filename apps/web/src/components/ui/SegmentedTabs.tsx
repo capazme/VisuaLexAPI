@@ -1,19 +1,22 @@
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { FOCUS_RING } from '../../constants/interactions';
 import { cn } from '../../lib/utils';
-import { markTransition, panelEntrance } from './segmentedTabsMotion';
+import { markTransition, panelEntrance, PANEL_ENTRANCE_TIMING } from './segmentedTabsMotion';
 
 /**
- * «Linguette che scorrono» (U1; first on the Forum's three, S7a): a row of tabs over one panel. The chosen tab's mark,
- * the light pill behind it, slides to the new one on the app's spring while the words change colour in the same time;
- * the panel's content comes in with a short fade and a shift the way the choice moved (`segmentedTabsMotion.ts`).
- * Under reduced motion the mark is drawn in place and the content changes at once. The mark does not move on the first
- * drawing: Framer's `layoutId` animates a change, not a mount. Each row's marks are its own (`LayoutGroup` with the
- * row's id), so two rows on a page never trade them.
+ * «Linguette che scorrono» (U1; first on the Forum's three, S7a): a row of segments, the app's one component for a
+ * segmented choice (LC105: `SegmentedControl` is gone into it). The chosen segment's mark, the light pill behind it,
+ * slides to the new one on the app's spring while the words change colour in the same time. Under reduced motion the
+ * mark is drawn in place. The mark does not move on the first drawing: Framer's `layoutId` animates a change, not a
+ * mount. Each row's marks are its own (`LayoutGroup` with the row's id), so two rows on a page never trade them.
  *
- * Tabs, not pressed buttons: `tablist` / `tab` / `tabpanel`, the chosen tab the only one in the Tab order, the arrows,
- * Home and End moving the choice and the focus together.
+ * Over a panel (`panelId`, with a `SegmentedTabPanel`) the row is tabs: `tablist` / `tab` / `tabpanel`, the panel's
+ * content coming in the way the choice moved (`segmentedTabsMotion.ts`). Without a panel it is a choice in a form (the
+ * card's kind, a relation's end): `radiogroup` / `radio`, since a tab with no panel is a wrong promise to a reader.
+ * Either way the chosen segment is the only one in the Tab order, the arrows, Home and End moving the choice and the
+ * focus together. Links between pages are `SegmentedTabLinks`, below.
  */
 
 export interface SegmentedTab<T extends string> {
@@ -30,8 +33,8 @@ export interface SegmentedTabsProps<T extends string> {
   onChange: (id: T) => void;
   /** The row's name («Sezioni del Forum»). */
   label: string;
-  /** The panel's id (`SegmentedTabPanel`), from which the tabs' ids are made. */
-  panelId: string;
+  /** The panel's id (`SegmentedTabPanel`), from which the tabs' ids are made; without it the row is a choice. */
+  panelId?: string;
   id?: string;
   /** The row's width. */
   className?: string;
@@ -44,9 +47,33 @@ const tabId = (panelId: string, id: string) => `${panelId}-tab-${id}`;
 /** The mark's corners (`rounded-md`) and shadow (`shadow-sm`). */
 const MARK_STYLE = { borderRadius: 6, boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' };
 
+const TRACK = 'flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800';
+// The words change colour over the mark's slide (`spring.snappy`, 0.3 s).
+const SEGMENT = 'relative flex min-h-[44px] items-center justify-center rounded-md text-sm font-medium transition-colors duration-300';
+const segmentTone = (active: boolean) =>
+  active ? 'text-slate-900 dark:text-ink-950' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white';
+
+/** The chosen segment's mark, measured again only when `choice` changes, not on every render of the page around it. */
+function SegmentedMark({ choice }: { choice: string }) {
+  const reduced = useReducedMotion() ?? false;
+  return (
+    <motion.span
+      layoutId="segmented-tabs-mark"
+      layoutDependency={choice}
+      data-segmented-mark
+      aria-hidden
+      className="absolute inset-0 bg-white dark:bg-toga-400"
+      // The corners and the shadow in `style`, which Framer corrects as the mark stretches between tabs of different
+      // widths; as classes they were squashed during the slide.
+      style={MARK_STYLE}
+      transition={markTransition(reduced)}
+    />
+  );
+}
+
 export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, panelId, id, className, tabClassName }: SegmentedTabsProps<T>) {
   const group = useId();
-  const reduced = useReducedMotion() ?? false;
+  const base = panelId ?? group;
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     // Alt and the arrows are the browser's back and forward (Cmd on a Mac): those stay the browser's.
@@ -62,58 +89,89 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
     if (next === null) return;
     event.preventDefault();
     onChange(tabs[next].id);
-    document.getElementById(tabId(panelId, tabs[next].id))?.focus();
+    document.getElementById(tabId(base, tabs[next].id))?.focus();
   };
 
   return (
     <LayoutGroup id={group}>
-      <div
-        id={id}
-        role="tablist"
-        aria-label={label}
-        onKeyDown={onKeyDown}
-        className={cn('flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800', className)}
-      >
+      <div id={id} role={panelId ? 'tablist' : 'radiogroup'} aria-label={label} onKeyDown={onKeyDown} className={cn(TRACK, className)}>
         {tabs.map((tab) => {
           const active = tab.id === value;
           return (
             <button
               key={tab.id}
-              id={tabId(panelId, tab.id)}
+              id={tabId(base, tab.id)}
               type="button"
-              role="tab"
-              aria-selected={active}
-              aria-controls={panelId}
+              {...(panelId
+                ? { role: 'tab', 'aria-selected': active, 'aria-controls': panelId }
+                : { role: 'radio', 'aria-checked': active })}
               tabIndex={active ? 0 : -1}
               onClick={() => onChange(tab.id)}
-              className={cn(
-                // The words change colour over the mark's slide (`spring.snappy`, 0.3 s).
-                'relative flex min-h-[44px] items-center justify-center rounded-md text-sm font-medium transition-colors duration-300',
-                FOCUS_RING,
-                active ? 'text-slate-900 dark:text-ink-950' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
-                tabClassName,
-              )}
+              className={cn(SEGMENT, FOCUS_RING, segmentTone(active), tabClassName)}
             >
-              {active && (
-                <motion.span
-                  layoutId="segmented-tabs-mark"
-                  // Measured again only when the choice changes, not on every render of the page around it.
-                  layoutDependency={value}
-                  data-segmented-mark
-                  aria-hidden
-                  className="absolute inset-0 bg-white dark:bg-toga-400"
-                  // The corners and the shadow in `style`, which Framer corrects as the mark stretches between tabs of
-                  // different widths; as classes they were squashed during the slide.
-                  style={MARK_STYLE}
-                  transition={markTransition(reduced)}
-                />
-              )}
+              {active && <SegmentedMark choice={value} />}
               <span className="relative flex items-center gap-2">{tab.label}</span>
               {tab.extra}
             </button>
           );
         })}
       </div>
+    </LayoutGroup>
+  );
+}
+
+export interface SegmentedTabLink {
+  /** The view's address. */
+  to: string;
+  /** What the link says, which is its name. */
+  label: ReactNode;
+  /** Drawn on the link after its words, over the mark (a count). */
+  extra?: ReactNode;
+  /** Chosen only on this exact address, not under it (`NavLink`'s `end`). */
+  end?: boolean;
+}
+
+export interface SegmentedTabLinksProps {
+  links: ReadonlyArray<SegmentedTabLink>;
+  /** The navigation's name («Viste di Work»). */
+  label: string;
+  /** A link followed (the page keeping its place). */
+  onNavigate?: () => void;
+  /** The row's width. */
+  className?: string;
+  /** Each link's width and padding. */
+  tabClassName?: string;
+}
+
+/**
+ * The same row as `SegmentedTabs` for views that each have their address (Opus's, Learn's): a `nav` of router links,
+ * the current one carrying `aria-current="page"` and the sliding mark. Links, not tabs: each is in the Tab order and
+ * the arrows are left to the page.
+ */
+export function SegmentedTabLinks({ links, label, onNavigate, className, tabClassName }: SegmentedTabLinksProps) {
+  const group = useId();
+  const { pathname } = useLocation();
+  return (
+    <LayoutGroup id={group}>
+      <nav aria-label={label} className={cn(TRACK, className)}>
+        {links.map((link) => (
+          <NavLink
+            key={link.to}
+            to={link.to}
+            end={link.end}
+            onClick={onNavigate}
+            className={({ isActive }) => cn(SEGMENT, FOCUS_RING, segmentTone(isActive), tabClassName)}
+          >
+            {({ isActive }) => (
+              <>
+                {isActive && <SegmentedMark choice={pathname} />}
+                <span className="relative flex items-center gap-2">{link.label}</span>
+                {link.extra}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
     </LayoutGroup>
   );
 }
@@ -142,7 +200,7 @@ export function SegmentedTabPanel<T extends string>({ panelId, order, value, cla
   return (
     <div id={panelId} role="tabpanel" aria-labelledby={tabId(panelId, value)} className="-mx-2 overflow-x-clip px-2">
       {/* A new element for each view, so its entrance plays once as it is drawn. */}
-      <div key={value} className={cn(panelEntrance(shown.direction, shown.changed), className)}>
+      <div key={value} className={cn(panelEntrance(shown.direction, shown.changed), className)} style={shown.changed ? PANEL_ENTRANCE_TIMING : undefined}>
         {children}
       </div>
     </div>
