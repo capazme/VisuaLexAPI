@@ -5,10 +5,10 @@
 #   docker build --target migrate -t visualex-migrate apps/server
 #
 # Two targets on purpose. The one-shot that applies the migrations runs from the build
-# stage, which holds the generated client and every dependency; the runtime carries the
-# production dependencies only. `prisma` (the CLI that applies the migrations) is a
-# production dependency since G-555, so the blocking audit covers it: the runtime
-# therefore holds the CLI too, unused.
+# stage, which holds the `prisma/` folder (schema and migrations); the runtime does not,
+# and carries the production dependencies and `dist/` only. `prisma` (the CLI that
+# applies the migrations) is a production dependency since G-555, so the blocking audit
+# covers it: the runtime therefore holds the CLI too, unused.
 
 FROM node:24-bookworm-slim AS base
 # Debian, not Alpine, and openssl on purpose: Prisma's query engine picks its
