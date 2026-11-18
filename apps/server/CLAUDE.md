@@ -1026,7 +1026,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
   the tick's body is the occurrence seen, required for a repeating task (400 without), a stale one
   409, so a double tick never moves it twice. Any other tick closes the task and its open
-  subtasks at one instant, and reopening reopens what closed at that instant. Routes
+  subtasks at one instant, and reopening reopens what closed at that instant. `{ forever: true }`
+  («Completa per sempre») closes a repeating task that way too, with its rule cleared and no next
+  occurrence; its origin and kept day stay stored, so `reopen { recurrence }` puts the rule back in
+  the same transaction and the series resumes from its kept day. Routes
   (`routes/tasks.ts`, `/api/tasks`, session only — not in the delegated table): `GET
   ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
   `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT

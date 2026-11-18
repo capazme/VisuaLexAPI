@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { Flag, Hourglass, X } from 'lucide-react';
+import { CheckCheck, Flag, Hourglass, X } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -8,6 +8,7 @@ import { tagLabel } from '../../../utils/tagLabel';
 import { DossierPicker } from './DossierPicker';
 import { countdown, PRIORITY_LABEL, RECURRENCE_FROM_LABEL, RECURRENCE_LABEL } from './taskDates';
 import { parseLabels } from './taskDraft';
+import { FOCUS_RING } from '../studia/progress/tokens';
 import { DEADLINE_TONE, FIELD, FIELD_HINT, ICON_BUTTON, PRIORITY_FLAG } from './plannerStyles';
 
 /** A change from the sheet: what to show at once, and what to send; false when it is refused before sending. */
@@ -17,6 +18,8 @@ interface Props {
   task: Task;
   today: string;
   onSave: SheetSave;
+  /** «Completa per sempre», under the repetition of a repeating task, as in the «⋯». */
+  onCompleteForever: () => void;
 }
 
 const ROW_LABEL = 'text-sm font-medium text-slate-700 dark:text-slate-300';
@@ -118,7 +121,7 @@ function DayAndTime({ day, time, dayLabel, timeLabel, disabled, describedBy, onD
  * Etichette — and the repetition last. Each saves when it changes (`onSave`); a subtask's dossier is its parent's and
  * is shown, not chosen. A repetition and a deadline switch each other off and say why, as in the quick add.
  */
-export function TaskSheetFields({ task, today, onSave }: Props) {
+export function TaskSheetFields({ task, today, onSave, onCompleteForever }: Props) {
   const id = useId();
   const dossiers = useAppStore((s) => s.dossiers);
   const [newLabel, setNewLabel] = useState('');
@@ -298,6 +301,16 @@ export function TaskSheetFields({ task, today, onSave }: Props) {
                 ? 'Alla spunta il compito torna alla data successiva.'
                 : 'Richiede la data pianificata.'}
         </p>
+        {task.recurrence && (
+          <button
+            type="button"
+            onClick={onCompleteForever}
+            className={cn('-mx-2 inline-flex min-h-[44px] items-center gap-2 justify-self-start rounded-lg px-2 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50', FOCUS_RING)}
+          >
+            <CheckCheck size={16} aria-hidden />
+            Completa per sempre
+          </button>
+        )}
       </FieldRow>
     </div>
   );
