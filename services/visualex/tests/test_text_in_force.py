@@ -15,7 +15,7 @@ import pytest
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.normattiva_validity import extract_validity, starts_after_today, upcoming_change
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
-    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller, requested, _no_history_writes,
+    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller, requested,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "normattiva"
@@ -300,8 +300,7 @@ class TestOriginalWithADate:
     def client(self):
         from app import NormaController
 
-        with patch("app.add_to_history"):
-            yield NormaController().app.test_client()
+        yield NormaController().app.test_client()
 
     @pytest.mark.parametrize("endpoint", ["/fetch_norma_data", "/fetch_article_text", "/fetch_all_data", "/stream_article_text"])
     @pytest.mark.parametrize("version", ["originale", " Originale "])

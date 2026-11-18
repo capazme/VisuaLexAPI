@@ -51,7 +51,7 @@ All environment variables are optional and have sensible defaults.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Server bind address |
+| `HOST` | `127.0.0.1` | Server bind address for `python app.py` (development): this machine alone. `start.sh` passes `0.0.0.0` when `MERLT_ENABLED=true`; production runs `hypercorn asgi:app` in its container. |
 | `PORT` | `5000` | Server port |
 
 ### HTTP Client Configuration
