@@ -12,6 +12,31 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-11-18
+
+Pratiche on the common controls, caps on dossiers, and MERL-T's last security fixes before it can come back on:
+zero-retention models, logs without people's words, and no port of its own on the host. No migration.
+MERL-T stays off.
+
+### Work
+
+- Pratiche on the common controls, with the order as a choice in a row (LC106, alignment 5 of 14).
+
+### Server
+
+- Caps on dossiers: 500 per account, 2,000 entries each, 10,000 entries in all; a refusal says the limit in
+  Italian (G-576, #644).
+
+### MERL-T
+
+- The default models have a zero-retention provider; 53 stale model ids removed (G-575, #642).
+- Logs carry lengths, never a person's text, a model's text or a provider's raw error (#627).
+
+### Infrastructure
+
+- In production MERL-T's port and mcp-legal-it's are not published on the host; the ingress refuses MERL-T's
+  internal callbacks (#625, #643).
+
 ## [1.42.0] - 2026-11-18
 
 Two more parts of the interface alignment: common switches, back links, text areas and cards, and one way for
