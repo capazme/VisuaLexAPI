@@ -67,7 +67,7 @@ describe('DecisionEntryView in a dossier\'s «Lettura» (LC58)', () => {
     expect(cited.holds(CC_2043)).toBe(true);
     expect(cited.holds(CC_1218)).toBe(false);
     // the preview's button cannot say «Apri in Ricerca» here: the norm lands in the «Lettura»
-    expect(cited.elsewhere).toBe('Apri nella Lettura');
+    expect(cited.elsewhere).toBe('Apri in Fonti');
     cited.open(CC_1218, null);
     expect(search).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'codice civile', article: '1218', version: 'vigente', besideId: 'win-1' }));
   });

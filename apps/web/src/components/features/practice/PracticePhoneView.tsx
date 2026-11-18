@@ -61,7 +61,8 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
   const save = usePracticeSaveActions(practice?.id ?? '');
   // LC68: one act names the table by its own heading; the table's head is not drawn and its «⋯» rides the act's.
   const oneAct = practice !== undefined && !bound && isOneActPractice(practice);
-  const simple = practice !== undefined && isSimplePractice(practice);
+  // A dossier's «Fonti» (LC86): its one article a closed row as any other, never Lettura semplice.
+  const simple = practice !== undefined && isSimplePractice(practice) && !bound;
   const renamePractice = useAppStore((s) => s.renamePractice);
   const [editing, setEditing] = useState(false);
   const rename = useMemo(() => ({

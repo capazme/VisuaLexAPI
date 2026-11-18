@@ -48,13 +48,14 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     const initial = first.current;
     first.current = false;
 
-    if (open) {
+    // Drawn already open (a page that opens on its last article, LC86), it takes no focus: the focus follows an opening.
+    if (open && !initial) {
       const active = document.activeElement;
       if (!(outer?.contains(active))) openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
       const target = initialFocusRef?.current ?? inner?.querySelector<HTMLElement>(FIELD) ?? inner?.querySelector<HTMLElement>(FOCUSABLE);
       // The page does not jump to a field that is still a line high.
       target?.focus({ preventScroll: true });
-    } else {
+    } else if (!open) {
       const active = document.activeElement;
       const opener = openerRef.current;
       if (opener?.isConnected && (active === document.body || active === null || outer?.contains(active))) opener.focus({ preventScroll: true });
@@ -73,6 +74,8 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     const fromOpacity = moving ? Number(getComputedStyle(inner).opacity) : open ? 0 : 1;
     running.current.forEach((a) => a.cancel());
     running.current = [];
+    // A height a growth held (below) gives way to this movement, read above.
+    outer.style.removeProperty('height');
     if (open) reveal();
 
     const timing = open ? ISLAND_OPEN : ISLAND_CLOSE;
@@ -110,15 +113,22 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
         last = next;
         return;
       }
-      const from = outer.getBoundingClientRect().height;
+      // Moving, the space is where its animation is; at rest it already took the new height in this layout (the
+      // observer runs after it, before the paint): it starts from the height it had, or the text arriving late jumps.
+      const moving = heightAnim.current !== null && running.current.includes(heightAnim.current);
+      const from = moving ? outer.getBoundingClientRect().height : last;
       last = next;
       const replaced = heightAnim.current;
       replaced?.cancel();
+      // An animation started here applies from the next frame: this frame, already styled, would be painted at the new
+      // height. The space is held where it was until the animation takes over.
+      outer.style.height = `${from}px`;
       const grow = outer.animate([{ height: `${from}px` }, { height: `${next}px` }], ISLAND_OPEN);
       heightAnim.current = grow;
       const anims = [...running.current.filter((a) => a !== replaced), grow];
       running.current = anims;
       grow.onfinish = () => {
+        if (heightAnim.current === grow) outer.style.removeProperty('height');
         if (running.current === anims) running.current = [];
       };
     });
