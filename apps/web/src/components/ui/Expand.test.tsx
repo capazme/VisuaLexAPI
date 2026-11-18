@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Expand } from './Expand';
@@ -101,12 +101,13 @@ describe('Expand', () => {
     expect(fades()[1].timing).toMatchObject({ duration: 150, easing: 'linear' });
   });
 
-  it('gives the focus to its first field on opening and back to its command on closing', () => {
+  it('gives the focus to the space itself on opening, never to a field, and back to its command on closing (LC105)', () => {
     render(<Harness />);
     const button = screen.getByRole('button', { name: 'Apri' });
     button.focus();
     fireEvent.click(button);
-    expect(screen.getByRole('textbox', { name: 'Campo' })).toHaveFocus();
+    expect(document.getElementById('space')).toHaveFocus();
+    expect(document.getElementById('space')).toHaveAttribute('tabindex', '-1');
     expect(button).toHaveAttribute('aria-expanded', 'true');
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Campo' }), { key: 'Escape' });
     expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -234,5 +235,29 @@ describe('Expand', () => {
     rect.mockRestore();
     expect(closing.cancel).toHaveBeenCalled();
     expect(heights()[2].frames).toEqual([{ height: '0px' }, { height: '120px' }]);
+  });
+
+  // LC105: at rest nothing is cut (a focus ring at its edges), while the height moves it is clipped on the height alone.
+  it('clips its height only while it moves, with clip, and nothing at rest', () => {
+    render(<Harness />);
+    const button = screen.getByRole('button', { name: 'Apri' });
+    fireEvent.click(button);
+    const space = document.getElementById('space')!;
+    expect(space.style.overflowY).toBe('clip');
+    expect(space).not.toHaveClass('overflow-hidden');
+    finishAll();
+    expect(space.style.overflowY).toBe('');
+    fireEvent.click(button);
+    expect(space.style.overflowY).toBe('clip');
+  });
+
+  // LC105, Papiniano on #637: StrictMode runs the effect twice on mounting; a space kept mounted closed played a closing.
+  it('kept mounted and closed, plays no closing when its effect runs again', () => {
+    render(
+      <StrictMode>
+        <Expand id="kept" open={false} keepMounted><p>x</p></Expand>
+      </StrictMode>,
+    );
+    expect(calls).toHaveLength(0);
   });
 });
