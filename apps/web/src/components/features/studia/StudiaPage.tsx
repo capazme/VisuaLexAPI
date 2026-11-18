@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useLocation, useOutlet } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
+import { ViewSlide } from '../../layout/ViewSlide';
 import { LessonFrame } from './LessonFrame';
 import { StudyStrip } from './progress/StudyStrip';
 import { useProgress } from './progress/useProgress';
@@ -30,6 +31,9 @@ const withAction = (pathname: string) => /^\/learn\/schede(\/|$)/.test(pathname)
 const isLesson = (pathname: string) =>
   /^\/learn\/ripasso\/sessione(\/|$)/.test(pathname) || /^\/learn\/percorsi\/[^/]+\/(moduli|esami)\/[^/]+\/?$/.test(pathname) || /^\/learn\/lezione\/?$/.test(pathname);
 
+/** The views in the sidebar's order, by their address's first word: the order of their slide (LC98). */
+const VIEW_ORDER = ['ripasso', 'percorsi', 'progressi', 'schede', 'valida'];
+
 /** The streak and the goal over «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
 function AreaStrip() {
   const progress = useProgress(undefined);
@@ -49,11 +53,10 @@ export function StudiaPage() {
   const { pathname } = useLocation();
   const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const context = { validator: loading ? undefined : user ? isValidator : null, actionSlot } satisfies StudiaOutletContext;
+  const outlet = useOutlet(context);
   if (isLesson(pathname)) {
     return (
-      <LessonFrame>
-        <Outlet context={context} />
-      </LessonFrame>
+      <LessonFrame>{outlet}</LessonFrame>
     );
   }
   return (
@@ -65,8 +68,11 @@ export function StudiaPage() {
       className="h-full"
       action={withAction(pathname) ? <div ref={setActionSlot} className="contents" /> : undefined}
     >
-      {underStrip(pathname) && <AreaStrip />}
-      <Outlet context={context} />
+      {/* A view, not an address: a card opened in «Le mie schede», or a course in «Percorsi», stays in its view. */}
+      <ViewSlide view={pathname.split('/')[2] ?? ''} order={VIEW_ORDER}>
+        {underStrip(pathname) && <AreaStrip />}
+        {outlet}
+      </ViewSlide>
     </PageFrame>
   );
 }

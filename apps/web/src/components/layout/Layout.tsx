@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useContext, useMemo, lazy, Suspense, Component, type ReactNode } from 'react';
-import { UNSAFE_LocationContext, useLocation, useNavigate, useOutlet, type Location } from 'react-router-dom';
+import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
+import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
+import { AtLocation } from './AtLocation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
@@ -90,18 +91,6 @@ function CompareWaiting() {
   );
 }
 
-/**
- * The address a page was drawn at, kept for it (LC84): `PageSlide` keeps the leaving page's element, whose route is its
- * own (`useOutlet`), but whatever in it reads `useLocation` (a title from the address, Opus's) would read the new one
- * and draw the coming page twice. The router has no public way to give a subtree its own location (`<Routes location>`
- * starts a new tree of routes), hence its context.
- */
-function AtLocation({ location, children }: { location: Location; children: ReactNode }) {
-  const context = useContext(UNSAFE_LocationContext);
-  const value = useMemo(() => ({ ...context, location }), [context, location]);
-  return <UNSAFE_LocationContext.Provider value={value}>{children}</UNSAFE_LocationContext.Provider>;
-}
-
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
     settings: s.settings,
@@ -175,8 +164,8 @@ export function Layout() {
     const active = document.activeElement;
     if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
   };
-  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it from the
-  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or an
+  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it puts the
+  // focus in the drawer, below). An Esc a control inside took (the user menu, the section switcher) or an
   // overlay over the drawer (a modal dialog, a sheet, the palette) is theirs. Only while the drawer is drawn: a window
   // widened past `lg` with it open hides it by CSS and keeps the state, and its Esc belongs to the page (gotcha 26).
   const lgUp = useMediaQuery('(min-width: 1024px)');
@@ -191,6 +180,11 @@ export function Layout() {
   const showSearchBar = showSearchBarRaw && !lgUp;
   // The search page from lg: the top bar with the path and the field, in full screen as well.
   const searchInTopBar = onSearchPage && lgUp;
+  // Opened, the drawer takes the focus on its first control (LC98): the menu button that opened it lies under the drawer's
+  // head, out of sight and out of reach.
+  useEffect(() => {
+    if (sidebarOpen && drawerDrawn) drawerRef.current?.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus({ preventScroll: true });
+  }, [sidebarOpen, drawerDrawn]);
   useEffect(() => {
     if (!sidebarOpen || !drawerDrawn) return;
     const onKeyDown = (e: KeyboardEvent) => {
