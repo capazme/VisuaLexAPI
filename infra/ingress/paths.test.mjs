@@ -63,10 +63,10 @@ test('every scraping path is a prefix match, like a Vite proxy key', () => {
 });
 
 test('nothing else of the Python API is routed to it', () => {
-  // The Python API keeps a global search history and a dossier file of its own,
-  // and a circuit-breaker status page. None of them is for the outside. Nor are the
-  // Massimario's internal routes: the portal's paced client and a volume's records,
-  // which MERL-T reads from inside.
+  // The Python API's old global search history and dossiers, and its twin's circuit-breaker
+  // page, were removed on 18 November 2026: this keeps them out should they come back. Nor are
+  // the Massimario's internal routes for the outside: the portal's paced client and a volume's
+  // records, which MERL-T reads from inside.
   for (const forbidden of ['/history', '/dossiers', '/api/circuit-breakers', '/fetch_massimario', '/massimario']) {
     assert.ok(
       !caddyLegalTokens().some((token) => token.startsWith(forbidden)),

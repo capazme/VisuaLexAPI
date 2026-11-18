@@ -12,10 +12,10 @@
 #   SCRAPERS_UPSTREAM   default scrapers:5000
 #   APP_SUBNET, EDGE_SUBNET   the subnets a forwarded client address is kept from
 #
-# Only the paths below reach the Python API. Its own /history, /dossiers… and
-# circuit-breaker pages stay unrouted: it keeps a global, unauthenticated history
-# and dossier file that were never meant for the outside. The paths that do reach it are
-# behind the login, except /version and /health (see the scrapers block).
+# Only the paths below reach the Python API; anything else stays unrouted. Its old global,
+# unauthenticated /history and /dossiers, and the circuit-breaker page of its unused twin,
+# were removed on 18 November 2026; paths.test.mjs keeps them out should they come back. The
+# paths that do reach it are behind the login, except /version and /health (see the scrapers block).
 
 {
 	admin off
