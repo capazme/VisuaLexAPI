@@ -349,11 +349,20 @@ POST unless noted, JSON bodies.
   were 14 «articles» numbered «1 (commi 101-200)» (and the existence check found no art. 1); the
   persistent keys carry `|parts`, so a tree stored before is read again
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection. `/parse_query`
-  answers `identifies_act` beside `recognized` (`act_identity.py`)
+  answers `identifies_act` beside `recognized` (`act_identity.py`). A recital clause
+  («considerando 26 GDPR», «cons. 26 reg. 2016/679», lists and ranges up to 150; spec
+  `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §3) is taken out first by
+  `tools/recital_clause.py` and the rest read as today (`read_norm_query`): the answer is
+  recognised with `parsed.recital` and no `urn`; `display` is the recital's citation
+  (`sources.cite_recital`), «considerando 26» with no act, nothing when refused. A top-level
+  `refusal` is `recital_not_eu` (not an EU regulation or directive) or `recital_with_article`; a
+  refused `parsed` keeps the act's fields only, never `article`. A clause with no act read is
+  `source: "recital"`. An article of an act with no recitals («art. 2043 c.c. considerando 5
+  anni») reads as before, the clause ignored: there «considerando» is the gerund
 - `/parse_query_batch` — `{"queries": [...]}`, 1 to 200 strings of 1 to 200 characters, the body
   at most 48 KB (anything else a 400 that names the limit) → `{"results": [{recognized, parsed,
   source, identifies_act}]}` in order: each read as `/parse_query` reads one (`read_norm_query`),
-  and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
+  a recital clause answered as not recognised this round, and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
   failures and the duration, never a string, and an error by its type only: the strings are the
   citations of a document the user may hold confidential (`tests/test_parse_query_batch.py`
   captures the records). Priced 3 points by the server's scrape gate; routed by the ingress's
@@ -401,8 +410,21 @@ POST unless noted, JSON bodies.
   display text
 - `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
+  Routed by the ingress's `@legal` and Vite's proxy, behind the login
+  (ADR-001), priced 1 point by the scrape gate (the default; spec
+  `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §8).
   Reads the OJ page the tree already uses; a consolidated text has no
-  preamble and answers an empty list. Normattiva acts get a 400
+  preamble and answers an empty list. Normattiva acts get a 400. The text
+  is a data contract like `article_text` (root rule 23, spec
+  `2026-11-17-eu-recitals-design.md` §7): a paragraph's text nodes join with
+  no space of ours, a footnote call (modern markup) goes with the whitespace
+  before it, ASCII whitespace runs become one space, the no-break space stays;
+  a legacy paragraph without «(N)» joins the recital before it with `\n` once
+  the next recital arrives. `tests/test_recitals_text_frozen.py` holds each
+  recital's projection (SHA-256 and length); it binds from the web's PR 4a of
+  that plan. EU article text read from the Official Journal's markup has its
+  own guard, `tests/test_eurlex_article_text_frozen.py`, binding now (the
+  consolidated markup has none yet)
 - `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
   AKN text plus, for the codici, the FRBRWork date of each article (the day
   its current text came into force). `urn` is the act's full URL as

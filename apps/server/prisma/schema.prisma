@@ -1934,6 +1934,14 @@ model LingoCorsoDomandaCompetenza {
   @@map("lingo_corsi_domande_competenze")
 }
 
+/// A learner's goal for a course (G-488): the web groups the paths by it.
+enum LingoCorsoObiettivo {
+  ESAME_AVVOCATO
+  ESAME_MATERIA
+  AGGIORNAMENTO_NORMATIVO
+  ALTRO
+}
+
 model LingoCorsoIscrizione {
   id         String    @id @default(uuid())
   corsoId    String    @map("corso_id")
@@ -1942,6 +1950,11 @@ model LingoCorsoIscrizione {
   dossierId  String?   @map("dossier_id")
   // The Rome day the course was passed: written once, never cleared.
   superatoIl DateTime? @map("superato_il") @db.Date
+  // The learner's goal and exam date (G-488), set from the web only (`PATCH /:id`): a kind, an optional sentence
+  // (1–200, only with a kind: a CHECK) and a Rome day, refused when past as it is set and kept once it passes.
+  obiettivo     LingoCorsoObiettivo?
+  obiettivoNota String?              @map("obiettivo_nota")
+  dataEsame     DateTime?            @map("data_esame") @db.Date
   createdAt  DateTime  @default(now()) @map("created_at")
 
   corso     LingoCorso              @relation(fields: [corsoId], references: [id], onDelete: Cascade)

@@ -34,6 +34,22 @@ describe('PageSlide', () => {
     expect(screen.getByText('Pagina B')).toBeInTheDocument();
   });
 
+  it('going back, makes the same movement the other way (LC84)', () => {
+    const calls: { el: Element; frames: Keyframe[] }[] = [];
+    Element.prototype.animate = function (this: Element, frames: Keyframe[]) {
+      calls.push({ el: this, frames });
+      return { cancel: vi.fn(), onfinish: null } as unknown as Animation;
+    } as unknown as typeof Element.prototype.animate;
+
+    const { rerender } = render(<PageSlide pageKey="/impostazioni"><p>Impostazioni</p></PageSlide>);
+    rerender(<PageSlide pageKey="/a" back><p>Pagina A</p></PageSlide>);
+
+    const coming = calls.find((c) => c.el.contains(screen.getByText('Pagina A')))!;
+    const going = calls.find((c) => c.el.contains(screen.getByText('Impostazioni')))!;
+    expect(coming.frames[0]).toEqual({ opacity: 0, transform: 'translateX(-24px)' });
+    expect(going.frames[1]).toEqual({ opacity: 0, transform: 'translateX(24px)' });
+  });
+
   it('without Web Animations changes the page at once', () => {
     const { rerender } = render(<PageSlide pageKey="/a"><p>Pagina A</p></PageSlide>);
     rerender(<PageSlide pageKey="/b"><p>Pagina B</p></PageSlide>);

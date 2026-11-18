@@ -27,6 +27,7 @@ import { useRassegneForTopic } from '../rassegne/useRassegneForTopic';
 import { rememberSearch } from '../rassegne/searchMemory';
 import { provenance } from '../rassegne/rassegnaFilters';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
+import { useOpenSettings } from '../settings/settingsRoute';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -219,21 +220,20 @@ function IslandVeil({ onClick }: { onClick: () => void }) {
 
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, onShowSearch, onOpenRassegne }: CommandPaletteProps) {
   const {
-    quickNorms, selectQuickNorm, settings, openQuickNormsManager,
-    customAliases, trackAliasUsage, openAliasManager, openDecision, openTopicSearch, takeCommandPaletteQuery, commandPaletteQuery
+    quickNorms, selectQuickNorm, settings,
+    customAliases, trackAliasUsage, openDecision, openTopicSearch, takeCommandPaletteQuery, commandPaletteQuery
   } = useAppStore(useShallow(s => ({
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
     settings: s.settings,
-    openQuickNormsManager: s.openQuickNormsManager,
     customAliases: s.customAliases,
     trackAliasUsage: s.trackAliasUsage,
-    openAliasManager: s.openAliasManager,
     openDecision: s.openDecision,
     openTopicSearch: s.openTopicSearch,
     takeCommandPaletteQuery: s.takeCommandPaletteQuery,
     commandPaletteQuery: s.commandPaletteQuery,
   })));
+  const openSettings = useOpenSettings();
   // The box is focused as the palette opens; the first-open tour (driver.js, started 300 ms later)
   // can take that focus, so when the tour ends the box gets it back. Only if the box is still there:
   // the ref is empty once the palette has closed or moved on to another step.
@@ -437,16 +437,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     }
   }, [selectQuickNorm, onSearch, done]);
 
+  // The quick norms and the aliases are parts of Impostazioni (LC84): the palette closes and the page opens there.
   const handleOpenQuickNormsManager = useCallback(() => {
     done();
-    // Small delay to let the palette close before opening manager
-    setTimeout(() => openQuickNormsManager(), 100);
-  }, [done, openQuickNormsManager]);
+    openSettings('norme-rapide');
+  }, [done, openSettings]);
 
   const handleOpenAliasManager = useCallback(() => {
     done();
-    setTimeout(() => openAliasManager(), 100);
-  }, [done, openAliasManager]);
+    openSettings('alias');
+  }, [done, openSettings]);
 
   const handleSelectAlias = useCallback((alias: CustomAlias) => {
     trackAliasUsage(alias.id);

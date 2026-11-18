@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { Request, Response } from 'express';
-import type { User } from '@prisma/client';
+import { Prisma, type User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { hashPassword, passwordSchema, verifyPassword } from '../utils/password';
@@ -68,39 +69,63 @@ const toMeResponse = (user: User) => ({
   last_login_at: user.lastLoginAt,
 });
 
-// Register - creates inactive user pending admin approval
+const REGISTRATION_REFUSED = 'Registrazione non riuscita con questi dati.';
+
+const isUniqueClash = (error: unknown): error is Prisma.PrismaClientKnownRequestError =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
+/**
+ * Register - creates inactive user pending admin approval.
+ *
+ * Which emails have an account is nobody's business (item 9 of the security inventory). The owner chose one refusal
+ * for an email or a username already in use (G-520), in Italian so the web shows it as it comes: it never says which
+ * of the two.
+ *
+ * Accepted limit of that choice, until the e-mail is confirmed (self-service sign-up, parked): a refusal still says
+ * that one of the two is in use, so with a username nobody has it points to the email. The failed attempts limit on
+ * this route slows that down; it does not close it.
+ */
 export const register = async (req: Request, res: Response) => {
   const { email, username, password } = registerSchema.parse(req.body);
 
-  // Check if user already exists
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ email }, { username }],
-    },
-  });
-
-  if (existingUser) {
-    throw new AppError(400, 'User with this email or username already exists');
+  const inUse = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] }, select: { id: true } });
+  if (inUse) {
+    throw new AppError(400, REGISTRATION_REFUSED);
   }
 
-  // Hash password
   const hashedPassword = await hashPassword(password);
-
-  // Create user with isActive: false (requires admin approval)
-  await prisma.user.create({
-    data: {
-      email,
-      username,
-      password: hashedPassword,
-      isActive: false, // User must be approved by admin
-    },
-  });
+  try {
+    // Create user with isActive: false (requires admin approval)
+    await prisma.user.create({
+      data: {
+        email,
+        username,
+        password: hashedPassword,
+        isActive: false, // User must be approved by admin
+      },
+    });
+  } catch (error) {
+    // Two registrations at once with the same email or username: the second meets the unique index, and gets the
+    // refusal the check above would have given it.
+    if (isUniqueClash(error)) throw new AppError(400, REGISTRATION_REFUSED);
+    throw error;
+  }
 
   // Don't generate tokens - user cannot login until approved
   res.status(201).json({
     message: 'Registrazione completata. Il tuo account è in attesa di approvazione da parte di un amministratore.',
     pending_approval: true,
   });
+};
+
+/**
+ * A bcrypt hash of nothing anyone knows, at the cost `hashPassword` uses: a sign-in with an unknown email compares
+ * against it, so it takes as long as a wrong password and the time of the answer does not tell which emails exist.
+ */
+// Computed when the module loads, not on the first unknown email: that first sign-in would otherwise take twice as long.
+const decoyHash = hashPassword(randomUUID());
+const spendAPasswordCheck = async (password: string): Promise<void> => {
+  await verifyPassword(password, await decoyHash);
 };
 
 // Login
@@ -113,6 +138,7 @@ export const login = async (req: Request, res: Response) => {
   });
 
   if (!user) {
+    await spendAPasswordCheck(password);
     throw new AppError(401, 'Invalid credentials');
   }
 
