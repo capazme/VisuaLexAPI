@@ -43,15 +43,15 @@ describe('TrashPage, «Elimina definitivamente» (LC85, Papiniano on #585)', () 
     Reflect.deleteProperty(Element.prototype, 'animate');
     vi.restoreAllMocks();
   });
-  function Page() {
-    const [entries, setEntries] = useState<TrashEntry[]>([entry, second]);
+  function Page({ start = [entry, second] }: { start?: TrashEntry[] }) {
+    const [entries, setEntries] = useState<TrashEntry[]>(start);
     const purge = vi.fn(async (e: TrashEntry) => {
       setEntries((now) => now.filter((x) => x.id !== e.id));
       return true;
     });
     return <TrashPage trash={{ entries, error: null, reload: vi.fn(), restore: vi.fn(), purge }} onBack={() => {}} showToast={() => {}} />;
   }
-  function setup() {
+  function setup(start?: TrashEntry[]) {
     runs = [];
     Object.defineProperty(Element.prototype, 'animate', {
       value: function (this: Element, keyframes: Keyframe[]) {
@@ -70,7 +70,7 @@ describe('TrashPage, «Elimina definitivamente» (LC85, Papiniano on #585)', () 
       if (this.getAttribute('role') === 'alertdialog') return rect(528, 350, 384, 200);
       return own.call(this);
     });
-    render(<Page />);
+    render(<Page start={start} />);
     return screen.getByRole('button', { name: 'Elimina definitivamente Pratica «Vecchia pratica»' });
   }
 
@@ -94,5 +94,17 @@ describe('TrashPage, «Elimina definitivamente» (LC85, Papiniano on #585)', () 
     });
     await waitFor(() => expect(screen.queryByText('Pratica «Vecchia pratica»')).toBeNull());
     await waitFor(() => expect(screen.getByRole('button', { name: 'Ripristina Pratica «Altra pratica»' })).toHaveFocus());
+  });
+
+  // LC106: the list sits inside `PageFrame`, a level deeper than the way back.
+  it('confirmed on the last entry, the focus goes to «Indietro»: never the body', async () => {
+    const button = setup([entry]);
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('alertdialog');
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina definitivamente' }));
+    });
+    await waitFor(() => expect(screen.queryByText('Pratica «Vecchia pratica»')).toBeNull());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Indietro' })).toHaveFocus());
   });
 });
