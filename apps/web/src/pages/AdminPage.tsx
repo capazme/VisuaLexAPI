@@ -43,7 +43,7 @@ const MUTED = 'text-xs text-slate-500 dark:text-slate-400';
 const COLUMN_HEAD = 'hidden gap-4 pb-2 text-xs font-medium text-slate-500 md:grid dark:text-slate-400';
 
 const USER_COLUMNS = 'md:grid-cols-[minmax(0,1.5fr)_5.5rem_minmax(12rem,1.2fr)_minmax(0,1.5fr)_2.25rem]';
-const ENV_COLUMNS = 'md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.4fr)_6rem_minmax(0,1.4fr)_2.25rem]';
+const ENV_COLUMNS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_6rem_minmax(12rem,1.3fr)_2.25rem]';
 
 const FEEDBACK_TYPE: Record<FeedbackType, string> = { bug: 'Errore', suggestion: 'Suggerimento', other: 'Altro' };
 const FEEDBACK_STATUS: Record<FeedbackStatus, string> = { new: 'Nuovo', read: 'Letto', resolved: 'Risolto', dismissed: 'Ignorato' };
@@ -481,7 +481,7 @@ export function AdminPage() {
                     aria-current={location.hash === `#${part.id}` ? 'location' : undefined}
                     className={cn(
                       'flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
-                      'lg:min-h-0 lg:border-transparent lg:py-1.5',
+                      'lg:min-h-0 lg:border-transparent lg:py-1.5 lg:dark:border-transparent',
                       'aria-[current=location]:bg-slate-100 aria-[current=location]:font-medium aria-[current=location]:text-slate-900 dark:aria-[current=location]:bg-slate-800 dark:aria-[current=location]:text-slate-50',
                       FOCUS_RING,
                     )}
