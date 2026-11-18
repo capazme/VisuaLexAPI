@@ -55,13 +55,13 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
   });
 
   // LC92 (Luca, 18 Nov): by use, in four groups; the page's parts in the same order as the index.
-  it('orders its index in four groups, Lettura, Ricerca, Account, Aiuto, and its parts the same way', () => {
+  it('orders its index in four groups, Lettura, Ricerca, Account, Supporto, and its parts the same way', () => {
     app();
     enter();
     const index = screen.getByRole('navigation', { name: 'Parti delle impostazioni' });
     const groups = within(index).getAllByRole('list');
     expect(groups.map((list) => list.getAttribute('aria-labelledby') && document.getElementById(list.getAttribute('aria-labelledby')!)?.textContent))
-      .toEqual(['Lettura', 'Ricerca', 'Account', 'Aiuto']);
+      .toEqual(['Lettura', 'Ricerca', 'Account', 'Supporto']);
     expect(groups.map((list) => within(list).getAllByRole('link').map((link) => link.textContent))).toEqual([
       ['Aspetto', 'Significato dei colori'],
       ['Norme rapide', 'Alias'],

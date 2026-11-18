@@ -304,7 +304,7 @@ export function SettingsPage() {
             { id: 'sviluppo', name: 'Sviluppo', shown: canUseDevMode },
             { id: 'amministrazione', name: 'Amministrazione', shown: isAdmin },
         ] },
-        { group: 'Aiuto', parts: [
+        { group: 'Supporto', parts: [
             { id: 'segnala', name: 'Segnala un problema', shown: isAuthenticated },
             { id: 'scorciatoie', name: 'Scorciatoie da tastiera' },
             { id: 'aiuto', name: 'Aiuto' },
