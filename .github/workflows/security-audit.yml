@@ -31,9 +31,9 @@ jobs:
   # What ships blocks; development tools are shown and never block (G-552). The runtime images
   # install with `npm ci --omit=dev` and the web ships as built files. The Prisma CLI, which the
   # one-shot `migrate` container runs against the database, is a production dependency of the
-  # server (G-555), so this job covers it. One exception still runs on the deployment host: the
-  # web's build tools, on our own sources. The cost: a future high advisory in a development tool,
-  # these included, no longer blocks.
+  # server (G-555), so this job covers it. Development tools still run on the deployment host only
+  # while the images are built: the build tools of the web, the server and the MCP, on our own
+  # sources. The cost: a future high advisory in a development tool, these included, no longer blocks.
   npm-audit:
     name: npm audit, production dependencies
     runs-on: ubuntu-latest
