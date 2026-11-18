@@ -647,45 +647,60 @@ describe('CommandPalette — in the page, not over it (L-75)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('after a choice, gives the focus to the page it led to (its title), not back to the pill nor to the body', async () => {
+  /** A choice in the palette: «art. 2043 c.c.» and Enter. */
+  async function choose() {
+    const box = screen.getByRole('combobox');
+    fireEvent.change(box, { target: { value: 'art. 2043 c.c.' } });
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    fireEvent.keyDown(box, { key: 'Enter' });
+  }
+  // The search page as it is with a practice open: its title an h2, the practice's name, marked as the page's title.
+  const ricerca = <main><h2 key="ricerca" data-page-title="">Ricerca del 18 novembre</h2></main>;
+
+  it('after a choice, gives the focus to the title of the page it led to, an h2 on the search page, not to the pill nor to the body', async () => {
     const pill = document.createElement('button');
     document.body.append(pill);
     pill.focus();
     const onClose = vi.fn();
     const onSearch = vi.fn();
-    const { rerender } = render(<><main><h1>Ricerca</h1></main><CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
-    const box = screen.getByRole('combobox');
-    fireEvent.change(box, { target: { value: 'art. 2043 c.c.' } });
-    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
-    fireEvent.keyDown(box, { key: 'Enter' });
+    const { rerender } = render(<>{ricerca}<CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
+    await choose();
     expect(onSearch).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
-    rerender(<><main><h1>Ricerca</h1></main><CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ricerca' })).toHaveFocus());
+    rerender(<>{ricerca}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    // At once, in the same commit: never a frame on the body.
+    expect(screen.getByRole('heading', { name: 'Ricerca del 18 novembre' })).toHaveFocus();
     expect(pill).not.toHaveFocus();
     pill.remove();
   });
 
-  it('after a choice that changes the page, skips the title of the page left and gives the focus to the new one as it comes', async () => {
+  it('after a choice on a page with no marked title, gives the focus to <main> at once', async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<><main><p>Senza titolo</p></main><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    await choose();
+    rerender(<><main><p>Senza titolo</p></main><CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} /></>);
+    expect(document.querySelector('main')).toHaveFocus();
+  });
+
+  it('after a choice that changes the page, holds the focus on <main>, skips the title of the page left, and gives it to the new one as it comes', async () => {
     const onClose = vi.fn();
     const onSearch = vi.fn();
-    // A page of its own each: the router mounts the new one, a new title.
-    const page = (title: string) => <main><h1 key={title}>{title}</h1></main>;
-    const { rerender } = render(<>{page('Pratiche')}<CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
-    const box = screen.getByRole('combobox');
-    fireEvent.change(box, { target: { value: 'art. 2043 c.c.' } });
-    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
-    fireEvent.keyDown(box, { key: 'Enter' });
-    expect(onSearch).toHaveBeenCalled();
+    const pratiche = <main><h1 key="pratiche" data-page-title="">Pratiche</h1></main>;
+    const { rerender } = render(<>{pratiche}<CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
+    await choose();
     const before = `${window.location.pathname}${window.location.search}`;
     // The router has changed the address; the page left is still drawn as the menu closes.
     window.history.pushState({}, '', '/altrove');
-    const seen: string[] = [];
-    document.addEventListener('focusin', (event) => seen.push((event.target as HTMLElement).textContent ?? ''));
-    rerender(<>{page('Pratiche')}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
-    rerender(<>{page('Ricerca')}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ricerca' })).toHaveFocus());
-    expect(seen).not.toContain('Pratiche');
+    const seen: Element[] = [];
+    const record = (event: FocusEvent) => seen.push(event.target as Element);
+    const left = screen.getByRole('heading', { name: 'Pratiche' });
+    document.addEventListener('focusin', record);
+    rerender(<>{pratiche}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    expect(document.querySelector('main')).toHaveFocus();
+    rerender(<>{ricerca}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ricerca del 18 novembre' })).toHaveFocus());
+    expect(seen).not.toContain(left);
+    document.removeEventListener('focusin', record);
     window.history.pushState({}, '', before);
   });
 

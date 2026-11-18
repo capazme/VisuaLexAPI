@@ -52,6 +52,8 @@ describe('PracticeTable (spec §3.1)', () => {
     s().openDecision(FOUND, { practiceId, open: false });
     render(table());
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(searchTableLabel(new Date()));
+    // The search page's title, an h2: where the focus lands after a choice in ⌘K (L-75, Papiniano, #599).
+    expect(screen.getByRole('heading', { level: 2 })).toHaveAttribute('data-page-title');
     expect(screen.getByText('1 atto · 2 articoli · 1 sentenza')).toBeInTheDocument();
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();

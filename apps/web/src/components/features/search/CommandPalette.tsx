@@ -173,41 +173,40 @@ function focusTitle(title: HTMLElement) {
 
 /** How long a page reached by a choice may take to draw its title (its code and its first data). */
 const LANDING_MS = 3000;
+/** A page's title, where the focus lands after a choice: marked on each page, an `h1` or an `h2` (Papiniano, #599). */
+const PAGE_TITLE = 'main [data-page-title]';
 
 /**
- * After a choice (Papiniano, #599): the focus on the page it led to — what took the focus there by itself keeps it,
- * else the page's title — never the pill, never the body. `left`: the choice changed the address, so the title on screen
- * now is the page being left (the router draws the new one a commit later): only another one is the landing's. The
- * page's DOM is watched until the title comes, at most `LANDING_MS`; then `<main>`. Returns the cleanup.
+ * After a choice (Papiniano, #599): at once on `<main>`, never left on the body; then on the title of what the choice
+ * opened — the first marked title that was not on screen before it (the page reached, a reader opened beside), or, on
+ * the same page, the title there. `left`: the choice changed the address, so the titles on screen now are the page being
+ * left (the router draws the new one a commit later), never focused. Whatever takes the focus by itself keeps it. The
+ * page is watched for `LANDING_MS`. Returns the cleanup.
  */
 function focusLanding(left: boolean): () => void {
-  const leaving = left ? document.querySelector<HTMLElement>('main h1') : null;
+  const before = new Set(document.querySelectorAll(PAGE_TITLE));
+  const main = document.querySelector('main');
   let given: HTMLElement | null = null;
-  const look = (): boolean => {
+  const look = () => {
     const active = document.activeElement;
-    // Something on the page took the focus by itself (a result that focuses itself): it keeps it.
-    if (active && active !== document.body && active !== given) return true;
-    const title = document.querySelector<HTMLElement>('main h1');
-    if (!title || title === leaving) return false;
-    if (title !== given) {
+    // Something took the focus by itself (a reader that focuses itself): it keeps it.
+    if (active && active !== document.body && active !== main && active !== given) return stop();
+    const titles = [...document.querySelectorAll<HTMLElement>(PAGE_TITLE)];
+    const title = titles.find((el) => !before.has(el)) ?? (left || given ? null : titles[0]);
+    if (title && title !== given) {
       focusTitle(title);
       given = title;
     }
-    return true;
   };
-  if (look() && !left) return () => {};
-  const observer = new MutationObserver(() => {
-    if (look()) stop();
-  });
-  const timer = window.setTimeout(() => {
-    stop();
-    if (!document.activeElement || document.activeElement === document.body) focusPage();
-  }, LANDING_MS);
+  focusPage();
+  look();
+  const observer = new MutationObserver(look);
+  observer.observe(document.body, { childList: true, subtree: true });
+  const timer = window.setTimeout(() => stop(), LANDING_MS);
   function stop() {
     observer.disconnect();
     window.clearTimeout(timer);
   }
-  observer.observe(document.body, { childList: true, subtree: true });
   return stop;
 }
 
