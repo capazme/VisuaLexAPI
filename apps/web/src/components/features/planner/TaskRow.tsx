@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarDays, CheckCheck, ChevronRight, Folder, Hourglass, ListTree, MoreHorizontal, Pencil, Plus, Repeat, Tag, Trash2 } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
@@ -34,9 +35,35 @@ interface Props extends TaskRowActions {
 const time = (value: string | null) => (value ? ` · ${value}` : '');
 
 /**
+ * On one line (a wide list, 1024 px) the labels and the dossier shrink with the room the other signs leave, down to
+ * «U…» and «R». One that would be cut under two letters' width is not drawn (LC91): all shown, measured, the cut ones
+ * hidden, in one frame, at each render of the row (any sign may take room) and when its width changes.
+ */
+function useHideWhenCut(signs: React.RefObject<HTMLDivElement | null>) {
+  useLayoutEffect(() => {
+    const box = signs.current;
+    if (!box) return undefined;
+    const check = () => {
+      const parts = [...box.querySelectorAll<HTMLElement>('[data-squeezable]')];
+      parts.forEach((part) => { part.style.display = ''; });
+      for (const part of parts) {
+        const text = part.querySelector<HTMLElement>('.truncate');
+        const em = parseFloat(getComputedStyle(part).fontSize) || 12;
+        if (text && text.scrollWidth > text.clientWidth && text.clientWidth < 2 * em) part.style.display = 'none';
+      }
+    };
+    check();
+    const row = box.closest('li');
+    const observer = typeof ResizeObserver === 'function' && row ? new ResizeObserver(check) : null;
+    if (observer && row) observer.observe(row);
+    return () => observer?.disconnect();
+  });
+}
+
+/**
  * One task, on two levels as the list's rows are (P2b): the tick (a real checkbox, so Space ticks it; its ring the
  * priority's), the title (opens the task's sheet), its description in one grey line, then a line of signs — the
- * planned day in its colour and in words (`rowDay`: «Domani», «venerdì», «Ieri · in ritardo di 1 giorno»), the
+ * planned day in its colour and in words (`rowDay`: «Domani», «ven 23», «Ieri · in ritardo di 1 giorno»), the
  * deadline bordered with its count, the subtasks' counter (which opens them in place), the repetition, the priority in
  * words, the labels — with the dossier at its right end, in grey; and «⋯». The list moves between rows with the arrows
  * (`TaskList`).
@@ -45,6 +72,8 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
   const dossierTitle = useAppStore((s) => (task.dossierId ? s.dossiers.find((d) => d.id === task.dossierId)?.title : undefined));
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
   const plannedShown = task.plannedDate !== null && !(task.plannedDate === dayShown && !task.plannedTime);
+  const signs = useRef<HTMLDivElement>(null);
+  useHideWhenCut(signs);
   const hasSigns = Boolean(plannedShown || due || (subtasks && subtasks.count > 0) || task.recurrence || task.priority < 4 || task.labels.length > 0 || (showDossier && task.dossierId));
 
   return (
@@ -76,7 +105,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
           )}
           </div>
           {hasSigns && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 @2xl:mt-0 @2xl:max-w-[60%] @2xl:flex-nowrap @2xl:justify-end">
+            <div ref={signs} className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 @2xl:mt-0 @2xl:max-w-[60%] @2xl:flex-nowrap @2xl:justify-end">
               {task.plannedDate && plannedShown && (
                 <span className={cn(META, DAY_TONE[dayTone(task.plannedDate, today)])}>
                   <CalendarDays size={12} aria-hidden />
@@ -135,7 +164,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
                 </span>
               )}
               {task.labels.map((label) => (
-                <span key={label} className={cn(META, 'max-w-full rounded bg-slate-100 px-1.5 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300')}>
+                <span key={label} data-squeezable className={cn(META, 'max-w-full rounded bg-slate-100 px-1.5 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300')}>
                   <Tag size={11} aria-hidden />
                   <span className="sr-only">Etichetta: </span>
                   {/* Shown as the dossiers' tags are, its first letter capitalised; stored as typed. */}
@@ -144,6 +173,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
               ))}
               {showDossier && task.dossierId && (
                 <Link
+                  data-squeezable
                   to={`/pratiche?dossier=${encodeURIComponent(task.dossierId)}`}
                   // At the line's right end; 44 px tall for a finger, laid over the gaps where a pointer is precise.
                   className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%] @2xl:ml-0 @2xl:min-w-0 @2xl:max-w-[14rem] @2xl:shrink', FOCUS_RING)}
