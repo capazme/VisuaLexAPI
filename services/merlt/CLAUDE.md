@@ -75,7 +75,7 @@ services/merlt/
 |---|---|
 | `app.py` | the FastAPI app (`merlt.app:app`), the lifespan boot sequence, `/health`, the router list |
 | `api/` | the routers (below), `engine_bootstrap.py` (builds the orchestrator, also used by "Riavvia motore"), `auth.py` (`verify_api_key`, `require_role`), `api_key_seed.py`, `models/` (Pydantic DTOs) |
-| `experts/` | `orchestrator.py`, the four experts, `base.py`, `react_mixin.py`, `synthesizer.py` (`AdaptiveSynthesizer`), `router.py`, `gating.py`, `neural_gating/` (gating MLP, `HybridExpertRouter`, tool selector), `models.py` (`QATrace`, `QAFeedback`, `ApiKey`), `llm/` |
+| `experts/` | `orchestrator.py`, the four experts, `base.py`, `react_mixin.py`, `synthesizer.py` (`AdaptiveSynthesizer`), `router.py`, `gating.py`, `neural_gating/` (gating MLP, `HybridExpertRouter`, tool selector), `models.py` (`QATrace`, `QAFeedback`, `ApiKey`) |
 | `tools/` | the tools the experts call (`search.py`, `mcp_legal_adapter.py` for mcp-legal-it, `registry.py`, …) |
 | `rlcf/` | `training_scheduler.py` (buffer, `add_experience`, persistence), `replay_buffer.py`, `buffer_rehydration.py`, `policy_gradient.py` (REINFORCE, `GRAPH_TO_POLICY_RELATION`), `policy_manager.py` (loads `*_latest.pt`), `authority.py`, `domain_authority.py`, `authority_sync.py`, `aggregation.py`, `devils_advocate.py`, `quarantine_service.py`, `ai_service.py` (`OpenRouterService`), and more |
 | `weights/` | `store.py` (`WeightStore`, `weight_versions`), `learner.py`, `experiment.py`, `config/` |
@@ -189,6 +189,14 @@ BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
   does not relay it; do not add a field that carries it.
 - `api/user_data_router.py`: `GET`/`DELETE /api/v1/user-data/{user_id}`, admin
   key only (`require_role("admin")`).
+- **The language models** (G-456: only providers that neither keep nor train on
+  the text, asked on every call). Every call goes through `OpenRouterService`
+  (`rlcf/ai_service.py`) and carries `OPENROUTER_PROVIDER_RULE`:
+  `provider.data_collection: "deny"` and `provider.zdr: true`. The model is chosen
+  at run time, so the rule rides on the request, not on a list of models; a model
+  with no zero-retention endpoint is refused by OpenRouter, so a model chosen for
+  MERL-T must have one. Do not add a client that calls a model another way: the
+  unused multi-provider package `experts/llm/` was removed for that reason.
 
 Never call the user id «anonymous», «opaque» or «pseudonymous», and never log
 it next to a payload. The research export (`export_router`) pseudonymises with a
