@@ -31,8 +31,8 @@ x-hardening: &hardening
   security_opt: ["no-new-privileges:true"]
 
 services:
-  # Applies the Prisma migrations, then exits. `prisma` is a development dependency,
-  # which is why this is its own image target and not part of the server's.
+  # Applies the Prisma migrations, then exits. Its own image target: only the server's
+  # build stage holds the `prisma/` folder (schema and migrations) it applies.
   migrate:
     <<: *hardening
     build:
