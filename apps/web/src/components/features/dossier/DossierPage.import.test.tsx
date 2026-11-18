@@ -100,7 +100,7 @@ describe('DossierPage: an import stopped by the server\'s write limit (429)', ()
   it('says why it stopped and «Riprendi» goes on from the items left, into the same dossier', async () => {
     const { importDossier, region } = await importWith([note, note, note], { id: 'srv', imported: 1, failed: 0, next: 1 });
     await waitFor(() => expect(said(region)).toHaveTextContent(
-      'Import interrotto: 1 voce entrata su 3. Il server ha chiesto di rallentare: «Riprendi» continua dalle voci rimaste, nella stessa pratica.',
+      'Import interrotto, il server ha chiesto di rallentare: 1 voce entrata su 3, 2 non ancora importate. «Riprendi» continua dalle voci rimaste, nella stessa pratica.',
     ));
     const resume = within(region).getByRole('button', { name: 'Riprendi: 2 voci' });
     expect(resume).toHaveFocus();
@@ -109,6 +109,30 @@ describe('DossierPage: an import stopped by the server\'s write limit (429)', ()
     // All in now: the dossier opens, as a whole import does.
     expect(await screen.findByText('Pratica importata')).toHaveAttribute('data-type', 'success');
     expect(vi.mocked(importDossier).mock.calls[1]).toMatchObject([expect.anything(), { resume: { id: 'srv', from: 1 } }]);
+  });
+});
+
+describe('DossierPage: an import stopped by a lost connection', () => {
+  it('says «Connessione persa», counts nothing as scartate, offers «Riprendi», and asks before the page is left', async () => {
+    let answer: (value: unknown) => void = () => {};
+    const importDossier = vi.fn<(dossier: Dossier, options?: unknown) => Promise<unknown>>(() => new Promise((resolve) => { answer = resolve; }));
+    appStore.setState({ dossiers: [], importDossier } as never);
+    render(<MemoryRouter initialEntries={[link([note, note, note])]}><DossierPage /></MemoryRouter>);
+    const region = await screen.findByRole('region', { name: 'Importa una pratica' });
+    fireEvent.click(within(region).getByRole('button', { name: 'Importa' }));
+    expect(within(region).getByText('Se lasci la pagina l’importazione si ferma.')).toBeInTheDocument();
+    const leaving = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    expect(leaving.defaultPrevented).toBe(true);
+    answer({ id: 'srv', imported: 1, failed: 0, next: 1, stopped: 'network' });
+    await waitFor(() => expect(said(region)).toHaveTextContent(
+      'Connessione persa: 1 voce entrata su 3, 2 non ancora importate. «Riprendi» continua dalle voci rimaste, nella stessa pratica.',
+    ));
+    expect(said(region)).not.toHaveTextContent('scartat');
+    expect(within(region).getByRole('button', { name: 'Riprendi: 2 voci' })).toHaveFocus();
+    const after = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(after);
+    expect(after.defaultPrevented).toBe(false);
   });
 });
 

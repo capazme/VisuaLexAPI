@@ -29,7 +29,7 @@ interface Result {
   message: string;
   type: ToastType;
   dossierId?: string;
-  /** Stopped by the server's write limit: «Riprendi» goes on from there. */
+  /** Stopped by the server's write limit or a lost connection: «Riprendi» goes on from there. */
   resumable?: boolean;
 }
 
@@ -44,6 +44,7 @@ interface Tally {
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const SLOW_DOWN = 'Il server ha chiesto di rallentare';
+const NO_ANSWER = 'La connessione non risponde';
 
 /**
  * «Importa una pratica» in the page (LC107, L-73): a space at the top of the dossiers (`Expand`), never over them. The
@@ -92,6 +93,13 @@ function ImportBody({ check, busy, setBusy, onClose, onOpen, showToast }: Omit<P
   // The pressed «Importa» is gone with the outcome: the focus goes to what comes next, a button, never a field.
   const nextRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (result) nextRef.current?.focus({ preventScroll: true }); }, [result]);
+  // Leaving the page stops the import, and what is not in yet is lost: the browser asks first (L-74, data at stake).
+  useEffect(() => {
+    if (!busy) return undefined;
+    const hold = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', hold);
+    return () => window.removeEventListener('beforeunload', hold);
+  }, [busy]);
 
   const run = async () => {
     const prior = tally;
@@ -121,8 +129,11 @@ function ImportBody({ check, busy, setBusy, onClose, onOpen, showToast }: Omit<P
     };
     setTally(sum);
     if (sum.next !== undefined) {
+      // What is left is not yet in, never «scartate»: that word is for a cap's 409.
+      const why = outcome.stopped === 'network' ? 'Connessione persa' : `Import interrotto, ${SLOW_DOWN.toLowerCase()}`;
+      const notYet = total - sum.next;
       setResult({
-        message: `Import interrotto: ${plural(sum.imported, 'voce entrata', 'voci entrate')} su ${total}. ${SLOW_DOWN}: «Riprendi» continua dalle voci rimaste, nella stessa pratica.`,
+        message: `${why}: ${plural(sum.imported, 'voce entrata', 'voci entrate')} su ${total}, ${notYet} non ancora ${notYet === 1 ? 'importata' : 'importate'}. «Riprendi» continua dalle voci rimaste, nella stessa pratica.`,
         type: 'warning',
         dossierId: sum.id,
         resumable: true,
@@ -142,7 +153,7 @@ function ImportBody({ check, busy, setBusy, onClose, onOpen, showToast }: Omit<P
   // While it runs: the items in so far, of how many, and whether it is waiting for the server's limit.
   const entered = (tally?.imported ?? 0) + (progress?.done ?? 0);
   const running = progress?.waiting
-    ? `${plural(entered, 'voce entrata', 'voci entrate')} su ${total}. ${SLOW_DOWN}: aspetto e riprendo da solo.`
+    ? `${plural(entered, 'voce entrata', 'voci entrate')} su ${total}. ${progress.reason === 'network' ? NO_ANSWER : SLOW_DOWN}: aspetto e riprovo da solo.`
     : `Importo la pratica: ${plural(entered, 'voce entrata', 'voci entrate')} su ${total}…`;
   const left = total - (tally?.next ?? total);
 
@@ -184,6 +195,7 @@ function ImportBody({ check, busy, setBusy, onClose, onOpen, showToast }: Omit<P
       <p role="status" className={cn(result || busy ? 'text-sm font-medium' : 'sr-only', result?.type === 'error' ? 'text-red-700 dark:text-red-300' : 'text-slate-800 dark:text-slate-200')}>
         {busy ? running : result?.message}
       </p>
+      {busy && <p className="text-sm text-slate-600 dark:text-slate-400">Se lasci la pagina l’importazione si ferma.</p>}
 
       <div className="flex flex-wrap justify-end gap-3">
         {result ? (

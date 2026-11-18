@@ -3218,9 +3218,11 @@ meant to stay split; add new features as new files, not inside the shells:
   `ImportDossierPanel` on `ui/Expand`): at the top of the list (a share link's `?import=` is read there) and under the
   dossier's header; an import the server cut short (its caps, a 409 in Italian, G-576) stays open and says how many
   items came in and why the others did not, in the server's words; a whole one opens the new dossier. The items go
-  one at a time at the write limit's pace (`IMPORT_PACE_MS`, under `WRITE_POINTS`' 200 a minute); a 429 waits its
-  `Retry-After` and tries again, and if the server keeps refusing the import stops, says so and offers «Riprendi»
-  into the same dossier), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  one at a time at the write limit's pace (`IMPORT_PACE_MS`, under `WRITE_POINTS`' 200 a minute); a 429, a 5xx or no
+  answer waits (`Retry-After`, else 2, 4, 8 s) and tries again, and if it keeps failing the import stops, says why
+  («Connessione persa», the server asking to slow down), counts what is left as «non ancora importate» (never
+  «scartate», which is a cap's 409) and offers «Riprendi» into the same dossier; while it runs the browser asks
+  before the page is left (`beforeunload`, L-74) and a line says that leaving stops it), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
   (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),

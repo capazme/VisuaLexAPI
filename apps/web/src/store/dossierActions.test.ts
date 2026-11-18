@@ -214,7 +214,7 @@ describe('importDossier and the write limit (LC107)', () => {
     expect(dossierService.addItem).toHaveBeenCalledTimes(1);
     await vi.runAllTimersAsync();
     expect(await run).toEqual({ id: 'srv-1', imported: 2, failed: 0 });
-    expect(progress[0]).toEqual({ done: 0, total: 2, waiting: true });
+    expect(progress[0]).toEqual({ done: 0, total: 2, waiting: true, reason: 'rate' });
     expect(appStore.getState().dossiers[0].items).toHaveLength(2);
   });
 
@@ -225,7 +225,7 @@ describe('importDossier and the write limit (LC107)', () => {
     const run = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(3) });
     await vi.runAllTimersAsync();
     // the first item in, the second tried four times (once and three waits), the third never sent
-    expect(await run).toEqual({ id: 'srv-1', imported: 1, failed: 0, next: 1 });
+    expect(await run).toEqual({ id: 'srv-1', imported: 1, failed: 0, next: 1, stopped: 'rate' });
     expect(dossierService.addItem).toHaveBeenCalledTimes(5);
 
     vi.mocked(dossierService.addItem).mockReset().mockImplementation(async () => fakeDossierItemApi(`srv-${served++}`));
@@ -235,6 +235,42 @@ describe('importDossier and the write limit (LC107)', () => {
     expect(dossierService.create).toHaveBeenCalledOnce();
     expect(appStore.getState().dossiers).toHaveLength(1);
     expect(appStore.getState().dossiers[0].items.map((i) => i.data)).toEqual(['nota 0', 'nota 1', 'nota 2']);
+  });
+
+  // As services/api.ts rejects them: no answer at all (no status), a server failing (5xx).
+  const noAnswer = { message: 'Il server non risponde. Controlla la connessione e riprova.' };
+  const serverDown = { status: 502, message: 'Richiesta non riuscita (errore 502). Riprova tra poco.' };
+
+  it('waits and tries again when the connection comes back after one try: no item lost', async () => {
+    vi.mocked(dossierService.addItem)
+      .mockResolvedValueOnce(fakeDossierItemApi('srv-a'))
+      .mockRejectedValueOnce(noAnswer)
+      .mockImplementation(async () => fakeDossierItemApi(`srv-${served++}`));
+    const progress: Array<{ waiting: boolean; reason?: string }> = [];
+    const run = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(3) }, { onProgress: (p) => progress.push(p) });
+    await vi.runAllTimersAsync();
+    expect(await run).toEqual({ id: 'srv-1', imported: 3, failed: 0 });
+    expect(progress).toContainEqual({ done: 1, total: 3, waiting: true, reason: 'network' });
+    expect(appStore.getState().dossiers[0].items.map((i) => i.data)).toEqual(['nota 0', 'nota 1', 'nota 2']);
+  });
+
+  it('stops when the connection stays down halfway, nothing counted as refused, and «Riprendi» adds no item twice', async () => {
+    vi.mocked(dossierService.addItem)
+      .mockResolvedValueOnce(fakeDossierItemApi('srv-a'))
+      .mockResolvedValueOnce(fakeDossierItemApi('srv-b'))
+      .mockRejectedValueOnce(noAnswer)
+      .mockRejectedValue(serverDown);
+    const run = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(5) });
+    await vi.runAllTimersAsync();
+    expect(await run).toEqual({ id: 'srv-1', imported: 2, failed: 0, next: 2, stopped: 'network' });
+
+    vi.mocked(dossierService.addItem).mockReset().mockImplementation(async () => fakeDossierItemApi(`srv-${served++}`));
+    const again = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(5) }, { resume: { id: 'srv-1', from: 2 } });
+    await vi.runAllTimersAsync();
+    expect(await again).toEqual({ id: 'srv-1', imported: 3, failed: 0 });
+    // Only the three left were sent again, each once.
+    expect(vi.mocked(dossierService.addItem).mock.calls.map((c) => (c[1] as { content: unknown }).content)).toEqual(['nota 2', 'nota 3', 'nota 4']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.data)).toEqual(['nota 0', 'nota 1', 'nota 2', 'nota 3', 'nota 4']);
   });
 
   it('sends more than 200 items under the limit\'s pace, all of them', async () => {
@@ -434,7 +470,8 @@ describe('decision items in the store', () => {
   });
 
   it('importDossier says how many items the server refused', async () => {
-    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('ok')).mockRejectedValueOnce(new Error('400'));
+    // A refusal as services/api.ts rejects it (a status, not a lost connection).
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('ok')).mockRejectedValueOnce({ status: 400, message: 'Richiesta non valida.' });
     const outcome = await appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: [
       { id: 'a', type: 'sentenza', data: sentenza, addedAt: '' },
       { id: 'b', type: 'note', data: 'n', addedAt: '' },

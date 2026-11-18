@@ -178,8 +178,10 @@ export interface ImportOutcome {
     failed: number;
     /** The server's own words for a cap it hit (409, G-576), each once: «Una pratica può contenere al massimo …». */
     refusals?: string[];
-    /** Stopped because the server kept asking to slow down (429): the first item not sent, for `resume`. */
+    /** Stopped before the end: the first item not sent, for `resume`. */
     next?: number;
+    /** Why it stopped: the server kept asking to slow down (429), or the connection or the server failed (no answer, 5xx). */
+    stopped?: 'rate' | 'network';
 }
 
 /** How an import runs: where it is said, and where a stopped one goes on (the same dossier, from `from`). */
@@ -202,7 +204,16 @@ export interface ImportProgress {
     done: number;
     total: number;
     waiting: boolean;
+    /** What it waits for, while `waiting`. */
+    reason?: 'rate' | 'network';
 }
+
+/** What a wait and another try may get through: the write limit (429), the server failing (5xx), no answer at all. */
+const transientFailure = (err: unknown): 'rate' | 'network' | null => {
+    const status = (err as { status?: number } | null)?.status;
+    if (status === 429) return 'rate';
+    return status === undefined || status >= 500 ? 'network' : null;
+};
 
 /** After a 429: the server's `Retry-After`, else waits that grow (2, 4, 8 … s, at most a minute). */
 const retryWaitMs = (err: unknown, attempt: number): number => {
@@ -2350,6 +2361,7 @@ const appStore = createStore<AppState>()(
                     let failedCount = 0;
                     let refusal: string | null = null;
                     let next: number | undefined;
+                    let stopped: 'rate' | 'network' | undefined;
                     let lastSent = 0;
                     const total = dossier.items.length;
                     for (let index = resume?.from ?? 0; index < total; index++) {
@@ -2371,13 +2383,17 @@ const appStore = createStore<AppState>()(
                                 items.push({ ...item, id: serverItem.id, addedAt: serverItem.created_at, ...serverFieldsFromApi(serverItem) });
                                 break;
                             } catch (err) {
-                                if ((err as { status?: number } | null)?.status === 429 && attempt < IMPORT_RETRIES) {
-                                    onProgress?.({ done: items.length, total, waiting: true });
+                                // The limit, the server or the connection: wait and try again; still failing, stop here.
+                                const transient = transientFailure(err);
+                                if (transient && attempt < IMPORT_RETRIES) {
+                                    onProgress?.({ done: items.length, total, waiting: true, reason: transient });
                                     await sleep(retryWaitMs(err, attempt++));
                                     continue;
                                 }
-                                if ((err as { status?: number } | null)?.status === 429) next = index;
-                                else {
+                                if (transient) {
+                                    next = index;
+                                    stopped = transient;
+                                } else {
                                     refusal = capRefusal(err);
                                     failedCount++;
                                 }
@@ -2413,7 +2429,7 @@ const appStore = createStore<AppState>()(
                         imported: items.length,
                         failed: failedCount,
                         ...(refusals.length > 0 && { refusals }),
-                        ...(next !== undefined && { next }),
+                        ...(next !== undefined && { next, stopped }),
                     };
                 } catch (err) {
                     console.error('Failed to import dossier:', err);
