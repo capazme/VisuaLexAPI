@@ -1,32 +1,50 @@
+import { useState } from 'react';
+import { MoreHorizontal, Upload } from 'lucide-react';
 import { todayInRome } from '../../../utils/dateUtils';
+import { MenuButton } from '../../ui/MenuButton';
 import { BLOCK_HEADING, TILE } from '../studia/progress/tokens';
 import { cn } from '../../../lib/utils';
 import { QuickAddField } from './QuickAddField';
 import { TaskList } from './TaskList';
 import { TaskSheetScope } from './TaskSheetScope';
+import { TodoistImport } from './TodoistImport';
+import { ICON_BUTTON } from './plannerStyles';
 import { TaskListSkeleton, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { useTaskView } from './useTaskView';
 
 /**
  * «Compiti» on a dossier's page (the planner's row 13): the dossier's open tasks, with the quick add, the dossier
- * already chosen. The rows do not repeat the dossier's name. Nothing here touches the dossier's entries.
+ * already chosen. The rows do not repeat the dossier's name. Nothing here touches the dossier's entries. Its «⋯» holds
+ * «Importa da Todoist (CSV)», which opens a space under the heading (LC80).
  */
 export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
   const state = useTaskView('dossier', dossierId);
   const today = state.answer?.today ?? todayInRome();
   const tasks = state.answer?.tasks ?? [];
+  const [importing, setImporting] = useState(false);
+  const importId = `todoist-import-${dossierId}`;
   return (
     <section aria-labelledby="dossier-tasks-heading" className={cn(TILE, 'mb-6 min-w-0 space-y-3 p-3 md:p-4')}>
-      <h3 id="dossier-tasks-heading" tabIndex={-1} data-focus-fallback className={cn(BLOCK_HEADING, 'focus-visible:outline-none')}>
-        Compiti
-        {tasks.length > 0 && (
-          <span className="ml-2 font-sans text-sm font-normal text-slate-600 dark:text-slate-400">
-            <span className="sr-only">, </span>
-            {tasks.length}
-            <span className="sr-only">{tasks.length === 1 ? ' compito' : ' compiti'}</span>
-          </span>
-        )}
-      </h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 id="dossier-tasks-heading" tabIndex={-1} data-focus-fallback className={cn(BLOCK_HEADING, 'focus-visible:outline-none')}>
+          Compiti
+          {tasks.length > 0 && (
+            <span className="ml-2 font-sans text-sm font-normal text-slate-600 dark:text-slate-400">
+              <span className="sr-only">, </span>
+              {tasks.length}
+              <span className="sr-only">{tasks.length === 1 ? ' compito' : ' compiti'}</span>
+            </span>
+          )}
+        </h3>
+        <MenuButton
+          label="Altre azioni sui compiti"
+          triggerClassName={ICON_BUTTON}
+          items={[{ label: 'Importa da Todoist (CSV)', icon: Upload, onSelect: () => setImporting(true) }]}
+        >
+          <MoreHorizontal size={18} aria-hidden />
+        </MenuButton>
+      </div>
+      <TodoistImport id={importId} open={importing} onClose={() => setImporting(false)} dossierId={dossierId} today={today} />
       <QuickAddField key={dossierId} view="dossier" today={today} defaults={{ dossierId }} dossierLocked />
       <div aria-busy={state.status === 'loading'}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}

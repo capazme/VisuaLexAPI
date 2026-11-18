@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RECURRENCE_RULES } from '../../../types/tasks';
 import example from './__fixtures__/todoist-esempio.csv?raw';
-import { NotTodoistCsvError, parseCsv, planTodoistImport, runTodoistImport, toRome } from './todoistImport';
+import { NotTodoistCsvError, parseCsv, planTodoistImport, runTodoistImport, toRome } from './todoistCsv';
 
 // Tuesday 17 November 2026, the server's Rome day.
 const TODAY = '2026-11-17';
