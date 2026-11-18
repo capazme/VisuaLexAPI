@@ -3315,6 +3315,10 @@ meant to stay split; add new features as new files, not inside the shells:
   only entering and leaving Impostazioni. What opens inside it opens in the page (`Expand`). A section's views (Pratiche's
   list, dossier and trash; Learn's and Opus's views) move the same way through `layout/ViewSlide` (LC98), in their order,
   the focus then on the page's `data-page-title`; what arrives after a wait comes in through `ui/Arrive` over a `Skeleton`.
+  «Indietro» above a page's frame is `ui/BackLink` (LC104, Amministrazione): the focus lands on the title reached or,
+  toward an anchor (`/impostazioni#amministrazione`), on the anchored part's heading once drawn; the browser's own focus
+  of an anchored part that is no control drops it to the body, and `focusLanding` gives it back. `ui/Switch` (one size,
+  44 × 24), `ui/Textarea` (on `controlStyles`, as `Input`) and `ui/Card` (one box, no variants) are the common ones.
 - `features/workspace/` — what a practice's rows borrow from the old workspace: `LazyStudyMode` (the
   `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are lazy the same way) and
   `ArticleNavigation` (an act's previous/next arrows). The floating tabs, their dock and their panels are gone
