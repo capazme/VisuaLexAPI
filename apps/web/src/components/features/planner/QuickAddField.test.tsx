@@ -9,6 +9,7 @@ import { taskService } from '../../../services/taskService';
 import { appStore } from '../../../store/useAppStore';
 import type { Dossier } from '../../../types';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
+import { FIELD_CONTROL, FIELD_SURFACE } from '../../ui/controlStyles';
 
 // «Dettagli» of the task's quick add (U1b): its fields in a panel in place under the row, the box growing.
 describe('QuickAddField — «Dettagli»', () => {
@@ -136,6 +137,24 @@ describe('QuickAddField — the line read', () => {
   const title = () => screen.getByLabelText('Nuovo compito');
   const chips = () => screen.queryByRole('list', { name: 'Letto nella riga' });
   const summaryLine = () => document.getElementById(title().getAttribute('aria-describedby')!)!;
+
+  // LC111: a field must look like a field — the box on the common fields' ground, not a card's.
+  it('draws its box on the ground of the common fields', () => {
+    render(<QuickAddField view="today" today={TODAY} defaults={{}} />);
+    expect(title().closest('form')).toHaveClass(FIELD_SURFACE);
+    expect(FIELD_CONTROL.split(' ')).toContain(FIELD_SURFACE);
+  });
+
+  // LC111: after «Aggiungi il compito» the focus is back in the field, for the next task (it was on the body).
+  it('keeps the focus in the field after the button adds the task', async () => {
+    render(<QuickAddField view="today" today={TODAY} defaults={{}} />);
+    const user = userEvent.setup();
+    await user.type(title(), 'Telefonare al cliente');
+    await user.click(screen.getByRole('button', { name: /Aggiungi il compito/ }));
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(title()).toHaveValue('');
+    expect(title()).toHaveFocus();
+  });
 
   it('reads several symbols together and saves the line without them', async () => {
     render(<QuickAddField view="today" today={TODAY} defaults={{}} />);
