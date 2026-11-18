@@ -62,6 +62,7 @@ export function CorpusPracticesDialog() {
   const practices = useAppStore(useShallow((s) => (s.corpusPracticesPending ? corpusPractices(s.practices) : [])));
   const [unticked, setUnticked] = useState<Set<string>>(() => new Set());
   const [confirming, setConfirming] = useState<'discard' | 'save' | null>(null);
+  const [confirmFrom, setConfirmFrom] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const navigate = useNavigate();
@@ -144,14 +145,19 @@ export function CorpusPracticesDialog() {
         description={`Nella Ricerca avevi ${n} ${n === 1 ? 'raccolta' : 'raccolte'} di norme e sentenze. Le salviamo come pratiche, così le ritrovi in Pratiche.`}
         footer={
           <>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirming('discard')}>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirming('discard'); }}>
               Non salvare
             </Button>
             <Button
               variant="primary"
               size="sm"
               disabled={busy || ticked.length === 0}
-              onClick={() => (ticked.length < offered.length ? setConfirming('save') : void save())}
+              onClick={(event) => {
+                if (ticked.length < offered.length) {
+                  setConfirmFrom(event.currentTarget);
+                  setConfirming('save');
+                } else void save();
+              }}
             >
               Salva come pratiche
             </Button>
@@ -186,6 +192,7 @@ export function CorpusPracticesDialog() {
       </Modal>
       <ConfirmDialog
         open={confirming !== null}
+        origin={confirmFrom}
         variant="danger"
         title={confirming === 'discard' ? 'Non salvare le raccolte?' : 'Salvare solo quelle spuntate?'}
         message={confirming === 'discard' ? 'Le raccolte non si potranno recuperare.' : 'Le raccolte non spuntate non si potranno recuperare.'}

@@ -875,29 +875,28 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. Its look is
   `ui/buttonStyles.ts`'s `buttonClassName(variant, size)`, for a link that must look like one (the 404's «Torna alla
   ricerca», `primary` `lg`: 44 px at every width). `Modal`
-  enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
+  enters in `dur.panel` on `ease.drawer`, growing from 0.97 (with `growFrom`, out of a control instead: below), and `Sheet` rises from its edge on the same
   timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`).
   `Sheet` gives the focus back to what had it as it opened, taken while it is first drawn: a field inside with
   `autoFocus` (the palette's box) takes the focus before the focus manager records what had it, and the focus went to
   the body as the sheet closed. The notifications (K1a,
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
-  the bottom (at the top for `position="top"`; from `md` at the right, 32 px from the bottom), three at most per edge — the newest first, a fourth closes the oldest
+  the bottom (at the top for `position="top"`; from `md` at the right, 32 px from the bottom; over a bar held at the foot,
+  `footBarStore`: «Sposta l'evidenziazione», Opus's views on a phone, its height with the safe area), three at most per edge — the newest first, a fourth closes the oldest
   plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
   out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
   again). Where no host is mounted (a component's test) a `Toast` draws itself alone at
-  its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`, Framer Motion's `useAnimate`)
-  is drawn from a line: the line grows from the centre with a tick at each end (300 ms), opens like a slit
-  (an `inset` clip with the same lengths at both ends, 350 ms), and the words rise from it 60 ms apart with a touch
-  of weight (Inter's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
-  `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 5 s is the
-  line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
-  into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a finger, or the
+  its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`)
+  grows out of a 120 × 32 pill at the middle of its edge and goes back into it (`ui/IslandSurface`, LC85, below). Each entry's time is a
+  `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 10 s (`UNDO_MS`, the least any «Annulla» stays: `notify` raises a shorter one) is the
+  line at the bottom drawing back between two ticks, which grow while it is held. Run out, taken back, ✕ or Esc from
+  inside it, it goes back into its pill; a swipe to the side (a finger, or the
   mouse dragging it from anywhere but a button, which it presses instead; a short one springs back, and a press that
   moved it is no click — `swipeGuard.ts`: never a key's click (`detail` 0), and the flag goes once the release has
   been seen, so a swipe let go outside eats nothing after it; no text is selected while it moves; started in `onPointerDown` with `dragListener` off, so the words stay selectable by a double
-  or triple click) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
+  or triple click) folds it and slides it away along the swipe. «Annulla» closes it at once — nothing in a closing
   notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
   outlasts the exit); the focus of a notification closed from the keyboard (Esc, or a key's click, `detail` 0, or a
   `:focus-visible` button) goes to the next one still open — never after a mouse click or a swipe, where it would
@@ -924,7 +923,21 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   screen), and the live region says «Annullato: <what it did>»; a notification older than it does not write the key
   beside its «Annulla»; `settleShortcutUndo` carries it out at logout, while the token is there.
   `registerUndoToastListener` hands the newest «Annulla» on screen to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
-  without motion within 300 ms of another closing, and at once on keyboard focus.
+  without motion within 300 ms of another closing, and at once on keyboard focus; otherwise a 120 ms fade, no shape.
+  **What opens over the content grows out of what opened it** (LC85, L-76: the «⋯» menus of `MenuButton`, the
+  notifications, `ConfirmDialog` through `Modal`'s `growFrom`, `WireConfirm`): `ui/IslandSurface`, the search
+  island's technique (`CommandPalette` uses it too, with `hideSource`, `within`, `settle`). Two layers, the shape
+  (ground, edge, corners, shadow: `surfaceClassName`) and the content clipped to it, grow by Web Animations from the
+  source's rectangle, which may lie outside the box (negative insets), to the box in `ISLAND_OPEN` (280 ms), the content
+  seen from a quarter of the way, and go back in `ISLAND_CLOSE` (220 ms); interrupted, each way starts from the values
+  on screen; closing, the surface is `inert`. Kept mounted by `AnimatePresence` or by its owner (`open`, `onClosed`).
+  The source is an element or a rectangle against the box (the notifications' pill); a confirmation's is its `origin`, required
+  on `ConfirmDialog` and `WireConfirm` (`event.currentTarget`; for a menu's entry the trigger, which `MenuButton` hands
+  to `onSelect` as its second argument), never guessed from the focus (a screen reader's click, Safari and a tap focus
+  no button); once it is gone, the rectangle it had as the confirmation opened (`islandMotion.ts`'s `originOf`).
+  `ConfirmDialog` gives the focus back to it, or to `focusBack` (the row, its title) where it is gone or busy.
+  Nothing to grow from (gone, off screen) or «riduci movimento», read live (`useReducedMotionLive`, `matchMedia`'s
+  `change`): a fade by the same times.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the
   properties it moves (never `all`; `scale` and `translate` included, `box-shadow` left out so the focus
@@ -3060,25 +3073,23 @@ browser asks before the page is left (`beforeunload`). Otherwise never
 the message so it names the scope *and* what is not touched ("Segnalibri e dossier non
 saranno toccati"). Where the action **leaves you** or **cannot be undone** and comes rarely (K1b, L-35: erasing
 the MERL-T data, revoking a connected app, deleting a published copy from the dossier's «Forum» menu or from the
-Forum's card), the confirmation is drawn from its button: `components/ui/wireConfirm/WireConfirm` (the same props,
-plus `origin`, the button: pass it, `event.currentTarget`, since Safari and a tap do not focus a button they press;
-absent, the element focused as it opens, right for a menu's entry — `MenuButton` gives the focus back to its trigger
-by code before an entry runs, the Forum's card does the same by hand). A button its action disabled (busy) gets the
-focus back once enabled again. A wire leaves the button, meets the card on the edge
-that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
-rising one after the other (about 500 ms; the lead fades once it is there). `emphasis="cancel"` makes the cancel the
+Forum's card), the confirmation grows from its button: `components/ui/wireConfirm/WireConfirm` (the same props,
+plus `origin`, the button, required: `event.currentTarget`, since Safari, a tap and a screen reader do not focus a
+button they press; for a menu's entry its trigger — `MenuButton` hands it to `onSelect` and gives it the focus back by
+code before an entry runs, the Forum's card does the same by hand and passes it to `onDelete`). A button its action disabled (busy) gets the
+focus back once enabled again. The card grows out of the button and goes back into it (`ui/IslandSurface`, LC85). `emphasis="cancel"` makes the cancel the
 filled button, on the right, where going back is what one wants most (the lesson's «Interrompere il ripasso?», which
-leaves you and comes often); `focusBack` sends the focus elsewhere than the button after a cancel. «Annulla», Esc or a click outside wind it
-back into the button (about 300 ms) and give it the focus; leaving, the card is `inert`, so an Enter during the rewind
+leaves you and comes often); `focusBack` sends the focus elsewhere than the button after a cancel. «Annulla», Esc or a click outside send it
+back into the button and give it the focus; leaving, the card is `inert`, so an Enter while it goes back
 confirms nothing, and the layer still takes the clicks, which do not fall to the page. Its buttons answer only once
-they have risen into sight (`READY_MS`, about 500 ms; `data-ready` on the card): a double tap on a button the card then
-covers runs nothing unseen. Confirming folds the card into a line, and `onConfirm` may resolve to the outcome the button then
+the card has grown (`READY_MS`, `ISLAND_OPEN`'s 280 ms; `data-ready` on the card): a double tap on a button the card then
+covers runs nothing unseen. Confirming sends the card back into the button too, and `onConfirm` may resolve to the outcome the button then
 says, a tick drawing itself over it (`OutcomeTick`, «Eliminata ✓», 1.6 s, seen only: each caller says the outcome in
 words where a screen reader hears it); a caller that removes the button (a row, a card) does it in `onOutcomeDone`,
 once the tick is gone, and hands the focus to a neighbour; an outcome that gives way to a newer one (two revocations in
 a row) is told over at once, so the callers keep a queue of ids, oldest first, and the words a confirmation names until
-it is gone. The outline is drawn again when the window changes. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
-motion the card fades in already drawn, and the outcome comes once it is gone. On a phone the card is the page's
+it is gone. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
+motion the card fades in and out, and the outcome comes once it is gone. On a phone the card is the page's
 width less 16 px each side.
 
 **Keyboard-accessible collapsibles** — a `div` that toggles on click needs

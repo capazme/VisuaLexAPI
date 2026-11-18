@@ -27,6 +27,7 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
   const deleteEnvironment = useAppStore((s) => s.deleteEnvironment);
   const [recovering, setRecovering] = useState<Environment | null>(null);
   const [deleting, setDeleting] = useState<Environment | null>(null);
+  const [deleteFrom, setDeleteFrom] = useState<HTMLElement | null>(null);
   if (environments.length === 0) return null;
 
   const exportOne = async (env: Environment) => {
@@ -78,7 +79,7 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
               </button>
               <button
                 type="button"
-                onClick={() => setDeleting(env)}
+                onClick={(event) => { setDeleteFrom(event.currentTarget); setDeleting(env); }}
                 aria-label={`Elimina «${env.name}»`}
                 className={`${ACTION} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20`}
               >
@@ -109,6 +110,7 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
 
       <ConfirmDialog
         open={!!deleting}
+        origin={deleteFrom}
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (deleting) void deleteEnvironment(deleting.id);

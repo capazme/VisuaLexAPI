@@ -42,6 +42,7 @@ import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
 import { isMacPlatform } from '../ui/notifications/undoShortcut';
+import { stackRoomStore } from '../ui/notifications/stackRoom';
 import { FULL_PAGE_FRAME, PAGE_FRAME } from './frame';
 
 /**
@@ -141,6 +142,7 @@ export function Layout() {
   const location = useLocation();
   const { pathname, search } = location;
   const onSearchPage = pathname === '/';
+  const notificationRoom = stackRoomStore((s) => s.room);
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
   // Below lg (from lg the top bar holds the field, compact: LC21, the anti-slop review's FAIL of the 15th).
@@ -534,6 +536,9 @@ export function Layout() {
               </AtLocation>
             </PageSlide>
           </div>
+          {/* LC85: while notifications show at the bottom, the page can scroll its last rows above them. Not on the
+              search page, whose practice columns are the scroller's height and scroll on their own. */}
+          {!onSearchPage && notificationRoom > 0 && <div aria-hidden data-notification-room="" style={{ height: notificationRoom }} />}
         </div>
       </main>
 

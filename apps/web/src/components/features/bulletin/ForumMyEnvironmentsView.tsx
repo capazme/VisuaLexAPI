@@ -13,7 +13,7 @@ interface ForumMyEnvironmentsViewProps {
   onImport: (env: SharedEnvironment) => void;
   onReport: (id: string) => void;
   onEdit: (env: SharedEnvironment) => void;
-  onDelete: (env: SharedEnvironment) => void;
+  onDelete: (env: SharedEnvironment, origin: HTMLElement | null) => void;
   onWithdraw: (env: SharedEnvironment) => void;
   onRepublish: (env: SharedEnvironment) => void;
   onPublishClick: () => void;

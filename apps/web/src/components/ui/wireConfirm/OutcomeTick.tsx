@@ -3,7 +3,13 @@ import { motion } from 'framer-motion';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { ease } from '../../../lib/motion';
 import { cn } from '../../../lib/utils';
-import type { Box } from './wirePath';
+/** A rectangle on screen: where the button was. */
+export interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 /** How long the button says the outcome, in milliseconds; a caller that removes the button waits this long. */
 export const OUTCOME_MS = 1600;

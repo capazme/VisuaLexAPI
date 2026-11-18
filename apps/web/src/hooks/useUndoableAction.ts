@@ -41,7 +41,7 @@ export interface UseUndoableActionReturn {
  *   action: () => deleteItem(id),
  *   undo: () => restoreItem(item),
  *   message: "Elemento eliminato",
- *   duration: 5000
+ *   duration: 10000
  * });
  */
 export function useUndoableAction<T>({

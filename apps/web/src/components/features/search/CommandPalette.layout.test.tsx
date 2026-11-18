@@ -26,7 +26,8 @@ import type { CustomAlias, QuickNorm } from '../../../types';
 
 function asDesktop(desktop: boolean) {
   vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
-    matches: desktop, media: query, onchange: null,
+    // The island reads «riduci movimento» from here (LC85); every other query is the width's.
+    matches: query.includes('reduced-motion') ? motionPref.reduced : desktop, media: query, onchange: null,
     addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {},
     dispatchEvent: () => false,
   }) as unknown as MediaQueryList);

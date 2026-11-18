@@ -62,6 +62,9 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
   const [done, setDone] = useState('');
   const [pending, setPending] = useState<{ file: File; versionOf?: string } | null>(null);
   const [toDelete, setToDelete] = useState<PraticaFile | null>(null);
+  // The button each confirmation grows from and gives the focus back to (LC85): «Carica…», «Elimina».
+  const [chosenFrom, setChosenFrom] = useState<HTMLElement | null>(null);
+  const [deleteFrom, setDeleteFrom] = useState<HTMLElement | null>(null);
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
@@ -123,7 +126,8 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
     void upload(file, of);
   };
 
-  const choose = (of?: string) => {
+  const choose = (from: HTMLElement, of?: string) => {
+    setChosenFrom(from);
     versionOf.current = of;
     input.current?.click();
   };
@@ -138,6 +142,8 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
     event.preventDefault();
     setDragging(false);
     if (filesOff) return;
+    // Dropped: no button asked; the notice fades in.
+    setChosenFrom(null);
     take(event.dataTransfer.files?.[0]);
   };
 
@@ -176,7 +182,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
                     </span>
                     <span className="flex flex-wrap gap-2">
                       <Button variant="secondary" size="sm" icon={<Download size={14} aria-hidden />} aria-label={`Scarica ${group.nome}`} onClick={() => void download(group)}>Scarica</Button>
-                      <Button variant="secondary" size="sm" icon={<FilePlus size={14} aria-hidden />} aria-label={`Carica una versione nuova di ${group.nome}`} disabled={busy} onClick={() => choose(group.id)}>Carica una versione nuova</Button>
+                      <Button variant="secondary" size="sm" icon={<FilePlus size={14} aria-hidden />} aria-label={`Carica una versione nuova di ${group.nome}`} disabled={busy} onClick={(event) => choose(event.currentTarget, group.id)}>Carica una versione nuova</Button>
                       <Button variant="secondary" size="sm" icon={<Trash2 size={14} aria-hidden />} aria-label={`Sposta nel cestino ${group.nome}`} onClick={() => void run(() => praticaFilesService.trash(dossierId, group.id), 'Il file non è stato spostato nel cestino. Riprova.', `«${group.nome}» è nel cestino della pratica.`)}>Sposta nel cestino</Button>
                     </span>
                     {group.versioni.length > 0 && (
@@ -211,7 +217,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
                         {file.versioneDi ? `${file.nome}, versione ${file.versione}` : file.nome}
                       </span>
                       <Button variant="secondary" size="sm" icon={<RotateCcw size={14} aria-hidden />} aria-label={`Ripristina ${file.nome}`} onClick={() => void run(() => praticaFilesService.restore(dossierId, file.id), 'Il file non è stato ripristinato. Riprova.', `«${file.nome}» è di nuovo tra i file.`)}>Ripristina</Button>
-                      <Button variant="secondary" size="sm" icon={<X size={14} aria-hidden />} aria-label={`Elimina ${file.nome}`} onClick={() => setToDelete(file)}>Elimina</Button>
+                      <Button variant="secondary" size="sm" icon={<X size={14} aria-hidden />} aria-label={`Elimina ${file.nome}`} onClick={(event) => { setDeleteFrom(event.currentTarget); setToDelete(file); }}>Elimina</Button>
                     </li>
                   ))}
                 </ul>
@@ -232,7 +238,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
             dragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-slate-300 dark:border-slate-700',
           )}
         >
-          <Button icon={<Upload size={16} aria-hidden />} loading={busy} disabled={filesOff} onClick={() => choose()}>Carica un file</Button>
+          <Button icon={<Upload size={16} aria-hidden />} loading={busy} disabled={filesOff} onClick={(event) => choose(event.currentTarget)}>Carica un file</Button>
           {!filesOff && <span className="text-sm text-slate-600 max-md:hidden dark:text-slate-400">oppure trascinalo qui.</span>}
           <input
             ref={input}
@@ -253,6 +259,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
 
       <ConfirmDialog
         open={pending !== null}
+        origin={chosenFrom}
         title="Prima di caricare il primo file"
         message={NOTICE}
         confirmLabel="Ho capito, carica"
@@ -267,6 +274,7 @@ export function PraticaFilesPanel({ dossierId, headingClass, onCount }: { dossie
       />
       <ConfirmDialog
         open={toDelete !== null}
+        origin={deleteFrom}
         variant="danger"
         title="Eliminare il file?"
         message={toDelete?.versioneDi ? 'La versione esce dalla pratica. Non si può annullare.' : 'Il file e le sue versioni escono dalla pratica. Non si può annullare.'}
