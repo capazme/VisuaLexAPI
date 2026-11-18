@@ -299,8 +299,8 @@ else:
 normattiva_scraper = NormattivaScraper()
 eurlex_scraper = EurlexScraper()
 
-# /health/detailed probes three live sources on the shared throttled client and
-# circuit breakers; the frontend banner polls it, so N open tabs multiply that
+# /health/detailed probes three live sources on the shared throttled client; the
+# frontend banner polls it, so N open tabs multiply that
 # load. One cached result is shared by every caller for HEALTH_DETAILED_TTL
 # seconds, with a lock so concurrent cold callers trigger a single probe
 # instead of one each. Module-level (like the scrapers above): there is one
@@ -704,7 +704,7 @@ class NormaController:
         return jsonify({
             "service": "VisuaLex API",
             "status": "running",
-            "docs": None,  # Swagger is not implemented on this root app (see visualex_api/app.py for the prefixed variant)
+            "docs": None,  # no Swagger
             "frontend": "http://localhost:5173",
         })
 
@@ -715,8 +715,7 @@ class NormaController:
         log.info("Creating NormaVisitata from data", data=data)
 
         # The root controller never validated its input: a missing act_type
-        # surfaced as a generic 500 instead of a 400. The /api twin already
-        # does this (visualex_api/app.py:309-312).
+        # surfaced as a generic 500 instead of a 400.
         if 'act_type' not in data or not data.get('act_type'):
             raise ValidationError("Campo obbligatorio mancante: act_type")
         if 'article' not in data or data.get('article') in (None, ''):
@@ -1410,8 +1409,7 @@ class NormaController:
         """Map an exception to the status its class documents.
 
         `exceptions.py` states ValidationError -> 400 and
-        ResourceNotFoundError -> 404, and the /api twin honours that in
-        `handle_error` (visualex_api/app.py:224). The root controller returned
+        ResourceNotFoundError -> 404. The root controller returned
         500 for every failure, so "act_type mancante" was indistinguishable
         from a Normattiva outage for any client that branches on the status.
         """
@@ -1448,8 +1446,7 @@ class NormaController:
         """Parse a natural language query into structured API params + URN.
 
         Used by the MERL-T contribution picker so the user can type
-        "art 1453 cc" instead of a NIR URN. Mirrors the parser in
-        `visualex_api/app.py` but additionally builds the canonical URN via the
+        "art 1453 cc" instead of a NIR URN. It builds the canonical URN via the
         same pipeline as `fetch_norma_data`, so the FE gets a ready-to-paste
         URN string without a second round-trip.
 

@@ -5,8 +5,8 @@ Quart's development server. A production server needs a module-level object. The
 fetch queue and the browser pool are started and stopped by the application's own
 ``before_serving`` and ``after_serving`` hooks, which Hypercorn runs too.
 
-Run it with ONE worker: the rate limiter, the circuit breaker and the fetch queue
-keep their state in memory, per process.
+Run it with ONE worker: the rate limiter and the fetch queue keep their state in
+memory, per process.
 """
 from app import NormaController
 
