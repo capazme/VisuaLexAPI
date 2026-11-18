@@ -37,9 +37,9 @@ const time = (value: string | null) => (value ? ` · ${value}` : '');
 /**
  * On one line (a wide list, 1024 px) the labels and the dossier shrink with the room the other signs leave, down to
  * «U…» and «R». One that would be cut under two letters' width is not drawn (LC91): all shown, measured, the cut ones
- * hidden, in one frame, again when the row's width or its signs change.
+ * hidden, in one frame, at each render of the row (any sign may take room) and when its width changes.
  */
-function useHideWhenCut(signs: React.RefObject<HTMLDivElement | null>, deps: unknown[]) {
+function useHideWhenCut(signs: React.RefObject<HTMLDivElement | null>) {
   useLayoutEffect(() => {
     const box = signs.current;
     if (!box) return undefined;
@@ -57,8 +57,7 @@ function useHideWhenCut(signs: React.RefObject<HTMLDivElement | null>, deps: unk
     const observer = typeof ResizeObserver === 'function' && row ? new ResizeObserver(check) : null;
     if (observer && row) observer.observe(row);
     return () => observer?.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  });
 }
 
 /**
@@ -74,7 +73,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
   const plannedShown = task.plannedDate !== null && !(task.plannedDate === dayShown && !task.plannedTime);
   const signs = useRef<HTMLDivElement>(null);
-  useHideWhenCut(signs, [task.labels.join('\n'), dossierTitle, showDossier]);
+  useHideWhenCut(signs);
   const hasSigns = Boolean(plannedShown || due || (subtasks && subtasks.count > 0) || task.recurrence || task.priority < 4 || task.labels.length > 0 || (showDossier && task.dossierId));
 
   return (
