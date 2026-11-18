@@ -239,8 +239,8 @@ export function TreeViewPanel({
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     const list = Array.from(listRef.current?.querySelectorAll<HTMLElement>('[data-tree-row]') ?? []);
     const at = list.indexOf(e.target as HTMLElement);
-    // From the filter or a row only: the part's menu keeps its own arrows.
-    if (!list.length || (at === -1 && e.target !== filterRef.current)) return;
+    // From the filter, a row or the space itself (focused on opening, LC105) only: the part's menu keeps its own arrows.
+    if (!list.length || (at === -1 && e.target !== filterRef.current && e.target !== e.currentTarget)) return;
     e.preventDefault();
     const next = e.key === 'ArrowDown' ? Math.min(at + 1, list.length - 1) : at - 1;
     if (next < 0) filterRef.current?.focus();
@@ -430,7 +430,6 @@ export function TreeViewPanel({
       id={id}
       open={isOpen}
       onClose={onClose}
-      initialFocusRef={filterRef}
       onKeyDown={onKeyDown}
       // Opened on a page scrolled down, its title lands under the act's sticky heading (`--practice-head`), not behind it.
       className="scroll-mt-[calc(var(--practice-head,0px)+0.5rem)]"

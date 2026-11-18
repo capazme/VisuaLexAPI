@@ -310,7 +310,9 @@ describe('AdminPage — a page, nothing over it (LC93)', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Reimposta la password' }));
     const reset = screen.getByLabelText('Nuova password per bob');
     expect(reset.closest('li')).toHaveTextContent('bob@example.com');
-    expect(document.activeElement).toBe(reset);
+    // The focus on the space under the row, not in the field (LC105).
+    expect(document.activeElement).toContainElement(reset);
+    expect(document.activeElement).toHaveAttribute('tabindex', '-1');
 
     const create = screen.getByRole('button', { name: /Nuovo utente/ });
     fireEvent.click(create);

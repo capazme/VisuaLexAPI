@@ -1,6 +1,5 @@
 import { annotationTargetLabel } from './annotationLabels';
 import { useState, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   FolderOpen,
   Zap,
@@ -17,6 +16,7 @@ import type { Environment } from '../../../types';
 import type { EnvironmentSelection, DetailedEnvironmentStats } from '../../../utils/environmentUtils';
 import { getDetailedEnvironmentStats } from '../../../utils/environmentUtils';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
+import { Expand } from '../../ui/Expand';
 
 type TabType = 'dossiers' | 'quickNorms' | 'aliases' | 'annotations' | 'highlights';
 
@@ -197,29 +197,19 @@ export function EnvironmentContentViewer({
               </span>
             </div>
 
-            <AnimatePresence>
-              {expandedDossiers.has(dossier.id) && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="overflow-hidden"
-                >
-                  <div className="ml-8 pl-3 border-l-2 border-slate-200 dark:border-slate-700 py-1">
-                    {dossier.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 italic">
-                        {dossier.description}
-                      </p>
-                    )}
-                    {/* Would need to access actual dossier items from environment */}
-                    <p className="text-xs text-slate-400">
-                      Contiene {dossier.articleCount} norme{dossier.decisionCount > 0 ? ` e ${dossier.decisionCount} ${dossier.decisionCount === 1 ? 'sentenza' : 'sentenze'}` : ''}
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <Expand open={expandedDossiers.has(dossier.id)}>
+              <div className="ml-8 pl-3 border-l-2 border-slate-200 dark:border-slate-700 py-1">
+                {dossier.description && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 italic">
+                    {dossier.description}
+                  </p>
+                )}
+                {/* Would need to access actual dossier items from environment */}
+                <p className="text-xs text-slate-400">
+                  Contiene {dossier.articleCount} norme{dossier.decisionCount > 0 ? ` e ${dossier.decisionCount} ${dossier.decisionCount === 1 ? 'sentenza' : 'sentenze'}` : ''}
+                </p>
+              </div>
+            </Expand>
           </div>
         ))}
       </div>
