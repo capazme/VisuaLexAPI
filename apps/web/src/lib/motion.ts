@@ -19,3 +19,12 @@ export const spring = {
  */
 export const ISLAND_OPEN = { duration: 280, easing: `cubic-bezier(${ease.drawer.join(', ')})` } as const;
 export const ISLAND_CLOSE = { duration: 220, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
+
+/**
+ * The menus (LC102, variant A of the «⋯» page): they appear under their trigger, aligned to its edge, by a fade and a
+ * shift of `MENU_SHIFT` px; under reduced motion only the fade, 150 ms linear (the app's rule in `index.css`).
+ */
+export const MENU_OPEN = { duration: 140, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
+export const MENU_CLOSE = { duration: 100, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
+export const MENU_FADE = { duration: 150, easing: 'linear' } as const;
+export const MENU_SHIFT = 4;

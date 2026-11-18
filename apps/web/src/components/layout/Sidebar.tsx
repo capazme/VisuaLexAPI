@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { IslandSurface } from '../ui/IslandSurface';
+import { MenuSurface } from '../ui/MenuSurface';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, Bug, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, EyeOff, type LucideIcon } from 'lucide-react';
@@ -361,8 +361,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  // The button the menu grows from and goes back into (`IslandSurface`, LC85), taken as it opens.
-  const [menuFrom, setMenuFrom] = useState<HTMLElement | null>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0, maxHeight: 0 });
 
   const logoReduce = useReducedMotion();
@@ -408,7 +406,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const openMenu = (at: 'first' | 'last') => {
     placeMenu();
     setOpenAt(at);
-    setMenuFrom(userButtonRef.current);
     setShowUserMenu(true);
   };
   const closeMenu = (returnFocus: boolean) => {
@@ -723,20 +720,18 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 onClick={() => closeMenu(false)}
               />
             )}
-            {/* Menu popup: it grows out of the user button and goes back into it (LC85). */}
+            {/* Menu popup: it appears over the user button by a fade and a 4 px shift (`MenuSurface`, LC102). */}
             <AnimatePresence>
             {showUserMenu && (
-            <IslandSurface
+            <MenuSurface
               key="user-menu"
               ref={menuRef}
-              source={menuFrom}
+              above
               role="menu"
               aria-label="Menu utente"
               onKeyDown={onMenuKeyDown}
               style={{ bottom: menuPosition.bottom, left: menuPosition.left, maxHeight: menuPosition.maxHeight > 0 ? menuPosition.maxHeight : undefined }}
-              className={cn("fixed flex w-56 flex-col", Z_INDEX.menuPanel)}
-              surfaceClassName="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700"
-              contentClassName="relative min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl py-2"
+              className={cn("fixed w-56 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-2 shadow-md dark:border-slate-700 dark:bg-slate-800", Z_INDEX.menuPanel)}
             >
               {/* User Info */}
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
@@ -820,7 +815,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   Esci
                 </button>
               </div>
-            </IslandSurface>
+            </MenuSurface>
             )}
             </AnimatePresence>
           </>,

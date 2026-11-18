@@ -7,6 +7,8 @@ import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { tagLabel } from '../../../utils/tagLabel';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
+import { AnimatePresence } from 'framer-motion';
+import { MenuSurface } from '../../ui/MenuSurface';
 
 interface SharedEnvironmentCardProps {
   environment: SharedEnvironment;
@@ -149,8 +151,9 @@ export function SharedEnvironmentCard({
               >
                 <MoreHorizontal size={16} className="text-slate-500" />
               </button>
+              <AnimatePresence>
               {showMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-10 min-w-[160px]">
+                <MenuSurface key="menu" className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-10 min-w-[160px]">
                   {/* Owner actions */}
                   {environment.isOwner && showOwnerActions && (
                     <>
@@ -249,8 +252,9 @@ export function SharedEnvironmentCard({
                       </button>
                     </>
                   )}
-                </div>
+                </MenuSurface>
               )}
+              </AnimatePresence>
             </div>
           </div>
         </div>

@@ -4,6 +4,8 @@ import { Loader2, Search, ArrowRight, Trash2, Zap, FolderPlus, MoreVertical, Che
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
+import { AnimatePresence } from 'framer-motion';
+import { MenuSurface } from '../../ui/MenuSurface';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useAppStore } from '../../../store/useAppStore';
@@ -536,8 +538,12 @@ export function HistoryView() {
                                                                     onMouseDown stopPropagation so click-outside doesn't fire when
                                                                     the user clicks inside the portaled menu (no longer a DOM
                                                                     descendant of menuRef). */}
-                                                                {openMenu === item.id && menuPos && createPortal(
-                                                                    <div
+                                                                {createPortal(
+                                                                    <AnimatePresence>
+                                                                    {openMenu === item.id && menuPos && (
+                                                                    <MenuSurface
+                                                                        key="menu"
+                                                                        above={menuPos.bottom !== undefined}
                                                                         onMouseDown={(e) => e.stopPropagation()}
                                                                         style={{
                                                                             position: 'fixed',
@@ -620,7 +626,9 @@ export function HistoryView() {
                                                                             <Trash2 size={16} />
                                                                             <span>Rimuovi dalla cronologia</span>
                                                                         </button>
-                                                                    </div>,
+                                                                    </MenuSurface>
+                                                                    )}
+                                                                    </AnimatePresence>,
                                                                     document.body
                                                                 )}
                                                             </div>
