@@ -853,12 +853,10 @@ restano il registro per i DB che tracciano la storia, e vanno lanciate a mano.
 
 ### 6.6 Sicurezza: il trust boundary è il BFF
 
-`app.py` esegue `app.dependency_overrides[verify_api_key] = optional_api_key`: **ogni endpoint che
-dichiara `verify_api_key` diventa di fatto opzionale** — senza `X-API-Key` la richiesta passa. La
-superficie MERL-T **non è protetta a monte**; il vero cancello è `require_role("admin")` (blocca 401/403)
-e, soprattutto, **il BFF Node**, che autentica via JWT e inietta `user_id`. Regola: progetta qualsiasi
-nuovo endpoint sensibile assumendo che `verify_api_key` **non** filtri, e non esporre `:8000`
-direttamente.
+Ogni route di MERL-T chiede la chiave (scan A.2): `app.py` include ogni router dietro `verify_api_key`;
+restano aperte solo `/health` e `/`. Senza chiave configurata ogni route risponde 401. La chiave è una
+sola, seminata all'avvio da `MERLT_ADMIN_API_KEY`, che disattiva tutte le altre; nessuna route la
+consegna. Il BFF Node resta il cancello per l'utente: autentica via JWT e inietta `user_id`.
 
 **Immagine baked-at-build:** il codice `services/merlt/` è dentro l'immagine (solo `data/` è volume-montato).
 Modifiche al codice Python richiedono `docker compose -f infra/compose.yml --profile merlt build` + recreate — non

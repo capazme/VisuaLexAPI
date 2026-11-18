@@ -1,13 +1,15 @@
-"""Seed the admin API key from the environment at boot (idempotent).
+"""Seed the API key from the environment at boot (idempotent).
 
-MERL-T's admin routes (RLCF training, graph hygiene, mechanical ingestion,
-NER training) sit behind ``require_role("admin")`` and need an ``X-API-Key``
-row in ``api_keys``. The only way to mint the first one was a manual
-``POST /api/v1/api-keys/bootstrap`` that no runbook, start.sh or compose file
-ever called, so on a fresh stack every ops action answered 401 (the BFF
-showed "MERL-T non raggiungibile"). With ``MERLT_ADMIN_API_KEY`` set (compose
-passes the BFF's ``MERLT_API_KEY``), the key is inserted once, by hash; the
-raw value is never logged.
+Every MERL-T route but /health and / needs an ``X-API-Key`` row in ``api_keys``
+(merlt.app, scan A.2), and its only caller is the VisuaLex server. With
+``MERLT_ADMIN_API_KEY`` set (compose passes the server's ``MERLT_API_KEY``), the
+key is inserted once, by hash, and every other active key is deactivated (kept,
+not deleted): the configured key is the only one that opens MERL-T, so a key
+minted by the old bootstrap route, or the previous value after a rotation, stops
+working. The raw value is never logged; the deactivated keys only as a count.
+
+``KEY_READY`` says whether the seed left a usable key, for /health: without one
+every route answers 401 while the stores are healthy.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import os
 from uuid import uuid4
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from merlt.api.auth import hash_api_key
 from merlt.experts.models import ApiKey
@@ -27,42 +29,58 @@ log = structlog.get_logger()
 ENV_VAR = "MERLT_ADMIN_API_KEY"
 SEED_USER_ID = "env_admin"
 
+# Whether the last seed left the configured key usable (read by /health).
+KEY_READY = False
+
 
 async def ensure_admin_api_key() -> bool:
-    """Insert the admin key named by ``MERLT_ADMIN_API_KEY`` if it is missing.
+    """Make the key named by ``MERLT_ADMIN_API_KEY`` the one active key.
 
-    Returns True when a row was created, False when nothing had to be done
-    (variable unset or key already present). Never raises past the caller's
-    guard: a seeding failure must not stop the api from booting.
+    Inserts it when missing, re-activates it as an unlimited admin key when it is
+    not, and deactivates every other active key. Returns True when a row was
+    created. The caller guards it: a seeding failure must not stop the api from
+    booting, and leaves ``KEY_READY`` false, which /health reports.
     """
+    global KEY_READY
+    KEY_READY = False
     raw = (os.getenv(ENV_VAR) or "").strip()
     if not raw:
-        log.info("Admin API key seed skipped (%s unset)", ENV_VAR)
+        log.error("No API key configured (%s unset): every MERL-T route answers 401", ENV_VAR)
         return False
     key_hash = hash_api_key(raw)
+    created = False
     async with get_async_session() as session:
         existing = (
             await session.execute(select(ApiKey).where(ApiKey.api_key_hash == key_hash))
         ).scalar_one_or_none()
-        if existing is not None:
-            if not existing.is_active or existing.role != "admin":
-                existing.is_active = True
-                existing.role = "admin"
-                await session.commit()
-                log.info("Admin API key re-activated", key_id=existing.key_id)
-            return False
-        key_id = f"key_{uuid4().hex[:12]}"
-        session.add(
-            ApiKey(
-                key_id=key_id,
-                api_key_hash=key_hash,
-                role="admin",
-                rate_limit_tier="unlimited",
-                is_active=True,
-                user_id=SEED_USER_ID,
-                description=f"Seeded from {ENV_VAR} at boot",
+        if existing is None:
+            key_id = f"key_{uuid4().hex[:12]}"
+            session.add(
+                ApiKey(
+                    key_id=key_id,
+                    api_key_hash=key_hash,
+                    role="admin",
+                    rate_limit_tier="unlimited",
+                    is_active=True,
+                    user_id=SEED_USER_ID,
+                    description=f"Seeded from {ENV_VAR} at boot",
+                )
             )
+            created = True
+        elif not existing.is_active or existing.role != "admin" or existing.rate_limit_tier != "unlimited":
+            existing.is_active = True
+            existing.role = "admin"
+            existing.rate_limit_tier = "unlimited"
+            log.info("Admin API key re-activated", key_id=existing.key_id)
+        others = await session.execute(
+            update(ApiKey)
+            .where(ApiKey.api_key_hash != key_hash, ApiKey.is_active.is_(True))
+            .values(is_active=False)
         )
         await session.commit()
-    log.info("Admin API key seeded from environment", key_id=key_id)
-    return True
+    if others.rowcount:
+        log.warning("Other API keys deactivated: only the configured key opens MERL-T", count=others.rowcount)
+    if created:
+        log.info("Admin API key seeded from environment")
+    KEY_READY = True
+    return created

@@ -2,7 +2,7 @@
 
 Il browser parla solo con il BFF Node (`/api/merlt/*`). Il BFF autentica l'utente VisuaLex, applica i guard e inietta `user_id` nel corpo o nella query verso MERL-T. Non inoltra né il JWT né alcun header `X-User-ID`.
 
-Ogni client BFF invia `MERLT_API_KEY` come `X-API-Key` quando la variabile è impostata. MERL-T rende `verify_api_key` opzionale: `services/merlt/merlt/app.py` fa `app.dependency_overrides[verify_api_key] = optional_api_key`. La chiave serve quindi solo alle route `require_role("admin")`, marcate **ADMIN** qui sotto. **OPT** vuol dire che MERL-T accetta la richiesta anche senza chiave: su quelle route il solo cancello è il BFF, e per questo `:8000` non va mai esposto.
+Ogni client BFF invia `MERLT_API_KEY` come `X-API-Key` quando la variabile è impostata. Dalla correzione A.2 ogni route di MERL-T chiede la chiave: `services/merlt/merlt/app.py` include ogni router dietro `verify_api_key`, e restano aperte solo `/health` e `/`. Le route `require_role("admin")`, marcate **ADMIN** qui sotto, chiedono anche il ruolo admin. **OPT** vuol dire ora: chiave richiesta, nessun ruolo.
 
 Fonte di verità: `apps/server/src/routes/merlt/index.ts` (montaggio e feature flag) e i router in `apps/server/src/routes/merlt/*.ts`. Le tabelle elencano le route effettivamente montate al 2026-09-25.
 

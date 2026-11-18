@@ -110,7 +110,6 @@ router is mounted with `prefix="/api/v1"` plus its own prefix:
 | `profile_router` | `/profile` |
 | `rlcf_router` | `/rlcf` |
 | `expert_metrics_router` | `/expert-metrics` |
-| `ws_router` | `/ws` |
 | `tracking_router` | `/tracking` |
 | `policy_evolution_router` | `/policy-evolution` |
 | `export_router` | `/export` |
@@ -125,17 +124,23 @@ router is mounted with `prefix="/api/v1"` plus its own prefix:
 | `rassegne_router` | `/rassegne` (`GET /by-norma`: the review paragraphs citing a norm, by year; no caller since the web reads the Python API's store, removed in PR 3 of design 2026-10-30-rassegne-without-merlt) |
 | `user_data_router` | `/user-data` (`GET` and `DELETE /{user_id}`: a person's data, for the BFF only; see Personal data) |
 
-**Auth.** `app.py` sets `app.dependency_overrides[verify_api_key] = optional_api_key`,
-so a route that declares only `verify_api_key` accepts requests without a key.
-Only `require_role("admin")` checks the key.
+**Auth (scan A.2).** Every route needs the API key: `app.py` includes every
+router with `dependencies=KEY_REQUIRED` (`verify_api_key`), and only `/health`
+(the containers' probe) and `/` stay open. A missing, unknown, inactive or
+expired key is a 401; `require_role("admin")` adds a 403 for a key that is not
+admin. There is no open mode: with no key configured every route answers 401.
 
-- Among the routes the BFF uses, those are `/rlcf/training/{start,stop}` and
-  `/ingestion/mechanical/*`.
-- `/admin/*` and `/ner/*` are therefore open at this layer. Never expose :8000,
-  and design every new sensitive route assuming `verify_api_key` filters
-  nothing.
-- The admin key is seeded at boot from `MERLT_ADMIN_API_KEY`
-  (`api/api_key_seed.py`).
+- The one key is seeded at boot from `MERLT_ADMIN_API_KEY` (`api/api_key_seed.py`;
+  compose passes the server's `MERLT_API_KEY`). The seed deactivates every other
+  active key (kept, not deleted), so a key created through `/api-keys` lasts until
+  the next boot. No route hands out a key.
+- `/health` reports `api_key: missing` when the seed left no usable key.
+- `verify_api_key` writes the key's `last_used_at` at most every five minutes.
+- `/docs`, `/redoc` and `/openapi.json` are off unless `MERLT_DOCS=true`.
+- In development, set `MERLT_API_KEY` in `apps/server/.env` (any long random
+  string): `start.sh` passes it to MERL-T as `MERLT_ADMIN_API_KEY`.
+- A new router is covered by `tests/api/test_every_route_needs_the_key.py`, which
+  walks the app's routes.
 
 **Callbacks to the BFF.** They carry `X-Internal-Secret` (`MERLT_INTERNAL_SECRET`):
 
