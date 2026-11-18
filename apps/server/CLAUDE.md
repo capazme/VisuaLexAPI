@@ -558,8 +558,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   reply or a comment **outlives its author's account** (`user_id` SET NULL; every view says «utente
   cancellato» and a null author is nobody's own, G-307); a report names its item by a **plain id, no
   foreign key**, and keeps `reported_text` (the item as reported) for the moderators until 90 days after
-  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes, also deletes
-  notifications read 90 days ago); `article_comment_reports`, `forum_notifications`,
+  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes and checked hourly by
+  a timer `index.ts` starts, also deletes notifications read 90 days ago, and erases a closed report's
+  `details` and `resolution_note` 12 months after it was closed, G-503, and turns a moderation log
+  entry's `reason` into «(tolto dopo 12 mesi)» 12 months after it was written, G-550); `article_comment_reports`, `forum_notifications`,
   `forum_moderation_log`, `users.forum_moderator`; accepted answer, edit/delete marks (emptied text is
   `''`, a CHECK), lock, `materia`, `licence_text_id` (the version of `CONTRIBUTO_COMMUNITY` a row was
   written under). `GET /auth/export` adds the user's votes, reports (never their copy, who closed them or
@@ -642,7 +644,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   /moderation/profile-reports/:profileId/resolve { action: confirm | dismiss, reason }` (confirm withdraws
   the name: «nome ritirato» everywhere, no writing, no change of profile) and `…/restore { reason }`; logged
   as `withdraw_name`, `restore_name` (target `profile`) or `dismiss` (target `report`, `profile:<id>`). The
-  sweep erases a closed report's details after 90 days. The export carries the profile and the reports one
+  sweep erases a closed report's details after 90 days, and the owners' note after 12 months (G-503). The export carries the profile and the reports one
   made.
   **Communities by subject** (spec §C, D-214, D-267, G-478; migration `20261116100002_forum_communities`;
   `controllers/forumCommunitiesController.ts`, `forum/roles.ts`, `forum/validation.ts`, `forum/appeals.ts`,
@@ -677,7 +679,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   cleared when shown): `POST /forum/appeals { kind, itemId, text }` by the author of a hidden item, once per
   hiding (the `report` counter); the owners' `GET /moderation/appeals` and `POST /moderation/appeals/:id/decide
   { action: uphold | reject, reason }` (uphold shows the item, logged `unhide`; reject logged
-  `appeal_rejected`; the author told, `appeal`); showing an item by any route closes its pending appeal as
+  `appeal_rejected`; the author told, `appeal`; the queue's `hidingReason` is the log's, so after 12 months
+  it reads «(tolto dopo 12 mesi)» and only the category is left, G-550); showing an item by any route closes its pending appeal as
   upheld with a fixed note, never the moderator's free reason (it may name who reported); the author's deletion of the item deletes its appeals; the hidden notice carries `appeal`
   (`pending` | `rejected` | null). The profiles carry `roles` (public) and `validatedCount`; `GET
   /forum/profiles/:profileId/validated` lists the visible contributions at the threshold. The export

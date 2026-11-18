@@ -4,6 +4,7 @@ import { prisma } from './lib/prisma';
 import { startNormaWatcher } from './utils/normaWatcher';
 import { startDeadLetterSweeper } from './services/merlt/deadLetterLog';
 import { startMerltErasureWorker } from './services/merlt/userData';
+import { startCommunitySweeper } from './forum/sweep';
 import { cookieSecure } from './auth/webSession';
 import {
   scheduleStuckJobSweeper,
@@ -50,6 +51,10 @@ const deadLetterSweeper: NodeJS.Timeout | null =
 // Erasures MERL-T has not confirmed yet are retried (services/merlt/userData.ts).
 const merltErasureWorker: NodeJS.Timeout | null =
   config.nodeEnv !== 'test' ? startMerltErasureWorker() : null;
+// The Forum's terms (copies of reported texts, details and notes of closed reports, read notifications)
+// hold even when nobody writes there (forum/sweep.ts).
+const stopCommunitySweeper: (() => void) | null =
+  config.nodeEnv !== 'test' ? startCommunitySweeper() : null;
 
 const server = app.listen(config.port, () => {
   normaWatcherInterval = startNormaWatcher();
@@ -96,6 +101,7 @@ function shutdown(signal: NodeJS.Signals): void {
   if (normaWatcherInterval) clearInterval(normaWatcherInterval);
   if (deadLetterSweeper) clearInterval(deadLetterSweeper);
   if (merltErasureWorker) clearInterval(merltErasureWorker);
+  stopCommunitySweeper?.();
   server.close(() => {
     prisma
       .$disconnect()
