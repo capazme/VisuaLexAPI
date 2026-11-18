@@ -25,6 +25,8 @@ import { Illustration } from '../../ui/Illustration';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const LIST_PATH = '/learn/schede';
+/** The shared trash, where a deleted card is restored (`DossierPage`). */
+const TRASH_PATH = '/pratiche?trash=1';
 
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
@@ -251,10 +253,20 @@ export function MyCardsView() {
     navigate(`${LIST_PATH}/${encodeURIComponent(savedId)}`);
   };
 
-  // Confirmed in `CardDetail` (#457); the card goes to the trash for 30 days and the notification's «Annulla» takes it
-  // back out (K1a).
+  // Asked nothing (LC89, L-80): the card goes to the trash for 30 days, the notification's «Annulla» takes it back out
+  // (K1a) and «Apri il cestino» leads to where it can be restored once the notification is gone.
   // One trash call per card: a double click on «Elimina» must not send a second one.
   const deleting = useRef<string | null>(null);
+  // Where the focus goes once the deleted card's detail is gone: the next card of the list (else the one before), or
+  // the page's title, never the body (LC89). undefined: no deletion pending.
+  const focusAfterDelete = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (id || focusAfterDelete.current === undefined) return;
+    const next = focusAfterDelete.current;
+    focusAfterDelete.current = undefined;
+    const link = next ? document.querySelector<HTMLElement>(`a[href="${LIST_PATH}/${encodeURIComponent(next)}"]`) : null;
+    (link ?? document.querySelector<HTMLElement>('h1[data-section-title]'))?.focus();
+  }, [id]);
   const deleteCard = async (card: Scheda) => {
     if (deleting.current === card.id) return;
     deleting.current = card.id;
@@ -281,6 +293,7 @@ export function MyCardsView() {
             void refresh();
           },
           message: 'Scheda nel cestino',
+          link: { label: 'Apri il cestino', onClick: () => navigate(TRASH_PATH) },
         });
       } else if (outcome.moved.includes(card.id)) {
         setToast({ message: 'Scheda nel cestino', type: 'success' });
@@ -295,6 +308,9 @@ export function MyCardsView() {
         // The router moves off the card as a transition: until it lands, the card is known to be gone,
         // so the new list that lacks it is not read as a reason to fetch it.
         setFetched({ id: card.id, card: null });
+        const order = groups.flatMap((group) => group.istituti.flatMap((institute) => institute.cards.map((c) => c.id)));
+        const at = order.indexOf(card.id);
+        focusAfterDelete.current = at < 0 ? null : (order[at + 1] ?? order[at - 1] ?? null);
         navigate(LIST_PATH);
       }
       void refresh();
