@@ -1,5 +1,6 @@
 import type { LingoCardStato, Prisma } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
+import { canTransition } from './cardStates';
 
 /**
  * Removing one's own contributions to Learn before leaving (G-502): a card the community took up, and the reason
@@ -57,4 +58,24 @@ export async function removeOwnCommunityCard(tx: Prisma.TransactionClient, userI
 export async function eraseOwnVoteReason(tx: Prisma.TransactionClient, userId: string, cardId: string): Promise<boolean> {
   const { count } = await tx.lingoValidazioneCard.updateMany({ where: { cardId, utenteId: userId }, data: { motivazione: null } });
   return count > 0;
+}
+
+/**
+ * The author withdraws a proposed card: back to a draft at any time, its votes deleted and its accepted notice
+ * cleared (`POST /api/lingo/cards/:id/ritira`, and the account's «remove my contributions», G-558).
+ */
+export async function withdrawOwnProposal(tx: Prisma.TransactionClient, userId: string, cardId: string) {
+  // Locked like a vote's: a vote that comes in at this moment either lands before (and is deleted here) or finds a draft.
+  const locked = await tx.$queryRaw<{ stato: LingoCardStato }[]>`SELECT stato FROM lingo_cards WHERE id = ${cardId} AND autore_id = ${userId} FOR UPDATE`;
+  if (locked.length !== 1) throw new AppError(404, 'Scheda non trovata.');
+  if (!canTransition(locked[0].stato, 'BOZZA_PERSONALE')) {
+    throw new AppError(409, 'Solo una scheda in attesa di validazione si può ritirare.');
+  }
+  // The votes belong to the proposal being withdrawn: a new proposal starts from none.
+  await tx.lingoValidazioneCard.deleteMany({ where: { cardId } });
+  return tx.lingoCard.update({
+    where: { id: cardId },
+    data: { stato: 'BOZZA_PERSONALE', propostaTestoId: null },
+    include: { ancore: true },
+  });
 }

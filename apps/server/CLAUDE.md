@@ -1028,7 +1028,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   finishes before the states are read (plan, decision 14). Their votes outlive them, anonymous
   (`LingoValidazioneCard.utenteId` `SET NULL`), as do the text versions they wrote
   (`autoreId` `SET NULL`); their acceptances go. A card's votes go with the card: one
-  restored from the trash comes back without them. `GET /auth/export` includes the user's cards
+  restored from the trash comes back without them. Before leaving, the person can remove
+  everything they wrote for others at once (G-558): `POST /auth/contributions/remove { password }`,
+  session only, one transaction (`account/removeAllContributions.ts`) — their glosse, then their
+  replies and comments, newest first, by the author's own delete rule (`deleteOwnThreadIn`,
+  `deleteOwnCommentIn` in `controllers/communityController.ts`); the Forum validations they gave;
+  their proposed cards withdrawn; their validated or under-review cards by G-556; their votes' reasons
+  erased (G-557). It answers `{ glosse: {cancellate, svuotate}, risposte: {cancellate, svuotate},
+  validazioniForum, schede: {ritirate, cancellate, senzaNome}, motivazioni }`; a wrong password is a
+  400 and changes nothing. `GET /auth/export` includes the user's cards
   as `data.lingoCards`, their votes as `data.lingoValidazioni` (card id, verdict, reason, time)
   and their acceptances as `data.lingoAccettazioni` (key, version, time). Review data is personal: `LingoStatoRipasso`
   (`lingo_stato_ripasso`, one row per user and card, indexed by `(utente_id, due_at)`),

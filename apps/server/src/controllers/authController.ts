@@ -20,6 +20,7 @@ import {
 } from '../auth/webSession';
 import { exportUserCourses } from '../lingo/courses';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
+import { removeAllOwnContributions } from '../account/removeAllContributions';
 import { dateToDay } from '../lingo/studyDays';
 
 // Validation schemas
@@ -47,6 +48,10 @@ const changePasswordSchema = z.object({
 const setDevModeSchema = z.object({
   enabled: z.boolean(),
 }).strict();
+
+const removeContributionsSchema = z.object({
+  password: z.string().min(1).max(1_024),
+});
 
 const deleteAccountSchema = z.object({
   password: boundedText(MAX_PASSWORD_LENGTH, 'password').min(1),
@@ -744,6 +749,20 @@ export const exportAccountData = async (req: Request, res: Response) => {
       })),
     },
   });
+};
+
+/**
+ * «Togli i miei contributi» (G-502, G-558): everything the person wrote for others, removed at once, each kind by the
+ * rule it already has (`account/removeAllContributions.ts`); the answer says what was done, kind by kind. It cannot be
+ * undone, so it asks for the password, as deleting the account does. The user's own session only.
+ */
+export const removeOwnContributions = async (req: Request, res: Response) => {
+  const { password } = removeContributionsSchema.parse(req.body);
+  const user = req.user!;
+  if (!(await verifyPassword(password, user.password))) {
+    throw new AppError(400, 'La password non è corretta');
+  }
+  res.json(await removeAllOwnContributions(user.id));
 };
 
 /**
