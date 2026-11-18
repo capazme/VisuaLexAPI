@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RECURRENCE_RULES } from '../../../types/tasks';
 import example from './__fixtures__/todoist-esempio.csv?raw';
-import { NotTodoistCsvError, parseCsv, planTodoistImport, runTodoistImport, toRome } from './todoistCsv';
+import { NotTodoistCsvError, parseCsv, planTodoistImport, readTodoistTitle, runTodoistImport, toRome } from './todoistCsv';
 
 // Tuesday 17 November 2026, the server's Rome day.
 const TODAY = '2026-11-17';
@@ -26,9 +26,10 @@ describe('planTodoistImport on the example file', () => {
   it('counts tasks, subtasks and the sections as labels; meta and empty rows are skipped', () => {
     expect(plan.tasks).toHaveLength(13);
     expect(plan.subtasks).toBe(3);
-    expect(plan.labels).toEqual(['Studio della pratica 📚', 'Adempimenti ⭐️']);
+    expect(plan.labels).toEqual(['udienza', 'Studio della pratica 📚', 'Adempimenti ⭐️']);
+    expect(plan.fromTitles).toEqual({ labels: 1, deadlines: 1, durations: 1, links: 1 });
     expect(byTitle('Rileggere il contratto, clausola 7').input.labels).toEqual(['Studio della pratica 📚']);
-    expect(byTitle('Deposito memoria @udienza {tra 10 giorni} !1h').input.labels).toEqual([]);
+    expect(byTitle('Deposito memoria').input.labels).toEqual(['udienza']);
   });
 
   it('builds the tree from INDENT and the order of the rows', () => {
@@ -43,7 +44,7 @@ describe('planTodoistImport on the example file', () => {
   });
 
   it('keeps the priority as it is (1 is urgent in the CSV too) and the multi-line description', () => {
-    expect(byTitle('Deposito memoria @udienza {tra 10 giorni} !1h').input.priority).toBe(1);
+    expect(byTitle('Deposito memoria').input.priority).toBe(1);
     expect(byTitle("Preparare l'indice dei documenti").input.priority).toBe(2);
     expect(byTitle("Preparare l'indice dei documenti").input.description).toBe(
       'Punti da coprire:\n\n- allegati del ricorso\n- [modello](https://example.com/modello) da adattare',
@@ -51,12 +52,10 @@ describe('planTodoistImport on the example file', () => {
   });
 
   it('reads dates in Italian and English, and the five repetitions', () => {
-    expect(byTitle('Leggi la guida introduttiva ([Guarda](https://example.com/guida)) 📽️').input.plannedDate).toBe(TODAY);
+    expect(byTitle('Leggi la guida introduttiva (Guarda) 📽️').input.plannedDate).toBe(TODAY);
     expect(byTitle('Rileggere il contratto, clausola 7').input.plannedDate).toBe('2026-11-18');
     expect(byTitle('Fissare la telefonata').input).toMatchObject({ plannedDate: '2026-11-18', plannedTime: '15:00' });
-    expect(byTitle('Deposito memoria @udienza {tra 10 giorni} !1h').input).toMatchObject({
-      plannedDate: '2026-11-20', plannedTime: '10:00', recurrence: RECURRENCE_RULES.weekly, recurrenceFrom: 'pianificata',
-    });
+    expect(byTitle('Rileggere il contratto, clausola 7').input.recurrence).toBeUndefined();
     expect(byTitle('Controllo PEC').input).toMatchObject({ plannedTime: '09:00', recurrence: RECURRENCE_RULES.workingDays });
     expect(byTitle('Inviare il riepilogo').input).toMatchObject({ dueDate: '2026-11-30' });
   });
@@ -75,8 +74,20 @@ describe('planTodoistImport on the example file', () => {
     const monthly = byTitle('Revisione mensile').input;
     expect(monthly).toMatchObject({ plannedDate: TODAY, dueDate: '2026-12-15' });
     expect(monthly.recurrence).toBeUndefined();
-    expect(plan.nonRecurring.map((n) => n.phrase)).toEqual(['ogni 2 settimane', 'ogni mese']);
-    expect(plan.nonRecurring.map((n) => n.why)).toEqual([undefined, 'ha anche un termine finale, che non si ripete']);
+    expect(plan.nonRecurring.map((n) => n.phrase)).toEqual(['ogni venerdì alle 10', 'ogni 2 settimane', 'ogni mese']);
+    const why = 'ha anche un termine finale, che non si ripete';
+    expect(plan.nonRecurring.map((n) => n.why)).toEqual([why, undefined, why]);
+  });
+
+  it("reads Todoist's syntax out of the title: label, deadline, duration and links", () => {
+    const deposit = byTitle('Deposito memoria').input;
+    // «{tra 10 giorni}» is the deadline (the CSV has none), so «ogni venerdì alle 10» does not repeat.
+    expect(deposit).toMatchObject({ labels: ['udienza'], dueDate: '2026-11-27', plannedDate: '2026-11-20', plannedTime: '10:00' });
+    expect(deposit.recurrence).toBeUndefined();
+    expect(deposit.description).toBe(
+      'Durata in Todoist: 1h\n\nRipetizione in Todoist: «ogni venerdì alle 10» (non si ripete: il compito ha un termine finale)',
+    );
+    expect(byTitle('Leggi la guida introduttiva (Guarda) 📽️').input.description).toBe('Link:\n- Guarda: https://example.com/guida');
   });
 
   it('lists the dates it did not understand and keeps them in the description', () => {
@@ -96,6 +107,31 @@ describe('planTodoistImport on the example file', () => {
     // Never half an emoji at the cut.
     const emoji = planTodoistImport(`TYPE,CONTENT\ntask,${'x'.repeat(499)}📚`, TODAY);
     expect(emoji.tasks[0].input.title).toBe('x'.repeat(499));
+  });
+});
+
+describe('readTodoistTitle', () => {
+  it('reads only labels and a deadline, never a date in words or a priority', () => {
+    const read = readTodoistTitle('Chiamare domani p1 il cliente @telefono @studio', TODAY);
+    expect(read).toMatchObject({ title: 'Chiamare domani p1 il cliente', labels: ['telefono', 'studio'], due: null, notes: [] });
+  });
+
+  it('keeps a «{…}» that is not a date, an address and a «!» that is not a duration', () => {
+    const read = readTodoistTitle('Scrivere a mario@studio.it {bozza} !importante', TODAY);
+    expect(read).toMatchObject({ title: 'Scrivere a mario@studio.it {bozza} !importante', labels: [], due: null, durations: 0 });
+  });
+
+  it('keeps the words of every link, with the addresses in the description, and a title of symbols alone whole', () => {
+    const read = readTodoistTitle('Leggi [art. 2043](https://example.com/a?x=1 y) e [la nota](https://example.com/b) !30 min', TODAY);
+    expect(read.title).toBe('Leggi art. 2043 e la nota');
+    expect(read.notes).toEqual(['Link:\n- art. 2043: https://example.com/a?x=1 y\n- la nota: https://example.com/b', 'Durata in Todoist: 30 min']);
+    expect(readTodoistTitle('@solo', TODAY).title).toBe('@solo');
+  });
+
+  it('leaves the deadline of the CSV first and writes the title\'s down', () => {
+    const csv = 'TYPE,CONTENT,DEADLINE\ntask,Depositare {tra 3 giorni},2026-12-01';
+    const task = planTodoistImport(csv, TODAY).tasks[0].input;
+    expect(task).toMatchObject({ title: 'Depositare', dueDate: '2026-12-01', description: 'Termine nel titolo in Todoist: {tra 3 giorni}' });
   });
 });
 

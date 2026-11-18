@@ -34,8 +34,9 @@ describe('TodoistImport', () => {
     render(<TodoistImport id="imp" open onClose={() => {}} dossierId="d1" today={TODAY} />);
 
     chooseFile(example);
-    expect(await screen.findByText(/Nasceranno 13 compiti, di cui 3 sottocompiti, con 2 etichette/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nasceranno 13 compiti, di cui 3 sottocompiti, con 3 etichette/)).toBeInTheDocument();
     expect(screen.getByText(/Date non capite/)).toBeInTheDocument();
+    expect(screen.getByText(/Dai titoli: 1 «@…» diventa un'etichetta; 1 «\{…\}» diventa il termine finale; 1 durata «!…» va nella descrizione; 1 link resta come testo/)).toBeInTheDocument();
     expect(screen.getByText(/Ripetizioni che diventano compiti non ricorrenti/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Importa 13 compiti' }));

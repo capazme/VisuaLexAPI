@@ -99,6 +99,16 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
     }
   };
 
+  // Todoist's syntax read out of the titles, said in the preview.
+  const t = plan?.fromTitles;
+  const fromTitles = t
+    ? [
+        t.labels > 0 && `${plural(t.labels, '«@…» diventa un\'etichetta', '«@…» diventano etichette')}`,
+        t.deadlines > 0 && `${plural(t.deadlines, '«{…}» diventa il termine finale', '«{…}» diventano termini finali')}`,
+        t.durations > 0 && `${plural(t.durations, 'durata «!…» va', 'durate «!…» vanno')} nella descrizione`,
+        t.links > 0 && `${plural(t.links, 'link resta', 'link restano')} come testo, con l'indirizzo nella descrizione`,
+      ].filter((part): part is string => typeof part === 'string')
+    : [];
   const created = progress?.created;
   const done = plan && created ? plan.tasks.filter((t) => created.has(t.row)).length : 0;
   const left = plan ? plan.tasks.length - done : 0;
@@ -149,6 +159,9 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
                 {plan.subtasks > 0 && <>, di cui {plural(plan.subtasks, 'sottocompito', 'sottocompiti')}</>}
                 {plan.labels.length > 0 ? <>, con {plural(plan.labels.length, 'etichetta', 'etichette')} dalle sezioni: {plan.labels.join(', ')}.</> : '.'}
               </p>
+            )}
+            {fromTitles.length > 0 && (
+              <p className="text-sm text-slate-700 dark:text-slate-300">Dai titoli: {fromTitles.join('; ')}.</p>
             )}
             <NoteList heading="Date non capite: restano nella descrizione" notes={plan.unreadDates} />
             <NoteList heading="Ripetizioni che diventano compiti non ricorrenti" notes={plan.nonRecurring} />

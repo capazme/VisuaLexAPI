@@ -56,7 +56,7 @@ export const BROWSER_STORAGE: readonly StorageEntry[] = [
   { area: 'local', key: 'visualex.studia.valida.materia', kind: 'user', what: 'Gymnasium: the subject chosen for validation' },
   { area: 'local', key: 'visualex.studia.percorsi.passo', kind: 'user', what: 'Gymnasium: the step reached in each module' },
   { area: 'session', key: 'visualex.studia.percorsi.lavoro', kind: 'user', what: 'Gymnasium: the work on a module in this tab' },
-  { area: 'session', key: 'visualex.opus.todoist-import', kind: 'user', what: 'Todoist CSV import, per dossier and file (size and date, no name): the ids of the rows already created and of their tasks, no task text; replaced by the import\'s day when it ends well' },
+  { area: 'session', key: 'visualex.opus.todoist-import', kind: 'user', what: 'Todoist CSV import, per practice and file (size and date, no name): the ids of the rows already created and of their tasks, no task text; replaced by the import\'s day when it ends well' },
   { area: 'local', key: 'visualex.atti.avviso-visto', kind: 'user', what: 'the notice before the first upload of a case file, seen (shown again after a sign-out)' },
   { area: 'local', key: 'visualex.merlt.consent', kind: 'user', what: 'legacy: the MERL-T consent level, no longer written' },
   { area: 'local', key: 'visualex.merlt.consent-snooze', kind: 'user', what: 'legacy: the old consent banner snoozed, no longer written' },

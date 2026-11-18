@@ -1,5 +1,6 @@
 import type { TaskInput, TaskPriority } from '../../../types/tasks';
 import { isRepetitionPhrase, parseDatePhrase, type DatePhrase } from './datePhrase';
+import { readQuickAddLine } from './quickAddLine';
 
 /**
  * Todoist's CSV export read into tasks, all in the browser (LC80): the file never leaves it, only the tasks go to
@@ -13,6 +14,7 @@ import { isRepetitionPhrase, parseDatePhrase, type DatePhrase } from './datePhra
 const MAX_TITLE = 500;
 const MAX_DESCRIPTION = 10_000;
 const MAX_LABEL = 50;
+const MAX_LABELS = 20;
 const ROME = 'Europe/Rome';
 
 /** RFC 4180: quoted fields with commas, doubled quotes and line breaks inside; a BOM, CRLF or LF. */
@@ -79,6 +81,56 @@ export interface ImportPlan {
   nonRecurring: ImportNote[];
   /** Titles or descriptions cut to the server's length. */
   trimmed: number;
+  /** Todoist's syntax read out of the titles: `@etichetta`, `{termine}`, `!durata`, `[testo](url)`. */
+  fromTitles: { labels: number; deadlines: number; durations: number; links: number };
+}
+
+export interface ReadTitle {
+  title: string;
+  labels: string[];
+  /** The `{…}` read as a date, with its words. */
+  due: { value: DatePhrase; raw: string } | null;
+  /** What leaves the title for the description: a duration, the links' addresses. */
+  notes: string[];
+  durations: number;
+  links: number;
+}
+
+/**
+ * A Todoist title read as the quick add reads a line (`quickAddLine.ts`): `@x` is a label and `{…}` a deadline; only
+ * these two, never a date in words or `p1` (the CSV has its own columns). A Markdown link keeps its words, its address
+ * goes to the description; `!1h` (a duration) leaves the title for the description. A title left empty stays whole.
+ */
+export function readTodoistTitle(content: string, today: string): ReadTitle {
+  const linkLines: string[] = [];
+  const durationNotes: string[] = [];
+  let text = content.replace(/\[([^\]\n]+)\]\(([^()\s][^()]*)\)/g, (_all, words: string, url: string) => {
+    linkLines.push(`- ${words}: ${url.trim()}`);
+    return words;
+  });
+  text = text.replace(/(?<=^|\s)!(\d+(?:[.,]\d+)?\s?(?:h|m|min|ora|ore|minuti?|hours?|minutes?))(?=[\s,;.]|$)/gi, (_all, duration: string) => {
+    durationNotes.push(`Durata in Todoist: ${duration}`);
+    return ' ';
+  });
+  const line = readQuickAddLine(text, today, { dossiers: [], dossierLocked: true });
+  const read = line.parts.filter((part) => part.kind === 'label' || part.kind === 'due');
+  let title = '';
+  let from = 0;
+  for (const part of read) {
+    title += `${text.slice(from, part.start)} `;
+    from = part.end;
+  }
+  // Not before «!»: a «!» left in the title opens a word of its own.
+  title = `${title}${text.slice(from)}`.replace(/\s+/g, ' ').replace(/\s+([,;.:?)])/g, '$1').trim();
+  const due = read.find((part) => part.kind === 'due');
+  return {
+    title: title || content.trim(),
+    labels: read.flatMap((part) => (part.kind === 'label' ? [part.label] : [])),
+    due: due && due.kind === 'due' ? { value: due.value, raw: due.raw } : null,
+    notes: [...(linkLines.length > 0 ? [['Link:', ...linkLines].join('\n')] : []), ...durationNotes],
+    durations: durationNotes.length,
+    links: linkLines.length,
+  };
 }
 
 export class NotTodoistCsvError extends Error {
@@ -142,7 +194,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
   if (at('TYPE') < 0 || at('CONTENT') < 0) throw new NotTodoistCsvError();
   const cell = (record: string[], name: string) => (at(name) < 0 ? '' : (record[at(name)] ?? '').trim());
 
-  const plan: ImportPlan = { tasks: [], subtasks: 0, labels: [], unreadDates: [], nonRecurring: [], trimmed: 0 };
+  const plan: ImportPlan = { tasks: [], subtasks: 0, labels: [], unreadDates: [], nonRecurring: [], trimmed: 0, fromTitles: { labels: 0, deadlines: 0, durations: 0, links: 0 } };
   let section: string | null = null;
   // The open tasks above this row, by indent: the last one with a smaller indent is the parent.
   let stack: { indent: number; row: number }[] = [];
@@ -167,12 +219,19 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
     if (parentRow !== null) plan.subtasks++;
 
     const priority = Number(cell(record, 'PRIORITY'));
+    const read = readTodoistTitle(content, today);
+    const titleLabels = read.labels.map((label) => cut(label, MAX_LABEL));
+    const labels = [...new Set([...(section ? [section] : []), ...titleLabels])].slice(0, MAX_LABELS);
+    for (const label of titleLabels) if (!plan.labels.includes(label)) plan.labels.push(label);
+    plan.fromTitles.labels += titleLabels.length;
+    plan.fromTitles.durations += read.durations;
+    plan.fromTitles.links += read.links;
     const input: TaskInput & { title: string } = {
-      title: cut(content, MAX_TITLE),
+      title: cut(read.title, MAX_TITLE),
       priority: ([1, 2, 3, 4].includes(priority) ? priority : 4) as TaskPriority,
-      labels: section ? [section] : [],
+      labels,
     };
-    const notes: string[] = [];
+    const notes: string[] = [...read.notes];
     const zone = cell(record, 'TIMEZONE');
 
     const datePhrase = cell(record, 'DATE');
@@ -192,7 +251,10 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
     }
 
     const deadlinePhrase = cell(record, 'DEADLINE');
-    const deadline = deadlinePhrase ? readWhen(deadlinePhrase, today) : null;
+    // The `{…}` of the title is the deadline only when the CSV has none: else it is written down.
+    if (read.due && deadlinePhrase) notes.push(`Termine nel titolo in Todoist: ${read.due.raw}`);
+    else if (read.due) plan.fromTitles.deadlines++;
+    const deadline = deadlinePhrase ? readWhen(deadlinePhrase, today) : read.due?.value ?? null;
     if (deadline && !deadline.recurrence) {
       const moved = deadline.time ? toRome(deadline.date, deadline.time, zone) : { date: deadline.date, time: null };
       input.dueDate = moved.date;
@@ -211,7 +273,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
 
     const description = [clean(cell(record, 'DESCRIPTION')), ...notes].filter(Boolean).join('\n\n');
     if (description) input.description = cut(description, MAX_DESCRIPTION);
-    if (content.length > MAX_TITLE || description.length > MAX_DESCRIPTION) plan.trimmed++;
+    if (read.title.length > MAX_TITLE || description.length > MAX_DESCRIPTION) plan.trimmed++;
     plan.tasks.push({ row, parentRow, input });
   });
   return plan;
