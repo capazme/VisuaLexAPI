@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
 import { prefersReducedMotion } from '../../features/sections/sectionTransition';
+import { scrollParentOf } from '../../utils/scrollParent';
 
 /** How far a page travels as it comes and goes: a nudge, not a whole screen. */
 const SHIFT = 24;
@@ -54,6 +55,12 @@ export function PageSlide({ pageKey, back = false, className, children }: PageSl
       leave.style.left = `${placed.current.left - grid.getBoundingClientRect().left}px`;
       leave.style.width = `${placed.current.width}px`;
     }
+    // Cut at the bottom of what is in sight: a long leaving page made a short coming one scroll, and its scrollbar came
+    // and went with the movement, moving a centred page 4 px at its end (Impostazioni back to the search page).
+    const scroller = leave ? scrollParentOf(leave) : null;
+    if (leave && scroller) {
+      leave.style.maxHeight = `${Math.max(0, scroller.getBoundingClientRect().bottom - leave.getBoundingClientRect().top)}px`;
+    }
     const coming = enter?.animate(
       [{ opacity: 0, transform: still ? 'none' : `translateX(${toward * SHIFT}px)` }, { opacity: 1, transform: 'none' }],
       ISLAND_OPEN,
@@ -81,7 +88,7 @@ export function PageSlide({ pageKey, back = false, className, children }: PageSl
     <div ref={gridRef} className={cn('relative grid', className)}>
       {/* Out of the grid's flow: the cell is the coming page's alone. */}
       {leaving && (
-        <div ref={leaveRef} key={leaving.key} inert aria-hidden className="pointer-events-none absolute top-0 left-0 w-full">
+        <div ref={leaveRef} key={leaving.key} inert aria-hidden className="pointer-events-none absolute top-0 left-0 w-full overflow-hidden">
           {leaving.node}
         </div>
       )}
