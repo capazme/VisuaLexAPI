@@ -17,10 +17,10 @@ import { DossierModal } from '../../ui/DossierModal';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeItemCounts, decodeDossierShare, decisionCitationOf, validateImportedDossier, type ImportCheck,
+  formatTimestampLong, computeItemCounts, decodeDossierShare, decisionCitationOf, validateImportedDossier,
 } from './dossierUtils';
 import { EditDossierPanel } from './EditDossierPanel';
-import { ImportDossierPanel } from './ImportDossierPanel';
+import { ImportDossierPanel, type ImportRequest } from './ImportDossierPanel';
 import type { Dossier, DossierKind } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { sectionOfDossierKind, useDossierKind } from '../../../features/sections/useSection';
@@ -80,7 +80,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
-  const [importing, setImporting] = useState<ImportCheck | null>(null);
+  const [importing, setImporting] = useState<ImportRequest | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -95,7 +95,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       // A share link is untrusted: its decision items are checked, and what cannot be imported is listed.
       const check = validateImportedDossier(JSON.parse(decoded));
       if (!check) throw new Error('not a dossier');
-      setImporting(check);
+      setImporting({ ...check, fromLink: true });
     } catch (e) {
       console.error('Failed to parse import data:', e);
       showToast('Link di importazione non valido', 'error');

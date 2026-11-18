@@ -3217,7 +3217,10 @@ meant to stay split; add new features as new files, not inside the shells:
   «Modifica pratica» and «Importa una pratica» open in the page since LC107 (L-73; `EditDossierPanel`,
   `ImportDossierPanel` on `ui/Expand`): at the top of the list (a share link's `?import=` is read there) and under the
   dossier's header; an import the server cut short (its caps, a 409 in Italian, G-576) stays open and says how many
-  items came in and why the others did not, in the server's words; a whole one opens the new dossier), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  items came in and why the others did not, in the server's words; a whole one opens the new dossier. The items go
+  one at a time at the write limit's pace (`IMPORT_PACE_MS`, under `WRITE_POINTS`' 200 a minute); a 429 waits its
+  `Retry-After` and tries again, and if the server keeps refusing the import stops, says so and offers «Riprendi»
+  into the same dossier), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
   (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),

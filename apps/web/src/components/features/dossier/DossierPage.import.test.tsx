@@ -25,7 +25,7 @@ function link(items: unknown[], title = 'Da link') {
 }
 
 async function importWith(items: unknown[], outcome: unknown, url = link(items)) {
-  const importDossier = vi.fn(async () => outcome);
+  const importDossier = vi.fn<(dossier: Dossier, options?: unknown) => Promise<unknown>>(async () => outcome);
   appStore.setState({ dossiers: [], importDossier } as never);
   render(<MemoryRouter initialEntries={[url]}><DossierPage /></MemoryRouter>);
   const region = await screen.findByRole('region', { name: 'Importa una pratica' });
@@ -52,7 +52,7 @@ describe('DossierPage: after an import', () => {
     await waitFor(() => expect(said(region)).toHaveTextContent('Pratica importata in parte: 1 voce importata, 2 scartate'));
     expect(within(region).getByRole('button', { name: 'Apri la pratica' })).toBeInTheDocument();
     // the dossier sent to the store holds only what passed the check
-    expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ items: [{ id: 'n' }] }]);
+    expect(vi.mocked(importDossier).mock.calls[0][0]).toMatchObject({ items: [{ id: 'n' }] });
     expect((vi.mocked(importDossier).mock.calls[0] as unknown as [{ items: unknown[] }])[0].items).toHaveLength(1);
   });
 
@@ -70,7 +70,7 @@ describe('DossierPage: after an import', () => {
     render(<MemoryRouter initialEntries={[link([note])]}><DossierPage /></MemoryRouter>);
     const region = await screen.findByRole('region', { name: 'Importa una pratica' });
     fireEvent.click(within(region).getByRole('button', { name: 'Importa' }));
-    expect(said(region)).toHaveTextContent('Importo la pratica…');
+    expect(said(region)).toHaveTextContent('Importo la pratica: 0 voci entrate su 1…');
     fireEvent.keyDown(region, { key: 'Escape' });
     expect(screen.getByRole('region', { name: 'Importa una pratica' })).toBe(region);
     answer({ id: 'srv', imported: 0, failed: 1 });
@@ -96,7 +96,37 @@ describe('DossierPage: after an import', () => {
   });
 });
 
+describe('DossierPage: an import stopped by the server\'s write limit (429)', () => {
+  it('says why it stopped and «Riprendi» goes on from the items left, into the same dossier', async () => {
+    const { importDossier, region } = await importWith([note, note, note], { id: 'srv', imported: 1, failed: 0, next: 1 });
+    await waitFor(() => expect(said(region)).toHaveTextContent(
+      'Import interrotto: 1 voce entrata su 3. Il server ha chiesto di rallentare: «Riprendi» continua dalle voci rimaste, nella stessa pratica.',
+    ));
+    const resume = within(region).getByRole('button', { name: 'Riprendi: 2 voci' });
+    expect(resume).toHaveFocus();
+    vi.mocked(importDossier).mockResolvedValueOnce({ id: 'srv', imported: 2, failed: 0 });
+    fireEvent.click(resume);
+    // All in now: the dossier opens, as a whole import does.
+    expect(await screen.findByText('Pratica importata')).toHaveAttribute('data-type', 'success');
+    expect(vi.mocked(importDossier).mock.calls[1]).toMatchObject([expect.anything(), { resume: { id: 'srv', from: 1 } }]);
+  });
+});
+
 describe('DossierPage: the import in the page (LC107, L-73)', () => {
+  it('says «Qualcuno ha condiviso una pratica con te» for a link only, not for a file the user chose', async () => {
+    appStore.setState({ dossiers: [], importDossier: vi.fn() } as never);
+    const { unmount } = render(<MemoryRouter initialEntries={[link([note])]}><DossierPage /></MemoryRouter>);
+    expect(await screen.findByText('Qualcuno ha condiviso una pratica con te')).toBeInTheDocument();
+    unmount();
+    const { container } = render(<MemoryRouter initialEntries={['/pratiche']}><DossierPage /></MemoryRouter>);
+    const json = JSON.stringify({ title: 'Da file', items: [note] });
+    const file = new File([json], 'pratica.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: async () => json });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    await screen.findByRole('region', { name: 'Importa una pratica' });
+    expect(screen.queryByText('Qualcuno ha condiviso una pratica con te')).toBeNull();
+  });
+
   it('opens at the top of the list, with no dialog, and Esc closes it', async () => {
     appStore.setState({ dossiers: [], importDossier: vi.fn() } as never);
     render(<MemoryRouter initialEntries={[link([note])]}><DossierPage /></MemoryRouter>);
@@ -130,12 +160,12 @@ describe('DossierPage: the import in the page (LC107, L-73)', () => {
 describe('DossierPage: share links', () => {
   it('imports a dossier whose title holds a typographic apostrophe', async () => {
     const { importDossier } = await importWith([note], { id: 'srv', imported: 1, failed: 0 }, link([note], 'L’azione revocatoria'));
-    expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ title: 'L’azione revocatoria' }]);
+    expect(vi.mocked(importDossier).mock.calls[0][0]).toMatchObject({ title: 'L’azione revocatoria' });
   });
 
   it('still imports a link made before the UTF-8 links', async () => {
     const old = `/pratiche?import=${encodeURIComponent(btoa(JSON.stringify({ title: 'Perché', items: [note] })))}`;
     const { importDossier } = await importWith([note], { id: 'srv', imported: 1, failed: 0 }, old);
-    expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ title: 'Perché' }]);
+    expect(vi.mocked(importDossier).mock.calls[0][0]).toMatchObject({ title: 'Perché' });
   });
 });

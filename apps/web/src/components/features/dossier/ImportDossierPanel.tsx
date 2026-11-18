@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FolderInput } from 'lucide-react';
-import { useAppStore } from '../../../store/useAppStore';
+import { useAppStore, type ImportProgress } from '../../../store/useAppStore';
 import { importReport, importToastType, type ImportCheck } from './dossierUtils';
 import { countsLine } from './dossierLayout';
 import { tagLabel } from '../../../utils/tagLabel';
@@ -11,9 +11,12 @@ import { cn } from '../../../lib/utils';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+/** A check, and whether it came from a share link (someone shared it) or from a file the user chose. */
+export type ImportRequest = ImportCheck & { fromLink?: boolean };
+
 interface Props {
   /** What a share link or a file holds, checked (`validateImportedDossier`); null, closed. */
-  check: ImportCheck | null;
+  check: ImportRequest | null;
   onClose: () => void;
   /** Opens the dossier the import made. */
   onOpen: (dossierId: string) => void;
@@ -26,12 +29,28 @@ interface Result {
   message: string;
   type: ToastType;
   dossierId?: string;
+  /** Stopped by the server's write limit: «Riprendi» goes on from there. */
+  resumable?: boolean;
 }
 
+/** The runs of one import so far (a stopped one and its «Riprendi»), added up. */
+interface Tally {
+  id: string;
+  imported: number;
+  failed: number;
+  refusals: string[];
+  next?: number;
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const SLOW_DOWN = 'Il server ha chiesto di rallentare';
+
 /**
- * «Importa una pratica» in the page (LC107, L-73): a space at the top of the dossiers (`Expand`), never over them. An
- * import that takes everything opens the new dossier, as before; one the server cut short (its caps, G-576: a 409 in
- * Italian) stays here and says how many items came in and why the others did not, in the server's words.
+ * «Importa una pratica» in the page (LC107, L-73): a space at the top of the dossiers (`Expand`), never over them. The
+ * items go one at a time at the server's write pace (`importDossier`), and the space says how many are in. An import
+ * that takes everything opens the new dossier, as before. One the server cut short stays here: its caps (G-576, a 409
+ * in Italian) said in its words; its write limit, if it kept refusing, with «Riprendi» for the items left, into the same
+ * dossier.
  */
 export function ImportDossierPanel({ check, onClose, onOpen, showToast, className }: Props) {
   // The preview stays drawn while the space closes; a new check (the same file chosen again) starts afresh.
@@ -43,66 +62,99 @@ export function ImportDossierPanel({ check, onClose, onOpen, showToast, classNam
   }
   // While the server works, Esc does not close: the outcome would have nowhere to be said.
   const [busy, setBusy] = useState(false);
-  const headingId = useId();
 
   return (
     <Expand
       open={check !== null}
       onClose={busy ? undefined : onClose}
       role="region"
-      aria-labelledby={headingId}
+      aria-label="Importa una pratica"
       className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}
     >
       {shown && (
-        <ImportBody key={round} check={shown} headingId={headingId} busy={busy} setBusy={setBusy} onClose={onClose} onOpen={onOpen} showToast={showToast} />
+        <ImportBody key={round} check={shown} busy={busy} setBusy={setBusy} onClose={onClose} onOpen={onOpen} showToast={showToast} />
       )}
     </Expand>
   );
 }
 
-function ImportBody({ check, headingId, busy, setBusy, onClose, onOpen, showToast }: Omit<Props, 'check' | 'className'> & {
-  check: ImportCheck;
-  headingId: string;
+function ImportBody({ check, busy, setBusy, onClose, onOpen, showToast }: Omit<Props, 'check' | 'className'> & {
+  check: ImportRequest;
   busy: boolean;
   setBusy: (busy: boolean) => void;
 }) {
   const importDossier = useAppStore((s) => s.importDossier);
-  const { dossier, discarded } = check;
+  const { dossier, discarded, fromLink } = check;
+  const total = dossier.items.length;
   const [result, setResult] = useState<Result | null>(null);
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
+  const [tally, setTally] = useState<Tally | null>(null);
   // The pressed «Importa» is gone with the outcome: the focus goes to what comes next, a button, never a field.
   const nextRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (result) nextRef.current?.focus({ preventScroll: true }); }, [result]);
 
-  const confirm = async () => {
+  const run = async () => {
+    const prior = tally;
     setBusy(true);
-    const outcome = await importDossier(dossier);
+    setResult(null);
+    setProgress(null);
+    const outcome = await importDossier(dossier, {
+      onProgress: setProgress,
+      ...(prior?.next !== undefined && { resume: { id: prior.id, from: prior.next } }),
+    });
     setBusy(false);
+    setProgress(null);
     if (!outcome) {
-      setResult({ message: 'Impossibile importare la pratica: errore server', type: 'error' });
+      setResult({ message: 'Impossibile importare la pratica: errore server', type: 'error', dossierId: prior?.id });
       return;
     }
     if ('refused' in outcome) {
       setResult({ message: `Pratica non importata. ${outcome.refused}`, type: 'error' });
       return;
     }
-    const lost = outcome.failed + discarded.length;
-    if (lost === 0) {
-      showToast(importReport(outcome.imported, lost), 'success');
-      onOpen(outcome.id);
+    const sum: Tally = {
+      id: outcome.id,
+      imported: (prior?.imported ?? 0) + outcome.imported,
+      failed: (prior?.failed ?? 0) + outcome.failed,
+      refusals: [...new Set([...(prior?.refusals ?? []), ...(outcome.refusals ?? [])])],
+      next: outcome.next,
+    };
+    setTally(sum);
+    if (sum.next !== undefined) {
+      setResult({
+        message: `Import interrotto: ${plural(sum.imported, 'voce entrata', 'voci entrate')} su ${total}. ${SLOW_DOWN}: «Riprendi» continua dalle voci rimaste, nella stessa pratica.`,
+        type: 'warning',
+        dossierId: sum.id,
+        resumable: true,
+      });
       return;
     }
-    const words = outcome.refusals?.length ? ` ${outcome.refusals.join(' ')}` : '';
-    setResult({ message: `${importReport(outcome.imported, lost)}.${words}`, type: importToastType(outcome.imported, lost), dossierId: outcome.id });
+    const lost = sum.failed + discarded.length;
+    if (lost === 0) {
+      showToast(importReport(sum.imported, lost), 'success');
+      onOpen(sum.id);
+      return;
+    }
+    const words = sum.refusals.length ? ` ${sum.refusals.join(' ')}` : '';
+    setResult({ message: `${importReport(sum.imported, lost)}.${words}`, type: importToastType(sum.imported, lost), dossierId: sum.id });
   };
+
+  // While it runs: the items in so far, of how many, and whether it is waiting for the server's limit.
+  const entered = (tally?.imported ?? 0) + (progress?.done ?? 0);
+  const running = progress?.waiting
+    ? `${plural(entered, 'voce entrata', 'voci entrate')} su ${total}. ${SLOW_DOWN}: aspetto e riprendo da solo.`
+    : `Importo la pratica: ${plural(entered, 'voce entrata', 'voci entrate')} su ${total}…`;
+  const left = total - (tally?.next ?? total);
 
   return (
     <div className="space-y-4 p-4 md:p-5">
       <div>
-        <h2 id={headingId} className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
           <FolderInput size={18} aria-hidden className="text-slate-500 dark:text-slate-400" />
           Importa una pratica
         </h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Qualcuno ha condiviso una pratica con te</p>
+        {/* Only a link was shared by someone: a file is the user's own. */}
+        {fromLink && <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Qualcuno ha condiviso una pratica con te</p>}
       </div>
 
       <div className={cn('space-y-2 bg-slate-50 p-4 dark:bg-slate-800/50', CARD_RADIUS)}>
@@ -130,19 +182,28 @@ function ImportBody({ check, headingId, busy, setBusy, onClose, onOpen, showToas
 
       {/* The outcome in the flow: what came in, and the server's words for what did not. */}
       <p role="status" className={cn(result || busy ? 'text-sm font-medium' : 'sr-only', result?.type === 'error' ? 'text-red-700 dark:text-red-300' : 'text-slate-800 dark:text-slate-200')}>
-        {busy ? 'Importo la pratica…' : result?.message}
+        {busy ? running : result?.message}
       </p>
 
       <div className="flex flex-wrap justify-end gap-3">
         {result ? (
           <>
             <Button ref={result.dossierId ? undefined : nextRef} type="button" variant="quiet" onClick={onClose}>Chiudi</Button>
-            {result.dossierId && <Button ref={nextRef} type="button" onClick={() => onOpen(result.dossierId!)}>Apri la pratica</Button>}
+            {result.dossierId && (
+              <Button ref={result.resumable ? undefined : nextRef} type="button" variant={result.resumable ? 'secondary' : 'primary'} onClick={() => onOpen(result.dossierId!)}>
+                Apri la pratica
+              </Button>
+            )}
+            {result.resumable && (
+              <Button ref={nextRef} type="button" onClick={() => void run()}>
+                Riprendi: {plural(left, 'voce', 'voci')}
+              </Button>
+            )}
           </>
         ) : (
           <>
             <Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Annulla</Button>
-            <Button type="button" onClick={() => void confirm()} disabled={busy} icon={<FolderInput size={16} aria-hidden />}>
+            <Button type="button" onClick={() => void run()} disabled={busy} icon={<FolderInput size={16} aria-hidden />}>
               Importa
             </Button>
           </>

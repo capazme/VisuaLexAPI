@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../services/dossierService', () => ({
   dossierService: {
@@ -21,7 +21,7 @@ vi.mock('../services/dossierService', () => ({
 // `getState`/`setState` of its own. The vanilla store instance is the
 // separately-exported `appStore` (see e.g. useAuth.ts),
 // so tests that need direct state access use that instead.
-import { appStore } from './useAppStore';
+import { appStore, IMPORT_PACE_MS } from './useAppStore';
 import { dossierService, type DossierItemApi } from '../services/dossierService';
 
 const norma = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '2043' };
@@ -185,6 +185,67 @@ describe('importDossier', () => {
     expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', expect.objectContaining({
       content: norma,
     }));
+  });
+});
+
+// The write limiter (WRITE_POINTS, 200 a minute): the import goes at its pace, and a 429 met waits, never loses an item.
+describe('importDossier and the write limit (LC107)', () => {
+  const notes = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `n${i}`, type: 'note' as const, data: `nota ${i}`, addedAt: '' }));
+  const tooMany = (retryAfter?: string) => ({ status: 429, message: 'Troppe richieste in poco tempo.', retryAfter });
+  let served = 0;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    served = 0;
+    appStore.setState({ dossiers: [] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    // Back to the module mock's own answer for the tests after these.
+    vi.mocked(dossierService.addItem).mockReset();
+  });
+
+  it('waits the Retry-After of a 429 and sends the item again: none is lost', async () => {
+    vi.mocked(dossierService.addItem)
+      .mockRejectedValueOnce(tooMany('7'))
+      .mockImplementation(async () => fakeDossierItemApi(`srv-${served++}`));
+    const progress: Array<{ done: number; waiting: boolean }> = [];
+    const run = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(2) }, { onProgress: (p) => progress.push(p) });
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(dossierService.addItem).toHaveBeenCalledTimes(1);
+    await vi.runAllTimersAsync();
+    expect(await run).toEqual({ id: 'srv-1', imported: 2, failed: 0 });
+    expect(progress[0]).toEqual({ done: 0, total: 2, waiting: true });
+    expect(appStore.getState().dossiers[0].items).toHaveLength(2);
+  });
+
+  it('stops after many 429s in a row with nothing counted as refused, and «Riprendi» goes on in the same dossier', async () => {
+    vi.mocked(dossierService.addItem)
+      .mockResolvedValueOnce(fakeDossierItemApi('srv-a'))
+      .mockRejectedValue(tooMany());
+    const run = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(3) });
+    await vi.runAllTimersAsync();
+    // the first item in, the second tried four times (once and three waits), the third never sent
+    expect(await run).toEqual({ id: 'srv-1', imported: 1, failed: 0, next: 1 });
+    expect(dossierService.addItem).toHaveBeenCalledTimes(5);
+
+    vi.mocked(dossierService.addItem).mockReset().mockImplementation(async () => fakeDossierItemApi(`srv-${served++}`));
+    const again = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(3) }, { resume: { id: 'srv-1', from: 1 } });
+    await vi.runAllTimersAsync();
+    expect(await again).toEqual({ id: 'srv-1', imported: 2, failed: 0 });
+    expect(dossierService.create).toHaveBeenCalledOnce();
+    expect(appStore.getState().dossiers).toHaveLength(1);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.data)).toEqual(['nota 0', 'nota 1', 'nota 2']);
+  });
+
+  it('sends more than 200 items under the limit\'s pace, all of them', async () => {
+    vi.mocked(dossierService.addItem).mockImplementation(async () => fakeDossierItemApi(`srv-${served++}`));
+    const run = appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: notes(250) });
+    await vi.advanceTimersByTimeAsync(60_000);
+    // Within a minute, fewer than the limiter's 200 writes.
+    expect(vi.mocked(dossierService.addItem).mock.calls.length).toBeLessThan(200);
+    expect(vi.mocked(dossierService.addItem).mock.calls.length).toBe(Math.floor(60_000 / IMPORT_PACE_MS) + 1);
+    await vi.runAllTimersAsync();
+    expect(await run).toEqual({ id: 'srv-1', imported: 250, failed: 0 });
   });
 });
 
