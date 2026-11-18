@@ -12,6 +12,17 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-11-18
+
+Two more parts of the interface alignment: common switches, back links, text areas and cards, and one way for
+tabs and rows that open. Web only, no migration.
+
+### Interface
+
+- Common Switch, BackLink, Textarea and one Card across the app (LC104, alignment 2 of 14).
+- Tabs and rows that open work the same everywhere: one SegmentedTabs, a link version, Collapsible
+  (LC105, alignment 3 of 14).
+
 ## [1.41.0] - 2026-11-18
 
 The «⋯» menus fade in under their trigger, as Luca chose (variant A), across the app. Web only, no migration.
