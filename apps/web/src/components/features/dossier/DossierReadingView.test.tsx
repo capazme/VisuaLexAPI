@@ -117,9 +117,9 @@ describe('the «Lettura» builds the dossier\'s bound table and shows it', () =>
     expect(s().practices.filter(isBoundPractice)).toHaveLength(1);
   });
 
-  it('says, at its head, what happens to what is opened while reading', () => {
+  it('draws no sentence over the blocks (LC86): a row only on the table says so itself', () => {
     render(<DossierReadingView dossier={TWO} showToast={toast} />);
-    expect(screen.getByText('Quello che apri leggendo resta qui finché non lo aggiungi alla pratica.')).toBeInTheDocument();
+    expect(screen.queryByText(/Quello che apri leggendo/)).toBeNull();
   });
 
   it('re-syncs the table when the dossier is refreshed (an item added, by Claude too)', () => {

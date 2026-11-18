@@ -141,12 +141,11 @@ describe('the mark: «Non nella pratica» for what arrived while reading, nothin
 });
 
 describe('for a reader of fifty (LC55, the reviewer of #529)', () => {
-  it('a row\'s commands are named, never a bare «×»; «Apri accanto» and the act\'s article numbers are 14 px', () => {
+  it('a row\'s commands are named, never a bare «×»; «Apri accanto» is 14 px; no chips repeat the rows (LC86)', () => {
     render(<Page />);
     expect(screen.queryByRole('button', { name: /^Togli dal tavolo/ })).toBeNull();
     expect(rowOf('24', '5')!.getByRole('button', { name: /^Apri accanto/ })).toHaveClass('text-sm');
-    const index = screen.getByRole('list', { name: /Articoli sul tavolo di l\. 8 marzo 2017/ });
-    for (const chip of within(index).getAllByRole('button')) expect(chip).toHaveClass('text-sm');
+    expect(screen.queryByRole('list', { name: /Articoli sul tavolo di/ })).toBeNull();
   });
 });
 

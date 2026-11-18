@@ -180,7 +180,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     addArticlesToPractice(practiceId, norma, loaded, { reveal: 'first' });
   }, [addArticlesToPractice, practiceId]);
   const {
-    treeData, treeMetadata, treeLoading, rubriche, abrogati, rubricheParts, currentAnnex, allArticleIds,
+    treeData, treeMetadata, rubriche, abrogati, rubricheParts, currentAnnex, allArticleIds,
     loadingArticle, fetchTree, handleAnnexSelect, handleLoadArticle, loadedArticleIds,
   } = useAnnexNavigation({ norma: act.norma, articles: act.articles, addArticles: landInAct, activeArticle: current });
 
@@ -281,7 +281,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {...listeners}
           aria-label={`Sposta ${heading}`}
           // Lettura semplice (LC28): one act, nothing to reorder.
-          className={cn(plain ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
+          // 44 px to grab on a computer too (LC86); its reach goes into the panel's margin, the grip where it was.
+          className={cn(plain ? 'hidden' : 'hidden md:flex', 'min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-300 hover:text-slate-500 md:-my-2 md:-ml-3 md:-mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
@@ -358,7 +359,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white')}
                 >
                   <GitBranch size={16} aria-hidden />
-                  <span className="hidden lg:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>
+                  {/* Its name, loading or not (LC86): the tree's arrival shows in the space it opens. */}
+                  <span className="hidden lg:inline">Struttura</span>
                 </button>
                 <button
                   type="button"
@@ -454,13 +456,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         <div className="py-1">
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
           {/* Lettura semplice (LC70): no line of its own; the selector and the loading are in the status line. */}
-          {!simple && (act.articles.length > 1 || loadingArticle || (showNavigation && !navInHead)) && (
+          {!simple && ((act.articles.length > 1 && !hostDossier) || loadingArticle || (showNavigation && !navInHead)) && (
             // On a phone one row: the chips scroll sideways beside the arrows (R3: two rows of chips came before the text).
             // The arrows first, the left arrow's glyph on the text's edge (LC68: no empty half row before them).
             <div className="flex items-center gap-x-3 gap-y-1 py-1 md:flex-wrap md:py-1.5">
               {showNavigation && !navInHead && navigation('-ml-3 shrink-0 md:-ml-1')}
               {/* A compact index, with more than one article: one alone says nothing it does not say below (R3). */}
-              {act.articles.length > 1 && (
+              {/* Not in a dossier's «Fonti» (LC86): its rows are right below, the chips would repeat them. */}
+              {act.articles.length > 1 && !hostDossier && (
                 <ul aria-label={`Articoli sul tavolo di ${heading}`} className={cn('practice-act-index flex min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex-wrap md:overflow-visible', HIDDEN_SCROLLBAR)}>
                   {act.articles.map((article) => {
                     const key = practiceArticleKey(article);

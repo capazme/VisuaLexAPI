@@ -243,8 +243,7 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
 
   return (
     <div ref={rootRef} className="space-y-3">
-      {/* §14: nothing goes away without saying so. What a gesture puts on the table is not the dossier's (c4 adds it). */}
-      <p className="text-sm text-slate-600 dark:text-slate-400">Quello che apri leggendo resta qui finché non lo aggiungi alla pratica.</p>
+      {/* LC86: no sentence over the blocks; a row only on the table says «Non nella pratica» itself (§14). */}
       {pending > 0 && <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Carico il testo…</p>}
       {practiceId && (empty ? (
         <p className="rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
