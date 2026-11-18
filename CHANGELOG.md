@@ -12,6 +12,42 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-11-18
+
+EU acts before 2015 cited in the Official Journal's form, the first shared components of the interface
+alignment, and a round of security and clean-up on the server, the Python API and MERL-T. No migration.
+MERL-T stays off.
+
+### Sources
+
+- EU acts before 2015 are cited as the Official Journal numbered them, «dir. 95/46/CE»,
+  «reg. (CE) n. 1907/2006», in the web, the server and the API (G-540, #581, #617).
+
+### Interface
+
+- Shared components with one language, the first of the alignment's fourteen parts (LC97).
+
+### Server
+
+- Failed password checks count per account too, from any address, and a wrong password at password change or
+  account deletion counts as a failed attempt (#620, #602).
+- «Togli i miei contributi»: one call that removes what a person wrote for others (G-558, #601); an author
+  removes a validated card, a validator erases a vote's reason (G-556, G-557, #600).
+- The server survives an error nobody caught; free-text fields have a length limit (#598).
+- A Forum suggestion item is taken, declined or revoked once (#609).
+
+### Python API
+
+- At most two browsers at once for EUR-Lex; the rest wait, then retry (#596).
+- Every redirect the scrapers follow is checked against the allow-list first (#610).
+- The old global /history and /dossiers, the unused twin server and the code nothing called are gone
+  (#611, #612, #618, #621).
+
+### MERL-T
+
+- Every call to a language model refuses providers that keep or train on the text (#622); a key MERL-T refuses
+  is the server's 503, never the user's 401 (#624). MERL-T stays off until G-575.
+
 ## [1.38.0] - 2026-11-18
 
 The search island in the flow, glosses at the height of their words, Amministrazione as a page inside the
