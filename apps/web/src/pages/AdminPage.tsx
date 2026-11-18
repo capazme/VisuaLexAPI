@@ -1,8 +1,9 @@
 /**
- * Admin page for user and feedback management
+ * Amministrazione: users, comments, published dossiers, reports, Learn's texts and MERL-T's ingestion.
  */
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, MoreHorizontal, RefreshCw, UserPlus } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import * as adminService from '../services/adminService';
 import { sharedEnvironmentService } from '../services/sharedEnvironmentService';
@@ -17,99 +18,152 @@ import { IngestionAdminPanel } from '../features/merlt/ops/ingestion/IngestionAd
 import { CoursesSwitchAdmin } from '../components/features/admin/CoursesSwitchAdmin';
 import { StudiaSoglieAdmin } from '../components/features/admin/StudiaSoglieAdmin';
 import { StudiaTextsAdmin } from '../components/features/admin/StudiaTextsAdmin';
-import {
-  Users,
-  UserPlus,
-  Shield,
-  ShieldOff,
-  Trash2,
-  Key,
-  Check,
-  X,
-  AlertCircle,
-  RefreshCw,
-  LogOut,
-  Home,
-  MessageSquare,
-  Bug,
-  Lightbulb,
-  HelpCircle,
-  Eye,
-  EyeOff,
-  CheckCircle,
-  XCircle,
-  Package,
-  Search,
-  TrendingUp,
-  Download,
-  Heart,
-  Flag,
-  Database,
-  GraduationCap,
-} from 'lucide-react';
+import { PageFrame } from '../components/layout/PageFrame';
+import { Button } from '../components/ui/Button';
+import { Expand } from '../components/ui/Expand';
+import { MenuButton, type MenuItem } from '../components/ui/MenuButton';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { notify } from '../components/ui/notifications/notifications';
+import { showUndoToast } from '../hooks/useUndoableAction';
+import { FIELD_TEXT, FOCUS_RING } from '../constants/interactions';
+import { scrollParentOf } from '../utils/scrollParent';
+import { FORUM_CATEGORIES } from '../utils/forumCategories';
 import { cn } from '../lib/utils';
 
-/** A dialog's filled action: light ink in the dark. */
-const DIALOG_PRIMARY = 'px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50';
+type AdminSection = 'utenti' | 'commenti' | 'dossier-pubblicati' | 'segnalazioni' | 'learn' | 'ingestione';
 
-type AdminTab = 'users' | 'feedback' | 'environments' | 'reports' | 'studia' | 'ingestion';
+const FIELD = cn('w-full min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 md:min-h-9 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT, FOCUS_RING);
+const SELECT = cn('min-h-11 rounded-lg border border-slate-200 bg-white px-2 md:min-h-9 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT, FOCUS_RING);
+const LABEL = 'block text-sm font-medium text-slate-700 dark:text-slate-300';
+const ICON_BUTTON = cn('inline-grid size-11 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50 md:size-9 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING);
+/** The «⋯» of a row. */
+const ROW_MENU = cn('inline-grid size-11 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 md:size-9 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING);
+const LIST = 'divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800';
+const MUTED = 'text-xs text-slate-500 dark:text-slate-400';
+const COLUMN_HEAD = 'hidden gap-4 pb-2 text-xs font-medium text-slate-500 md:grid dark:text-slate-400';
 
+const USER_COLUMNS = 'md:grid-cols-[minmax(0,1.5fr)_5.5rem_minmax(12rem,1.2fr)_minmax(0,1.5fr)_2.25rem]';
+const ENV_COLUMNS = 'md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.4fr)_6rem_minmax(0,1.4fr)_2.25rem]';
+
+const FEEDBACK_TYPE: Record<FeedbackType, string> = { bug: 'Errore', suggestion: 'Suggerimento', other: 'Altro' };
+const FEEDBACK_STATUS: Record<FeedbackStatus, string> = { new: 'Nuovo', read: 'Letto', resolved: 'Risolto', dismissed: 'Ignorato' };
+const REPORT_STATUS: Record<ReportStatus, string> = { pending: 'In attesa', reviewed: 'Esaminata', dismissed: 'Ignorata' };
+const REPORT_REASON: Record<SharedEnvironmentReport['reason'], string> = {
+  spam: 'Spam',
+  inappropriate: 'Contenuto inappropriato',
+  copyright: 'Violazione del diritto d’autore',
+  other: 'Altro',
+};
+
+const day = (iso: string) => new Date(iso).toLocaleDateString('it-IT');
+const moment = (iso: string) => new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+/** Back where it was before it was taken out (`showUndoToast`'s undo). */
+function putBack<T>(list: T[], item: T, at: number): T[] {
+  const next = [...list];
+  next.splice(Math.min(at, next.length), 0, item);
+  return next;
+}
+
+/** A part of the page: its anchor, its heading, the controls on the heading's right, and what it holds. */
+function Part({ id, title, count, controls, children }: { id: AdminSection; title: string; count?: ReactNode; controls?: ReactNode; children: ReactNode }) {
+  return (
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        {/* Focusable by script: where the focus goes when the row it was on is gone. */}
+        <h2 id={`${id}-title`} tabIndex={-1} className="text-base font-semibold text-slate-900 focus:outline-none dark:text-slate-50">
+          {title}
+          {count !== undefined && <span className="ml-2 font-normal tabular-nums text-slate-500 dark:text-slate-400">{count}</span>}
+        </h2>
+        {controls && <div className="flex flex-wrap items-center gap-2">{controls}</div>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Refresh({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} disabled={busy} aria-label="Aggiorna" title="Aggiorna" className={ICON_BUTTON}>
+      <RefreshCw size={16} aria-hidden className={busy ? 'animate-spin' : undefined} />
+    </button>
+  );
+}
+
+function RowMenu({ label, items }: { label: string; items: MenuItem[] }) {
+  return (
+    <MenuButton label={label} items={items} triggerClassName={ROW_MENU}>
+      <MoreHorizontal size={18} aria-hidden />
+    </MenuButton>
+  );
+}
+
+/** A line of a list with nothing in it yet, or nothing at all. */
+function Quiet({ children }: { children: ReactNode }) {
+  return <p className="border-y border-slate-200 py-6 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">{children}</p>;
+}
+
+/**
+ * Amministrazione as a page of the app (LC93, L-73: «niente sopra il contenuto»), as Impostazioni is (LC84): an index at
+ * the left from `lg`, a list at the top below it, an anchor for each part (`/admin#commenti`). A new account and a new
+ * password open in the page (`Expand`); a row's actions are in its «⋯». Erasing an account cannot be undone, so it
+ * asks first, growing out of the «⋯» it came from (L-74); a comment or a published dossier goes at once, with
+ * «Annulla», and the server erases it only once that notification is gone.
+ */
 export function AdminPage() {
   const navigate = useNavigate();
-  const { user, logout, isAdmin } = useAuth();
-  // opsVisible mirrors useMerltFeatures().opsVisible (merltEnabled && isAdmin) but is
-  // derived here WITHOUT useConsent: AdminPage renders OUTSIDE the ConsentProvider
-  // (App.tsx wraps only <Layout> with it), so calling useMerltFeatures — which calls
-  // useConsent — would throw "useConsent must be used within a ConsentProvider".
+  const location = useLocation();
+  const { user, isAdmin } = useAuth();
+  // opsVisible mirrors useMerltFeatures().opsVisible (merltEnabled && isAdmin) without useConsent: the page was drawn
+  // outside the ConsentProvider until LC93 and its tests still draw it so; the gate needs no consent.
   const opsVisible = isMerltEnabled() && isAdmin;
-  // VisuaLex Studia's admin parts (the texts tab, the validator checkbox) follow its flag, as its pages do.
+  // VisuaLex Studia's admin parts (the texts, the validator checkbox) follow its flag, as its pages do.
   const studiaVisible = isStudiaEnabled();
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<AdminTab>('users');
-
-  // Users state
+  // Users
   const [users, setUsers] = useState<AdminUserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Feedback state
+  // Comments
   const [feedbacks, setFeedbacks] = useState<AdminFeedback[]>([]);
   const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState<{ status?: FeedbackStatus; type?: FeedbackType }>({});
-  const [showDeleteFeedbackConfirm, setShowDeleteFeedbackConfirm] = useState<string | null>(null);
 
-  // Environments state
+  // Published dossiers
   const [environments, setEnvironments] = useState<AdminSharedEnvironment[]>([]);
   const [envPagination, setEnvPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [envLoading, setEnvLoading] = useState(false);
   const [envSearch, setEnvSearch] = useState('');
   const [envStatusFilter, setEnvStatusFilter] = useState<'active' | 'withdrawn' | 'all'>('all');
-  const [showDeleteEnvConfirm, setShowDeleteEnvConfirm] = useState<string | null>(null);
 
-  // Reports state
+  // Reports
   const [reports, setReports] = useState<SharedEnvironmentReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportStatusFilter, setReportStatusFilter] = useState<ReportStatus | 'all'>('pending');
 
-  // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showResetPasswordModal, setShowResetPasswordModal] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-
-  // Form states
+  // A new account, opened at the top of the users (`Expand`).
+  const [createOpen, setCreateOpen] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', username: '', password: '', isAdmin: false });
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  // A new password, opened under its user's row.
+  const [resetFor, setResetFor] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  // Erasing an account: the user and the «⋯» it grows from.
+  // Kept while the confirmation closes, so its words do not change on the way back.
+  const [deleting, setDeleting] = useState<{ user: AdminUserResponse; origin: HTMLElement | null } | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await adminService.listUsers();
-      setUsers(data);
+      setUsers(await adminService.listUsers());
     } catch (err) {
       setError(getErrorMessage(err) || 'Errore nel caricamento degli utenti');
     } finally {
@@ -120,10 +174,7 @@ export function AdminPage() {
   const loadFeedbacks = async () => {
     try {
       setFeedbackLoading(true);
-      const [data, stats] = await Promise.all([
-        adminService.listFeedbacks(feedbackFilter),
-        adminService.getFeedbackStats(),
-      ]);
+      const [data, stats] = await Promise.all([adminService.listFeedbacks(feedbackFilter), adminService.getFeedbackStats()]);
       setFeedbacks(data);
       setFeedbackStats(stats);
     } catch (err) {
@@ -136,18 +187,9 @@ export function AdminPage() {
   const loadEnvironments = async (page = 1) => {
     try {
       setEnvLoading(true);
-      const response = await adminService.listSharedEnvironments({
-        page,
-        limit: 20,
-        status: envStatusFilter,
-        search: envSearch || undefined,
-      });
+      const response = await adminService.listSharedEnvironments({ page, limit: 20, status: envStatusFilter, search: envSearch || undefined });
       setEnvironments(response.data);
-      setEnvPagination({
-        page: response.pagination.page,
-        pages: response.pagination.pages,
-        total: response.pagination.total,
-      });
+      setEnvPagination({ page: response.pagination.page, pages: response.pagination.pages, total: response.pagination.total });
     } catch (err) {
       setError(getErrorMessage(err) || 'Errore nel caricamento dei dossier pubblicati');
     } finally {
@@ -158,8 +200,7 @@ export function AdminPage() {
   const loadReports = async () => {
     try {
       setReportsLoading(true);
-      const data = await sharedEnvironmentService.getReports(reportStatusFilter);
-      setReports(data);
+      setReports(await sharedEnvironmentService.getReports(reportStatusFilter));
     } catch (err) {
       setError(getErrorMessage(err) || 'Errore nel caricamento delle segnalazioni');
     } finally {
@@ -167,1340 +208,665 @@ export function AdminPage() {
     }
   };
 
-  // The load* helpers are plain closures re-created every render (they read the
-  // live filter state); listing them in the deps below would refetch on every
-  // render (fetch → setState → render → new identity → refetch, ad infinitum).
-  // Each effect is intentionally keyed on its semantic trigger only.
+  // The load* helpers are plain closures re-created every render (they read the live filters); listing them in the
+  // deps would refetch on every render. Every part is on the page at once (LC93): each loads at the mount and again
+  // when its own filter changes; the published dossiers' search is submit-driven.
   useEffect(() => {
     loadUsers();
-    loadFeedbacks();
-    // Mount-only initial load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   useEffect(() => {
-    if (activeTab === 'feedback') {
-      loadFeedbacks();
-    }
-    // Refetch on filter change only; switching tabs keeps the mount-time data.
+    loadFeedbacks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedbackFilter]);
-
   useEffect(() => {
-    if (activeTab === 'environments') {
-      loadEnvironments(1);
-    }
-    // Refetch on tab entry or status-filter change; search is submit-driven.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, envStatusFilter]);
-
-  useEffect(() => {
-    if (activeTab === 'reports') {
-      loadReports();
-    }
-    // Refetch on tab entry or status-filter change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, reportStatusFilter]);
-
-  // Environment handlers
-  const handleWithdrawEnv = async (id: string) => {
-    try {
-      setActionLoading(true);
-      await adminService.withdrawSharedEnvironment(id);
-      setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: false } : e));
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel ritirare il dossier pubblicato');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRepublishEnv = async (id: string) => {
-    try {
-      setActionLoading(true);
-      await adminService.republishSharedEnvironment(id);
-      setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: true } : e));
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel ripubblicare il dossier pubblicato');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteEnv = async () => {
-    if (!showDeleteEnvConfirm) return;
-    try {
-      setActionLoading(true);
-      await adminService.deleteSharedEnvironment(showDeleteEnvConfirm);
-      setEnvironments(prev => prev.filter(e => e.id !== showDeleteEnvConfirm));
-      setShowDeleteEnvConfirm(null);
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'eliminazione del dossier pubblicato');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleEnvSearch = (e: React.FormEvent) => {
-    e.preventDefault();
     loadEnvironments(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envStatusFilter]);
+  useEffect(() => {
+    loadReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportStatusFilter]);
+
+  // Back where it was opened from, or to the search page when it was opened by its address.
+  const goBack = () => (location.key === 'default' ? navigate('/') : navigate(-1));
+
+  // The part in the address comes in view, moving the page's scroller alone (gotcha 34), and is followed for a moment
+  // while the lists arrive above it; with none the page opens at its top, its title focused (as Impostazioni, LC84).
+  const root = useRef<HTMLDivElement>(null);
+  const [asked, setAsked] = useState(0);
+  const entered = useRef(false);
+  useEffect(() => {
+    const page = root.current;
+    const scroller = page ? scrollParentOf(page) : null;
+    const id = decodeURIComponent(location.hash.slice(1));
+    const part = id ? document.getElementById(id) : null;
+    if (!entered.current) {
+      const title = document.getElementById('admin-title');
+      title?.setAttribute('tabindex', '-1');
+      title?.focus({ preventScroll: true });
+      entered.current = true;
+    }
+    if (!scroller || !part) return undefined;
+    const bring = () => {
+      const room = (parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0) + 16;
+      scroller.scrollTo({ top: scroller.scrollTop + part.getBoundingClientRect().top - scroller.getBoundingClientRect().top - room });
+    };
+    bring();
+    if (typeof ResizeObserver === 'undefined' || !page) return undefined;
+    const growing = new ResizeObserver(bring);
+    growing.observe(page);
+    const stop = () => growing.disconnect();
+    const timer = setTimeout(stop, 2000);
+    scroller.addEventListener('wheel', stop, { once: true, passive: true });
+    scroller.addEventListener('touchmove', stop, { once: true, passive: true });
+    return () => {
+      stop();
+      clearTimeout(timer);
+      scroller.removeEventListener('wheel', stop);
+      scroller.removeEventListener('touchmove', stop);
+    };
+  }, [location.hash, asked]);
+
+  const goTo = (id: AdminSection) => (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    navigate({ hash: `#${id}` }, { replace: true, state: location.state });
+    setAsked((n) => n + 1);
   };
 
-  const handleUpdateReportStatus = async (id: string, status: ReportStatus) => {
+  // ── Users ──
+  const updateUser = async (userId: string, data: Parameters<typeof adminService.updateUser>[1]) => {
     try {
       setActionLoading(true);
-      await sharedEnvironmentService.updateReportStatus(id, status);
-      await loadReports();
+      await adminService.updateUser(userId, data);
+      await loadUsers();
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento della segnalazione');
+      setError(getErrorMessage(err) || 'Errore nell’aggiornamento');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const getReportStatusBadge = (status: ReportStatus) => {
-    const styles = {
-      pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-      reviewed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      dismissed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-    };
-    const labels = { pending: 'In attesa', reviewed: 'Esaminata', dismissed: 'Ignorata' };
-    return (
-      <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', styles[status])}>
-        {labels[status]}
-      </span>
-    );
+  const closeCreate = useCallback(() => {
+    setCreateOpen(false);
+    setCreateError(null);
+    setNewUser({ email: '', username: '', password: '', isAdmin: false });
+  }, []);
+
+  const handleCreateUser = async (e: FormEvent) => {
+    e.preventDefault();
+    // The server holds an account the administrator opens to the sign-up rule: say it before sending.
+    if (!PASSWORD_RULE.test(newUser.password)) {
+      setCreateError(PASSWORD_RULE_ERROR);
+      return;
+    }
+    try {
+      setCreateBusy(true);
+      setCreateError(null);
+      await adminService.createUser(newUser);
+      notify({ type: 'success', message: `Utente ${newUser.username} creato`, duration: 4000 });
+      closeCreate();
+      await loadUsers();
+    } catch (err) {
+      setCreateError(getErrorMessage(err) || 'Errore nella creazione dell’utente');
+    } finally {
+      setCreateBusy(false);
+    }
   };
 
-  const REPORT_REASON_LABELS: Record<SharedEnvironmentReport['reason'], string> = {
-    spam: 'Spam',
-    inappropriate: 'Contenuto inappropriato',
-    copyright: 'Violazione copyright',
-    other: 'Altro',
+  const closeReset = useCallback(() => {
+    setResetFor(null);
+    setResetError(null);
+    setNewPassword('');
+  }, []);
+
+  const handleResetPassword = async (e: FormEvent, target: AdminUserResponse) => {
+    e.preventDefault();
+    if (!newPassword) return;
+    if (!PASSWORD_RULE.test(newPassword)) {
+      setResetError(PASSWORD_RULE_ERROR);
+      return;
+    }
+    try {
+      setResetBusy(true);
+      setResetError(null);
+      await adminService.resetPassword(target.id, { newPassword });
+      notify({ type: 'success', message: `Password di ${target.username} reimpostata`, duration: 4000 });
+      closeReset();
+    } catch (err) {
+      setResetError(getErrorMessage(err) || 'Errore nel reimpostare la password');
+    } finally {
+      setResetBusy(false);
+    }
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleting) return;
+    const { user: target } = deleting;
+    try {
+      setActionLoading(true);
+      await adminService.deleteUser(target.id);
+      // Out of the list in the same render that closes the confirmation: its «⋯» is gone, the focus goes to the heading.
+      setUsers((prev) => prev.filter((x) => x.id !== target.id));
+      setConfirmOpen(false);
+      notify({ type: 'success', message: `Utente ${target.username} eliminato`, duration: 4000 });
+      await loadUsers();
+    } catch (err) {
+      setConfirmOpen(false);
+      setError(getErrorMessage(err) || 'Errore nell’eliminazione');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ── Comments ──
   const handleUpdateFeedbackStatus = async (id: string, status: FeedbackStatus) => {
     try {
       setActionLoading(true);
       await adminService.updateFeedbackStatus(id, status);
       await loadFeedbacks();
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
+      setError(getErrorMessage(err) || 'Errore nell’aggiornamento');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleDeleteFeedback = async () => {
-    if (!showDeleteFeedbackConfirm) return;
-    try {
-      setActionLoading(true);
-      await adminService.deleteFeedback(showDeleteFeedbackConfirm);
-      setShowDeleteFeedbackConfirm(null);
+  // Gone from the list at once, with «Annulla»; the server erases it only once the notification is gone (L-35).
+  const handleDeleteFeedback = (f: AdminFeedback) => {
+    const at = feedbacks.findIndex((x) => x.id === f.id);
+    void showUndoToast({
+      action: () => setFeedbacks((prev) => prev.filter((x) => x.id !== f.id)),
+      undo: () => setFeedbacks((prev) => putBack(prev, f, at)),
+      message: 'Commento eliminato',
+    }).then(async (stands) => {
+      if (!stands) return;
+      try {
+        await adminService.deleteFeedback(f.id);
+      } catch (err) {
+        setError(getErrorMessage(err) || 'Errore nell’eliminazione');
+      }
       await loadFeedbacks();
+    });
+  };
+
+  // ── Published dossiers ──
+  const setEnvActive = async (id: string, active: boolean) => {
+    try {
+      setActionLoading(true);
+      if (active) await adminService.republishSharedEnvironment(id);
+      else await adminService.withdrawSharedEnvironment(id);
+      setEnvironments((prev) => prev.map((e) => (e.id === id ? { ...e, isActive: active } : e)));
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'eliminazione');
+      setError(getErrorMessage(err) || (active ? 'Errore nel ripubblicare il dossier pubblicato' : 'Errore nel ritirare il dossier pubblicato'));
     } finally {
       setActionLoading(false);
     }
   };
 
-  const getFeedbackTypeIcon = (type: FeedbackType) => {
-    switch (type) {
-      case 'bug': return <Bug size={16} className="text-red-500" />;
-      case 'suggestion': return <Lightbulb size={16} className="text-amber-500" />;
-      default: return <HelpCircle size={16} className="text-primary-500" />;
-    }
+  const handleDeleteEnv = (env: AdminSharedEnvironment) => {
+    const at = environments.findIndex((x) => x.id === env.id);
+    void showUndoToast({
+      action: () => setEnvironments((prev) => prev.filter((x) => x.id !== env.id)),
+      undo: () => setEnvironments((prev) => putBack(prev, env, at)),
+      message: `«${env.title}» eliminato dai dossier pubblici`,
+    }).then(async (stands) => {
+      if (!stands) return;
+      try {
+        await adminService.deleteSharedEnvironment(env.id);
+      } catch (err) {
+        setError(getErrorMessage(err) || 'Errore nell’eliminazione del dossier pubblicato');
+      }
+      await loadEnvironments(envPagination.page);
+    });
   };
 
-  const getFeedbackStatusBadge = (status: FeedbackStatus) => {
-    const styles = {
-      new: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
-      read: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-      resolved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      dismissed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    };
-    const labels = { new: 'Nuovo', read: 'Letto', resolved: 'Risolto', dismissed: 'Ignorato' };
-    return (
-      <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', styles[status])}>
-        {labels[status]}
-      </span>
-    );
-  };
-
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleEnvSearch = (e: FormEvent) => {
     e.preventDefault();
-    // The server holds an account the administrator opens to the sign-up rule: say it before sending.
-    if (!PASSWORD_RULE.test(newUser.password)) {
-      setActionError(PASSWORD_RULE_ERROR);
-      return;
-    }
+    loadEnvironments(1);
+  };
+
+  // ── Reports ──
+  const handleUpdateReportStatus = async (id: string, status: ReportStatus) => {
     try {
       setActionLoading(true);
-      setActionError(null);
-      await adminService.createUser(newUser);
-      setNewUser({ email: '', username: '', password: '', isAdmin: false });
-      setShowCreateModal(false);
-      await loadUsers();
+      await sharedEnvironmentService.updateReportStatus(id, status);
+      await loadReports();
     } catch (err) {
-      setActionError(getErrorMessage(err) || 'Errore nella creazione utente');
+      setError(getErrorMessage(err) || 'Errore nell’aggiornamento della segnalazione');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleToggleAdmin = async (userId: string, currentIsAdmin: boolean) => {
-    try {
-      setActionLoading(true);
-      await adminService.updateUser(userId, { isAdmin: !currentIsAdmin });
-      await loadUsers();
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleToggleValidator = async (userId: string, currentIsValidator: boolean) => {
-    try {
-      setActionLoading(true);
-      await adminService.updateUser(userId, { lingoValidatore: !currentIsValidator });
-      await loadUsers();
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleToggleDevModeAllowed = async (userId: string, current: boolean) => {
-    try {
-      setActionLoading(true);
-      await adminService.updateUser(userId, { devModeAllowed: !current });
-      await loadUsers();
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleToggleActive = async (userId: string, currentIsActive: boolean) => {
-    try {
-      setActionLoading(true);
-      await adminService.updateUser(userId, { isActive: !currentIsActive });
-      await loadUsers();
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!showResetPasswordModal || !newPassword) return;
-    if (!PASSWORD_RULE.test(newPassword)) {
-      setActionError(PASSWORD_RULE_ERROR);
-      return;
-    }
-    try {
-      setActionLoading(true);
-      setActionError(null);
-      await adminService.resetPassword(showResetPasswordModal, { newPassword });
-      setNewPassword('');
-      setShowResetPasswordModal(null);
-    } catch (err) {
-      setActionError(getErrorMessage(err) || 'Errore nel reset password');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteUser = async () => {
-    if (!showDeleteConfirm) return;
-    try {
-      setActionLoading(true);
-      await adminService.deleteUser(showDeleteConfirm);
-      setShowDeleteConfirm(null);
-      await loadUsers();
-    } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'eliminazione');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const pending = users.filter((u) => !u.is_active).length;
+  const newComments = feedbackStats?.new ?? 0;
+  const index: Array<{ id: AdminSection; name: string; badge?: number; shown?: boolean }> = [
+    { id: 'utenti', name: 'Utenti', badge: pending },
+    { id: 'commenti', name: 'Commenti', badge: newComments },
+    { id: 'dossier-pubblicati', name: 'Dossier pubblicati' },
+    { id: 'segnalazioni', name: 'Segnalazioni' },
+    { id: 'learn', name: 'Learn', shown: studiaVisible },
+    { id: 'ingestione', name: 'Ingestione MERL-T', shown: opsVisible },
+  ];
 
   return (
-    <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex min-w-0 items-center gap-6">
-              <div className="flex shrink-0 items-center gap-3">
-                <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-lg flex items-center justify-center">
-                  <Shield size={20} />
-                </div>
-                <div>
-                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Amministrazione</h1>
-                  <p className="text-xs text-gray-500">LexCraft</p>
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="flex min-w-0 items-center gap-1 overflow-x-auto bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 [&>button]:shrink-0">
-                <button
-                  onClick={() => setActiveTab('users')}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    activeTab === 'users'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <Users size={16} />
-                  Utenti
-                </button>
-                <button
-                  onClick={() => setActiveTab('feedback')}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors relative',
-                    activeTab === 'feedback'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <MessageSquare size={16} />
-                  Commenti
-                  {feedbackStats && feedbackStats.new > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                      {feedbackStats.new}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setActiveTab('environments')}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    activeTab === 'environments'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <Package size={16} />
-                  Forum
-                </button>
-                <button
-                  onClick={() => setActiveTab('reports')}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    activeTab === 'reports'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <Flag size={16} />
-                  Segnalazioni
-                </button>
-                {studiaVisible && (
-                  <button
-                    onClick={() => setActiveTab('studia')}
+    <div ref={root} className="flex flex-col gap-4 pb-12 [&_h1:focus]:outline-none">
+      <button
+        type="button"
+        onClick={goBack}
+        className={cn('inline-flex min-h-[44px] w-fit items-center gap-1.5 rounded-lg px-2 -ml-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:py-1.5 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
+      >
+        <ArrowLeft size={16} aria-hidden /> Indietro
+      </button>
+      <PageFrame title="Amministrazione" titleId="admin-title">
+        <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
+          <nav aria-label="Parti dell’amministrazione" className="lg:sticky lg:top-0 lg:self-start">
+            <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-0.5">
+              {index.filter((part) => part.shown !== false).map((part) => (
+                <li key={part.id}>
+                  <a
+                    href={`#${part.id}`}
+                    onClick={goTo(part.id)}
+                    aria-current={location.hash === `#${part.id}` ? 'location' : undefined}
                     className={cn(
-                      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                      activeTab === 'studia'
-                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      'flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+                      'lg:min-h-0 lg:border-transparent lg:py-1.5',
+                      'aria-[current=location]:bg-slate-100 aria-[current=location]:font-medium aria-[current=location]:text-slate-900 dark:aria-[current=location]:bg-slate-800 dark:aria-[current=location]:text-slate-50',
+                      FOCUS_RING,
                     )}
                   >
-                    <GraduationCap size={16} />
-                    Testi di Learn
-                  </button>
-                )}
-                {opsVisible && (
-                  <button
-                    onClick={() => setActiveTab('ingestion')}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                      activeTab === 'ingestion'
-                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    {part.name}
+                    {!!part.badge && (
+                      <span className="ml-auto text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                        <span aria-hidden>{part.badge}</span>
+                        <span className="sr-only">{part.id === 'utenti' ? `, ${part.badge} in attesa` : `, ${part.badge} nuovi`}</span>
+                      </span>
                     )}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <div className="min-w-0 space-y-12">
+            {error && (
+              <div role="alert" className="flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                <p>{error}</p>
+                <button type="button" onClick={() => setError(null)} className={cn('shrink-0 font-medium underline-offset-2 hover:underline', FOCUS_RING)}>Chiudi</button>
+              </div>
+            )}
+
+            {/* ── Utenti ── */}
+            <Part
+              id="utenti"
+              title="Utenti"
+              count={users.length || undefined}
+              controls={
+                <>
+                  <Refresh busy={loading} onClick={() => void loadUsers()} />
+                  <Button
+                    size="sm"
+                    icon={<UserPlus size={16} aria-hidden />}
+                    onClick={() => (createOpen ? closeCreate() : setCreateOpen(true))}
+                    aria-expanded={createOpen}
+                    aria-controls="admin-new-user"
                   >
-                    <Database size={16} />
-                    Ingestione
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1 sm:gap-3 relative z-50">
-              <span className="hidden min-w-0 truncate text-sm text-gray-500 dark:text-gray-400 sm:block sm:max-w-xs">
-                {user?.email}
-              </span>
-              <button
-                onClick={() => navigate('/')}
-                className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors pointer-events-auto"
-                title="Torna all'app"
-              >
-                <Home size={20} />
-              </button>
-              <button
-                onClick={logout}
-                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors pointer-events-auto"
-                title="Logout"
-              >
-                <LogOut size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+                    Nuovo utente
+                  </Button>
+                </>
+              }
+            >
+              {pending > 0 && <p className="mb-3 text-sm text-amber-700 dark:text-amber-400">{pending === 1 ? '1 account in attesa di approvazione' : `${pending} account in attesa di approvazione`}</p>}
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 isolate">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
-            <AlertCircle className="text-red-500" size={20} />
-            <p className="text-red-600 dark:text-red-400">{error}</p>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
-              <X size={18} />
-            </button>
-          </div>
-        )}
-
-        {/* ==================== USERS TAB ==================== */}
-        {activeTab === 'users' && (
-          <>
-            {/* Actions Bar */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Users size={20} className="text-gray-500" />
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Utenti ({users.length})
-                  </h2>
-                </div>
-                {/* Pending users badge */}
-                {users.filter(u => !u.is_active).length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-sm font-medium">
-                    <AlertCircle size={14} />
-                    {users.filter(u => !u.is_active).length} in attesa di approvazione
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={loadUsers}
-                  disabled={loading}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  title="Aggiorna"
-                >
-                  <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                </button>
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  <UserPlus size={18} />
-                  Nuovo utente
-                </button>
-              </div>
-            </div>
-
-            {/* Users Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              {loading && users.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-                  Caricamento utenti...
-                </div>
-              ) : users.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  Nessun utente trovato
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700/50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Utente
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Stato
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Ruolo
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Attività
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Creato
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Azioni
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {users.map((u) => (
-                        <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                          <td className="px-6 py-4">
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">{u.username}</p>
-                              <p className="text-sm text-gray-500">{u.email}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <button
-                              onClick={() => handleToggleActive(u.id, u.is_active)}
-                              disabled={u.id === user?.id}
-                              className={cn(
-                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                                u.is_active
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                                u.id === user?.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
-                              )}
-                            >
-                              {u.is_active ? <Check size={12} /> : <X size={12} />}
-                              {u.is_active ? 'Attivo' : 'Disattivo'}
-                            </button>
-                          </td>
-                          <td className="px-6 py-4">
-                            <button
-                              onClick={() => handleToggleAdmin(u.id, u.is_admin)}
-                              disabled={u.id === user?.id}
-                              className={cn(
-                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                                u.is_admin
-                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-                                u.id === user?.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
-                              )}
-                            >
-                              {u.is_admin ? <Shield size={12} /> : <ShieldOff size={12} />}
-                              {u.is_admin ? 'Admin' : 'Utente'}
-                            </button>
-                            {studiaVisible && (
-                              <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                                <input
-                                  type="checkbox"
-                                  checked={u.lingo_validatore}
-                                  onChange={() => handleToggleValidator(u.id, u.lingo_validatore)}
-                                  disabled={actionLoading}
-                                  aria-label={`Validatore di Learn: ${u.username}`}
-                                  className="h-4 w-4 rounded border-gray-300"
-                                />
-                                Validatore di Learn
-                              </label>
-                            )}
-                            <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                              <input
-                                type="checkbox"
-                                checked={u.dev_mode_allowed ?? false}
-                                onChange={() => handleToggleDevModeAllowed(u.id, u.dev_mode_allowed ?? false)}
-                                disabled={actionLoading}
-                                aria-label={`Modalità sviluppo consentita: ${u.username}`}
-                                className="h-4 w-4 rounded border-gray-300"
-                              />
-                              Modalità sviluppo consentita
-                            </label>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                              <p className="font-medium text-gray-700 dark:text-gray-300">
-                                {u.login_count ?? 0} accessi
-                              </p>
-                              {u.last_login_at && (
-                                <p>Ultimo: {new Date(u.last_login_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
-                              )}
-                              {u.stats && (
-                                <p className="text-gray-400">{u.stats.bookmarks} segnalibri</p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(u.created_at).toLocaleDateString('it-IT')}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => setShowResetPasswordModal(u.id)}
-                                className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                                title="Reimposta password"
-                              >
-                                <Key size={16} />
-                              </button>
-                              <button
-                                onClick={() => setShowDeleteConfirm(u.id)}
-                                disabled={u.id === user?.id}
-                                className={cn(
-                                  'p-2 rounded-lg transition-colors',
-                                  u.id === user?.id
-                                    ? 'text-gray-300 cursor-not-allowed'
-                                    : 'text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                )}
-                                title="Elimina utente"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* ==================== FEEDBACK TAB ==================== */}
-        {activeTab === 'feedback' && (
-          <>
-            {/* Actions Bar */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={20} className="text-gray-500" />
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Commenti ({feedbacks.length})
-                  </h2>
-                </div>
-                {feedbackStats && (
-                  <div className="flex items-center gap-3 text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Bug size={14} className="text-red-500" />
-                      {feedbackStats.bugs} bug
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Lightbulb size={14} className="text-amber-500" />
-                      {feedbackStats.suggestions} suggerimenti
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Filters */}
-                <select
-                  value={feedbackFilter.status || ''}
-                  onChange={(e) => setFeedbackFilter({ ...feedbackFilter, status: e.target.value as FeedbackStatus || undefined })}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                >
-                  <option value="">Tutti gli stati</option>
-                  <option value="new">Nuovo</option>
-                  <option value="read">Letto</option>
-                  <option value="resolved">Risolto</option>
-                  <option value="dismissed">Ignorato</option>
-                </select>
-                <select
-                  value={feedbackFilter.type || ''}
-                  onChange={(e) => setFeedbackFilter({ ...feedbackFilter, type: e.target.value as FeedbackType || undefined })}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                >
-                  <option value="">Tutti i tipi</option>
-                  <option value="bug">Bug</option>
-                  <option value="suggestion">Suggerimento</option>
-                  <option value="other">Altro</option>
-                </select>
-                <button
-                  onClick={loadFeedbacks}
-                  disabled={feedbackLoading}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  title="Aggiorna"
-                >
-                  <RefreshCw size={20} className={feedbackLoading ? 'animate-spin' : ''} />
-                </button>
-              </div>
-            </div>
-
-            {/* Feedback List */}
-            <div className="space-y-4">
-              {feedbackLoading && feedbacks.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
-                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-                  Caricamento commenti...
-                </div>
-              ) : feedbacks.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
-                  <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                  Nessun commento trovato
-                </div>
-              ) : (
-                feedbacks.map((f) => (
-                  <div
-                    key={f.id}
-                    className={cn(
-                      'bg-white dark:bg-gray-800 rounded-xl border p-4 transition-colors',
-                      f.status === 'new'
-                        ? 'border-primary-200 dark:border-primary-800 bg-primary-50/50 dark:bg-primary-900/10'
-                        : 'border-gray-200 dark:border-gray-700'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getFeedbackTypeIcon(f.type)}
-                          <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                            {f.type === 'bug' ? 'Bug' : f.type === 'suggestion' ? 'Suggerimento' : 'Altro'}
-                          </span>
-                          {getFeedbackStatusBadge(f.status)}
-                          <span className="text-xs text-gray-400">
-                            {new Date(f.created_at).toLocaleString('it-IT')}
-                          </span>
-                        </div>
-                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                          {f.message}
-                        </p>
-                        <p className="mt-2 text-xs text-gray-500">
-                          Da: <span className="font-medium">{f.user.username}</span> ({f.user.email})
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {f.status === 'new' && (
-                          <button
-                            onClick={() => handleUpdateFeedbackStatus(f.id, 'read')}
-                            disabled={actionLoading}
-                            className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                            title="Segna come letto"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        )}
-                        {f.status !== 'resolved' && (
-                          <button
-                            onClick={() => handleUpdateFeedbackStatus(f.id, 'resolved')}
-                            disabled={actionLoading}
-                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                            title="Segna come risolto"
-                          >
-                            <CheckCircle size={16} />
-                          </button>
-                        )}
-                        {f.status !== 'dismissed' && (
-                          <button
-                            onClick={() => handleUpdateFeedbackStatus(f.id, 'dismissed')}
-                            disabled={actionLoading}
-                            className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                            title="Ignora"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setShowDeleteFeedbackConfirm(f.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          title="Elimina"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+              <Expand id="admin-new-user" open={createOpen} onClose={closeCreate}>
+                <form onSubmit={handleCreateUser} className="mb-4 space-y-4 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-1">
+                      <label htmlFor="admin-new-email" className={LABEL}>Email</label>
+                      <input id="admin-new-email" type="email" autoComplete="off" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className={FIELD} required />
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="admin-new-username" className={LABEL}>Nome utente</label>
+                      <input id="admin-new-username" type="text" autoComplete="off" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} className={FIELD} required minLength={3} />
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="admin-new-password" className={LABEL}>Password</label>
+                      <input id="admin-new-password" type="password" autoComplete="new-password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className={FIELD} required minLength={8} aria-describedby="admin-new-user-password-rule" />
+                      <p id="admin-new-user-password-rule" className={MUTED}>{PASSWORD_RULE_HINT}</p>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </>
-        )}
+                  <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-slate-700 md:min-h-0 dark:text-slate-300">
+                    <input type="checkbox" checked={newUser.isAdmin} onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })} className="size-4 rounded border-slate-300" />
+                    Amministratore
+                  </label>
+                  {createError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{createError}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" size="sm" loading={createBusy}>Crea l’utente</Button>
+                    <Button type="button" size="sm" variant="quiet" onClick={closeCreate}>Annulla</Button>
+                  </div>
+                </form>
+              </Expand>
 
-        {/* ==================== ENVIRONMENTS TAB ==================== */}
-        {activeTab === 'environments' && (
-          <>
-            {/* Actions Bar */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Package size={20} className="text-gray-500" />
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Dossier pubblicati ({envPagination.total})
-                  </h2>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Search */}
-                <form onSubmit={handleEnvSearch} className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              {loading && users.length === 0 ? (
+                <Quiet>Caricamento degli utenti…</Quiet>
+              ) : users.length === 0 ? (
+                <Quiet>Nessun utente.</Quiet>
+              ) : (
+                <>
+                  <div aria-hidden className={cn(COLUMN_HEAD, USER_COLUMNS)}>
+                    <span>Utente</span><span>Stato</span><span>Permessi</span><span>Attività</span><span />
+                  </div>
+                  <ul className={LIST}>
+                    {users.map((u) => {
+                      const self = u.id === user?.id;
+                      return (
+                        <li key={u.id}>
+                          <div className={cn('grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 md:items-center', USER_COLUMNS)}>
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-slate-900 dark:text-slate-50">{u.username}</p>
+                              <p className="truncate text-sm text-slate-500 dark:text-slate-400">{u.email}</p>
+                            </div>
+                            <p className={cn('max-md:col-span-2 text-sm', u.is_active ? 'text-slate-700 dark:text-slate-300' : 'text-amber-700 dark:text-amber-400')}>
+                              {u.is_active ? 'Attivo' : 'Non attivo'}
+                            </p>
+                            <div className="max-md:col-span-2 text-sm">
+                              {u.is_admin && <p className="text-slate-700 dark:text-slate-300">Amministratore</p>}
+                              {studiaVisible && (
+                                <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-xs text-slate-600 md:min-h-7 dark:text-slate-400">
+                                  <input
+                                    type="checkbox"
+                                    checked={u.lingo_validatore}
+                                    onChange={() => void updateUser(u.id, { lingoValidatore: !u.lingo_validatore })}
+                                    disabled={actionLoading}
+                                    aria-label={`Validatore di Learn: ${u.username}`}
+                                    className="size-4 rounded border-slate-300"
+                                  />
+                                  Validatore di Learn
+                                </label>
+                              )}
+                              <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-xs text-slate-600 md:min-h-7 dark:text-slate-400">
+                                <input
+                                  type="checkbox"
+                                  checked={u.dev_mode_allowed ?? false}
+                                  onChange={() => void updateUser(u.id, { devModeAllowed: !(u.dev_mode_allowed ?? false) })}
+                                  disabled={actionLoading}
+                                  aria-label={`Modalità sviluppo consentita: ${u.username}`}
+                                  className="size-4 rounded border-slate-300"
+                                />
+                                Modalità sviluppo consentita
+                              </label>
+                            </div>
+                            <div className={cn('max-md:col-span-2', MUTED)}>
+                              <p><span className="tabular-nums">{u.login_count ?? 0}</span> accessi{u.last_login_at && <> · ultimo {moment(u.last_login_at)}</>}</p>
+                              <p>Dal {day(u.created_at)}{u.stats && <> · {u.stats.bookmarks} segnalibri</>}</p>
+                            </div>
+                            <div className="max-md:col-start-2 max-md:row-start-1 justify-self-end">
+                              <RowMenu
+                                label={`Azioni per ${u.username}`}
+                                items={[
+                                  { label: 'Reimposta la password', onSelect: () => { setNewPassword(''); setResetError(null); setResetFor(u.id); } },
+                                  { label: u.is_admin ? 'Togli il ruolo di amministratore' : 'Rendi amministratore', disabled: self || actionLoading, onSelect: () => void updateUser(u.id, { isAdmin: !u.is_admin }) },
+                                  { label: u.is_active ? 'Disattiva l’account' : 'Attiva l’account', disabled: self || actionLoading, onSelect: () => void updateUser(u.id, { isActive: !u.is_active }) },
+                                  { label: 'Elimina l’utente…', danger: true, separatorBefore: true, disabled: self, onSelect: (_e, trigger) => { setDeleting({ user: u, origin: trigger }); setConfirmOpen(true); } },
+                                ]}
+                              />
+                            </div>
+                          </div>
+                          <Expand id={`admin-reset-${u.id}`} open={resetFor === u.id} onClose={closeReset}>
+                            <form onSubmit={(e) => void handleResetPassword(e, u)} className="space-y-3 pb-4">
+                              <div className="max-w-sm space-y-1">
+                                <label htmlFor={`admin-reset-field-${u.id}`} className={LABEL}>Nuova password per {u.username}</label>
+                                <input
+                                  id={`admin-reset-field-${u.id}`}
+                                  type="password"
+                                  autoComplete="new-password"
+                                  value={newPassword}
+                                  onChange={(e) => setNewPassword(e.target.value)}
+                                  className={FIELD}
+                                  minLength={8}
+                                  aria-describedby="admin-reset-password-rule"
+                                />
+                                <p id="admin-reset-password-rule" className={MUTED}>{PASSWORD_RULE_HINT}</p>
+                              </div>
+                              {resetError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{resetError}</p>}
+                              <div className="flex flex-wrap gap-2">
+                                <Button type="submit" size="sm" loading={resetBusy} disabled={!newPassword}>Imposta la password</Button>
+                                <Button type="button" size="sm" variant="quiet" onClick={closeReset}>Annulla</Button>
+                              </div>
+                            </form>
+                          </Expand>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
+            </Part>
+
+            {/* ── Commenti ── */}
+            <Part
+              id="commenti"
+              title="Commenti"
+              count={feedbacks.length || undefined}
+              controls={
+                <>
+                  <select
+                    aria-label="Stato dei commenti"
+                    value={feedbackFilter.status || ''}
+                    onChange={(e) => setFeedbackFilter({ ...feedbackFilter, status: (e.target.value as FeedbackStatus) || undefined })}
+                    className={SELECT}
+                  >
+                    <option value="">Tutti gli stati</option>
+                    {(Object.keys(FEEDBACK_STATUS) as FeedbackStatus[]).map((s) => <option key={s} value={s}>{FEEDBACK_STATUS[s]}</option>)}
+                  </select>
+                  <select
+                    aria-label="Tipo di commento"
+                    value={feedbackFilter.type || ''}
+                    onChange={(e) => setFeedbackFilter({ ...feedbackFilter, type: (e.target.value as FeedbackType) || undefined })}
+                    className={SELECT}
+                  >
+                    <option value="">Tutti i tipi</option>
+                    {(Object.keys(FEEDBACK_TYPE) as FeedbackType[]).map((t) => <option key={t} value={t}>{FEEDBACK_TYPE[t]}</option>)}
+                  </select>
+                  <Refresh busy={feedbackLoading} onClick={() => void loadFeedbacks()} />
+                </>
+              }
+            >
+              {feedbackStats && (feedbackStats.bugs > 0 || feedbackStats.suggestions > 0) && (
+                <p className={cn('mb-3', MUTED)}>{feedbackStats.bugs === 1 ? '1 errore' : `${feedbackStats.bugs} errori`}, {feedbackStats.suggestions === 1 ? '1 suggerimento' : `${feedbackStats.suggestions} suggerimenti`}</p>
+              )}
+              {feedbackLoading && feedbacks.length === 0 ? (
+                <Quiet>Caricamento dei commenti…</Quiet>
+              ) : feedbacks.length === 0 ? (
+                <Quiet>Nessun commento trovato</Quiet>
+              ) : (
+                <ul className={LIST}>
+                  {feedbacks.map((f) => (
+                    <li key={f.id} className="flex items-start gap-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                          <span className="font-medium text-slate-900 dark:text-slate-50">{FEEDBACK_TYPE[f.type]}</span>
+                          <span className={f.status === 'new' ? 'text-primary-700 dark:text-primary-300' : 'text-slate-500 dark:text-slate-400'}>{FEEDBACK_STATUS[f.status]}</span>
+                          <span className={MUTED}>{new Date(f.created_at).toLocaleString('it-IT')}</span>
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-300">{f.message}</p>
+                        <p className={cn('mt-1 break-words', MUTED)}>{f.user.username} · {f.user.email}</p>
+                      </div>
+                      <RowMenu
+                        label="Azioni sul commento"
+                        items={[
+                          ...(f.status === 'new' ? [{ label: 'Segna come letto', disabled: actionLoading, onSelect: () => void handleUpdateFeedbackStatus(f.id, 'read') }] : []),
+                          ...(f.status !== 'resolved' ? [{ label: 'Segna come risolto', disabled: actionLoading, onSelect: () => void handleUpdateFeedbackStatus(f.id, 'resolved') }] : []),
+                          ...(f.status !== 'dismissed' ? [{ label: 'Ignora', disabled: actionLoading, onSelect: () => void handleUpdateFeedbackStatus(f.id, 'dismissed') }] : []),
+                          { label: 'Elimina', danger: true, separatorBefore: true, onSelect: () => handleDeleteFeedback(f) },
+                        ]}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Part>
+
+            {/* ── Dossier pubblicati ── */}
+            <Part
+              id="dossier-pubblicati"
+              title="Dossier pubblicati"
+              count={envPagination.total || undefined}
+              controls={
+                <>
+                  <form onSubmit={handleEnvSearch} role="search" className="flex items-center gap-2">
                     <input
-                      type="text"
+                      type="search"
                       value={envSearch}
                       onChange={(e) => setEnvSearch(e.target.value)}
                       placeholder="Cerca un dossier pubblicato…"
-                      className="pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none w-64"
+                      aria-label="Cerca un dossier pubblicato"
+                      className={cn(FIELD, 'w-56')}
                     />
-                  </div>
-                  <button
-                    type="submit"
-                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                  >
-                    Cerca
-                  </button>
-                </form>
-                {/* Status Filter */}
-                <select
-                  value={envStatusFilter}
-                  onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                >
-                  <option value="all">Tutti</option>
-                  <option value="active">Attivi</option>
-                  <option value="withdrawn">Ritirati</option>
-                </select>
-                <button
-                  onClick={() => loadEnvironments(envPagination.page)}
-                  disabled={envLoading}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  title="Aggiorna"
-                >
-                  <RefreshCw size={20} className={envLoading ? 'animate-spin' : ''} />
-                </button>
-              </div>
-            </div>
-
-            {/* Environments Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <Button type="submit" size="sm" variant="secondary">Cerca</Button>
+                  </form>
+                  <select aria-label="Stato dei dossier pubblicati" value={envStatusFilter} onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')} className={SELECT}>
+                    <option value="all">Tutti</option>
+                    <option value="active">Attivi</option>
+                    <option value="withdrawn">Ritirati</option>
+                  </select>
+                  <Refresh busy={envLoading} onClick={() => void loadEnvironments(envPagination.page)} />
+                </>
+              }
+            >
               {envLoading && environments.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-                  Caricamento dei dossier pubblicati…
-                </div>
+                <Quiet>Caricamento dei dossier pubblicati…</Quiet>
               ) : environments.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <Package size={32} className="mx-auto mb-2 opacity-50" />
-                  Nessun dossier pubblicato trovato
-                </div>
+                <Quiet>Nessun dossier pubblicato trovato</Quiet>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 dark:bg-gray-700/50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                            Dossier pubblicato
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                            Autore
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                            Stato
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                            Statistiche
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                            Creato
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">
-                            Azioni
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {environments.map((env) => (
-                          <tr key={env.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                            <td className="px-6 py-4">
-                              <div>
-                                <p className="font-medium text-gray-900 dark:text-white">
-                                  {env.title}
-                                </p>
-                                <p className="text-sm text-gray-500 truncate max-w-xs">
-                                  {env.description || 'Nessuna descrizione'}
-                                </p>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
-                                    {env.category}
-                                  </span>
-                                  <span className="text-xs text-gray-400">v{env.currentVersion}</span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm">
-                                <p className="font-medium text-gray-900 dark:text-white">{env.user.username}</p>
-                                <p className="text-gray-500">{env.user.email}</p>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={cn(
-                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
-                                env.isActive
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                              )}>
-                                {env.isActive ? <Eye size={12} /> : <EyeOff size={12} />}
-                                {env.isActive ? 'Attivo' : 'Ritirato'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3 text-xs text-gray-500">
-                                <span className="flex items-center gap-1" title="Visualizzazioni">
-                                  <TrendingUp size={12} />
-                                  {env.viewCount}
-                                </span>
-                                <span className="flex items-center gap-1" title="Download">
-                                  <Download size={12} />
-                                  {env.downloadCount}
-                                </span>
-                                <span className="flex items-center gap-1" title="Like">
-                                  <Heart size={12} />
-                                  {env.likeCount}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                              {new Date(env.createdAt).toLocaleDateString('it-IT')}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {env.isActive ? (
-                                  <button
-                                    onClick={() => handleWithdrawEnv(env.id)}
-                                    disabled={actionLoading}
-                                    className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                                    title="Ritira"
-                                  >
-                                    <EyeOff size={16} />
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleRepublishEnv(env.id)}
-                                    disabled={actionLoading}
-                                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                                    title="Ripubblica"
-                                  >
-                                    <Eye size={16} />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => setShowDeleteEnvConfirm(env.id)}
-                                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                  title="Elimina"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div aria-hidden className={cn(COLUMN_HEAD, ENV_COLUMNS)}>
+                    <span>Dossier</span><span>Autore</span><span>Stato</span><span>Uso</span><span />
                   </div>
-
-                  {/* Pagination */}
+                  <ul className={LIST}>
+                    {environments.map((env) => (
+                      <li key={env.id} className={cn('grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 md:items-center', ENV_COLUMNS)}>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-900 dark:text-slate-50">{env.title}</p>
+                          {env.description && <p className="truncate text-sm text-slate-500 dark:text-slate-400">{env.description}</p>}
+                          <p className={MUTED}>{FORUM_CATEGORIES.find((c) => c.value === env.category)?.label ?? env.category} · versione {env.currentVersion} · dal {day(env.createdAt)}</p>
+                        </div>
+                        <div className="max-md:col-span-2 min-w-0 text-sm">
+                          <p className="truncate text-slate-700 dark:text-slate-300">{env.user.username}</p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{env.user.email}</p>
+                        </div>
+                        <p className={cn('max-md:col-span-2 text-sm', env.isActive ? 'text-slate-700 dark:text-slate-300' : 'text-amber-700 dark:text-amber-400')}>
+                          {env.isActive ? 'Pubblicato' : 'Ritirato'}
+                        </p>
+                        <p className={cn('max-md:col-span-2 tabular-nums', MUTED)}>{env.viewCount} visite · {env.downloadCount} download · {env.likeCount} mi piace</p>
+                        <div className="max-md:col-start-2 max-md:row-start-1 justify-self-end">
+                          <RowMenu
+                            label={`Azioni su ${env.title}`}
+                            items={[
+                              env.isActive
+                                ? { label: 'Ritira', disabled: actionLoading, onSelect: () => void setEnvActive(env.id, false) }
+                                : { label: 'Ripubblica', disabled: actionLoading, onSelect: () => void setEnvActive(env.id, true) },
+                              { label: 'Elimina', danger: true, separatorBefore: true, onSelect: () => handleDeleteEnv(env) },
+                            ]}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                   {envPagination.pages > 1 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-                      <p className="text-sm text-gray-500">
-                        Pagina {envPagination.page} di {envPagination.pages} ({envPagination.total} dossier pubblicati)
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => loadEnvironments(envPagination.page - 1)}
-                          disabled={envPagination.page <= 1 || envLoading}
-                          className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Precedente
-                        </button>
-                        <button
-                          onClick={() => loadEnvironments(envPagination.page + 1)}
-                          disabled={envPagination.page >= envPagination.pages || envLoading}
-                          className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Successiva
-                        </button>
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
+                      <p className={MUTED}>Pagina {envPagination.page} di {envPagination.pages}</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => void loadEnvironments(envPagination.page - 1)} disabled={envPagination.page <= 1 || envLoading}>Precedente</Button>
+                        <Button size="sm" variant="secondary" onClick={() => void loadEnvironments(envPagination.page + 1)} disabled={envPagination.page >= envPagination.pages || envLoading}>Successiva</Button>
                       </div>
                     </div>
                   )}
                 </>
               )}
-            </div>
-          </>
-        )}
+            </Part>
 
-        {/* ==================== REPORTS TAB ==================== */}
-        {activeTab === 'reports' && (
-          <>
-            {/* Actions Bar */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Flag size={20} className="text-gray-500" />
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Segnalazioni ({reports.length})
-                  </h2>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={reportStatusFilter}
-                  onChange={(e) => setReportStatusFilter(e.target.value as ReportStatus | 'all')}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                >
-                  <option value="pending">In attesa</option>
-                  <option value="reviewed">Esaminate</option>
-                  <option value="dismissed">Ignorate</option>
-                  <option value="all">Tutte</option>
-                </select>
-                <button
-                  onClick={loadReports}
-                  disabled={reportsLoading}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  title="Aggiorna"
-                >
-                  <RefreshCw size={20} className={reportsLoading ? 'animate-spin' : ''} />
-                </button>
-              </div>
-            </div>
-
-            {/* Reports List */}
-            <div className="space-y-4">
+            {/* ── Segnalazioni ── */}
+            <Part
+              id="segnalazioni"
+              title="Segnalazioni"
+              count={reports.length || undefined}
+              controls={
+                <>
+                  <select aria-label="Stato delle segnalazioni" value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value as ReportStatus | 'all')} className={SELECT}>
+                    <option value="pending">In attesa</option>
+                    <option value="reviewed">Esaminate</option>
+                    <option value="dismissed">Ignorate</option>
+                    <option value="all">Tutte</option>
+                  </select>
+                  <Refresh busy={reportsLoading} onClick={() => void loadReports()} />
+                </>
+              }
+            >
               {reportsLoading && reports.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
-                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-                  Caricamento segnalazioni...
-                </div>
+                <Quiet>Caricamento delle segnalazioni…</Quiet>
               ) : reports.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
-                  <Flag size={32} className="mx-auto mb-2 opacity-50" />
-                  Nessuna segnalazione trovata
-                </div>
+                <Quiet>Nessuna segnalazione trovata</Quiet>
               ) : (
-                reports.map((r) => (
-                  <div
-                    key={r.id}
-                    className={cn(
-                      'bg-white dark:bg-gray-800 rounded-xl border p-4 transition-colors',
-                      r.status === 'pending'
-                        ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
-                        : 'border-gray-200 dark:border-gray-700'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Flag size={16} className="text-red-500" />
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">
-                            {REPORT_REASON_LABELS[r.reason]}
-                          </span>
-                          {getReportStatusBadge(r.status)}
-                          <span className="text-xs text-gray-400">
-                            {new Date(r.createdAt).toLocaleString('it-IT')}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          Dossier pubblicato: <span className="font-medium">{r.environment.title}</span>
+                <ul className={LIST}>
+                  {reports.map((r) => (
+                    <li key={r.id} className="flex items-start gap-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                          <span className="font-medium text-slate-900 dark:text-slate-50">{REPORT_REASON[r.reason]}</span>
+                          <span className={r.status === 'pending' ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}>{REPORT_STATUS[r.status]}</span>
+                          <span className={MUTED}>{new Date(r.createdAt).toLocaleString('it-IT')}</span>
                         </p>
-                        {r.details && (
-                          <p className="mt-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                            {r.details}
-                          </p>
-                        )}
-                        <p className="mt-2 text-xs text-gray-500">
-                          Segnalato da: <span className="font-medium">{r.reporter.username}</span>
-                        </p>
+                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Su «{r.environment.title}»</p>
+                        {r.details && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-300">{r.details}</p>}
+                        <p className={cn('mt-1', MUTED)}>Segnalata da {r.reporter.username}</p>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {r.status !== 'reviewed' && (
-                          <button
-                            onClick={() => handleUpdateReportStatus(r.id, 'reviewed')}
-                            disabled={actionLoading}
-                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                            title="Segna come esaminata"
-                          >
-                            <CheckCircle size={16} />
-                          </button>
-                        )}
-                        {r.status !== 'dismissed' && (
-                          <button
-                            onClick={() => handleUpdateReportStatus(r.id, 'dismissed')}
-                            disabled={actionLoading}
-                            className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                            title="Ignora"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        )}
-                        {r.status !== 'pending' && (
-                          <button
-                            onClick={() => handleUpdateReportStatus(r.id, 'pending')}
-                            disabled={actionLoading}
-                            className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                            title="Rimetti in attesa"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
+                      <RowMenu
+                        label="Azioni sulla segnalazione"
+                        items={[
+                          ...(r.status !== 'reviewed' ? [{ label: 'Segna come esaminata', disabled: actionLoading, onSelect: () => void handleUpdateReportStatus(r.id, 'reviewed') }] : []),
+                          ...(r.status !== 'dismissed' ? [{ label: 'Ignora', disabled: actionLoading, onSelect: () => void handleUpdateReportStatus(r.id, 'dismissed') }] : []),
+                          ...(r.status !== 'pending' ? [{ label: 'Rimetti in attesa', disabled: actionLoading, onSelect: () => void handleUpdateReportStatus(r.id, 'pending') }] : []),
+                        ]}
+                      />
+                    </li>
+                  ))}
+                </ul>
               )}
-            </div>
-          </>
-        )}
+            </Part>
 
-        {/* ==================== VISUALEX STUDIA TAB ==================== */}
-        {studiaVisible && activeTab === 'studia' && (
-          <div className="space-y-5">
-            <CoursesSwitchAdmin />
-            <StudiaSoglieAdmin />
-            <StudiaTextsAdmin />
-          </div>
-        )}
-
-        {/* ==================== INGESTION TAB ==================== */}
-        {activeTab === 'ingestion' && opsVisible && <IngestionAdminPanel />}
-      </main>
-
-      {/* Create User Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Nuovo utente
-            </h3>
-            {actionError && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
-                {actionError}
-              </div>
+            {studiaVisible && (
+              <Part id="learn" title="Learn">
+                <div className="space-y-5">
+                  <CoursesSwitchAdmin />
+                  <StudiaSoglieAdmin />
+                  <StudiaTextsAdmin />
+                </div>
+              </Part>
             )}
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={newUser.username}
-                  onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  required
-                  minLength={3}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  required
-                  minLength={8}
-                  aria-describedby="admin-new-user-password-rule"
-                />
-                <p id="admin-new-user-password-rule" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {PASSWORD_RULE_HINT}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isAdmin"
-                  checked={newUser.isAdmin}
-                  onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                />
-                <label htmlFor="isAdmin" className="text-sm text-gray-700 dark:text-gray-300">
-                  Amministratore
-                </label>
-              </div>
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setActionError(null);
-                    setNewUser({ email: '', username: '', password: '', isAdmin: false });
-                  }}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className={DIALOG_PRIMARY}
-                >
-                  {actionLoading ? 'Creazione…' : 'Crea l’utente'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Reset Password Modal */}
-      {showResetPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Reset Password
-            </h3>
-            {actionError && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
-                {actionError}
-              </div>
+            {opsVisible && (
+              <Part id="ingestione" title="Ingestione MERL-T">
+                <IngestionAdminPanel />
+              </Part>
             )}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nuova Password
-                </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  minLength={8}
-                  aria-describedby="admin-reset-password-rule"
-                />
-                <p id="admin-reset-password-rule" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {PASSWORD_RULE_HINT}
-                </p>
-              </div>
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowResetPasswordModal(null);
-                    setActionError(null);
-                    setNewPassword('');
-                  }}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={handleResetPassword}
-                  disabled={actionLoading || !newPassword}
-                  className={DIALOG_PRIMARY}
-                >
-                  {actionLoading ? 'Reset…' : 'Reset Password'}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
-      )}
+      </PageFrame>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Conferma Eliminazione
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Sei sicuro di voler eliminare questo utente? Tutti i suoi dati verranno eliminati permanentemente.
-              </p>
-              <div className="flex justify-center gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(null)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={handleDeleteUser}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? 'Eliminazione…' : 'Elimina'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Feedback Confirmation Modal */}
-      {showDeleteFeedbackConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Elimina commento
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Sei sicuro di voler eliminare questo commento? L'azione non può essere annullata.
-              </p>
-              <div className="flex justify-center gap-3">
-                <button
-                  onClick={() => setShowDeleteFeedbackConfirm(null)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={handleDeleteFeedback}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? 'Eliminazione…' : 'Elimina'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Environment Confirmation Modal */}
-      {showDeleteEnvConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Elimina dai dossier pubblici
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
-                La copia pubblicata e tutte le sue versioni vengono eliminate per sempre. La pratica del suo autore resta com'è.
-              </p>
-              <div className="flex justify-center gap-3">
-                <button
-                  onClick={() => setShowDeleteEnvConfirm(null)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={handleDeleteEnv}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? 'Eliminazione…' : 'Elimina'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Erasing an account cannot be undone (L-74): it asks, growing out of the row's «⋯». */}
+      <ConfirmDialog
+        open={confirmOpen}
+        variant="danger"
+        title={`Eliminare ${deleting?.user.username ?? 'l’utente'}?`}
+        message="L’account e tutti i suoi dati vengono eliminati per sempre."
+        confirmLabel={actionLoading ? 'Eliminazione…' : 'Elimina'}
+        focusCancel
+        origin={deleting?.origin ?? null}
+        focusBack={() => document.getElementById('utenti-title')}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => void handleDeleteUser()}
+      />
     </div>
   );
 }
