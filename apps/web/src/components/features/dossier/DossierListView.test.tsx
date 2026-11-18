@@ -232,14 +232,12 @@ describe('DossierListView — the category menu (D1)', () => {
     expect(values()).toEqual(['', 'penale']);
   });
 
-  it('gives both menus the same look, 44 px at every width (S7c) and half the row each on a phone', () => {
+  it('draws the category menu with the common `Select`, half the row on a phone (LC106)', () => {
     appStore.setState({ dossiers: listed });
     renderList();
-    for (const name of ['Ordina le pratiche', 'Filtra per categoria']) {
-      expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('flex-1 min-w-0'));
-      expect(screen.getByRole('combobox', { name })).toHaveClass('min-h-[44px]');
-      expect(screen.getByRole('combobox', { name }).className).not.toMatch(/md:min-h-0/);
-    }
+    const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
+    expect(menu).toHaveClass('appearance-none', 'rounded-md', 'min-h-11');
+    expect(menu.closest('.flex-1')).toHaveClass('min-w-0');
   });
 
   it('has no menu when no dossier has a category, and the order menu stays', () => {
@@ -287,8 +285,8 @@ describe('DossierListView — the heading on a phone', () => {
     expect(header).toHaveClass('flex-row', 'items-center', 'justify-between');
     const create = screen.getByRole('button', { name: 'Nuova pratica' });
     expect(create).toHaveAttribute('id', 'tour-dossier-create');
-    expect(create).toHaveClass('h-11', 'w-11');
-    expect(screen.getByRole('button', { name: 'Altre azioni sulle pratiche' })).toHaveClass('h-11', 'w-11');
+    expect(create).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: 'Altre azioni sulle pratiche' })).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.queryByRole('button', { name: 'Importa una pratica da file JSON' })).toBeNull();
   });
 
@@ -329,7 +327,9 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     expect(within(card).queryByRole('button', { name: 'Apri Pratica Rossi in Ricerca' })).toBeNull();
     for (const name of ['Azioni su Pratica Rossi']) {
       const control = within(card).getByRole('button', { name });
-      expect(control).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+      // `IconButton size="lg"`'s look: 44 px at every width.
+      expect(control).toHaveClass('min-h-11', 'min-w-11');
+      expect(control.className).not.toMatch(/md:min-[hw]-/);
       expect(control.className).not.toMatch(/opacity-0/);
     }
     // No icon of a folder, no «N elementi» badge.
@@ -374,7 +374,7 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     expect(empty.children[1]).toBe(screen.getByRole('heading', { name: 'Nessuna pratica di lavoro' }));
     expect(empty.innerHTML).not.toContain('--vlx-section-');
     for (const svg of empty.querySelectorAll('svg')) expect(svg.closest('button')).not.toBeNull();
-    expect(within(empty).getByRole('button', { name: 'Crea la tua prima pratica' })).toHaveClass('min-h-[44px]', 'bg-primary-600');
-    expect(within(empty).getByRole('button', { name: 'Pronti da LexCraft' })).toHaveClass('min-h-[44px]');
+    expect(within(empty).getByRole('button', { name: 'Crea la tua prima pratica' })).toHaveClass('min-h-11', 'bg-toga-600');
+    expect(within(empty).getByRole('button', { name: 'Pronti da LexCraft' })).toHaveClass('min-h-11');
   });
 });

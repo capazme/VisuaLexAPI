@@ -3,7 +3,6 @@ import { loadAssistantFeatures } from '../../../store/assistantProposals';
 import { CurrentDossierContext } from './currentDossier';
 import {
   Trash2,
-  ArrowLeft,
   Download,
   Search,
   Edit2,
@@ -60,8 +59,9 @@ import { tagLabel } from '../../../utils/tagLabel';
 import { cn } from '../../../lib/utils';
 import { PageFrame } from '../../layout/PageFrame';
 import { sectionOfDossierKind } from '../../../features/sections/useSection';
-import { FOCUS_RING } from '../studia/progress/tokens';
-import { HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
+import { HEADER_BUTTON, HEADER_ICON_BUTTON } from './dossierStyles';
+import { Button } from '../../ui/Button';
+import { BackLink } from '../../ui/BackLink';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -353,13 +353,12 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   // The header's actions in one row (D3), each 44 px as the planner's controls (S7c). A label never wraps inside its
   // button (D3b): when the window is narrow the row wraps, as a row. Only on the buttons: their menus wrap their items.
-  const rowButton = cn(HEADER_BUTTON, 'whitespace-nowrap');
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
       <MenuButton
         label="Aggiungi"
         align="left"
-        triggerClassName={rowButton}
+        triggerClassName={HEADER_BUTTON}
         items={[
           { label: 'Articoli da una norma', icon: TreeDeciduous, onSelect: () => setTreeNavigatorAct(null) },
           { label: 'Nota', icon: StickyNote, onSelect: () => setNoteTarget({ heading: 'Aggiungi una nota alla pratica' }) },
@@ -372,7 +371,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       <MenuButton
         label="Esporta"
         align="left"
-        triggerClassName={rowButton}
+        triggerClassName={HEADER_BUTTON}
         items={[
           { label: 'PDF', icon: Download, onSelect: () => setPdfDialogOpen(true), disabled: !!pdfProgress },
           { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
@@ -383,7 +382,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         <Download size={16} aria-hidden />
         <span className="hidden sm:inline">Esporta</span>
       </MenuButton>
-      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={rowButton} />
+      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={HEADER_BUTTON} />
       <MenuButton
         label="Altre azioni"
         triggerClassName={HEADER_ICON_BUTTON}
@@ -410,14 +409,10 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
         action={
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button onClick={() => navigate('/')} className={cn(HEADER_PRIMARY, 'justify-center')}>
-              <Search size={18} />
-              Cerca articoli
-            </button>
-            <button onClick={() => setTreeNavigatorAct(null)} className={cn(HEADER_BUTTON, 'justify-center')}>
-              <TreeDeciduous size={18} />
+            <Button icon={<Search size={18} aria-hidden />} onClick={() => navigate('/')}>Cerca articoli</Button>
+            <Button variant="secondary" icon={<TreeDeciduous size={18} aria-hidden />} onClick={() => setTreeNavigatorAct(null)}>
               Importa da norma
-            </button>
+            </Button>
           </div>
         }
       />
@@ -439,13 +434,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     <div>
       {/* The way back (S7c), over the frame, below lg; from lg the top bar's path is the way back (LC21). No entrance: a
           page opened tens of times a day does not slide in. */}
-      <button
-        type="button"
-        onClick={onBack}
-        className={cn('-ml-2 mb-2 inline-flex lg:hidden min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
-      >
-        <ArrowLeft size={18} aria-hidden /> Torna alle pratiche
-      </button>
+      <BackLink onBack={onBack} className="mb-2 lg:hidden" />
 
       {/* In the sections' frame (W2, S7c): the dossier's name as the title, in the reader's serif and with no icon,
           wrapping at the column's width; its section's phrase over it; the description under it; then the tags, the

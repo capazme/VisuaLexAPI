@@ -3,8 +3,10 @@ import { CheckSquare, FolderInput, FolderMinus, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Expand } from '../../ui/Expand';
 import { RowMovePicker } from '../practice/RowDossierPanels';
-import { FIELD, ICON_BUTTON } from '../planner/plannerStyles';
-import { HEADER_BUTTON } from './dossierStyles';
+import { FIELD } from '../planner/plannerStyles';
+import { Button } from '../../ui/Button';
+import { Card } from '../../ui/Card';
+import { IconButton } from '../../ui/IconButton';
 
 interface Props {
   dossierId: string;
@@ -74,51 +76,53 @@ export function FontiToolbar({
             className={cn(FIELD, 'pl-9 pr-11')}
           />
           {query && (
-            <button type="button" onClick={() => { onQuery(''); inputRef.current?.focus(); }} aria-label="Svuota il filtro" className={cn(ICON_BUTTON, 'absolute right-0 top-1/2 -translate-y-1/2')}>
-              <X size={16} aria-hidden />
-            </button>
+            <IconButton size="lg" onClick={() => { onQuery(''); inputRef.current?.focus(); }} aria-label="Svuota il filtro" className="absolute right-0 top-1/2 -translate-y-1/2 [&>svg]:h-4 [&>svg]:w-4" icon={<X aria-hidden />} />
           )}
         </div>
-        <button
+        <Button
           ref={toggleRef}
           type="button"
+          variant="secondary"
           onClick={() => { setMoving(false); onSelecting(!selecting); }}
           aria-expanded={selecting}
-          className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap')}
+          className="whitespace-nowrap"
+          icon={<CheckSquare size={16} aria-hidden />}
         >
-          <CheckSquare size={16} aria-hidden />
           {selecting ? 'Fine' : 'Seleziona'}
-        </button>
+        </Button>
       </div>
       {/* Said to a screen reader as it changes: how many rows the filter leaves. */}
       <p role="status" className={cn('text-sm text-slate-600 dark:text-slate-400', !filtering && 'sr-only')}>
         {filtering ? `${shown} di ${total}` : ''}
       </p>
       <Expand open={selecting} onClose={() => onSelecting(false)} initialFocusRef={toggleRef}>
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+        <Card className="flex flex-wrap items-center gap-2 p-2">
           <span role="status" className="mr-auto px-1 text-sm text-slate-700 dark:text-slate-300">
             {selectedCount === 1 ? '1 selezionato' : `${selectedCount} selezionati`}
           </span>
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => setMoving((v) => !v)}
             disabled={selectedCount === 0}
             aria-expanded={moving}
-            className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap disabled:opacity-40')}
+            className="whitespace-nowrap"
+            icon={<FolderInput size={16} aria-hidden />}
           >
-            <FolderInput size={16} aria-hidden />
             Sposta in…
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             onClick={onRemove}
             disabled={selectedCount === 0}
-            className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap text-red-700 disabled:opacity-40 dark:text-red-300')}
+            // Red words on the secondary look: it takes the rows out of the pratica (they go to the trash).
+            className="whitespace-nowrap text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200"
+            icon={<FolderMinus size={16} aria-hidden />}
           >
-            <FolderMinus size={16} aria-hidden />
             Togli dalla pratica
-          </button>
-        </div>
+          </Button>
+        </Card>
         <Expand open={selecting && moving} onClose={() => setMoving(false)}>
           <RowMovePicker from={dossierId} onMove={onMove} onDone={() => setMoving(false)} />
         </Expand>

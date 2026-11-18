@@ -18,6 +18,8 @@ import { dossierRecency, dossierContainsArticle, dossierContainsDecision } from 
 import { useDossierKind } from '../../../features/sections/useSection';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
@@ -208,15 +210,8 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                         Aggiungi alla pratica
                     </h3>
                 </div>
-                <button
-                    onClick={onClose}
-                    // 44 px to the touch on a phone (LC61), as every control of the sheet.
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center md:min-h-0 md:min-w-0 p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                    title="Chiudi (Esc)"
-                    aria-label="Chiudi"
-                >
-                    <X size={16} />
-                </button>
+                {/* 44 px to the touch on a phone (LC61), as every control of the sheet. */}
+                <IconButton size="sm" onClick={onClose} title="Chiudi (Esc)" aria-label="Chiudi" icon={<X aria-hidden />} />
             </header>
 
             {dossiers.length > 5 && (
@@ -243,6 +238,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                     visible.map((d) => {
                         const alreadyPresent = contains(d);
                         return (
+                            // bare-button: a row of the list of pratiche, its name, its count and «già presente», not a button's look.
                             <button
                                 key={d.id}
                                 type="button"
@@ -280,19 +276,10 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
 
             <div className="px-3 py-2.5 border-t border-slate-200 dark:border-slate-800 shrink-0">
                 {!creating ? (
-                    <button
-                        type="button"
-                        onClick={() => setCreating(true)}
-                        className={cn(
-                            'w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed rounded-lg transition-colors text-sm',
-                            TOUCH_TARGET_RESPONSIVE,
-                            'border-slate-300 dark:border-slate-700 text-slate-500',
-                            'hover:border-primary-500 hover:text-primary-500',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
-                        )}
-                    >
-                        <FolderPlus size={16} /> Nuova pratica…
-                    </button>
+                    // A place for a new one: the secondary look, its border dashed.
+                    <Button type="button" variant="secondary" onClick={() => setCreating(true)} className="w-full border-dashed" icon={<FolderPlus size={16} aria-hidden />}>
+                        Nuova pratica…
+                    </Button>
                 ) : (
                     <form aria-label="Crea una pratica" onSubmit={handleCreate} className="flex gap-2">
                         <input
@@ -305,13 +292,9 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                             aria-label="Nome della nuova pratica"
                             className="flex-1 min-h-[44px] md:min-h-0 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
                         />
-                        <button
-                            type="submit"
-                            disabled={busy || !newTitle.trim()}
-                            className="min-h-[44px] md:min-h-0 px-3 text-sm font-semibold text-white bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
+                        <Button type="submit" size="sm" disabled={busy || !newTitle.trim()}>
                             Crea e aggiungi
-                        </button>
+                        </Button>
                     </form>
                 )}
             </div>

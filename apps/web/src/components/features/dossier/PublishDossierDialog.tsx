@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ShieldAlert, Upload } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
+import { Select } from '../../ui/Select';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { Dossier, EnvironmentCategory, SharedEnvironmentContent } from '../../../types';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
@@ -31,7 +32,6 @@ const TAGS_MAX = 10;
 const TAG_MAX = 30;
 
 const INPUT = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
-const LINK_BUTTON = `rounded px-2 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`;
 
 // The owner's wording (14 October 2026, question 186), with his added sentence on manuals. LC60: what travels, first.
 const WARNING = [
@@ -248,9 +248,9 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="publish-category" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Categoria</label>
-              <select id="publish-category" value={category} onChange={(e) => edit(setCategory)(e.target.value as EnvironmentCategory)} className={`${INPUT} min-h-[44px] md:min-h-0`}>
+              <Select id="publish-category" size="sm" value={category} onChange={(e) => edit(setCategory)(e.target.value as EnvironmentCategory)}>
                 {FORUM_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label htmlFor="publish-tags" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Tag (separati da virgola)</label>
@@ -350,9 +350,9 @@ function RowGroup({ heading, hint, rows, ticked, onToggle, onAll }: {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{heading}</h4>
-        <div className="flex gap-1">
-          <button type="button" className={LINK_BUTTON} onClick={() => onAll(true)}>Tutte</button>
-          <button type="button" className={LINK_BUTTON} onClick={() => onAll(false)}>Nessuna</button>
+        <div className="flex gap-4">
+          <Button type="button" variant="link" size="sm" onClick={() => onAll(true)}>Tutte</Button>
+          <Button type="button" variant="link" size="sm" onClick={() => onAll(false)}>Nessuna</Button>
         </div>
       </div>
       {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}

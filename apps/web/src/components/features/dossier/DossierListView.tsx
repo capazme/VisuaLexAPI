@@ -26,8 +26,13 @@ import { AttributionChip } from '../bulletin/AttributionChip';
 import { sectionOfDossierKind, useDossierKind } from '../../../features/sections/useSection';
 import { kindLabel } from './dossierKinds';
 import { actsSummary, countsParts, layoutDossier } from './dossierLayout';
-import { ICON_BUTTON } from '../planner/plannerStyles';
-import { HEADER_BUTTON, HEADER_PRIMARY } from './dossierStyles';
+import { HEADER_ICON_BUTTON } from './dossierStyles';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
+import { Card } from '../../ui/Card';
+import { buttonClassName } from '../../ui/buttonStyles';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
@@ -50,9 +55,6 @@ interface Props {
 }
 
 type SortBy = 'date' | 'name' | 'items';
-
-// The list's two menus (order, category): one look, 44 px on a phone, where they share a row half and half.
-const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
   const { dossiers, updateDossier, importDossier } = useAppStore();
@@ -223,32 +225,32 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       action={isDesktop ? (
         <>
           {trashCount > 0 && onOpenTrash && (
-            <button
-              type="button"
-              onClick={onOpenTrash}
-              className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <Trash2 size={18} aria-hidden /> Cestino ({trashCount})
-            </button>
+            <Button type="button" variant="secondary" onClick={onOpenTrash} icon={<Trash2 size={16} aria-hidden />}>
+              Cestino ({trashCount})
+            </Button>
           )}
-          <button
+          <Button
+            type="button"
+            variant="secondary"
             onClick={triggerFileImport}
-            className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             title="Importa da file JSON (i)"
             aria-label="Importa una pratica da file JSON"
             aria-keyshortcuts="i"
+            icon={<Upload size={16} aria-hidden />}
           >
-            <Upload size={18} /> Importa
-          </button>
-          <button
+            Importa
+          </Button>
+          <Button
             id="tour-dossier-create"
+            type="button"
             onClick={() => setIsModalOpen(true)}
-            className="flex-1 md:flex-none dossier-create-button bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="dossier-create-button"
             title="Nuova pratica (n)"
             aria-keyshortcuts="n"
+            icon={<FolderPlus size={16} aria-hidden />}
           >
-            <FolderPlus size={20} /> Nuova pratica
-          </button>
+            Nuova pratica
+          </Button>
         </>
       ) : (
         <>
@@ -258,18 +260,19 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               { label: 'Importa da file JSON', icon: Upload, onSelect: triggerFileImport },
               ...(trashCount > 0 && onOpenTrash ? [{ label: `Cestino (${trashCount})`, icon: Trash2, onSelect: onOpenTrash }] : []),
             ]}
-            triggerClassName="h-11 w-11 justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            triggerClassName={HEADER_ICON_BUTTON}
           >
             <MoreHorizontal size={20} aria-hidden />
           </MenuButton>
-          <button
+          <IconButton
             id="tour-dossier-create"
+            variant="primary"
+            size="lg"
             onClick={() => setIsModalOpen(true)}
             aria-label="Nuova pratica"
-            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-          >
-            <Plus size={22} aria-hidden />
-          </button>
+            className="dossier-create-button"
+            icon={<Plus aria-hidden />}
+          />
         </>
       )}
     >
@@ -286,44 +289,45 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       {/* The search, then the two menus: one row on a computer; on a phone the search on its own row and the
           menus side by side under it, half each (D1). */}
       <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-        <div id="tour-dossier-search" className="relative flex-1 min-w-0 md:min-w-[14rem]">
-          <Search size={18} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
+        <div id="tour-dossier-search" className="flex-1 min-w-0 md:min-w-[14rem]">
+          <Input
             ref={searchInputRef}
             type="text"
+            icon={<Search size={16} aria-hidden />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cerca nelle pratiche…"
             aria-label="Cerca nelle pratiche"
             aria-keyshortcuts="/"
-            className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           />
         </div>
         <div className="flex gap-3 md:gap-4">
-          <select
-            id="tour-dossier-sort"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            aria-label="Ordina le pratiche"
-            className={cn(LIST_MENU, 'md:flex-none')}
-          >
-            <option value="date">Ordina per data</option>
-            <option value="name">Ordina per nome</option>
-            <option value="items">Ordina per elementi</option>
-          </select>
-          {categories.length > 0 && (
-            <select
-              id="tour-dossier-filters"
-              value={selectedCategory?.key ?? ''}
-              onChange={(e) => setSelectedTag(e.target.value || null)}
-              aria-label="Filtra per categoria"
-              className={cn(LIST_MENU, 'md:flex-none md:max-w-[16rem]')}
+          <div className="min-w-0 flex-1 md:flex-none">
+            <Select
+              id="tour-dossier-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              aria-label="Ordina le pratiche"
             >
-              <option value="">{isDesktop ? 'Tutte le categorie' : 'Tutte'}</option>
-              {categories.map((category) => (
-                <option key={category.key} value={category.key}>{category.label}</option>
-              ))}
-            </select>
+              <option value="date">Ordina per data</option>
+              <option value="name">Ordina per nome</option>
+              <option value="items">Ordina per elementi</option>
+            </Select>
+          </div>
+          {categories.length > 0 && (
+            <div className="min-w-0 flex-1 md:max-w-[16rem] md:flex-none">
+              <Select
+                id="tour-dossier-filters"
+                value={selectedCategory?.key ?? ''}
+                onChange={(e) => setSelectedTag(e.target.value || null)}
+                aria-label="Filtra per categoria"
+              >
+                <option value="">{isDesktop ? 'Tutte le categorie' : 'Tutte'}</option>
+                {categories.map((category) => (
+                  <option key={category.key} value={category.key}>{category.label}</option>
+                ))}
+              </Select>
+            </div>
           )}
         </div>
       </div>
@@ -352,16 +356,14 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               </p>
               <p className="mt-2 text-slate-600 dark:text-slate-400">Crea la prima, o parti da una pratica di studio pronta.</p>
               <div className="mt-8 flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <button type="button" onClick={() => setIsModalOpen(true)} className={cn(HEADER_PRIMARY, 'justify-center sm:whitespace-nowrap')}>
-                  <FolderPlus size={18} aria-hidden />
+                <Button type="button" onClick={() => setIsModalOpen(true)} className="sm:whitespace-nowrap" icon={<FolderPlus size={16} aria-hidden />}>
                   Crea la tua prima pratica
-                </button>
+                </Button>
                 {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12), after the
                     community's dossiers since S7a: the address takes the reader to their strip. */}
-                <button type="button" onClick={() => navigate('/forum#pronti')} className={cn(HEADER_BUTTON, 'justify-center sm:whitespace-nowrap')}>
-                  <BookOpen size={18} aria-hidden />
+                <Button type="button" variant="secondary" onClick={() => navigate('/forum#pronti')} className="sm:whitespace-nowrap" icon={<BookOpen size={16} aria-hidden />}>
                   Pronti da LexCraft
-                </button>
+                </Button>
               </div>
             </section>
           )
@@ -373,7 +375,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             return (
               // A card (S7c): the name in the reader's serif and its two actions, the description, the acts it holds, what
               // it holds in one line, the date; 44 px controls, always there, as the planner's.
-              <div
+              <Card
+                hover
                 key={dossier.id}
                 id={idx === 0 ? 'tour-dossier-card' : undefined}
                 role="button"
@@ -388,10 +391,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   }
                 }}
                 className={cn(
-                  'dossier-card group relative flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-[border-color,translate,scale] duration-[160ms] ease-out hover:border-slate-400 hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100 md:p-5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500',
-                  // LC30: it lifts 1 px as its shadow grows, and the press brings it back down. The shadow changes at
-                  // once: `box-shadow` is not transitioned, the focus ring is one and must appear at once (TRANSITION).
-                  'motion-safe:[@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-px motion-safe:[@media(hover:hover)_and_(pointer:fine)]:active:translate-y-0',
+                  // `Card hover` (LC106): the box at 8 px, no shadow, the border darker and a lift of 1 px on a fine
+                  // pointer, in `TRANSITION`'s time; the press brings it back down.
+                  'dossier-card group relative flex flex-col p-4 active:scale-[0.98] motion-reduce:active:scale-100 md:p-5',
+                  '[@media(hover:hover)_and_(pointer:fine)]:active:translate-y-0',
                   FOCUS_RING,
                 )}
               >
@@ -402,7 +405,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   <div id={idx === 0 ? 'tour-dossier-card-actions' : undefined} className="-mr-2 -mt-1 flex shrink-0 items-center">
                     <MenuButton
                       label={`Azioni su ${dossier.title}`}
-                      triggerClassName={ICON_BUTTON}
+                      // `IconButton size="lg"`'s look: 44 px at every width, as the planner's.
+                      triggerClassName={cn(buttonClassName('quiet', 'lg'), 'min-w-11 px-0')}
                       items={[
                         { label: 'Rinomina / Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
                         { label: 'Elimina', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => deleteDossierWithUndo(dossier, onTrashChanged) },
@@ -470,7 +474,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   </p>
                   <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Creata il {formatTimestampLong(dossier.createdAt)}</p>
                 </div>
-              </div>
+              </Card>
             );
           })
         )}

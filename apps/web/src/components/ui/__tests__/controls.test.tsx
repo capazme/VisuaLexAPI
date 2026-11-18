@@ -10,7 +10,7 @@ import { Select } from '../Select';
 import { Textarea } from '../Textarea';
 import { Switch } from '../Switch';
 import { Card } from '../Card';
-import { CONTROL_BORDER, CONTROL_HEIGHT, CONTROL_RADIUS, type ControlSize } from '../controlStyles';
+import { CARD_RADIUS, CONTROL_BORDER, CONTROL_HEIGHT, CONTROL_RADIUS, type ControlSize } from '../controlStyles';
 
 const SRC = resolve(process.cwd(), 'src');
 const classes = (el: HTMLElement) => el.className.split(/\s+/);
@@ -150,10 +150,12 @@ describe('Textarea, Switch and Card', () => {
     expect(toggle).toHaveClass('min-h-[44px]', 'min-w-[44px]');
   });
 
-  it('draw one card, with no variant: the fields\' radius and border, no shadow at rest', () => {
+  it('draw one card, with no variant: 8 px corners, the fields\' border, no shadow at rest', () => {
     render(<Card data-testid="card">Contenuto</Card>);
     const card = screen.getByTestId('card');
-    expect(radii(card)).toEqual([CONTROL_RADIUS]);
+    // LC106, the consultant's rule: 4 px for what is pressed or typed in, 8 px for what holds.
+    expect(radii(card)).toEqual([CARD_RADIUS]);
+    expect(CARD_RADIUS).toBe('rounded-[8px]');
     expect(card).toHaveClass(...CONTROL_BORDER.split(' '));
     expect(classes(card).filter((c) => /^shadow/.test(c))).toEqual([]);
     expect(readFileSync(join(SRC, 'components', 'ui', 'Card.tsx'), 'utf8')).not.toMatch(/variant/);

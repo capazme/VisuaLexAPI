@@ -30,6 +30,7 @@ import { useNoteOpener, useSignTarget } from '../../../hooks/useSignTarget';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { isGloss } from '../../../utils/aiReview';
 import { GLOSS_WORDS } from '../../../constants/glossWords';
+import { Button } from '../../ui/Button';
 
 interface Props {
   norma: NormaVisitata;
@@ -285,13 +286,15 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     return (
       <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-sm text-red-600 dark:text-red-400 flex items-center gap-3">
         <span>{state.message}</span>
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           onClick={() => setRetryTick(t => t + 1)}
-          className="font-semibold underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded"
+          className="font-semibold text-red-700 decoration-red-300 hover:text-red-800 dark:text-red-300 dark:decoration-red-700 dark:hover:text-red-200"
         >
           Riprova
-        </button>
+        </Button>
       </div>
     );
   }
@@ -386,32 +389,26 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         />
       )}
       <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-        <button
-          type="button"
-          onClick={handleCopyCitation}
-          disabled={citeLocked}
-          className="inline-flex min-h-[44px] md:min-h-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Copy size={13} /> Copia citazione
-        </button>
+        <Button type="button" variant="quiet" size="sm" onClick={handleCopyCitation} disabled={citeLocked} className="gap-1.5 px-2" icon={<Copy size={13} aria-hidden />}>
+          Copia citazione
+        </Button>
         {hasLink && (
-          <button
+          <Button
             type="button"
+            variant="quiet"
+            size="sm"
             onClick={handleCopyLink}
             disabled={citeLocked}
             title={european ? EUROPEAN_LINK_NOTE : 'L’indirizzo dell’articolo su Normattiva; incollato in Word, la citazione con il collegamento'}
-            className="inline-flex min-h-[44px] md:min-h-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="gap-1.5 px-2"
+            icon={<Link2 size={13} aria-hidden />}
           >
-            <Link2 size={13} aria-hidden /> {normLinkActionLabel(norma)}
-          </button>
+            {normLinkActionLabel(norma)}
+          </Button>
         )}
-        <button
-          type="button"
-          onClick={onOpenOnDashboard}
-          className="inline-flex min-h-[44px] md:min-h-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        >
-          <ExternalLink size={13} /> Apri in Ricerca
-        </button>
+        <Button type="button" variant="quiet" size="sm" onClick={onOpenOnDashboard} className="gap-1.5 px-2" icon={<ExternalLink size={13} aria-hidden />}>
+          Apri in Ricerca
+        </Button>
         {/* The highlighter (H1, A4): the dossier's reader has no bar of its own, so it sits with its actions; not on a text
             read only, which takes none. */}
         {!readOnly && (

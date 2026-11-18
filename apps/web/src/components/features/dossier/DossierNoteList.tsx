@@ -4,6 +4,7 @@ import { hasAssistantNote } from '../../../utils/aiReview';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { formatTimestampLong } from './dossierUtils';
 import { ROW_REMOVE } from './dossierStyles';
+import { IconButton } from '../../ui/IconButton';
 import { useNoteRemovalFocus } from './useNoteRemovalFocus';
 import { NoteText } from './NoteText';
 
@@ -36,14 +37,7 @@ export function DossierNoteList({ notes, onRemoveNote }: { notes: NoteItem[]; on
             : <>{words}{meta}</>}
         </div>
         {onRemoveNote && !reviewed && (
-          <button
-            type="button"
-            onClick={() => remove(note)}
-            aria-label="Rimuovi nota"
-            className={ROW_REMOVE}
-          >
-            <Trash2 size={14} aria-hidden />
-          </button>
+          <IconButton size="lg" onClick={() => remove(note)} aria-label="Rimuovi nota" className={ROW_REMOVE} icon={<Trash2 aria-hidden />} />
         )}
       </div>
     );

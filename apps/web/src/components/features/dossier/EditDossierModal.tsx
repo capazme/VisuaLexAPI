@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Dossier, DossierKind } from '../../../types';
 import { DossierKindChoice } from './DossierKindChoice';
+import { Button } from '../../ui/Button';
 
 interface Props {
   dossier: Dossier;
@@ -56,18 +57,12 @@ export function EditDossierModal({ dossier, onClose, onSave }: Props) {
             <DossierKindChoice value={kind} onChange={setKind} />
           </div>
           <div className="flex justify-end gap-3 mt-6">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
+            <Button variant="quiet" onClick={onClose}>
               Annulla
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-            >
+            </Button>
+            <Button onClick={handleSave}>
               Salva
-            </button>
+            </Button>
           </div>
         </div>
       </div>

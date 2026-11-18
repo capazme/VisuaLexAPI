@@ -7,7 +7,7 @@ import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
 import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { getErrorMessage } from '../../../utils/errors';
-import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
 import { PublishDossierDialog } from './PublishDossierDialog';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -99,23 +99,20 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
   if (!published) {
     return (
       <>
-        <button
+        <Button
           ref={publishRef}
           type="button"
+          variant="secondary"
           onClick={() => setDialogOpen(true)}
           disabled={blocked || dossier.items.length === 0}
           title={blocked ? "L'amministrazione l'ha ritirato dai dossier pubblici: non puoi ripubblicarlo." : undefined}
           aria-label={blocked ? 'Ritirato dai dossier pubblici' : 'Pubblica nel Forum'}
-          // The look `MenuButton` gives the header's other triggers.
-          className={cn(
-            'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-            buttonClassName,
-            'disabled:cursor-not-allowed disabled:opacity-40',
-          )}
+          // The look the header gives its other triggers (`HEADER_BUTTON`).
+          className={buttonClassName}
         >
           <Upload size={16} aria-hidden />
           <span className="hidden sm:inline" aria-hidden>{blocked ? 'Ritirato dai dossier pubblici' : 'Pubblica nel Forum'}</span>
-        </button>
+        </Button>
         {dialog}
         {confirmation}
       </>
