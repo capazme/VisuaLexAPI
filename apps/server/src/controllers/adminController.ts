@@ -5,6 +5,8 @@ import { hashPassword, passwordSchema } from '../utils/password';
 import { AppError } from '../middleware/errorHandler';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
 import { logModeration } from '../forum/moderationLog';
+import { revokeUserWebSessions } from '../auth/webSession';
+import { revokeUserGrants } from '../oauth/tokens';
 
 // Validation schemas
 const createUserSchema = z.object({
@@ -261,7 +263,7 @@ export const updateUser = async (req: Request, res: Response) => {
         targetKind: 'user', targetId: id, reason: data.reason!,
       });
     }
-    return tx.user.update({
+    const updated = await tx.user.update({
       where: { id },
       data: {
         ...(data.email && { email: data.email }),
@@ -277,6 +279,9 @@ export const updateUser = async (req: Request, res: Response) => {
         }),
       },
     });
+    // A deactivated account's web sessions go (A.1, D3): they already stop working, an inactive user being refused.
+    if (data.isActive === false) await revokeUserWebSessions(id, undefined, tx);
+    return updated;
   });
 
   res.json({
@@ -340,10 +345,15 @@ export const resetPassword = async (req: Request, res: Response) => {
   // Hash new password
   const hashedPassword = await hashPassword(newPassword);
 
-  // Update password
-  await prisma.user.update({
-    where: { id },
-    data: { password: hashedPassword },
+  // Update password; a reset means a forgotten or compromised password, so every web session of the user ends and
+  // every connected application is revoked (A.1, D3).
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+    await revokeUserWebSessions(id, undefined, tx);
+    await revokeUserGrants(id, tx);
   });
 
   res.json({ message: 'Password reset successfully' });

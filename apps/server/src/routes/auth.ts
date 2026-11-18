@@ -108,10 +108,16 @@ const limitRefreshes: RequestHandler = async (req: Request, res: Response, next:
 router.post('/auth/register', countFailedAttempts({ perAccount: false }), authController.register);
 router.post('/auth/login', countFailedAttempts({ perAccount: true }), authController.login);
 router.post('/auth/refresh', limitRefreshes, authController.refresh);
+// Sign-out needs no live session: it ends whatever this browser's cookie names, and clears it (A.1).
+router.post('/auth/logout', authController.logout);
 
 // Protected routes. GET /auth/me, the session check, is mounted in app.ts before the general limiter, with its
 // own (G-484).
 router.put('/auth/dev-mode', authenticate, authController.setDevMode);
+// The web's sessions (A.1, D5): the list, one ended, all ended.
+router.get('/auth/sessions', authenticate, authController.listSessions);
+router.delete('/auth/sessions/:id', authenticate, authController.deleteSession);
+router.post('/auth/logout-all', authenticate, authController.logoutAll);
 router.put('/auth/change-password', authenticate, authController.changePassword);
 router.get('/auth/export', authenticate, authController.exportAccountData);
 router.delete('/auth/account', authenticate, authController.deleteAccount);
