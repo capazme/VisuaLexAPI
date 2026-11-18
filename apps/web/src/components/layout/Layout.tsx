@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useContext, useMemo, lazy, Suspense, Component, type ReactNode } from 'react';
-import { UNSAFE_LocationContext, useLocation, useNavigate, useOutlet, type Location } from 'react-router-dom';
+import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
+import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
+import { AtLocation } from './AtLocation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
@@ -88,18 +89,6 @@ function CompareWaiting() {
       <span className="size-6 rounded-full border-2 border-primary-600 border-t-transparent animate-spin dark:border-primary-400 dark:border-t-transparent" />
     </div>
   );
-}
-
-/**
- * The address a page was drawn at, kept for it (LC84): `PageSlide` keeps the leaving page's element, whose route is its
- * own (`useOutlet`), but whatever in it reads `useLocation` (a title from the address, Opus's) would read the new one
- * and draw the coming page twice. The router has no public way to give a subtree its own location (`<Routes location>`
- * starts a new tree of routes), hence its context.
- */
-function AtLocation({ location, children }: { location: Location; children: ReactNode }) {
-  const context = useContext(UNSAFE_LocationContext);
-  const value = useMemo(() => ({ ...context, location }), [context, location]);
-  return <UNSAFE_LocationContext.Provider value={value}>{children}</UNSAFE_LocationContext.Provider>;
 }
 
 export function Layout() {

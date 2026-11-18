@@ -43,7 +43,8 @@ export function focusLanding(left: boolean): () => void {
     const active = document.activeElement;
     // Something took the focus by itself (a reader that focuses itself): it keeps it.
     if (active && active !== document.body && active !== main && active !== given) return stop();
-    const titles = [...document.querySelectorAll<HTMLElement>(PAGE_TITLE)];
+    // Never the title of a page or view that is leaving (`PageSlide`'s `inert` layer, LC98).
+    const titles = [...document.querySelectorAll<HTMLElement>(PAGE_TITLE)].filter((el) => !el.closest('[inert]'));
     const title = titles.find((el) => !before.has(el)) ?? (left || given ? null : titles[0]);
     if (title && title !== given) {
       focusTitle(title);

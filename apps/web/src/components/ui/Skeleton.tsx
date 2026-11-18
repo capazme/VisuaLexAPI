@@ -8,9 +8,14 @@ export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
   height?: string | number;
 }
 
+/**
+ * A place held at the size of what is coming (LC98): the flat Pietra ground of the app's placeholders, pulsing only
+ * with motion allowed, unread by a screen reader (the page says «loading» once, in words). What arrives comes in
+ * through `Arrive`.
+ */
 export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
   ({ variant = 'rectangular', width, height, className, style, ...props }, ref) => {
-    const baseStyles = 'animate-shimmer bg-shimmer bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800';
+    const baseStyles = 'bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800';
 
     const variantStyles = {
       text: 'h-4 rounded',
@@ -26,6 +31,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
     return (
       <div
         ref={ref}
+        aria-hidden
         className={cn(baseStyles, variantStyles[variant], className)}
         style={{ ...dimensions, ...style }}
         {...props}
