@@ -402,7 +402,17 @@ POST unless noted, JSON bodies.
 - `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
   Reads the OJ page the tree already uses; a consolidated text has no
-  preamble and answers an empty list. Normattiva acts get a 400
+  preamble and answers an empty list. Normattiva acts get a 400. The text
+  is a data contract like `article_text` (root rule 23, spec
+  `2026-11-17-eu-recitals-design.md` §7): a paragraph's text nodes join with
+  no space of ours, a footnote call (modern markup) goes with the whitespace
+  before it, ASCII whitespace runs become one space, the no-break space stays;
+  a legacy paragraph without «(N)» joins the recital before it with `\n` once
+  the next recital arrives. `tests/test_recitals_text_frozen.py` holds each
+  recital's projection (SHA-256 and length); it binds from the web's PR 4a of
+  that plan. EU article text read from the Official Journal's markup has its
+  own guard, `tests/test_eurlex_article_text_frozen.py`, binding now (the
+  consolidated markup has none yet)
 - `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
   AKN text plus, for the codici, the FRBRWork date of each article (the day
   its current text came into force). `urn` is the act's full URL as
