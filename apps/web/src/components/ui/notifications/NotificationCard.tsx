@@ -246,7 +246,8 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
             >
               Annulla
               {/* Seen, not part of the name («Annulla»): `aria-keyshortcuts` says the key. */}
-              {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">· {shortcut.label}</span>}
+              {/* Not on a phone's width, where no keyboard is likely (Papiniano on #585). */}
+              {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 max-md:hidden dark:text-slate-400">· {shortcut.label}</span>}
             </button>
           )}
           {entry.action && (

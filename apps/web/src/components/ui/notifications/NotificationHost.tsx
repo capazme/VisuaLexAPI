@@ -111,7 +111,7 @@ function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'b
       observer?.disconnect();
       stackRoomStore.setState({ room: 0 });
     };
-  }, [position, shown]);
+  }, [position, shown, footRoom]);
   if (!shown) return null;
   return (
     <div

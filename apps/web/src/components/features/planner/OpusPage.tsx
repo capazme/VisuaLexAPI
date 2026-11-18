@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { scrollParentOf } from '../practice/practiceView';
 import { CalendarDays, CalendarCheck, Inbox, ListFilter, Trash2 } from 'lucide-react';
@@ -9,6 +9,7 @@ import { MenuButton } from '../../ui/MenuButton';
 import { QUIET_BUTTON } from '../studia/progress/tokens';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { plannerStore } from './plannerStore';
+import { setFootBarRoom } from '../../ui/notifications/footBar';
 
 /** The planner's three views, tabs of the page since Work's bar lists only its five entries (D-315, LC8): the short
  *  word on a phone, where they are the bar at the foot, the full name from `md`, one name each (LC83). */
@@ -58,6 +59,26 @@ export function OpusPage() {
   const inTrash = pathname.startsWith('/work/cestino');
   const inboxCount = plannerStore((s) => s.inboxCount);
   const tabs = useRef<HTMLDivElement>(null);
+  const tabsShown = inView || inTrash;
+  // On a phone the views' bar is held at the screen's foot: its room there (its height and the safe area under it,
+  // `footBarStore`), so the notifications rise over it and the page keeps both free (LC85, Papiniano on #585). From md
+  // the bar is in the header: no room.
+  useLayoutEffect(() => {
+    const bar = tabs.current;
+    if (!tabsShown || !bar) return;
+    const measure = () => setFootBarRoom(getComputedStyle(bar).position === 'fixed'
+      ? Math.max(0, Math.round(document.documentElement.clientHeight - bar.getBoundingClientRect().top))
+      : 0);
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(bar);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      setFootBarRoom(0);
+    };
+  }, [tabsShown]);
   /** Scrolled past the header, a change of view puts the scroller back where it sticks; above it, nothing moves. */
   const keepPlace = () => {
     // The frame's top, where the header sits before it sticks: the header itself reads where it is stuck.
