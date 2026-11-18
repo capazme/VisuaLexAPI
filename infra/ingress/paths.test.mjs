@@ -158,3 +158,9 @@ test('introspection is not reachable through the ingress: only the MCP calls it,
   assert.match(block, /@introspect path \/oauth\/introspect \/oauth\/introspect\/\*/, 'the exact path and anything under it');
   assert.match(block, /respond @introspect 404/);
 });
+
+test('MERL-T\'s callbacks to the server are not reachable through the ingress: MERL-T calls them from inside', () => {
+  const block = handleBlock('/api/*');
+  assert.match(block, /@merltInternal path \/api\/merlt\/internal \/api\/merlt\/internal\/\*/, 'the exact path and anything under it');
+  assert.match(block, /respond @merltInternal 404/);
+});

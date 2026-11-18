@@ -21,9 +21,13 @@
 # Docker does not publish ports of a container that is on internal networks only.
 #
 # A compromised scraper (it renders third-party pages) can reach `app` but not the
-# databases. What it could still reach — the home network, and MERL-T's own API, whose
-# /admin and /ner routes have no gate of their own — is spelled out in the spec,
-# sections 4.2 (R1, R2) and 8 (H1).
+# databases. What it could still reach — the home network, and MERL-T's own API, which
+# needs its key on every route since the security line's A.2 — is spelled out in the
+# spec, sections 4.2 (R1, R2) and 8 (H1).
+#
+# MERL-T's port is not published in production (compose.yml publishes it on the loopback
+# for development): only the server calls it, by container name, so nothing on the host
+# should reach it there.
 #
 # The stores keep publishing on the loopback, as in compose.yml: the backup tool
 # (scripts/backup.sh) reaches them there.
@@ -92,6 +96,7 @@ services:
     <<: *hardening
     restart: unless-stopped
     networks: [app, data]
+    ports: !reset []
     environment:
       # No development default here: the same value, from the same place, as the server.
       MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:?MERLT_INTERNAL_SECRET is not set in infra/.env (./start.sh --prod creates it)}"

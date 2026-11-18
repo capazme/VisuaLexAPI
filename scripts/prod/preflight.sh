@@ -101,7 +101,7 @@ check_env() {
     fi
   done
   if [ "$(env_get "$infra" MERLT_ENABLED)" != false ] && [ -z "$(env_get "$infra" MERLT_API_KEY)" ]; then
-    warn "MERLT_API_KEY is empty in infra/.env: MERL-T's admin routes will answer 401"
+    warn "MERLT_API_KEY is empty in infra/.env: every MERL-T route will answer 401"
   fi
 
   jwt="$(env_get "$server" JWT_SECRET)"
