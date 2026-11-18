@@ -193,7 +193,7 @@ class DefinitionLookupTool(BaseTool):
             ToolResult con lista di definizioni trovate
         """
         log.debug(
-            f"definition_lookup - term='{term}', "
+            f"definition_lookup - term_chars={len(term)}, "
             f"types={source_types}, exact={exact_match}"
         )
 
@@ -267,7 +267,7 @@ class DefinitionLookupTool(BaseTool):
 
             log.info(
                 f"definition_lookup completed - "
-                f"term='{term}', found={len(unique_defs)}"
+                f"term_chars={len(term)}, found={len(unique_defs)}"
             )
 
             return ToolResult.ok(

@@ -34,7 +34,11 @@ load_dotenv(env_file)
 log = structlog.get_logger()
 log.info("Environment variables loaded", env_file=str(env_file))
 
+from merlt.api.access_log import install as install_access_log_filter
 from merlt.storage.enrichment import init_db, close_db, create_tables
+
+# The access log keeps method, path and status, never a query string (a person's search).
+install_access_log_filter()
 from merlt.api.auth import verify_api_key
 from merlt.api import (
     feedback_router,

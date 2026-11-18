@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { spring } from '../../../lib/motion';
-import { SegmentedControl } from '../SegmentedControl';
-import { SegmentedTabPanel, SegmentedTabs } from '../SegmentedTabs';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { dur, ease, spring } from '../../../lib/motion';
+import { SegmentedTabLinks, SegmentedTabPanel, SegmentedTabs } from '../SegmentedTabs';
 import { markTransition, panelEntrance } from '../segmentedTabsMotion';
 
 type View = 'uno' | 'due' | 'tre';
@@ -78,10 +78,10 @@ describe('the motion of SegmentedTabs', () => {
 
   it('brings the content in from the side the choice moved to, in CSS, not on the first drawing', () => {
     expect(panelEntrance(0, false)).toBe('');
-    // To a tab further right the content moves right: it starts on the left. 12 px (spacing 3), 160 ms.
-    expect(panelEntrance(1, true)).toBe('animate-in fade-in slide-in-from-left-3 duration-160');
-    expect(panelEntrance(-1, true)).toBe('animate-in fade-in slide-in-from-right-3 duration-160');
-    expect(panelEntrance(0, true)).toBe('animate-in fade-in duration-160');
+    // To a tab further right the content moves right: it starts on the left. 12 px (spacing 3).
+    expect(panelEntrance(1, true)).toBe('animate-in fade-in slide-in-from-left-3');
+    expect(panelEntrance(-1, true)).toBe('animate-in fade-in slide-in-from-right-3');
+    expect(panelEntrance(0, true)).toBe('animate-in fade-in');
   });
 
   it('plays the entrance on the view drawn after a change, and on the first one not at all', () => {
@@ -93,6 +93,16 @@ describe('the motion of SegmentedTabs', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'UNO' }));
     expect(screen.getByRole('tabpanel').firstElementChild).toHaveClass('slide-in-from-right-3');
   });
+
+  // LC105: the entrance's time and curve come from lib/motion.ts, none typed by hand.
+  it('times the entrance on dur.pop and the app\'s ease-out, and only after a change', () => {
+    render(<Harness />);
+    expect((screen.getByRole('tabpanel').firstElementChild as HTMLElement).style.animationDuration).toBe('');
+    fireEvent.click(screen.getByRole('tab', { name: 'DUE' }));
+    const view = screen.getByRole('tabpanel').firstElementChild as HTMLElement;
+    expect(view.style.animationDuration).toBe(`${dur.pop * 1000}ms`);
+    expect(view.style.animationTimingFunction).toBe(`cubic-bezier(${ease.out.join(', ')})`);
+  });
   // LC19: in the dark the chosen option of a group is the light ink with dark text, as every other group's; the grey
   // mark on the grey track hardly stood out.
   it('marks the chosen tab in the light ink in the dark, with dark text', () => {
@@ -103,10 +113,70 @@ describe('the motion of SegmentedTabs', () => {
     expect(screen.getByRole('tab', { name: 'DUE' })).not.toHaveClass('dark:text-ink-950');
   });
 
-  it('SegmentedControl marks its chosen option the same way', () => {
-    render(<SegmentedControl options={[{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]} value="a" onChange={() => {}} />);
-    const chosen = screen.getByRole('tab', { name: 'A' });
-    expect(chosen).toHaveClass('dark:text-ink-950');
-    expect(chosen.firstElementChild).toHaveClass('dark:bg-toga-400');
+});
+
+describe('SegmentedTabs as a choice, with no panel', () => {
+  function Choice() {
+    const [kind, setKind] = useState<View>('uno');
+    return <SegmentedTabs tabs={TABS} value={kind} onChange={setKind} label="Tipo di scheda" />;
+  }
+
+  it('is a radio group, not tabs: no tab promises a panel that is not there', () => {
+    render(<Choice />);
+    expect(screen.getByRole('radiogroup', { name: 'Tipo di scheda' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab')).toBeNull();
+    const radios = screen.getAllByRole('radio');
+    expect(radios.map((radio) => radio.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+    for (const radio of radios) expect(radio).not.toHaveAttribute('aria-controls');
+    expect(radios.map((radio) => radio.tabIndex)).toEqual([0, -1, -1]);
+  });
+
+  it('moves the choice and the focus with the arrows and a press', () => {
+    render(<Choice />);
+    const [uno, due, tre] = screen.getAllByRole('radio');
+    uno.focus();
+    fireEvent.keyDown(uno, { key: 'ArrowRight' });
+    expect(due).toHaveAttribute('aria-checked', 'true');
+    expect(due).toHaveFocus();
+    fireEvent.keyDown(due, { key: 'End' });
+    expect(tre).toHaveFocus();
+    fireEvent.click(uno);
+    expect(uno).toHaveAttribute('aria-checked', 'true');
+    expect(uno.querySelector('[data-segmented-mark]')).not.toBeNull();
+  });
+});
+
+describe('SegmentedTabLinks', () => {
+  const LINKS = [{ to: '/viste/oggi', label: 'Oggi' }, { to: '/viste/prossimi', label: 'Prossimi' }];
+  function App() {
+    return (
+      <MemoryRouter initialEntries={['/viste/oggi']}>
+        <SegmentedTabLinks links={LINKS} label="Viste di Work" />
+        <Routes>
+          <Route path="/viste/oggi" element={<p>vista oggi</p>} />
+          <Route path="/viste/prossimi" element={<p>vista prossimi</p>} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it('is a navigation of links, the current one marked by aria-current and the mark', () => {
+    render(<App />);
+    const nav = screen.getByRole('navigation', { name: 'Viste di Work' });
+    expect(nav.querySelector('[role="tab"]')).toBeNull();
+    const oggi = screen.getByRole('link', { name: 'Oggi' });
+    expect(oggi).toHaveAttribute('aria-current', 'page');
+    expect(oggi.querySelector('[data-segmented-mark]')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Prossimi' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('goes to the view pressed, the mark following it', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('link', { name: 'Prossimi' }));
+    expect(screen.getByText('vista prossimi')).toBeInTheDocument();
+    const prossimi = screen.getByRole('link', { name: 'Prossimi' });
+    expect(prossimi).toHaveAttribute('aria-current', 'page');
+    expect(document.querySelectorAll('[data-segmented-mark]')).toHaveLength(1);
+    expect(prossimi.querySelector('[data-segmented-mark]')).not.toBeNull();
   });
 });

@@ -22,6 +22,7 @@ Esempio:
     [('literal', 0.8), ('systemic', 0.6), ('precedent', 0.4)]
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import structlog
 import re
 import json
@@ -223,7 +224,7 @@ Rispondi con: {{"type": "<tipo>", "confidence": <0.0-1.0>}}"""
         self,
         config_path: Optional[Path] = None,
         ai_service: Any = None,
-        classification_model: str = "google/gemini-2.5-flash",
+        classification_model: str = DEFAULT_FAST_MODEL,
         disable_regex: bool = False,
     ):
         """
@@ -232,7 +233,7 @@ Rispondi con: {{"type": "<tipo>", "confidence": <0.0-1.0>}}"""
         Args:
             config_path: Path opzionale a config YAML
             ai_service: Servizio AI per LLM-based classification (opzionale, fallback a regex)
-            classification_model: Modello per classificazione (default: gemini-2.0-flash)
+            classification_model: Modello per classificazione (default: DEFAULT_FAST_MODEL, merlt/config/llm_models.py)
             disable_regex: Se True, non usa regex classification; se LLM fallisce usa "general"
         """
         self.config_path = config_path
@@ -360,7 +361,9 @@ Rispondi con: {{"type": "<tipo>", "confidence": <0.0-1.0>}}"""
                 prompt=prompt,
                 model=classification_model,
                 temperature=0.0,
-                max_tokens=200,
+                # The answer is about twenty tokens; 512 leaves room for a model that reasons
+                # first (G-575), since a cut answer here fails silently into keyword scoring.
+                max_tokens=512,
                 response_format={"type": "json_object"},  # structured output: the classifier emits {type, confidence}
             )
 

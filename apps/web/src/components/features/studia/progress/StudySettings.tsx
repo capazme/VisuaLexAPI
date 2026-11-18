@@ -1,6 +1,6 @@
 import type { Ref } from 'react';
 import { Settings2 } from 'lucide-react';
-import { Collapsible } from '../../../ui/Collapsible';
+import { Expand } from '../../../ui/Expand';
 import { cn } from '../../../../lib/utils';
 import { StudyPreferences } from '../StudyPreferences';
 import { FOCUS_RING } from './tokens';
@@ -49,25 +49,19 @@ export interface StudySettingsPanelProps {
 
 /**
  * The study settings in place, inside «I tuoi progressi» under its heading (the owner, 21 October 2026: «si estende il
- * tab»): `ui/Collapsible`, the app's one way to open a panel in place (U1a) — no window and no veil, the card grows
- * downward, Esc inside closes it. Mounted closed with the band, so the settings are read before the gear is pressed
- * and the height grows once, to its full size (read on opening, they arrived halfway and the card jumped).
+ * tab»): `ui/Expand`, the app's one way to open a panel in place (LC105) — no window and no veil, the card grows
+ * downward, Esc inside closes it. Kept mounted closed (`keepMounted`) with the band, so the settings are read before
+ * the gear is pressed and the height grows once, to its full size (read on opening, they arrived halfway and the card
+ * jumped).
  */
 export function StudySettingsPanel({ id, open, onClose, onChanged, communityRequest = 0, aside = false }: StudySettingsPanelProps) {
   return (
-    <Collapsible
-      id={id}
-      open={open}
-      onClose={onClose}
-      role="region"
-      aria-label="Impostazioni dello studio"
-      tabIndex={-1}
-      className="focus:outline-none"
-      // 20 px above the line, the card's gap when the panel was a row of its grid; room under the last control in the
-      // strip too, whose own padding is small.
-      contentClassName="mt-5 border-t border-slate-200 pb-2 pt-4 dark:border-slate-800"
-    >
-      <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
-    </Collapsible>
+    <Expand id={id} open={open} onClose={onClose} keepMounted role="region" aria-label="Impostazioni dello studio" tabIndex={-1} className="focus:outline-none">
+      {/* 20 px above the line, the card's gap when the panel was a row of its grid; room under the last control in the
+          strip too, whose own padding is small. */}
+      <div className="mt-5 border-t border-slate-200 pb-2 pt-4 dark:border-slate-800">
+        <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
+      </div>
+    </Expand>
   );
 }

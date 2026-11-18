@@ -1093,7 +1093,7 @@ async def query_experts(
 
     log.info(
         "Expert query received",
-        query=request.query[:50],
+        query_chars=len(request.query),
         user_id=request.user_id,
         max_experts=request.max_experts
     )
@@ -1127,7 +1127,7 @@ async def query_experts(
         )
 
     except Exception as e:
-        log.error("Expert query failed", error=str(e), query=request.query[:50])
+        log.error("Expert query failed", error=str(e), query_chars=len(request.query))
         raise HTTPException(status_code=500, detail=f"Expert query failed: {str(e)}")
 
 
@@ -1305,7 +1305,7 @@ async def run_query_progressive(
         log.error(
             "Expert query (async) failed",
             error=str(e),
-            query=request.query[:50],
+            query_chars=len(request.query),
             bff_job_id=bff_job_id,
             trace_id=trace_id,
         )
@@ -1346,7 +1346,7 @@ async def query_experts_async(
 
     log.info(
         "Expert query (async) accepted",
-        query=request.query[:50],
+        query_chars=len(request.query),
         user_id=request.user_id,
         max_experts=request.max_experts,
         bff_job_id=request.bff_job_id,
@@ -2023,7 +2023,7 @@ async def submit_refine_feedback(
         "Refine feedback received",
         trace_id=request.trace_id,
         user_id=request.user_id,
-        follow_up=request.follow_up_query[:50]
+        follow_up_chars=len(request.follow_up_query)
     )
 
     try:

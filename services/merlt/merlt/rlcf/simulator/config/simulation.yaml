@@ -3,7 +3,7 @@
 # Configurazione per l'esperimento EXP-021: Validazione RLCF Loop
 #
 # Variabili d'ambiente supportate:
-#   - RLCF_JUDGE_MODEL: Modello LLM per valutazione (default: gemini-2.5-flash)
+#   - RLCF_JUDGE_MODEL: Modello LLM per valutazione (default: gemini-3.5-flash-lite)
 #   - OPENROUTER_API_KEY: API key per OpenRouter
 #
 # Uso: python scripts/run_rlcf_simulation.py --config simulation.yaml
@@ -51,7 +51,7 @@ authority_model:
 evaluation:
   llm_judge:
     # Modello configurabile via env var
-    model: "${RLCF_JUDGE_MODEL:-google/gemini-2.5-flash}"
+    model: "${RLCF_JUDGE_MODEL:-google/gemini-3.5-flash-lite}"
     temperature: 0.1       # Bassa per consistenza
     enabled: true
     provider: "openrouter"
@@ -103,7 +103,6 @@ hypotheses:
 # Modelli disponibili per LLM Judge (via OpenRouter)
 # Imposta RLCF_JUDGE_MODEL per cambiare
 # Opzioni comuni:
-#   - google/gemini-2.5-flash (default, economico)
-#   - google/gemini-2.5-pro (più accurato)
-#   - anthropic/claude-3.5-sonnet (alternativa)
-#   - openai/gpt-4o-mini (alternativa economica)
+#   - google/gemini-3.5-flash-lite (default, economico)
+#   - anthropic/claude-sonnet-4.5 (più accurato)
+#   Solo modelli con un fornitore a conservazione zero: merlt/config/llm_models.py (G-575).

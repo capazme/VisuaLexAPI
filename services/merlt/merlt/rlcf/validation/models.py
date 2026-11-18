@@ -8,6 +8,7 @@ Progettato per integrazione API con frontend React/Vite.
 Tutti i modelli hanno metodi `to_dict()` e `to_json()` per serializzazione JSON.
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -320,7 +321,7 @@ class ValidationConfig:
 
     # Impostazioni LLM (per check ambigui)
     use_llm_for_ambiguous: bool = False
-    llm_model: str = "google/gemini-2.5-flash"
+    llm_model: str = DEFAULT_FAST_MODEL
 
     # Limiti
     max_issues_per_check: int = 100
@@ -360,7 +361,7 @@ class ValidationConfig:
             semantic_similarity_threshold=data.get("semantic_similarity_threshold", 0.85),
             enabled_checks=data.get("enabled_checks"),
             use_llm_for_ambiguous=data.get("use_llm_for_ambiguous", False),
-            llm_model=data.get("llm_model", "google/gemini-2.5-flash"),
+            llm_model=data.get("llm_model", DEFAULT_FAST_MODEL),
             max_issues_per_check=data.get("max_issues_per_check", 100),
             max_nodes_to_scan=data.get("max_nodes_to_scan", 10000),
             expand_pages=data.get("expand_pages", 0),

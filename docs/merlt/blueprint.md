@@ -393,7 +393,8 @@ quindi un cambio ha effetto dalla query successiva:
 
 - **Modello LLM** (editabile a caldo): `expert_model` (analisi+sintesi, default
   `anthropic/claude-sonnet-4.5`), `react_decision_model` (scelta tool nel ReAct, default
-  `google/gemini-2.5-flash`).
+  `google/gemini-3.5-flash-lite`). Solo modelli con un fornitore a conservazione zero, elencati in
+  `services/merlt/merlt/config/llm_models.py` (G-575): ogni chiamata rifiuta gli altri.
 - **Manopole**: `gating_confidence_threshold` (0.7), `llm_max_tokens` (4096), `max_experts` (4),
   `disagreement_model_enabled` (false), `tool_gating_ab_ratio` (0.0).
 - **Stato di costruzione** (richiede `POST /admin/engine/reinitialize`): `react_enabled`,

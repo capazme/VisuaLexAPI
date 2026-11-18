@@ -14,7 +14,7 @@ Esempio:
 
     # Registra chiamata LLM
     metrics.record_llm_call(
-        model="google/gemini-2.5-flash",
+        model="google/gemini-3.5-flash-lite",
         tokens_in=1234,
         tokens_out=567,
         cost=0.0023,

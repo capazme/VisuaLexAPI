@@ -204,6 +204,24 @@ BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
   with no zero-retention endpoint is refused by OpenRouter, so a model chosen for
   MERL-T must have one. Do not add a client that calls a model another way: the
   unused multi-provider package `experts/llm/` was removed for that reason.
+  Every model MERL-T picks by itself (defaults, fallbacks, the admin's choices) is
+  on `ZERO_RETENTION_MODELS` in `merlt/config/llm_models.py` (G-575), with the two
+  defaults `DEFAULT_FAST_MODEL` and `DEFAULT_EXPERT_MODEL`;
+  `tests/unit/test_default_models_zero_retention.py` fails on any other model id
+  (OpenRouter's `provider/model` form, for the providers it lists) written in a
+  Python or YAML file of `merlt/` or `scripts/`. When an id loses its zero-retention endpoint,
+  remove it there and pick another.
+
+**Logs carry lengths, never text.** A question, a search someone typed, a proposed
+entity, the search strings an expert builds, the model's «thought» and answer, and a
+provider's raw error stay out of the logs; log `query_chars=len(query)` and the like.
+`tests/unit/test_logs_carry_no_user_text.py` reads every log call in `merlt/` and
+fails when one carries a name of its `TEXT` list other than as `len(...)`: a new name
+for a person's text must be added there. Its `ALLOWED` names the few expressions kept
+on purpose, each with its reason. A provider error is logged as its status,
+OpenRouter's code and its short message (`ai_service._provider_error`), never the
+error's metadata. uvicorn's access log drops query strings (`api/access_log.py`,
+installed in `app.py`): a search sent as `?q=` stays out of the logs.
 
 Never call the user id «anonymous», «opaque» or «pseudonymous», and never log
 it next to a payload. The research export (`export_router`) pseudonymises with a

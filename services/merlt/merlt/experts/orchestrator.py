@@ -777,7 +777,7 @@ class MultiExpertOrchestrator:
         if max_experts is not None:
             effective_max_experts = max(1, min(int(max_experts), base_cap))
 
-        log.info(f"Processing query", query=query[:50], trace_id=trace_id)
+        log.info(f"Processing query", query_chars=len(query), trace_id=trace_id)
 
         # Step 1: Analizza query per estrarre entità (NER stage)
         ner_t0 = time.perf_counter()

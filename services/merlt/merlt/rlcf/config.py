@@ -1,3 +1,4 @@
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import yaml
 from pydantic import BaseModel, Field
 from typing import Dict, Literal, List, Any, Union
@@ -34,7 +35,7 @@ class ModelConfig(BaseModel):
     track_record: Dict[str, float]
     thresholds: Dict[str, float]
     baseline_credentials: BaselineCredentialsConfig
-    ai_model: AIModelConfigSettings = Field(default_factory=lambda: AIModelConfigSettings(name="openai/gpt-3.5-turbo"))
+    ai_model: AIModelConfigSettings = Field(default_factory=lambda: AIModelConfigSettings(name=DEFAULT_FAST_MODEL))
 
 
 class TaskSchemaDefinition(BaseModel):
