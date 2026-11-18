@@ -1,9 +1,8 @@
 import { useId, useState, type ChangeEvent } from 'react';
 import { Expand } from '../../ui/Expand';
 import { taskService } from '../../../services/taskService';
-import { cn } from '../../../lib/utils';
-import { INK_BUTTON, QUIET_BUTTON } from '../studia/progress/tokens';
-import { FIELD_HINT, FIELD_LABEL } from './plannerStyles';
+import { Button } from '../../ui/Button';
+import { FIELD_HELP, FIELD_LABEL } from '../../ui/controlStyles';
 import { failureMessage, plannerStore } from './plannerStore';
 import { NotTodoistCsvError, planTodoistImport, runTodoistImport, type ImportNote, type ImportPlan } from './todoistCsv';
 
@@ -135,7 +134,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
       <div className="space-y-3 p-3">
         <div className="space-y-1">
           <label htmlFor={inputId} className={FIELD_LABEL}>Importa da Todoist (CSV)</label>
-          <p className={FIELD_HINT}>
+          <p className={FIELD_HELP}>
             Il file resta nel browser: arrivano solo i compiti, come se li scrivessi tu. Assegnatario, promemoria, durata e autore non si importano.
           </p>
           <input
@@ -166,7 +165,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
             <NoteList heading="Date non capite: restano nella descrizione" notes={plan.unreadDates} />
             <NoteList heading="Ripetizioni che diventano compiti non ricorrenti" notes={plan.nonRecurring} />
             {plan.trimmed > 0 && (
-              <p className={FIELD_HINT}>{plural(plan.trimmed, 'compito ha', 'compiti hanno')} un titolo o una descrizione troppo lunghi: vengono accorciati.</p>
+              <p className={FIELD_HELP}>{plural(plan.trimmed, 'compito ha', 'compiti hanno')} un titolo o una descrizione troppo lunghi: vengono accorciati.</p>
             )}
 
             {progress?.importedAt && !outcome && (
@@ -192,20 +191,20 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
 
             <div className="flex flex-wrap items-center gap-2">
               {left > 0 && (
-                <button type="button" onClick={() => void start()} disabled={running} className={INK_BUTTON}>
+                <Button type="button" onClick={() => void start()} disabled={running}>
                   {outcome?.kind === 'failed' ? `Riprova: ${plural(left, 'compito', 'compiti')} da importare` : `Importa ${plural(left, 'compito', 'compiti')}`}
-                </button>
+                </Button>
               )}
-              <button type="button" onClick={onClose} disabled={running} className={cn(QUIET_BUTTON, 'mx-0')}>
+              <Button type="button" variant="link" onClick={onClose} disabled={running}>
                 Chiudi
-              </button>
+              </Button>
             </div>
           </div>
         )}
         {!plan && (
-          <button type="button" onClick={onClose} className={cn(QUIET_BUTTON, 'mx-0')}>
+          <Button type="button" variant="link" onClick={onClose}>
             Chiudi
-          </button>
+          </Button>
         )}
       </div>
     </Expand>

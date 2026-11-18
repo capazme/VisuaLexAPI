@@ -5,7 +5,9 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { addDaysToIsoDate, todayInRome } from '../../../utils/dateUtils';
 import type { Task, TaskView } from '../../../types/tasks';
-import { FOCUS_RING, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { FOCUS_RING } from '../studia/progress/tokens';
+import { Button } from '../../ui/Button';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { dossierRecency } from '../dossier/dossierUtils';
 import { kindLabel } from '../dossier/dossierKinds';
 import { QuickAddField } from './QuickAddField';
@@ -128,29 +130,18 @@ function TodayEmpty() {
   );
 }
 
-/** «Raggruppa» of «Scadenziario», in the page over its rows (L-73, LC91): two buttons, the one in use pressed. */
+/** «Raggruppa» of «Scadenziario», in the page over its rows (L-73, LC91): a choice of two, at the fields' height (LC110). */
 function GroupingToggle() {
   const grouping = plannerStore((s) => s.grouping);
   return (
-    <div role="group" aria-label="Raggruppa" className="flex w-fit gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-      {(['date', 'dossier'] as const).map((choice) => (
-        <button
-          key={choice}
-          type="button"
-          aria-pressed={grouping === choice}
-          onClick={() => plannerStore.getState().setGrouping(choice)}
-          className={cn(
-            'min-h-[44px] rounded-md px-4 text-sm font-medium transition-colors',
-            FOCUS_RING,
-            grouping === choice
-              ? 'bg-card text-slate-900 shadow-sm dark:bg-toga-400 dark:text-ink-950'
-              : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
-          )}
-        >
-          {choice === 'date' ? 'Per data' : 'Per pratica'}
-        </button>
-      ))}
-    </div>
+    <SegmentedTabs
+      size="sm"
+      label="Raggruppa"
+      className="w-fit"
+      tabs={[{ id: 'date', label: 'Per data' }, { id: 'dossier', label: 'Per pratica' }]}
+      value={grouping}
+      onChange={(choice) => plannerStore.getState().setGrouping(choice)}
+    />
   );
 }
 
@@ -305,10 +296,9 @@ export function TaskTrashView() {
                   {task.parentId ? 'Sottocompito · ' : ''}Eliminato{task.deletedAt ? ` il ${deletedOn.format(new Date(task.deletedAt))}` : ''}
                 </p>
               </div>
-              <button type="button" onClick={() => void restoreTask(task, optimistic)} className={cn(SECONDARY_BUTTON, 'inline-flex items-center gap-2')}>
-                <RotateCcw size={16} aria-hidden />
+              <Button type="button" variant="secondary" icon={<RotateCcw size={16} aria-hidden />} onClick={() => void restoreTask(task, optimistic)}>
                 Ripristina<span className="sr-only">: {task.title}</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

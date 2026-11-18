@@ -1,5 +1,5 @@
 import { cn } from '../../../lib/utils';
-import { SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { Button } from '../../ui/Button';
 import { Illustration, type IllustrationName } from '../../ui/Illustration';
 import { Skeleton } from '../../ui/Skeleton';
 
@@ -27,7 +27,7 @@ export function TaskViewError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
       <p className="text-sm text-slate-700 dark:text-slate-300">Non riesco a leggere i compiti.</p>
-      <button type="button" onClick={onRetry} className={SECONDARY_BUTTON}>Riprova</button>
+      <Button variant="secondary" onClick={onRetry}>Riprova</Button>
     </div>
   );
 }

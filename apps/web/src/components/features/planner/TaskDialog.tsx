@@ -3,7 +3,7 @@ import { Modal } from '../../ui/Modal';
 import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
 import type { Task } from '../../../types/tasks';
-import { INK_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { Button } from '../../ui/Button';
 import { draftProblem, emptyDraft, inputFromDraft, type TaskDraft } from './taskDraft';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
@@ -60,10 +60,10 @@ export function TaskDialog({ defaults, onClose, onCreated }: Props) {
       initialFocusRef={titleRef}
       footer={
         <div className="flex w-full justify-end gap-2">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>Annulla</button>
-          <button type="submit" form={formId} disabled={busy} className={INK_BUTTON}>
+          <Button type="button" variant="secondary" onClick={onClose}>Annulla</Button>
+          <Button type="submit" form={formId} disabled={busy}>
             {busy ? 'Salvo…' : 'Aggiungi'}
-          </button>
+          </Button>
         </div>
       }
     >

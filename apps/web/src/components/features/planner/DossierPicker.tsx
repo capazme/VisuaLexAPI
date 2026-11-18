@@ -3,8 +3,9 @@ import { Check, ChevronDown, Folder, Inbox } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { FOCUS_RING } from '../studia/progress/tokens';
-import { FIELD } from './plannerStyles';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { FIELD_TRIGGER } from './plannerStyles';
 
 const INBOX = "Lista d'ingresso";
 
@@ -89,26 +90,24 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
         if (open && !wrapperRef.current?.contains(e.relatedTarget as Node | null)) close(false);
       }}
     >
-      <button
+      <Button
         ref={triggerRef}
+        variant="quiet"
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-labelledby={`${labelId} ${id}-current`}
         // The list opens on the dossier chosen now (with no words typed, `options` lists them all).
         onClick={() => (open ? close(false) : (setActive(Math.max(0, options.findIndex((o) => o.id === value))), setOpen(true)))}
-        className={cn(
-          'flex min-h-[44px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-sm text-slate-900 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800',
-          FOCUS_RING,
-        )}
+        className={cn(FIELD_TRIGGER, 'min-w-0')}
       >
         {value ? <Folder size={15} aria-hidden className="shrink-0 text-slate-500" /> : <Inbox size={15} aria-hidden className="shrink-0 text-slate-500" />}
         <span id={`${id}-current`} className="min-w-0 flex-1 truncate">{current}</span>
         <ChevronDown size={15} aria-hidden className="shrink-0 text-slate-500" />
-      </button>
+      </Button>
       {open && (
         <div className={cn('absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800', Z_INDEX.dropdown)}>
-          <input
+          <Input
             autoFocus
             role="combobox"
             aria-label="Cerca una pratica"
@@ -124,7 +123,6 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
             }}
             onKeyDown={onKey}
             autoComplete="off"
-            className={FIELD}
           />
           <ul id={`${id}-list`} role="listbox" aria-label="Pratiche" className="mt-1 max-h-64 overflow-y-auto">
             {options.map((option, index) => (

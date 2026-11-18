@@ -3,6 +3,7 @@ import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { OpusPage } from './OpusPage';
 import { plannerStore } from './plannerStore';
+import { CONTROL_HEIGHT } from '../../ui/controlStyles';
 
 function renderAt(path: string) {
   render(
@@ -49,7 +50,7 @@ describe('Work\'s page', () => {
     renderAt('/work/prossimi');
     for (const link of screen.getByRole('navigation', { name: 'Viste di Work' }).querySelectorAll('a')) {
       expect(link).not.toHaveAttribute('aria-label');
-      const names = [...link.querySelectorAll('span')].filter((span) => !span.children.length && !span.classList.contains('sr-only'));
+      const names = [...link.querySelectorAll('span')].filter((span) => !span.children.length && !span.classList.contains('sr-only') && !span.hasAttribute('data-segmented-mark'));
       expect(names.map((span) => span.className)).toEqual(['md:hidden', 'hidden md:inline']);
     }
   });
@@ -79,5 +80,19 @@ describe('Work\'s page', () => {
     renderAt(path);
     expect(screen.queryByRole('navigation', { name: 'Viste di Work' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Cestino dei compiti' })).toBeNull();
+  });
+
+  // LC110: the common sizes — the tabs as `SegmentedTabs size="sm"` (44 px on a phone, 36 from md, 4 px corners), the
+  // trash `Button`'s height, and on a phone the bar at the foot with an icon over each word.
+  it('draws the tabs and the trash at the common sizes, the tabs a bar at the foot on a phone', () => {
+    renderAt('/work/prossimi');
+    const views = screen.getByRole('navigation', { name: 'Viste di Work' });
+    expect(views).toHaveClass('p-0.5', 'rounded-md', 'max-md:bg-transparent');
+    for (const link of views.querySelectorAll('a')) {
+      expect(link).toHaveClass('min-h-10', 'md:min-h-8', 'rounded-md', 'max-md:min-h-11', 'max-md:flex-1');
+      expect(link.querySelector('svg')!.parentElement).toHaveClass('md:hidden');
+    }
+    expect(views.closest('.max-md\\:fixed')).toHaveClass('max-md:bottom-0');
+    expect(screen.getByRole('link', { name: 'Cestino dei compiti' })).toHaveClass(...CONTROL_HEIGHT.md.split(' '), 'rounded-md');
   });
 });

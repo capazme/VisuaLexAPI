@@ -6,13 +6,14 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
 import type { TaskView } from '../../../types/tasks';
-import { FOCUS_RING, INK_BUTTON } from '../studia/progress/tokens';
+import { FOCUS_RING } from '../studia/progress/tokens';
+import { Button } from '../../ui/Button';
+import { FIELD_HELP } from '../../ui/controlStyles';
 import { belongsTo, draftProblem, emptyDraft, inputFromDraft, MAX_TITLE, type TaskDraft } from './taskDraft';
 import { PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
 import { draftWithLine, readQuickAddLine, suggestDossiers, type DossierName, type FoundPart } from './quickAddLine';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
-import { FIELD_HINT, ICON_BUTTON } from './plannerStyles';
 
 interface Props {
   /** The view it sits on: a task that will not show there is announced. */
@@ -200,23 +201,24 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           />
         </div>
         <div className="ml-auto flex items-center gap-1">
-          <button
+          <Button
             type="button"
+            variant="quiet"
             aria-expanded={open}
             aria-controls={`${id}-details`}
             onClick={() => setOpen((v) => !v)}
-            // In a row at every width: the planner's icon button is a grid, which stacked the icon over the arrow.
-            className={cn(ICON_BUTTON, 'inline-flex gap-1.5 px-2 sm:px-3', open && 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50')}
+            // A square on a phone, where the word is for a screen reader only.
+            className={cn('gap-1.5 px-2 max-sm:min-w-11 sm:px-3', open && 'bg-ink-100 text-ink-900 dark:bg-ink-800 dark:text-ink-50')}
           >
             <SlidersHorizontal size={16} aria-hidden />
             <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Dettagli</span>
             {/* Turns as the panel opens, with its height: the button's state at every width. */}
-            <ChevronDown size={14} aria-hidden className={cn('shrink-0 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
-          </button>
-          <button type="submit" disabled={busy || !task.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 max-sm:w-11 max-sm:px-0 sm:px-4')}>
+            <ChevronDown size={14} aria-hidden className={cn('shrink-0 transition-transform duration-(--dur-pop) motion-reduce:transition-none', open && 'rotate-180')} />
+          </Button>
+          <Button type="submit" disabled={busy || !task.title.trim()} className="shrink-0 px-3 max-sm:w-11 max-sm:px-0 sm:px-4">
             <Plus size={18} aria-hidden className="sm:hidden" />
             {busy ? <span className="max-sm:sr-only">Aggiungo…</span> : <><span className="max-sm:sr-only">Aggiungi</span><span className="sr-only"> il compito</span></>}
-          </button>
+          </Button>
         </div>
       </div>
       {/* What the line says, in the flow under the field: a chip clicked turns its words back into text. */}
@@ -224,6 +226,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
         <ul aria-label="Letto nella riga" className="flex flex-wrap gap-x-1 px-2.5">
           {line.parts.map((part) => (
             <li key={part.key}>
+              {/* bare-button: a chip of what the line read, its 44 px of hit area round the pill. */}
               <button
                 type="button"
                 onClick={() => dismiss(part)}
@@ -262,14 +265,14 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
             ))}
           </ul>
         ) : (
-          <p className={cn(FIELD_HINT, 'px-4 pb-1')}>
+          <p className={cn(FIELD_HELP, 'px-4 pb-1')}>
             {line.dossierQuery!.query.trim() ? `Nessuna pratica «${line.dossierQuery!.query.trim()}»: resta nel titolo.` : 'Nessuna pratica.'}
           </p>
         )
       )}
       {/* Only once there is a task to sum up (LC83). Always mounted, empty when idle, and polite: what the line read is
           said aloud as it changes, since the chips come in silently. */}
-      <p id={`${id}-summary`} aria-live="polite" className={cn(FIELD_HINT, 'px-4 pb-2 empty:p-0')}>
+      <p id={`${id}-summary`} aria-live="polite" className={cn(FIELD_HELP, 'px-4 pb-2 empty:p-0')}>
         {draft.title.trim() ? summary(task, today, dossierTitle) : ''}
         {line.lockedHash && ' · In una pratica il compito resta qui: «#» resta nel titolo.'}
       </p>
