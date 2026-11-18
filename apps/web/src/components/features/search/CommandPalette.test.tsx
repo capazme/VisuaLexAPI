@@ -159,7 +159,7 @@ describe('CommandPalette — G-577: regional laws, dated names, ambiguous names'
       await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), `${words}{Enter}`);
       await settle();
 
-      expect(screen.getAllByText(REFUSAL).length).toBeGreaterThan(0);
+      expect(screen.getByText(REFUSAL, { selector: 'p:not([role="status"])' })).toBeInTheDocument();
       expect(onSearch).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalledWith('/parse_query', expect.anything());
       expect(screen.queryByText(/nelle sentenze della Cassazione/)).not.toBeInTheDocument();
@@ -172,7 +172,7 @@ describe('CommandPalette — G-577: regional laws, dated names, ambiguous names'
     await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), 'art 1 statuto regionale');
     await settle();
 
-    await waitFor(() => expect(screen.getAllByText(REFUSAL).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByText(REFUSAL, { selector: 'p:not([role="status"])' })).toBeInTheDocument());
   });
 
   it('shows the notice of a dated name in the flow, under the reading', async () => {
@@ -186,6 +186,20 @@ describe('CommandPalette — G-577: regional laws, dated names, ambiguous names'
     await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     const line = screen.getByText(NOTICE, { selector: 'p:not([role="status"])' });
     expect(line.closest('[role="dialog"], [aria-modal="true"]')).toBeNull();
+  });
+
+  it('does not open a reading with a notice on an Enter typed before the answer: the line is read, a second Enter opens', async () => {
+    const NOTICE = 'Dal 1° gennaio 2027 si applica il testo unico delle imposte sui redditi (d.lgs. 19 giugno 2026, n. 117, allegato 1).';
+    answering({ recognized: true, parsed: { act_type: 'decreto del presidente della repubblica', act_number: '917', date: '1986-12-22', article: '10' }, notice: NOTICE });
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), 'art. 10 tuir{Enter}');
+    await settle();
+
+    await waitFor(() => expect(screen.getByText(NOTICE, { selector: 'p:not([role="status"])' })).toBeInTheDocument());
+    expect(onSearch).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_number: '917', article: '10' }));
   });
 
   it('offers the two acts of «art. 1 tua», and each opens as it is', async () => {

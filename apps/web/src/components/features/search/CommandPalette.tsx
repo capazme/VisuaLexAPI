@@ -502,6 +502,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const runWhenAnswered = useEffectEvent(() => {
     setWaitingFor(null);
     if (decisionRef) handleOpenDecision();
+    // A reading with a notice is not run unseen: the wait ends on the line, a second Enter opens it (G-577).
+    else if (parsedCitation && notice) return;
     else if (parsedCitation) handleCitationSearch();
     else if (topic) handleSearchTopic();
   });

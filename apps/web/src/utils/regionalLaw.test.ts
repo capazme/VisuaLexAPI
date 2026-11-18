@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseLegalCitation } from './citationParser';
 import { readNormQuery } from './normQuery';
-import { citesRegionalLaw, REGIONAL_LAW_REFUSAL } from './regionalLaw';
+import { citesRegionalLaw, regionalLawSpans, REGIONAL_LAW_REFUSAL } from './regionalLaw';
 
 const REGIONAL = [
   'l.r. Toscana 65/2014',
@@ -87,6 +87,17 @@ describe('regional laws (G-577)', () => {
     const reading = readNormQuery(`art. 3 ${name}`);
     expect(reading.refusal).toBeUndefined();
     expect(reading.citation).toMatchObject({ act_type: 'legge', article: '3' });
+  });
+
+  it('reads a long query in linear time (the patterns run on every query and on whole documents)', () => {
+    const long = [' '.repeat(100_000), `l${' '.repeat(100_000)}x`, `legge 1/2000${' '.repeat(100_000)}x`,
+      `l. 10 novembre 2014,${' ,'.repeat(50_000)}`, 'legge regione'.repeat(10_000), 'l '.repeat(50_000), 'legge 65/2014 della '.repeat(5_000)];
+    for (const text of long) {
+      const started = performance.now();
+      citesRegionalLaw(text);
+      regionalLawSpans(text);
+      expect(performance.now() - started).toBeLessThan(500);
+    }
   });
 
   it.each(LOOK_ALIKE)('«%s» only looks like one', (name) => {
