@@ -25,7 +25,10 @@ const ART_2043 = {
 };
 const ccArticle = (n: string) => ({ ...ART_2043, numero_articolo: n, urn: `${CC_ACT}:2~art${n.replace('-', '')}` });
 
-const PARSED: Record<string, { parsed: Record<string, string> | null; recognized: boolean; display?: string; refusal?: string }> = {
+const PARSED: Record<string, {
+  parsed: Record<string, string> | null; recognized: boolean; display?: string; refusal?: string;
+  ambiguous?: Array<{ name: string; display: string; parsed: Record<string, string> }>;
+}> = {
   'art. 2043 c.c.': { parsed: { act_type: 'codice civile', article: '2043' }, recognized: true, display: 'Art. 2043 — codice civile' },
   'art 2059 cc': { parsed: { act_type: 'codice civile', article: '2059' }, recognized: true, display: 'Art. 2059 — codice civile' },
   'art. 2645-bis c.c.': { parsed: { act_type: 'codice civile', article: '2645-bis' }, recognized: true },
@@ -57,6 +60,16 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   // What /parse_query reads since the recitals' PR 1b (spec 2026-11-17 §3.2).
   'considerando 26 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', recital: '26' }, recognized: true },
   'art. 4 e considerando 26 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', recital: '26' }, recognized: true, refusal: 'recital_with_article' },
+  // What /parse_query reads since G-577: a regional law refused, a name of two acts listed.
+  'art. 3 l.r. Toscana 65/2014': { parsed: null, recognized: false, refusal: 'regional_law' },
+  'art. 29 tua': {
+    parsed: null, recognized: false, ambiguous: [
+      { name: "codice dell'ambiente", display: 'd.lgs. 3 aprile 2006, n. 152',
+        parsed: { act_type: 'decreto legislativo', act_number: '152', date: '2006-04-03', article: '29' } },
+      { name: 'testo unico accise', display: 'd.lgs. 26 ottobre 1995, n. 504',
+        parsed: { act_type: 'decreto legislativo', act_number: '504', date: '1995-10-26', article: '29' } },
+    ],
+  },
 };
 
 // D.lgs. 104/2010: the codice del processo amministrativo is its annex, which Normattiva
@@ -371,6 +384,17 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(response.body.results.map((r: { outcome: string; detail: string }) => [r.outcome, r.detail])).toEqual([
       ['not_recognised', 'Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.'],
       ['not_recognised', 'Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.'],
+    ]);
+    expect(calls['/fetch_norma_data'] ?? 0).toBe(0);
+    expect(await prisma.dossierItem.count()).toBe(0);
+  });
+
+  it('adds no regional law and no name of two acts, and says why (G-577)', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 3 l.r. Toscana 65/2014', 'art. 29 tua']);
+    expect(response.body.results.map((r: { outcome: string; detail: string }) => [r.outcome, r.detail])).toEqual([
+      ['not_recognised', 'Le leggi regionali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla banca dati della Regione.'],
+      ['ambiguous', "Il nome indica più atti: codice dell'ambiente (d.lgs. 3 aprile 2006, n. 152) o testo unico accise "
+        + '(d.lgs. 26 ottobre 1995, n. 504). Indica l’atto per numero e data.'],
     ]);
     expect(calls['/fetch_norma_data'] ?? 0).toBe(0);
     expect(await prisma.dossierItem.count()).toBe(0);
