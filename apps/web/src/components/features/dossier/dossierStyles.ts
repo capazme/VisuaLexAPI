@@ -3,9 +3,10 @@ import { cn } from '../../../lib/utils';
 import { buttonClassName } from '../../ui/buttonStyles';
 
 /**
- * A dossier's page in the planner's shape (S7c): the planner's targets and measures — every control 44 px at every
- * width — and its rows of two levels (the task's title, a grey line, the signs at the right), in the «Inchiostro»
- * tokens, light and dark. The page, its act blocks, its notes and its decisions draw from here.
+ * A dossier's page in the planner's shape (S7c): its rows of two levels (the task's title, a grey line, the signs at
+ * the right), in the «Inchiostro» tokens, light and dark. The header's buttons have `Button`'s heights (LC106: 44 px on
+ * a phone, 36 from md); a row's icons stay 44 px at every width. The page, its act blocks, its notes and its decisions
+ * draw from here.
  */
 
 /**

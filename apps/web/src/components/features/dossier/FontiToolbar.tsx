@@ -3,10 +3,10 @@ import { CheckSquare, FolderInput, FolderMinus, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Expand } from '../../ui/Expand';
 import { RowMovePicker } from '../practice/RowDossierPanels';
-import { FIELD } from '../planner/plannerStyles';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
 
 interface Props {
   dossierId: string;
@@ -56,9 +56,9 @@ export function FontiToolbar({
     <div className="mb-4 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1">
-          <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-          <input
+          <Input
             ref={inputRef}
+            icon={<Search size={16} aria-hidden />}
             type="text"
             value={query}
             onChange={(e) => onQuery(e.target.value)}
@@ -73,10 +73,11 @@ export function FontiToolbar({
             placeholder="Filtra le fonti… ( / )"
             aria-label="Filtra le fonti della pratica"
             aria-keyshortcuts="/"
-            className={cn(FIELD, 'pl-9 pr-11')}
+            // Room on the right for «Svuota il filtro».
+            className="pr-11"
           />
           {query && (
-            <IconButton size="lg" onClick={() => { onQuery(''); inputRef.current?.focus(); }} aria-label="Svuota il filtro" className="absolute right-0 top-1/2 -translate-y-1/2 [&>svg]:h-4 [&>svg]:w-4" icon={<X aria-hidden />} />
+            <IconButton onClick={() => { onQuery(''); inputRef.current?.focus(); }} aria-label="Svuota il filtro" className="absolute right-0 top-1/2 -translate-y-1/2" icon={<X aria-hidden />} />
           )}
         </div>
         <Button

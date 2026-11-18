@@ -4,6 +4,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
+import { Textarea } from '../../ui/Textarea';
 
 interface Props {
   onClose: () => void;
@@ -75,8 +76,8 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota all
         </div>
 
         <div className="p-6 space-y-2">
-          <label htmlFor="dossier-note-text" className="sr-only">Testo della nota</label>
-          <textarea
+          <Textarea
+            aria-label="Testo della nota"
             id="dossier-note-text"
             ref={textareaRef}
             value={text}
@@ -84,7 +85,7 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota all
             onKeyDown={handleKeyDown}
             rows={6}
             placeholder="Scrivi un appunto, una riflessione o un promemoria da allegare alla pratica…"
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 resize-y min-h-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            className="min-h-32"
           />
           <div className="flex justify-between text-xs text-slate-400">
             <span>⌘/Ctrl + Invio per salvare</span>

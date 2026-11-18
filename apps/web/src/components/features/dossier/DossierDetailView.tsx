@@ -351,7 +351,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     }
   };
 
-  // The header's actions in one row (D3), each 44 px as the planner's controls (S7c). A label never wraps inside its
+  // The header's actions in one row (D3), with `Button`'s heights (LC106). A label never wraps inside its
   // button (D3b): when the window is narrow the row wraps, as a row. Only on the buttons: their menus wrap their items.
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
@@ -402,7 +402,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   );
 
   const emptyDossier = (
-    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
+    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[8px] border-2 border-dashed border-slate-200 dark:border-slate-700">
       <EmptyState
         variant="dossier"
         title="Pratica vuota"

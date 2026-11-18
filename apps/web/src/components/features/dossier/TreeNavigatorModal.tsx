@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Search, CheckSquare, Square, TreeDeciduous } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
+import { Input } from '../../ui/Input';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { resolveAct } from '../../../utils/actUrn';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
@@ -158,8 +159,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label htmlFor="tree-act-type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo atto</label>
-              <Select id="tree-act-type" value={actType} onChange={(e) => setActType(e.target.value)}>
+              <Select label="Tipo atto" value={actType} onChange={(e) => setActType(e.target.value)}>
                 {!ACT_TYPE_OPTIONS.some((o) => o.value === actType) && (
                   <option value={actType}>{actType}</option>
                 )}
@@ -169,23 +169,10 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Numero</label>
-              <input
-                value={actNumber}
-                onChange={(e) => setActNumber(e.target.value)}
-                placeholder="241"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              />
+              <Input label="Numero" value={actNumber} onChange={(e) => setActNumber(e.target.value)} placeholder="241" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
-              <input
-                type="text"
-                value={actDate}
-                onChange={(e) => setActDate(e.target.value)}
-                placeholder="aaaa o gg-mm-aaaa"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              />
+              <Input label="Data" type="text" value={actDate} onChange={(e) => setActDate(e.target.value)} placeholder="aaaa o gg-mm-aaaa" />
             </div>
           </div>
 

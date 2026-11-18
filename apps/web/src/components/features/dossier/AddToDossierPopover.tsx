@@ -20,6 +20,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
@@ -211,21 +212,19 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                     </h3>
                 </div>
                 {/* 44 px to the touch on a phone (LC61), as every control of the sheet. */}
-                <IconButton size="sm" onClick={onClose} title="Chiudi (Esc)" aria-label="Chiudi" icon={<X aria-hidden />} />
+                <IconButton onClick={onClose} title="Chiudi (Esc)" aria-label="Chiudi" icon={<X aria-hidden />} />
             </header>
 
             {dossiers.length > 5 && (
                 <div className="px-3 pt-2 shrink-0">
-                    <div className="relative">
-                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Cerca una pratica…"
-                            className="w-full min-h-[44px] md:min-h-0 pl-8 pr-2.5 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
-                        />
-                    </div>
+                    <Input
+                        type="text"
+                        icon={<Search size={14} aria-hidden />}
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Cerca una pratica…"
+                        aria-label="Cerca una pratica"
+                    />
                 </div>
             )}
 
@@ -282,17 +281,18 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                     </Button>
                 ) : (
                     <form aria-label="Crea una pratica" onSubmit={handleCreate} className="flex gap-2">
-                        <input
-                            type="text"
-                            autoFocus
-                            value={newTitle}
-                            onChange={(e) => setNewTitle(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Escape') setCreating(false); }}
-                            placeholder="Nome della pratica…"
-                            aria-label="Nome della nuova pratica"
-                            className="flex-1 min-h-[44px] md:min-h-0 text-sm rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
-                        />
-                        <Button type="submit" size="sm" disabled={busy || !newTitle.trim()}>
+                        <div className="min-w-0 flex-1">
+                            <Input
+                                type="text"
+                                autoFocus
+                                value={newTitle}
+                                onChange={(e) => setNewTitle(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Escape') setCreating(false); }}
+                                placeholder="Nome della pratica…"
+                                aria-label="Nome della nuova pratica"
+                            />
+                        </div>
+                        <Button type="submit" disabled={busy || !newTitle.trim()}>
                             Crea e aggiungi
                         </Button>
                     </form>
