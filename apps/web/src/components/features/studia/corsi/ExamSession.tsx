@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { Button } from '../../../ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -9,8 +10,7 @@ import type { Chiave, DomandaEsame, DomandaModulo, ProvaEsame } from '../../../.
 import { WireConfirm } from '../../../ui/wireConfirm/WireConfirm';
 import { LessonBar } from '../GradeBar';
 import { LessonLoading } from '../LessonFrame';
-import { LESSON_PRIMARY } from '../lessonStyles';
-import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, MUTED_TEXT, SUCCESS_TEXT, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, SUCCESS_TEXT, TILE } from '../progress/tokens';
 import { CoursesGate } from './CoursesGate';
 import { coursePath, fromDay, onDay } from './corsiLabels';
 import { useCoursesSwitch } from './coursesSwitch';
@@ -171,16 +171,17 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
       </div>
     );
     bar = (
-      <button
+      <Button
         type="button"
+        size="lg"
         onClick={() => {
           setStarted(null);
           setReads((n) => n + 1);
         }}
-        className={LESSON_PRIMARY}
+        className="w-full gap-3"
       >
         Riprova
-      </button>
+      </Button>
     );
   } else if (phase === 'inizio') {
     middle = (
@@ -197,9 +198,9 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
       </div>
     );
     bar = (
-      <button type="button" onClick={() => void start()} disabled={busy} aria-busy={busy || undefined} className={cn(LESSON_PRIMARY, 'disabled:opacity-70')}>
+      <Button type="button" size="lg" onClick={() => void start()} disabled={busy} aria-busy={busy || undefined} className="w-full gap-3">
         {busy ? 'Inizio la prova…' : started ? 'Riprendi la prova' : 'Inizia la prova'}
-      </button>
+      </Button>
     );
   } else if (phase === 'domande') {
     line = `Esame finale · ${answered} di ${graded.length} risposte`;
@@ -228,23 +229,24 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
       </div>
     );
     bar = (
-      <button
+      <Button
         type="button"
+        size="lg"
         disabled={busy}
         aria-busy={busy || undefined}
         // One attempt, no way back: the hand-in always asks first (LC12).
         onClick={(event) => setConfirm({ kind: 'consegna', origin: event.currentTarget })}
-        className={cn(LESSON_PRIMARY, 'disabled:opacity-70')}
+        className="w-full gap-3"
       >
         {busy ? 'Consegno…' : 'Consegna'}
-      </button>
+      </Button>
     );
   } else if (prova) {
     middle = <ExamResult id={id} esameId={esameId} prova={prova} parere={parere} headingRef={heading} />;
     bar = (
-      <button type="button" onClick={back} className={LESSON_PRIMARY}>
+      <Button type="button" size="lg" className="w-full gap-3" onClick={back}>
         Torna al percorso
-      </button>
+      </Button>
     );
   }
 
@@ -252,20 +254,11 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
     <section aria-label="Esame finale" className="flex h-full min-h-0 flex-1 flex-col">
       <header className="shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className={cn(COLUMN, 'flex items-center gap-3')}>
-          <button
-            type="button"
-            onClick={(event) => leave(event.currentTarget)}
-            aria-label="Chiudi la prova"
-            className={cn(
-              'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
-              FOCUS_RING,
-            )}
-          >
-            <X size={20} aria-hidden />
+          <Button type="button" variant="quiet" size="lg" onClick={(event) => leave(event.currentTarget)} aria-label="Chiudi la prova" icon={<X size={20} aria-hidden />} className="min-w-11 shrink-0 px-2 text-sm">
             <span aria-hidden className="hidden md:inline">
               Chiudi
             </span>
-          </button>
+          </Button>
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-200">{line}</p>
         </div>
       </header>
@@ -319,7 +312,7 @@ function OpinionField({ testo, value, onChange }: { testo: string; value: string
         onChange={(event) => onChange(event.target.value)}
         rows={8}
         className={cn(
-          'min-h-[44px] w-full resize-y rounded-xl border border-slate-300 bg-card p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+          'min-h-[44px] w-full resize-y rounded-md border border-slate-300 bg-card p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
           FIELD_TEXT,
           FOCUS_RING,
         )}
@@ -422,6 +415,7 @@ function OpinionReview({ id, esameId, opinion, parere, spuntate }: { id: string;
           <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-100">Che cosa c’era nel tuo parere</legend>
           {rubric.map((criterio, i) => (
             <label key={i} className="grid min-h-[44px] cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-3 text-base text-slate-900 dark:text-slate-100">
+              {/* bare-input: a checkbox, which has no common component; the row is its label. */}
               <input
                 type="checkbox"
                 checked={ticks.includes(i)}
@@ -432,9 +426,9 @@ function OpinionReview({ id, esameId, opinion, parere, spuntate }: { id: string;
             </label>
           ))}
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            <button type="button" onClick={() => void save()} disabled={state === 'busy'} aria-busy={state === 'busy' || undefined} className={INK_BUTTON}>
+            <Button type="button" size="lg" onClick={() => void save()} disabled={state === 'busy'} aria-busy={state === 'busy' || undefined}>
               Salva l’autovalutazione
-            </button>
+            </Button>
             <p role="status" className={cn('text-sm font-medium', state === 'failed' ? 'text-red-700 dark:text-red-400' : SUCCESS_TEXT)}>
               {state === 'saved' ? 'Autovalutazione salvata.' : state === 'failed' ? 'Non registrata: riprova.' : ''}
             </p>

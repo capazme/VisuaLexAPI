@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../../../ui/Button';
 import { HIDDEN_SCROLLBAR } from '../../../../constants/interactions';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi } from '../../../../types/studia';
@@ -6,7 +7,7 @@ import { MATERIA_LABEL } from '../studiaLabels';
 import { InstituteStops } from './InstituteStops';
 import { formatCount, totalCards } from './layout';
 import { dueBySubject, orderStops, stopStates } from './today';
-import { BLOCK_HEADING, FOCUS_RING, INK_BORDER, INK_TEXT, MUTED_TEXT, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
+import { BLOCK_HEADING, FOCUS_RING, INK_BORDER, INK_TEXT, MUTED_TEXT, TILE, subjectHue } from './tokens';
 import type { PercorsoState } from './usePercorso';
 
 /** The stagger of the rows' entrance (Gymnasium spec §7): once per mount, nothing after. */
@@ -28,7 +29,7 @@ export interface SubjectListProps {
 
 /** A row's choice: 44 px, an ink edge as well as a tint when pressed, so it is not told by colour alone. */
 const CHOICE = cn(
-  'flex min-h-[44px] w-full min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-sm transition-colors',
+  'flex min-h-[44px] w-full min-w-0 items-center gap-2.5 rounded-md border px-3 py-2 text-left text-sm transition-colors',
   FOCUS_RING,
 );
 const PRESSED = cn('border bg-ink-300/60 font-semibold text-slate-900 dark:bg-primary-900/30 dark:text-white', INK_BORDER);
@@ -73,7 +74,7 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
           <div aria-hidden>
             <div className={LIST}>
               {Array.from({ length: 6 }, (_, index) => (
-                <div key={index} className={cn(ITEM, 'h-[92px] rounded-xl bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800/60')} />
+                <div key={index} className={cn(ITEM, 'h-[92px] rounded-md bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800/60')} />
               ))}
             </div>
           </div>
@@ -95,6 +96,7 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
       <div role="group" aria-label="Materia">
         <ul className={LIST}>
           <li className={cn(ITEM, 'w-auto')}>
+            {/* bare-button: a row of the list that is a whole choice, its counts inside it. */}
             <button type="button" aria-pressed={selected === undefined} onClick={() => onSelect(undefined)} className={cn(CHOICE, 'h-full whitespace-nowrap', selected === undefined ? PRESSED : IDLE)}>
               Tutte le materie
             </button>
@@ -115,6 +117,7 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                 className={cn(ITEM, 'grid gap-1.5 max-md:content-start md:flex md:items-center md:gap-2')}
                 style={{ animationDelay: `${(index + 1) * STAGGER_MS}ms` }}
               >
+                {/* bare-button: a subject's row, a whole choice with its counts and its bar. */}
                 <button type="button" aria-pressed={on} onClick={() => onSelect(stop.materia)} className={cn(CHOICE, on ? PRESSED : IDLE, 'flex-wrap md:min-w-0 md:flex-1 md:flex-nowrap')}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(stop.materia) }} />
                   {/* Never cut (G8b): on a phone the name has the card's width — the counts go to a line of their own —
@@ -141,14 +144,9 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                   )}
                 </button>
                 {total > 0 && (
-                  <button
-                    type="button"
-                    aria-label={`Ripassa ${label}`}
-                    onClick={() => navigate(`/learn/ripasso/sessione?materia=${stop.materia}`)}
-                    className={cn(SECONDARY_BUTTON, 'shrink-0 px-3')}
-                  >
+                  <Button type="button" variant="secondary" aria-label={`Ripassa ${label}`} onClick={() => navigate(`/learn/ripasso/sessione?materia=${stop.materia}`)} className="shrink-0 px-3">
                     Ripassa
-                  </button>
+                  </Button>
                 )}
               </li>
             );

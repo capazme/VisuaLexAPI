@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { Button } from '../../../ui/Button';
 import { Navigate } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import { loadAssistantFeatures } from '../../../../store/assistantProposals';
-import { MUTED_TEXT, SECONDARY_BUTTON } from '../progress/tokens';
+import { MUTED_TEXT } from '../progress/tokens';
 import { useCoursesSwitch } from './coursesSwitch';
 
 /**
@@ -31,9 +32,9 @@ export function CoursesGate({ children }: { children: ReactNode }) {
     return (
       <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
         <p className="min-w-0 flex-1 basis-60">Non è stato possibile sapere se i percorsi sono disponibili: forse sei offline.</p>
-        <button type="button" onClick={() => setReads((n) => n + 1)} className={SECONDARY_BUTTON}>
+        <Button type="button" variant="secondary" size="lg" onClick={() => setReads((n) => n + 1)}>
           Riprova
-        </button>
+        </Button>
       </div>
     );
   }

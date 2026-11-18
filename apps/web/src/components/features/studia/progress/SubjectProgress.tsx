@@ -14,6 +14,9 @@ export interface SubjectProgressProps {
   onSelect: (materia: Materia | undefined) => void;
 }
 
+/** A subject's card at its least, and its placeholder's height (LC112): the block keeps its height as the answer comes. */
+export const SUBJECT_CARD_HEIGHT = 'min-h-36';
+
 const reviews = (n: number) => (n === 0 ? 'Nessun ripasso negli ultimi 30 giorni' : `${formatCount(n)} ${n === 1 ? 'ripasso' : 'ripassi'} negli ultimi 30 giorni`);
 
 /**
@@ -33,12 +36,14 @@ export function SubjectProgress({ materie, selected, onSelect }: SubjectProgress
         const on = selected === row.materia;
         return (
           <li key={row.materia}>
+            {/* bare-button: a subject's card, its counts and bar inside, pressed to narrow the page. */}
             <button
               type="button"
               aria-pressed={on}
               onClick={() => onSelect(on ? undefined : row.materia)}
               className={cn(
-                'grid h-full min-h-[44px] w-full content-start gap-2 rounded-xl text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                'grid h-full w-full content-start gap-2 rounded-[8px] text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                SUBJECT_CARD_HEIGHT,
                 FOCUS_RING,
                 // The chosen one's border is twice as thick and its padding a pixel less, so nothing moves.
                 on ? cn('border-2 bg-slate-50 p-[11px] dark:bg-slate-800/60', INK_BORDER) : 'border border-slate-200 p-3 dark:border-slate-800',

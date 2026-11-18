@@ -9,6 +9,7 @@ import { formatNormCitation, unversionedCitation, withCitation } from '../../../
 import { todayInRome } from '../../../utils/dateUtils';
 import { describeVersion } from '../../../utils/versionDisplay';
 import type { ArticleData, NormaVisitata } from '../../../types';
+import { Button } from '../../ui/Button';
 import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { VersionBanner } from '../search/VersionBanner';
@@ -88,13 +89,9 @@ export function ArticleReadOnly({ norma, showToast }: ArticleReadOnlyProps) {
     return (
       <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
         <span>{'message' in current ? current.message : ''}</span>
-        <button
-          type="button"
-          onClick={() => setRetryTick((tick) => tick + 1)}
-          className="min-h-[44px] rounded px-2 font-medium underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-        >
+        <Button type="button" variant="link" onClick={() => setRetryTick((tick) => tick + 1)}>
           Riprova
-        </button>
+        </Button>
       </div>
     );
   }

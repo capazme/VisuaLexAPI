@@ -1,9 +1,10 @@
 import { useId, useRef, useState } from 'react';
+import { Button } from '../../../ui/Button';
 import { Check, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { FIELD_TEXT } from '../../../../constants/interactions';
 import type { BloccoLezione, Chiave, DomandaModulo } from '../../../../types/corsi';
-import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, MUTED_TEXT, SUCCESS_TEXT, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, SUCCESS_TEXT, TILE } from '../progress/tokens';
 import { LessonText } from './LessonText';
 import type { Span } from './lessonFormat';
 
@@ -56,7 +57,7 @@ export function RecallStep({ blocco, where, fase, scritto, onScritto, spans, onS
             onChange={(event) => onScritto(event.target.value)}
             rows={10}
             className={cn(
-              'min-h-[44px] w-full max-w-measure resize-y rounded-xl border border-slate-300 bg-card p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+              'min-h-[44px] w-full max-w-measure resize-y rounded-md border border-slate-300 bg-card p-3 leading-relaxed text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
               FIELD_TEXT,
               FOCUS_RING,
             )}
@@ -168,7 +169,7 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer, chosen, onCh
             <label
               key={opzione.chiave}
               className={cn(
-                'grid min-h-[44px] cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 rounded-xl border p-3 text-base',
+                'grid min-h-[44px] cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 rounded-md border p-3 text-base',
                 answered ? 'cursor-default' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
                 right
                   ? 'border-green-700 bg-green-50 dark:border-green-500 dark:bg-green-950/30'
@@ -177,6 +178,7 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer, chosen, onCh
                     : 'border-slate-200 dark:border-slate-700',
               )}
             >
+              {/* bare-input: a radio of the question (`RecallQuestion`), its option card its label. */}
               <input
                 type="radio"
                 name={name}
@@ -211,9 +213,9 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer, chosen, onCh
       </p>
       {!answered && !onChoose && (
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => void send()} disabled={!scelta || sending} aria-busy={sending || undefined} className={INK_BUTTON}>
+          <Button type="button" size="lg" onClick={() => void send()} disabled={!scelta || sending} aria-busy={sending || undefined} className="justify-self-start">
             {failed !== null ? 'Riprova' : 'Rispondi'}
-          </button>
+          </Button>
           {failed !== null && (
             <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
               Non registrato: {failed}

@@ -3,7 +3,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { Voto } from '../../../types/studia';
 import { formatInterval } from './formatInterval';
-import { LESSON_PRIMARY } from './lessonStyles';
+import { Button } from '../../ui/Button';
 import { FOCUS_RING, MUTED_TEXT } from './progress/tokens';
 
 const GRADES: Array<{ rating: Voto; label: string }> = [
@@ -54,7 +54,7 @@ export interface GradeBarProps {
 }
 
 const GRADE =
-  'flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-2 text-center leading-tight transition-[background-color,border-color,scale] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none disabled:opacity-60';
+  'flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md border px-1 py-2 text-center leading-tight transition-[background-color,border-color,scale] duration-(--dur-press) ease-out active:scale-[0.97] motion-reduce:transition-none disabled:opacity-60';
 const NEUTRAL = 'border-slate-300 bg-card text-slate-900 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
 const WARNING = 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/30';
 
@@ -96,6 +96,7 @@ export function GradeBar({ revealed, anteprima, onReveal, onGrade, practice, dis
       {revealed ? (
         <div role="group" aria-label="Come è andata?" className="flex gap-2">
           {GRADES.map(({ rating, label }) => (
+            // bare-button: a grade, its interval over its word, four of them sharing the bar.
             <button
               key={rating}
               type="button"
@@ -116,10 +117,10 @@ export function GradeBar({ revealed, anteprima, onReveal, onGrade, practice, dis
           ))}
         </div>
       ) : (
-        <button type="button" onClick={onReveal} aria-keyshortcuts="Space" className={LESSON_PRIMARY}>
+        <Button type="button" size="lg" onClick={onReveal} aria-keyshortcuts="Space" className="w-full gap-3">
           Mostra risposta
           <kbd className="hidden rounded border border-current/40 px-1.5 text-xs font-normal opacity-80 md:inline">Spazio</kbd>
-        </button>
+        </Button>
       )}
     </LessonBar>
   );

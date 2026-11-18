@@ -1,10 +1,12 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { buttonClassName } from '../../../ui/buttonStyles';
+import { Button } from '../../../ui/Button';
 import { Link, useLocation } from 'react-router-dom';
 import { FolderOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { CopyableCode } from '../../../../features/connections/CopyableCode';
 import type { CompetenzaPagina, CorsoPagina, EsamePagina, Mancanze, ModuloPagina } from '../../../../types/corsi';
-import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { MasteryChip, ModuleStateChip } from './CourseChips';
 import { closingOpensExam, competenceNumbers, completeSentence, examPath, fromDay, missingLines, moduleOpenLabel, modulePath, newExamSentence, onDay, thePercent } from './corsiLabels';
 
@@ -53,14 +55,14 @@ export function EndProgrammeOffer({ deleted, missing, onEnd, busy }: {
   const count = missing.moduli.contati;
   const rest = count === 1 ? 'con l’unico modulo che c’è' : `con i ${count} moduli che ci sono`;
   return (
-    <div className="grid grid-cols-1 gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+    <div className="grid grid-cols-1 gap-2 rounded-[8px] border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
       <p className="max-w-measure break-words">
         Hai eliminato il modulo {deleted.ordine}, «{deleted.titolo}». Se non vuoi altri moduli, il programma può finire {rest}
         {closingOpensExam(missing) ? ', così l’esame potrà aprirsi.' : '.'}
       </p>
-      <button type="button" onClick={onEnd} disabled={busy} className={cn(SECONDARY_BUTTON, 'justify-self-start bg-card disabled:opacity-60 dark:bg-transparent')}>
+      <Button type="button" variant="secondary" size="lg" onClick={onEnd} disabled={busy} className="justify-self-start">
         Il programma finisce qui
-      </button>
+      </Button>
     </div>
   );
 }
@@ -144,30 +146,27 @@ export function ModulesSection({ corsoId, moduli, actions, headingRef, offer }: 
                   <Link
                     to={modulePath(corsoId, m.id)}
                     aria-label={`${moduleOpenLabel(m.stato)} il modulo ${m.ordine}, ${m.titolo}`}
-                    className={cn(SECONDARY_BUTTON, 'inline-flex items-center')}
+                    className={buttonClassName('secondary', 'lg')}
                   >
                     {moduleOpenLabel(m.stato)}
                   </Link>
                   {deletable(m) && (
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
+                      size="lg"
                       disabled={busy}
                       onClick={() => actions.onDelete(m)}
                       aria-label={`Elimina il modulo ${m.ordine}, ${m.titolo}`}
-                      className={cn(QUIET_BUTTON, 'mx-0 text-red-700 disabled:opacity-60 dark:text-red-300')}
+                      className="text-red-700 decoration-red-300 hover:text-red-800 dark:text-red-300 dark:decoration-red-700 dark:hover:text-red-200"
                     >
                       Elimina
-                    </button>
+                    </Button>
                   )}
                   {withdrawable(m) && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={(event) => actions.onWithdraw(m, event.currentTarget)}
-                      className={cn(SECONDARY_BUTTON, 'disabled:opacity-60')}
-                    >
+                    <Button type="button" variant="secondary" size="lg" disabled={busy} onClick={(event) => actions.onWithdraw(m, event.currentTarget)}>
                       Ritira questo modulo
-                    </button>
+                    </Button>
                   )}
                 </div>
               </li>
@@ -205,7 +204,7 @@ export function ExamSection({ corsoId, titolo, esame, inPreparazione }: { corsoI
       </h3>
       <ExamState titolo={titolo} esame={esame} inPreparazione={inPreparazione} />
       {link && (
-        <Link ref={linkRef} to={examPath(corsoId, esame.esameId!)} className={cn(INK_BUTTON, 'justify-self-start')}>
+        <Link ref={linkRef} to={examPath(corsoId, esame.esameId!)} className={cn(buttonClassName('primary', 'lg'), 'justify-self-start')}>
           {link}
         </Link>
       )}
@@ -263,7 +262,7 @@ export function DossierLink({ dossier }: { dossier: CorsoPagina['dossier'] }) {
   return (
     <Link
       to={`/pratiche?dossier=${encodeURIComponent(dossier.id)}`}
-      className={cn(SECONDARY_BUTTON, 'inline-flex max-w-full items-center gap-2 justify-self-start', FOCUS_RING)}
+      className={cn(buttonClassName('secondary', 'lg'), 'max-w-full justify-self-start')}
     >
       <FolderOpen aria-hidden size={16} className="shrink-0" />
       <span className="min-w-0 break-words">Pratica «{dossier.name}»</span>

@@ -59,7 +59,7 @@ export function GoalRing({ ripassi, obiettivo, raggiunto, giorno, compact = fals
       <span aria-hidden className="block h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <span
           data-testid="goal-arc"
-          className="block h-full rounded-full bg-ink-900 transition-[width] duration-700 ease-out motion-reduce:transition-none dark:bg-ink-100"
+          className="block h-full rounded-full bg-ink-900 transition-[width] duration-(--dur-scene) ease-out motion-reduce:transition-none dark:bg-ink-100"
           style={{ width: `${shown * 100}%` }}
         />
       </span>

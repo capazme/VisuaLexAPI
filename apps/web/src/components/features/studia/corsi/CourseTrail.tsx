@@ -35,7 +35,7 @@ function Node({ kind, icon }: { kind: NodeKind; icon?: ReactNode }) {
   );
 }
 
-const ROW = 'flex w-full items-center gap-4 rounded-xl py-2 pl-1 pr-2 text-left';
+const ROW = 'flex w-full items-center gap-4 rounded-md py-2 pl-1 pr-2 text-left';
 const LINK_ROW = cn(ROW, 'transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/60', FOCUS_RING);
 
 /** One node: a link when it leads somewhere, else a named group that says why not. */

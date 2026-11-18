@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '../../../ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -10,8 +11,7 @@ import { Toast } from '../../../ui/Toast';
 import { WireConfirm } from '../../../ui/wireConfirm/WireConfirm';
 import { LessonBar } from '../GradeBar';
 import { LessonLoading } from '../LessonFrame';
-import { LESSON_PRIMARY } from '../lessonStyles';
-import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { CitationPanel } from './CitationPanel';
 import { CoursesGate } from './CoursesGate';
 import { coursePath } from './corsiLabels';
@@ -296,10 +296,10 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     middle = (
       <div className={cn(COLUMN, 'px-4 py-6')}>
         <p className="sr-only">Carico il modulo…</p>
-        <div aria-hidden className="h-72 rounded-2xl border border-slate-200 bg-card motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
+        <div aria-hidden className="h-72 rounded-[8px] border border-slate-200 bg-card motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
       </div>
     );
-    bar = <div aria-hidden className="h-12 rounded-xl bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />;
+    bar = <div aria-hidden className="h-12 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />;
   } else if (read.status === 'error' || !modulo || !passo) {
     const notFound = read.status === 'error' && read.notFound;
     const offline = read.status === 'error' && read.offline;
@@ -311,13 +311,13 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       </div>
     );
     bar = notFound ? (
-      <button type="button" onClick={back} className={LESSON_PRIMARY}>
+      <Button type="button" size="lg" className="w-full gap-3" onClick={back}>
         Torna al percorso
-      </button>
+      </Button>
     ) : (
-      <button type="button" onClick={() => setReads((n) => n + 1)} className={LESSON_PRIMARY}>
+      <Button type="button" size="lg" className="w-full gap-3" onClick={() => setReads((n) => n + 1)}>
         Riprova
-      </button>
+      </Button>
     );
   } else if (preview) {
     middle = (
@@ -372,7 +372,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
         </div>
         {modulo.domandePrima.length > 0 && (
           <details className={cn(TILE, 'group p-4')}>
-            <summary className={cn('-m-2 flex min-h-[44px] cursor-pointer items-center rounded-lg px-2 text-sm font-semibold text-slate-800 dark:text-slate-100', FOCUS_RING)}>
+            <summary className={cn('-m-2 flex min-h-[44px] cursor-pointer items-center rounded-md px-2 text-sm font-semibold text-slate-800 dark:text-slate-100', FOCUS_RING)}>
               Le domande guida
             </summary>
             <PreQuestions domande={modulo.domandePrima} />
@@ -389,9 +389,9 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       </div>
     );
     bar = (
-      <button type="button" onClick={() => goTo(step + 1)} className={LESSON_PRIMARY}>
+      <Button type="button" size="lg" className="w-full gap-3" onClick={() => goTo(step + 1)}>
         Ho letto: al richiamo
-      </button>
+      </Button>
     );
   } else if (passo.tipo === 'richiamo' && blockOf) {
     const cites = citeIn(blockOf);
@@ -417,21 +417,21 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     const next = () => goTo(step + 1);
     if (mine.fase === 'scrivi') {
       bar = (
-        <button type="button" onClick={() => setWorkOf(blockOf, { fase: 'confronta' })} className={LESSON_PRIMARY}>
+        <Button type="button" size="lg" className="w-full gap-3" onClick={() => setWorkOf(blockOf, { fase: 'confronta' })}>
           Confronta con il testo
-        </button>
+        </Button>
       );
     } else if (mine.fase === 'confronta' && questions) {
       bar = (
-        <button type="button" onClick={() => setWorkOf(blockOf, { fase: 'domande' })} className={LESSON_PRIMARY}>
+        <Button type="button" size="lg" className="w-full gap-3" onClick={() => setWorkOf(blockOf, { fase: 'domande' })}>
           Alle domande
-        </button>
+        </Button>
       );
     } else {
       bar = (
-        <button type="button" onClick={next} className={LESSON_PRIMARY}>
+        <Button type="button" size="lg" className="w-full gap-3" onClick={next}>
           Avanti
-        </button>
+        </Button>
       );
     }
   } else {
@@ -448,9 +448,9 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       </div>
     );
     bar = (
-      <button type="button" onClick={leave} className={LESSON_PRIMARY}>
+      <Button type="button" size="lg" className="w-full gap-3" onClick={leave}>
         Torna al percorso
-      </button>
+      </Button>
     );
   }
 
@@ -463,21 +463,11 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       </p>
       <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className={cn(COLUMN, 'flex items-center gap-3')}>
-          <button
-            ref={setCloseButton}
-            type="button"
-            onClick={leave}
-            aria-label="Chiudi il modulo"
-            className={cn(
-              'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
-              FOCUS_RING,
-            )}
-          >
-            <X size={20} aria-hidden />
+          <Button ref={setCloseButton} type="button" variant="quiet" size="lg" onClick={leave} aria-label="Chiudi il modulo" icon={<X size={20} aria-hidden />} className="min-w-11 shrink-0 px-2 text-sm">
             <span aria-hidden className="hidden md:inline">
               Chiudi
             </span>
-          </button>
+          </Button>
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-200">
             {modulo && passo ? (preview ? `Anteprima · ${modulo.titolo}` : stepLine(step, steps)) : ''}
           </p>
@@ -608,13 +598,13 @@ function StartActions({
   const label = notStarted ? (opening === 'busy' ? 'Inizio il modulo…' : 'Inizia il modulo') : 'Comincia a leggere';
   return (
     <div className="grid w-full justify-items-center gap-1">
-      <button type="button" onClick={onStart} disabled={opening === 'busy'} aria-busy={opening === 'busy' || undefined} className={cn(LESSON_PRIMARY, 'disabled:opacity-70')}>
+      <Button type="button" size="lg" onClick={onStart} disabled={opening === 'busy'} aria-busy={opening === 'busy' || undefined} className="w-full gap-3">
         {label}
-      </button>
+      </Button>
       {notStarted && (
-        <button type="button" onClick={onPreview} className={cn(QUIET_BUTTON, 'mx-0 justify-self-center text-center')}>
+        <Button type="button" variant="link" size="lg" onClick={onPreview} className="justify-self-center">
           {previewLabel}
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -127,7 +127,8 @@ describe('StudyPreferences', () => {
       await withCommunity();
       expect(screen.getByText('Schede validate dalla comunità, per materia')).toBeInTheDocument();
       const switches = screen.getAllByRole('switch');
-      expect(switches.map((s) => s.textContent)).toEqual([
+      // The common `Switch` (LC112), named by the subject's words beside it.
+      expect(switches.map((s) => document.getElementById(s.getAttribute('aria-labelledby') ?? '')?.textContent)).toEqual([
         'Diritto civile', 'Diritto penale', 'Diritto amministrativo', 'Diritto processuale civile', 'Diritto processuale penale',
       ]);
       switches.forEach((s) => expect(s).toHaveAttribute('aria-checked', 'false'));

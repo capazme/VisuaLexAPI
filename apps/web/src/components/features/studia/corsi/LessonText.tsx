@@ -25,7 +25,7 @@ const MARK_STYLE: Record<HighlightColor, React.CSSProperties> = {
 const MARK = 'rounded-[2px]';
 
 /** The highlighter over the text: the bars' quiet look, 44 px at every width (`corsi.guard.test.ts`). */
-const TOOL = 'min-h-[44px] min-w-[44px] gap-1.5 rounded-lg px-2.5 text-slate-600 hover:bg-slate-100 md:min-w-[44px] dark:text-slate-300 dark:hover:bg-slate-800';
+const TOOL = 'min-h-[44px] min-w-[44px] gap-1.5 rounded-md px-2.5 text-slate-600 hover:bg-slate-100 md:min-w-[44px] dark:text-slate-300 dark:hover:bg-slate-800';
 
 interface LessonTextProps {
   text: string;
@@ -276,6 +276,7 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
           const label = citations?.get(item.marker);
           if (!onCite || label === undefined) return <Fragment key={k}>{inline(item.children, k)}</Fragment>;
           return (
+            // bare-button: a citation inside the lesson's text, words in a sentence.
             <button
               key={k}
               type="button"

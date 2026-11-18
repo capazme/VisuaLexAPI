@@ -1,12 +1,14 @@
 import { useId, useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { FIELD_TEXT } from '../../../constants/interactions';
 import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { Materia, StatoScheda, TipoScheda } from '../../../types/studia';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
+import { Switch } from '../../ui/Switch';
 import type { ActOption, FilterState } from './useMyCards';
-import { FOCUS_RING } from './progress/tokens';
 import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL } from './studiaLabels';
 
 export interface CardFiltersProps {
@@ -24,14 +26,6 @@ export interface CardFiltersProps {
   row?: boolean;
 }
 
-// 44 px at every width (Gymnasium spec §3): the row is short enough to afford it on a computer too.
-const CONTROL = cn(
-  'min-h-[44px] rounded-xl border border-slate-300 bg-card px-3 text-sm text-slate-900 transition-colors dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50',
-  FOCUS_RING,
-);
-/** A pressed toggle: an ink edge and a tint, and `aria-pressed`, so the state is not told by colour alone. */
-const PRESSED = 'border-primary-900 bg-primary-50 font-medium text-primary-900 dark:border-primary-300 dark:bg-primary-900/30 dark:text-primary-200';
-
 interface FilterSelectProps<T extends string> {
   label: string;
   all: string;
@@ -43,18 +37,26 @@ interface FilterSelectProps<T extends string> {
 
 function FilterSelect<T extends string>({ label, all, value, options, disabled, onChange }: FilterSelectProps<T>) {
   return (
-    <select
-      aria-label={label}
-      value={value ?? ''}
-      disabled={disabled}
-      onChange={(e) => onChange((e.target.value || undefined) as T | undefined)}
-      className={cn(CONTROL, FIELD_TEXT, 'min-w-0 disabled:opacity-60')}
-    >
-      <option value="">{all}</option>
-      {options.map(([optionValue, text]) => (
-        <option key={optionValue} value={optionValue}>{text}</option>
-      ))}
-    </select>
+    // The wrapper takes the row's share (`Select`'s field is as wide as its box).
+    <div className="min-w-0 flex-1 basis-40">
+      <Select aria-label={label} value={value ?? ''} disabled={disabled} onChange={(e) => onChange((e.target.value || undefined) as T | undefined)}>
+        <option value="">{all}</option>
+        {options.map(([optionValue, text]) => (
+          <option key={optionValue} value={optionValue}>{text}</option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
+/** A yes/no filter: the common `Switch` and its words, which name it unless `name` says more. */
+function FilterSwitch({ name, checked, onChange, row, children }: { name?: string; checked: boolean; onChange: (on: boolean) => void; row: boolean; children: string }) {
+  const wordsId = useId();
+  return (
+    <div className={cn('col-span-2 flex items-center gap-2 text-sm text-slate-800 dark:text-slate-100', row ? 'lg:col-span-1 lg:whitespace-nowrap' : 'md:col-span-1')}>
+      <Switch checked={checked} onCheckedChange={onChange} aria-label={name} aria-labelledby={name ? undefined : wordsId} />
+      <span id={wordsId} aria-hidden={name ? true : undefined}>{children}</span>
+    </div>
   );
 }
 
@@ -79,16 +81,16 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts, row
       // Opaque, bled over the layout's page padding (p-4 md:p-8) so cards scrolling under it do not show. On a phone it pins
       // under the bar at the top (`--phone-bar-offset`, set by `Layout`), and moves up with it when the bar slides away.
       className={cn(
-        'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950',
+        'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-(--dur-pop) ease-out motion-reduce:transition-none -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950',
         row && 'lg:flex lg:items-start lg:gap-2 lg:space-y-0',
         Z_INDEX.sticky,
       )}
     >
       <div className={cn('flex gap-2', row && 'lg:w-1/3 lg:shrink-0')}>
         <div className="relative min-w-0 flex-1">
-          <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-          <input
+          <Input
             type="search"
+            icon={<Search size={16} aria-hidden />}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             aria-label="Cerca nelle schede"
@@ -98,7 +100,6 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts, row
             // `sm` the hint says it).
             placeholder={wide ? 'Cerca per istituto o domanda' : narrow ? 'Cerca' : 'Cerca nelle schede'}
             maxLength={100}
-            className={cn(CONTROL, FIELD_TEXT, 'w-full pl-9')}
           />
           {!wide && (
             <span id={hintId} className="sr-only">
@@ -106,15 +107,16 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts, row
             </span>
           )}
         </div>
-        <button
+        <Button
           type="button"
+          variant="secondary"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className={cn(CONTROL, 'inline-flex shrink-0 items-center gap-2', row ? 'lg:hidden' : 'md:hidden')}
+          icon={<SlidersHorizontal size={16} aria-hidden />}
+          className={cn('shrink-0', row ? 'lg:hidden' : 'md:hidden')}
         >
-          <SlidersHorizontal size={16} aria-hidden />
           {active > 0 ? `Filtri (${active})` : 'Filtri'}
-        </button>
+        </Button>
       </div>
       <div
         className={cn(
@@ -154,34 +156,18 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts, row
             onChange={(normaKey) => onChange({ ...value, normaKey })}
           />
         )}
-        <button
-          type="button"
-          aria-pressed={value.daRileggere}
+        <FilterSwitch
           // The visible words start the name (label in name); the rest says what the switch keeps.
-          aria-label="Scritte da Claude, da rileggere"
-          onClick={() => onChange({ ...value, daRileggere: !value.daRileggere })}
-          className={cn(
-            CONTROL,
-            'col-span-2 text-left',
-            row ? 'lg:col-span-1 lg:whitespace-nowrap lg:text-center' : 'md:col-span-1 md:text-center',
-            value.daRileggere && PRESSED,
-          )}
+          name="Scritte da Claude, da rileggere"
+          checked={value.daRileggere}
+          onChange={(daRileggere) => onChange({ ...value, daRileggere })}
+          row={row}
         >
           Scritte da Claude
-        </button>
-        <button
-          type="button"
-          aria-pressed={value.dovuteOggi}
-          onClick={() => onChange({ ...value, dovuteOggi: !value.dovuteOggi })}
-          className={cn(
-            CONTROL,
-            'col-span-2 text-left',
-            row ? 'lg:col-span-1 lg:whitespace-nowrap lg:text-center' : 'md:col-span-1 md:text-center',
-            value.dovuteOggi && PRESSED,
-          )}
-        >
+        </FilterSwitch>
+        <FilterSwitch checked={value.dovuteOggi} onChange={(dovuteOggi) => onChange({ ...value, dovuteOggi })} row={row}>
           Da ripassare oggi
-        </button>
+        </FilterSwitch>
       </div>
     </div>
   );

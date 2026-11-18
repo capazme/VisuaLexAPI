@@ -17,7 +17,8 @@ export const MUTED_TEXT = 'text-slate-500 dark:text-slate-400';
 
 /** A tile of the dashboard: the missions, the statistics, a stop of the road. */
 // LC23: the prototype's surface (#faf8f4 on the stone page), not white.
-export const TILE = 'rounded-2xl border border-slate-200 bg-card dark:border-slate-800 dark:bg-slate-900';
+// LC112: 8 px, a box that holds things (`CARD_RADIUS`, the consultant's rule).
+export const TILE = 'rounded-[8px] border border-slate-200 bg-card dark:border-slate-800 dark:bg-slate-900';
 /**
  * A block's heading: the reader's serif, in sentence case. One type language (Gymnasium spec §5.1): headings
  * in EB Garamond, labels in Inter; no small capitals and no double rule.
@@ -25,13 +26,6 @@ export const TILE = 'rounded-2xl border border-slate-200 bg-card dark:border-sla
 export const BLOCK_HEADING = 'font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 
 export const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900';
-
-/** A secondary button: an ink outline, 44 px, a press that gives a little. */
-export const SECONDARY_BUTTON = `min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition-[background-color,scale] active:scale-[0.97] ${INK_BORDER} text-primary-900 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-primary-900/30 ${FOCUS_RING}`;
-/** A solid ink button, 44 px: the one action of a block («+ Nuova scheda» in an empty list, «Proponi alla comunità», «Invia»). */
-export const INK_BUTTON = `inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 text-sm font-semibold transition-[background-color,opacity,scale] active:scale-[0.97] disabled:opacity-60 hover:bg-primary-800 dark:hover:bg-primary-200 ${INK_BG} ${ON_INK} dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 ${FOCUS_RING}`;
-/** A quiet action under a mission: words in ink, 44 px tall, underlined on hover. */
-export const QUIET_BUTTON = `-mx-2 min-h-[44px] justify-self-start rounded-lg px-2 text-left text-sm font-medium text-primary-900 underline-offset-4 hover:underline dark:text-primary-200 ${FOCUS_RING}`;
 
 const SUBJECT_TOKEN: Record<Materia, string> = {
   DIRITTO_CIVILE: '--category-civil',

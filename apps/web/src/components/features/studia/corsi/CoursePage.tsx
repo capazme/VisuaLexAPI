@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { buttonClassName } from '../../../ui/buttonStyles';
+import { Input } from '../../../ui/Input';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Download, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -15,7 +17,7 @@ import { MenuButton } from '../../../ui/MenuButton';
 import { Modal } from '../../../ui/Modal';
 import { notify } from '../../../ui/notifications/notifications';
 import { MATERIA_LABEL } from '../studiaLabels';
-import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, subjectHue } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, subjectHue } from '../progress/tokens';
 import { CourseStateChip } from './CourseChips';
 import { CoursesGate } from './CoursesGate';
 import { CompetencesSection, DossierLink, EndProgrammeOffer, ExamSection, ModulesSection, PreparationPanel } from './CourseSections';
@@ -276,7 +278,7 @@ function Course({ id }: { id: string }) {
 function CourseHeader({ data, onRename, onExport, onTrash }: { data: CorsoPagina; onRename: () => void; onExport: () => void; onTrash: () => void }) {
   return (
     <header className="grid grid-cols-1 gap-3">
-      <Link to={COURSES_PATH} className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1')}>
+      <Link to={COURSES_PATH} className={cn(buttonClassName('link', 'lg'), 'justify-self-start gap-1')}>
         <ChevronLeft aria-hidden size={16} />
         Tutti i percorsi
       </Link>
@@ -287,7 +289,7 @@ function CourseHeader({ data, onRename, onExport, onTrash }: { data: CorsoPagina
         <MenuButton
           label="Azioni del percorso"
           align="right"
-          triggerClassName={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
+          triggerClassName={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
           items={[
             { label: 'Rinomina', icon: Pencil, onSelect: onRename },
             { label: 'Esporta', icon: Download, onSelect: onExport, description: 'Il percorso e i tuoi esiti, in un file JSON' },
@@ -314,7 +316,7 @@ function CourseNotFound() {
   return (
     <div className="grid grid-cols-1 gap-3">
       <p className="text-sm text-slate-700 dark:text-slate-300">Questo percorso non c’è: forse è stato eliminato.</p>
-      <Link to={COURSES_PATH} className={cn(QUIET_BUTTON, 'mx-0')}>
+      <Link to={COURSES_PATH} className={cn(buttonClassName('link', 'lg'), 'justify-self-start')}>
         Torna ai percorsi
       </Link>
     </div>
@@ -372,7 +374,7 @@ function RenameDialog({ id, titolo, onClose, onRenamed }: { id: string; titolo: 
         <label htmlFor={inputId} className="text-sm font-medium text-slate-800 dark:text-slate-100">
           Nome
         </label>
-        <input
+        <Input
           ref={input}
           id={inputId}
           value={value}
@@ -380,7 +382,8 @@ function RenameDialog({ id, titolo, onClose, onRenamed }: { id: string; titolo: 
           onChange={(event) => setValue(event.target.value)}
           aria-invalid={!valid}
           aria-describedby={error ? `${inputId}-errore` : undefined}
-          className="min-h-[44px] rounded-lg border border-slate-300 bg-card px-3 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+          // «Percorsi»'s 44 px at every width.
+          className="md:min-h-[44px]"
         />
         {error && (
           <p id={`${inputId}-errore`} role="alert" className="text-sm text-red-700 dark:text-red-300">

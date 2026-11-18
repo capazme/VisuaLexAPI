@@ -196,21 +196,17 @@ describe('the subject filter', () => {
     expect(screen.queryByText(/da ripassare/)).toBeNull();
   });
 
-  it('offers «Tutte le materie» and the five subjects as chips, one pressed', async () => {
+  it('offers «Tutte le materie» and the five subjects as the common choice in a row, one chosen', async () => {
     const onSelect = vi.fn();
-    render(<SubjectChips selected="DIRITTO_PENALE" onSelect={onSelect} />);
-    const group = screen.getByRole('group', { name: 'Materia' });
-    expect(within(group).getAllByRole('button')).toHaveLength(6);
-    // 44 px tall at every width, a computer too.
-    for (const chip of within(group).getAllByRole('button')) {
-      expect(chip).toHaveClass('min-h-[44px]');
-      expect(chip.className).not.toMatch(/\bmd:(?:min-h|h|py)-/);
-    }
+    const { container } = render(<SubjectChips selected="DIRITTO_PENALE" onSelect={onSelect} />);
+    // LC112: `SegmentedTabs size="sm"`, a radiogroup, as the app's other choices in a row.
+    const group = screen.getByRole('radiogroup', { name: 'Materia' });
+    expect(within(group).getAllByRole('radio')).toHaveLength(6);
     // A phone's sideways row with no bar drawn: in dark mode it showed light (theme.test.ts checks the CSS).
-    expect(group).toHaveClass(...HIDDEN_SCROLLBAR.split(' '));
-    expect(within(group).getByRole('button', { name: 'Diritto penale' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(group).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'false');
-    await userEvent.setup().click(within(group).getByRole('button', { name: 'Tutte le materie' }));
+    expect(container.firstElementChild).toHaveClass(...HIDDEN_SCROLLBAR.split(' '));
+    expect(within(group).getByRole('radio', { name: 'Diritto penale' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(group).getByRole('radio', { name: 'Tutte le materie' })).toHaveAttribute('aria-checked', 'false');
+    await userEvent.setup().click(within(group).getByRole('radio', { name: 'Tutte le materie' }));
     expect(onSelect).toHaveBeenCalledWith(undefined);
   });
 });

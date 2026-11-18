@@ -1,5 +1,4 @@
-import { cn } from '../../../../lib/utils';
-import { SECONDARY_BUTTON } from '../progress/tokens';
+import { Button } from '../../../ui/Button';
 
 interface ReadFailureProps {
   /** What could not be read, after «Non è stato possibile leggere»: «i tuoi percorsi». */
@@ -17,15 +16,15 @@ export function ReadFailure({ what, offline, stale = false, onRetry }: ReadFailu
     ? `Sei offline o il server non risponde: non è stato possibile leggere ${what}.`
     : `Non è stato possibile leggere ${what}.`;
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+    <div role="alert" className="flex flex-wrap items-center gap-3 rounded-[8px] border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
       <p className="min-w-0 flex-1 basis-60">
         {sentence}
         {stale && ' Quello che vedi è l’ultima lettura.'}
         {offline && ' Si aggiorna da sé quando torna la connessione.'}
       </p>
-      <button type="button" onClick={onRetry} className={cn(SECONDARY_BUTTON, 'bg-card dark:bg-transparent')}>
+      <Button type="button" variant="secondary" size="lg" onClick={onRetry}>
         Riprova
-      </button>
+      </Button>
     </div>
   );
 }

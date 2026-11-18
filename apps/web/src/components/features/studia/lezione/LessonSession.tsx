@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { buttonClassName } from '../../../ui/buttonStyles';
+import { Select } from '../../../ui/Select';
+import { IconButton } from '../../../ui/IconButton';
+import { Button } from '../../../ui/Button';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { FIELD_TEXT } from '../../../../constants/interactions';
 import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { cn } from '../../../../lib/utils';
 import { studiaService } from '../../../../services/studiaService';
 import type { EsercizioLezione, EsitoEsercizio, Lezione, Materia, RispostaEsercizio } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
-import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_BUTTON, INK_TEXT, MUTED_TEXT, SECONDARY_BUTTON, SUCCESS_TEXT, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, SUCCESS_TEXT, TILE } from '../progress/tokens';
 import { gainLabel, gainOf, gainSentence } from '../progress/xpGains';
 
 const HOME = '/learn/ripasso';
@@ -38,7 +41,7 @@ function solutionWords(exercise: EsercizioLezione, solution: RispostaEsercizio):
 const sentence = (text: string) => `${text.replace(/[.\s]+$/, '')}.`;
 
 const OPTION = cn(
-  'flex min-h-[48px] w-full items-center rounded-xl border-2 px-4 py-3 text-left text-base leading-snug transition-[background-color,border-color,scale] active:scale-[0.99] aria-disabled:active:scale-100',
+  'flex min-h-[48px] w-full items-center rounded-md border-2 px-4 py-3 text-left text-base leading-snug transition-[background-color,border-color,scale] active:scale-[0.99] aria-disabled:active:scale-100',
   FOCUS_RING,
 );
 const OPTION_IDLE = 'border-slate-200 bg-card hover:border-primary-700 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-primary-300';
@@ -62,6 +65,7 @@ function Options({ labels, values, chosen, graded, onAnswer, busy }: {
         const isChosen = chosen === value;
         const state = !graded ? (isChosen && busy ? 'chosen' : 'idle') : value === graded.soluzione ? 'right' : isChosen ? 'wrong' : 'dim';
         return (
+          // bare-button: an answer of the exercise, its words wrapping, its outcome its colour.
           <button
             key={label + i}
             type="button"
@@ -113,7 +117,7 @@ function Match({ exercise, graded, busy, onAnswer }: {
               {norma}
             </label>
             <div className="grid gap-1">
-              <select
+              <Select
                 id={id}
                 value={picks[i] ?? ''}
                 disabled={graded !== null || busy}
@@ -121,12 +125,9 @@ function Match({ exercise, graded, busy, onAnswer }: {
                   const value = event.target.value === '' ? null : Number(event.target.value);
                   setPicks((current) => current.map((p, j) => (j === i ? value : p)));
                 }}
-                className={cn(
-                  'min-h-[44px] w-full rounded-lg border bg-card px-3 dark:bg-slate-900',
-                  FIELD_TEXT,
-                  right === null ? 'border-slate-300 dark:border-slate-700' : right ? 'border-green-700 dark:border-green-400' : 'border-red-700 dark:border-red-400',
-                  FOCUS_RING,
-                )}
+                // The lesson's 44 px at every width; the outcome's green or red edge once graded.
+                size="lg"
+                className={right === null ? undefined : right ? 'border-green-700 dark:border-green-400' : 'border-red-700 dark:border-red-400'}
               >
                 <option value="">Scegli l’istituto</option>
                 {exercise.istituti.map((istituto, k) => (
@@ -134,16 +135,16 @@ function Match({ exercise, graded, busy, onAnswer }: {
                     {istituto}
                   </option>
                 ))}
-              </select>
+              </Select>
               {solution && !right && <span className={cn('text-sm', MUTED_TEXT)}>Giusto: {exercise.istituti[solution[i]]}</span>}
             </div>
           </div>
         );
       })}
       {!graded && (
-        <button type="submit" disabled={picks.some((p) => p === null)} aria-disabled={busy} className={cn(INK_BUTTON, 'w-full sm:w-auto sm:justify-self-end')}>
+        <Button type="submit" size="lg" disabled={picks.some((p) => p === null)} aria-disabled={busy} className="w-full sm:w-auto sm:justify-self-end">
           Verifica
-        </button>
+        </Button>
       )}
     </form>
   );
@@ -207,10 +208,10 @@ function EndScreen({ fine, onAgain }: { fine: NonNullable<EsitoEsercizio['fine']
       )}
       <p className={cn('text-sm', MUTED_TEXT)}>Sei al livello {fine.xp.livello.livello}.</p>
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-        <button type="button" onClick={onAgain} className={INK_BUTTON}>
+        <Button type="button" size="lg" onClick={onAgain}>
           Un’altra lezione
-        </button>
-        <Link to={HOME} className={cn(SECONDARY_BUTTON, 'inline-flex items-center justify-center')}>
+        </Button>
+        <Link to={HOME} className={buttonClassName('secondary', 'lg')}>
           Torna a Oggi
         </Link>
       </div>
@@ -344,19 +345,19 @@ export function LessonSession() {
         {sendFailed && (
           <div className="grid gap-1">
             <p className="text-sm text-red-700 dark:text-red-400">Non riesco a inviare la risposta.</p>
-            <button type="button" onClick={() => chosen !== null && send(chosen)} className={cn(SECONDARY_BUTTON, 'justify-self-start')}>
+            <Button type="button" variant="secondary" size="lg" onClick={() => chosen !== null && send(chosen)} className="justify-self-start">
               Riprova
-            </button>
+            </Button>
           </div>
         )}
         {graded && (
-          <div className={cn('grid gap-3 rounded-2xl px-4 py-4', graded.giusta ? 'bg-green-50 dark:bg-green-950/40' : 'bg-red-50 dark:bg-red-950/40')}>
+          <div className={cn('grid gap-3 rounded-[8px] px-4 py-4', graded.giusta ? 'bg-green-50 dark:bg-green-950/40' : 'bg-red-50 dark:bg-red-950/40')}>
             <p id="lezione-correzione" role="status" className={cn('text-base font-semibold', graded.giusta ? SUCCESS_TEXT : 'text-red-700 dark:text-red-400')}>
               {graded.giusta ? 'Giusto!' : `Non è così. La risposta giusta: ${sentence(solutionWords(exercise, graded.soluzione))}`}
             </p>
-            <button ref={continueRef} type="button" onClick={next} aria-describedby="lezione-correzione" className={cn(INK_BUTTON, 'w-full sm:w-auto sm:justify-self-end')}>
+            <Button ref={continueRef} type="button" size="lg" onClick={next} aria-describedby="lezione-correzione" className="w-full sm:w-auto sm:justify-self-end">
               Continua
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -366,15 +367,7 @@ export function LessonSession() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <button
-          ref={closeRef}
-          type="button"
-          onClick={leave}
-          aria-label="Chiudi la lezione"
-          className={cn('inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
-        >
-          <X size={20} aria-hidden />
-        </button>
+        <IconButton ref={closeRef} size="lg" onClick={leave} aria-label="Chiudi la lezione" icon={<X size={20} aria-hidden />} />
         <div
           role="progressbar"
           aria-label="Avanzamento della lezione"
@@ -383,7 +376,7 @@ export function LessonSession() {
           aria-valuenow={answered}
           className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
         >
-          <div className={cn('h-full rounded-full motion-safe:transition-[width] motion-safe:duration-300', INK_BG)} style={{ width: total ? `${(answered / total) * 100}%` : '0%' }} />
+          <div className={cn('h-full rounded-full motion-safe:transition-[width] motion-safe:duration-(--dur-scene)', INK_BG)} style={{ width: total ? `${(answered / total) * 100}%` : '0%' }} />
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -413,11 +406,11 @@ function Notice({ text, onRetry }: { text: string; onRetry?: () => void }) {
       <p className="max-w-prose text-base">{text}</p>
       <div className="flex flex-wrap gap-2">
         {onRetry && (
-          <button type="button" onClick={onRetry} className={INK_BUTTON}>
+          <Button type="button" size="lg" onClick={onRetry}>
             Riprova
-          </button>
+          </Button>
         )}
-        <Link to={HOME} className={cn(SECONDARY_BUTTON, 'inline-flex items-center justify-center')}>
+        <Link to={HOME} className={buttonClassName('secondary', 'lg')}>
           Torna a Oggi
         </Link>
       </div>

@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { AnimatePresence, LayoutGroup, animate, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion';
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
+import { SegmentedTabs } from '../../../ui/SegmentedTabs';
 import { ease, spring } from '../../../../lib/motion';
 import type { GiornoAttivita } from '../../../../types/studia';
 import { dayDate, describeDay, formatCount, formatDate } from './layout';
@@ -226,15 +227,6 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
     onPeriod(next);
     setActive(null);
   };
-  const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const last = TREND_PERIODS.length - 1;
-    const to = event.key === 'ArrowRight' ? (index + 1) % (last + 1) : event.key === 'ArrowLeft' ? (index + last) % (last + 1) : event.key === 'Home' ? 0 : event.key === 'End' ? last : null;
-    if (to === null) return;
-    event.preventDefault();
-    choosePeriod(TREND_PERIODS[to].id);
-    document.getElementById(`${uid}-tab-${TREND_PERIODS[to].id}`)?.focus();
-  };
-
   const words = PERIOD_WORDS[period];
   const labels = axisLabels(series, plotW);
   const readout =
@@ -275,40 +267,11 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
             )}
           </p>
         </div>
-        <LayoutGroup id={`${uid}-periods`}>
-          <div role="tablist" aria-label="Periodo" className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-            {TREND_PERIODS.map((p, index) => {
-              const selected = p.id === period;
-              return (
-                <button
-                  key={p.id}
-                  id={`${uid}-tab-${p.id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls={panelId}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => choosePeriod(p.id)}
-                  onKeyDown={(event) => onTabKey(event, index)}
-                  className={cn('relative min-h-[44px] rounded-lg px-3 text-sm font-medium transition-colors', selected ? 'text-slate-900 dark:text-slate-50' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50', FOCUS_RING)}
-                >
-                  {selected && (
-                    <motion.span
-                      layoutId="pill"
-                      aria-hidden
-                      className="absolute inset-0 rounded-lg bg-card shadow-sm dark:bg-slate-900"
-                      transition={still ? { duration: 0 } : { duration: BEND_S, ease: ease.inOut }}
-                    />
-                  )}
-                  <span className="relative">{p.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </LayoutGroup>
+        {/* LC112: the common tabs, small (`SegmentedTabs size="sm"`), over the chart's panel. */}
+        <SegmentedTabs size="sm" label="Periodo" tabs={TREND_PERIODS} value={period} onChange={choosePeriod} panelId={panelId} />
       </div>
 
-      <div ref={boxRef} id={panelId} role="tabpanel" aria-labelledby={`${uid}-tab-${period}`} className="min-w-0">
+      <div ref={boxRef} id={panelId} role="tabpanel" aria-labelledby={`${panelId}-tab-${period}`} className="min-w-0">
         {/* A finger moving sideways moves the cursor; up and down, the page still scrolls (`touch-action` on the
             drawing itself: an SVG shape does not take it). */}
         <div tabIndex={0} role="group" aria-label={summary} aria-describedby={`${uid}-readout`} onKeyDown={onKey} className={cn('relative touch-pan-y rounded-md', FOCUS_RING)}>
@@ -462,16 +425,29 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
   );
 }
 
-/** The chart's place while its read travels: the header's and the drawing's heights. */
-export function ReviewTrendSkeleton() {
+const PLACE = 'rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800';
+
+/**
+ * The chart's place while its read travels: the header's (the total and the periods' tabs, `SegmentedTabs size="sm"`)
+ * and the drawing's heights. With a `note` it is a newcomer's chart (LC112): the same place, still, the sentence where
+ * the line will be drawn — so the block keeps the height its placeholder held.
+ */
+export function ReviewTrendSkeleton({ note }: { note?: string } = {}) {
+  const header = note ? 'invisible' : PLACE;
   return (
     // As tall as the chart will be on this card: 190 px under 520 px of card, 230 above (a container query).
-    <div aria-hidden className="@container grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="h-[3.75rem] w-44 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-        <div className="h-[52px] w-64 rounded-xl bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+    <div aria-hidden={note ? undefined : true} className="@container grid gap-4">
+      <div aria-hidden className="flex flex-wrap items-end justify-between gap-3">
+        <div className={cn('h-[3.75rem] w-44', header)} />
+        <div className={cn('h-11 w-52 md:h-9', header)} />
       </div>
-      <div className="h-[190px] rounded-md bg-slate-100 motion-safe:animate-pulse @min-[520px]:h-[230px] dark:bg-slate-800" />
+      {note ? (
+        <div className="grid h-[190px] place-items-center rounded-md border border-dashed border-slate-300 px-4 text-center @min-[520px]:h-[230px] dark:border-slate-700">
+          <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{note}</p>
+        </div>
+      ) : (
+        <div className={cn('h-[190px] @min-[520px]:h-[230px]', PLACE)} />
+      )}
       <div className="h-11" />
     </div>
   );

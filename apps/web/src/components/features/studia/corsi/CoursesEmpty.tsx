@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { buttonClassName } from '../../../ui/buttonStyles';
 import { Link } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import { connectionsService, type ConnectedApp } from '../../../../features/connections/connectionsService';
 import { CopyableCode } from '../../../../features/connections/CopyableCode';
-import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, SECONDARY_BUTTON, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { COURSES_WRITE_SCOPE, CREATE_SENTENCE } from './corsiLabels';
 
 type Connections = { status: 'loading' } | { status: 'error' } | { status: 'ready'; apps: ConnectedApp[] };
@@ -62,7 +63,7 @@ export function CoursesEmpty() {
 
 function ConnectionLine({ connections }: { connections: Connections }) {
   const link = (
-    <Link to="/collega-app" className={cn(SECONDARY_BUTTON, 'inline-flex items-center justify-self-start')}>
+    <Link to="/collega-app" className={cn(buttonClassName('secondary', 'lg'), 'justify-self-start')}>
       Collega un’app AI
     </Link>
   );
@@ -98,7 +99,7 @@ function ConnectionLine({ connections }: { connections: Connections }) {
     );
   }
   return (
-    <div role="note" className="grid grid-cols-1 gap-2 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+    <div role="note" className="grid grid-cols-1 gap-2 rounded-[8px] bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
       <p>
         {apps.length === 1 ? 'La tua app collegata non ha' : 'Le tue app collegate non hanno'} il permesso di creare percorsi
         di studio. I permessi si scelgono quando colleghi un’app, da «Collega un’app AI»: un collegamento fatto prima che

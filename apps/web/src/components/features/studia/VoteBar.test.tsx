@@ -21,12 +21,12 @@ describe('VoteBar — the keyboard’s place', () => {
 });
 
 describe('VoteBar — three verdicts, the reason required', () => {
-  it('draws the three verdicts alike, 44 px at every width: the interface does not lean', () => {
+  it('draws the three verdicts alike, the common secondary `Button`: the interface does not lean', () => {
     render(<VoteBar cardId="c1" busy={false} onVote={vi.fn()} />);
     const verdicts = ['Approvata', 'Migliorabile', 'Errata'].map((name) => screen.getByRole('button', { name }));
     expect(new Set(verdicts.map((button) => button.className)).size).toBe(1);
-    expect(verdicts[0]).toHaveClass('min-h-[44px]');
-    expect(verdicts[0].className).not.toMatch(/\bmd:min-h-0\b/);
+    // The common heights (LC112): 44 px on a phone, 36 from md.
+    expect(verdicts[0]).toHaveClass('min-h-11', 'md:min-h-9');
   });
 
   it('sends «Approvata» at once, and the others only with a reason written', async () => {

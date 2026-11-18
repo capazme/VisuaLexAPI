@@ -132,6 +132,7 @@ describe('InstituteStops', () => {
 
   it('gives every stop and control a 44 px target', () => {
     renderStops(ready(Array.from({ length: 10 }, (_, i) => tappa(`Istituto ${i}`, 0))));
-    for (const button of screen.getAllByRole('button')) expect(button.className).toContain('min-h-[44px]');
+    // The stops' own 44 px, or the common `Button`'s on a phone (LC112).
+    for (const button of screen.getAllByRole('button')) expect(button.className).toMatch(/(?:^|\s)min-h-(?:\[44px\]|11)(?:\s|$)/);
   });
 });

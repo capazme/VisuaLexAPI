@@ -58,8 +58,8 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: 
         ) : (
           loading && (
             <>
-              <div aria-hidden className="h-9 w-28 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-              <div aria-hidden className="h-9 w-24 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+              <div aria-hidden className="h-9 w-28 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+              <div aria-hidden className="h-9 w-24 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
             </>
           )
         )}

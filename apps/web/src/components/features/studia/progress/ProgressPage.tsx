@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { Button } from '../../../ui/Button';
 import { useIsDesktop } from '../../../../hooks/useIsDesktop';
 import { cn } from '../../../../lib/utils';
 import { CARD_GRID_COLUMNS } from '../../../layout/frame';
@@ -13,8 +14,8 @@ import { LevelBar } from './LevelBar';
 import { rememberedMateria, rememberMateria } from './rememberedSubject';
 import { StreakBadge } from './StreakBadge';
 import { SubjectChips } from './SubjectChips';
-import { SubjectProgress } from './SubjectProgress';
-import { BLOCK_HEADING, MUTED_TEXT, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
+import { SUBJECT_CARD_HEIGHT, SubjectProgress } from './SubjectProgress';
+import { BLOCK_HEADING, MUTED_TEXT, TILE, subjectHue } from './tokens';
 import { useProgress } from './useProgress';
 import { Arrive } from '../../../ui/Arrive';
 import { Skeleton } from '../../../ui/Skeleton';
@@ -67,12 +68,15 @@ function Summary({ data }: { data: Progressi }) {
   );
 }
 
+/** The summary's own rows (LC112): the streak and the goal, then the level (`LevelBar`'s 86 px), at their heights. */
 function SummarySkeleton() {
   return (
-    <div aria-hidden className="flex flex-wrap items-center gap-x-10 gap-y-5">
-      <Skeleton className="h-10 w-40" />
-      <Skeleton className="h-10 w-24" />
-      <Skeleton className="h-[4.5rem] w-full lg:max-w-md" />
+    <div aria-hidden className="grid gap-6">
+      <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
+        <Skeleton className="h-8 w-52" />
+        <Skeleton className="h-8 w-12" />
+      </div>
+      <Skeleton className="h-[5.375rem] w-full lg:max-w-md" />
     </div>
   );
 }
@@ -131,9 +135,9 @@ export function ProgressPage() {
         // No alert: the page says it where the numbers would be, and the button reads again.
         <div className={cn(TILE, 'flex flex-wrap items-center justify-between gap-3 p-4 md:p-5')}>
           <p className="text-sm text-slate-800 dark:text-slate-100">Non riesco a leggere i tuoi progressi.</p>
-          <button type="button" onClick={reload} className={SECONDARY_BUTTON}>
+          <Button type="button" variant="secondary" onClick={reload}>
             Riprova
-          </button>
+          </Button>
         </div>
       )}
 
@@ -155,8 +159,9 @@ export function ProgressPage() {
             {scoped(
               (data) =>
                 // A newcomer only: someone back after more than the server's 26 weeks has a record, and a flat line.
+                // In the chart's place, at its placeholder's height: the page does not shrink as the answer comes (LC112).
                 data.calendario.length === 0 && day.data?.serie.record === 0 ? (
-                  <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Il primo giorno comincia oggi: qui si disegnano i ripassi di ogni giorno.</p>
+                  <ReviewTrendSkeleton note="Il primo giorno comincia oggi: qui si disegnano i ripassi di ogni giorno." />
                 ) : (
                   <ReviewTrend
                     calendario={data.calendario}
@@ -191,7 +196,7 @@ export function ProgressPage() {
             ) : (
               <div aria-hidden className={cn('grid gap-2', CARD_GRID_COLUMNS)}>
                 {[0, 1, 2, 3, 4].map((n) => (
-                  <Skeleton key={n} className="h-28 rounded-xl" />
+                  <Skeleton key={n} className={cn('rounded-[8px]', SUBJECT_CARD_HEIGHT)} />
                 ))}
               </div>
             )}
