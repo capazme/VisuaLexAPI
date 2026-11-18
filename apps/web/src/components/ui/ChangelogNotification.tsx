@@ -1,4 +1,4 @@
-import { useRef, type FocusEvent } from 'react';
+import { useRef, type CSSProperties, type FocusEvent } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Newspaper, X } from 'lucide-react';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
@@ -8,6 +8,7 @@ import { spring } from '../../lib/motion';
 import { ACTIVE, FOCUS_RING, TRANSITION } from '../../constants/interactions';
 import { newsSince, parseNote, type Inline, type VersionNews } from '../../content/novita/releaseNotes';
 import { focusPage } from '../../utils/focusPage';
+import { FOOT_STACK_BOTTOM, footBarStore } from './notifications/footBar';
 
 /**
  * The version's news (R1): a toast when the app is at a version this browser has not seen, and «Vedi»
@@ -23,6 +24,9 @@ export function ChangelogNotification({ inBar = false }: { inBar?: boolean } = {
   const { currentVersion, hasNewVersion, lastSeenVersion, dismissNotification, showChangelog, setShowChangelog } =
     useVersionCheck();
   const still = useReducedMotion();
+  // A bar held at the window's foot (Work's views on a phone, «Sposta l'evidenziazione»): the news rises over it, as
+  // the notifications do (LC101; it had a place of its own and covered the views' bar).
+  const footRoom = footBarStore((s) => s.room);
   // Where the focus was before it entered the toast: «Vedi» and the X go with it.
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -77,10 +81,12 @@ export function ChangelogNotification({ inBar = false }: { inBar?: boolean } = {
             transition={spring.snappy}
             className={cn(
               'fixed z-[60] flex items-center gap-3 py-2 pl-4 pr-2 rounded-xl border w-max max-w-[calc(100vw-2rem)] md:max-w-md',
-              'bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:bottom-8 md:right-8',
+              'left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-8',
+              FOOT_STACK_BOTTOM,
               'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800',
               'text-slate-900 dark:text-slate-100 shadow-lg'
             )}
+            style={footRoom > 0 ? ({ '--foot-bar': `${footRoom}px` } as CSSProperties) : undefined}
             onFocus={rememberFocus}
           >
             <div
