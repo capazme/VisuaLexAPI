@@ -139,6 +139,7 @@ export function Layout() {
   const location = useLocation();
   const { pathname, search } = location;
   const onSearchPage = pathname === '/';
+  const slidePage = pathname === SETTINGS_PATH ? 'impostazioni' : /^\/admin(\/|$)/.test(pathname) ? 'admin' : 'app';
   const notificationRoom = stackRoomStore((s) => s.room);
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
@@ -517,9 +518,9 @@ export function Layout() {
             // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-10',
           )}>
-            {/* Impostazioni comes in as a page of its own and goes back the other way (LC84); every other change of page
-                keeps its own transition, so the key changes only entering and leaving it. */}
-            <PageSlide pageKey={pathname === SETTINGS_PATH ? 'impostazioni' : 'app'} back={pathname !== SETTINGS_PATH}>
+            {/* Impostazioni (LC84) and Amministrazione (LC93) come in as pages of their own and go back the other way;
+                every other change of page keeps its own transition, so the key changes only entering and leaving them. */}
+            <PageSlide pageKey={slidePage} back={slidePage === 'app'}>
               <AtLocation location={location}>
                 <div data-page-place className="contents">
                   <RoutePage>
