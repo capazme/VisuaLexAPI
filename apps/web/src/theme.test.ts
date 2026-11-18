@@ -10,6 +10,7 @@ import type { Materia } from './types/studia';
 import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
 import { CARD_GRID_COLUMNS, FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
 import { OVERVIEW_GRID } from './components/features/practice/besideLayout';
+import { dur } from './lib/motion';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -724,6 +725,15 @@ describe('the passage between the practice\'s two views (U2, L-62)', () => {
   }, 30000);
 });
 
+describe('the motion tokens for CSS (LC98)', () => {
+  it('are `lib/motion.ts`\'s `dur`, in milliseconds', async () => {
+    const css = await compile([]);
+    for (const [name, seconds] of Object.entries(dur)) {
+      expect(css, `--dur-${name}`).toMatch(new RegExp(`--dur-${name}:\\s*${Math.round(seconds * 1000)}ms`));
+    }
+  }, 30000);
+});
+
 describe('the section change (T1)', () => {
   const ms = (css: string, rule: RegExp) => {
     const match = css.match(rule);
@@ -733,8 +743,12 @@ describe('the section change (T1)', () => {
 
   it('fades the page out, then in rising by a few pixels, in under 250 ms, with no overlap and nothing else moving', async () => {
     const css = await compile([]);
-    const [out] = ms(css, /::view-transition-old\(vlx-page\)\s*\{\s*animation:\s*vlx-page-out\s+(\d+)ms/);
-    const [into, delay] = ms(css, /::view-transition-new\(vlx-page\)\s*\{\s*animation:\s*vlx-page-in\s+(\d+)ms\s+var\(--ease-out\)\s+(\d+)ms/);
+    // Its times are `lib/motion.ts`'s `dur`, as `--dur-*` (LC98).
+    const token = (name: string) => ms(css, new RegExp(`--dur-${name}:\\s*(\\d+)ms`))[0];
+    const out = token(css.match(/::view-transition-old\(vlx-page\)\s*\{\s*animation:\s*vlx-page-out\s+var\(--dur-(\w+)\)/)?.[1] ?? 'none');
+    const names = css.match(/::view-transition-new\(vlx-page\)\s*\{\s*animation:\s*vlx-page-in\s+var\(--dur-(\w+)\)\s+var\(--ease-out\)\s+var\(--dur-(\w+)\)/);
+    expect(names).not.toBeNull();
+    const [into, delay] = [token(names![1]), token(names![2])];
     expect(delay).toBeGreaterThanOrEqual(out);
     expect(delay + into).toBeLessThan(250);
     const [rise] = ms(css, /@keyframes vlx-page-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*translate:\s*0\s+(\d+)px/);

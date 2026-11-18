@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { SectionId } from './sections';
 import { prefersReducedMotion } from './sectionTransition';
+import { dur, ease } from '../../lib/motion';
 
-/** How long one entry takes to fade in. */
-export const ENTRY_FADE_MS = 140;
+/** How long one entry takes to fade in: `dur.press` (LC98). */
+export const ENTRY_FADE_MS = dur.press * 1000;
 /** The step between the first entries; the cascade runs over `CASCADE_ENTRIES` and the rest come with the last. */
 export const CASCADE_STEP_MS = 20;
 export const CASCADE_ENTRIES = 6;
@@ -15,7 +16,7 @@ export const CASCADE_ENTRIES = 6;
 const ENTRIES = ':scope > :not([role="group"]), :scope > [role="group"] > *';
 
 /**
- * Fades in the group's entries, the first six 20 ms apart: 240 ms at most. One keyframe, at the start (alone it would
+ * Fades in the group's entries, the first six 20 ms apart: 220 ms at most. One keyframe, at the start (alone it would
  * be the end), so each ends at its own opacity; nothing moves, nothing is held after.
  */
 export function fadeInEntries(group: HTMLElement) {
@@ -24,7 +25,7 @@ export function fadeInEntries(group: HTMLElement) {
     entry.animate([{ opacity: 0, offset: 0 }], {
       duration: ENTRY_FADE_MS,
       delay: Math.min(index, CASCADE_ENTRIES - 1) * CASCADE_STEP_MS,
-      easing: 'ease-out',
+      easing: `cubic-bezier(${ease.out.join(', ')})`,
       fill: 'backwards',
     });
   });
