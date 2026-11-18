@@ -26,6 +26,8 @@ vi.mock('../../services/adminService', () => ({
   getFeedbackStats: vi.fn().mockResolvedValue({ new: 0, bugs: 0, suggestions: 0 }),
   listSharedEnvironments: vi.fn().mockResolvedValue({ data: [], pagination: { page: 1, pages: 1, total: 0 } }),
   updateUser: vi.fn().mockResolvedValue({}),
+  createUser: vi.fn().mockResolvedValue({}),
+  resetPassword: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('../../components/features/admin/StudiaTextsAdmin', () => ({
@@ -226,5 +228,49 @@ describe('AdminPage — development mode', () => {
 
     fireEvent.click(alice);
     await waitFor(() => expect(adminService.updateUser).toHaveBeenCalledWith('a', { devModeAllowed: false }));
+  });
+});
+
+describe('AdminPage — a password the administrator sets', () => {
+  const row = { id: 'c', username: 'carol', email: 'carol@example.com', is_active: true, is_verified: true,
+    is_admin: false, lingo_validatore: false, dev_mode_allowed: false, dev_mode: false, created_at: '2026-10-01T10:00:00Z' };
+  const rule = 'La password deve avere almeno 8 caratteri, con una maiuscola, una minuscola e un numero.';
+  const passwordField = () => document.querySelector('input[type="password"]') as HTMLInputElement;
+
+  beforeEach(() => {
+    vi.mocked(adminService.listUsers).mockResolvedValue([row]);
+    vi.mocked(adminService.createUser).mockClear();
+    vi.mocked(adminService.resetPassword).mockClear();
+  });
+
+  it('holds a reset to the sign-up rule: a weak one is not sent, a good one is', async () => {
+    renderAdminPage();
+    fireEvent.click(await screen.findByTitle('Reimposta password'));
+    expect(screen.getByText('Almeno 8 caratteri, con una maiuscola, una minuscola e un numero.')).toBeInTheDocument();
+
+    fireEvent.change(passwordField(), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Password' }));
+    expect(await screen.findByText(rule)).toBeInTheDocument();
+    expect(adminService.resetPassword).not.toHaveBeenCalled();
+
+    fireEvent.change(passwordField(), { target: { value: 'Abcdefg1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Password' }));
+    await waitFor(() => expect(adminService.resetPassword).toHaveBeenCalledWith('c', { newPassword: 'Abcdefg1' }));
+  });
+
+  it('holds a new account to the same rule', async () => {
+    renderAdminPage();
+    await screen.findByTitle('Reimposta password');
+    fireEvent.click(screen.getByRole('button', { name: /Nuovo utente/ }));
+    const form = passwordField().closest('form') as HTMLFormElement;
+
+    fireEvent.change(passwordField(), { target: { value: 'abcdefgh' } });
+    fireEvent.submit(form);
+    expect(await screen.findByText(rule)).toBeInTheDocument();
+    expect(adminService.createUser).not.toHaveBeenCalled();
+
+    fireEvent.change(passwordField(), { target: { value: 'Abcdefg1' } });
+    fireEvent.submit(form);
+    await waitFor(() => expect(adminService.createUser).toHaveBeenCalledWith(expect.objectContaining({ password: 'Abcdefg1' })));
   });
 });

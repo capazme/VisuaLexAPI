@@ -97,7 +97,7 @@ router.post('/', async (req, res) => {
     res.status(409).json({
       detail: 'Prima di creare un percorso devi accettare la dichiarazione sul materiale di studio, in VisuaLex › Percorsi.',
       richiedeTesto: outcome.richiedeTesto,
-      link: '/studia/percorsi',
+      link: '/learn/percorsi',
     });
     return;
   }
@@ -200,7 +200,7 @@ router.post('/:id/esami/:esameId/aperta', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   noControlCharacters(req.body);
-  res.json(await patchCourse(req.user!.id, req.params.id, coursePatchSchema.parse(req.body)));
+  res.json(await patchCourse(req.user!.id, req.params.id, coursePatchSchema.parse(req.body), today()));
 });
 
 router.delete('/:id', async (req, res) => {

@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE } from '../../src/norms/actTypes';
 import { citeAct, citeArticle, shortNorm, type CitableNorm } from '../../src/norms/citation';
 import { citeDecision, shortDecision, type CitableDecision } from '../../src/norms/decisionCitation';
+import { citeRecital, recitalIdentity, recitalUnitLabel, shortRecital } from '../../src/norms/recital';
+import type { RecitalEntry } from '../../src/schemas/recitalEntry';
 
 // The server's labels of norms and decisions against the convention's golden file
 // (conventions/sources/golden.json; spec docs/superpowers/specs/2026-10-04-source-convention-design.md).
@@ -25,9 +27,11 @@ interface DecisionCase {
 }
 
 const ROOT = root(__dirname);
+interface RecitalCase { id: string; input: RecitalEntry; identity: Record<string, Expected>; labels: Record<string, Expected> }
 const golden = JSON.parse(readFileSync(join(ROOT, 'conventions', 'sources', 'golden.json'), 'utf8')) as {
   norms: NormCase[];
   decisions: DecisionCase[];
+  recitals: RecitalCase[];
 };
 const ASSERTED = new Set(['decided', 'current', 'proposed']);
 const withLabel = <T extends { labels: Record<string, Expected> }>(cases: T[], label: string): T[] =>
@@ -110,4 +114,22 @@ describe('the ANNEX_SIGLE table is the API\'s', () => {
     expect(Object.keys(rows).length).toBeGreaterThan(0);
     expect(ANNEX_SIGLE).toEqual(rows);
   });
+});
+
+// A recital's identity and labels (spec docs/superpowers/specs/2026-11-17-eu-recitals-design.md §2).
+describe('the identity and labels of recitals are the golden file\'s', () => {
+  it('has cases', () => expect(golden.recitals.length).toBeGreaterThan(2));
+  for (const c of golden.recitals) {
+    it(`${c.id}: identity`, () => expect(recitalIdentity(c.input)).toBe(c.identity.recital.value));
+  }
+  const LABELS: Array<[string, (e: RecitalEntry) => string]> = [
+    ['citation', citeRecital],
+    ['short', shortRecital],
+    ['unit', recitalUnitLabel],
+  ];
+  for (const [label, write] of LABELS) {
+    for (const c of withLabel(golden.recitals, label)) {
+      it(`${c.id}: ${label}`, () => expect(write(c.input)).toBe(c.labels[label].value));
+    }
+  }
 });

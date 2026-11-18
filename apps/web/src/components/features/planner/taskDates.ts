@@ -50,35 +50,21 @@ export function dayHeading(day: string, today: string): string {
   return capitalise(long);
 }
 
-const blockFormat = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const weekdayName = new Intl.DateTimeFormat('it-IT', { weekday: 'long', timeZone: 'UTC' });
 const weekdayShort = new Intl.DateTimeFormat('it-IT', { weekday: 'short', timeZone: 'UTC' });
-const monthYearFormat = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
-/** A day's block in «Prossimi giorni»: «21 ott · Oggi · mercoledì», «22 ott · Domani · giovedì», «23 ott · venerdì». */
+/** A day's group, one form (LC83): «Oggi · mar 17», «Domani · mer 18», «Gio 19». */
 export function blockHeading(day: string, today: string): string {
   const offset = daysBetween(today, day);
-  const date = blockFormat.format(new Date(utc(day))).replace(/\./g, '');
-  const name = weekdayName.format(new Date(utc(day)));
-  if (offset === 0) return `${date} · Oggi · ${name}`;
-  if (offset === 1) return `${date} · Domani · ${name}`;
-  return `${date} · ${name}`;
-}
-
-/** The Monday of a day's week (the Italian week starts on Monday). */
-export function weekStart(day: string): string {
-  const weekday = new Date(utc(day)).getUTCDay();
-  return addDaysToIsoDate(day, -((weekday + 6) % 7));
+  const { weekday, date } = stripDay(day);
+  if (offset === 0) return `Oggi · ${weekday} ${date}`;
+  if (offset === 1) return `Domani · ${weekday} ${date}`;
+  return capitalise(`${weekday} ${date}`);
 }
 
 /** A day in the week's strip: «lun» and «19». */
 export function stripDay(day: string): { weekday: string; date: number } {
   return { weekday: weekdayShort.format(new Date(utc(day))).replace(/\./g, ''), date: Number(day.slice(8, 10)) };
-}
-
-/** «ottobre 2026». */
-export function monthLabel(day: string): string {
-  return monthYearFormat.format(new Date(utc(day)));
 }
 
 export type DayTone = 'late' | 'today' | 'tomorrow' | 'week' | 'later';

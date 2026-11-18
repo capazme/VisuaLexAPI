@@ -70,6 +70,8 @@ describe('the page frame (W2, U1)', () => {
   it('widens to the full screen\'s frame while a page that declares itself `full` is in it (U1)', async () => {
     const css = await compile([FULL_PAGE_FRAME]);
     expect(css).toMatch(/:has\(\*:is\(\[data-page-width=full\]\)\)\s*\{\s*max-width:\s*var\(--container-frame-full\)/);
+    // Not for a page that is leaving (LC84: `PageSlide`'s inert layer).
+    expect(css).toContain(':not([inert] *)');
   }, 30000);
 
   it('compiles the grid of cards of at least 20rem, and the Forum\'s packs turning into it by their own width (U1 §7)', async () => {

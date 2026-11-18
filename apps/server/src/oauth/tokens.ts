@@ -51,6 +51,16 @@ export async function revokeGrant(grantId: string): Promise<void> {
 }
 
 /**
+ * Every connection of a user, revoked with its tokens (A.1, D3: an administrator's password reset means a forgotten or
+ * compromised password). Inside the caller's transaction when it passes one.
+ */
+export async function revokeUserGrants(userId: string, tx: Prisma.TransactionClient = prisma): Promise<void> {
+  const now = new Date();
+  await tx.oAuthToken.updateMany({ where: { grant: { userId }, revokedAt: null }, data: { revokedAt: now } });
+  await tx.oAuthGrant.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+}
+
+/**
  * The challenge the SDK verifies the PKCE verifier against. A code that is
  * unknown, foreign, or expired without ever being used is `invalid_grant`
  * here; a used one still answers, even past its expiry, so that its replay

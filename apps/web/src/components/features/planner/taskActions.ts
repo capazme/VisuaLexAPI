@@ -61,6 +61,39 @@ export async function completeWithUndo(task: Task, today: string, optimistic: Op
   });
 }
 
+/**
+ * «Completa per sempre»: a repeating task's occurrence is ticked, its rule goes and no next one comes (the server, in one
+ * write). «Annulla» reopens it with the rule back, on the day it kept (L-35): no question before, the toast is enough.
+ */
+export async function completeForeverWithUndo(task: Task, optimistic: Optimistic): Promise<void> {
+  const rule = task.recurrence;
+  if (!rule || !task.plannedDate) return;
+  optimistic.hide(task.id);
+  try {
+    await taskService.complete(task.id, task.plannedDate, true);
+  } catch (error) {
+    refused(task, optimistic, error, 'Non riesco a chiudere la serie. Riprova.');
+    return;
+  }
+  optimistic.landed(task.id);
+  changed();
+  await showUndoToast({
+    action: () => rule,
+    undo: async () => {
+      try {
+        await taskService.reopen(task.id, rule);
+      } catch (error) {
+        notify(failureMessage(error, 'Non riesco ad annullare. Riprova.'), 'error');
+        // Said: no «Ripristinato» after it.
+        throw error;
+      } finally {
+        changed();
+      }
+    },
+    message: 'Serie chiusa',
+  });
+}
+
 /** Moves a task, with its subtasks, to the trash for 30 days, with «Annulla». */
 export async function trashWithUndo(task: Task, optimistic: Optimistic): Promise<void> {
   optimistic.hide(task.id);

@@ -171,7 +171,7 @@ export async function startStubs() {
         return void res.status(409).json({
           detail: 'Prima di creare un percorso devi accettare la dichiarazione sul materiale di studio, in VisuaLex › Percorsi.',
           richiedeTesto: { id: 't1', chiave: 'MATERIALE_STUDIO', versione: 1 },
-          link: '/studia/percorsi',
+          link: '/learn/percorsi',
         });
       }
       const dossier = stub.dossiers.find((d) => d.id === req.body.dossierId);

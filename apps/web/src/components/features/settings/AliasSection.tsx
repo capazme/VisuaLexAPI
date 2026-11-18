@@ -2,8 +2,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Tag, Pencil, Trash2, ArrowRight, AlertCircle, Plus, Package, BookOpen, Search, Info } from 'lucide-react';
-import { Modal } from '../../ui/Modal';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
+import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { cn } from '../../../lib/utils';
 import type { CustomAlias } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
@@ -38,10 +38,9 @@ const ACT_TYPES = [
     { value: 'CDFUE', label: 'CDFUE' },
 ];
 
-export function AliasManager() {
+/** The user's aliases and what the system already knows, a part of the Impostazioni page (LC84: it was a dialog). */
+export function AliasSection() {
     const {
-        aliasManagerOpen,
-        closeAliasManager,
         addCustomAlias,
         updateCustomAlias,
         removeCustomAlias,
@@ -61,7 +60,7 @@ export function AliasManager() {
     // names the resolver understands without any alias at all. Both were
     // invisible here, which is how this screen came to suggest "es. gdpr" as a
     // trigger to create while `gdpr` had been a shipped preset all along.
-    const { catalog, loading: catalogLoading } = useAliasCatalog(aliasManagerOpen);
+    const { catalog, loading: catalogLoading } = useAliasCatalog(true);
     const [catalogFilter, setCatalogFilter] = useState('');
 
     // Edit state
@@ -112,7 +111,7 @@ export function AliasManager() {
         if (!trigger) return null;
         if (trigger.length < 2) return 'Minimo 2 caratteri';
         if (!/^[a-zA-Z0-9\-_.]+$/.test(trigger)) return 'Solo lettere, numeri, - e _';
-        if (isAliasTriggerTaken(trigger)) return 'Trigger già in uso';
+        if (isAliasTriggerTaken(trigger)) return 'Abbreviazione già in uso';
         return null;
     }, [trigger, isAliasTriggerTaken]);
 
@@ -188,38 +187,48 @@ export function AliasManager() {
 
     const aliases = getCustomAliasesSorted();
 
+    // Deleted with «Annulla» (L-35): it leaves the list at once, and the server is told only once the notification has
+    // gone without «Annulla».
+    const deleteWithUndo = (alias: CustomAlias) => {
+        // The focus goes to the next alias (its «Modifica»), or to the section's heading when it was the last.
+        const at = aliases.findIndex((a) => a.id === alias.id);
+        const next = aliases[at + 1] ?? aliases[at - 1];
+        requestAnimationFrame(() => {
+            const target = next
+                ? document.querySelector<HTMLElement>(`[data-alias-edit="${CSS.escape(next.id)}"]`)
+                : document.querySelector<HTMLElement>('#alias h3');
+            if (!next) target?.setAttribute('tabindex', '-1');
+            target?.focus();
+        });
+        void showUndoToast({
+            action: () => { appStore.setState((s) => ({ customAliases: s.customAliases.filter((a) => a.id !== alias.id) })); },
+            undo: () => { appStore.setState((s) => ({ customAliases: [...s.customAliases, alias] })); },
+            message: `Alias «${alias.trigger}» eliminato`,
+        }).then((stands) => {
+            if (!stands) return;
+            // Back for a moment, so the store's removal finds it and tells the server (it puts it back on a refusal).
+            appStore.setState((s) => ({ customAliases: [...s.customAliases, alias] }));
+            void removeCustomAlias(alias.id);
+        });
+    };
+
     return (
-        <Modal
-            isOpen={aliasManagerOpen}
-            onClose={closeAliasManager}
-            title="Alias Personalizzati"
-            size="lg"
-        >
             <div className="space-y-6">
-                {/* Info Banner */}
-                <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-4">
-                    <p className="text-sm text-primary-700 dark:text-primary-300">
-                        Crea abbreviazioni per norme frequenti. Dopo aver creato un alias potrai cercare digitando{' '}
-                        <code className="bg-primary-100 dark:bg-primary-800 px-1.5 py-0.5 rounded text-xs font-mono">
-                            art X [trigger]
-                        </code>
-                        {' '}nella ricerca veloce (⌘K).
-                    </p>
-                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Un’abbreviazione per una norma che usi spesso: nella ricerca (⌘K) scrivi{' '}
+                    <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-800">art 5 abbreviazione</code>.
+                </p>
 
                 {/* Add New Alias Form */}
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-                        <Plus size={16} />
-                        Nuovo Alias
-                    </h3>
+                    <h4 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Nuovo alias</h4>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Trigger + Display Name */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Trigger <span className="text-red-500">*</span>
+                                    Abbreviazione <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -227,7 +236,7 @@ export function AliasManager() {
                                     onChange={(e) => setTrigger(e.target.value.toLowerCase())}
                                     placeholder="es. mio-contratto"
                                     className={cn(
-                                        "w-full px-3 py-2 rounded-lg text-sm",
+                                        "w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm",
                                         "bg-white dark:bg-slate-800 border",
                                         triggerError
                                             ? "border-red-300 dark:border-red-700 focus:ring-red-500"
@@ -253,30 +262,30 @@ export function AliasManager() {
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Nome Display
+                                    Nome mostrato
                                 </label>
                                 <input
                                     type="text"
                                     value={displayName}
                                     onChange={(e) => setDisplayName(e.target.value)}
                                     placeholder="es. GDPR, Privacy"
-                                    className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 />
                             </div>
                         </div>
 
                         {/* Norm Reference Fields */}
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div>
                                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Tipo Atto <span className="text-red-500">*</span>
+                                    Tipo di atto <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     value={actType}
                                     onChange={(e) => setActType(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 >
-                                    <option value="">Seleziona...</option>
+                                    <option value="">Scegli…</option>
                                     {ACT_TYPES.map(at => (
                                         <option key={at.value} value={at.value}>{at.label}</option>
                                     ))}
@@ -291,19 +300,19 @@ export function AliasManager() {
                                     value={actNumber}
                                     onChange={(e) => setActNumber(e.target.value)}
                                     placeholder="es. 679"
-                                    className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Anno/Data
+                                    Anno o data
                                 </label>
                                 <input
                                     type="text"
                                     value={actDate}
                                     onChange={(e) => setActDate(e.target.value)}
                                     placeholder="es. 2016"
-                                    className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 />
                             </div>
                         </div>
@@ -311,14 +320,14 @@ export function AliasManager() {
                         {/* Default Article (optional) */}
                         <div>
                             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                Articolo Default (opzionale)
+                                Articolo predefinito (facoltativo)
                             </label>
                             <input
                                 type="text"
                                 value={defaultArticle}
                                 onChange={(e) => setDefaultArticle(e.target.value)}
                                 placeholder="es. 1"
-                                className="w-24 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-24 min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                         </div>
 
@@ -326,7 +335,7 @@ export function AliasManager() {
                             type="submit"
                             disabled={!canSubmit}
                             className={cn(
-                                "w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors",
+                                "w-full min-h-[44px] md:min-h-0 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors",
                                 "flex items-center justify-center gap-2",
                                 canSubmit
                                     ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
@@ -334,16 +343,16 @@ export function AliasManager() {
                             )}
                         >
                             <Plus size={16} />
-                            Aggiungi Alias
+                            Aggiungi l’alias
                         </button>
                     </form>
                 </div>
 
                 {/* Alias List */}
                 <div>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                        Alias Salvati ({aliases.length})
-                    </h3>
+                    <h4 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        I tuoi alias ({aliases.length})
+                    </h4>
 
                     {aliases.length === 0 ? (
                         <div className="text-center py-8 text-slate-400">
@@ -365,7 +374,7 @@ export function AliasManager() {
                                     onStartEdit={handleStartEdit}
                                     onSaveEdit={handleSaveEdit}
                                     onCancelEdit={handleCancelEdit}
-                                    onDelete={() => removeCustomAlias(alias.id)}
+                                    onDelete={() => deleteWithUndo(alias)}
                                 />
                             ))}
                         </div>
@@ -382,7 +391,7 @@ export function AliasManager() {
                             value={catalogFilter}
                             onChange={(e) => setCatalogFilter(e.target.value)}
                             placeholder="Cerca fra gli alias in dotazione e i nomi riconosciuti…"
-                            className="flex-1 px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                            className="flex-1 min-h-[44px] md:min-h-0 px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                         />
                     </div>
 
@@ -390,12 +399,12 @@ export function AliasManager() {
                         <p className="text-xs text-slate-400 py-3">Carico ciò che il sistema già riconosce…</p>
                     )}
 
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                        <Package size={12} />
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        <Package size={14} aria-hidden />
                         In dotazione ({filteredPresets.length})
-                    </h3>
+                    </h4>
                     <p className="text-[11px] text-slate-400 mb-3">
-                        Alias già pronti. Per cambiarne uno, crea sopra un alias con lo stesso trigger: il tuo ha la precedenza.
+                        Alias già pronti. Per cambiarne uno, crea sopra un alias con la stessa abbreviazione: il tuo ha la precedenza.
                     </p>
                     <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
                         {filteredPresets.map(([trigger, preset]) => (
@@ -419,10 +428,10 @@ export function AliasManager() {
                         )}
                     </div>
 
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-6 mb-2 flex items-center gap-2">
-                        <BookOpen size={12} />
+                    <h4 className="mt-6 mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        <BookOpen size={14} aria-hidden />
                         Nomi riconosciuti ({filteredKnownActs.length})
-                    </h3>
+                    </h4>
                     <p className="text-[11px] text-slate-400 mb-3">
                         Questi puoi scriverli per esteso nella ricerca: non serve alcun alias.
                     </p>
@@ -443,7 +452,6 @@ export function AliasManager() {
                     )}
                 </div>
             </div>
-        </Modal>
     );
 }
 
@@ -474,33 +482,39 @@ function AliasItem({
 }: AliasItemProps) {
     if (isEditing) {
         return (
-            <div className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 border border-primary-200 dark:border-primary-800">
-                <div className="flex gap-2 mb-2">
+            // Esc gives up the change and stays on the page (taken here, before the page's own Esc goes back).
+            <div
+                onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onCancelEdit(); } }}
+                className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 border border-primary-200 dark:border-primary-800"
+            >
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row">
                     <input
                         type="text"
                         value={editTrigger}
                         onChange={(e) => onEditTriggerChange(e.target.value.toLowerCase())}
-                        className="flex-1 px-2 py-1 rounded text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                        placeholder="Trigger"
+                        className="flex-1 min-h-[44px] md:min-h-0 px-2 py-1 rounded text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                        placeholder="Abbreviazione"
                     />
                     <input
                         type="text"
                         value={editDisplayName}
                         onChange={(e) => onEditDisplayNameChange(e.target.value)}
-                        className="flex-1 px-2 py-1 rounded text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                        placeholder="Nome display"
+                        className="flex-1 min-h-[44px] md:min-h-0 px-2 py-1 rounded text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                        placeholder="Nome mostrato"
                     />
                 </div>
                 <div className="flex gap-2 justify-end">
                     <button
+                        type="button"
                         onClick={onCancelEdit}
-                        className="px-3 py-1 text-xs rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300"
+                        className="min-h-[44px] md:min-h-0 px-3 py-1 text-xs rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300"
                     >
                         Annulla
                     </button>
                     <button
+                        type="button"
                         onClick={onSaveEdit}
-                        className="px-3 py-1 text-xs rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
+                        className="min-h-[44px] md:min-h-0 px-3 py-1 text-xs rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
                     >
                         Salva
                     </button>
@@ -543,16 +557,22 @@ function AliasItem({
                     <span className="block text-[11px] text-slate-400/80">{formatLastUsed(alias.lastUsedAt)}</span>
                 )}
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* In sight at every width: on a page, not under a pointer only (a phone has none, the keyboard neither). */}
+            <div className="flex gap-1">
                 <button
+                    type="button"
                     onClick={() => onStartEdit(alias)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                    data-alias-edit={alias.id}
+                    aria-label={`Modifica l’alias ${alias.trigger}`}
+                    className="grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                 >
                     <Pencil size={14} />
                 </button>
                 <button
+                    type="button"
                     onClick={onDelete}
-                    className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500"
+                    aria-label={`Elimina l’alias ${alias.trigger}`}
+                    className="grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-500 hover:bg-red-100 hover:text-red-600 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-red-900/30"
                 >
                     <Trash2 size={14} />
                 </button>

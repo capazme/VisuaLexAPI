@@ -132,7 +132,7 @@ describe('the validator flag, from the administrator’s page', () => {
     const created = await request(app)
       .post('/api/admin/users')
       .set(authHeader(admin))
-      .send({ email: 'flag-new@test.local', username: 'flag-new', password: 'secret' });
+      .send({ email: 'flag-new@test.local', username: 'flag-new', password: 'Secret123' });
     expect(created.status).toBe(201);
     expect(created.body.lingo_validatore).toBe(false);
   });

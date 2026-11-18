@@ -92,6 +92,18 @@ describe('omnilex_leggi_pratica', () => {
     await client.close();
   });
 
+  it('lists a recital and a note about it by the recital’s citation (spec 2026-11-17 §6.4)', async () => {
+    env.stub.dossiers[0].items.push(
+      { id: 'r1', item_type: 'norm', title: 'considerando 26, reg. (UE) 2016/679', citation: 'considerando 26, reg. (UE) 2016/679', content: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' }, created_by: null },
+      { id: 'r2', item_type: 'note', title: 'Nota', citation: null, content: 'Sul dato anonimo.', created_by: null, about_item_id: 'r1' },
+    );
+    const client = await connect();
+    const out = text(await client.callTool({ name: 'omnilex_leggi_pratica', arguments: { dossier: 'Rossi c. Bianchi' } }));
+    expect(out).toContain('[r1] norm · considerando 26, reg. (UE) 2016/679');
+    expect(out).toContain('[r2] nota su considerando 26, reg. (UE) 2016/679');
+    await client.close();
+  });
+
   it('leaves the notes’ text out without «Leggere i testi»', async () => {
     const client = await connect('old');
     const out = text(await client.callTool({ name: 'omnilex_leggi_pratica', arguments: { dossier: 'd1' } }));

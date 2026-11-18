@@ -1,5 +1,6 @@
 import { postLegalApi, SourceUnavailable } from '../norms/resolveReference';
 import { decisionKeyOf } from '../norms/resolveDecisions';
+import { isRecitalContent } from '../schemas/recitalEntry';
 import { parseDecisionItemContent } from '../schemas/decisionItem';
 import { partOf } from '../norms/parts';
 import { wireNormaKey } from '../services/studyImport';
@@ -229,6 +230,8 @@ export interface EntryText {
 }
 
 export class EntryHasNoText extends Error {}
+/** A recital entry (a `norm` entry with `considerando`): its text is not read here yet (spec 2026-11-17 §6.3). */
+export class RecitalHasNoText extends Error {}
 /** A norm entry whose stored content names no act or article: its data are incomplete, not a note. */
 export class EntryUnreadable extends Error {}
 export class TextUnavailable extends Error {}
@@ -249,6 +252,7 @@ type Entry = { itemType: string; content: unknown };
 /** Reads the entry's text through the Python API, as the dossier's reader does. */
 export async function readEntryText(item: Entry, signal: AbortSignal = AbortSignal.timeout(TEXT_BUDGET_MS)): Promise<EntryText> {
   try {
+    if (item.itemType === 'norm' && isRecitalContent(item.content)) throw new RecitalHasNoText();
     if (item.itemType === 'norm') return await readNorm(item.content, signal);
     if (item.itemType === 'sentenza') return await readDecision(item.content, signal);
   } catch (error) {

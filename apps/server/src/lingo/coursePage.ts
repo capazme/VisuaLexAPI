@@ -4,7 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { LIMITS } from '../schemas/lingo/corso';
 import { checkCardRank, wantsCheckCards } from './courseMastery';
 import { evaluatePassed, masteryFor, serializeMastery, type CourseMastery } from './courseProgress';
-import { countingModules, courseState, EXAM_PAUSE_DAYS, NOT_FOUND } from './courses';
+import { countingModules, courseState, EXAM_PAUSE_DAYS, goalView, NOT_FOUND } from './courses';
 import { EXAM_PASS, examIsOpen } from './courseStudy';
 import { COURSE_MISSION, MODULE_MISSION, settleMissions, type XpCredito } from './missions';
 import { REVIEWABLE_OWN_STATES, reviewScope } from './reviewQueue';
@@ -207,6 +207,7 @@ export async function readCoursePage(userId: string, corsoId: string, today: str
     descrizione: corso.descrizione,
     stato,
     superatoIl: superatoIl && dateToDay(superatoIl),
+    ...goalView(enrolment),
     moduliPrevisti: corso.moduliPrevisti,
     competenze: mastery.competenze.map((c) => serializeMastery(c, mastery.padronanza.get(c.id)!)),
     moduli,
@@ -277,7 +278,10 @@ export async function readToday(userId: string, today: string) {
   });
   const enrolments = await prisma.lingoCorsoIscrizione.findMany({
     where: { utenteId: userId, corsoId: { in: courses.map((c) => c.id) } },
-    select: { id: true, corsoId: true, stati: { select: { moduloId: true, fattoGiorno: true, ritiratoIl: true } } },
+    select: {
+      id: true, corsoId: true, obiettivo: true, obiettivoNota: true, dataEsame: true,
+      stati: { select: { moduloId: true, fattoGiorno: true, ritiratoIl: true } },
+    },
   });
   const byCourse = new Map(enrolments.map((e) => [e.corsoId, e]));
   const mastery = await masteryFor(prisma, userId, enrolments, today);
@@ -296,7 +300,7 @@ export async function readToday(userId: string, today: string) {
     const verifica = await checkCardIds(prisma, userId, scope, m, dueStates.map((s) => s.cardId), today);
     if (!next && dueStates.length === 0 && verifica.length === 0) continue;
     out.push({
-      corso: { id: corso.id, titolo: corso.titolo, materia: corso.materia },
+      corso: { id: corso.id, titolo: corso.titolo, materia: corso.materia, ...goalView(enrolment) },
       modulo: next ? { id: next.id, ordine: next.ordine, titolo: next.titolo } : null,
       schede: { dovute: dueStates.length, verifica: verifica.length },
     });

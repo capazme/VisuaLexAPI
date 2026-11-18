@@ -12,7 +12,7 @@
  */
 import type { Prisma } from '@prisma/client';
 import { rebuildDecisionEntry } from '../schemas/decisionItem';
-import { rebuildNormEntry } from '../schemas/normEntry';
+import { isRecitalEntry, rebuildNormEntry } from '../schemas/normEntry';
 import { MAX_NOTE_LENGTH as MAX_NOTE } from '../controllers/dossierController';
 
 
@@ -45,6 +45,8 @@ export function rebuildDossierEntry(raw: unknown): EntryCheck {
   if (e.articleRef !== undefined && e.articleRef !== null) {
     const norm = rebuildNormEntry(e.articleRef);
     if (!norm.ok) return { ok: false, reason: norm.reason };
+    // The Forum learns recitals in a later round (spec 2026-11-17 §6.2).
+    if (isRecitalEntry(norm.entry)) return { ok: false, reason: 'I considerando non si possono ancora proporre nel Forum.' };
     return { ok: true, entry: { articleRef: norm.entry as unknown as Prisma.InputJsonObject, ...star } };
   }
   if (typeof e.note === 'string') {

@@ -1,5 +1,17 @@
 import { create } from 'zustand';
 
+const GROUPING_KEY = 'visualex-opus-today-grouping';
+export type Grouping = 'date' | 'dossier';
+
+/** The grouping «Scadenziario» was left on, in this browser: a convenience, so a storage that throws reads as the default. */
+function storedGrouping(): Grouping {
+  try {
+    return localStorage.getItem(GROUPING_KEY) === 'dossier' ? 'dossier' : 'date';
+  } catch {
+    return 'date';
+  }
+}
+
 export interface PlannerNotice {
   message: string;
   type: 'success' | 'error' | 'info';
@@ -35,6 +47,12 @@ export const plannerStore = create<{
   /** The groups folded on the views («Termini scaduti», a day, a dossier), by their key, for the session. */
   folded: Readonly<Record<string, true>>;
   toggleFolded: (key: string) => void;
+  /** «Raggruppa» of «Scadenziario»: in the page's header (`OpusPage`), read by the view (`TodayView`). */
+  grouping: Grouping;
+  setGrouping: (grouping: Grouping) => void;
+  /** The inbox's tasks, for its tab: the one view with no group to carry its count (LC83). Null until read. */
+  inboxCount: number | null;
+  setInboxCount: (count: number | null) => void;
 }>()((set) => ({
   version: 0,
   changed: () => set((s) => ({ version: s.version + 1 })),
@@ -56,6 +74,17 @@ export const plannerStore = create<{
       else folded[key] = true;
       return { folded };
     }),
+  grouping: storedGrouping(),
+  setGrouping: (grouping) => {
+    try {
+      localStorage.setItem(GROUPING_KEY, grouping);
+    } catch {
+      // Kept for this visit only.
+    }
+    set({ grouping });
+  },
+  inboxCount: null,
+  setInboxCount: (inboxCount) => set({ inboxCount }),
 }));
 
 /** A server refusal's own words (Italian, and never a title: `routes/tasks.ts`), else ours. */

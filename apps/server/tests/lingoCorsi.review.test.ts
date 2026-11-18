@@ -318,7 +318,7 @@ describe('«Oggi» (`GET /oggi`)', () => {
     const { id, moduleIds } = await course(alice, token, 2, { moduliPrevisti: 2 });
     setClock(`${TODAY}T09:00:00Z`);
     const today = async () => (await request(app).get(`${CORSI}/oggi`).set(a)).body;
-    expect(await today()).toEqual([{ corso: { id, titolo: 'Proprietà intellettuale', materia: 'DIRITTO_CIVILE' }, modulo: { id: moduleIds[0], ordine: 1, titolo: 'Modulo 1' }, schede: { dovute: 0, verifica: 0 } }]);
+    expect(await today()).toEqual([{ corso: { id, titolo: 'Proprietà intellettuale', materia: 'DIRITTO_CIVILE', obiettivo: null, dataEsame: null }, modulo: { id: moduleIds[0], ordine: 1, titolo: 'Modulo 1' }, schede: { dovute: 0, verifica: 0 } }]);
     await studyModule(a, id, moduleIds[0]);
     expect(await today()).toEqual([]);
     setClock(`${TOMORROW}T09:00:00Z`);
