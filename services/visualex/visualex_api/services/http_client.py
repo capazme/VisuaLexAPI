@@ -2,7 +2,7 @@ import asyncio
 import random
 import time
 from typing import Dict, Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 import structlog
@@ -29,6 +29,32 @@ def _host_of(url: str) -> Optional[str]:
         return urlparse(url).hostname
     except ValueError:
         return None
+
+
+def redirect_guard() -> aiohttp.TraceConfig:
+    """Checks every redirect against the allow-list before aiohttp follows it (item 15 of the
+    security inventory). Without it only the first address was checked, and a declared source that
+    redirected elsewhere took the scraper to any host, an internal one included."""
+
+    async def on_redirect(_session, _ctx, params) -> None:
+        # The header aiohttp follows: Location, else URI (aiohttp's own fallback). With neither it stops.
+        location = params.response.headers.get("Location") or params.response.headers.get("URI")
+        if not location:
+            return
+        target = urljoin(str(params.url), location)
+        if not is_allowed(target):
+            log.error("Blocked redirect to undeclared host", host=_host_of(target))
+            raise NetworkError(f"Rinvio verso un host non consentito: {_host_of(target) or '?'}", status_code=403)
+
+    trace = aiohttp.TraceConfig()
+    trace.on_request_redirect.append(on_redirect)
+    return trace
+
+
+def new_session(**kwargs) -> aiohttp.ClientSession:
+    """An aiohttp session whose redirects are checked (`redirect_guard`). Every session passed to
+    `ThrottledHttpClient.request` must come from here."""
+    return aiohttp.ClientSession(trace_configs=[redirect_guard()], **kwargs)
 
 
 class HttpResult:
@@ -60,7 +86,7 @@ class ThrottledHttpClient:
             if self._session is None or self._session.closed:
                 timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
                 connector = aiohttp.TCPConnector()  # certificate verification enabled
-                self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+                self._session = new_session(connector=connector, timeout=timeout)
             return self._session
 
     async def close(self) -> None:

@@ -111,8 +111,7 @@ async def fetch_from_cellar(url: str) -> str:
 
     Two requests: the CELEX resource answers a 303 to the Italian expression's document, then
     the document. The redirect is followed here, not by aiohttp: CELLAR points to plain http,
-    and the client does not re-check a redirect's host, so each hop is moved to https and
-    checked against the allow-list before it is asked."""
+    so each hop is moved to https and checked against the allow-list before it is asked."""
     celex = celex_of(url)
     if celex is None:
         raise DocumentNotFoundError(f"Nessun CELEX da chiedere a CELLAR per {url[:80]}", urn=url)
