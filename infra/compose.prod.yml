@@ -25,9 +25,9 @@
 # needs its key on every route since the security line's A.2 — is spelled out in the
 # spec, sections 4.2 (R1, R2) and 8 (H1).
 #
-# MERL-T's port is not published in production (compose.yml publishes it on the loopback
-# for development): only the server calls it, by container name, so nothing on the host
-# should reach it there.
+# MERL-T's port and mcp-legal-it's are not published in production (compose.yml publishes
+# them on the loopback for development): only the server calls MERL-T, and only MERL-T calls
+# mcp-legal-it, each by container name, so nothing on the host should reach them there.
 #
 # The stores keep publishing on the loopback, as in compose.yml: the backup tool
 # (scripts/backup.sh) reaches them there.
@@ -91,6 +91,7 @@ services:
     <<: *hardening
     restart: unless-stopped
     networks: [app]
+    ports: !reset []
     logging: *logging
   merlt-api:
     <<: *hardening
