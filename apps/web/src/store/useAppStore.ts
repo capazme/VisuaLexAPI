@@ -30,7 +30,7 @@ import { highlightColorName, isHighlightColor, sanitizeHighlightMeanings } from 
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
-import { dossierService, type DossierItemApi } from '../services/dossierService';
+import { dossierService } from '../services/dossierService';
 import { annotationService } from '../services/annotationService';
 import { highlightService } from '../services/highlightService';
 import { environmentService, type EnvironmentApi } from '../services/environmentService';
@@ -176,7 +176,64 @@ export interface ImportOutcome {
     id: string;
     imported: number;
     failed: number;
+    /** The server's own words for a cap it hit (409, G-576), each once: «Una pratica può contenere al massimo …». */
+    refusals?: string[];
+    /** Stopped before the end: the first item not sent, for `resume`. */
+    next?: number;
+    /** Why it stopped: the server kept asking to slow down (429), or the connection or the server failed (no answer, 5xx). */
+    stopped?: 'rate' | 'network';
 }
+
+/** How an import runs: where it is said, and where a stopped one goes on (the same dossier, from `from`). */
+export interface ImportOptions {
+    onProgress?: (progress: ImportProgress) => void;
+    resume?: { id: string; from: number };
+}
+
+/**
+ * The pace of an import's writes, under the server's write limit (`WRITE_POINTS`, 200 a minute per user): one every
+ * 320 ms is about 187 a minute, a margin for the page's other writes. A 429 still met waits and tries again, at most
+ * `IMPORT_RETRIES` times for one item; then the import stops, and nothing past it is counted as refused.
+ */
+export const IMPORT_PACE_MS = 320;
+const IMPORT_RETRIES = 3;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Where an import is: the items in so far in this run, of how many in all, and whether it waits after a 429. */
+export interface ImportProgress {
+    done: number;
+    total: number;
+    waiting: boolean;
+    /** What it waits for, while `waiting`. */
+    reason?: 'rate' | 'network';
+}
+
+/** What a wait and another try may get through: the write limit (429), the server failing (5xx), no answer at all. */
+const transientFailure = (err: unknown): 'rate' | 'network' | null => {
+    const status = (err as { status?: number } | null)?.status;
+    if (status === 429) return 'rate';
+    return status === undefined || status >= 500 ? 'network' : null;
+};
+
+/** After a 429: the server's `Retry-After`, else waits that grow (2, 4, 8 … s, at most a minute). */
+const retryWaitMs = (err: unknown, attempt: number): number => {
+    const seconds = Number((err as { retryAfter?: unknown } | null)?.retryAfter);
+    return (Number.isFinite(seconds) && seconds > 0 ? seconds : Math.min(2 ** (attempt + 1), 60)) * 1000;
+};
+
+/** An import the server refused whole, a cap on the dossiers (409): its words. */
+export interface ImportRefused {
+    refused: string;
+}
+
+/** The codes of the server's caps (`apps/server/src/utils/dossierCaps.ts`); another 409 («Already exists») is not one. */
+const CAP_CODES = new Set(['dossier_limit', 'dossier_items_limit', 'account_items_limit']);
+
+/** A cap's Italian words, as `services/api.ts` rejects them (`message` is the server's `detail`); anything else: null. */
+const capRefusal = (err: unknown): string | null => {
+    const e = err as { status?: number; message?: unknown; data?: { error?: unknown } } | null;
+    return e?.status === 409 && CAP_CODES.has(String(e.data?.error)) && typeof e.message === 'string' && e.message ? e.message : null;
+};
 
 interface AppState {
     settings: AppSettings;
@@ -579,7 +636,7 @@ interface AppState {
     flushDossierOrder: (dossierId: string) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
-    importDossier: (dossier: Dossier) => Promise<ImportOutcome | null>; // null when the dossier itself could not be created
+    importDossier: (dossier: Dossier, options?: ImportOptions) => Promise<ImportOutcome | ImportRefused | null>; // null when the dossier itself could not be created
 
     addAnnotation: (normaKey: string, articleId: string, text: string, anchor?: { anchorText: string; startOffset: number }) => void;
     removeAnnotation: (id: string) => void;
@@ -2281,44 +2338,82 @@ const appStore = createStore<AppState>()(
                 })();
             },
 
-            importDossier: async (dossier) => {
+            importDossier: async (dossier, { onProgress, resume } = {}) => {
                 // Persist the dossier server-side first: any `addItem` call later
                 // (add note, add norma) does `findFirst({ id, userId })` on the
                 // server and 404s if we only populated the local store. Create
                 // the shell, recreate items in parallel, then push the fully
                 // populated dossier with server ids into the store.
                 try {
-                    const created = await dossierService.create({
-                        name: dossier.title,
-                        description: dossier.description,
-                        ...(dossier.tags && dossier.tags.length > 0 && { tags: dossier.tags }),
-                    });
+                    // Resumed: the dossier the first run made, already in the store.
+                    const held = resume ? get().dossiers.find((d) => d.id === resume.id) : undefined;
+                    const created = resume
+                        ? { id: resume.id, created_at: held?.createdAt ?? new Date().toISOString() }
+                        : await dossierService.create({
+                            name: dossier.title,
+                            description: dossier.description,
+                            ...(dossier.tags && dossier.tags.length > 0 && { tags: dossier.tags }),
+                        });
 
-                    const itemResults = await Promise.allSettled(
-                        dossier.items.map(async (item) => {
-                            const serverItem = await dossierService.addItem(created.id, {
-                                ...serverItemFor(item),
-                                content: itemContentFor(item),
-                            });
-                            return { serverItem, original: item };
-                        })
-                    );
-
-                    const items: DossierItem[] = itemResults
-                        .filter((r): r is PromiseFulfilledResult<{ serverItem: DossierItemApi; original: DossierItem }> => r.status === 'fulfilled')
-                        .map((r) => ({
-                            ...r.value.original,
-                            id: r.value.serverItem.id,
-                            addedAt: r.value.serverItem.created_at,
-                            ...serverFieldsFromApi(r.value.serverItem),
-                        }));
-
-                    const failedCount = itemResults.filter((r) => r.status === 'rejected').length;
-                    if (failedCount > 0) {
-                        console.warn(`importDossier: ${failedCount}/${dossier.items.length} items failed to sync`);
+                    // One at a time, in order and at the limit's pace: a burst would meet 429s. A cap (409, G-576)
+                    // refuses every later item too: they are counted with it, not sent.
+                    const items: DossierItem[] = [];
+                    let failedCount = 0;
+                    let refusal: string | null = null;
+                    let next: number | undefined;
+                    let stopped: 'rate' | 'network' | undefined;
+                    let lastSent = 0;
+                    const total = dossier.items.length;
+                    for (let index = resume?.from ?? 0; index < total; index++) {
+                        const item = dossier.items[index];
+                        if (refusal) {
+                            failedCount++;
+                            continue;
+                        }
+                        let attempt = 0;
+                        for (;;) {
+                            const wait = lastSent + IMPORT_PACE_MS - Date.now();
+                            if (lastSent > 0 && wait > 0) await sleep(wait);
+                            lastSent = Date.now();
+                            try {
+                                const serverItem = await dossierService.addItem(created.id, {
+                                    ...serverItemFor(item),
+                                    content: itemContentFor(item),
+                                });
+                                items.push({ ...item, id: serverItem.id, addedAt: serverItem.created_at, ...serverFieldsFromApi(serverItem) });
+                                break;
+                            } catch (err) {
+                                // The limit, the server or the connection: wait and try again; still failing, stop here.
+                                const transient = transientFailure(err);
+                                if (transient && attempt < IMPORT_RETRIES) {
+                                    onProgress?.({ done: items.length, total, waiting: true, reason: transient });
+                                    await sleep(retryWaitMs(err, attempt++));
+                                    continue;
+                                }
+                                if (transient) {
+                                    next = index;
+                                    stopped = transient;
+                                } else {
+                                    refusal = capRefusal(err);
+                                    failedCount++;
+                                }
+                                break;
+                            }
+                        }
+                        if (next !== undefined) break;
+                        onProgress?.({ done: items.length, total, waiting: false });
                     }
+                    if (failedCount > 0) {
+                        console.warn(`importDossier: ${failedCount}/${total} items failed to sync`);
+                    }
+                    const refusals = refusal ? [refusal] : [];
 
                     set((state) => {
+                        const resumed = resume && state.dossiers.find((d) => d.id === resume.id);
+                        if (resumed) {
+                            resumed.items.push(...items);
+                            return;
+                        }
                         upsertById(state.dossiers, {
                             id: created.id,
                             title: dossier.title,
@@ -2329,10 +2424,17 @@ const appStore = createStore<AppState>()(
                             isPinned: !!dossier.isPinned,
                         });
                     });
-                    return { id: created.id, imported: items.length, failed: failedCount };
+                    return {
+                        id: created.id,
+                        imported: items.length,
+                        failed: failedCount,
+                        ...(refusals.length > 0 && { refusals }),
+                        ...(next !== undefined && { next, stopped }),
+                    };
                 } catch (err) {
                     console.error('Failed to import dossier:', err);
-                    return null;
+                    const refused = capRefusal(err);
+                    return refused ? { refused } : null;
                 }
             },
 

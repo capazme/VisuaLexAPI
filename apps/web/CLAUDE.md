@@ -3213,7 +3213,16 @@ meant to stay split; add new features as new files, not inside the shells:
   wraps under the order; every button and menu of `features/dossier/` is a common one (`pratiche.guard.test.ts`: a
   bare `<button>` or `<select>` only with `bare-button: <reason>` on the line above); on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: an EB Garamond title, the
   counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
-  always there at 44 px; with no dossier, a composed empty state, words and two actions, no drawing since LC21), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  always there at 44 px; with no dossier, a composed empty state, words and two actions, no drawing since LC21;
+  «Modifica pratica» and «Importa una pratica» open in the page since LC107 (L-73; `EditDossierPanel`,
+  `ImportDossierPanel` on `ui/Expand`): at the top of the list (a share link's `?import=` is read there) and under the
+  dossier's header; an import the server cut short (its caps, a 409 in Italian, G-576) stays open and says how many
+  items came in and why the others did not, in the server's words; a whole one opens the new dossier. The items go
+  one at a time at the write limit's pace (`IMPORT_PACE_MS`, under `WRITE_POINTS`' 200 a minute); a 429, a 5xx or no
+  answer waits (`Retry-After`, else 2, 4, 8 s) and tries again, and if it keeps failing the import stops, says why
+  («Connessione persa», the server asking to slow down), counts what is left as «non ancora importate» (never
+  «scartate», which is a cap's 409) and offers «Riprendi» into the same dossier; while it runs the browser asks
+  before the page is left (`beforeunload`, L-74) and a line says that leaving stops it), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
   (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),

@@ -10,17 +10,17 @@ import {
   BookOpen,
   Plus,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeItemCounts, decisionCitationOf, importReport, importToastType, validateImportedDossier, type ImportCheck,
+  formatTimestampLong, computeItemCounts, decodeDossierShare, decisionCitationOf, validateImportedDossier,
 } from './dossierUtils';
-import { EditDossierModal } from './EditDossierModal';
-import { ImportDossierModal } from './ImportDossierModal';
+import { EditDossierPanel } from './EditDossierPanel';
+import { ImportDossierPanel, type ImportRequest } from './ImportDossierPanel';
 import type { Dossier, DossierKind } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { sectionOfDossierKind, useDossierKind } from '../../../features/sections/useSection';
@@ -64,7 +64,7 @@ const SORT_CHOICES: { id: SortBy; label: string }[] = [
 ];
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
-  const { dossiers, updateDossier, importDossier } = useAppStore();
+  const { dossiers, updateDossier } = useAppStore();
   const isLoadingData = useAppStore((s) => s.isLoadingData);
   const navigate = useNavigate();
 
@@ -80,9 +80,28 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
-  const [importing, setImporting] = useState<ImportCheck | null>(null);
+  const [importing, setImporting] = useState<ImportRequest | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // A share link's `?import=` opens the import at the top of the list (LC107): synced into state and the external
+  // signal cleared in the same transaction (see CLAUDE.md gotcha #11).
+  useEffect(() => {
+    const importData = searchParams.get('import');
+    if (!importData) return;
+    try {
+      const decoded = decodeDossierShare(decodeURIComponent(importData));
+      // A share link is untrusted: its decision items are checked, and what cannot be imported is listed.
+      const check = validateImportedDossier(JSON.parse(decoded));
+      if (!check) throw new Error('not a dossier');
+      setImporting({ ...check, fromLink: true });
+    } catch (e) {
+      console.error('Failed to parse import data:', e);
+      showToast('Link di importazione non valido', 'error');
+    }
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams, showToast]);
 
   // The categories of the dossiers this section lists, so none of them filters to an empty list.
   const categories = useMemo(() => tagCategories(
@@ -147,7 +166,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   };
 
 
-  // JSON file import: opens the same preview modal used by share-link imports.
+  // JSON file import: opens the same preview as a share link's.
   const triggerFileImport = () => fileInputRef.current?.click();
 
   // Page-scoped keyboard shortcuts:
@@ -203,20 +222,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       console.error('JSON import failed:', err);
       showToast(`File JSON non valido${err instanceof Error && err.message ? `: ${err.message}` : ''}`, 'error');
     }
-  };
-
-  const handleConfirmJsonImport = async () => {
-    if (!importing) return;
-    const { dossier, discarded } = importing;
-    setImporting(null);
-    const outcome = await importDossier(dossier);
-    if (!outcome) {
-      showToast('Impossibile importare la pratica: errore server', 'error');
-      return;
-    }
-    const lost = outcome.failed + discarded.length;
-    showToast(importReport(outcome.imported, lost), importToastType(outcome.imported, lost));
-    onSelect(outcome.id);
   };
 
   return (
@@ -291,6 +296,15 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
         onChange={handleFileChange}
         className="hidden"
         aria-hidden
+      />
+
+      {/* «Modifica» and «Importa» open here, at the top of the list, in the page (LC107, L-73). */}
+      <EditDossierPanel dossier={editingDossier} onClose={() => setEditingDossier(null)} onSave={handleUpdateDossier} />
+      <ImportDossierPanel
+        check={importing}
+        onClose={() => setImporting(null)}
+        onOpen={(id) => { setImporting(null); onSelect(id); }}
+        showToast={showToast}
       />
 
       {/* The search, then the two menus: one row on a computer; on a phone the search on its own row and the
@@ -488,23 +502,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       </div>
 
       <DossierModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-
-      {editingDossier && (
-        <EditDossierModal
-          dossier={editingDossier}
-          onClose={() => setEditingDossier(null)}
-          onSave={handleUpdateDossier}
-        />
-      )}
-
-      {importing && (
-        <ImportDossierModal
-          dossier={importing.dossier}
-          discarded={importing.discarded}
-          onClose={() => setImporting(null)}
-          onConfirm={handleConfirmJsonImport}
-        />
-      )}
     </PageFrame>
   );
 }
