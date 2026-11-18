@@ -84,10 +84,17 @@ _EU_SECTOR_3 = {"regolamento ue": "R", "direttiva ue": "L"}
 
 
 def eu_identity(tipo_atto: str, data: Optional[str], numero_atto: Optional[str],
-                articolo: Optional[str] = None) -> Optional[str]:
-    """``celex:32016R0679`` for the act, ``celex:32016R0679~art5`` for an article; None when the
-    act is not one of the Union's or its year and number are not both known."""
+                articolo: Optional[str] = None, considerando: Optional[str] = None) -> Optional[str]:
+    """``celex:32016R0679`` for the act, ``celex:32016R0679~art5`` for an article,
+    ``celex:32016R0679~rct26`` for a recital (``rct`` is EUR-Lex's own name for it, ``div#rct_26``;
+    spec 2026-11-17 §2.1); None when the act is not one of the Union's or its year and number are
+    not both known. A treaty has no numbered recitals: None. An article and a recital together
+    are no one thing: ValueError."""
+    if articolo and considerando:
+        raise ValueError("an article or a recital, not both")
     kind = (tipo_atto or "").strip().lower()
+    if considerando and kind in _TREATY_CELEX:
+        return None
     if kind in _TREATY_CELEX:
         celex = _TREATY_CELEX[kind]
     elif kind in _EU_SECTOR_3:
@@ -99,6 +106,8 @@ def eu_identity(tipo_atto: str, data: Optional[str], numero_atto: Optional[str],
     else:
         return None
     key = f"celex:{celex}"
+    if considerando:
+        return f"{key}~rct{considerando}"
     return f"{key}~art{articolo.replace('-', '')}" if articolo else key
 
 
@@ -245,6 +254,25 @@ def _is_default_annex(norm: Mapping[str, Any], annex: str) -> bool:
 def cite_act(norm: Mapping[str, Any]) -> str:
     """The act alone: "l. 7 agosto 1990, n. 241", "c.c.", "reg. (UE) 2016/679"."""
     return _act(norm)[0]
+
+
+def recital_numbers(spec: str) -> str:
+    """«26», «26 e 27», «26, 27 e 30», «26-30»: a list joins with commas and «e», a range keeps its dash."""
+    numbers = [n.strip() for n in spec.split(",") if n.strip()]
+    if len(numbers) < 2:
+        return spec.strip()
+    return f"{', '.join(numbers[:-1])} e {numbers[-1]}"
+
+
+def cite_recital(norm: Mapping[str, Any]) -> str:
+    """«considerando 26, reg. (UE) 2016/679» (spec 2026-11-17 §2.2): the word written out, never
+    «cons.», and the act as `cite_act` writes it. A list reads «considerando 26 e 27, …» (the word
+    is invariable), a range «considerando 26-30, …». Only a regulation or a directive of the Union
+    has numbered recitals: anything else is a ValueError."""
+    if _key(_text(norm, "tipo_atto")) not in _EU:
+        raise ValueError("only an EU regulation or directive has numbered recitals")
+    act, joiner = _act(norm)
+    return f"considerando {recital_numbers(_text(norm, 'considerando'))}{joiner}{act}"
 
 
 def cite_article(norm: Mapping[str, Any]) -> str:
