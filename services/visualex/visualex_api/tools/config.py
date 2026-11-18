@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Any, List, Optional
 
 BASE_PATH = Path(__file__).resolve().parents[2]
 
@@ -41,7 +40,7 @@ HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", 30))
 # the stream ends with an error line naming what was not sent. Most articles take 1.5-3 s; the
 # allowance leaves room for the HTTP client's retries. The cap bounds what one request may hold
 # open (a client that never reads holds its generator). The defaults give 180 articles their
-# full allowance, above the per-request article ceiling (100), so the cap never cuts a request
+# full allowance, above the per-request article ceiling (150), so the cap never cuts a request
 # that ceiling lets through; raise the cap with the ceiling if it ever goes past 180.
 STREAM_SECONDS_PER_ARTICLE = max(1.0, float(os.getenv("STREAM_SECONDS_PER_ARTICLE") or 30))
 # A short request keeps at least the 60 s it had under the framework's own limit.
@@ -58,61 +57,3 @@ AKN_CACHE_MAX_ACTS = int(os.getenv("AKN_CACHE_MAX_ACTS", "40"))
 
 FETCH_QUEUE_WORKERS = int(os.getenv("FETCH_QUEUE_WORKERS", 2))
 FETCH_QUEUE_DELAY = float(os.getenv("FETCH_QUEUE_DELAY", 0.3))
-
-
-class Settings:
-    """
-    Configuration settings manager.
-    
-    Provides access to configuration values via environment variables
-    with sensible defaults.
-    """
-    
-    def __init__(self) -> None:
-        self._cache: dict = {}
-    
-    def get(self, key: str, default: Any = None) -> Any:
-        """
-        Get a configuration value.
-        
-        Args:
-            key: The configuration key (will be uppercased for env var lookup)
-            default: Default value if not found
-            
-        Returns:
-            The configuration value
-        """
-        if key in self._cache:
-            return self._cache[key]
-        
-        env_key = key.upper().replace(".", "_")
-        value = os.getenv(env_key, default)
-        self._cache[key] = value
-        return value
-    
-    def get_list(self, key: str, default: Optional[List[str]] = None) -> List[str]:
-        """
-        Get a configuration value as a list.
-        
-        Args:
-            key: The configuration key
-            default: Default list if not found
-            
-        Returns:
-            List of configuration values
-        """
-        if default is None:
-            default = []
-        
-        value = self.get(key)
-        if value is None:
-            return default
-        
-        if isinstance(value, list):
-            return value
-        
-        # Parse comma-separated string
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        
-        return default

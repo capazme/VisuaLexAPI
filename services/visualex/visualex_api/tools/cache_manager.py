@@ -106,15 +106,6 @@ class CacheManager:
             "act_dates": _create_cache("act_dates", ttl=365 * 24 * 3600),
         }
 
-        self.stats: Dict[str, int] = {
-            "hits": 0,
-            "misses": 0,
-            "warmup_count": 0,
-        }
-
-        self._warmup_complete = False
-        self._warmup_started = False
-
         self._initialized = True
         backend_type = type(next(iter(self.persistent.values()))).__name__
         log.info(
@@ -136,10 +127,8 @@ class CacheManager:
         value = await cache.get(key)
 
         if value is not None:
-            self.stats["hits"] += 1
             log.debug("Cache hit", namespace=namespace, key=key[:50])
         else:
-            self.stats["misses"] += 1
             log.debug("Cache miss", namespace=namespace, key=key[:50])
 
         return value
@@ -149,33 +138,6 @@ class CacheManager:
         cache = self.get_persistent(namespace)
         await cache.set(key, value)
         log.debug("Cache set", namespace=namespace, key=key[:50])
-
-    def get_stats(self) -> Dict[str, Any]:
-        self._init_caches()
-        total = self.stats["hits"] + self.stats["misses"]
-        hit_rate = self.stats["hits"] / total if total > 0 else 0.0
-        backend_type = type(next(iter(self.persistent.values()))).__name__
-
-        return {
-            **self.stats,
-            "total_requests": total,
-            "hit_rate": round(hit_rate * 100, 2),
-            "warmup_complete": self._warmup_complete,
-            "backend": backend_type,
-        }
-
-    def mark_warmup_started(self) -> bool:
-        self._init_caches()
-        if self._warmup_started:
-            return False
-        self._warmup_started = True
-        return True
-
-    def mark_warmup_complete(self, count: int) -> None:
-        self._init_caches()
-        self._warmup_complete = True
-        self.stats["warmup_count"] = count
-        log.info("Cache warmup marked complete", count=count)
 
 
 async def prune_normattiva_cache(manager: Optional["CacheManager"] = None) -> int:
