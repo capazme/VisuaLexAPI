@@ -79,7 +79,7 @@ describe('the permission, from the administrator’s page', () => {
     const created = await request(app)
       .post('/api/admin/users')
       .set(authHeader(admin))
-      .send({ email: 'dev-new@test.local', username: 'dev-new', password: 'secret' });
+      .send({ email: 'dev-new@test.local', username: 'dev-new', password: 'Secret123' });
     expect(created.status).toBe(201);
     expect(created.body.dev_mode_allowed).toBe(false);
     expect(created.body.dev_mode).toBe(false);

@@ -23,10 +23,49 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (~6 s, measured), past what a process manager waits before its SIGKILL (pm2,
   on the old server, waited 1.6 s).
 - `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
-  authenticated 300/min (by userId), writes 200/min. `RateLimiterRedis` when
-  `REDIS_ENABLED=true`, else in-memory with a startup warning.
+  authenticated 300/min (by userId), writes 200/min. Every limiter comes from
+  `createLimiter`: `RateLimiterRedis` when `REDIS_ENABLED=true`, else in-memory
+  with a startup warning. On Redis, a store error (down, not ready; a Redis that hangs without erring is not covered, there is no command timeout) hands the
+  count to an in-memory limiter with the same limits (the insurance limiter),
+  so a limit holds per process; the fail-open branches are only a last resort.
+  The session check (`GET /api/auth/me`, G-484) has its own counter,
+  `SESSION_CHECK_POINTS` (600) a minute per user or address, mounted in `app.ts`
+  after `delegatedAuth` and before the general limiter, which it skips.
+- `src/routes/auth.ts` — failed sign-ins and registrations: 5 per 15 minutes per
+  address (shared, as before); failed sign-ins per account (the SHA-256 of the
+  email as typed, trimmed and lower-cased, existing or not): 10 an hour from any
+  address; refreshes: 30 a minute per address. Counted on arrival (a burst is
+  held too) and given back on success. A refusal is 429 with `Retry-After`.
+  Someone who knows an email can block that sign-in for up to an hour: the
+  accepted price of stopping guesses spread over many addresses.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
-  connection errors fail open.
+  connection errors go to the limiters' memory fallback.
+- **The web's session (A.1, step 1 of `docs/superpowers/specs/2026-11-16-web-session-cookies-design.md`).**
+  `src/auth/webSession.ts`: a session is a `WebSession` row (SHA-256 of the
+  secret, a coarse device label, no IP); the browser holds the secret in an
+  `HttpOnly; SameSite=Strict; Path=/` cookie, `__Host-vx_session` and `Secure`
+  when the first `ALLOWED_ORIGINS` entry is https (`SESSION_COOKIE_SECURE`
+  overrides), `vx_session` otherwise. 7 days idle, 30 at most
+  (`SESSION_IDLE_DAYS`, `SESSION_MAX_DAYS`); `lastUsedAt` written at most every
+  10 minutes; dead rows swept at most daily on a sign-in.
+  `middleware/webSession.ts`, mounted on `/api` before the ingress's login check
+  and the limiters, sets `req.user` and `req.webSessionId`; a Bearer token takes
+  precedence until the web has moved. Sign-in opens a session only for a request
+  with `X-VisuaLex-Client: web` (answering the user, no tokens), otherwise the
+  tokens as before. Routes: `POST /auth/logout`, `GET /auth/sessions`,
+  `DELETE /auth/sessions/:id`, `POST /auth/logout-all`. What ends sessions
+  (D3): one's own password change (all but the one in use), the
+  administrator's reset and `db:reset-admin` (all, and every OAuth grant
+  revoked), a deactivation (all), account deletion (cascade).
+- `src/middleware/csrfGuard.ts` — on `/api` after `delegatedAuth`: a
+  POST/PUT/PATCH/DELETE that carries the session cookie or the web header must
+  carry `X-VisuaLex-Client: web` and, when an `Origin` is present, one in
+  `ALLOWED_ORIGINS` or the request's own host; otherwise **403**
+  `code: "csrf_refused"`. Exempt: exchanged tokens, `/api/merlt/internal/*`,
+  and (until step 3) a Bearer token or a request with neither cookie nor
+  header. The scraping gate applies the same rule to a cookie-authenticated
+  write named by `X-Forwarded-Method`. In tests, `authHeader` sends the cookie
+  and the header; `bearerHeader` the old JWT; `cookieOnly` the cookie alone.
 - `src/middleware/auth.ts` — `authenticate` answers **401** only when the
   session is over: no token, a token that does not verify, the wrong type, a
   missing or disabled user. When it cannot read the user (the database is

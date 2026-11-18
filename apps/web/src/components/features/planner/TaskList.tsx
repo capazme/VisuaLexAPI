@@ -47,7 +47,8 @@ export function TaskList({ tasks, today, optimistic, showDossier = true, label, 
   };
 
   return (
-    <ul aria-label={label} onKeyDown={moveBetweenRows} className="grid min-w-0 grid-cols-1">
+    // A container: each row lays itself out by the list's width, not the window's (`TaskRow`).
+    <ul aria-label={label} onKeyDown={moveBetweenRows} className="@container grid min-w-0 grid-cols-1">
       {nestTasks(tasks).map(({ task, children }) => {
         const open = subtasksOpen !== flipped.has(task.id);
         return (
