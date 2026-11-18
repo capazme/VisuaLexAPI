@@ -336,7 +336,10 @@ POST unless noted, JSON bodies.
 
 - `/fetch_norma_data` — build norm structure from params
 - `/fetch_article_text` — fetch article text (array response)
-- `/stream_article_text` — stream results as NDJSON, one object per line
+- `/stream_article_text` — stream results as NDJSON, one object per line; with `"end_line": true`
+  in the body, every stream the server ends itself closes with `{"kind": "end", "sent": N,
+  "total": M}` (after a `time_budget` line too), so a body that stops without it was cut on the way
+  (G-488). Only on request: the search panel as it is and the archive read every line as an article
 - `/fetch_brocardi_info` — 410 Gone: Brocardi is no longer a source (D-078)
 - `/fetch_all_data` — article text and `norma_data` (and `validity`) in one call
 - `/fetch_tree` — article tree for a complete URN. An article Normattiva splits into parts is one
@@ -407,8 +410,21 @@ POST unless noted, JSON bodies.
   display text
 - `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
+  Routed by the ingress's `@legal` and Vite's proxy, behind the login
+  (ADR-001), priced 1 point by the scrape gate (the default; spec
+  `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §8).
   Reads the OJ page the tree already uses; a consolidated text has no
-  preamble and answers an empty list. Normattiva acts get a 400
+  preamble and answers an empty list. Normattiva acts get a 400. The text
+  is a data contract like `article_text` (root rule 23, spec
+  `2026-11-17-eu-recitals-design.md` §7): a paragraph's text nodes join with
+  no space of ours, a footnote call (modern markup) goes with the whitespace
+  before it, ASCII whitespace runs become one space, the no-break space stays;
+  a legacy paragraph without «(N)» joins the recital before it with `\n` once
+  the next recital arrives. `tests/test_recitals_text_frozen.py` holds each
+  recital's projection (SHA-256 and length); it binds from the web's PR 4a of
+  that plan. EU article text read from the Official Journal's markup has its
+  own guard, `tests/test_eurlex_article_text_frozen.py`, binding now (the
+  consolidated markup has none yet)
 - `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
   AKN text plus, for the codici, the FRBRWork date of each article (the day
   its current text came into force). `urn` is the act's full URL as

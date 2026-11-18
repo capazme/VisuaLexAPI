@@ -1,4 +1,4 @@
-import { LingoMateria } from '@prisma/client';
+import { LingoCorsoObiettivo, LingoMateria } from '@prisma/client';
 import { z } from 'zod';
 import { CITATION_MARKER } from '../../lingo/courseFormat';
 
@@ -142,13 +142,37 @@ export const examCreateSchema = z
   .strict();
 export type ExamCreateInput = z.infer<typeof examCreateSchema>;
 
+/** The learner's goal (G-488): a kind from the closed list, and a sentence of its own, counted in characters. */
+export const GOAL_NOTE_MAX = 200;
+const goalNote = z
+  .string()
+  .trim()
+  .refine((text) => [...text].length <= GOAL_NOTE_MAX, `La frase dell’obiettivo ha al massimo ${GOAL_NOTE_MAX} caratteri.`)
+  // An empty sentence is no sentence: the web's field may send it.
+  .transform((text) => (text === '' ? null : text));
+const goal = z
+  .object({ tipo: z.nativeEnum(LingoCorsoObiettivo), nota: goalNote.nullable().optional() })
+  .strict();
+/** A calendar day as 'YYYY-MM-DD' (2026-02-30 is not one: JavaScript would make it 2 March). */
+const examDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'La data dell’esame va scritta come AAAA-MM-GG.')
+  .refine((day) => {
+    const at = new Date(`${day}T00:00:00.000Z`);
+    return !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === day;
+  }, 'Data dell’esame non valida.');
+
 export const coursePatchSchema = z
   .object({
     titolo: z.string().trim().min(1).max(200).optional(),
     moduliPrevisti: z.number().int().min(1).max(LIMITS.liveModules).optional(),
+    // The learner's, on the enrolment (G-488): null clears; a goal replaces the kind and the sentence together.
+    obiettivo: goal.nullable().optional(),
+    dataEsame: examDay.nullable().optional(),
   })
   .strict()
-  .refine((body) => body.titolo !== undefined || body.moduliPrevisti !== undefined, { message: 'Niente da modificare.' });
+  .refine((body) => Object.values(body).some((value) => value !== undefined), { message: 'Niente da modificare.' });
+export type CoursePatch = z.infer<typeof coursePatchSchema>;
 
 // ─── Studying (S2, §10.4–§10.5): what the web sends. The server grades and dates; a choice is all it takes. ───
 

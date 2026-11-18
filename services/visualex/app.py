@@ -519,6 +519,16 @@ class NormaController:
         budget = min(max(len(normavisitate) * STREAM_SECONDS_PER_ARTICLE, STREAM_MIN_SECONDS), STREAM_MAX_SECONDS)
         deadline = asyncio.get_running_loop().time() + budget
 
+        # The closing line (G-488), for a client that asks with `"end_line": true`: every stream the
+        # server ends itself ends with `{"kind": "end", "sent": N, "total": M}`, after the time
+        # budget's line too, so a body that stops without it was cut on the way (a proxy, a crash, a
+        # dropped connection). Asked for, not always sent: the search panel as it is and the archive
+        # read every line as an article.
+        end_line = isinstance(data, dict) and data.get('end_line') is True
+
+        def closing(sent):
+            return json.dumps({'kind': 'end', 'sent': sent, 'total': len(normavisitate)}) + "\n"
+
         async def read_one(scraper, nv):
             article_text, url, validity, extra = await self._document_in_force(
                 scraper, nv, upcoming_asked, until)
@@ -569,10 +579,15 @@ class NormaController:
                         'kind': 'time_budget',
                         'missing': missing,
                     }) + "\n"
+                    if end_line:
+                        yield closing(index)
                     return
 
                 # Send result immediately
                 yield json.dumps(result) + "\n"
+
+            if end_line:
+                yield closing(len(normavisitate))
 
         # Return streaming response with proper headers
         response = Response(

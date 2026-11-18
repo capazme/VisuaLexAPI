@@ -131,8 +131,8 @@ describe("the dossier's tasks", () => {
     const panel = screen.getByRole('region', { name: /Compiti/ });
     expect(await within(panel).findByRole('checkbox', { name: /Compito a/ })).toBeInTheDocument();
     expect(within(panel).queryByRole('link', { name: /Ricorso Rossi/ })).toBeNull();
-    expect(within(panel).getByText('Senza data · nella pratica «Ricorso Rossi»')).toBeInTheDocument();
     fireEvent.change(within(panel).getByLabelText('Nuovo compito'), { target: { value: 'Notificare' } });
+    expect(within(panel).getByText('Senza data · nella pratica «Ricorso Rossi»')).toBeInTheDocument();
     fireEvent.submit(within(panel).getByLabelText('Nuovo compito'));
     await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ title: 'Notificare', dossierId: 'd1' }));
   });

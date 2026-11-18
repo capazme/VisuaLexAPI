@@ -24,12 +24,15 @@ interface Props {
   dossierLocked?: boolean;
 }
 
-/** Where a new task is going, in a line under the field. */
+/** Where a new task is going, in a line under the field: its day and time, deadline, priority, labels and place. */
 function summary(draft: TaskDraft, today: string, dossierTitle: string | undefined): string {
   const parts: string[] = [];
-  parts.push(draft.plannedDate ? `Per ${shortDay(draft.plannedDate, today).toLowerCase()}` : 'Senza data');
-  if (draft.dueDate) parts.push(`termine finale ${shortDay(draft.dueDate, today).toLowerCase()}`);
+  const at = (time: string) => (time ? ` alle ${time}` : '');
+  parts.push(draft.plannedDate ? `Per ${shortDay(draft.plannedDate, today).toLowerCase()}${at(draft.plannedTime)}` : 'Senza data');
+  if (draft.dueDate) parts.push(`termine finale ${shortDay(draft.dueDate, today).toLowerCase()}${at(draft.dueTime)}`);
   if (draft.priority < 4) parts.push(`priorità ${PRIORITY_LABEL[draft.priority].toLowerCase()}`);
+  const labels = draft.labels.split(',').map((label) => label.trim()).filter(Boolean);
+  if (labels.length > 0) parts.push(`${labels.length === 1 ? 'etichetta' : 'etichette'} ${labels.map((label) => `«${label}»`).join(', ')}`);
   parts.push(draft.dossierId ? `nella pratica «${dossierTitle ?? '…'}»` : "nella lista d'ingresso");
   return parts.join(' · ');
 }
@@ -264,7 +267,12 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           </p>
         )
       )}
-      <p id={`${id}-summary`} className={cn(FIELD_HINT, 'px-4 pb-2')}>{summary(task, today, dossierTitle)}</p>
+      {/* Only once there is a task to sum up (LC83). Always mounted, empty when idle, and polite: what the line read is
+          said aloud as it changes, since the chips come in silently. */}
+      <p id={`${id}-summary`} aria-live="polite" className={cn(FIELD_HINT, 'px-4 pb-2 empty:p-0')}>
+        {draft.title.trim() ? summary(task, today, dossierTitle) : ''}
+        {line.lockedHash && ' · In una pratica il compito resta qui: «#» resta nel titolo.'}
+      </p>
       <Collapsible
         id={`${id}-details`}
         open={open}

@@ -17,8 +17,12 @@ export const PAGE_FRAME = 'mx-auto box-content px-4 md:px-8 2xl:px-12';
  */
 export type PageWidth = 'reading' | 'work' | 'full';
 
-/** `Layout`'s frame while a `full` page is in it. */
-export const FULL_PAGE_FRAME = 'has-[[data-page-width=full]]:max-w-frame-full';
+/**
+ * `Layout`'s frame while a `full` page is in it. Not a page that is leaving (`PageSlide`'s `inert` layer, LC84): coming
+ * from the search page, the frame stayed wide while it faded out and narrowed at its end, and the page coming in jumped
+ * 44 px at 1440.
+ */
+export const FULL_PAGE_FRAME = 'has-[[data-page-width=full]:not([inert]_*)]:max-w-frame-full';
 
 /**
  * The columns of a grid of cards (U1 §7: the room left over goes to columns, a list of cards is a grid, never a
