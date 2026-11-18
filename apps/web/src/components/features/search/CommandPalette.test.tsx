@@ -613,6 +613,18 @@ describe('CommandPalette — the reviews under a topic (U3)', () => {
 });
 
 describe('CommandPalette — in the page, not over it (L-75)', () => {
+  it('opened again, chooses the first row, not the one chosen in the last opening (cmdk lives on between openings)', () => {
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const chosen = () => document.querySelector('[cmdk-item][data-selected="true"]')?.textContent;
+    const first = chosen();
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    expect(chosen()).not.toBe(first);
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(chosen()).toBe(first);
+  });
+
   it('covers nothing: no veil, no dialog, no mark over the workspace, so Cmd/Ctrl+F stays the app\'s', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(isWorkspaceCovered()).toBe(false);

@@ -591,11 +591,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   // Where it opened, kept while it closes: what the field grows from, and the bar's slot it grows in (none: the band's
   // first row). Read as it opens, as the opener is.
+  const [chosenRow, setChosenRow] = useState('');
   const [place, setPlace] = useState<{ source: HTMLElement | null; slot: HTMLElement | null }>({ source: null, slot: null });
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen);
     if (isOpen) {
       setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      // The row chosen in the last opening is not this one's: cmdk lives on between openings now (L-75), so its choice is
+      // ours, and empty again, and cmdk chooses the first row.
+      setChosenRow('');
       const source = sourceNow();
       setPlace({ source, slot: source?.closest('[data-palette-bar]')?.querySelector<HTMLElement>('[data-palette-slot]') ?? null });
       setChose(false);
@@ -1193,6 +1197,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       id="command-menu-root"
       label="Menu di ricerca"
       shouldFilter={false}
+      value={chosenRow}
+      onValueChange={setChosenRow}
       ref={bandRef}
       className="shrink-0"
     >
