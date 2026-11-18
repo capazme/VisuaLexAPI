@@ -12,6 +12,27 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-11-18
+
+The fiscal testi unici follow the date, regional laws are never read as state laws, and «Modifica pratica» and
+«Importa» open inside the page, with an import that keeps the pace of the server's limit. No migration.
+MERL-T stays off.
+
+### Sources
+
+- «tuir», «tur» and «tuiva» lead to the old text until 31/12/2026 and to the new testo unico (annex 1) from
+  1/1/2027, with a notice; «tua» asks which of the two acts; regional laws are refused, never read as state
+  laws (G-577, #647 in the API, #650 in the web).
+
+### Work
+
+- «Modifica pratica» and «Importa una pratica» open inside the page; the import keeps the pace of the write
+  limit and offers «Riprendi» after a refusal or a dropped connection, saying what is not imported yet (LC107).
+
+### Tests
+
+- The StudiaPage test of the strip's settings waits for the panel to open (LC108).
+
 ## [1.43.0] - 2026-11-18
 
 Pratiche on the common controls, caps on dossiers, and MERL-T's last security fixes before it can come back on:
