@@ -109,6 +109,12 @@ describe('Expand', () => {
     expect(button).toHaveFocus();
   });
 
+  it('drawn already open, takes no focus: the focus follows an opening (LC86)', () => {
+    render(<Harness initial />);
+    expect(screen.getByRole('textbox', { name: 'Campo' })).not.toHaveFocus();
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it('leaves an Esc already taken inside it alone', () => {
     render(<Harness initial />);
     const field = screen.getByRole('textbox', { name: 'Campo' });
@@ -131,6 +137,31 @@ describe('Expand', () => {
       expect(opening.anim.cancel).toHaveBeenCalled();
       expect(heights()[1].frames).toEqual([{ height: '60px' }, { height: '400px' }]);
       expect(heights()[1].timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+    } finally {
+      rect.mockRestore();
+      globalThis.ResizeObserver = original;
+    }
+  });
+
+  it('open and at rest, follows content arriving later from the height it had, not from the new one (LC86)', () => {
+    let notify: () => void = () => {};
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class { constructor(cb: () => void) { notify = cb; } observe() {} disconnect() {} } as unknown as typeof ResizeObserver;
+    // The observer runs after the layout: the space already measures the new height when it is told.
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 400 } as DOMRect);
+    try {
+      render(<Harness />);
+      fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
+      finishAll();
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 400 });
+      act(() => notify());
+      expect(heights().at(-1)!.frames).toEqual([{ height: '120px' }, { height: '400px' }]);
+      expect(heights().at(-1)!.timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+      // Held at the height it had until the animation applies (the next frame), then let go.
+      const space = document.getElementById('space')!;
+      expect(space.style.height).toBe('120px');
+      finishAll();
+      expect(space.style.height).toBe('');
     } finally {
       rect.mockRestore();
       globalThis.ResizeObserver = original;

@@ -93,7 +93,12 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 
-describe('a norm a decision cites, in the dossier (D7d)', () => {
+// LC86: these are the old «Fonti» list's, in the code but never drawn; in the one «Fonti» a norm a decision cites opens
+// through the reading's own route (`useTableCitedNorms`). PR 2
+// removes the old list with these tests.
+const oldFonti = describe.skip;
+
+oldFonti('a norm a decision cites, in the dossier (D7d)', () => {
   it('opens it in the norms’ column: its row opens, takes the focus and glows; the page stays', () => {
     const text = renderView();
     expect(articleToggle()).toHaveAttribute('aria-expanded', 'false');
@@ -152,7 +157,7 @@ describe('a norm a decision cites, in the dossier (D7d)', () => {
   });
 });
 
-describe('a norm a decision cites, not in the dossier (D7d)', () => {
+oldFonti('a norm a decision cites, not in the dossier (D7d)', () => {
   it('opens nothing by itself: it offers Dashboard or a dossier, by the link', async () => {
     const text = renderView();
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
@@ -214,7 +219,7 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
   });
 });
 
-describe('the columns (D7d)', () => {
+oldFonti('the columns (D7d)', () => {
   it('from lg each column of two scrolls on its own, as tall as the window, a named region the keyboard reaches', () => {
     renderView();
     const norms = screen.getByRole('region', { name: 'Norme' });

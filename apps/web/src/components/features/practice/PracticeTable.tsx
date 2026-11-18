@@ -54,7 +54,8 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
     tryStartTour('practice');
   });
   if (!practice) return null;
-  const simple = layout === 'overview' && isSimplePractice(practice);
+  // A dossier's «Fonti» (LC86): its one article a closed row as any other, never Lettura semplice.
+  const simple = layout === 'overview' && isSimplePractice(practice) && !bound;
   // LC68: one act with more articles is named by its own heading too; the head would repeat it as «c.c.».
   const headless = layout === 'overview' && isOneActPractice(practice) && practice.beside.length === 0;
   return (
