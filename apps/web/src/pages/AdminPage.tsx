@@ -58,12 +58,8 @@ const REPORT_REASON: Record<SharedEnvironmentReport['reason'], string> = {
 const day = (iso: string) => new Date(iso).toLocaleDateString('it-IT');
 const moment = (iso: string) => new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-/** Back where it was before it was taken out (`showUndoToast`'s undo). */
-function putBack<T>(list: T[], item: T, at: number): T[] {
-  const next = [...list];
-  next.splice(Math.min(at, next.length), 0, item);
-  return next;
-}
+/** A row's action that failed: said where the row is in sight, not in the box at the top of a long page. */
+const fail = (err: unknown, fallback: string) => notify({ type: 'error', message: getErrorMessage(err) || fallback, duration: 6000 });
 
 /** A part of the page: its anchor, its heading, the controls on the heading's right, and what it holds. */
 function Part({ id, title, count, controls, children }: { id: AdminSection; title: string; count?: ReactNode; controls?: ReactNode; children: ReactNode }) {
@@ -158,6 +154,14 @@ export function AdminPage() {
   const [deleting, setDeleting] = useState<{ user: AdminUserResponse; origin: HTMLElement | null } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  // Comments and published dossiers taken out while their «Annulla» shows: hidden here, whatever a reload brings back.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const hide = (id: string) => setHidden((prev) => new Set(prev).add(id));
+  const unhide = (id: string) => setHidden((prev) => {
+    const next = new Set(prev);
+    next.delete(id);
+    return next;
+  });
 
   const loadUsers = async () => {
     try {
@@ -228,7 +232,8 @@ export function AdminPage() {
   }, [reportStatusFilter]);
 
   // Back where it was opened from, or to the search page when it was opened by its address.
-  const goBack = () => (location.key === 'default' ? navigate('/') : navigate(-1));
+  // The router's index in the history, which the index's `replace` keeps: an address opened directly has none behind it.
+  const goBack = () => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate('/'));
 
   // The part in the address comes in view, moving the page's scroller alone (gotcha 34), and is followed for a moment
   // while the lists arrive above it; with none the page opens at its top, its title focused (as Impostazioni, LC84).
@@ -246,7 +251,11 @@ export function AdminPage() {
       title?.focus({ preventScroll: true });
       entered.current = true;
     }
-    if (!scroller || !part) return undefined;
+    if (!scroller) return undefined;
+    if (!part) {
+      scroller.scrollTo({ top: 0 });
+      return undefined;
+    }
     const bring = () => {
       const room = (parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0) + 16;
       scroller.scrollTo({ top: scroller.scrollTop + part.getBoundingClientRect().top - scroller.getBoundingClientRect().top - room });
@@ -280,7 +289,7 @@ export function AdminPage() {
       await adminService.updateUser(userId, data);
       await loadUsers();
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell’aggiornamento');
+      fail(err, 'Errore nell’aggiornamento');
     } finally {
       setActionLoading(false);
     }
@@ -340,7 +349,7 @@ export function AdminPage() {
   };
 
   const handleDeleteUser = async () => {
-    if (!deleting) return;
+    if (!deleting || actionLoading) return;
     const { user: target } = deleting;
     try {
       setActionLoading(true);
@@ -352,7 +361,7 @@ export function AdminPage() {
       await loadUsers();
     } catch (err) {
       setConfirmOpen(false);
-      setError(getErrorMessage(err) || 'Errore nell’eliminazione');
+      fail(err, 'Errore nell’eliminazione');
     } finally {
       setActionLoading(false);
     }
@@ -365,7 +374,7 @@ export function AdminPage() {
       await adminService.updateFeedbackStatus(id, status);
       await loadFeedbacks();
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell’aggiornamento');
+      fail(err, 'Errore nell’aggiornamento');
     } finally {
       setActionLoading(false);
     }
@@ -373,19 +382,19 @@ export function AdminPage() {
 
   // Gone from the list at once, with «Annulla»; the server erases it only once the notification is gone (L-35).
   const handleDeleteFeedback = (f: AdminFeedback) => {
-    const at = feedbacks.findIndex((x) => x.id === f.id);
     void showUndoToast({
-      action: () => setFeedbacks((prev) => prev.filter((x) => x.id !== f.id)),
-      undo: () => setFeedbacks((prev) => putBack(prev, f, at)),
+      action: () => hide(f.id),
+      undo: () => unhide(f.id),
       message: 'Commento eliminato',
     }).then(async (stands) => {
       if (!stands) return;
       try {
         await adminService.deleteFeedback(f.id);
+        await loadFeedbacks();
       } catch (err) {
-        setError(getErrorMessage(err) || 'Errore nell’eliminazione');
+        fail(err, 'Errore nell’eliminazione');
       }
-      await loadFeedbacks();
+      unhide(f.id);
     });
   };
 
@@ -397,26 +406,26 @@ export function AdminPage() {
       else await adminService.withdrawSharedEnvironment(id);
       setEnvironments((prev) => prev.map((e) => (e.id === id ? { ...e, isActive: active } : e)));
     } catch (err) {
-      setError(getErrorMessage(err) || (active ? 'Errore nel ripubblicare il dossier pubblicato' : 'Errore nel ritirare il dossier pubblicato'));
+      fail(err, active ? 'Errore nel ripubblicare il dossier pubblicato' : 'Errore nel ritirare il dossier pubblicato');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteEnv = (env: AdminSharedEnvironment) => {
-    const at = environments.findIndex((x) => x.id === env.id);
     void showUndoToast({
-      action: () => setEnvironments((prev) => prev.filter((x) => x.id !== env.id)),
-      undo: () => setEnvironments((prev) => putBack(prev, env, at)),
+      action: () => hide(env.id),
+      undo: () => unhide(env.id),
       message: `«${env.title}» eliminato dai dossier pubblici`,
     }).then(async (stands) => {
       if (!stands) return;
       try {
         await adminService.deleteSharedEnvironment(env.id);
+        await loadEnvironments(envPagination.page);
       } catch (err) {
-        setError(getErrorMessage(err) || 'Errore nell’eliminazione del dossier pubblicato');
+        fail(err, 'Errore nell’eliminazione del dossier pubblicato');
       }
-      await loadEnvironments(envPagination.page);
+      unhide(env.id);
     });
   };
 
@@ -432,12 +441,14 @@ export function AdminPage() {
       await sharedEnvironmentService.updateReportStatus(id, status);
       await loadReports();
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell’aggiornamento della segnalazione');
+      fail(err, 'Errore nell’aggiornamento della segnalazione');
     } finally {
       setActionLoading(false);
     }
   };
 
+  const shownFeedbacks = feedbacks.filter((f) => !hidden.has(f.id));
+  const shownEnvironments = environments.filter((e) => !hidden.has(e.id));
   const pending = users.filter((u) => !u.is_active).length;
   const newComments = feedbackStats?.new ?? 0;
   const index: Array<{ id: AdminSection; name: string; badge?: number; shown?: boolean }> = [
@@ -647,7 +658,7 @@ export function AdminPage() {
             <Part
               id="commenti"
               title="Commenti"
-              count={feedbacks.length || undefined}
+              count={shownFeedbacks.length || undefined}
               controls={
                 <>
                   <select
@@ -675,13 +686,13 @@ export function AdminPage() {
               {feedbackStats && (feedbackStats.bugs > 0 || feedbackStats.suggestions > 0) && (
                 <p className={cn('mb-3', MUTED)}>{feedbackStats.bugs === 1 ? '1 errore' : `${feedbackStats.bugs} errori`}, {feedbackStats.suggestions === 1 ? '1 suggerimento' : `${feedbackStats.suggestions} suggerimenti`}</p>
               )}
-              {feedbackLoading && feedbacks.length === 0 ? (
+              {feedbackLoading && shownFeedbacks.length === 0 ? (
                 <Quiet>Caricamento dei commenti…</Quiet>
-              ) : feedbacks.length === 0 ? (
+              ) : shownFeedbacks.length === 0 ? (
                 <Quiet>Nessun commento trovato</Quiet>
               ) : (
                 <ul className={LIST}>
-                  {feedbacks.map((f) => (
+                  {shownFeedbacks.map((f) => (
                     <li key={f.id} className="flex items-start gap-4 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
@@ -734,9 +745,9 @@ export function AdminPage() {
                 </>
               }
             >
-              {envLoading && environments.length === 0 ? (
+              {envLoading && shownEnvironments.length === 0 ? (
                 <Quiet>Caricamento dei dossier pubblicati…</Quiet>
-              ) : environments.length === 0 ? (
+              ) : shownEnvironments.length === 0 ? (
                 <Quiet>Nessun dossier pubblicato trovato</Quiet>
               ) : (
                 <>
@@ -744,7 +755,7 @@ export function AdminPage() {
                     <span>Dossier</span><span>Autore</span><span>Stato</span><span>Uso</span><span />
                   </div>
                   <ul className={LIST}>
-                    {environments.map((env) => (
+                    {shownEnvironments.map((env) => (
                       <li key={env.id} className={cn('grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 md:items-center', ENV_COLUMNS)}>
                         <div className="min-w-0">
                           <p className="truncate font-medium text-slate-900 dark:text-slate-50">{env.title}</p>

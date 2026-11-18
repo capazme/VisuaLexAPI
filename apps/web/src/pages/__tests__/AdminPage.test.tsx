@@ -51,6 +51,7 @@ vi.mock('../../services/sharedEnvironmentService', () => ({
 }));
 
 import * as adminService from '../../services/adminService';
+import { registerUndoToastListener, type UndoToast } from '../../hooks/useUndoableAction';
 import { AdminPage } from '../AdminPage';
 
 // Mounts AdminPage the way production does: inside a Router but OUTSIDE the
@@ -351,6 +352,30 @@ describe('AdminPage — a page, nothing over it (LC93)', () => {
     expect(adminService.deleteFeedback).not.toHaveBeenCalled();
     expect(dialogs()).toBe(0);
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    vi.mocked(adminService.listFeedbacks).mockResolvedValue([]);
+  });
+
+  it('keeps a comment out through a reload while «Annulla» shows, and «Annulla» brings it back once', async () => {
+    vi.mocked(adminService.listFeedbacks).mockResolvedValue([
+      { id: 'f1', type: 'bug', message: 'Non si apre', status: 'new', created_at: '2026-11-01T10:00:00Z', user: { id: 'b', username: 'bob', email: 'bob@example.com' } },
+    ] as never);
+    let toast: UndoToast | null = null;
+    const stop = registerUndoToastListener((t) => { toast = t; });
+    renderAdminPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Azioni sul commento' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
+    await waitFor(() => expect(toast).not.toBeNull());
+
+    // A reload brings the comment back from the server: it stays out while the notification shows.
+    const reloads = vi.mocked(adminService.listFeedbacks).mock.calls.length;
+    fireEvent.click(within(document.getElementById('commenti') as HTMLElement).getByRole('button', { name: 'Aggiorna' }));
+    await waitFor(() => expect(vi.mocked(adminService.listFeedbacks).mock.calls.length).toBeGreaterThan(reloads));
+    expect(screen.queryByText('Non si apre')).not.toBeInTheDocument();
+
+    await (toast as unknown as UndoToast).onUndo();
+    expect(await screen.findAllByText('Non si apre')).toHaveLength(1);
+    expect(adminService.deleteFeedback).not.toHaveBeenCalled();
+    stop();
     vi.mocked(adminService.listFeedbacks).mockResolvedValue([]);
   });
 });
