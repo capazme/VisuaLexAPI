@@ -125,6 +125,11 @@ async function identify(reference: string): Promise<Resolution> {
   const parsed = await postLegalApi('/parse_query', { query: reference });
   if (parsed.status !== 200) throw new SourceUnavailable(`parse_query ${parsed.status}`);
   const params = parsed.data.parsed as Record<string, string> | null | undefined;
+  // A recital clause («considerando 26 GDPR», refused or not): added from the reader, not by reference
+  // (spec 2026-11-17 §6.3). Checked first: a refused reading must never fall through to an article.
+  if (params?.recital || parsed.data.refusal) {
+    return { outcome: 'not_recognised', detail: 'Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.' };
+  }
   if (!parsed.data.recognized || !params?.act_type) {
     return { outcome: 'not_recognised', detail: 'Riferimento non riconosciuto: indica articolo e atto (es. «art. 2043 c.c.»).' };
   }

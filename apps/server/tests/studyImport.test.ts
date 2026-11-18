@@ -72,6 +72,25 @@ describe('«Aggiungi ai miei dossier»: a Forum download', () => {
     expect(read.body.items[1].citation).toBe(COST_LABEL);
   });
 
+  it('keeps a recital entry as a recital, titled with its citation, its marks under its identity (spec 2026-11-17 §6.2)', async () => {
+    const recital = { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' };
+    const key = 'celex:32016R0679~rct26';
+    const content = { dossiers: [{ title: 'GDPR', items: [{ id: 'r1', type: 'norma', data: recital }, { id: 'r2', type: 'norma', data: { ...recital, considerando: '026' } }] }],
+      quickNorms: [], annotations: [{ normaKey: key, articleId: '', text: 'sul dato anonimo' }],
+      highlights: [{ normaKey: key, articleId: '', text: 'dati anonimi', color: 'yellow', startOffset: 4 }] };
+    const env = await request(app).post('/api/shared-environments').set(authHeader(alice)).send({ title: 'GDPR', category: 'civil', content });
+    expect(env.status).toBe(400);
+    const valid = { ...content, dossiers: [{ title: 'GDPR', items: [{ id: 'r1', type: 'norma', data: recital }] }] };
+    const published = await request(app).post('/api/shared-environments').set(authHeader(alice)).send({ title: 'GDPR', category: 'civil', content: valid });
+    expect(published.status).toBe(201);
+    const res = await request(app).post(`/api/shared-environments/${published.body.id}/download`).set(authHeader(bob)).send({ addNotes: true, addHighlights: true });
+    expect(res.status).toBe(201);
+    const dossier = await prisma.dossier.findUniqueOrThrow({ where: { id: res.body.dossiers[0].id }, include: { items: true } });
+    expect(dossier.items.map((i) => [i.itemType, i.title, i.content])).toEqual([['norm', 'considerando 26, reg. (UE) 2016/679', recital]]);
+    expect(await prisma.annotation.findFirst({ where: { userId: bob.id } })).toMatchObject({ normaKey: `${key}::art::` });
+    expect(await prisma.highlight.findFirst({ where: { userId: bob.id } })).toMatchObject({ normaKey: `${key}::art::`, startOffset: 4 });
+  });
+
   it('adds the notes and highlights under the keys the web reads, credited to the publisher, text unchanged', async () => {
     const res = await download(bob);
     expect(res.body.notes).toEqual({ added: 2, skipped: 0 });
