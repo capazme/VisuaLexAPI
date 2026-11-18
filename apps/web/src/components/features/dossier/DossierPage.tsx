@@ -4,6 +4,9 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import { Toast } from '../../ui/Toast';
 import { Button } from '../../ui/Button';
+import { Arrive } from '../../ui/Arrive';
+import { Skeleton } from '../../ui/Skeleton';
+import { ViewSlide } from '../../layout/ViewSlide';
 import { DossierListView } from './DossierListView';
 import { DossierDetailView } from './DossierDetailView';
 import { ImportDossierModal } from './ImportDossierModal';
@@ -14,6 +17,23 @@ import { showSectionOfDossier } from '../../../features/sections/useSection';
 import { decodeDossierShare, importReport, importToastType, validateImportedDossier, type ImportCheck } from './dossierUtils';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
+
+/** The page's three views, in the order they slide: the list, a dossier opened from it, the trash. */
+const VIEWS = ['list', 'detail', 'trash'];
+
+/** A dossier asked by its address, while the dossiers are read: its title and first rows held in place. */
+function DossierOpening() {
+  return (
+    <div className="grid gap-4 p-6">
+      <p role="status" className="sr-only">Apro la pratica…</p>
+      <Skeleton className="h-9 w-2/3 max-w-md" />
+      <Skeleton variant="text" className="w-1/3 max-w-xs" />
+      <div className="grid gap-2 pt-2">
+        {[0, 1, 2].map((n) => <Skeleton key={n} className="h-14" />)}
+      </div>
+    </div>
+  );
+}
 
 export function DossierPage() {
   const { dossiers, importDossier } = useAppStore();
@@ -97,12 +117,23 @@ export function DossierPage() {
 
   return (
     <>
-      {showTrash ? (
-        <TrashPage trash={trash} onBack={() => setShowTrash(false)} showToast={showToast} />
-      ) : !selectedDossier && (selectedDossierId || readError) ? (
-        reading ? (
-          <p role="status" className="p-6 text-sm text-slate-600 dark:text-slate-400">Apro la pratica…</p>
-        ) : (
+      {/* The list, a dossier and the trash slide one into the other (LC98); a dossier asked by its address comes in once
+          the dossiers are read. */}
+      <ViewSlide view={showTrash ? 'trash' : selectedDossierId ? 'detail' : 'list'} order={VIEWS}>
+        {showTrash ? (
+          <TrashPage trash={trash} onBack={() => setShowTrash(false)} showToast={showToast} />
+        ) : selectedDossier || (reading && (selectedDossierId || readError)) ? (
+          <Arrive loading={!selectedDossier} placeholder={<DossierOpening />}>
+            {selectedDossier && (
+              <DossierDetailView
+                dossier={selectedDossier}
+                onBack={() => setSelectedDossierId(null)}
+                showToast={showToast}
+                trash={trash}
+              />
+            )}
+          </Arrive>
+        ) : selectedDossierId || readError ? (
           <div className="flex flex-col items-start gap-3 p-6">
             <p className="text-[15px] text-slate-700 dark:text-slate-300">
               {readError ? 'Non riesco a leggere le pratiche: riprova tra poco.' : 'Questa pratica non c’è o non è tua.'}
@@ -112,23 +143,16 @@ export function DossierPage() {
               {selectedDossierId && <Button variant="secondary" onClick={() => setSelectedDossierId(null)}>Vai alle pratiche</Button>}
             </div>
           </div>
-        )
-      ) : selectedDossier ? (
-        <DossierDetailView
-          dossier={selectedDossier}
-          onBack={() => setSelectedDossierId(null)}
-          showToast={showToast}
-          trash={trash}
-        />
-      ) : (
-        <DossierListView
-          onSelect={(id) => setSelectedDossierId(id)}
-          showToast={showToast}
-          trashCount={trash.entries?.length ?? 0}
-          onOpenTrash={() => setShowTrash(true)}
-          onTrashChanged={() => void trash.reload()}
-        />
-      )}
+        ) : (
+          <DossierListView
+            onSelect={(id) => setSelectedDossierId(id)}
+            showToast={showToast}
+            trashCount={trash.entries?.length ?? 0}
+            onOpenTrash={() => setShowTrash(true)}
+            onTrashChanged={() => void trash.reload()}
+          />
+        )}
+      </ViewSlide>
 
       {importing && (
         <ImportDossierModal

@@ -369,7 +369,7 @@ def _client(monkeypatch, *, role=None):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from merlt.api.auth import optional_api_key, verify_api_key
+    from merlt.api.auth import verify_api_key
     from merlt.rlcf.database import get_async_session_dep
 
     router_mod = importlib.import_module("merlt.api.user_data_router")
@@ -387,10 +387,7 @@ def _client(monkeypatch, *, role=None):
         yield None
 
     app.dependency_overrides[get_async_session_dep] = no_session
-    if role is None:
-        # As in merlt.app: verify_api_key is optional, so only require_role guards.
-        app.dependency_overrides[verify_api_key] = optional_api_key
-    else:
+    if role is not None:
         app.dependency_overrides[verify_api_key] = lambda: SimpleNamespace(role=role, user_id="svc")
     return TestClient(app), calls
 

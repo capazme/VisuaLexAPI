@@ -268,22 +268,25 @@ function App() {
                 </Suspense>
               }
             >
+              {/* Learn's views have no Suspense of their own (LC98): a change of view is the router's transition, so the view
+                  left stays until the coming one's code is there, and `ViewSlide` slides it in with its content. The lessons
+                  keep their frame's `LessonLoading`. */}
               <Route index element={<Navigate to="ripasso" replace />} />
-              <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
+              <Route path="ripasso" element={<ReviewHome />} />
               <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
               {/* The short lesson of a subject (LC63), the lesson's frame as the review's. */}
               <Route path="lezione" element={<Suspense fallback={<LessonLoading />}><LessonSession /></Suspense>} />
               {/* «Percorsi» (courses spec §6): drawn only while the switch `lingo_courses` is on, else back to Oggi. */}
-              <Route path="percorsi" element={<Suspense fallback={null}><CoursesView /></Suspense>} />
-              <Route path="percorsi/:id" element={<Suspense fallback={null}><CoursePage /></Suspense>} />
+              <Route path="percorsi" element={<CoursesView />} />
+              <Route path="percorsi/:id" element={<CoursePage />} />
               {/* A module's session (courses spec §6.5), the lesson's frame as the review's. */}
               <Route path="percorsi/:id/moduli/:moduloId" element={<Suspense fallback={<LessonLoading />}><ModuleSession /></Suspense>} />
               {/* The course's final exam (LC9), in the same frame. */}
               <Route path="percorsi/:id/esami/:esameId" element={<Suspense fallback={<LessonLoading />}><ExamSession /></Suspense>} />
-              <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
-              <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
-              <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
-              <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />
+              <Route path="progressi" element={<ProgressPage />} />
+              <Route path="schede" element={<MyCardsView />} />
+              <Route path="schede/:id" element={<MyCardsView />} />
+              <Route path="valida" element={<ValidationQueueView />} />
             </Route>
           )}
           <Route path="sentenze" element={<DecisionAddress />} />
