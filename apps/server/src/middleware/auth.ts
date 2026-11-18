@@ -10,10 +10,21 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     next();
     return;
   }
+  // The web's session, from its cookie, already resolved with its user by `webSession`
+  // (middleware/webSession.ts). Only that middleware sets `req.webSessionId`.
+  if (req.webSessionId && req.user) {
+    next();
+    return;
+  }
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      if (req.sessionUnavailable) {
+        // The cookie's session could not be read (the database did not answer): not a session that is over.
+        res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
+        return;
+      }
       res.status(401).json({ detail: 'Missing or invalid authorization header' });
       return;
     }

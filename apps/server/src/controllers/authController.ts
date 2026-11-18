@@ -3,23 +3,29 @@ import { Request, Response } from 'express';
 import { Prisma, type User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { atLeastUnits } from '../utils/utf16Length';
-import { hashPassword, verifyPassword } from '../utils/password';
+import { hashPassword, passwordSchema, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
+import { WEB_CLIENT_HEADER } from '../middleware/csrfGuard';
+import {
+  clearSessionCookie,
+  createWebSession,
+  deleteWebSessionBySecret,
+  readSessionCookie,
+  revokeUserWebSessions,
+  sessionIdleMs,
+  setSessionCookie,
+  sweepWebSessionsAtMostDaily,
+} from '../auth/webSession';
 import { exportUserCourses } from '../lingo/courses';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
 import { dateToDay } from '../lingo/studyDays';
-
-// Password validation regex: min 8 chars, at least 1 uppercase, 1 lowercase, 1 number
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const passwordErrorMessage = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
 
 // Validation schemas
 const registerSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50),
-  password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
+  password: passwordSchema(),
 });
 
 const loginSchema = z.object({
@@ -33,7 +39,7 @@ const refreshSchema = z.object({
 
 const changePasswordSchema = z.object({
   current_password: z.string(),
-  new_password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
+  new_password: passwordSchema(),
 });
 
 // Strict on purpose: an extra key (`devModeAllowed` above all) is refused, not stripped.
@@ -156,7 +162,20 @@ export const login = async (req: Request, res: Response) => {
     },
   });
 
-  // Generate tokens
+  // The web, once it says so with its header (A.1): a new session in a cookie scripts cannot read, and no tokens.
+  // A new row every time, so a session cannot be fixed in advance; the one the browser presented, if any, ends.
+  if (req.get(WEB_CLIENT_HEADER) === 'web') {
+    const presented = readSessionCookie(req);
+    if (presented) await deleteWebSessionBySecret(presented);
+    const secret = await createWebSession(updatedUser.id, req.get('user-agent'));
+    setSessionCookie(res, secret);
+    void sweepWebSessionsAtMostDaily();
+    res.json({ user: toMeResponse(updatedUser) });
+    return;
+  }
+
+  // Without the header, the tokens as before, and no cookie: the current web keeps working until it moves (step 2),
+  // and another site's form gets nothing it could use.
   const accessToken = generateAccessToken(updatedUser.id, updatedUser.email);
   const refreshToken = generateRefreshToken(updatedUser.id, updatedUser.email);
 
@@ -166,6 +185,63 @@ export const login = async (req: Request, res: Response) => {
     token_type: 'Bearer',
     user: toMeResponse(updatedUser),
   });
+};
+
+/** Sign-out (A.1): this browser's session ends, whatever state it is in, and its cookie is cleared. Always 204. */
+export const logout = async (req: Request, res: Response) => {
+  const secret = readSessionCookie(req);
+  if (secret) await deleteWebSessionBySecret(secret);
+  clearSessionCookie(res);
+  res.status(204).end();
+};
+
+/** «Esci da tutti i dispositivi» (A.1, D3): every web session of the user ends, this one included. */
+export const logoutAll = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+  await revokeUserWebSessions(req.user.id);
+  clearSessionCookie(res);
+  res.status(204).end();
+};
+
+/** The user's open web sessions, the most recently used first; `current` marks the one this request came with. */
+export const listSessions = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+  const now = new Date();
+  const sessions = await prisma.webSession.findMany({
+    where: {
+      userId: req.user.id,
+      expiresAt: { gt: now },
+      lastUsedAt: { gt: new Date(now.getTime() - sessionIdleMs()) },
+    },
+    orderBy: { lastUsedAt: 'desc' },
+    select: { id: true, label: true, createdAt: true, lastUsedAt: true },
+  });
+  res.json(
+    sessions.map((session) => ({
+      id: session.id,
+      label: session.label,
+      created_at: session.createdAt,
+      last_used_at: session.lastUsedAt,
+      current: session.id === req.webSessionId,
+    })),
+  );
+};
+
+/** Ends one of the user's own sessions; another user's id, or an unknown one, is 404. */
+export const deleteSession = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+  const { count } = await prisma.webSession.deleteMany({ where: { id: req.params.id, userId: req.user.id } });
+  if (count === 0) {
+    throw new AppError(404, 'Sessione non trovata');
+  }
+  if (req.params.id === req.webSessionId) clearSessionCookie(res);
+  res.status(204).end();
 };
 
 // Refresh token
@@ -249,10 +325,15 @@ export const changePassword = async (req: Request, res: Response) => {
   // Hash new password
   const hashedPassword = await hashPassword(new_password);
 
-  // Update password
-  await prisma.user.update({
-    where: { id: req.user.id },
-    data: { password: hashedPassword },
+  // Update password, and end every other web session of the user (A.1, D3): whoever held one with the old password
+  // is out. The session in use stays. The connected applications are not touched: their page lists them.
+  const userId = req.user.id;
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+    await revokeUserWebSessions(userId, req.webSessionId, tx);
   });
 
   res.json({ message: 'Password changed successfully' });
@@ -681,5 +762,7 @@ export const deleteAccount = async (req: Request, res: Response) => {
   }
 
   await deleteUserAccount(user.id);
+  // Its sessions went with the account (cascade); the browser's cookie goes too.
+  clearSessionCookie(res);
   res.status(204).send();
 };
