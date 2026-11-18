@@ -1,11 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Loader2, Search, ArrowRight, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
-import { AnimatePresence } from 'framer-motion';
-import { MenuSurface } from '../../ui/MenuSurface';
+import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useAppStore } from '../../../store/useAppStore';
@@ -81,49 +79,12 @@ export function HistoryView() {
     const [loading, setLoading] = useState(true);
     const [clearing, setClearing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [openMenu, setOpenMenu] = useState<string | null>(null);
-    const [showDossierList, setShowDossierList] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const [clearFrom, setClearFrom] = useState<HTMLElement | null>(null);
     const [createDossierFor, setCreateDossierFor] = useState<SearchHistoryItem | null>(null);
     const [newDossierTitle, setNewDossierTitle] = useState('');
-    // Menu position is computed from the trigger's getBoundingClientRect on open
-    // so the dropdown can use position:fixed and escape parent overflow contexts
-    // (the page layout has overflow-hidden on <main>; absolute positioning was
-    // getting clipped by it). flip is set when there's not enough space below.
-    const [menuPos, setMenuPos] = useState<{
-        top?: number;
-        bottom?: number;
-        right: number;
-    } | null>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    const closeMenu = () => {
-        setOpenMenu(null);
-        setShowDossierList(null);
-        setMenuPos(null);
-    };
-
-    const handleToggleMenu = (e: React.MouseEvent, itemId: string) => {
-        e.stopPropagation();
-        if (openMenu === itemId) {
-            closeMenu();
-            return;
-        }
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const ESTIMATED_MENU_HEIGHT = 180;
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const flipUp = spaceBelow < ESTIMATED_MENU_HEIGHT && rect.top > ESTIMATED_MENU_HEIGHT;
-        setMenuPos({
-            top: flipUp ? undefined : rect.bottom + 4,
-            bottom: flipUp ? window.innerHeight - rect.top + 4 : undefined,
-            right: window.innerWidth - rect.right,
-        });
-        setOpenMenu(itemId);
-        setShowDossierList(null);
-    };
 
     const {
         triggerSearch,
@@ -140,28 +101,6 @@ export function HistoryView() {
         tryStartTour('history');
     }, [tryStartTour]);
 
-    // Chiudi menu quando si clicca fuori, oppure quando l'utente scrolla
-    // (il dropdown è position:fixed con coordinate calcolate, quindi non
-    // riposiziona da solo — chiuderlo è la UX più semplice e coerente).
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                closeMenu();
-            }
-        };
-        const handleScrollOrResize = () => closeMenu();
-        document.addEventListener('mousedown', handleClickOutside);
-        if (openMenu) {
-            window.addEventListener('scroll', handleScrollOrResize, true);
-            window.addEventListener('resize', handleScrollOrResize);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            window.removeEventListener('scroll', handleScrollOrResize, true);
-            window.removeEventListener('resize', handleScrollOrResize);
-        };
-    }, [openMenu]);
-
     // Auto-hide feedback
     useEffect(() => {
         if (feedback) {
@@ -174,7 +113,7 @@ export function HistoryView() {
     // focused. Skipped while any overlay is open or the user is typing in
     // a different input/textarea (mirrors DossierListView pattern).
     useEffect(() => {
-        const hasOverlay = clearConfirmOpen || createDossierFor !== null || openMenu !== null;
+        const hasOverlay = clearConfirmOpen || createDossierFor !== null;
         const handler = (e: KeyboardEvent) => {
             if (e.metaKey || e.ctrlKey || e.altKey) return;
             const target = e.target as HTMLElement | null;
@@ -190,7 +129,7 @@ export function HistoryView() {
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [clearConfirmOpen, createDossierFor, openMenu, searchTerm]);
+    }, [clearConfirmOpen, createDossierFor, searchTerm]);
 
     const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
         setFeedback({ message, type });
@@ -202,7 +141,6 @@ export function HistoryView() {
         const label = generateQuickNormLabel(item);
         addQuickNorm(label, searchParams);
         showFeedback('Aggiunto alle norme rapide');
-        setOpenMenu(null);
     };
 
     const handleAddToDossier = (e: React.MouseEvent, item: SearchHistoryItem, dossierId: string) => {
@@ -210,16 +148,12 @@ export function HistoryView() {
         const norma = historyToNormaVisitata(item);
         addToDossier(dossierId, norma, 'norma');
         showFeedback('Aggiunto alla pratica');
-        setOpenMenu(null);
-        setShowDossierList(null);
     };
 
     const handleCreateDossierAndAdd = (e: React.MouseEvent, item: SearchHistoryItem) => {
         e.stopPropagation();
         setCreateDossierFor(item);
         setNewDossierTitle('');
-        setOpenMenu(null);
-        setShowDossierList(null);
     };
 
     const handleConfirmCreateDossier = async () => {
@@ -267,6 +201,29 @@ export function HistoryView() {
             showFeedback('Impossibile eliminare la voce dalla cronologia', 'error');
         }
     };
+
+    // A norm's «⋯»: the pratiche listed in it under their heading, as one menu (LC103: a `MenuButton`, as every other).
+    const historyMenuItems = (item: SearchHistoryItem): MenuItem[] => [
+        { label: 'Aggiungi a norme rapide', icon: Zap, iconClassName: 'text-amber-500', onSelect: (e) => handleAddQuickNorm(e, item) },
+        ...dossiers.map((dossier, i) => ({
+            label: dossier.title,
+            ariaLabel: `Aggiungi a ${dossier.title}`,
+            icon: FolderPlus,
+            iconClassName: 'text-primary-500',
+            separatorBefore: i === 0,
+            sectionHeading: i === 0 ? 'Aggiungi a una pratica' : undefined,
+            onSelect: (e: React.MouseEvent) => handleAddToDossier(e, item, dossier.id),
+        })),
+        {
+            label: 'Nuova pratica…',
+            ariaLabel: 'Aggiungi a una nuova pratica…',
+            icon: Plus,
+            separatorBefore: dossiers.length === 0,
+            sectionHeading: dossiers.length === 0 ? 'Aggiungi a una pratica' : undefined,
+            onSelect: (e) => handleCreateDossierAndAdd(e, item),
+        },
+        { label: 'Rimuovi dalla cronologia', icon: Trash2, danger: true, separatorBefore: true, onSelect: (e) => handleDeleteItem(e, item.id) },
+    ];
 
     const handleOpenNorma = (params: SearchParams) => {
         navigate('/');
@@ -380,10 +337,9 @@ export function HistoryView() {
             }
         >
             <NormaChangesSection onOpen={handleOpenNorma} />
-            {/* `overflow-clip`, not `hidden`, for the rounded corners: `hidden` made this card the date labels' scroll
-                container, so on a phone they pinned 56 px (the bar's height) below its top, over the first entry and
-                under an empty band (M1). */}
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-clip">
+            {/* No overflow at all: `hidden` made this card the date labels' scroll container (M1), and `clip` cut the
+                «⋯» menus at its edge (LC103); its padding keeps everything inside the rounded corners. */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
                 {/* Timeline with grouped dates. No inner scroll: the page is the
                     scroll context so the action dropdown isn't clipped. Sticky date
                     headers attach to the page's scroller, under the phone's bar. */}
@@ -439,16 +395,16 @@ export function HistoryView() {
                                     {/* Timeline items */}
                                     {/* Mobile: simpler timeline */}
                                     <div className="md:hidden space-y-2">
-                                        {items.map((item, idx) => item.decision_key ? (
+                                        {items.map((item) => item.decision_key ? (
                                             <DecisionHistoryRow key={item.id} item={item} variant="mobile" onDelete={handleDeleteItem} />
                                         ) : (
-                                            <div key={idx} className="relative">
+                                            <div key={item.id} className="relative">
                                                 {/* Mobile Item card - compact, tap-friendly; a button, so Tab reaches it and Enter opens it (A6) */}
                                                 <button
                                                     type="button"
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative block w-full text-left bg-white dark:bg-slate-800 p-3 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
+                                                        "relative block w-full text-left bg-white dark:bg-slate-800 p-3 pr-12 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "active:scale-[0.98] active:border-primary-400",
                                                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
@@ -474,6 +430,18 @@ export function HistoryView() {
                                                         <ArrowRight size={18} aria-hidden className="text-primary-500 flex-shrink-0 mt-1" />
                                                     </span>
                                                 </button>
+                                                {/* Beside the card, over its right edge: a button cannot hold another (LC103, 44 px to the touch). */}
+                                                <MenuButton
+                                                    label={`Altre azioni su ${historyLabel(item)}`}
+                                                    title="Altre azioni"
+                                                    items={historyMenuItems(item)}
+                                                    placement="auto"
+                                                    menuClassName="max-h-80"
+                                                    className="absolute right-1 top-1"
+                                                    triggerClassName="min-h-[44px] min-w-[44px] justify-center text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                                                >
+                                                    <MoreVertical size={18} aria-hidden />
+                                                </MenuButton>
                                             </div>
                                         ))}
                                     </div>
@@ -484,7 +452,7 @@ export function HistoryView() {
                                             <DecisionHistoryRow key={item.id} item={item} variant="desktop" onDelete={handleDeleteItem}
                                                 id={idx === 0 ? 'tour-history-item' : undefined} />
                                         ) : (
-                                            <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
+                                            <div key={item.id} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
 
                                                 {/* Item card: the title is a button stretched over the card (A6), so the card still opens
                                                     on a click anywhere and Tab and Enter reach it; the menu sits beside it, above the stretch. */}
@@ -522,115 +490,17 @@ export function HistoryView() {
 
                                                         <div className="relative z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-[color,background-color,border-color,opacity]">
                                                             {/* Menu azioni */}
-                                                            <div className="relative" ref={openMenu === item.id ? menuRef : null}>
-                                                                <button
-                                                                    id={idx === 0 ? 'tour-history-actions' : undefined}
-                                                                    onClick={(e) => handleToggleMenu(e, item.id)}
-                                                                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                                            <div id={idx === 0 ? 'tour-history-actions' : undefined}>
+                                                                <MenuButton
+                                                                    label={`Altre azioni su ${historyLabel(item)}`}
                                                                     title="Altre azioni"
+                                                                    items={historyMenuItems(item)}
+                                                                    placement="auto"
+                                                                    menuClassName="max-h-80"
+                                                                    triggerClassName="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
                                                                 >
-                                                                    <MoreVertical size={16} />
-                                                                </button>
-
-                                                                {/* Dropdown menu — portaled to body so it escapes parent overflow
-                                                                    AND parent opacity (the row's group-hover wrapper has opacity-0
-                                                                    when not hovered, which would inherit through fixed children).
-                                                                    onMouseDown stopPropagation so click-outside doesn't fire when
-                                                                    the user clicks inside the portaled menu (no longer a DOM
-                                                                    descendant of menuRef). */}
-                                                                {createPortal(
-                                                                    <AnimatePresence>
-                                                                    {openMenu === item.id && menuPos && (
-                                                                    <MenuSurface
-                                                                        key="menu"
-                                                                        above={menuPos.bottom !== undefined}
-                                                                        onMouseDown={(e) => e.stopPropagation()}
-                                                                        style={{
-                                                                            position: 'fixed',
-                                                                            top: menuPos.top,
-                                                                            bottom: menuPos.bottom,
-                                                                            right: menuPos.right,
-                                                                            zIndex: 50,
-                                                                        }}
-                                                                        className="w-56 bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1"
-                                                                    >
-                                                                        {/* QuickNorm */}
-                                                                        <button
-                                                                            id={idx === 0 ? 'tour-history-quick-norm' : undefined}
-                                                                            onClick={(e) => handleAddQuickNorm(e, item)}
-                                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                                                                        >
-                                                                            <Zap size={16} className="text-amber-500" />
-                                                                            <span>Aggiungi a norme rapide</span>
-                                                                        </button>
-
-                                                                        {/* Divider */}
-                                                                        <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
-
-                                                                        {/* Dossier */}
-                                                                        <div className="relative">
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setShowDossierList(showDossierList === item.id ? null : item.id);
-                                                                                }}
-                                                                                className="w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                                                                            >
-                                                                                <span className="flex items-center gap-2">
-                                                                                    <FolderPlus size={16} className="text-primary-500" />
-                                                                                    <span>Aggiungi a una pratica</span>
-                                                                                </span>
-                                                                                <ArrowRight size={14} className="text-slate-400" />
-                                                                            </button>
-
-                                                                            {/* Sub-menu dossier */}
-                                                                            {showDossierList === item.id && (
-                                                                                <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 max-h-64 overflow-y-auto">
-                                                                                    {dossiers.length === 0 ? (
-                                                                                        <p className="px-3 py-2 text-sm text-slate-500">Nessuna pratica</p>
-                                                                                    ) : (
-                                                                                        dossiers.map(dossier => (
-                                                                                            <button
-                                                                                                key={dossier.id}
-                                                                                                onClick={(e) => handleAddToDossier(e, item, dossier.id)}
-                                                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors truncate"
-                                                                                            >
-                                                                                                {dossier.title}
-                                                                                            </button>
-                                                                                        ))
-                                                                                    )}
-                                                                                    <div className="border-t border-slate-200 dark:border-slate-700 mt-1 pt-1">
-                                                                                        <button
-                                                                                            onClick={(e) => handleCreateDossierAndAdd(e, item)}
-                                                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-                                                                                        >
-                                                                                            <Plus size={14} />
-                                                                                            <span>Nuova pratica...</span>
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-
-                                                                        {/* Divider */}
-                                                                        <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
-
-                                                                        {/* Elimina */}
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                handleDeleteItem(e, item.id);
-                                                                                closeMenu();
-                                                                            }}
-                                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                            <span>Rimuovi dalla cronologia</span>
-                                                                        </button>
-                                                                    </MenuSurface>
-                                                                    )}
-                                                                    </AnimatePresence>,
-                                                                    document.body
-                                                                )}
+                                                                    <MoreVertical size={16} aria-hidden />
+                                                                </MenuButton>
                                                             </div>
 
                                                             <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-primary-500 pointer-events-none">

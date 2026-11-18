@@ -69,7 +69,7 @@ describe('HistoryView — decisions', () => {
     expect(screen.getAllByText('l. n. 241 del 1990').length).toBeGreaterThan(0);
     expect(screen.queryByText(/^Art\. 3$/)).toBeNull();
     // The desktop row (the second title): a ruled row, no bordered card, no timeline dot beside it.
-    const title = screen.getAllByRole('button', { name: (n) => n.includes('art. 3 l. 241/1990') })[1];
+    const title = screen.getAllByRole('button', { name: (n) => n.includes('art. 3 l. 241/1990') && !n.startsWith('Altre azioni') })[1];
     const card = title.parentElement!.parentElement!;
     expect(card).toHaveClass('border-b');
     expect(card).not.toHaveClass('border-2');
@@ -107,7 +107,7 @@ describe('HistoryView — decisions', () => {
   it('opens a norm from the keyboard: its title is a button, Tab reaches it, Enter opens it; the menu sits beside it (A6)', async () => {
     getHistory.mockResolvedValue([norm]);
     mount();
-    const titles = await screen.findAllByRole('button', { name: (n) => n.includes('art. 3 l. 241/1990') });
+    const titles = await screen.findAllByRole('button', { name: (n) => n.includes('art. 3 l. 241/1990') && !n.startsWith('Altre azioni') });
     // One per layout (phone and desktop); none of them holds another control.
     expect(titles).toHaveLength(2);
     titles.forEach((title) => expect(title.querySelector('button')).toBeNull());
@@ -117,6 +117,60 @@ describe('HistoryView — decisions', () => {
     // A native button: Enter is its click.
     fireEvent.click(titles[1]);
     expect(screen.getByTestId('where').textContent).toBe('/');
+  });
+
+  // LC103: the norm's «⋯» is a `MenuButton`, as every other menu, on the phone as on a computer.
+  it('closes a norm\'s «⋯» on Escape and gives the focus back to its button', async () => {
+    getHistory.mockResolvedValue([norm]);
+    appStore.setState({ dossiers: [{ id: 'p1', title: 'Pratica Rossi' }] } as never);
+    mount();
+    const triggers = await screen.findAllByRole('button', { name: 'Altre azioni su art. 3 l. 241/1990' });
+    // One per layout (phone and desktop).
+    expect(triggers).toHaveLength(2);
+    for (const trigger of triggers) {
+      fireEvent.click(trigger);
+      const menu = screen.getByRole('menu');
+      expect(within(menu).getAllByRole('menuitem').map((i) => i.getAttribute('aria-label') ?? i.textContent)).toEqual([
+        'Aggiungi a norme rapide', 'Aggiungi a Pratica Rossi', 'Aggiungi a una nuova pratica…', 'Rimuovi dalla cronologia',
+      ]);
+      expect(within(menu).getAllByRole('menuitem')[0]).toHaveFocus();
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+      expect(within(menu).getByRole('menuitem', { name: 'Aggiungi a Pratica Rossi' })).toHaveFocus();
+      fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+      expect(trigger).toHaveFocus();
+    }
+  });
+
+  // Papiniano on #634: a «⋯» open, then «/» and a search, and the menu stood under another norm and removed it.
+  it('closes an open «⋯» on «/» and never leaves it under another norm when the filter changes', async () => {
+    const other = { ...norm, id: 'n2', act_type: 'codice civile', act_number: null, date: null, article: '2043' };
+    getHistory.mockResolvedValue([norm, other]);
+    mount();
+    const search = screen.getByRole('textbox', { name: 'Cerca nella cronologia' });
+    const desktop = async () => (await screen.findAllByRole('button', { name: 'Altre azioni su art. 3 l. 241/1990' }))[1];
+
+    // «/»: the menu closes, the search has the focus.
+    fireEvent.click(await desktop());
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement!, { key: '/' });
+    expect(search).toHaveFocus();
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    // The filter changing under an open menu: its row goes, and the menu with it; nothing moves under «art. 2043».
+    fireEvent.click(await desktop());
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: '2043' } });
+    await waitFor(() => expect(screen.queryAllByText('art. 3 l. 241/1990')).toHaveLength(0));
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('gives the phone\'s «⋯» a 44 px touch target, in the phone\'s list (it was only in the computer\'s, 0 wide at 390)', async () => {
+    getHistory.mockResolvedValue([norm]);
+    mount();
+    const [phone] = await screen.findAllByRole('button', { name: 'Altre azioni su art. 3 l. 241/1990' });
+    expect(phone.closest('.md\\:hidden')).not.toBeNull();
+    expect(phone).toHaveClass('min-h-[44px]', 'min-w-[44px]');
   });
 
   it('writes the time of a visit at 4.5:1 or more, in light and dark (Pietra\'s secondary text)', async () => {

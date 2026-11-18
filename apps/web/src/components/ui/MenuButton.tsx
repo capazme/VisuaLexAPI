@@ -137,8 +137,20 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
     } else if (event.key === 'Tab') close(false);
   };
 
+  // A «⋯» that opens nothing is not drawn (LC103).
+  if (items.length === 0) return null;
+
   return (
-    <div ref={wrapperRef} className={cn('relative', className)} onClick={(e) => e.stopPropagation()}>
+    <div
+      ref={wrapperRef}
+      className={cn('relative', className)}
+      onClick={(e) => e.stopPropagation()}
+      // The focus taken elsewhere (the Cronologia's «/» to its search) closes it, as Tab does (LC103). Only towards an
+      // element: a click on Safari leaves `relatedTarget` null, and the click outside has its own handler.
+      onBlur={(e) => {
+        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpenAt(null);
+      }}
+    >
       <button
         ref={triggerRef}
         type="button"
@@ -180,7 +192,8 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
             </p>
           )}
           {items.map((item, index) => (
-            <div key={item.label}>
+            // Two items may share a label (two pratiche of one title, in the Cronologia's «⋯»).
+            <div key={`${index}:${item.label}`}>
               {item.separatorBefore && <div className="my-1 border-t border-slate-200 dark:border-slate-700" aria-hidden />}
               {/* Seen, not read: the items under it carry it in their `ariaLabel`. */}
               {item.sectionHeading && (

@@ -19,6 +19,12 @@ function setup(onSelect = vi.fn(), onParentClick = vi.fn()) {
 }
 
 describe('MenuButton', () => {
+  it('draws no «⋯» when it has no items (LC103)', () => {
+    const { container } = render(<MenuButton label="Vuoto" items={[]}>⋯</MenuButton>);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button', { name: 'Vuoto' })).toBeNull();
+  });
+
   it('opens on click on its first item, selects, closes and returns focus', () => {
     const { trigger, onSelect } = setup();
     fireEvent.click(trigger);
