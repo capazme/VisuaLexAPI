@@ -1,22 +1,23 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { boundedTags, boundedText, parseBody } from '../utils/bodyLimits';
 import { AppError } from '../middleware/errorHandler';
 
 // Validation schemas
 const createBookmarkSchema = z.object({
-  normaKey: z.string().min(1),
+  normaKey: boundedText(500, 'norma').min(1),
   normaData: z.any().optional(), // JSON data from VisualEx API
-  title: z.string().optional(),
-  notes: z.string().optional(),
-  tags: z.array(z.string()).optional().default([]),
+  title: boundedText(500, 'titolo').optional(),
+  notes: boundedText(50_000, 'note').optional(),
+  tags: boundedTags(50, 100).optional().default([]),
   folderId: z.string().guid().optional().nullable(),
 });
 
 const updateBookmarkSchema = z.object({
-  title: z.string().optional(),
-  notes: z.string().optional(),
-  tags: z.array(z.string()).optional(),
+  title: boundedText(500, 'titolo').optional(),
+  notes: boundedText(50_000, 'note').optional(),
+  tags: boundedTags(50, 100).optional(),
   folderId: z.string().guid().optional().nullable(),
 });
 
@@ -39,7 +40,7 @@ export const createBookmark = async (req: Request, res: Response) => {
     throw new AppError(401, 'Not authenticated');
   }
 
-  const data = createBookmarkSchema.parse(req.body);
+  const data = parseBody(createBookmarkSchema, req.body);
 
   // Check if folder exists and belongs to user (if folderId provided)
   if (data.folderId) {
@@ -163,7 +164,7 @@ export const updateBookmark = async (req: Request, res: Response) => {
   }
 
   const { id } = req.params;
-  const data = updateBookmarkSchema.parse(req.body);
+  const data = parseBody(updateBookmarkSchema, req.body);
 
   // Check if bookmark exists and belongs to user
   const existingBookmark = await prisma.bookmark.findFirst({

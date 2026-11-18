@@ -3,6 +3,7 @@ import { Prisma, DossierItemType } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { boundedTags, boundedText, parseBody } from '../utils/bodyLimits';
 import { atMostUnits } from '../utils/utf16Length';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
@@ -175,38 +176,38 @@ const dossierKindSchema = z.enum(['lavoro', 'studio']);
 const createDossierSchema = z.object({
   // In UTF-16 units, as the Forum counts a published dossier's title (`LIMITS.title`).
   name: z.string().min(1).refine(...atMostUnits(200)),
-  description: z.string().optional(),
-  color: z.string().optional(),
-  tags: z.array(z.string()).optional(),
+  description: boundedText(5_000, 'descrizione').optional(),
+  color: boundedText(50, 'colore').optional(),
+  tags: boundedTags(50, 100).optional(),
   kind: dossierKindSchema.optional(),
 });
 
 const updateDossierSchema = z.object({
   name: z.string().min(1).refine(...atMostUnits(200)).optional(),
-  description: z.string().optional().nullable(),
-  color: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional(),
+  description: boundedText(5_000, 'descrizione').optional().nullable(),
+  color: boundedText(50, 'colore').optional().nullable(),
+  tags: boundedTags(50, 100).optional(),
   isPinned: z.boolean().optional(),
   kind: dossierKindSchema.optional(),
 });
 
 const createDossierItemSchema = z.object({
   itemType: z.enum(['norm', 'note', 'section', 'sentenza']),
-  title: z.string().min(1),
+  title: boundedText(1_000, 'titolo').min(1),
   content: z.any().optional(),
   position: z.number().optional(),
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
 });
 
 const updateDossierItemSchema = z.object({
-  title: z.string().min(1).optional(),
+  title: boundedText(1_000, 'titolo').min(1).optional(),
   content: z.any().optional(),
   position: z.number().optional(),
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
   // A note's article (or null to detach it): how the web app reattaches a note
   // to an article it restored with a new id. User session only: this route is
   // not in the delegated table, so a connected application cannot move notes.
-  aboutItemId: z.string().min(1).max(64).nullable().optional(),
+  aboutItemId: boundedText(64, 'articolo della nota').min(1).nullable().optional(),
 });
 
 const moveDossierItemSchema = z.object({
@@ -248,7 +249,7 @@ export const getDossier = async (req: Request, res: Response) => {
  * Create new dossier
  */
 export const createDossier = async (req: Request, res: Response) => {
-  const data = createDossierSchema.parse(req.body);
+  const data = parseBody(createDossierSchema, req.body);
 
   const dossier = await prisma.dossier.create({
     data: {
@@ -271,7 +272,7 @@ export const createDossier = async (req: Request, res: Response) => {
  */
 export const updateDossier = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const data = updateDossierSchema.parse(req.body);
+  const data = parseBody(updateDossierSchema, req.body);
 
   // Check ownership
   const existing = await prisma.dossier.findFirst({
@@ -359,7 +360,7 @@ function recitalItem(content: unknown): { content: Prisma.InputJsonObject; title
  */
 export const addDossierItem = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const data = createDossierItemSchema.parse(req.body);
+  const data = parseBody(createDossierItemSchema, req.body);
 
   // A decision's content is its identity: checked before anything is written (design 2026-10-01 §6).
   const decision = data.itemType === 'sentenza' ? parseDecisionItemContent(data.content) : null;
@@ -464,7 +465,7 @@ export const addDossierNote = async (req: Request, res: Response) => {
  */
 export const updateDossierItem = async (req: Request, res: Response) => {
   const { id, itemId } = req.params;
-  const data = updateDossierItemSchema.parse(req.body);
+  const data = parseBody(updateDossierItemSchema, req.body);
 
   // Check ownership
   const dossier = await prisma.dossier.findFirst({

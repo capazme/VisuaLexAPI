@@ -5,6 +5,8 @@ import { startNormaWatcher } from './utils/normaWatcher';
 import { startDeadLetterSweeper } from './services/merlt/deadLetterLog';
 import { startMerltErasureWorker } from './services/merlt/userData';
 import { startCommunitySweeper } from './forum/sweep';
+import { installProcessGuards } from './utils/processGuards';
+import { describeUnexpectedError } from './middleware/errorHandler';
 import { cookieSecure } from './auth/webSession';
 import {
   scheduleStuckJobSweeper,
@@ -93,7 +95,7 @@ const server = app.listen(config.port, () => {
 // short, which is safe: each of its writes is atomic, and the next run starts
 // again from the least recently seen watch.
 let shuttingDown = false;
-function shutdown(signal: NodeJS.Signals): void {
+function shutdown(signal: NodeJS.Signals | 'uncaughtException', exitCode = 0): void {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[shutdown] received ${signal}, closing server...`);
@@ -105,8 +107,8 @@ function shutdown(signal: NodeJS.Signals): void {
   server.close(() => {
     prisma
       .$disconnect()
-      .catch((err) => console.error('[shutdown] prisma disconnect failed:', err))
-      .finally(() => process.exit(0));
+      .catch((err) => console.error(`[shutdown] prisma disconnect failed: ${describeUnexpectedError(err)}`))
+      .finally(() => process.exit(exitCode));
   });
   // close() drops the idle keep-alive sockets only once. A socket that was
   // mid-request stays open for the whole keep-alive timeout (~6 s) after its
@@ -120,5 +122,7 @@ function shutdown(signal: NodeJS.Signals): void {
   }, 10_000).unref();
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+// An error nobody caught no longer ends the server for everyone (utils/processGuards.ts).
+installProcessGuards(() => shutdown('uncaughtException', 1));

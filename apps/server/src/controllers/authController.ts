@@ -3,7 +3,8 @@ import { Request, Response } from 'express';
 import { Prisma, type User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { hashPassword, passwordSchema, verifyPassword } from '../utils/password';
+import { boundedText, parseBody } from '../utils/bodyLimits';
+import { MAX_PASSWORD_LENGTH, hashPassword, passwordSchema, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
 import { WEB_CLIENT_HEADER } from '../middleware/csrfGuard';
@@ -23,22 +24,22 @@ import { dateToDay } from '../lingo/studyDays';
 
 // Validation schemas
 const registerSchema = z.object({
-  email: z.string().email(),
-  username: z.string().min(3).max(50),
+  email: boundedText(254, 'email').email(),
+  username: boundedText(50, 'nome utente').min(3),
   password: passwordSchema(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+  email: boundedText(254, 'email').email(),
+  password: boundedText(MAX_PASSWORD_LENGTH, 'password'),
 });
 
 const refreshSchema = z.object({
-  refresh_token: z.string(),
+  refresh_token: boundedText(4_096, 'token'),
 });
 
 const changePasswordSchema = z.object({
-  current_password: z.string(),
+  current_password: boundedText(MAX_PASSWORD_LENGTH, 'password attuale'),
   new_password: passwordSchema(),
 });
 
@@ -48,7 +49,7 @@ const setDevModeSchema = z.object({
 }).strict();
 
 const deleteAccountSchema = z.object({
-  password: z.string().min(1),
+  password: boundedText(MAX_PASSWORD_LENGTH, 'password').min(1),
   confirmation: z.literal('ELIMINA ACCOUNT'),
 });
 
@@ -86,7 +87,7 @@ const isUniqueClash = (error: unknown): error is Prisma.PrismaClientKnownRequest
  * this route slows that down; it does not close it.
  */
 export const register = async (req: Request, res: Response) => {
-  const { email, username, password } = registerSchema.parse(req.body);
+  const { email, username, password } = parseBody(registerSchema, req.body);
 
   const inUse = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] }, select: { id: true } });
   if (inUse) {
@@ -130,7 +131,7 @@ const spendAPasswordCheck = async (password: string): Promise<void> => {
 
 // Login
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = loginSchema.parse(req.body);
+  const { email, password } = parseBody(loginSchema, req.body);
 
   // Find user
   const user = await prisma.user.findUnique({
@@ -246,7 +247,7 @@ export const deleteSession = async (req: Request, res: Response) => {
 
 // Refresh token
 export const refresh = async (req: Request, res: Response) => {
-  const { refresh_token } = refreshSchema.parse(req.body);
+  const { refresh_token } = parseBody(refreshSchema, req.body);
 
   const payload = verifyToken(refresh_token);
 
@@ -313,7 +314,7 @@ export const changePassword = async (req: Request, res: Response) => {
     throw new AppError(401, 'Not authenticated');
   }
 
-  const { current_password, new_password } = changePasswordSchema.parse(req.body);
+  const { current_password, new_password } = parseBody(changePasswordSchema, req.body);
 
   // Verify current password
   const isPasswordValid = await verifyPassword(current_password, req.user.password);
@@ -752,7 +753,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
  * glosse, replies and comments, stay without their author (see `deleteUserAccount`).
  */
 export const deleteAccount = async (req: Request, res: Response) => {
-  const { password, confirmation } = deleteAccountSchema.parse(req.body);
+  const { password, confirmation } = parseBody(deleteAccountSchema, req.body);
   if (confirmation !== 'ELIMINA ACCOUNT') {
     throw new AppError(400, 'Conferma non valida');
   }
