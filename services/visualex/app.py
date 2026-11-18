@@ -71,7 +71,8 @@ from visualex_api.tools.text_op import article_input_error, parse_article_input,
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
 from visualex_api.tools.sources import cite_act, cite_article, cite_recital, recital_numbers
 from visualex_api.tools.act_identity import identifies_act
-from visualex_api.tools.norm_query import act_names, read_norm_query
+from visualex_api.tools.norm_query import act_names, ambiguous_choices, read_norm_query
+from visualex_api.tools.regional_law import REGIONAL_LAW_REFUSAL, is_regional_act_type
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
 from visualex_api.tools.exceptions import (
@@ -160,7 +161,8 @@ def _link_refused_before_lookup(norm):
     """The reason a norm gets no link before any request, or None: a reading that names no
     act, and a range or a list (the browser sends the first article, §4.4; a range would
     read the act's index for nothing)."""
-    if not identifies_act(norm) or _LINK_RANGE_OR_LIST.search(norm['article']):
+    if (not identifies_act(norm) or _LINK_RANGE_OR_LIST.search(norm['article'])
+            or is_regional_act_type(norm['act_type'])):
         return 'not_linkable'
     return None
 
@@ -252,7 +254,8 @@ def _recital_reading(params: dict, source: str | None) -> dict:
 def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
     """Each string read as /parse_query reads one; one that makes the reading raise is
     unrecognised, and counted. A recital clause is answered as not recognised this round: the
-    document analysis keeps its behaviour (spec 2026-11-17 §3.2). Returns (results in order,
+    document analysis keeps its behaviour (spec 2026-11-17 §3.2); so is a regional law (G-577).
+    A dated name's notice goes beside `parsed`, never in it. Returns (results in order,
     failures)."""
     results, failed = [], 0
     for query in queries:
@@ -261,14 +264,18 @@ def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
         except Exception:
             params, source = None, None
             failed += 1
-        if params is not None and params.get("recital"):
+        if params is not None and (params.get("recital") or params.get("refusal")):
             params, source = None, None
-        results.append({
+        notice = params.pop("notice", None) if params is not None else None
+        result = {
             "recognized": params is not None,
             "parsed": params,
             "source": source,
             "identifies_act": identifies_act(params),
-        })
+        }
+        if notice:
+            result["notice"] = notice
+        results.append(result)
     return results, failed
 
 # Funzione per il conteggio dei token (numero di parole) in modo ricorsivo
@@ -797,6 +804,11 @@ class NormaController:
         act_type = data.get('act_type')
         act_number = data.get('act_number')
         norma_date = data.get('date')
+
+        # No address for a regional act (G-577): Normattiva would answer it with the State's act
+        # of the same number, the wrong text in silence.
+        if is_regional_act_type(act_type):
+            raise ValidationError(REGIONAL_LAW_REFUSAL)
 
         # A consolidated EU version. Validated here so a Normattiva request
         # carrying the field fails loudly instead of being silently ignored.
@@ -1453,7 +1465,14 @@ class NormaController:
         Returns:
             { recognized: bool, parsed?: {...api params}, urn?: str,
               display?: str, source?: 'alias' | 'nl_parser' | 'recital',
-              refusal?: 'recital_not_eu' | 'recital_with_article' }
+              refusal?: 'recital_not_eu' | 'recital_with_article' | 'regional_law',
+              notice?: str, ambiguous?: [{name, parsed, display}] }
+
+        G-577: a dated name («art. 1 tuir») is read at today's date in Rome; its `parsed` carries
+        `annex` when the act's text is an annex, and `notice` is the one line to show with it. A
+        regional law is not recognised, with `refusal: "regional_law"`, never read as a State
+        law. An ambiguous name («art. 1 tua») is not recognised, and `ambiguous` lists the acts
+        it could mean, each with its own `parsed`.
         """
         try:
             data = await request.get_json() or {}
@@ -1465,9 +1484,17 @@ class NormaController:
             # parser ("art 1453 cc", "art 3 cost"): the reading /parse_query_batch shares.
             parsed_params, source = read_norm_query(query)
             if parsed_params is None:
-                return jsonify({"parsed": None, "recognized": False, "identifies_act": False})
+                answer = {"parsed": None, "recognized": False, "identifies_act": False}
+                choices = ambiguous_choices(query)
+                if choices:
+                    answer["ambiguous"] = choices
+                return jsonify(answer)
+            if parsed_params.get("refusal") == "regional_law":
+                return jsonify({"parsed": None, "recognized": False, "identifies_act": False,
+                                "refusal": "regional_law"})
             if parsed_params.get("recital"):
                 return jsonify(_recital_reading(parsed_params, source))
+            notice = parsed_params.pop("notice", None)
 
             # 3. Best-effort URN: build a NormaVisitata with the same pipeline
             # `fetch_norma_data` uses, then pick its .urn. If the URN cannot be
@@ -1500,7 +1527,7 @@ class NormaController:
             except Exception as e:
                 log.warning("parse_query URN build failed", error=str(e))
 
-            return jsonify({
+            answer = {
                 "recognized": True,
                 "parsed": parsed_params,
                 # The convention's predicate (act_identity.py): «art. 2 d.m.» reads, and names no act.
@@ -1508,7 +1535,10 @@ class NormaController:
                 "urn": urn,
                 "display": display,
                 "source": source,
-            })
+            }
+            if notice:
+                answer["notice"] = notice
+            return jsonify(answer)
         except Exception as e:
             log.error("Error in parse_query", error=str(e))
             return jsonify({"error": str(e)}), 500

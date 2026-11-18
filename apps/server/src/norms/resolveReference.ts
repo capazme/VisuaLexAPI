@@ -120,15 +120,38 @@ export const articleKey = (article: string): string => {
   return split && ORDINALS.has(split[2] + split[3]) ? `${split[1]}-${split[2]}${split[3]}${split[4]}` : key;
 };
 
+/** The API's sentence for a regional law (services/visualex `regional_law.REGIONAL_LAW_REFUSAL`). */
+const REGIONAL_LAW = 'Le leggi regionali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla banca dati della Regione.';
+
+/** «codice dell'ambiente (d.lgs. 3 aprile 2006, n. 152) o testo unico accise (…)» from `/parse_query`'s
+ * `ambiguous`, or null when the answer names no such acts. */
+function ambiguousActs(choices: unknown): string | null {
+  if (!Array.isArray(choices)) return null;
+  const named = choices
+    .filter((c): c is { name: string; display: string } =>
+      typeof c === 'object' && c !== null && typeof c.name === 'string' && typeof c.display === 'string')
+    .map((c) => `${c.name} (${c.display})`);
+  return named.length > 1 ? named.join(' o ') : null;
+}
+
 /** Steps 1 and 2 for one reference: what it names, or why not. */
 async function identify(reference: string): Promise<Resolution> {
   const parsed = await postLegalApi('/parse_query', { query: reference });
   if (parsed.status !== 200) throw new SourceUnavailable(`parse_query ${parsed.status}`);
   const params = parsed.data.parsed as Record<string, string> | null | undefined;
+  // A regional law (G-577): no source covers it, and the API never reads it as the State's law of that number.
+  if (parsed.data.refusal === 'regional_law') {
+    return { outcome: 'not_recognised', detail: REGIONAL_LAW };
+  }
   // A recital clause («considerando 26 GDPR», refused or not): added from the reader, not by reference
   // (spec 2026-11-17 §6.3). Checked first: a refused reading must never fall through to an article.
   if (params?.recital || parsed.data.refusal) {
     return { outcome: 'not_recognised', detail: 'Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.' };
+  }
+  // A name of two acts («art. 1 tua», G-577): the API names them, and the reference must say which.
+  const named = ambiguousActs(parsed.data.ambiguous);
+  if (named) {
+    return { outcome: 'ambiguous', detail: `Il nome indica più atti: ${named}. Indica l’atto per numero e data.` };
   }
   if (!parsed.data.recognized || !params?.act_type) {
     return { outcome: 'not_recognised', detail: 'Riferimento non riconosciuto: indica articolo e atto (es. «art. 2043 c.c.»).' };

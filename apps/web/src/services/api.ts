@@ -242,6 +242,8 @@ apiClient.interceptors.response.use(
         ? tooManyRequestsMessage(error.response?.headers?.['retry-after'])
         : (responseData?.detail && (SERVER_WORDS[responseData.detail] ?? responseData.detail)) || (status ? `Richiesta non riuscita (errore ${status}). Riprova tra poco.` : NO_ANSWER_MESSAGE),
       data: responseData,
+      // The write limiter's wait, in seconds, for a caller that waits and tries again (an import).
+      retryAfter: error.response?.headers?.['retry-after'],
     });
   }
 );

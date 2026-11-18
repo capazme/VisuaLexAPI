@@ -45,6 +45,29 @@ describe('DossierListView — the menu of a card', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('opens «Rinomina / Modifica» in the page at the top of the list; Esc gives the focus back to the card\'s «⋯» (LC107)', () => {
+    const updateDossier = vi.fn();
+    appStore.setState({ dossiers: [dossier([CIVIL])], updateDossier });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const trigger = screen.getByRole('button', { name: 'Azioni su Pratica Rossi' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rinomina / Modifica' }));
+    const region = screen.getByRole('region', { name: 'Modifica pratica' });
+    expect(region).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(region.compareDocumentPosition(screen.getByRole('textbox', { name: 'Cerca nelle pratiche' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Modifica pratica' })).toBeNull();
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rinomina / Modifica' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Titolo' }), { target: { value: 'Pratica Bianchi' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(updateDossier).toHaveBeenCalledWith(dossier([CIVIL]).id, expect.objectContaining({ title: 'Pratica Bianchi' }));
+    expect(screen.queryByRole('region', { name: 'Modifica pratica' })).toBeNull();
+  });
+
   it('deletes with no confirmation: the dossier goes to the trash and the notification offers «Annulla» (K1a)', async () => {
     const deleteDossier = vi.fn().mockResolvedValue({ trashId: 't1', itemCount: 1 });
     appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [], deleteDossier });

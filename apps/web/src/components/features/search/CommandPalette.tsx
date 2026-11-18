@@ -17,6 +17,7 @@ import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../consta
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
 import { ISLAND_FIELD_FOCUS, ISLAND_LENS, ISLAND_PLACEHOLDER, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TEXT, ISLAND_WORDS, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
+import { formatParsedCitation, isSearchReady, type ParsedCitation } from '../../../utils/citationParser';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
 import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
@@ -309,7 +310,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   );
 
   // What the box names (a decision, a norm, a topic): one reading, shared with the search page's field.
-  const { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic } = useSearchQuery(inputValue);
+  const { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic, refusal, notice, choices } = useSearchQuery(inputValue);
 
   // The box filters every list while it is typed (`paletteActs.ts`: each typed word begins a word of the
   // row). cmdk's own filter is off: it reorders the rows by score, across the two columns.
@@ -465,15 +466,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     onShowSearch?.();
   }, [decisionRef, openDecision, done, onShowSearch]);
 
-  const handleCitationSearch = useCallback(() => {
-    if (!parsedCitation) return;
-
+  // A norm read in the box, or one of the acts an ambiguous name could mean: searched when ready, completed otherwise.
+  const searchCitation = useCallback((parsedCitation: ParsedCitation) => {
     // Track alias usage if citation was resolved from an alias
     if (parsedCitation.fromAlias && parsedCitation.aliasId) {
       trackAliasUsage(parsedCitation.aliasId);
     }
 
-    if (citationReady) {
+    if (isSearchReady(parsedCitation)) {
       onSearch(citationSearchParams(parsedCitation, { filters }));
       done();
     } else if (parsedCitation.act_type) {
@@ -493,12 +493,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         setStep('input_article');
       }
     }
-  }, [parsedCitation, citationReady, onSearch, done, filters, trackAliasUsage]);
+  }, [onSearch, done, filters, trackAliasUsage]);
+  const handleCitationSearch = useCallback(() => {
+    if (parsedCitation) searchCitation(parsedCitation);
+  }, [parsedCitation, searchCitation]);
 
   // The answer Enter was waiting for has come: run it, once.
   const runWhenAnswered = useEffectEvent(() => {
     setWaitingFor(null);
     if (decisionRef) handleOpenDecision();
+    // A reading with a notice is not run unseen: the wait ends on the line, a second Enter opens it (G-577).
+    else if (parsedCitation && notice) return;
     else if (parsedCitation) handleCitationSearch();
     else if (topic) handleSearchTopic();
   });
@@ -894,7 +899,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             run: handleCitationSearch,
           }
         : null;
-  const readAsRow = readAs && (
+  // In the flow, never over it (L-73): the server's notice under the reading; for an ambiguous name («art. 1 tua») a
+  // row per act, each opening as it is; for a regional law the API's sentence, with nothing to run (G-577).
+  const readAsRow = readAs ? (
     <Command.Group className="shrink-0 pt-2">
       <PaletteRow value="lettura del campo" onSelect={readAs.run} still={still} className="min-h-[56px] gap-3 text-base">
         <readAs.icon size={18} aria-hidden className="shrink-0 text-toga-700 dark:text-toga-300" />
@@ -903,8 +910,25 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           <span className="font-medium text-toga-700 dark:text-toga-300"> · {readAs.action} ↵</span>
         </span>
       </PaletteRow>
+      {notice && !decisionRef && <p className={QUIET_LINE}>{notice}</p>}
     </Command.Group>
-  );
+  ) : step !== 'select_act' ? null
+    : choices.length > 0 ? (
+      <Command.Group className="shrink-0 pt-2" heading="Quale atto?">
+        {choices.map(({ citation, display }) => {
+          const act = display ?? formatParsedCitation({ ...citation, article: undefined });
+          const text = citation.article ? `art. ${citation.article}, ${act}` : act;
+          return (
+            <PaletteRow key={text} value={`scelta ${text}`} onSelect={() => searchCitation(citation)} still={still} className="min-h-[56px] gap-3 text-base">
+              <Zap size={18} aria-hidden className="shrink-0 text-toga-700 dark:text-toga-300" />
+              <span className="min-w-0 flex-1 truncate font-medium text-ink-900 dark:text-ink-50">{text}</span>
+            </PaletteRow>
+          );
+        })}
+      </Command.Group>
+    )
+    : refusal ? <p className={cn('shrink-0 pt-2', QUIET_LINE)}>{refusal}</p>
+    : null;
 
   // ── «Scegli l'atto» ─────────────────────────────────────────────────────────────────────────────
   // A decision or a norm read in the box is `readAs`'s row, which takes the columns' place.
@@ -1087,7 +1111,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           </PaletteRow>
         </Command.Group>
       )}
-      {readAs ? (
+      {readAsRow ? (
         <>
           {readAsRow}
           {/* Under it, only what still matches (a favourite «Art. 2043 c.c.», an alias, an act), in one column. */}
@@ -1226,10 +1250,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
           : waiting ? 'Cerco l’atto… la ricerca parte appena lo trovo.'
           : parsedCitation && citationPreview
-            ? `${preview!.text}${preview!.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
+            ? `${preview!.text}${preview!.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}${notice ? ` ${notice}` : ''}`
             : resolvingRemotely
               ? 'Cerco l’atto…'
-              : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
+              : choices.length > 0 ? `Il nome indica ${choices.length} atti: scegli quale.`
+              : refusal ?? (topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : '')}
       </p>
       {/* The field in the bar: it grows out of the pill or the field it opens from, and goes back into it (LC69, LC81).
           A portal into the bar's own slot, in the page's flow: React's context and events stay the menu's. */}

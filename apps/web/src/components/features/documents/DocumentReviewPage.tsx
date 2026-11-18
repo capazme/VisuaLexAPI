@@ -243,6 +243,11 @@ export function DocumentReviewPage() {
   const linkIn = useMemo(() => linkInputs(rows, choices), [rows, choices]);
   const links = useMemo(() => (prepared ? settleLinks(linkIn.rows, linkIn.choices, linkAnswers) : null), [prepared, linkIn, linkAnswers]);
   const live = useMemo(() => rows.filter((row) => !row.dismissed), [rows]);
+  // The batch's notices (G-577: «art. 10 TUIR» and the testo unico it names from 2027), each once, in the API's words.
+  const notices = useMemo(
+    () => [...new Set([...(loaded?.answers.values() ?? [])].flatMap((answer) => (answer.recognized && answer.notice ? [answer.notice] : [])))],
+    [loaded],
+  );
   const summary = useMemo(() => (links ? summarizeLinks(live.map((row) => links[row.index])) : null), [links, live]);
   const unlinked = useMemo(() => {
     if (!links || !loaded) return [];
@@ -797,6 +802,9 @@ export function DocumentReviewPage() {
                     <Button variant="secondary" size="sm" loading={retrying} onClick={() => void retry()} className="md:min-h-11">Riprova</Button>
                   </div>
                 )}
+                {notices.map((notice) => (
+                  <p key={notice} className="shrink-0 border-b border-slate-200 px-4 py-2 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-300">{notice}</p>
+                ))}
                 {reviewing && (
                   <p role="status" className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
                     Mostro le citazioni da confermare.{' '}

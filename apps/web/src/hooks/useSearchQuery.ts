@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../utils/citationParser';
-import { citationFromServer, preferredReading, readNormQuery } from '../utils/normQuery';
+import { choicesFromServer, citationFromServer, preferredReading, readNormQuery, refusalSentence } from '../utils/normQuery';
 import { parseItalianDate } from '../utils/dateUtils';
 import type { SearchFilters, SearchParams } from '../types';
 import { parseDecisionCitation } from '../utils/decisionCitationParser';
@@ -23,7 +23,15 @@ export interface SearchQueryReading {
   resolvingRemotely: boolean;
   /** Words that are neither a decision nor a norm: a topic for the Cassazione's decisions. */
   topic: string | null;
+  /** Why the words are read as no norm, in the API's sentence: a regional law (G-577). */
+  refusal: string | null;
+  /** The server's one line on the reading shown («tuir» and the date it names the new testo unico from). */
+  notice: string | null;
+  /** The acts an ambiguous name could mean («art. 1 tua»): each opens as it is. */
+  choices: Array<{ citation: ParsedCitation; display: string | null }>;
 }
+
+const NO_CHOICES: SearchQueryReading['choices'] = [];
 
 /**
  * Reads what a search box holds. The client's parser wins when its reading is already searchable;
@@ -66,7 +74,8 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
   // The answer carries the query it answered, so "is this still current?" is
   // derived at render instead of reset by a synchronous setState in the effect
   // (CLAUDE.md gotcha 11 — derive, do not silence the rule).
-  const [serverResult, setServerResult] = useState<{ query: string; citation: ParsedCitation | null } | null>(null);
+  type ServerResult = { query: string; citation: ParsedCitation | null; refusal?: string | null; notice?: string | null; choices?: SearchQueryReading['choices'] };
+  const [serverResult, setServerResult] = useState<ServerResult | null>(null);
 
   // Gated on "not search-ready", not merely "act unnamed". Both shapes reach
   // here: "statuto dei lavoratori" the client cannot name at all, and "gdpr"
@@ -90,7 +99,13 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
           return res.json();
         })
         .then(payload => {
-          setServerResult({ query: remoteQuery, citation: citationFromServer(payload) });
+          setServerResult({
+            query: remoteQuery,
+            citation: citationFromServer(payload),
+            refusal: refusalSentence(payload),
+            notice: typeof payload?.notice === 'string' ? payload.notice : null,
+            choices: choicesFromServer(payload),
+          });
         })
         .catch(err => {
           if ((err as Error).name === 'AbortError') return;
@@ -108,32 +123,38 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
     };
   }, [remoteQuery]);
 
-  const serverCitation = useMemo(
-    () => (remoteQuery && serverResult?.query === remoteQuery ? serverResult.citation : null),
-    [remoteQuery, serverResult]
-  );
+  const current = remoteQuery && serverResult?.query === remoteQuery ? serverResult : null;
+  const serverCitation = current?.citation ?? null;
   const resolvingRemotely = Boolean(remoteQuery) && serverResult?.query !== remoteQuery;
 
   // The client wins when its own parse is already searchable; otherwise the
   // server fills in. Nothing that resolves locally today changes.
+  // A refusal or a choice of the server's replaces the client's partial reading («art. 1» of «art. 1 tua»).
+  const serverChoices = current?.choices ?? NO_CHOICES;
+  const serverSaysNo = Boolean(current?.refusal) || serverChoices.length > 0;
   const parsedCitation = useMemo<ParsedCitation | null>(
-    () => (decisionRef ? null : preferredReading(localCitation, serverCitation)),
-    [localCitation, serverCitation, decisionRef]
+    () => (decisionRef || serverSaysNo ? null : preferredReading(localCitation, serverCitation)),
+    [localCitation, serverCitation, decisionRef, serverSaysNo]
   );
 
   const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
+  const refusal = decisionRef ? null : localReading?.refusal ?? current?.refusal ?? null;
+  // The notice is the server's reading's: shown only when that reading is the one shown.
+  const notice = parsedCitation && parsedCitation === serverCitation ? current?.notice ?? null : null;
+  const choices = decisionRef ? NO_CHOICES : serverChoices;
   const citationPreview = useMemo(() => parsedCitation ? formatParsedCitation(parsedCitation) : '', [parsedCitation]);
 
   // Words that are neither a decision nor a norm: a topic to look for in the Cassazione's decisions.
   // A custom alias as the first word is the user's own shortcut, not a topic.
   const topic = useMemo(() => {
     const words = inputValue.trim();
-    if (words.length < 3 || !/[\p{L}\p{N}]/u.test(words) || decisionRef || parsedCitation || resolvingRemotely) return null;
+    // A refused or an ambiguous norm is still a norm: never a topic for the decisions.
+    if (words.length < 3 || !/[\p{L}\p{N}]/u.test(words) || decisionRef || parsedCitation || resolvingRemotely || refusal || choices.length > 0) return null;
     const first = foldAlias(words.split(/\s+/)[0]);
     return customAliases.some((a) => foldAlias(a.trigger) === first) ? null : words;
-  }, [inputValue, decisionRef, parsedCitation, resolvingRemotely, customAliases]);
+  }, [inputValue, decisionRef, parsedCitation, resolvingRemotely, refusal, choices, customAliases]);
 
-  return { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic };
+  return { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic, refusal, notice, choices };
 }
 
 /** The search a ready norm runs: the text in force, the date as the API reads it. */

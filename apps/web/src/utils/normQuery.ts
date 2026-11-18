@@ -6,6 +6,7 @@
  */
 import type { CustomAlias } from '../types';
 import { isSearchReady, parseLegalCitation, type ParsedCitation } from './citationParser';
+import { citesRegionalLaw, REGIONAL_LAW_REFUSAL } from './regionalLaw';
 
 export interface NormQueryReading {
   /** The client parser's reading, with the user's aliases; null when it reads nothing. */
@@ -14,10 +15,14 @@ export interface NormQueryReading {
   ready: boolean;
   /** The words to ask the server about (trimmed), or null: the reading is ready, or the words are too short. */
   askServer: string | null;
+  /** Why the words are read as nothing, in the API's sentence: a regional law (G-577). */
+  refusal?: string;
 }
 
 /** The client half of the search's reading: pure, no request. */
 export function readNormQuery(query: string, customAliases: CustomAlias[] = []): NormQueryReading {
+  // Refused here, with no request: the API answers the same (`refusal: "regional_law"`).
+  if (citesRegionalLaw(query)) return { citation: null, ready: false, askServer: null, refusal: REGIONAL_LAW_REFUSAL };
   const citation = query && query.length >= 2 ? parseLegalCitation(query, customAliases) : null;
   const ready = isSearchReady(citation);
   const trimmed = (query ?? '').trim();
@@ -34,6 +39,25 @@ export interface ServerNormReading {
     article?: string | null;
     annex?: string | null;
   } | null;
+  /** Why the words name nothing: «regional_law» (G-577), a recital's reasons. */
+  refusal?: string;
+  /** The one line to show with the reading: a dated name («tuir») and the act it names (G-577). */
+  notice?: string;
+  /** The acts an ambiguous name could mean («art. 1 tua»), each a reading of its own (`/parse_query` only). */
+  ambiguous?: Array<{ name?: string; parsed?: ServerNormReading['parsed']; display?: string | null }>;
+}
+
+/** The sentence a refusal of the server's is shown with; null for the refusals the search does not say. */
+export function refusalSentence(answer: ServerNormReading | null | undefined): string | null {
+  return answer?.refusal === 'regional_law' ? REGIONAL_LAW_REFUSAL : null;
+}
+
+/** The acts an ambiguous name could mean, each as a reading that opens as it is, with its citation. */
+export function choicesFromServer(answer: ServerNormReading | null | undefined): Array<{ citation: ParsedCitation; display: string | null }> {
+  return (answer?.ambiguous ?? []).flatMap((choice) => {
+    const citation = citationFromServer({ recognized: true, parsed: choice.parsed });
+    return citation ? [{ citation, display: choice.display || null }] : [];
+  });
 }
 
 /** The server's reading as the client's shape; null when it names no act type. */

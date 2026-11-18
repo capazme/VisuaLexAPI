@@ -25,9 +25,16 @@ from visualex_api.tools.norm_query import act_names, read_norm_query  # noqa: E4
 
 
 def answer(query: str) -> dict:
-    """One result of /parse_query_batch (app.py `_read_norm_queries`)."""
+    """One result of /parse_query_batch, as app.py `_read_norm_queries` builds it: a recital or a refusal (a regional
+    law, G-577) is not recognised, and a dated name's notice goes beside `parsed`, never in it."""
     params, source = read_norm_query(query)
-    return {"recognized": params is not None, "parsed": params, "source": source, "identifies_act": identifies_act(params)}
+    if params is not None and (params.get("recital") or params.get("refusal")):
+        params, source = None, None
+    notice = params.pop("notice", None) if params is not None else None
+    result = {"recognized": params is not None, "parsed": params, "source": source, "identifies_act": identifies_act(params)}
+    if notice:
+        result["notice"] = notice
+    return result
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import type { CustomAlias } from '../types';
 import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
 import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
+import { citesRegionalLaw } from './regionalLaw';
 import { labelFromParams } from './sources';
 import { identifiesAct, isNumberedActType } from './sources/numberedActTypes';
 import { ANNEX_SIGLE, CODES_TABLE } from './sources/actTypes';
@@ -611,6 +612,8 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
   if (!input || input.trim().length < 2) {
     return null;
   }
+  // A regional law shares the State's words: never read as a State law or a regulation of the Union (G-577).
+  if (citesRegionalLaw(input)) return null;
 
   const { annex, remaining: withoutAnnex } = extractAnnex(input);
   const normalized = normalizeInput(withoutAnnex);
