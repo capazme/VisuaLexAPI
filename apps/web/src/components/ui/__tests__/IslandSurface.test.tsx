@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AnimatePresence } from 'framer-motion';
 import { IslandSurface } from '../IslandSurface';
+import { openerNow } from '../islandMotion';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 
 type Run = { el: Element; keyframes: Keyframe[]; options: KeyframeAnimationOptions; animation: Animation };
@@ -183,5 +184,20 @@ describe('IslandSurface (LC85)', () => {
     expect(trigger).toHaveFocus();
     screen.getByRole('menuitem', { name: 'Modifica' }).focus();
     expect(screen.getByRole('menuitem', { name: 'Modifica' })).toHaveFocus();
+  });
+});
+
+describe('openerNow: what a confirmation grows from and gives the focus back to', () => {
+  it('is the focused control, else the one last pressed (Safari and a tap focus none), never one pressed before a key', () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.pointerDown(trigger);
+    expect(openerNow()).toBe(trigger);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(openerNow()).toBeNull();
+    const other = document.createElement('button');
+    document.body.append(other);
+    other.focus();
+    expect(openerNow()).toBe(other);
+    other.remove();
   });
 });

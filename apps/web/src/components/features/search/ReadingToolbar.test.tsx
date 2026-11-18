@@ -438,7 +438,9 @@ describe('ReadingToolbar — the highlighter and its inks (H1, A4)', () => {
         const { container } = setup();
         const menu = openMore(phoneRow(container));
         // Long now: capped under the bar, it scrolls on its own, so the last colour is never off the screen.
-        expect(menu).toHaveClass('overflow-y-auto', 'max-h-[calc(100dvh-12rem)]');
+        // The list scrolls inside the surface (`IslandSurface`, LC85): the box would clip the shape growing from the «⋯».
+        expect(menu).toHaveClass('max-h-[calc(100dvh-12rem)]');
+        expect(menu.querySelector('[data-island-content]')).toHaveClass('overflow-y-auto');
         expect(within(menu).getByText('Colore dell’evidenziatore: uso suggerito')).toBeInTheDocument();
         const choices = within(menu).getAllByRole('menuitemradio');
         // Named for what they set, never «Evidenzia in…», which reads as «highlight now».

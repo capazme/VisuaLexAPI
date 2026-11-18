@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { NotificationHost, Toast } from '../Toast';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
@@ -57,6 +57,15 @@ describe('NotificationHost (K1a)', () => {
   });
 
   it('takes nothing while it leaves: a last-moment «Annulla» is not a restore', async () => {
+    // A closing that does not end (`IslandSurface` runs on Web Animations, which jsdom lacks: it would be gone at once).
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: () => ({ cancel: () => {}, onfinish: null, effect: null }),
+      configurable: true,
+      writable: true,
+    });
+    onTestFinished(() => {
+      Reflect.deleteProperty(Element.prototype, 'animate');
+    });
     const undo = vi.fn();
     render(<NotificationHost />);
     let outcome: Promise<boolean> | undefined;
@@ -65,7 +74,7 @@ describe('NotificationHost (K1a)', () => {
     });
     const annulla = screen.getByRole('button', { name: 'Annulla' });
     act(() => closeNotification(notificationStore.getState().entries[0].id, 'timeout'));
-    // Still drawn while it closes into its line, but it answers nothing.
+    // Still drawn while it goes back into its pill, but it answers nothing.
     expect(annulla).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Chiudi notifica' })).toBeDisabled();
     expect(annulla.closest('[inert]')).not.toBeNull();

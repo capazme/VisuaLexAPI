@@ -29,6 +29,10 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', (event) => {
     lastPressed = (event.target as Element | null)?.closest?.<HTMLElement>('button, a, [role="menuitem"], [role="button"]') ?? null;
   }, true);
+  // A key since: what opens now was not opened by that press (an Esc, a shortcut).
+  document.addEventListener('keydown', () => {
+    lastPressed = null;
+  }, true);
 }
 /** What opened a surface now: the focused control, else the last one pressed, if still on the page. */
 export function openerNow(): HTMLElement | null {

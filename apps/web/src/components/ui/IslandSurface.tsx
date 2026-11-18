@@ -140,16 +140,23 @@ export function IslandSurface({
     hidden.current = null;
   };
   useEffect(() => showSource, []);
+  // Gone at once, from a passive effect: it runs after every layout effect of the commit, `AnimatePresence`'s included,
+  // which counts the exit only then (called from the layout effect below, the removal was ignored).
+  const removeSoon = useRef(false);
+  useEffect(() => {
+    if (!removeSoon.current) return;
+    removeSoon.current = false;
+    // Not if it was opened again meanwhile.
+    if (!shown.current) remove.current?.();
+  });
 
   useLayoutEffect(() => {
     const root = rootRef.current;
     const shape = shapeRef.current;
     const content = contentRef.current;
-    // Gone at once: after the commit, once `AnimatePresence` (whose layout effect runs after this one) counts the exit.
-    const removeNow = () => queueMicrotask(() => {
-      // Not if it was opened again meanwhile.
-      if (!shown.current) remove.current?.();
-    });
+    const removeNow = () => {
+      removeSoon.current = true;
+    };
     if (!root || !shape || !content || typeof root.animate !== 'function') {
       if (!isPresent) removeNow();
       return undefined;
