@@ -12,6 +12,53 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-11-18
+
+Scadenze without the clutter, Impostazioni as a real page, and the server's security fixes of the night
+(G-553). One migration (web_sessions). MERL-T stays off.
+
+### Work
+
+- Scadenze: one header, one «Aggiungi», no empty spaces or interface descriptions (LC83).
+- Impostazioni is a page (`/impostazioni`) that slides in and back, not a modal (LC84).
+
+### Security (server)
+
+- Passwords set by the administrator follow the sign-up rule (#551).
+- Sign-in limited per account on Redis as well as per address, refresh limited, the session check on its
+  own limit (#552).
+- The server side of a web session in a cookie, kept on the server and revocable (#555, step 1; the web
+  moves later). Migration `20261117130000_web_sessions`.
+- One refusal for a taken email or username; sign-in no longer tells which emails exist (#567).
+- An unexpected error's log line says what failed and where, never what it carried (#563).
+- The article stream closes with an end line when the client asks (#550).
+- CI: the npm audit blocks only on what ships (#582).
+
+## [1.34.0] - 2026-11-17
+
+Glosses in the margin with their own button, the act structure opening in the page, the search pill and
+the island's field as one object, dates in words in the quick add, Learn's short lesson on validated
+cards only. No migration.
+
+### Reading
+
+- Glosses in the margin, part 1 (LC74): a «Glosse» button of its own in the article bar, with the count,
+  on computer and phone.
+- The act structure opens in the page and pushes the text down, nothing on top of the content (LC77);
+  small fixes to the structure lines, «In vigore dal…» and the PDF of a pratica (LC73).
+- The search pill and the island's field share shape, text, lens and colours: while the island opens only
+  width and position change (LC81).
+
+### Work
+
+- The quick add reads dates and times in words as you type («domani alle 10», «venerdì prossimo»,
+  «tra 3 giorni», «20/11»): the title keeps the rest (LC78).
+
+### Learn
+
+- The short lesson uses validated cards only, never a draft (L-67); the MCP tools say «schede di Learn»
+  (LC82).
+
 ## [1.33.0] - 2026-11-17
 
 The search island rewritten, the Ricerca reader on a phone, the act structure panel redone; the Forum

@@ -3,7 +3,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
-vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({
   FeedbackButton: ({ className }: { className?: string; onOpen: () => void }) => <button type="button" data-testid="feedback" className={className}>Commenti</button>,
 }));
@@ -15,7 +14,6 @@ vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 // The planner's host reads the tasks from the server: not under test here.
 vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
-vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
 vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
@@ -107,7 +105,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
     at(path);
     const bar = screen.getByTestId('top-bar');
     expect(within(bar).getByRole('navigation', { name: 'Percorso' })).toBeInTheDocument();
-    expect(within(bar).getByRole('button', { name: /Norma, sentenza o tema/ })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Apri il menu di ricerca' })).toBeInTheDocument();
     expect(within(bar).getByTestId('feedback')).not.toHaveClass('fixed');
     expect(within(bar).getByTestId('news-in-bar')).toBeInTheDocument();
     const fullScreen = within(bar).getByRole('button', { name: 'Tutto schermo' });
@@ -122,7 +120,7 @@ describe('Layout — the top bar from lg (LC21)', () => {
   it('opens the command palette from the bar\'s search', () => {
     appStore.setState({ commandPaletteOpen: false });
     at('/pratiche');
-    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: /Norma, sentenza o tema/ }));
+    fireEvent.click(within(screen.getByTestId('top-bar')).getByRole('button', { name: 'Apri il menu di ricerca' }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
     appStore.setState({ commandPaletteOpen: false });
   });

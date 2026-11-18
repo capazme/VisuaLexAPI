@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
+// Impostazioni is a page (LC84): the gear opens it at «Significato dei colori» (`#colori`).
+const openSettings = vi.hoisted(() => vi.fn());
+vi.mock('../settings/settingsRoute', () => ({ useOpenSettings: () => openSettings }));
 import { HighlighterButton } from './HighlighterButton';
 import { appStore } from '../../../store/useAppStore';
 import { registerInkTarget } from '../../../utils/inkTargets';
 
 afterEach(() => {
-  appStore.getState().closeSettings();
+  openSettings.mockReset();
   appStore.setState((s) => ({ readingTool: null, highlighterEraser: false, settings: { ...s.settings, highlightColor: 'yellow' } }));
   window.getSelection()?.removeAllRanges();
 });
@@ -158,7 +161,7 @@ describe('HighlighterButton — the gear to the colours\' meanings', () => {
     // The trigger's look, 44 px wide on a phone whatever the trigger's padding.
     expect(gear).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-w-0');
     fireEvent.click(gear);
-    expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
+    expect(openSettings).toHaveBeenCalledWith('colori');
     expect(onRow).not.toHaveBeenCalled();
   });
 

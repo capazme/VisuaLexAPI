@@ -43,8 +43,9 @@ async function richCard(author: TestUser | null, materia: LingoMateria = 'DIRITT
   });
 }
 
-async function richCards(author: TestUser, count: number, materia: LingoMateria = 'DIRITTO_CIVILE') {
-  for (let i = 0; i < count; i++) await richCard(author, materia);
+/** A lesson draws on validated cards only (L-67): the fixtures' default. */
+async function richCards(author: TestUser, count: number, materia: LingoMateria = 'DIRITTO_CIVILE', stato: 'BOZZA_PERSONALE' | 'VALIDATA' = 'VALIDATA') {
+  for (let i = 0; i < count; i++) await richCard(author, materia, stato);
 }
 
 const create = (h: Headers, materia: LingoMateria = 'DIRITTO_CIVILE') => request(app).post(LESSONS).set(h).send({ materia });
@@ -117,11 +118,21 @@ describe('POST /api/lingo/lezioni', () => {
   it('never takes another person\'s draft, and takes the community\'s validated cards only in the subjects switched on', async () => {
     const bob = await createTestUser('lezione_bob');
     await richCards(alice, LESSON_MIN_CARDS - 1);
-    await richCards(bob, 6);
+    await richCards(bob, 6, 'DIRITTO_CIVILE', 'BOZZA_PERSONALE');
     expect((await create(a)).status).toBe(409);
     for (let i = 0; i < 3; i++) await richCard(bob, 'DIRITTO_CIVILE', 'VALIDATA');
     expect((await create(a)).status).toBe(409);
     await prisma.lingoPreferenzeStudio.create({ data: { utenteId: alice.id, materieComunita: ['DIRITTO_CIVILE'] } });
+    expect((await create(a)).status).toBe(201);
+  });
+
+  it('never takes one\'s own cards that are not validated (L-67)', async () => {
+    await richCards(alice, 6, 'DIRITTO_CIVILE', 'BOZZA_PERSONALE');
+    await richCards(alice, LESSON_MIN_CARDS - 1);
+    const refused = await create(a);
+    expect(refused.status).toBe(409);
+    expect(refused.body.detail).toMatch(/almeno 4 schede validate.*ne hai 3/);
+    await richCards(alice, 1);
     expect((await create(a)).status).toBe(201);
   });
 

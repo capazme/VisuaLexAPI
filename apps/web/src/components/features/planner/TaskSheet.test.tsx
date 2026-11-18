@@ -302,6 +302,46 @@ describe('the task sheet', () => {
     expect(service.update).toHaveBeenCalledWith('w', { plannedDate: TODAY });
   });
 
+  it('«Completa per sempre» from the row\'s «⋯» ends the series in one write, and «Annulla» puts the rule back', async () => {
+    const daily = task('w', { plannedDate: TODAY, recurrence: 'FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR' });
+    service.list.mockResolvedValue(answer([daily]));
+    service.complete.mockResolvedValue({ task: { ...daily, recurrence: null, completedAt: '2026-10-20T10:00:00.000Z' }, recurred: null });
+    service.reopen.mockResolvedValue(daily);
+    renderAt(<TodayView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Azioni: Compito w' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Completa per sempre' }));
+    await waitFor(() => expect(service.complete).toHaveBeenCalledWith('w', TODAY, true));
+    await waitFor(() => expect(toasts[toasts.length - 1]?.message).toBe('Serie chiusa'));
+    expect(service.update).not.toHaveBeenCalled();
+    await act(async () => toasts[toasts.length - 1]!.onUndo());
+    expect(service.reopen).toHaveBeenCalledWith('w', 'FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR');
+  });
+
+  it('«Completa per sempre» from the sheet, under the repetition: the sheet closes', async () => {
+    const weekly = task('w', { plannedDate: TODAY, recurrence: 'FREQ=WEEKLY' });
+    service.complete.mockResolvedValue({ task: { ...weekly, recurrence: null }, recurred: null });
+    const sheet = await openSheet([weekly], 'Compito w', 'today');
+    const fields = within(sheet).getByRole('complementary', { name: 'Campi del compito' });
+    fireEvent.click(within(fields).getByRole('button', { name: 'Completa per sempre' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(service.complete).toHaveBeenCalledWith('w', TODAY, true));
+    await waitFor(() => expect(toasts[toasts.length - 1]?.message).toBe('Serie chiusa'));
+  });
+
+  it('offers no «Completa per sempre» on a task that does not repeat', async () => {
+    const sheet = await openSheet([task('a', { plannedDate: TODAY })], 'Compito a', 'today');
+    expect(within(sheet).queryByRole('button', { name: 'Completa per sempre' })).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Altre azioni sul compito' }));
+    expect(screen.getByRole('menuitem', { name: 'Sposta nel cestino' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Completa per sempre' })).toBeNull();
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni: Compito a' }));
+    expect(screen.getByRole('menuitem', { name: 'Sposta nel cestino' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Completa per sempre' })).toBeNull();
+  });
+
   it('gives up a date or a label not saved at the first Esc, and closes at the second', async () => {
     const a = task('a', { plannedDate: TODAY });
     const sheet = await openSheet([a], 'Compito a', 'today');

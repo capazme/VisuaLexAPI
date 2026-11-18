@@ -5,6 +5,7 @@ import { articleDiscussionService } from '../../../services/articleDiscussionSer
 import type { CommunityItem, CommunityReply, CommunityThread } from '../../../types/community';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
 import { ReplyForm, ReportButton, TOUCH, VoteButton } from '../search/discussionControls';
+import { voteFailure } from '../search/voteFailure';
 import { CommunityTarget } from './CommunityTarget';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
@@ -106,15 +107,15 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
     }
   }, [thread]);
 
-  const act = async (run: () => Promise<unknown>, failure: string, reload = true) => {
+  const act = async (run: () => Promise<unknown>, failure: string | ((error: unknown) => string), reload = true) => {
     setError(null);
     setNotice(null);
     try {
       await run();
       if (reload) await load();
       return true;
-    } catch {
-      setError(failure);
+    } catch (error) {
+      setError(typeof failure === 'string' ? failure : failure(error));
       return false;
     }
   };
@@ -146,10 +147,10 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
     const result = await articleDiscussionService.voteThread(thread.id);
     setThread({ ...thread, userVoted: result.voted, voteCount: result.voteCount });
     onChanged({ ...thread, userVoted: result.voted, voteCount: result.voteCount });
-  }, 'Impossibile aggiornare il voto. Riprova.', false);
+  }, voteFailure, false);
 
   const voteReply = (reply: CommunityReply) => act(
-    () => articleDiscussionService.voteComment(reply.id), 'Impossibile aggiornare il voto. Riprova.',
+    () => articleDiscussionService.voteComment(reply.id), voteFailure,
   );
 
   const report = async (run: () => Promise<void>) => {
@@ -179,7 +180,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
       </div>
       {!thread.deleted && <p className="mt-4 max-w-measure whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">{thread.body}</p>}
       <div className="mt-4 flex items-center gap-4 border-b border-slate-200 pb-4 md:gap-3 dark:border-slate-800">
-        <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota la discussione" onVote={() => void vote()} />
+        <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota la discussione" own={thread.isOwner} onVote={() => void vote()} />
         {!thread.isOwner && !thread.deleted && (
           <ReportButton label="Segnala la discussione" onReport={() => void report(() => articleDiscussionService.report(thread.id, 'segnalazione'))} />
         )}
@@ -205,7 +206,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                 {itemText(reply)}
                 {visible(reply) && (
                   <div className="mt-2 flex flex-wrap items-center gap-4 md:gap-3">
-                    <VoteButton voted={reply.userVoted} count={reply.voteCount} label={`Vota la risposta di ${reply.user.username}`} onVote={() => void voteReply(reply)} />
+                    <VoteButton voted={reply.userVoted} count={reply.voteCount} label={`Vota la risposta di ${reply.user.username}`} own={reply.isOwner} onVote={() => void voteReply(reply)} />
                     {!thread.locked && (
                       <button type="button" onClick={() => setCommenting(commenting === reply.id ? null : reply.id)} aria-expanded={commenting === reply.id} aria-label={`Commenta la risposta di ${reply.user.username}`} className={cn('rounded px-2 text-xs text-primary-700 hover:underline dark:text-primary-300 md:px-0', TOUCH, FOCUS_RING)}>
                         Commenta

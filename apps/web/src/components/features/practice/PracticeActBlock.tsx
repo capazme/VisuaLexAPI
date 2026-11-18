@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronDown, FileDown, FolderMinus, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { DRAG_ROLE_DESCRIPTION } from './dragAnnouncements';
@@ -64,8 +64,8 @@ function chipLabel(article: ArticleData): string {
  * heading with its tools (Studio, Struttura, PDF, «⋯»), an index of the act's rows on top, then the
  * rows one under the other. In the overview (U2) it is a panel of the grid, its tools beside its title; in the reading
  * view's index, its heading with «⋯» (the tools inside it, as on a phone) and its articles one entry a line, each
- * opening beside. The structure window is the desktop's (`structureWindow.blockId`), the drawer the phone's: one per
- * breakpoint (gotcha 26).
+ * opening beside. The structure (LC77) opens in the block, between its heading and its rows: on a computer when the store
+ * names this act (`structureWindow.blockId`), on a phone when toggled here or named by the store.
  */
 export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference, layout }: PracticeActBlockProps) {
   const {
@@ -121,6 +121,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // On a phone the index is the drawer (§8). «Apri l'indice e sfoglia» points the structure window at
   // the act it drops (§5.1): on a phone that request opens this act's drawer too.
   const drawerOpen = drawerToggled || (!isDesktop && isStructureWindowOpen);
+  const structureOpen = isDesktop ? isStructureWindowOpen : drawerOpen;
+  const structureId = useId();
   const closeDrawer = () => {
     setDrawerToggled(false);
     if (isStructureWindowOpen) closeStructureWindow();
@@ -344,8 +346,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   type="button"
                   onClick={toggleStructure}
                   aria-label="Struttura della norma"
-                  // It opens a window (the index): expanded, not pressed (R3b).
-                  aria-expanded={isStructureWindowOpen}
+                  // It opens a space (the index): expanded, not pressed (R3b).
+                  aria-expanded={structureOpen}
+                  aria-controls={structureId}
                   className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white')}
                 >
                   <GitBranch size={16} aria-hidden />
@@ -394,6 +397,25 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           </MenuButton>
         </div>
       </header>
+
+      {/* The index (LC77): in the card, under its heading, pushing the rows down; it does not close on a pick. Outside
+          the folded part: a folded act still opens its structure. */}
+      <TreeViewPanel
+        id={structureId}
+        isOpen={structureOpen}
+        onClose={isDesktop ? closeStructureWindow : closeDrawer}
+        treeData={treeData || []}
+        urn={act.norma.urn || ''}
+        title={structureTitle(heading)}
+        loadedArticles={loadedArticleIds}
+        activeArticle={current ? getUniqueArticleId(current) : undefined}
+        onArticleSelect={(articleNumber, targetAnnex) => openArticle(articleNumber, targetAnnex)}
+        annexes={treeMetadata?.annexes}
+        currentAnnex={currentAnnex}
+        rubriche={rubriche}
+        abrogati={abrogati}
+        rubricheParts={rubricheParts}
+      />
 
       {!act.isCollapsed && isIndex && (
         <div className="py-1">
@@ -512,26 +534,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           })}
         </div>
       )}
-
-      {/* The index: a window on the desktop, a drawer on the phone; neither closes on a pick. */}
-      <TreeViewPanel
-        variant={isDesktop ? 'window' : 'drawer'}
-        isOpen={isDesktop ? isStructureWindowOpen : drawerOpen}
-        onClose={isDesktop ? closeStructureWindow : closeDrawer}
-        treeData={treeData || []}
-        urn={act.norma.urn || ''}
-        title={structureTitle(heading)}
-        loadedArticles={loadedArticleIds}
-        activeArticle={current ? getUniqueArticleId(current) : undefined}
-        onArticleSelect={(articleNumber, targetAnnex) => openArticle(articleNumber, targetAnnex)}
-        annexes={treeMetadata?.annexes}
-        currentAnnex={currentAnnex}
-        rubriche={rubriche}
-        abrogati={abrogati}
-        rubricheParts={rubricheParts}
-      />
-
-
 
       {/* Mounted only with an article in hand: StudyMode dereferences it, and an act opened from the
           index has none until the first pick. */}

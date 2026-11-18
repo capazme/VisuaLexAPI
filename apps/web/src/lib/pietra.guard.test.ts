@@ -131,11 +131,11 @@ describe('Pietra\'s colours', () => {
   // highlighted row of a list.
   it('the chosen option of these groups is the light ink in the dark', () => {
     const groups = [
-      join('components', 'ui', 'SettingsModal.tsx'),
+      join('components', 'features', 'settings', 'SettingsPage.tsx'),
       join('components', 'ui', 'AdvancedExportModal.tsx'),
       join('components', 'features', 'planner', 'OpusPage.tsx'),
       join('components', 'features', 'search', 'FindWindow.tsx'),
-      join('components', 'features', 'search', 'QuickNormsManager.tsx'),
+      join('components', 'features', 'settings', 'QuickNormsSection.tsx'),
       join('components', 'features', 'search', 'NotesPeekPanel.tsx'),
       join('components', 'features', 'search', 'MoveProposalBar.tsx'),
       join('components', 'features', 'compare', 'CompareView.tsx'),
@@ -157,7 +157,7 @@ describe('Pietra\'s colours', () => {
   it('a switch that is on is the light ink in the dark, its knob dark on it', () => {
     const switches = [
       join('features', 'merlt', 'ops', 'OpsConfigPanel.tsx'),
-      join('components', 'ui', 'SettingsModal.tsx'),
+      join('components', 'features', 'settings', 'SettingsPage.tsx'),
       join('components', 'features', 'studia', 'StudyPreferences.tsx'),
       join('components', 'features', 'compare', 'CompareBody.tsx'),
       join('components', 'features', 'documents', 'DocumentReviewPage.tsx'),

@@ -5,6 +5,9 @@ out, closes the body with a 200 and no error. `/stream_article_text` reads the a
 after the other, so a request of 20-40 articles or more was cut there silently: the reader saw
 «40 di 100» and nothing else. The route now sets its own budget (articles × an allowance, under
 a hard cap) and, past it, ends with an explicit error line instead of a silent cut.
+
+A client that asks (`"end_line": true`, G-488) also gets a closing line on every stream the server
+ends itself, so a body cut anywhere else is known by the missing line.
 """
 import asyncio
 import json
@@ -21,7 +24,7 @@ def fake_nv(n):
     return SimpleNamespace(numero_articolo=str(n), to_dict=lambda n=n: {"numero_articolo": str(n)})
 
 
-async def stream(controller, count, seconds_each, fails=()):
+async def stream(controller, count, seconds_each, fails=(), body=None):
     async def slow(_self, _scraper, nv, *_args, **_kwargs):
         await asyncio.sleep(seconds_each)
         if nv.numero_articolo in fails:
@@ -34,7 +37,7 @@ async def stream(controller, count, seconds_each, fails=()):
             patch.object(NormaController, "_document_in_force", slow), \
             patch.object(NormaController, "_page_extras_for", AsyncMock(return_value={})):
         response = await controller.app.test_client().post(
-            "/stream_article_text", json={"act_type": "legge", "article": "1"})
+            "/stream_article_text", json={"act_type": "legge", "article": "1", **(body or {})})
         raw = await response.get_data(as_text=True)
     return response.status_code, [json.loads(line) for line in raw.splitlines() if line.strip()]
 
@@ -99,3 +102,35 @@ async def test_a_short_request_keeps_at_least_a_minute(controller, monkeypatch):
 def test_the_defaults_cover_a_request_at_the_article_ceiling():
     # 180 articles at the full allowance fit under the cap: above the ceiling (100, or 150).
     assert app_module.STREAM_MAX_SECONDS >= 180 * app_module.STREAM_SECONDS_PER_ARTICLE
+
+
+async def test_a_client_that_asks_gets_the_closing_line(controller, monkeypatch):
+    monkeypatch.setattr(app_module, "STREAM_SECONDS_PER_ARTICLE", 10.0)
+    controller.app.config["RESPONSE_TIMEOUT"] = 60
+    status, lines = await stream(controller, count=3, seconds_each=0.01, fails=("2",),
+                                 body={"end_line": True})
+    assert status == 200
+    # An article's own error is one of the lines sent: the stream still ends on purpose.
+    assert [line["norma_data"]["numero_articolo"] for line in lines[:-1]] == ["1", "2", "3"]
+    assert lines[-1] == {"kind": "end", "sent": 3, "total": 3}
+
+
+async def test_the_closing_line_follows_the_time_budgets_line(controller, monkeypatch):
+    monkeypatch.setattr(app_module, "STREAM_SECONDS_PER_ARTICLE", 0.2)
+    monkeypatch.setattr(app_module, "STREAM_MAX_SECONDS", 60.0)
+    monkeypatch.setattr(app_module, "STREAM_MIN_SECONDS", 0.0)
+    controller.app.config["RESPONSE_TIMEOUT"] = 60
+    status, lines = await stream(controller, count=4, seconds_each=0.3, body={"end_line": True})
+    assert lines[-2]["kind"] == "time_budget"
+    sent = len(lines) - 2
+    assert lines[-1] == {"kind": "end", "sent": sent, "total": 4}
+    assert sent + len(lines[-2]["missing"]) == 4
+
+
+async def test_without_asking_there_is_no_closing_line(controller, monkeypatch):
+    # The search panel as it is and the archive read every line as an article: they never get it.
+    monkeypatch.setattr(app_module, "STREAM_SECONDS_PER_ARTICLE", 10.0)
+    controller.app.config["RESPONSE_TIMEOUT"] = 60
+    for body in (None, {"end_line": "true"}, {"end_line": 1}):
+        status, lines = await stream(controller, count=2, seconds_each=0.01, body=body)
+        assert [line.get("kind") for line in lines] == [None, None]

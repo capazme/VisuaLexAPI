@@ -13,6 +13,10 @@ declare global {
        *  `readsTexts`: the token and its grant both hold `dossier:text`, whatever the words' version: the text of the
        *  norms a dossier holds, which the consent page promises only with that permission. */
       delegation?: { grantId: string; clientId: string; scopes: string[]; clientName: string | null; readsNotes: boolean; readsActs: boolean; readsTexts: boolean };
+      /** Set only by `webSession` (middleware/webSession.ts): the web session, from its cookie, that `user` came from. */
+      webSessionId?: string;
+      /** Set only by `webSession` when the database could not read the cookie's session: `authenticate` says 503. */
+      sessionUnavailable?: boolean;
     }
   }
 }

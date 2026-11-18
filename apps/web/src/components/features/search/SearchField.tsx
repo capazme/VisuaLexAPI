@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { FIELD_TEXT } from '../../../constants/interactions';
 import { useAppStore } from '../../../store/useAppStore';
-import { ISLAND_FOCUS, ISLAND_SURFACE, ISLAND_TARGET, PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
-import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { ISLAND_FOCUS, ISLAND_HINT, ISLAND_LENS, ISLAND_PLACEHOLDER, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TARGET, ISLAND_TEXT, ISLAND_WORDS, PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
 
 /**
  * The search page's field, always on screen above the practices (spec `2026-10-13-fixed-search-design.md`), and the
@@ -22,8 +20,6 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
   const isOpen = useAppStore((s) => s.commandPaletteOpen);
   const openCommandPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
-  // On a phone the examples do not fit: the placeholder says what the field takes, and stops there.
-  const isDesktop = useIsDesktop();
 
   useEffect(() => {
     valueRef.current = value;
@@ -75,7 +71,6 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
     }
   };
 
-  const placeholder = compact ? 'Norma, sentenza o tema' : isDesktop ? 'Norma, sentenza o tema: art. 2043 c.c., Cass. civ. 10787/2024' : 'Norma, sentenza o tema';
   return (
     <div className={cn('relative', compact ? 'w-[22rem]' : 'w-full max-w-3xl')}>
       <form id={SEARCH_FIELD_FORM_ID} role="search" aria-label="Ricerca" data-compact={compact ? '' : undefined} onSubmit={(event) => event.preventDefault()} className="flex items-center">
@@ -83,7 +78,7 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
           ref={buttonRef}
           type="button"
           id="tour-search-field"
-          aria-label={value ? `Cerca una norma, una sentenza o un tema: ${value}` : 'Cerca una norma, una sentenza o un tema'}
+          aria-label={value ? `Apri il menu di ricerca: ${value}` : 'Apri il menu di ricerca'}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           onClick={(event) => {
@@ -96,16 +91,15 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
           // It stands for a field: «?», ⌘Z and the other shortcuts of a page leave it alone.
           data-text-field=""
           className={cn(
-            // The field's type size (`FIELD_TEXT`, 16 px at least on a phone, «piccolo» included), as the box it opens.
-            compact
-              ? cn('relative flex h-8 w-full min-w-0 items-center rounded-full pl-9 pr-2 text-left text-[13px]', ISLAND_SURFACE)
-              // LC69: the pill of the bar, 40 px drawn (the menu button's line) and 44 px to the finger.
-              : cn('relative flex h-10 w-full min-w-0 items-center rounded-full pl-9 pr-3 text-left', ISLAND_SURFACE, ISLAND_TARGET, FIELD_TEXT),
+            // LC81: the panel's field's shape and type (`ISLAND_SHAPE`, `ISLAND_TEXT`): 40 px and 16 px on a phone, 32 px
+            // and 13 px in the top bar (`compact`, from lg). Below lg 44 px to the finger (LC69).
+            'w-full text-left', ISLAND_SHAPE, ISLAND_TEXT, ISLAND_SURFACE, !compact && ISLAND_TARGET,
             'cursor-text', ISLAND_FOCUS,
           )}
         >
-          <Search size={compact ? 15 : 16} aria-hidden className="pointer-events-none absolute left-3 text-slate-400" />
-          <span className={cn('min-w-0 flex-1 truncate', value ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400')}>{value || placeholder}</span>
+          <Search aria-hidden className={ISLAND_LENS} />
+          {/* The examples are the panel's, on the line under its field: the pill and the field say the same words (LC81). */}
+          <span className={cn('min-w-0 flex-1 truncate', value ? ISLAND_WORDS : ISLAND_HINT)}>{value || ISLAND_PLACEHOLDER}</span>
           {/* ⌘K (Ctrl K) opens it from anywhere on the page; said where a keyboard is likely: never on a phone, nor on a
               touch screen wider than md (M1), which has no such shortcut. */}
           <kbd aria-hidden className="ml-2 hidden shrink-0 rounded border border-slate-200 px-1 text-[11px] font-semibold text-slate-500 md:inline [@media(pointer:coarse)]:hidden dark:border-slate-700 dark:text-slate-400">

@@ -8,6 +8,8 @@
  * (`etichetta`, D9): every write recomputes it from the identity and the attributes.
  */
 import { citationDate, citeStoredNorm } from './citation';
+import { citeRecital } from './recital';
+import { isRecitalContent, rebuildRecitalEntry } from '../schemas/recitalEntry';
 import { EU_CASE, EU_COURT_NAME, EU_SECTION, euCaseLabel, euSectionLabel, isEuCourt, joinCases } from './euCourts';
 import { ADMIN_SECTION, PROVVEDIMENTO, adminCourtName, adminSectionLabel, isAdminCourt, isSeat, kindAbbreviation } from './adminCourts';
 
@@ -165,10 +167,22 @@ export function citeStoredDecision(itemType: string, content: unknown): string |
 }
 
 /**
- * How a stored dossier item is cited, whatever its kind: a norm by its article, a decision by
- * its citation; null for a note or a section. What every dossier answer and the trash carry as
- * `citation`, and what the MCP tools pass on.
+ * A stored `norm` entry that is a recital (its content has the key `considerando`, G-538), by its
+ * citation «considerando 26, reg. (UE) 2016/679»; null for anything else, and for a recital's
+ * content that does not hold (never cited as the article or the act it is not).
+ */
+export function citeStoredRecital(itemType: string, content: unknown): string | null {
+  if (itemType !== 'norm' || !isRecitalContent(content)) return null;
+  const recital = rebuildRecitalEntry(content);
+  return recital.ok ? citeRecital(recital.entry) : null;
+}
+
+/**
+ * How a stored dossier item is cited, whatever its kind: a norm by its article or, a recital, by
+ * its own citation; a decision by its citation; null for a note or a section. What every dossier
+ * answer and the trash carry as `citation`, and what the MCP tools pass on.
  */
 export function citeStoredItem(itemType: string, content: unknown): string | null {
+  if (itemType === 'norm' && isRecitalContent(content)) return citeStoredRecital(itemType, content);
   return citeStoredNorm(itemType, content) ?? citeStoredDecision(itemType, content);
 }
