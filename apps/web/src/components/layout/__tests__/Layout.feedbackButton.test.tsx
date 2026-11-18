@@ -155,4 +155,16 @@ describe('Layout — below lg the controls float as before', () => {
     expect(screen.getByTestId('news-floating')).toBeInTheDocument();
     expect(screen.queryByTestId('news-in-bar')).toBeNull();
   });
+
+  // LC92 (Papiniano, 390 px): the news covered the drawer's foot and took its clicks; it hides while the drawer is open.
+  it("hides the news while the phone's drawer is open, and shows it again once it closes", () => {
+    at('/pratiche');
+    const host = screen.getByTestId('news-floating-host');
+    expect(host).not.toHaveAttribute('hidden');
+    fireEvent.click(within(screen.getByTestId('phone-top-bar')).getByRole('button', { name: 'Apri il menu' }));
+    expect(host).toHaveAttribute('hidden');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(host).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('news-floating')).toBeInTheDocument();
+  });
 });

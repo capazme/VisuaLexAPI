@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Bug, Lightbulb, HelpCircle, Send, Loader2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { submitFeedback, type FeedbackType } from '../../../services/feedbackService';
@@ -22,6 +22,17 @@ export function ReportProblemSection() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // The focus follows the flow, never left on the body: to the confirmation once sent, back to the text for another.
+  const confirmation = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const focusField = useRef(false);
+  useEffect(() => {
+    if (success) confirmation.current?.focus();
+    else if (focusField.current) {
+      focusField.current = false;
+      field.current?.focus();
+    }
+  }, [success]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,11 +60,12 @@ export function ReportProblemSection() {
     setMessage('');
     setError(null);
     setSuccess(false);
+    focusField.current = true;
   };
 
   if (success) {
     return (
-      <div role="status" className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+      <div ref={confirmation} tabIndex={-1} role="status" className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 focus:outline-none dark:border-slate-700">
         <Send size={18} className="mt-0.5 shrink-0 text-green-600" aria-hidden />
         <div className="min-w-0 space-y-2">
           <p className="text-sm font-medium text-slate-900 dark:text-white">Grazie, la segnalazione è arrivata.</p>
@@ -115,6 +127,7 @@ export function ReportProblemSection() {
         </label>
         <textarea
           id={messageId}
+          ref={field}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={

@@ -41,10 +41,13 @@ describe('ReportProblemSection (LC92)', () => {
     fireEvent.change(screen.getByLabelText('Descrizione'), { target: { value: '  La ricerca non risponde  ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invia' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Grazie, la segnalazione è arrivata.');
+    // The focus follows the flow: to the confirmation, then back to the text, never the body.
+    expect(screen.getByRole('status')).toHaveFocus();
     expect(submitFeedback).toHaveBeenCalledWith({ type: 'bug', message: 'La ricerca non risponde' });
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: "Scrivi un'altra segnalazione" }));
     expect(screen.getByLabelText('Descrizione')).toHaveValue('');
+    expect(screen.getByLabelText('Descrizione')).toHaveFocus();
   });
 
   it('says what went wrong when the report is not sent, and keeps the text', async () => {

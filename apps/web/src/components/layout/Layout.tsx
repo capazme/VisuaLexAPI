@@ -540,7 +540,13 @@ export function Layout() {
       <WelcomeGuide />
 
       {/* Version changelog notification */}
-      {!controlsInBar && <ChangelogNotification />}
+      {/* LC92: hidden while the phone's drawer is open (at 390 it covered the drawer's foot and took its clicks); kept
+          mounted, so it comes back as it was when the drawer closes. */}
+      {!controlsInBar && (
+        <div data-testid="news-floating-host" className="contents" hidden={sidebarOpen && drawerDrawn}>
+          <ChangelogNotification />
+        </div>
+      )}
 
       {/* Global Undo Toast Container */}
       <NotificationHost />

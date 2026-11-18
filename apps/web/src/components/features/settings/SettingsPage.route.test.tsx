@@ -50,6 +50,42 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
     enter();
     expect(where()).toHaveTextContent('/impostazioni#dati');
     expect(document.getElementById('dati')).toContainElement(screen.getByRole('heading', { name: 'Dati e privacy' }));
+    // LC92: the focus goes to the part's heading, not to the page's title.
+    expect(screen.getByRole('heading', { name: 'Dati e privacy' })).toHaveFocus();
+  });
+
+  // LC92 (Luca, 18 Nov): by use, in four groups; the page's parts in the same order as the index.
+  it('orders its index in four groups, Lettura, Ricerca, Account, Aiuto, and its parts the same way', () => {
+    app();
+    enter();
+    const index = screen.getByRole('navigation', { name: 'Parti delle impostazioni' });
+    const groups = within(index).getAllByRole('list');
+    expect(groups.map((list) => list.getAttribute('aria-labelledby') && document.getElementById(list.getAttribute('aria-labelledby')!)?.textContent))
+      .toEqual(['Lettura', 'Ricerca', 'Account', 'Aiuto']);
+    expect(groups.map((list) => within(list).getAllByRole('link').map((link) => link.textContent))).toEqual([
+      ['Aspetto', 'Significato dei colori'],
+      ['Norme rapide', 'Alias'],
+      ['Applicazioni collegate', 'Dati e privacy'],
+      ['Segnala un problema', 'Scorciatoie da tastiera', 'Aiuto', 'Informazioni'],
+    ]);
+    const order = within(index).getAllByRole('link').map((link) => link.getAttribute('href')!.slice(1));
+    const parts = [...document.querySelectorAll('section[id]')].map((part) => part.id).filter((id) => order.includes(id));
+    expect(parts).toEqual(order);
+  });
+
+  // LC92 («perché hai messo sti riquadri brutti»): plain rows, no box and no fill; the current one in bold with a mark.
+  it('draws its index as plain rows: a line between them, 44 px, no border or fill around an entry', () => {
+    app('alias');
+    enter();
+    const index = screen.getByRole('navigation', { name: 'Parti delle impostazioni' });
+    for (const list of within(index).getAllByRole('list')) expect(list).toHaveClass('divide-y', 'lg:divide-y-0');
+    for (const link of within(index).getAllByRole('link')) {
+      expect(link).toHaveClass('min-h-[44px]', 'border-l-2', 'border-transparent');
+      expect(link.className).not.toMatch(/rounded|\bborder-slate-200\b|(^|\s)(aria-\[current=location\]:)?bg-/);
+    }
+    const current = within(index).getByRole('link', { name: 'Alias' });
+    expect(current).toHaveAttribute('aria-current', 'location');
+    expect(current).toHaveClass('aria-[current=location]:font-semibold', 'aria-[current=location]:border-slate-900');
   });
 
   // LC92: the bug beside «Impostazioni» and the user menu open «Segnala un problema», a part of the page, not a dialog.

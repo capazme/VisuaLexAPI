@@ -127,8 +127,8 @@ export function SettingsPage() {
     // later above the part (the aliases' catalog) would push it down: for a moment the part is brought back in view as
     // the page grows, until the reader scrolls.
     const [asked, setAsked] = useState(0);
-    // Coming in, the focus goes to the page's title (the colours' first field when they were asked for): what was
-    // focused stays on the page left behind, and Esc works at once.
+    // Coming in, the focus goes to the page's title, or to the part's heading when one was asked for (the colours'
+    // first field for them): what was focused stays on the page left behind, and Esc works at once.
     const entered = useRef(false);
     useEffect(() => {
         const page = root.current;
@@ -136,7 +136,12 @@ export function SettingsPage() {
         const id = decodeURIComponent(location.hash.slice(1));
         const part = id ? document.getElementById(id) : null;
         if (id === 'colori') meaningsField.current?.focus({ preventScroll: true });
-        else if (!entered.current) {
+        else if (part) {
+            // LC92: an anchor gives the focus to its part's heading, not to the page's title.
+            const heading = part.querySelector<HTMLElement>('h2, h3, h4') ?? part;
+            heading.setAttribute('tabindex', '-1');
+            heading.focus({ preventScroll: true });
+        } else if (!entered.current) {
             const title = document.getElementById('impostazioni-title');
             title?.setAttribute('tabindex', '-1');
             title?.focus({ preventScroll: true });
@@ -282,24 +287,33 @@ export function SettingsPage() {
         { value: 'mono', label: 'Mono', fontClass: 'font-mono' },
     ];
 
-    const index: Array<{ id: SettingsSection; name: string; shown?: boolean }> = [
-        { id: 'aspetto', name: 'Aspetto' },
-        { id: 'colori', name: 'Significato dei colori' },
-        { id: 'norme-rapide', name: 'Norme rapide' },
-        { id: 'alias', name: 'Alias' },
-        { id: 'scorciatoie', name: 'Scorciatoie da tastiera' },
-        { id: 'aiuto', name: 'Aiuto' },
-        { id: 'sviluppo', name: 'Sviluppo', shown: canUseDevMode },
-        { id: 'amministrazione', name: 'Amministrazione', shown: isAdmin },
-        { id: 'dati', name: 'Dati e privacy' },
-        { id: 'merlt', name: 'Dati MERL-T', shown: merltShown },
-        { id: 'app-collegate', name: 'Applicazioni collegate' },
-        { id: 'segnala', name: 'Segnala un problema', shown: isAuthenticated },
-        { id: 'informazioni', name: 'Informazioni' },
+    // LC92 (Luca, 18 Nov: «fai l'ordine più giusto»): the parts by use, in four groups; the page follows the same order.
+    const index: Array<{ group: string; parts: Array<{ id: SettingsSection; name: string; shown?: boolean }> }> = [
+        { group: 'Lettura', parts: [
+            { id: 'aspetto', name: 'Aspetto' },
+            { id: 'colori', name: 'Significato dei colori' },
+        ] },
+        { group: 'Ricerca', parts: [
+            { id: 'norme-rapide', name: 'Norme rapide' },
+            { id: 'alias', name: 'Alias' },
+        ] },
+        { group: 'Account', parts: [
+            { id: 'app-collegate', name: 'Applicazioni collegate' },
+            { id: 'dati', name: 'Dati e privacy' },
+            { id: 'merlt', name: 'Dati MERL-T', shown: merltShown },
+            { id: 'sviluppo', name: 'Sviluppo', shown: canUseDevMode },
+            { id: 'amministrazione', name: 'Amministrazione', shown: isAdmin },
+        ] },
+        { group: 'Aiuto', parts: [
+            { id: 'segnala', name: 'Segnala un problema', shown: isAuthenticated },
+            { id: 'scorciatoie', name: 'Scorciatoie da tastiera' },
+            { id: 'aiuto', name: 'Aiuto' },
+            { id: 'informazioni', name: 'Informazioni' },
+        ] },
     ];
 
     return (
-        <div ref={root} className="flex flex-col gap-4 pb-12 [&_h1:focus]:outline-none">
+        <div ref={root} className="flex flex-col gap-4 pb-12 [&_h1:focus]:outline-none [&_h2:focus]:outline-none [&_h3:focus]:outline-none [&_h4:focus]:outline-none [&_section:focus]:outline-none">
             <button
                 type="button"
                 onClick={goBack}
@@ -312,25 +326,39 @@ export function SettingsPage() {
                 <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
                     {/* The index: a list at the top below lg, a column that stays in sight from lg. */}
                     <nav aria-label="Parti delle impostazioni" className="lg:sticky lg:top-0 lg:self-start">
-                        <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-0.5">
-                            {index.filter((part) => part.shown !== false).map((part) => (
-                                <li key={part.id}>
-                                    <a
-                                        href={`#${part.id}`}
-                                        onClick={goTo(part.id)}
-                                        aria-current={location.hash === `#${part.id}` ? 'location' : undefined}
-                                        className={cn(
-                                            'flex min-h-[44px] items-center rounded-lg border border-slate-200 px-3 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
-                                            'lg:min-h-0 lg:border-transparent lg:py-1.5',
-                                            'aria-[current=location]:bg-slate-100 aria-[current=location]:font-medium aria-[current=location]:text-slate-900 dark:aria-[current=location]:bg-slate-800 dark:aria-[current=location]:text-slate-50',
-                                            FOCUS_RING,
-                                        )}
-                                    >
-                                        {part.name}
-                                    </a>
-                                </li>
-                            ))}
-                        </ul>
+                        {/* LC92: plain rows, no boxes: a thin line between them and 44 px on a phone, text alone from lg; the
+                            current part in bold with a mark at its left. */}
+                        <div className="space-y-5 lg:space-y-4">
+                            {index.map(({ group, parts }) => {
+                                const shown = parts.filter((part) => part.shown !== false);
+                                if (shown.length === 0) return null;
+                                const labelId = `impostazioni-gruppo-${group.toLowerCase()}`;
+                                return (
+                                    <div key={group}>
+                                        <p id={labelId} className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{group}</p>
+                                        <ul aria-labelledby={labelId} className="divide-y divide-slate-200 dark:divide-slate-800 lg:divide-y-0">
+                                            {shown.map((part) => (
+                                                <li key={part.id}>
+                                                    <a
+                                                        href={`#${part.id}`}
+                                                        onClick={goTo(part.id)}
+                                                        aria-current={location.hash === `#${part.id}` ? 'location' : undefined}
+                                                        className={cn(
+                                                            'flex min-h-[44px] items-center border-l-2 border-transparent pl-3 text-sm text-slate-700 transition-colors hover:text-slate-950 dark:text-slate-300 dark:hover:text-slate-50',
+                                                            'lg:min-h-0 lg:py-1.5',
+                                                            'aria-[current=location]:border-slate-900 aria-[current=location]:font-semibold aria-[current=location]:text-slate-950 dark:aria-[current=location]:border-slate-100 dark:aria-[current=location]:text-slate-50',
+                                                            FOCUS_RING,
+                                                        )}
+                                                    >
+                                                        {part.name}
+                                                    </a>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </nav>
 
                     <div className="min-w-0 max-w-2xl space-y-10">
@@ -438,26 +466,41 @@ export function SettingsPage() {
                     <AliasSection />
                 </Part>
 
-                <Part id="scorciatoie">
-                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Scorciatoie da tastiera</h3>
-                    <KeyboardShortcutsSection />
+                <Part id="app-collegate"><ConnectedAppsSection /></Part>
+
+                <Part id="dati">
+                <div>
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati e privacy</h3>
+                    <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className="text-xs text-slate-500">Esporta una copia dei tuoi dati oppure elimina definitivamente l’account. Password e token non vengono inclusi nell’export.</p>
+                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-50 px-3 py-2 md:min-h-0 text-sm font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50 dark:bg-primary-950/30 dark:text-primary-300"><Download size={16} /> Esporta i miei dati</button>
+                        <button
+                            ref={deleteOpener}
+                            type="button"
+                            onClick={() => (deleteOpen ? closeDelete() : setDeleteOpen(true))}
+                            aria-expanded={deleteOpen}
+                            aria-controls="delete-account-form"
+                            className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 md:min-h-0 dark:text-red-300 dark:hover:bg-red-950/30"
+                        >
+                            <Trash2 size={16} aria-hidden /> Elimina l’account…
+                        </button>
+                        {/* In the page, under its button (L-73); its first field takes the focus, Esc and «Annulla» give it back. */}
+                        <Expand id="delete-account-form" open={deleteOpen} onClose={closeDelete}>
+                            <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400">L’account e i suoi dati vengono eliminati per sempre. Per confermare, la password e la frase «ELIMINA ACCOUNT».</p>
+                                <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
+                                <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
+                                <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="min-h-[44px] md:min-h-0 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
+                                <button type="button" onClick={closeDelete} className="w-full inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 dark:text-slate-300 dark:hover:bg-slate-800">Annulla</button>
+                            </div>
+                        </Expand>
+                        {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
+                    </div>
+                </div>
+
                 </Part>
 
-                <Part id="aiuto">
-                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Aiuto</h3>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            // The guide opens over the page it was opened from, once that page is back.
-                            goBack();
-                            setTimeout(() => resetAndStartTour(), 300);
-                        }}
-                        className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
-                    >
-                        <HelpCircle size={16} />
-                        Rivedi la guida iniziale
-                    </button>
-                </Part>
+                <Part id="merlt"><MerltDataSection /></Part>
 
                 {/* Development mode - only for accounts the administrator enabled */}
                 {canUseDevMode && (
@@ -514,42 +557,6 @@ export function SettingsPage() {
                     </Part>
                 )}
 
-                <Part id="dati">
-                <div>
-                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati e privacy</h3>
-                    <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                        <p className="text-xs text-slate-500">Esporta una copia dei tuoi dati oppure elimina definitivamente l’account. Password e token non vengono inclusi nell’export.</p>
-                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-50 px-3 py-2 md:min-h-0 text-sm font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50 dark:bg-primary-950/30 dark:text-primary-300"><Download size={16} /> Esporta i miei dati</button>
-                        <button
-                            ref={deleteOpener}
-                            type="button"
-                            onClick={() => (deleteOpen ? closeDelete() : setDeleteOpen(true))}
-                            aria-expanded={deleteOpen}
-                            aria-controls="delete-account-form"
-                            className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 md:min-h-0 dark:text-red-300 dark:hover:bg-red-950/30"
-                        >
-                            <Trash2 size={16} aria-hidden /> Elimina l’account…
-                        </button>
-                        {/* In the page, under its button (L-73); its first field takes the focus, Esc and «Annulla» give it back. */}
-                        <Expand id="delete-account-form" open={deleteOpen} onClose={closeDelete}>
-                            <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
-                                <p className="text-xs text-slate-600 dark:text-slate-400">L’account e i suoi dati vengono eliminati per sempre. Per confermare, la password e la frase «ELIMINA ACCOUNT».</p>
-                                <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
-                                <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
-                                <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="min-h-[44px] md:min-h-0 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
-                                <button type="button" onClick={closeDelete} className="w-full inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 dark:text-slate-300 dark:hover:bg-slate-800">Annulla</button>
-                            </div>
-                        </Expand>
-                        {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
-                    </div>
-                </div>
-
-                </Part>
-
-                <Part id="merlt"><MerltDataSection /></Part>
-
-                <Part id="app-collegate"><ConnectedAppsSection /></Part>
-
                 {/* LC92: the form that was «Commenti»'s dialog, for a signed-in user as it was. */}
                 {isAuthenticated && (
                     <Part id="segnala">
@@ -557,6 +564,27 @@ export function SettingsPage() {
                         <ReportProblemSection />
                     </Part>
                 )}
+
+                <Part id="scorciatoie">
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Scorciatoie da tastiera</h3>
+                    <KeyboardShortcutsSection />
+                </Part>
+
+                <Part id="aiuto">
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Aiuto</h3>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            // The guide opens over the page it was opened from, once that page is back.
+                            goBack();
+                            setTimeout(() => resetAndStartTour(), 300);
+                        }}
+                        className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
+                    >
+                        <HelpCircle size={16} />
+                        Rivedi la guida iniziale
+                    </button>
+                </Part>
 
                 <Part id="informazioni">
                 {/* Version Info */}
