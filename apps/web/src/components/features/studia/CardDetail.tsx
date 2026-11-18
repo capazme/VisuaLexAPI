@@ -82,7 +82,6 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
   const [asked, setAsked] = useState<{ cardId: string; text: TestoDaAccettare } | null>(null);
   const notice = asked && asked.cardId === card.id ? asked.text : null;
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   // The buttons the confirmations grow from and give the focus back to (LC85).
   const [confirmFrom, setConfirmFrom] = useState<HTMLElement | null>(null);
   const [pending, setPending] = useState(false);
@@ -161,8 +160,9 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
               Ritira
             </button>
           )}
+          {/* No confirmation (LC89, L-80): the card goes to the trash and the notification offers «Annulla». */}
           {canDelete && (
-            <button type="button" onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirmDelete(true); }} className={DANGER}>
+            <button type="button" onClick={onDelete} className={DANGER}>
               Elimina
             </button>
           )}
@@ -258,21 +258,6 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
         focusCancel
         onConfirm={() => void withdraw()}
         onCancel={() => setConfirmWithdraw(false)}
-      />
-      {/* Asked first, the focus on «Annulla» (#457): a card was lost to a click meant to look where the focus went. */}
-      <ConfirmDialog
-        open={confirmDelete}
-        origin={confirmFrom}
-        variant="danger"
-        title="Eliminare la scheda?"
-        message="La scheda va nel cestino: per 30 giorni la puoi ripristinare da lì."
-        confirmLabel="Elimina"
-        focusCancel
-        onConfirm={() => {
-          setConfirmDelete(false);
-          onDelete();
-        }}
-        onCancel={() => setConfirmDelete(false)}
       />
     </article>
   );
