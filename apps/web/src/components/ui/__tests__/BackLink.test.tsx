@@ -31,6 +31,7 @@ function Settings() {
           <h3>Amministrazione</h3>
         </section>
       )}
+      <button type="button">Altro</button>
     </>
   );
 }
@@ -50,7 +51,11 @@ function renderAt(to: string) {
   );
 }
 
-afterEach(() => window.history.pushState({}, '', '/'));
+afterEach(() => {
+  // A click ends every landing still watched (3 s), so none reaches the next test.
+  document.dispatchEvent(new Event('pointerdown'));
+  window.history.pushState({}, '', '/');
+});
 
 describe('BackLink', () => {
   it('has Impostazioni\' look: 44 px on a phone, a background on hover', () => {
@@ -83,5 +88,18 @@ describe('BackLink', () => {
     act(() => heading.blur());
     expect(document.activeElement).toBe(document.body);
     await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('lets a focus moved out of the part stay there, after the heading had it', async () => {
+    renderAt('/impostazioni#amministrazione');
+    fireEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+    const heading = await screen.findByRole('heading', { name: 'Amministrazione', level: 3 });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    // Tab to a control out of the part, then the page changes: the focus stays where the reader put it.
+    const other = screen.getByRole('button', { name: 'Altro' });
+    act(() => other.focus());
+    act(() => document.querySelector('main')!.append(document.createElement('div')));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(other);
   });
 });

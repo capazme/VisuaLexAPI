@@ -50,6 +50,8 @@ export function focusLanding(left: boolean): () => void {
     const part = anchoredPart(from);
     if (part) {
       if (active && part.contains(active)) return;
+      // Once its heading had the focus, a focus moved elsewhere (Tab, a field) stays there.
+      if (given && part.contains(given) && active && active !== document.body && active !== main) return stop();
       const heading = part.querySelector<HTMLElement>('h1, h2, h3, h4') ?? part;
       focusTitle(heading);
       given = heading;
