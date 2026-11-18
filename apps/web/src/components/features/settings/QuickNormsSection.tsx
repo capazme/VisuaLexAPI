@@ -1,23 +1,14 @@
-import { useState, useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { X, Plus, Link, FileText, Star, Trash2, ExternalLink, Pencil, Check } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
+import { useSearchActions } from '../../../hooks/useSearchActions';
 import { parseNormattivaUrl, generateLabelFromParams, validateSearchParams } from '../../../utils/normattivaParser';
 import type { SearchParams, QuickNorm } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { getActTypesByGroup } from '../../../constants/actTypes';
-import { useTour } from '../../../hooks/useTour';
 import { AttributionChip } from '../bulletin/AttributionChip';
-import { spring } from '../../../lib/motion';
-
-interface QuickNormsManagerProps {
-  isOpen: boolean;
-  onClose: () => void;
-  /** Runs a quick norm used from the list (the host brings the reader to the search page); without it, the store's trigger. */
-  onSearch?: (params: SearchParams) => void;
-}
 
 type InputMode = 'url' | 'manual';
 
@@ -31,17 +22,13 @@ function formatLastUsed(iso?: string): string | null {
   return `ultima ${formatDistanceToNow(date, { addSuffix: true, locale: it })}`;
 }
 
-export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManagerProps) {
-  const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, selectQuickNorm, triggerSearch } = useAppStore();
-  const { tryStartTour } = useTour();
-
-  // Start quickNorms tour on first open
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => tryStartTour('quickNorms'), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, tryStartTour]);
+/**
+ * The quick norms (LC84: «Norme rapide», a part of the Impostazioni page; it was a dialog over the page). One used from
+ * the list runs as it always did (a trigger, checked for an annex) and brings the reader to the search page.
+ */
+export function QuickNormsSection() {
+  const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, selectQuickNorm } = useAppStore();
+  const { trigger } = useSearchActions();
 
   const [inputMode, setInputMode] = useState<InputMode>('manual');
   const [urlInput, setUrlInput] = useState('');
@@ -115,9 +102,8 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
 
   const handleUseQuickNorm = useCallback((qn: QuickNorm) => {
     selectQuickNorm(qn.id);
-    (onSearch ?? triggerSearch)(qn.searchParams);
-    onClose();
-  }, [selectQuickNorm, triggerSearch, onSearch, onClose]);
+    trigger(qn.searchParams);
+  }, [selectQuickNorm, trigger]);
 
   const handleStartEdit = useCallback((qn: QuickNorm) => {
     setEditingId(qn.id);
@@ -137,63 +123,18 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
     setEditLabel('');
   }, []);
 
-  if (!isOpen) return null;
-
   return (
-    <div id="tour-quicknorms-panel" className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/40 backdrop-blur-md"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={spring.snappy}
-        className={cn(
-          'relative w-full max-w-2xl max-h-[85vh] overflow-hidden',
-          'bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl',
-          'rounded-2xl shadow-glass-lg',
-          'border border-white/20 dark:border-white/10',
-          'flex flex-col'
-        )}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-white/5">
-          <div className="flex items-center gap-3">
-            <Star className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Ricerche Frequenti
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div id="tour-quicknorms-panel" className="space-y-6">
           {/* Add New Section */}
           <div id="tour-qn-add" className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-              Aggiungi Nuova
-            </h3>
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Aggiungi una norma</h4>
 
             {/* Mode Toggle */}
             <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
               <button
                 onClick={() => setInputMode('manual')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
+                  'flex-1 flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'manual'
                     ? 'bg-white shadow-sm text-slate-900 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                     : 'text-slate-600 dark:text-slate-400'
@@ -205,14 +146,14 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
               <button
                 onClick={() => setInputMode('url')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
+                  'flex-1 flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'url'
                     ? 'bg-white shadow-sm text-slate-900 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                     : 'text-slate-600 dark:text-slate-400'
                 )}
               >
                 <Link size={16} />
-                Da Link
+                Da un link
               </button>
             </div>
 
@@ -229,7 +170,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                     }}
                     placeholder="Incolla link di Normattiva…"
                     className={cn(
-                      'flex-1 px-4 py-2.5 rounded-xl text-sm',
+                      'min-w-0 flex-1 min-h-[44px] md:min-h-0 px-4 py-2.5 rounded-xl text-sm',
                       'bg-slate-50 dark:bg-slate-800 border',
                       urlError
                         ? 'border-red-300 dark:border-red-700'
@@ -239,7 +180,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                   />
                   <button
                     onClick={handleUrlParse}
-                    className="px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors"
+                    className="min-h-[44px] md:min-h-0 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors"
                   >
                     Importa
                   </button>
@@ -256,15 +197,15 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
             {/* Manual Form */}
             {inputMode === 'manual' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                      Tipo Atto
+                      Tipo di atto
                     </label>
                     <select
                       value={actType}
                       onChange={(e) => setActType(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     >
                       {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
                         <optgroup key={group} label={group}>
@@ -284,58 +225,58 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                       value={article}
                       onChange={(e) => setArticle(e.target.value)}
                       placeholder="es. 2043"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                      Numero Atto <span className="text-slate-400">(opzionale)</span>
+                      Numero dell’atto <span className="text-slate-400">(facoltativo)</span>
                     </label>
                     <input
                       type="text"
                       value={actNumber}
                       onChange={(e) => setActNumber(e.target.value)}
                       placeholder="es. 241"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                      Data <span className="text-slate-400">(opzionale)</span>
+                      Data <span className="text-slate-400">(facoltativa)</span>
                     </label>
                     <input
                       type="text"
                       value={actDate}
                       onChange={(e) => setActDate(e.target.value)}
                       placeholder="aaaa-mm-gg"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                    Nome personalizzato <span className="text-slate-400">(opzionale)</span>
+                    Nome <span className="text-slate-400">(facoltativo)</span>
                   </label>
                   <input
                     type="text"
                     value={customLabel}
                     onChange={(e) => setCustomLabel(e.target.value)}
                     placeholder="es. Risarcimento del danno"
-                    className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   />
                 </div>
 
                 <button
                   onClick={handleAddQuickNorm}
                   disabled={!actType || !article}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                  className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
                 >
                   <Plus size={18} />
-                  Aggiungi ai Preferiti
+                  Aggiungi alle norme rapide
                 </button>
               </div>
             )}
@@ -343,14 +284,14 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
 
           {/* Saved QuickNorms */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-              Le tue Ricerche Frequenti ({quickNorms.length})
-            </h3>
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Le tue norme rapide ({quickNorms.length})
+            </h4>
 
             {quickNorms.length === 0 ? (
               <div className="text-center py-8 text-slate-400 dark:text-slate-500">
                 <Star className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">Nessuna ricerca frequente salvata</p>
+                <p className="text-sm">Nessuna norma rapida</p>
                 <p className="text-xs mt-1">Aggiungi le norme che consulti spesso per accedervi rapidamente</p>
               </div>
             ) : (
@@ -372,21 +313,22 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                             onChange={(e) => setEditLabel(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleSaveEdit();
-                              if (e.key === 'Escape') handleCancelEdit();
+                              // Esc gives up the change and stays on the page, before the page's own Esc goes back.
+                              if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit(); }
                             }}
-                            className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                            className="min-w-0 flex-1 min-h-[44px] md:min-h-0 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                             autoFocus
                           />
                           <button
                             onClick={handleSaveEdit}
-                            className="p-2 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg text-green-600"
+                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg text-green-600"
                             title="Salva"
                           >
                             <Check size={16} />
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
+                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
                             title="Annulla"
                           >
                             <X size={16} />
@@ -419,10 +361,11 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                           </div>
                         </button>
 
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* In sight at every width: a phone has no pointer to bring them out, the keyboard neither. */}
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleStartEdit(qn)}
-                            className="p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg text-slate-500 hover:text-primary-600"
+                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg text-slate-500 hover:text-primary-600"
                             title="Rinomina"
                           >
                             <Pencil size={16} />
@@ -432,7 +375,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                               href={qn.sourceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
+                              className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
                               title="Apri su Normattiva"
                             >
                               <ExternalLink size={16} />
@@ -440,7 +383,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                           )}
                           <button
                             onClick={() => removeQuickNorm(qn.id)}
-                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-500 hover:text-red-600"
+                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-500 hover:text-red-600"
                             title="Rimuovi"
                           >
                             <Trash2 size={16} />
@@ -454,7 +397,5 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
             )}
           </div>
         </div>
-      </motion.div>
-    </div>
   );
 }

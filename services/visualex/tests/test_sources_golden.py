@@ -170,3 +170,51 @@ async def test_parse_query_writes_artt_for_a_list_or_a_range():
     assert await _display("art 1453-1455 cc", nv) == "artt. 1453-1455 c.c."
     assert await _display("art 1453,1454 cc", nv) == "artt. 1453, 1454 c.c."
     assert await _display("art 2645-bis cc", nv) == "art. 2645-bis c.c."
+
+
+# --- Recitals (spec docs/superpowers/specs/2026-11-17-eu-recitals-design.md §2) -----------------
+
+from visualex_api.tools.sources import cite_recital  # noqa: E402
+
+_RECITALS = GOLDEN["recitals"]
+_RECITALS_CITED = [c for c in _RECITALS if "citation" in c["labels"]]
+
+
+def test_the_recitals_section_has_its_cases():
+    assert {c["id"] for c in _RECITALS} >= {"gdpr-cons-26", "nis2-cons-1", "eprivacy-cons-2"}
+
+
+@pytest.mark.parametrize("case", _RECITALS, ids=[c["id"] for c in _RECITALS])
+def test_a_recitals_identity_is_its_acts_celex_with_rct(case):
+    n = case["input"]
+    assert eu_identity(n["tipo_atto"], n["data"], n["numero_atto"]) == case["identity"]["act"]["value"]
+    assert eu_identity(n["tipo_atto"], n["data"], n["numero_atto"], considerando=n["considerando"]) == (
+        case["identity"]["recital"]["value"])
+
+
+@pytest.mark.parametrize("case", _RECITALS_CITED, ids=[c["id"] for c in _RECITALS_CITED])
+def test_a_recitals_citation_is_the_conventions(case):
+    assert cite_recital(case["input"]) == case["labels"]["citation"]["value"]
+
+
+def test_an_article_and_a_recital_together_are_no_one_thing():
+    with pytest.raises(ValueError):
+        eu_identity("regolamento ue", "2016", "679", "5", "26")
+
+
+def test_a_treaty_has_no_recital_identity():
+    assert eu_identity("TFUE", None, None, considerando="1") is None
+
+
+@pytest.mark.parametrize("spec,words", [
+    ("26,27", "considerando 26 e 27, reg. (UE) 2016/679"),
+    ("26,27,30", "considerando 26, 27 e 30, reg. (UE) 2016/679"),
+    ("26-30", "considerando 26-30, reg. (UE) 2016/679"),
+])
+def test_a_list_or_a_range_of_recitals_is_cited_with_the_word_once(spec, words):
+    assert cite_recital({"tipo_atto": "regolamento ue", "numero_atto": "679", "data": "2016", "considerando": spec}) == words
+
+
+def test_only_an_eu_regulation_or_directive_has_recitals():
+    with pytest.raises(ValueError):
+        cite_recital({"tipo_atto": "legge", "numero_atto": "241", "data": "1990-08-07", "considerando": "3"})
