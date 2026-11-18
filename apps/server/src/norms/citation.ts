@@ -108,6 +108,24 @@ function namedAct(norm: CitableAct): string | undefined {
   return NAMED_ACTS[key(norm.tipo_atto)];
 }
 
+/**
+ * An EU regulation or directive as cited (G-540), the API's `sources._eu_act`: since 2015 the year comes
+ * first, «reg. (UE) 2016/679»; before, as the Official Journal numbered them, «reg. (CE) n. 1907/2006»,
+ * «dir. 2002/58/CE», the year in two digits before 1999 («dir. 95/46/CE», «reg. (CEE) n. 1408/71»), the
+ * Community CEE until 1 November 1993, CE until 1 December 2009, UE after (a year alone: 1993 is CEE, 2009 CE).
+ */
+function euAct(kind: string, date: string, number: string): string {
+  const year = date.slice(0, 4);
+  if (!number || !/^\d{4}$/.test(year)) return EU_ACTS[kind];
+  const y = parseInt(year, 10);
+  if (y >= 2015) return `${EU_ACTS[kind]} ${year}/${number}`;
+  const institution = /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date < '1993-11-01' ? 'CEE' : date < '2009-12-01' ? 'CE' : 'UE'
+    : y <= 1993 ? 'CEE' : y <= 2009 ? 'CE' : 'UE';
+  const shortYear = y >= 1999 ? year : year.slice(2);
+  return kind === 'regolamento ue' ? `reg. (${institution}) n. ${number}/${shortYear}` : `dir. ${shortYear}/${number}/${institution}`;
+}
+
 // The act, and how an article joins it: a code, the Constitution and a treaty follow the
 // article with a space ("art. 1284 c.c."), every other act with a comma (short: a space).
 function actOf(norm: CitableAct, short: boolean): { act: string; joiner: string } {
@@ -115,12 +133,7 @@ function actOf(norm: CitableAct, short: boolean): { act: string; joiner: string 
   const named = namedAct(norm);
   if (named) return { act: named, joiner: ' ' };
   const joiner = short ? ' ' : ', ';
-  const eu = EU_ACTS[kind];
-  if (eu) {
-    const number = text(norm.numero_atto);
-    const year = text(norm.data).slice(0, 4);
-    return { act: number && /^\d{4}$/.test(year) ? `${eu} ${year}/${number}` : eu, joiner };
-  }
+  if (EU_ACTS[kind]) return { act: euAct(kind, text(norm.data), text(norm.numero_atto)), joiner };
   const { type, date, number } = realType(norm);
   const abbreviation = ACT_TYPES[type] ?? type;
   const spelled = citationDate(date);
