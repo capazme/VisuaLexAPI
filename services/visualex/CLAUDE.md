@@ -4,12 +4,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 
 ### Python API (`services/visualex`)
 
-- **`app.py`** (this folder): main server, UI + API. **`services/visualex/visualex_api/app.py`**:
-  alternative server with `/api/*` prefix and Swagger. It is not deployed (`asgi.py` serves
-  the root app) and it does **not** apply the in-force rules: no `validity`, no
-  `reject_future_version_date`, an undated request served as Normattiva answers it (G-355,
-  G-357, G-358 are the root app's). Never deploy it as it is; its `/api/export_pdf` follows
-  the root app's. Retiring or porting it goes with the move to the mcp-legal-it shell.
+- **`app.py`** (this folder): the server, UI + API, served by `asgi.py`. The alternative
+  `/api/*` server with Swagger (`visualex_api/app.py`) was removed on 18 November 2026: nothing
+  ran it, it missed the in-force rules, and it kept a global search history with no login
+  (item 15 of the security inventory).
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`, `eurlex_fetch.py` (where an
   EU act's page comes from: CELLAR first, by CELEX through the shared client — `source="cellar"`,
   the 303 followed by hand over https and re-checked against the allow-list — and EUR-Lex's site
@@ -311,9 +309,6 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     («615 bis», «615bis», «615-bis») and always emitted as `615-bis`; before
     2026-10-07 only the hyphen was read and the other two came out as art. 615,
     so MERL-T's citation edges built from them may point at the wrong article
-  - `circuit_breaker.py` — per-source breaker. **State is in-memory
-    per-instance** — single-instance deployment only. Status at
-    `GET /api/circuit-breakers`
   - `redis_cache.py` + `cache_manager.py` — Redis cache with automatic
     filesystem fallback; startup warns when Redis is disabled or missing. The filesystem
     cache deletes an expired entry only when its key is read again, so a namespace nobody
@@ -801,8 +796,8 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
 `version.txt`): `docker build -f services/visualex/Dockerfile -t visualex-scrapers .`.
 `infra/compose.scrapers.yml` is the module that runs it.
 
-- **Hypercorn, one worker** (`asgi:app`). The rate limiter, the circuit breaker and the
-  fetch queue keep their state in memory, per process: more workers would each have
+- **Hypercorn, one worker** (`asgi:app`). The rate limiter and the fetch queue keep their
+  state in memory, per process: more workers would each have
   their own. `python app.py` is still the development server.
 - **It mirrors the repository layout** (`/repo/services/visualex`, `/repo/version.txt`)
   because `/version` and the `data/` and `download/` paths are computed relative to the
@@ -865,7 +860,7 @@ no panel, and a deploy never waits on the portal.
 
 Breaking one of these breaks the product. Read before editing.
 
-**Python** — `services/visualex/visualex_api/app.py` (controller) · `tools/norma.py` (models) ·
+**Python** — `services/visualex/app.py` (controller) · `tools/norma.py` (models) ·
 `tools/text_op.py` (parsing + dates) · `tools/sys_op.py` (browser pool) ·
 `services/*_scraper.py` (fragile HTML parsers).
 

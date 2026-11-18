@@ -4,7 +4,6 @@ Complete reference for all Python API endpoints. All endpoints accept JSON reque
 
 **Base URLs:**
 - Main server: `http://localhost:5000`
-- Alternative server: `http://localhost:5000/api` (with Swagger UI at `/api/docs`)
 
 ---
 
