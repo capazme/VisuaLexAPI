@@ -17,7 +17,7 @@ from ..tools.exceptions import DocumentNotFoundError, IndexUnavailableError, Par
 from ..tools.text_op import parse_date
 from ..tools.selectors import NormattivaSelectors
 from .akn_fetch import fetch_act_article
-from .http_client import http_client
+from .http_client import http_client, new_session
 from .normattiva_parts import extract_parts, part_cache_key, part_range, ranges_in_words
 
 # Configure structured logger
@@ -169,7 +169,7 @@ class NormattivaScraper(BaseScraper):
         that is not the part asked for is never stored.
         """
         timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
-        async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(), timeout=timeout) as session:
+        async with new_session(cookie_jar=aiohttp.CookieJar(), timeout=timeout) as session:
             article_page = (await http_client.request("GET", nv.urn, source="normattiva", session=session)).text
             if article_page and not await self.cache.get(nv.urn):
                 await self.cache.set(nv.urn, article_page)

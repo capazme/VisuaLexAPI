@@ -253,7 +253,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
     and the check before EUR-Lex's browser (`eurlex_fetch.fetch_with_playwright`, for the
     scraper and the tree alike) — `SECURITY.md` lists what it does not cover (the PDF
-    export's Playwright, what a page then loads, redirect targets except CELLAR's).
+    export's Playwright, what a page then loads); the client re-checks every redirect before it
+    follows it (`http_client.redirect_guard`, on every session `new_session` makes).
   - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
     the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
     pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
