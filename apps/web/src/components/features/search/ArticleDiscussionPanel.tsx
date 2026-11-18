@@ -10,7 +10,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { ReplyForm, ReportButton, TOUCH, VoteButton } from './discussionControls';
 import { AlignedGlosses, type GlossAlignment } from './AlignedGlosses';
 import { voteFailure } from './voteFailure';
-import { FormSelect } from '../../ui/FormSelect';
+import { Select } from '../../ui/Select';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
 import type { Materia } from '../../../types/studia';
 
@@ -433,7 +433,7 @@ export function ArticleDiscussionPanel({
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {/* Optional: the Forum's Community filters by it (the server keeps it only when sent). */}
-          <FormSelect
+          <Select
             size="sm"
             aria-label="Materia (facoltativa)"
             value={materia}
@@ -441,7 +441,7 @@ export function ArticleDiscussionPanel({
           >
             <option value="">Materia (facoltativa)</option>
             {(Object.keys(MATERIA_LABEL) as Materia[]).map(key => <option key={key} value={key}>{MATERIA_LABEL[key]}</option>)}
-          </FormSelect>
+          </Select>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={cancelComposer} className="px-3 py-1.5 text-xs text-slate-500">
               Annulla
