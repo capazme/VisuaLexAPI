@@ -1,9 +1,9 @@
 import { useId, useState, type ChangeEvent } from 'react';
 import { Expand } from '../../ui/Expand';
 import { taskService } from '../../../services/taskService';
+import { Button } from '../../ui/Button';
+import { CARD_RADIUS, CONTROL_BORDER, FIELD_HELP, FIELD_LABEL } from '../../ui/controlStyles';
 import { cn } from '../../../lib/utils';
-import { INK_BUTTON, QUIET_BUTTON } from '../studia/progress/tokens';
-import { FIELD_HINT, FIELD_LABEL } from './plannerStyles';
 import { failureMessage, plannerStore } from './plannerStore';
 import { NotTodoistCsvError, planTodoistImport, runTodoistImport, type ImportNote, type ImportPlan } from './todoistCsv';
 
@@ -131,11 +131,11 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
   };
 
   return (
-    <Expand id={id} open={open} onClose={onClose} className="rounded-lg border border-slate-200 dark:border-slate-700">
+    <Expand id={id} open={open} onClose={onClose} className={cn(CARD_RADIUS, CONTROL_BORDER)}>
       <div className="space-y-3 p-3">
         <div className="space-y-1">
           <label htmlFor={inputId} className={FIELD_LABEL}>Importa da Todoist (CSV)</label>
-          <p className={FIELD_HINT}>
+          <p className={FIELD_HELP}>
             Il file resta nel browser: arrivano solo i compiti, come se li scrivessi tu. Assegnatario, promemoria, durata e autore non si importano.
           </p>
           <input
@@ -144,7 +144,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
             accept=".csv,text/csv"
             onChange={(event) => void chooseFile(event)}
             disabled={running}
-            className="block min-h-[44px] w-full max-w-full text-sm text-slate-700 file:mr-3 file:min-h-[44px] file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:border-slate-600 dark:file:bg-slate-900 dark:file:text-slate-200"
+            className="block min-h-[44px] w-full max-w-full text-sm text-slate-700 file:mr-3 file:min-h-[44px] file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:border-slate-600 dark:file:bg-slate-900 dark:file:text-slate-200"
           />
         </div>
         {fileError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{fileError}</p>}
@@ -166,7 +166,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
             <NoteList heading="Date non capite: restano nella descrizione" notes={plan.unreadDates} />
             <NoteList heading="Ripetizioni che diventano compiti non ricorrenti" notes={plan.nonRecurring} />
             {plan.trimmed > 0 && (
-              <p className={FIELD_HINT}>{plural(plan.trimmed, 'compito ha', 'compiti hanno')} un titolo o una descrizione troppo lunghi: vengono accorciati.</p>
+              <p className={FIELD_HELP}>{plural(plan.trimmed, 'compito ha', 'compiti hanno')} un titolo o una descrizione troppo lunghi: vengono accorciati.</p>
             )}
 
             {progress?.importedAt && !outcome && (
@@ -192,20 +192,20 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
 
             <div className="flex flex-wrap items-center gap-2">
               {left > 0 && (
-                <button type="button" onClick={() => void start()} disabled={running} className={INK_BUTTON}>
+                <Button type="button" onClick={() => void start()} disabled={running}>
                   {outcome?.kind === 'failed' ? `Riprova: ${plural(left, 'compito', 'compiti')} da importare` : `Importa ${plural(left, 'compito', 'compiti')}`}
-                </button>
+                </Button>
               )}
-              <button type="button" onClick={onClose} disabled={running} className={cn(QUIET_BUTTON, 'mx-0')}>
+              <Button type="button" variant="link" onClick={onClose} disabled={running}>
                 Chiudi
-              </button>
+              </Button>
             </div>
           </div>
         )}
         {!plan && (
-          <button type="button" onClick={onClose} className={cn(QUIET_BUTTON, 'mx-0')}>
+          <Button type="button" variant="link" onClick={onClose}>
             Chiudi
-          </button>
+          </Button>
         )}
       </div>
     </Expand>

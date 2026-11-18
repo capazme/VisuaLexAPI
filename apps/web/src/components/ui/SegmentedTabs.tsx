@@ -65,7 +65,7 @@ const segmentTone = (active: boolean) =>
   active ? 'text-slate-900 dark:text-ink-950' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white';
 
 /** The chosen segment's mark, measured again only when `choice` changes, not on every render of the page around it. */
-function SegmentedMark({ choice, small = false }: { choice: string; small?: boolean }) {
+function SegmentedMark({ choice, small = false, className }: { choice: string; small?: boolean; className?: string }) {
   const reduced = useReducedMotion() ?? false;
   return (
     <motion.span
@@ -73,7 +73,7 @@ function SegmentedMark({ choice, small = false }: { choice: string; small?: bool
       layoutDependency={choice}
       data-segmented-mark
       aria-hidden
-      className="absolute inset-0 bg-white dark:bg-toga-400"
+      className={cn('absolute inset-0 bg-white dark:bg-toga-400', className)}
       // The corners and the shadow in `style`, which Framer corrects as the mark stretches between tabs of different
       // widths; as classes they were squashed during the slide.
       style={small ? MARK_STYLE_SM : MARK_STYLE}
@@ -139,6 +139,8 @@ export interface SegmentedTabLink {
   label: ReactNode;
   /** Drawn on the link after its words, over the mark (a count). */
   extra?: ReactNode;
+  /** Drawn over the words in the bar at the foot (`footBar`), below `md` only. */
+  icon?: ReactNode;
   /** Chosen only on this exact address, not under it (`NavLink`'s `end`). */
   end?: boolean;
 }
@@ -153,31 +155,52 @@ export interface SegmentedTabLinksProps {
   className?: string;
   /** Each link's width and padding. */
   tabClassName?: string;
+  /** `SegmentedTabs`'s `sm`: 44 px on a phone, 36 from md, 4 px corners. */
+  size?: 'md' | 'sm';
+  /**
+   * Below `md` the row is a bar at the screen's foot (LC33, Opus's views): no track, the links share its width, each
+   * its icon over a short word, the mark a tint of ink, since the bar is the paper the light mark would vanish on. Where
+   * the bar is placed is the page's (its fixed box).
+   */
+  footBar?: boolean;
 }
+
+const FOOT_TRACK = 'max-md:bg-transparent max-md:p-0 max-md:dark:bg-transparent';
+const FOOT_SEGMENT = 'max-md:min-h-11 max-md:flex-1 max-md:py-1.5 max-md:text-xs';
+const FOOT_MARK = 'max-md:bg-ink-200 max-md:dark:bg-ink-700';
+// On the bar's dark tint the chosen words are light, not the ink drawn on the toga mark.
+const FOOT_TONE = 'max-md:dark:text-slate-50';
 
 /**
  * The same row as `SegmentedTabs` for views that each have their address (Opus's, Learn's): a `nav` of router links,
  * the current one carrying `aria-current="page"` and the sliding mark. Links, not tabs: each is in the Tab order and
  * the arrows are left to the page.
  */
-export function SegmentedTabLinks({ links, label, onNavigate, className, tabClassName }: SegmentedTabLinksProps) {
+export function SegmentedTabLinks({ links, label, onNavigate, className, tabClassName, size = 'md', footBar = false }: SegmentedTabLinksProps) {
   const group = useId();
   const { pathname } = useLocation();
+  const small = size === 'sm';
   return (
     <LayoutGroup id={group}>
-      <nav aria-label={label} className={cn(TRACK, className)}>
+      <nav aria-label={label} className={cn(TRACK, small && TRACK_SM, footBar && FOOT_TRACK, className)}>
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             end={link.end}
             onClick={onNavigate}
-            className={({ isActive }) => cn(SEGMENT, FOCUS_RING, segmentTone(isActive), tabClassName)}
+            className={({ isActive }) => cn(
+              SEGMENT, small && cn(SEGMENT_SM, CONTROL_RADIUS), FOCUS_RING, segmentTone(isActive),
+              footBar && cn(FOOT_SEGMENT, isActive && FOOT_TONE), tabClassName,
+            )}
           >
             {({ isActive }) => (
               <>
-                {isActive && <SegmentedMark choice={pathname} />}
-                <span className="relative flex items-center gap-2">{link.label}</span>
+                {isActive && <SegmentedMark choice={pathname} small={small} className={footBar ? FOOT_MARK : undefined} />}
+                <span className={cn('relative flex items-center gap-2', footBar && 'max-md:flex-col max-md:gap-0.5')}>
+                  {link.icon && <span aria-hidden className={cn('inline-flex', footBar && 'md:hidden')}>{link.icon}</span>}
+                  {link.label}
+                </span>
                 {link.extra}
               </>
             )}

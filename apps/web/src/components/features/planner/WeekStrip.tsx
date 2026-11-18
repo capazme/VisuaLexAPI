@@ -17,12 +17,13 @@ interface Props {
 /**
  * The days of «Prossimi giorni» (P2c, LC83): one low row from today, no day gone by — each day «mar 17» on one
  * line, its count of tasks under it where the dot was, today in ink, the chosen day underlined. It stays under the bar
- * at the top while the days scroll; from `md` under the page's header, 4 rem tall: its 52 px tabs and 12 px of padding (`OpusPage`).
+ * at the top while the days scroll; from `md` under the page's header, 3.09375 rem tall: the title's line (`PAGE_TITLE`, 1.875 rem at
+ * `leading-tight`), taller than the 36 px tabs (LC110), and 12 px of padding (`OpusPage`).
  */
 export function WeekStrip({ today, days, selected, counts, onSelect }: Props) {
   return (
     // `data-week-strip`: the view scrolls a day's block to just under it (`UpcomingView`).
-    <div data-week-strip className={cn('sticky top-[var(--phone-bar-offset,0px)] md:top-[calc(var(--phone-bar-offset,0px)+4rem)] -mx-1 bg-slate-50 px-1 transition-[top] duration-200 ease-out motion-reduce:transition-none dark:bg-slate-950', Z_INDEX.sticky)}>
+    <div data-week-strip className={cn('sticky top-[var(--phone-bar-offset,0px)] md:top-[calc(var(--phone-bar-offset,0px)+3.09375rem)] -mx-1 bg-slate-50 px-1 transition-[top] duration-(--dur-pop) ease-out motion-reduce:transition-none dark:bg-slate-950', Z_INDEX.sticky)}>
       <ol aria-label={`Giorni da ${longDay(days[0], today)} a ${longDay(days[days.length - 1], today)}`} className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800">
         {days.map((day) => {
           const { weekday, date } = stripDay(day);
@@ -31,6 +32,7 @@ export function WeekStrip({ today, days, selected, counts, onSelect }: Props) {
           const count = counts.get(day) ?? 0;
           return (
             <li key={day} className="min-w-0">
+              {/* bare-button: a day of the strip, its weekday over its count and the line under the chosen one. */}
               <button
                 type="button"
                 aria-pressed={chosen}
@@ -38,7 +40,7 @@ export function WeekStrip({ today, days, selected, counts, onSelect }: Props) {
                 aria-label={`${longDay(day, today)}${isToday ? ', oggi' : ''}${count > 0 ? `, ${count === 1 ? '1 compito' : `${count} compiti`}` : ''}`}
                 onClick={() => onSelect(day)}
                 className={cn(
-                  'relative flex min-h-[44px] w-full flex-col items-center justify-center rounded-t-lg px-0.5 text-xs leading-tight text-slate-700 hover:bg-slate-100 sm:text-sm dark:text-slate-300 dark:hover:bg-slate-800',
+                  'relative flex min-h-[44px] w-full flex-col items-center justify-center rounded-t-md px-0.5 text-xs leading-tight text-slate-700 hover:bg-slate-100 sm:text-sm dark:text-slate-300 dark:hover:bg-slate-800',
                   isToday && 'font-semibold text-slate-900 dark:text-slate-50',
                   FOCUS_RING,
                 )}

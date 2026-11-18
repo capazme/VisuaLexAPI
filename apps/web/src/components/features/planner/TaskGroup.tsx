@@ -4,7 +4,7 @@ import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { plannerStore } from './plannerStore';
-import { ICON_BUTTON } from './plannerStyles';
+import { MENU_TRIGGER } from './plannerStyles';
 
 export const GROUP_HEADING = 'font-serif text-lg font-medium text-slate-900 dark:text-slate-50';
 const COUNT = 'ml-2 font-sans text-sm font-normal text-slate-600 dark:text-slate-400';
@@ -33,6 +33,7 @@ export function TaskGroup({ anchorId, foldKey, heading, count, actions = [], chi
     <section id={anchorId} aria-labelledby={`${id}-heading`} className="min-w-0">
       <div className="flex items-center gap-1 border-b border-slate-300 dark:border-slate-700">
         <h3 id={`${id}-heading`} className={cn(GROUP_HEADING, 'min-w-0 flex-1')}>
+          {/* bare-button: the group's heading itself, its words in the heading's type (the accordion pattern). */}
           <button
             type="button"
             aria-expanded={!folded}
@@ -52,7 +53,7 @@ export function TaskGroup({ anchorId, foldKey, heading, count, actions = [], chi
           </button>
         </h3>
         {actions.length > 0 && (
-          <MenuButton label={`Azioni del gruppo: ${heading}`} triggerClassName={ICON_BUTTON} items={actions}>
+          <MenuButton label={`Azioni del gruppo: ${heading}`} triggerClassName={MENU_TRIGGER} items={actions}>
             <MoreHorizontal size={18} aria-hidden />
           </MenuButton>
         )}

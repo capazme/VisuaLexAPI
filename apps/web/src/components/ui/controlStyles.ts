@@ -40,6 +40,8 @@ export const FIELD_CONTROL = [
   'transition-colors duration-150 ease-out',
   FOCUS_RING,
   'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-ink-100 dark:disabled:bg-ink-800',
+  // In the dark theme the browser's own parts (a date's calendar, a time's clock, a select's list) are drawn dark.
+  'dark:[color-scheme:dark]',
 ].join(' ');
 
 /** A field with an error: the red stays (a functional colour). */

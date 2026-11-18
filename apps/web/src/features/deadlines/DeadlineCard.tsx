@@ -4,7 +4,8 @@ import { taskService } from '../../services/taskService';
 import { cn } from '../../lib/utils';
 import { BLOCK_HEADING, FOCUS_RING, TILE } from '../../components/features/studia/progress/tokens';
 import { buttonClassName } from '../../components/ui/buttonStyles';
-import { FIELD, FIELD_LABEL } from '../../components/features/planner/plannerStyles';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { failureMessage, plannerStore } from '../../components/features/planner/plannerStore';
 import { computeDeadline, DEADLINE_OPTIONS, formatLong, formatPlain, type DeadlineKind } from './computeDeadline';
 
@@ -53,18 +54,12 @@ export function DeadlineCard({ dossierId }: { dossierId: string }) {
     <section aria-labelledby={`${id}-heading`} className={cn(TILE, 'mb-6 min-w-0 space-y-4 p-3 md:p-4')}>
       <h3 id={`${id}-heading`} className={BLOCK_HEADING}>Termini</h3>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <label htmlFor={`${id}-kind`} className={FIELD_LABEL}>Impugnazione</label>
-          <select id={`${id}-kind`} value={kind} onChange={(e) => setKind(e.target.value as DeadlineKind)} className={FIELD}>
-            {DEADLINE_OPTIONS.map((o) => (
-              <option key={o.kind} value={o.kind}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-1.5">
-          <label htmlFor={`${id}-start`} className={FIELD_LABEL}>{option.dateLabel}</label>
-          <input id={`${id}-start`} type="date" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} />
-        </div>
+        <Select label="Impugnazione" value={kind} onChange={(e) => setKind(e.target.value as DeadlineKind)}>
+          {DEADLINE_OPTIONS.map((o) => (
+            <option key={o.kind} value={o.kind}>{o.label}</option>
+          ))}
+        </Select>
+        <Input label={option.dateLabel} type="date" value={start} onChange={(e) => setStart(e.target.value)} />
       </div>
       <label className={cn('flex min-h-[44px] cursor-pointer items-start gap-3 rounded-lg py-2 text-sm text-slate-800 dark:text-slate-200', FOCUS_RING, 'focus-within:ring-2')}>
         <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-primary-900" />

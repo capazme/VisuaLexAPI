@@ -10,7 +10,7 @@ import { tagLabel } from '../../../utils/tagLabel';
 import { LinkedText } from './LinkedText';
 import { TaskCheckbox } from './TaskCheckbox';
 import { countdown, dayTone, PRIORITY_LABEL, RECURRENCE_LABEL, rowDay, shortDay } from './taskDates';
-import { DAY_TONE, DEADLINE_TONE, ICON_BUTTON, META, PRIORITY_TEXT } from './plannerStyles';
+import { DAY_TONE, DEADLINE_TONE, MENU_TRIGGER, META, PRIORITY_TEXT } from './plannerStyles';
 
 export interface TaskRowActions {
   onTick: (task: Task) => void;
@@ -90,6 +90,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
             title at the left and the signs at the right before «⋯», 44–48 px tall (LC83). */}
         <div className={cn('min-w-0 flex-1 @2xl:flex @2xl:items-center @2xl:gap-4 @2xl:pb-0', hasSigns ? 'pb-2' : 'pb-0.5')}>
           <div className="min-w-0 @2xl:flex-1">
+          {/* bare-button: the task's title, which opens it: words on the row, not a button's look. */}
           <button
             type="button"
             data-task-title
@@ -138,6 +139,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
                 </span>
               )}
               {subtasks && subtasks.count > 0 && (
+                // bare-button: a sign of the row's line, drawn as the others (`META`), that opens the subtasks.
                 <button
                   type="button"
                   aria-expanded={subtasks.open}
@@ -189,7 +191,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
 
         <MenuButton
           label={`Azioni: ${task.title}`}
-          triggerClassName={ICON_BUTTON}
+          triggerClassName={MENU_TRIGGER}
           items={[
             { label: 'Modifica', icon: Pencil, onSelect: () => onOpen(task) },
             // One level: a subtask takes none, whether it is drawn under its parent or as a row of its own.
