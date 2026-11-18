@@ -894,9 +894,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   409, a correction never) and `POST /:id/esami` are a connected application's only (the session gets 403;
   `lingo:courses:write`, counters `corso` 3 and `modulo` 40 a day); `GET /` (session and `lingo:courses:read`)
   lists the caller's courses; `GET /:id/struttura` (token only) gives the assistant the content with its keys
-  except an exam's not yet handed in, the flags and the judgements; `PATCH /:id { titolo?, moduliPrevisti? }`,
-  `DELETE /:id`, `DELETE /:id/moduli/:moduloId` (a module never opened; 409 once a state row exists) and `GET
-  /:id/export` are the session's. Every read and write is scoped to the author: anything else is 404. The lesson
+  except an exam's not yet handed in, the flags and the judgements; `PATCH /:id { titolo?, moduliPrevisti?,
+  obiettivo?, dataEsame? }`, `DELETE /:id`, `DELETE /:id/moduli/:moduloId` (a module never opened; 409 once a state row exists) and `GET
+  /:id/export` are the session's. **The learner's goal and exam date** (G-488; migration
+  `20261117120000_lingo_course_goal`) sit on the enrolment, not the course: `obiettivo { tipo, nota }` (a kind of
+  `LingoCorsoObiettivo`, `ESAME_AVVOCATO`, `ESAME_MATERIA`, `AGGIORNAMENTO_NORMATIVO`, `ALTRO`, and a sentence of
+  1–200 characters, only with a kind: a CHECK; `''` is no sentence) and `dataEsame` (a Rome day, from today to
+  five years on when set, kept once it passes); null clears either, a goal replaces kind and sentence together.
+  `goalView` puts both on `GET /`, `GET /:id`, `/oggi` (in `corso`) and the PATCH's answer; the exports carry the
+  columns. Every read and write is scoped to the author: anything else is 404. The lesson
   is a closed Markdown subset (`lingo/courseFormat.ts`): HTML, links but `[testo](#cN)`, images, code, other
   heading levels, nested lists and every control character but `\n` are refused, never stripped; each `#cN`
   names an entry of the enrolment's dossier, a norm or a decision, stored as a copy of its identity
