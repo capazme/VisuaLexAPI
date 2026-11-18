@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation, useOutlet } from 'react-router-dom';
 import { scrollParentOf } from '../practice/practiceView';
 import { CalendarDays, CalendarCheck, Inbox, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
+import { ViewSlide } from '../../layout/ViewSlide';
 import { QUIET_BUTTON } from '../studia/progress/tokens';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { plannerStore } from './plannerStore';
@@ -17,6 +18,9 @@ const VIEWS = [
   { to: '/work/prossimi', label: 'Prossimi giorni', short: 'Prossimi', icon: CalendarDays },
   { to: '/work/ingresso', label: "Lista d'ingresso", short: 'Ingresso', icon: Inbox },
 ];
+
+/** The views in the tabs' order, the trash after them (its way back is the tabs): the order of their slide (LC98). */
+const VIEW_ORDER = [...VIEWS.map((view) => view.to.split('/')[2]), 'cestino'];
 
 /** Below `lg` a framed square with the icon, the words for a screen reader (LC38): at 768 px the title, the tabs and
  *  both options in words do not fit one row (LC83). From `lg` the words in full. */
@@ -33,6 +37,7 @@ const HEADER_ICON = 'inline-flex items-center max-lg:size-9 max-lg:justify-cente
  */
 export function OpusPage() {
   const { pathname } = useLocation();
+  const outlet = useOutlet();
   // The trash's link belongs to the three views; the tabs to them and to the trash, as its way back (#448). Neither on
   // the tools that are coming.
   const inView = VIEWS.some((view) => pathname.startsWith(view.to));
@@ -133,10 +138,12 @@ export function OpusPage() {
       </>)}
     >
       {/* At least a screen tall: a view that mounts empty while it loads never shortens the page under the reader. It
-          comes in with a short fade (none under reduced motion). */}
-      <div key={pathname} className={cn('min-h-[calc(100dvh-8rem)] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150', (inView || inTrash) && 'max-md:pb-24')}>
-        <Outlet />
-      </div>
+          slides in from the side of its tab (LC98). */}
+      <ViewSlide view={pathname.split('/')[2] ?? ''} order={VIEW_ORDER}>
+        <div className={cn('min-h-[calc(100dvh-8rem)]', (inView || inTrash) && 'max-md:pb-24')}>
+          {outlet}
+        </div>
+      </ViewSlide>
     </PageFrame>
   );
 }
