@@ -56,7 +56,7 @@ describe('the declaration MATERIALE_STUDIO', () => {
     const refused = await request(app).post(CORSI).set(bobToken).send(courseBody(dossier.id));
     expect(refused.status).toBe(409);
     expect(refused.body.richiedeTesto).toMatchObject({ id: read.body.id, accettata: false });
-    expect(refused.body.link).toBe('/studia/percorsi');
+    expect(refused.body.link).toBe('/learn/percorsi');
     expect(await prisma.lingoCorso.count()).toBe(0);
 
     const stale = await request(app).post('/api/lingo/testi/MATERIALE_STUDIO/accetta').set(authHeader(bob)).send({ testoId: 'not-the-current-one' });
