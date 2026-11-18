@@ -2183,7 +2183,7 @@ async def check_entity_duplicate(
     """
     log.info(
         "API: check_entity_duplicate",
-        entity_text=request.entity_text,
+        entity_chars=len(request.entity_text),
         entity_type=request.entity_type,
         scope=request.scope,
     )
@@ -2406,7 +2406,7 @@ async def propose_entity(
             if has_exact_match:
                 log.info(
                     "Exact duplicate found, action required",
-                    exact_match=dedup_result.exact_match.entity_text if dedup_result.exact_match else None,
+                    exact_match_chars=len(dedup_result.exact_match.entity_text) if dedup_result.exact_match else None,
                 )
 
                 return EntityProposalResponse(

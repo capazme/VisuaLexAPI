@@ -154,7 +154,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
 
         log.info(
             "LiteralExpert analyzing",
-            query=context.query_text[:50],
+            query_chars=len(context.query_text),
             trace_id=context.trace_id,
             use_react=self.use_react,
             has_policy_manager=self.policy_manager is not None

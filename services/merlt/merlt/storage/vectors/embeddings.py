@@ -181,7 +181,7 @@ class EmbeddingService:
         # E5 models require "query: " prefix
         prefixed_text = f"query: {text}"
 
-        log.debug(f"Encoding query: {text[:100]}...")
+        log.debug(f"Encoding query ({len(text)} chars)")
 
         embedding = model.encode(
             prefixed_text,
@@ -208,7 +208,7 @@ class EmbeddingService:
         # E5 models require "passage: " prefix
         prefixed_text = f"passage: {text}"
 
-        log.debug(f"Encoding document: {text[:100]}...")
+        log.debug(f"Encoding document ({len(text)} chars)")
 
         embedding = model.encode(
             prefixed_text,

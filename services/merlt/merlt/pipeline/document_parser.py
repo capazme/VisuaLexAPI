@@ -706,7 +706,7 @@ class DocumentParserService:
                     )
                     resolved = strong[0].entity_id
             except Exception as exc:  # resolution is best-effort
-                log.warning("relation endpoint dedup failed", endpoint=raw, exc=str(exc))
+                log.warning("relation endpoint dedup failed", endpoint_chars=len(str(raw)), exc=str(exc))
 
         if resolved is not None and len(resolved) > ENDPOINT_MAX_LEN:
             resolved = None
