@@ -285,6 +285,13 @@ export function parseDatePhrase(phrase: string, today: string): DatePhrase | nul
   return readWords(tokens(phrase).map((t) => t.word), today);
 }
 
+/** Whether a phrase is a repetition by its first word («ogni …», «every …», «tutti i …»), read or not: the CSV import
+ *  tells a repetition outside the five rules from a date it did not understand. */
+export function isRepetitionPhrase(phrase: string): boolean {
+  const first = tokens(phrase)[0]?.word;
+  return first !== undefined && (EVERY.has(first) || first === 'tutti' || first === 'tutte');
+}
+
 const LONGEST = 8;
 
 /**

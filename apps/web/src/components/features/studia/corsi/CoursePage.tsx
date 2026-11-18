@@ -52,6 +52,7 @@ function Course({ id }: { id: string }) {
 
   const [renaming, setRenaming] = useState(false);
   const [confirming, setConfirming] = useState<Confirming>(null);
+  const [confirmFrom, setConfirmFrom] = useState<HTMLElement | null>(null);
   // The modules with a write out: each one's buttons wait for its own.
   const [busyModules, setBusyModules] = useState<ReadonlySet<string>>(new Set());
   const markBusy = (moduloId: string, busy: boolean) =>
@@ -210,10 +211,13 @@ function Course({ id }: { id: string }) {
             deleted={deleted}
             missing={missing}
             busy={busy}
-            onEnd={() => setConfirming({ kind: 'end-programme', contati, opensExam: closingOpensExam(missing) })}
+            onEnd={(event) => {
+              setConfirmFrom(event.currentTarget);
+              setConfirming({ kind: 'end-programme', contati, opensExam: closingOpensExam(missing) });
+            }}
           />
         ) : undefined}
-        actions={{ onDelete: trashModule, onWithdraw: (modulo) => setConfirming({ kind: 'withdraw', modulo }), busy: busyModules }}
+        actions={{ onDelete: trashModule, onWithdraw: (modulo, origin) => { setConfirmFrom(origin); setConfirming({ kind: 'withdraw', modulo }); }, busy: busyModules }}
       />
       <ExamSection corsoId={data.id} titolo={data.titolo} esame={data.esame} inPreparazione={data.inPreparazione !== null} />
 
@@ -247,6 +251,7 @@ function Course({ id }: { id: string }) {
       )}
       <ConfirmDialog
         open={confirming?.kind === 'end-programme'}
+        origin={confirmFrom}
         title={confirming?.kind === 'end-programme' ? `Il programma finisce con ${confirming.contati} ${confirming.contati === 1 ? 'modulo' : 'moduli'}?` : ''}
         message={`${confirming?.kind === 'end-programme' && confirming.opensExam ? 'L’esame finale potrà aprirsi con i moduli che ci sono. ' : ''}Il tuo assistente non potrà aggiungere altri moduli, solo correggere quelli che ci sono.`}
         confirmLabel="Il programma finisce qui"
@@ -256,6 +261,7 @@ function Course({ id }: { id: string }) {
       />
       <ConfirmDialog
         open={confirming?.kind === 'withdraw'}
+        origin={confirmFrom}
         title={confirming?.kind === 'withdraw' ? `Ritirare il modulo ${confirming.modulo.ordine}?` : ''}
         message="Le sue risposte non conteranno più per le competenze: conta la correzione che lo sostituisce."
         confirmLabel="Ritira il modulo"

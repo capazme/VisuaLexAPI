@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Task } from '../../../types/tasks';
-import { completeWithUndo, trashWithUndo, type Optimistic } from './taskActions';
+import { completeForeverWithUndo, completeWithUndo, trashWithUndo, type Optimistic } from './taskActions';
 import { nestTasks } from './taskTree';
 import { TaskRow } from './TaskRow';
 import { useTaskSheet } from './TaskSheetScope';
@@ -42,6 +42,10 @@ export function TaskList({ tasks, today, optimistic, showDossier = true, label, 
     onTrash: (task: Task) => {
       focusAwayFrom(task.id);
       void trashWithUndo(task, optimistic);
+    },
+    onCompleteForever: (task: Task) => {
+      focusAwayFrom(task.id);
+      void completeForeverWithUndo(task, optimistic);
     },
     onOpen: (task: Task, focus?: 'subtask') => sheet.open(task, focus),
   };

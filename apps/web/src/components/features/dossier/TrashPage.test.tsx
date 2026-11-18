@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TrashPage } from './TrashPage';
 import type { TrashEntry } from '../../../services/trashService';
 
@@ -31,5 +32,67 @@ describe('TrashPage', () => {
   it('says when the trash is out of reach', () => {
     render(<TrashPage trash={trash(null, 'Il cestino non è raggiungibile in questo momento.')} onBack={() => {}} showToast={() => {}} />);
     expect(screen.getByRole('alert')).toHaveTextContent('non è raggiungibile');
+  });
+});
+
+describe('TrashPage, «Elimina definitivamente» (LC85, Papiniano on #585)', () => {
+  const second: TrashEntry = { ...entry, id: 't4', label: 'Altra pratica' };
+  type Run = { el: Element; keyframes: Keyframe[] };
+  let runs: Run[] = [];
+  afterEach(() => {
+    Reflect.deleteProperty(Element.prototype, 'animate');
+    vi.restoreAllMocks();
+  });
+  function Page() {
+    const [entries, setEntries] = useState<TrashEntry[]>([entry, second]);
+    const purge = vi.fn(async (e: TrashEntry) => {
+      setEntries((now) => now.filter((x) => x.id !== e.id));
+      return true;
+    });
+    return <TrashPage trash={{ entries, error: null, reload: vi.fn(), restore: vi.fn(), purge }} onBack={() => {}} showToast={() => {}} />;
+  }
+  function setup() {
+    runs = [];
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: function (this: Element, keyframes: Keyframe[]) {
+        runs.push({ el: this, keyframes });
+        return { cancel: () => {}, onfinish: null, effect: { target: this } };
+      },
+      configurable: true,
+      writable: true,
+    });
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    const own = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      // The row's 27 × 27 icon at the right (Papiniano's numbers), the card 384 × 200 in the middle.
+      if (this.getAttribute('aria-label') === 'Elimina definitivamente Pratica «Vecchia pratica»') return rect(1316, 246, 27, 27);
+      if (this.getAttribute('role') === 'alertdialog') return rect(528, 350, 384, 200);
+      return own.call(this);
+    });
+    render(<Page />);
+    return screen.getByRole('button', { name: 'Elimina definitivamente Pratica «Vecchia pratica»' });
+  }
+
+  it('grows out of the button even when its click focused nothing (a screen reader, Safari), and gives it the focus back on «Annulla»', async () => {
+    const button = setup();
+    // `fireEvent.click` focuses nothing: the case Papiniano saw, the dialog centred and fading.
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('alertdialog', { name: 'Eliminare definitivamente?' });
+    const shape = dialog.querySelector('[data-island-shape]')!;
+    expect(runs.find((run) => run.el === shape)?.keyframes[0]).toMatchObject({ top: '-104px', left: '788px', right: '-431px', bottom: '277px' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(button).toHaveFocus());
+  });
+
+  it('confirmed, the focus waits on the row, then goes to the next one once the row has left: never the body', async () => {
+    const button = setup();
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('alertdialog');
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina definitivamente' }));
+    });
+    await waitFor(() => expect(screen.queryByText('Pratica «Vecchia pratica»')).toBeNull());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ripristina Pratica «Altra pratica»' })).toHaveFocus());
   });
 });

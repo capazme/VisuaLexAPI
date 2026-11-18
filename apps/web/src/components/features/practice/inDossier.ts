@@ -1,4 +1,4 @@
-import { FolderMinus, FolderPlus, Star, X } from 'lucide-react';
+import { FolderInput, FolderMinus, FolderPlus, Star, StickyNote, X } from 'lucide-react';
 import { useContext, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
@@ -45,13 +45,23 @@ export interface RowDossier {
   remove: () => void;
   /** «Segna come importante» / «Rimuovi da importanti», on the entry read. */
   toggleImportant: () => void;
+  /** The dossier's notes about the entry read (LC86: the closed row's sign). */
+  notes: number;
+  /** A note about the entry read, through the dossier's notes route; false when it was not saved. Articles only: the
+   *  server takes a note about an article of the dossier, never about a decision. */
+  addNote?: (text: string) => Promise<boolean>;
+  /** «Sposta in un'altra pratica»: the entry read, and its copies, into `targetId`. */
+  moveTo: (targetId: string) => void;
 }
 
-function useRowDossier(find: (d: Dossier | undefined) => string[], add: ((dossierId: string) => void) | undefined, removed: string, added: string): RowDossier | undefined {
+function useRowDossier(find: (d: Dossier | undefined) => string[], add: ((dossierId: string) => void) | undefined, removed: string, added: string, notesAbout = false): RowDossier | undefined {
   const host = useHostDossier();
   const ids = useAppStore(useShallow((s) => (host ? find(s.dossiers.find((d) => d.id === host.id)) : [])));
   const important = useAppStore((s) => ids.length > 0 && host !== undefined
     && s.dossiers.find((d) => d.id === host.id)?.items.find((i) => i.id === ids[0])?.status === 'important');
+  const notes = useAppStore((s) => (ids.length > 0 && host !== undefined
+    ? s.dossiers.find((d) => d.id === host.id)?.items.filter((i) => i.type === 'note' && i.aboutItemId === ids[0]).length ?? 0
+    : 0));
   if (!host) return undefined;
   return {
     inDossier: ids.length > 0,
@@ -60,6 +70,19 @@ function useRowDossier(find: (d: Dossier | undefined) => string[], add: ((dossie
     ...(add ? { add: () => { add(host.id); host.showToast?.(added, 'success'); } } : {}),
     remove: () => removeItemsWithUndo(host.id, ids, removed, host.onTrashChanged),
     toggleImportant: () => appStore.getState().updateDossierItemStatus(host.id, ids[0], important ? 'unread' : 'important'),
+    notes,
+    ...(notesAbout ? {
+      addNote: async (text: string) => {
+        const saved = await appStore.getState().addNoteToDossier(host.id, text, ids[0]);
+        if (saved) host.showToast?.('Nota aggiunta', 'success');
+        return saved;
+      },
+    } : {}),
+    moveTo: (targetId) => {
+      const target = appStore.getState().dossiers.find((d) => d.id === targetId);
+      appStore.getState().moveToDossier(host.id, targetId, ids);
+      host.showToast?.(`Spostato in «${target?.title ?? 'un\'altra pratica'}»`, 'success');
+    },
   };
 }
 
@@ -70,6 +93,7 @@ export function useArticleInDossier(norma: NormaVisitata): RowDossier | undefine
     (dossierId) => appStore.getState().addToDossier(dossierId, norma, 'norma'),
     'Articolo tolto dalla pratica',
     'Aggiunto alla pratica',
+    true,
   );
 }
 
@@ -121,7 +145,7 @@ export function useTableCitedNorms(besideId: string): CitedNorms | undefined {
       act_type: citation.act_type, act_number: citation.act_number || '', date: citation.date || '', article: citation.article,
       version: 'vigente', besideId,
     }),
-    elsewhere: 'Apri nella Lettura',
+    elsewhere: 'Apri in Fonti',
   } : undefined), [host, items, besideId]);
 }
 
@@ -137,10 +161,13 @@ export function useActItemIds(act: PracticeAct): { dossier: ReturnType<typeof us
 
 /** A row's «⋯» in a dossier's «Lettura», every command with its name: a row of the dossier takes the star or leaves it
  *  (never just the table, or the re-sync would bring it back); a row on the table only can join it or leave the table. */
-export function rowDossierItems(row: RowDossier, removeFromTable: () => void): MenuItem[] {
+export function rowDossierItems(row: RowDossier, removeFromTable: () => void, panels?: { note?: () => void; move: () => void }): MenuItem[] {
   if (row.inDossier) {
     return [
       { label: row.important ? 'Rimuovi da importanti' : 'Segna come importante', icon: Star, onSelect: row.toggleImportant },
+      // LC86: under the row, in the page (L-73), never a dialog over it.
+      ...(panels?.note ? [{ label: 'Aggiungi una nota', icon: StickyNote, onSelect: panels.note }] : []),
+      ...(panels ? [{ label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: panels.move }] : []),
       { label: 'Togli dalla pratica', icon: FolderMinus, danger: true, separatorBefore: true, onSelect: row.remove },
     ];
   }

@@ -47,7 +47,7 @@ import { fetchNormLinks } from './documentLinkServer';
 import { writeDocxLinksFile } from './docx/docxWriterClient';
 import { DocxError } from './docx/docxErrors';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
-import { notify } from '../../ui/notifications/notifications';
+import { notify, UNDO_MS } from '../../ui/notifications/notifications';
 import { FOCUS_RING as RING } from '../../../constants/interactions';
 
 interface LoadedDocument {
@@ -69,8 +69,6 @@ const askActNames = (signal?: AbortSignal) => fetchActNames(signal).catch((error
   return null;
 });
 
-/** «Atto applicato a 4 citazioni» stays this long with «Annulla» (#376 §5.4). */
-const APPLY_UNDO_MS = 8000;
 /** «The list's first row», for the focus after a row leaves the list. */
 const FIRST_ROW = -1;
 /** The title of a text pasted in the box (#391 §5.1). */
@@ -497,7 +495,8 @@ export function DocumentReviewPage() {
       // On another document by now: its rows are not these, nothing to put back.
       undo: () => { if (readingRef.current === reading) setChoices((current) => restore(current, before)); },
       message: keys.length === 1 ? 'Atto applicato a 1 citazione' : `Atto applicato a ${keys.length} citazioni`,
-      duration: APPLY_UNDO_MS,
+      // «Atto applicato a 4 citazioni» with «Annulla»: the least any «Annulla» stays (#376 §5.4, LC85).
+      duration: UNDO_MS,
     });
   };
 

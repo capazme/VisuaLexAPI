@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CalendarDays, ChevronRight, Folder, Hourglass, ListTree, MoreHorizontal, Pencil, Plus, Repeat, Tag, Trash2 } from 'lucide-react';
+import { CalendarDays, CheckCheck, ChevronRight, Folder, Hourglass, ListTree, MoreHorizontal, Pencil, Plus, Repeat, Tag, Trash2 } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -15,6 +15,8 @@ export interface TaskRowActions {
   onTick: (task: Task) => void;
   onOpen: (task: Task, focus?: 'subtask') => void;
   onTrash: (task: Task) => void;
+  /** «Completa per sempre»: offered on a repeating task only. */
+  onCompleteForever: (task: Task) => void;
 }
 
 interface Props extends TaskRowActions {
@@ -39,7 +41,7 @@ const time = (value: string | null) => (value ? ` · ${value}` : '');
  * words, the labels — with the dossier at its right end, in grey; and «⋯». The list moves between rows with the arrows
  * (`TaskList`).
  */
-export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, onOpen, onTrash, children }: Props) {
+export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, onOpen, onTrash, onCompleteForever, children }: Props) {
   const dossierTitle = useAppStore((s) => (task.dossierId ? s.dossiers.find((d) => d.id === task.dossierId)?.title : undefined));
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
   const plannedShown = task.plannedDate !== null && !(task.plannedDate === dayShown && !task.plannedTime);
@@ -162,6 +164,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
             { label: 'Modifica', icon: Pencil, onSelect: () => onOpen(task) },
             // One level: a subtask takes none, whether it is drawn under its parent or as a row of its own.
             ...(task.parentId ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => onOpen(task, 'subtask') }]),
+            ...(task.recurrence ? [{ label: 'Completa per sempre', icon: CheckCheck, onSelect: () => onCompleteForever(task) }] : []),
             { label: 'Sposta nel cestino', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => onTrash(task) },
           ]}
         >

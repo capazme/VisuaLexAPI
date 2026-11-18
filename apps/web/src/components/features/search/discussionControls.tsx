@@ -61,6 +61,8 @@ export function ReplyForm({ onSend, placeholder = 'Scrivi una risposta…', send
 export function ReportButton({ onReport, label, inline = false }: { onReport: () => void; label?: string; inline?: boolean }) {
   const [asking, setAsking] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  // «Segnala»: the question grows from it (LC85).
+  const [askFrom, setAskFrom] = useState<HTMLElement | null>(null);
   // Answered in the margin, the focus goes back to «Segnala», not to the page.
   const answer = (report: boolean) => {
     setAsking(false);
@@ -70,7 +72,7 @@ export function ReportButton({ onReport, label, inline = false }: { onReport: ()
   const question = 'La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto.';
   return (
     <>
-      <button ref={trigger} type="button" onClick={() => setAsking(true)} aria-label={label} aria-expanded={inline ? asking : undefined} className={cn('inline-flex items-center gap-1 px-2 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 md:px-0', TOUCH)}>
+      <button ref={trigger} type="button" onClick={(event) => { setAskFrom(event.currentTarget); setAsking(true); }} aria-label={label} aria-expanded={inline ? asking : undefined} className={cn('inline-flex items-center gap-1 px-2 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 md:px-0', TOUCH)}>
         <AlertTriangle size={12} aria-hidden /> Segnala
       </button>
       {/* `inline` (the article's margin, L-73): the question under the row, in the page, not a dialog over it. The
@@ -87,6 +89,7 @@ export function ReportButton({ onReport, label, inline = false }: { onReport: ()
       )}
       <ConfirmDialog
         open={asking && !inline}
+        origin={askFrom}
         variant="danger"
         title="Segnalare ai moderatori?"
         message={question}

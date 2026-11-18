@@ -340,9 +340,17 @@ export interface CompleteResult {
  * with the open tasks under it, all at the same instant (so that reopening it reopens them).
  * `seenPlannedDate` is the occurrence the user ticked, required for a repeating task (400 without):
  * one that has already moved on (a second click, another tab) answers 409 instead of moving twice.
- * Ticking a closed task changes nothing.
+ * Ticking a closed task changes nothing. `forever` («Completa per sempre») ends a repeating task's series instead:
+ * the rule goes, the task closes as any other, no next occurrence. Its origin and kept day stay stored, so a reopen
+ * that puts the rule back («Annulla») finds the series as it was.
  */
-export async function completeTask(userId: string, id: string, seenPlannedDate?: string, now: Date = new Date()): Promise<CompleteResult> {
+export async function completeTask(
+  userId: string,
+  id: string,
+  seenPlannedDate?: string,
+  now: Date = new Date(),
+  forever = false,
+): Promise<CompleteResult> {
   return prisma.$transaction(async (tx) => {
     await lockTask(tx, userId, id);
     const task = await liveTask(tx, userId, id);
@@ -356,23 +364,48 @@ export async function completeTask(userId: string, id: string, seenPlannedDate?:
       if (seenPlannedDate !== plannedDay) {
         throw new AppError(409, 'Il compito è già passato alla data successiva.');
       }
+      if (forever) {
+        await tx.task.update({ where: { id }, data: { recurrence: null } });
+        return closeSubtree(tx, userId, id, now);
+      }
       const next = nextOccurrence(task.recurrence as RecurrenceRule, task.recurrenceFrom, plannedDay, romeDay(now), task.recurrenceDay ?? undefined);
       const updated = await tx.task.update({ where: { id }, data: { plannedDate: dayToDate(next) } });
       return { task: updated, recurred: { previousPlannedDate: plannedDay, plannedDate: next } };
     }
 
-    const ids = await subtreeIds(tx, userId, id);
-    await tx.task.updateMany({ where: { id: { in: ids }, userId, completedAt: null, deletedAt: null }, data: { completedAt: now } });
-    return { task: await tx.task.findUniqueOrThrow({ where: { id } }), recurred: null };
+    return closeSubtree(tx, userId, id, now);
   });
 }
 
-/** Reopens a closed task, and the tasks under it that were closed with it. An open task stays as it is. */
-export async function reopenTask(userId: string, id: string): Promise<Task> {
+/** Closes a task with the open tasks under it, all at the same instant (so that reopening it reopens them). */
+async function closeSubtree(tx: Prisma.TransactionClient, userId: string, id: string, now: Date): Promise<CompleteResult> {
+  const ids = await subtreeIds(tx, userId, id);
+  await tx.task.updateMany({ where: { id: { in: ids }, userId, completedAt: null, deletedAt: null }, data: { completedAt: now } });
+  return { task: await tx.task.findUniqueOrThrow({ where: { id } }), recurred: null };
+}
+
+/**
+ * Reopens a closed task, and the tasks under it that were closed with it. An open task stays as it is. `recurrence`
+ * puts back the rule a «Completa per sempre» took away, in the same write: the series goes on from its kept day.
+ */
+export async function reopenTask(userId: string, id: string, recurrence?: RecurrenceRule): Promise<Task> {
   return prisma.$transaction(async (tx) => {
     await lockTask(tx, userId, id);
     const task = await liveTask(tx, userId, id);
     if (!task.completedAt) return task;
+    if (recurrence) {
+      checkShape({
+        dossierId: task.dossierId,
+        dossierItemId: task.dossierItemId,
+        plannedDate: dayOrNull(task.plannedDate),
+        plannedTime: timeOrNull(task.plannedTime),
+        dueDate: dayOrNull(task.dueDate),
+        dueTime: timeOrNull(task.dueTime),
+        recurrence,
+      });
+      const plannedDay = dayOrNull(task.plannedDate)!;
+      await tx.task.update({ where: { id }, data: { recurrence, recurrenceDay: task.recurrenceDay ?? dayOfMonth(plannedDay) } });
+    }
     const ids = await subtreeIds(tx, userId, id);
     await tx.task.updateMany({ where: { id: { in: ids }, userId, completedAt: task.completedAt, deletedAt: null }, data: { completedAt: null } });
     return tx.task.findUniqueOrThrow({ where: { id } });
