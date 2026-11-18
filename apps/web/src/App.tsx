@@ -7,6 +7,8 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ConnectPage } from './features/connections/ConnectPage';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
+// In the first chunk, as the dialog it replaces was (LC84): opened from every page, never waited for.
+import { SettingsPage } from './components/features/settings/SettingsPage';
 import { OldAttoRedirect } from './components/features/atti/OldAttoRedirect';
 import { isStudiaEnabled } from './features/studia/featureFlag';
 import { DevRoute } from './features/devMode/DevRoute';
@@ -196,6 +198,9 @@ function App() {
           <Route path="rassegne" element={<RassegneSearchPage />} />
           {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
           <Route path="collega-app" element={<ConnectAiAppPage />} />
+          <Route path="impostazioni" element={<SettingsPage />} />
+          {/* Amministrazione, a page in the shell like Impostazioni (LC93); the same guard as when it stood alone. */}
+          <Route path="admin/*" element={<AdminRoute><AdminPage /></AdminRoute>} />
           {/* The old addresses (D-235): no guard of their own, the new address keeps it. The more specific first:
               /merlt/qa and /merlt/chiedi go to the graph. */}
           <Route path="opus/*" element={<MovedTo from="/opus" to="/work" />} />
@@ -287,17 +292,6 @@ function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 
-        {/* Admin routes */}
-        <Route
-          path="/admin/*"
-          element={
-            <AdminRoute>
-              <Suspense fallback={<div className="flex items-center justify-center min-h-svh">Caricamento...</div>}>
-                <AdminPage />
-              </Suspense>
-            </AdminRoute>
-          }
-        />
       </Routes>
     </BrowserRouter>
   );

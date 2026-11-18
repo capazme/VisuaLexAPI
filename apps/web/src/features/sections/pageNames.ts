@@ -32,6 +32,8 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/documents(\/|$)/, 'Analizza documento'],
   [/^\/rassegne(\/|$)/, 'Rassegne'],
   [/^\/collega-app(\/|$)/, 'Collega un’app AI'],
+  [/^\/impostazioni(\/|$)/, 'Impostazioni'],
+  [/^\/admin(\/|$)/, 'Amministrazione'],
   [/^\/labs\/?$/, ASSISTANT_PAGE],
   [/^\/labs\/grafo(\/|$)/, GRAPH_PAGE],
 ];

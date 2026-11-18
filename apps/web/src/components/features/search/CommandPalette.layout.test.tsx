@@ -19,14 +19,15 @@ import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID } from '../../../utils/searchFie
 import type { CustomAlias, QuickNorm } from '../../../types';
 
 /**
- * The search menu in the new design (spec O1): on a computer a panel that drops from the search page's
- * field, on a phone `ui/Sheet`; the field first, the list of acts and «A portata di mano» under it, the
- * filters and the keys at the foot. The behaviour behind it is `CommandPalette.test.tsx`'s.
+ * The search menu (L-75): the field grows in the bar out of the pill or the search page's field, the lists are a band
+ * under the bars, in the page's flow; the list of acts and «A portata di mano», the filters and the keys at the foot. The
+ * behaviour behind it is `CommandPalette.test.tsx`'s.
  */
 
 function asDesktop(desktop: boolean) {
   vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
-    matches: desktop, media: query, onchange: null,
+    // The island reads «riduci movimento» from here (LC85); every other query is the width's.
+    matches: query.includes('reduced-motion') ? motionPref.reduced : desktop, media: query, onchange: null,
     addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {},
     dispatchEvent: () => false,
   }) as unknown as MediaQueryList);
@@ -56,22 +57,50 @@ afterEach(() => {
   appStore.setState({ quickNorms: [], customAliases: [] });
 });
 
-describe('CommandPalette — where it opens', () => {
-  it('on a computer, drops from the search page\'s field, with its own «Chiudi» and the keys at the foot', () => {
-    asDesktop(true);
-    const form = document.createElement('form');
-    form.id = SEARCH_FIELD_FORM_ID;
-    document.body.appendChild(form);
-    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+/**
+ * A bar as `TopBar`, `PhoneTopBar` and the search page's bar draw it (L-75): what the field grows from (the pill, or the
+ * search page's field) and the slot it grows in. `over`: it lies over the content, as the phone's.
+ */
+function bar({ from = 'pill', over = false }: { from?: 'pill' | 'field' | 'compact'; over?: boolean } = {}) {
+  const holder = document.createElement('div');
+  holder.setAttribute('data-palette-bar', over ? 'over' : '');
+  const source = document.createElement(from === 'pill' ? 'button' : 'form');
+  if (from === 'pill') source.id = SEARCH_ISLAND_ID;
+  else source.id = SEARCH_FIELD_FORM_ID;
+  if (from === 'compact') source.setAttribute('data-compact', '');
+  const slot = document.createElement('div');
+  slot.setAttribute('data-palette-slot', '');
+  holder.append(source, slot);
+  document.body.append(holder);
+  return { holder, source, slot };
+}
 
-    const panel = document.getElementById('command-menu-root')!.closest('[class*="fixed"]') as HTMLElement;
-    // placed by floating-ui against the field, not hung at the top of the screen
-    expect(panel.className).not.toMatch(/top-16/);
-    expect(panel.style.position).toBe('fixed');
-    expect(screen.getByRole('button', { name: 'Chiudi' })).toBeInTheDocument();
-    expect(screen.getByText('Naviga')).toBeInTheDocument();
-    // a dialog with its name, the focus kept inside
-    expect(screen.getByRole('dialog', { name: 'Menu di ricerca' })).toContainElement(screen.getByRole('combobox'));
+afterEach(() => {
+  document.querySelectorAll('[data-palette-bar]').forEach((el) => el.remove());
+});
+
+const band = () => screen.getByRole('region', { name: 'Menu di ricerca' });
+
+describe('CommandPalette — where it opens (L-75: in the page, nothing over it)', () => {
+  it('on a computer, the field grows in the bar that holds the pill, «Chiudi» beside it, the lists in a band under it, the keys at its foot', () => {
+    asDesktop(true);
+    const { slot } = bar();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(slot).toContainElement(screen.getByRole('combobox'));
+    expect(slot).toContainElement(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(band()).not.toContainElement(screen.getByRole('combobox'));
+    expect(band()).toContainElement(screen.getByText('Naviga'));
+    // No dialog, no veil, nothing fixed.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('[data-palette-veil]')).toBeNull();
+    expect(document.querySelector('.fixed')).toBeNull();
+  });
+
+  it('on the search page, grows in the bar out of its field, the compact one from lg as the large one below', () => {
+    asDesktop(true);
+    const { slot } = bar({ from: 'compact' });
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(slot).toContainElement(screen.getByRole('combobox'));
   });
 
   it('on a computer, gives the focus back to what had it (the search page\'s field) when it closes', async () => {
@@ -88,22 +117,21 @@ describe('CommandPalette — where it opens', () => {
     opener.remove();
   });
 
-  it('is as tall as what it holds, up to its maximum: no fixed height (Bill)', () => {
+  it('is as tall as what it holds, up to its maximum, on a computer: no fixed height (Bill)', () => {
     asDesktop(true);
-    const form = document.createElement('form');
-    form.id = SEARCH_FIELD_FORM_ID;
-    document.body.append(form);
+    bar();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    expect(box.style.height).toBe('');
-    expect(box.querySelector(':scope > div')).toHaveClass('max-h-[var(--palette-max-h,40rem)]');
+    expect(band().style.height).toBe('');
+    const column = band().querySelector<HTMLElement>('.max-w-3xl')!;
+    expect(column).toHaveClass('max-h-[var(--palette-max-h)]');
+    expect(column.style.getPropertyValue('--palette-max-h')).toBe('min(40rem, calc(100dvh - 12rem))');
   });
 
-  it('on a computer with no field on screen, hangs at the top, centred', () => {
+  it('with no bar (a lesson, full screen below lg), the field is the band\'s first row', () => {
     asDesktop(true);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const panel = document.getElementById('command-menu-root')!.closest('[class*="fixed"]') as HTMLElement;
-    expect(panel.className).toMatch(/top-16/);
+    expect(band()).toContainElement(screen.getByRole('combobox'));
+    expect(band()).toContainElement(screen.getByRole('button', { name: 'Chiudi' }));
   });
 
   it('on a phone, gives the focus back to what opened it (the bar\'s magnifier) when it closes', async () => {
@@ -120,18 +148,19 @@ describe('CommandPalette — where it opens', () => {
     opener.remove();
   });
 
-  it('on a phone, drops from the bar at the top across the page less 16 px each side, with its «Chiudi», and shows no keys (R2)', () => {
+  it('on a phone, the field grows in the bar, the band starts under the bar over the content and fills the page under it; no keys (R2)', () => {
     asDesktop(false);
+    const { slot } = bar({ over: true });
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    expect(panel).toHaveClass('inset-x-4');
-    expect(panel.className).toMatch(/top-\[calc\(env\(safe-area-inset-top\)/);
-    expect(within(panel).getByRole('button', { name: 'Chiudi' })).toBeInTheDocument();
+    expect(slot).toContainElement(screen.getByRole('combobox'));
+    expect(within(slot).getByRole('button', { name: 'Chiudi' })).toBeInTheDocument();
+    expect(band().firstElementChild!.firstElementChild).toHaveClass('pt-[calc(3.5rem+env(safe-area-inset-top))]');
+    expect(band().querySelector('.max-w-3xl')).toHaveClass('h-[var(--palette-max-h)]');
     expect(screen.queryByText('Naviga')).toBeNull();
   });
 });
 
-describe('CommandPalette — the island (LC69)', () => {
+describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
   type Run = { el: Element; keyframes: Keyframe[]; options: KeyframeAnimationOptions; animation: Animation };
   let runs: Run[] = [];
   /** jsdom has no Web Animations: one that records what it was asked, each animation ending when told to. */
@@ -147,18 +176,16 @@ describe('CommandPalette — the island (LC69)', () => {
       writable: true,
     });
   }
-  /** The bar's pill in the middle of a 1024 px window, and the 768 px panel under it, its top on the pill's. */
-  function pillAndPanel() {
-    const pill = document.createElement('button');
-    pill.id = SEARCH_ISLAND_ID;
+  /** The bar's pill in the middle of a 1024 px window, and the 768 px field it grows into, on the pill's line. */
+  function pillInBar() {
+    const { source: pill, slot } = bar();
     pill.style.borderTopLeftRadius = '16px';
-    document.body.append(pill);
     const rect = (left: number, top: number, width: number, height: number) =>
       ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
     const own = Element.prototype.getBoundingClientRect;
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
       if (this === pill) return rect(336, 10, 352, 32);
-      if (this.parentElement?.getAttribute('aria-label') === 'Menu di ricerca') return rect(128, 10, 768, 400);
+      if (this.parentElement === slot) return rect(128, 10, 768, 32);
       return own.call(this);
     });
     return pill;
@@ -170,102 +197,64 @@ describe('CommandPalette — the island (LC69)', () => {
 
   afterEach(() => {
     Reflect.deleteProperty(Element.prototype, 'animate');
-    document.getElementById(SEARCH_ISLAND_ID)?.remove();
   });
 
-  it('grows out of the pill: the shape from its rectangle and round ends, the content clipped to it, one time and one curve; the pill hidden under it', async () => {
+  it('the field grows out of the pill to both sides, one time and one curve; «Chiudi» fades in; the pill hidden under it', async () => {
     asDesktop(true);
     recordAnimations();
-    const pill = pillAndPanel();
+    const pill = pillInBar();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     // Started once the mount is over (the pill shows meanwhile), never under its long frames.
     expect(runs.find((run) => run.el === shapeOf())).toBeUndefined();
     expect(pill.style.opacity).toBe('');
     await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
     const grow = runOn(shapeOf());
-    expect(grow.keyframes[0]).toMatchObject({ top: '0px', right: '208px', bottom: '368px', left: '208px', borderRadius: '16px' });
+    expect(grow.keyframes[0]).toMatchObject({ top: '0px', right: '208px', bottom: '0px', left: '208px', borderRadius: '16px' });
     expect(grow.keyframes.at(-1)).toMatchObject({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
     expect(grow.options).toMatchObject(ISLAND_OPEN);
-    const show = runOn(contentOf());
-    expect(show.keyframes[0]).toEqual({ clipPath: 'inset(0px 208px 368px 208px round 16px)' });
-    expect(show.keyframes.at(-1)).toMatchObject({ clipPath: 'inset(0px 0px 0px 0px round 0px)' });
-    expect(show.options).toMatchObject(ISLAND_OPEN);
-    // LC81: the field is the pill from the first frame, seen at once, on its box (FLIP: a move and its width) …
+    expect(runOn(contentOf()).keyframes[0]).toEqual({ clipPath: 'inset(0px 208px 0px 208px round 16px)' });
+    // LC81: the field is the pill from the first frame, on its box (FLIP: a move and its width) …
     const field = runOn(document.querySelector('[data-island-field]')!);
     expect(field.keyframes[0]).toEqual({ transform: 'translate(336px, 10px)', minWidth: '352px', maxWidth: '352px', opacity: 1 });
     expect(field.keyframes.at(-1)).toMatchObject({ transform: 'translate(0px, 0px)', opacity: 1 });
     expect(field.options).toMatchObject(ISLAND_OPEN);
-    // … and the rest of the content fades in around it, from a quarter of the way.
+    // … and «Chiudi» fades in beside it, from a quarter of the way.
     expect(runOn(screen.getByRole('button', { name: 'Chiudi' })).keyframes).toEqual([{ opacity: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 1 }]);
-    // The veil by the same technique, time and curve: no Framer Motion animation left.
-    const veil = document.querySelector('[data-palette-veil]')!;
-    expect(runOn(veil).options).toMatchObject(ISLAND_OPEN);
     expect(pill.style.opacity).toBe('0');
-    // Open: nothing holds, the layers are their own CSS again.
+    expect(document.querySelector('[data-palette-veil]')).toBeNull();
     end(grow);
     expect(grow.animation.cancel).toHaveBeenCalled();
   });
 
-  it('grows out of the search page\'s field the same way: from its rectangle and corners, as wide as it', async () => {
+  it('the band grows in height and pushes the page, by the island\'s times; closing, the reverse', () => {
     asDesktop(true);
     recordAnimations();
-    const form = document.createElement('form');
-    form.id = SEARCH_FIELD_FORM_ID;
-    form.style.borderTopLeftRadius = '12px';
-    document.body.append(form);
-    const own = Element.prototype.getBoundingClientRect;
-    const rect = (left: number, top: number, width: number, height: number) =>
-      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
-    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-      if (this === form) return rect(128, 10, 768, 44);
-      if (this.parentElement?.getAttribute('aria-label') === 'Menu di ricerca') return rect(128, 10, 768, 400);
-      return own.call(this);
-    });
-    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
-    expect(runOn(shapeOf()).keyframes[0]).toMatchObject({ top: '0px', right: '0px', bottom: '356px', left: '0px', borderRadius: '12px' });
-    expect(runOn(contentOf()).keyframes[0]).toEqual({ clipPath: 'inset(0px 0px 356px 0px round 12px)' });
-    expect(form.style.opacity).toBe('0');
+    pillInBar();
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const open = runOn(band());
+    expect(Object.keys(open.keyframes[0])).toEqual(['height']);
+    expect(open.keyframes[0]).toEqual({ height: '0px' });
+    expect(open.options).toMatchObject(ISLAND_OPEN);
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    // Going: `aria-hidden`, no longer named.
+    const shut = runOn(document.querySelector('[data-palette-band]')!);
+    expect(shut.keyframes.at(-1)).toEqual({ height: '0px' });
+    expect(shut.options).toMatchObject(ISLAND_CLOSE);
   });
 
-  it('on a phone\'s search page, where no pill is, grows out of the page\'s field', async () => {
-    asDesktop(false);
-    recordAnimations();
-    const form = document.createElement('form');
-    form.id = SEARCH_FIELD_FORM_ID;
-    form.style.borderTopLeftRadius = '20px';
-    document.body.append(form);
-    const own = Element.prototype.getBoundingClientRect;
-    const rect = (left: number, top: number, width: number, height: number) =>
-      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
-    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-      if (this === form) return rect(52, 8, 322, 40);
-      if (this.parentElement?.getAttribute('aria-label') === 'Menu di ricerca') return rect(16, 8, 358, 600);
-      return own.call(this);
-    });
-    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
-    expect(runOn(shapeOf()).keyframes[0]).toMatchObject({ top: '0px', right: '0px', bottom: '560px', left: '36px', borderRadius: '20px' });
-    expect(form.style.opacity).toBe('0');
-  });
-
-  it('closes back into the pill, keeps the box where it is (a computer), and shows the pill again only as the shape lands', async () => {
+  it('closes back into the pill, and shows the pill again only as the field lands', async () => {
     asDesktop(true);
     recordAnimations();
-    const pill = pillAndPanel();
+    const pill = pillInBar();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    await waitFor(() => expect(box.style.width).toBe('768px'));
     await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
     end(runOn(shapeOf()));
 
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
-    // The box keeps its width while it closes (it spread to the window's edge, and the shape ended 938 px wide).
-    expect(box.style.width).toBe('768px');
     const shrink = runOn(shapeOf());
-    expect(shrink.keyframes.at(-1)).toMatchObject({ top: '0px', right: '208px', bottom: '368px', left: '208px', opacity: 0 });
+    expect(shrink.keyframes.at(-1)).toMatchObject({ top: '0px', right: '208px', bottom: '0px', left: '208px', opacity: 0 });
     expect(shrink.options).toMatchObject(ISLAND_CLOSE);
-    expect(runOn(contentOf()).keyframes.at(-1)).toMatchObject({ clipPath: 'inset(0px 208px 368px 208px round 16px)' });
     // LC81: the field lands on the pill, and gives way to it in the shape's crossfade.
     expect(runOn(document.querySelector('[data-island-field]')!).keyframes.at(-1)).toMatchObject({ transform: 'translate(336px, 10px)', maxWidth: '352px', opacity: 0 });
     const back = runOn(pill);
@@ -274,14 +263,14 @@ describe('CommandPalette — the island (LC69)', () => {
     expect(pill.style.opacity).toBe('0');
     end(shrink);
     expect(pill.style.opacity).toBe('');
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu di ricerca' })).toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-palette-slot]')).toBeEmptyDOMElement());
   });
 
-  it('opened again while it closes grows from where it is on screen, and closed again goes back from there', async () => {
+  it('opened again while it closes grows from where it is on screen', async () => {
     asDesktop(true);
     recordAnimations();
-    const pill = pillAndPanel();
-    const caught: Record<string, string> = { top: '0px', right: '120px', bottom: '200px', left: '120px', borderRadius: '15px', opacity: '0.4', clipPath: 'inset(0px 120px 200px 120px round 15px)' };
+    const pill = pillInBar();
+    const caught: Record<string, string> = { top: '0px', right: '120px', bottom: '0px', left: '120px', borderRadius: '15px', opacity: '0.4', clipPath: 'inset(0px 120px 0px 120px round 15px)' };
     const computed = window.getComputedStyle.bind(window);
     vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element, pseudo?: string | null) => {
       const style = computed(el, pseudo);
@@ -298,16 +287,13 @@ describe('CommandPalette — the island (LC69)', () => {
     expect(runOn(shapeOf())).toBe(closing);
 
     rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    // At once, from the values on screen: the closing stopped, never the pill's or the panel's.
     expect(closing.animation.cancel).toHaveBeenCalled();
     const again = runOn(shapeOf());
     expect(again).not.toBe(closing);
-    expect(again.keyframes[0]).toMatchObject({ top: '0px', right: '120px', bottom: '200px', left: '120px', borderRadius: '15px', opacity: '0.4' });
+    expect(again.keyframes[0]).toMatchObject({ top: '0px', right: '120px', bottom: '0px', left: '120px', borderRadius: '15px', opacity: '0.4' });
     expect(again.options).toMatchObject(ISLAND_OPEN);
     expect(runOn(contentOf()).keyframes[0]).toMatchObject({ clipPath: caught.clipPath });
-    // It takes the pointer again (the closing took it away).
     expect(shapeOf().parentElement!.style.pointerEvents).toBe('');
-    // Still hidden: the pill's way back was dropped with the closing.
     expect(runOn(pill).animation.cancel).toHaveBeenCalled();
     expect(pill.style.opacity).toBe('0');
   });
@@ -315,19 +301,19 @@ describe('CommandPalette — the island (LC69)', () => {
   it('closed before it started is gone at once, the pill never hidden', async () => {
     asDesktop(true);
     recordAnimations();
-    const pill = pillAndPanel();
+    const pill = pillInBar();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu di ricerca' })).toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-palette-slot]')).toBeEmptyDOMElement());
     expect(runs.filter((run) => run.el.hasAttribute('data-island-shape'))).toEqual([]);
     expect(pill.style.opacity).toBe('');
   });
 
-  it('under reduced motion, or with nothing to grow from, only fades, by the same times', async () => {
+  it('under reduced motion only fades, by the same times', async () => {
     asDesktop(true);
     recordAnimations();
     motionPref.reduced = true;
-    const pill = pillAndPanel();
+    const pill = pillInBar();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const root = () => shapeOf().parentElement!;
     await waitFor(() => expect(runOn(root())).toBeDefined());
@@ -340,67 +326,21 @@ describe('CommandPalette — the island (LC69)', () => {
     expect(runOn(root()).options).toMatchObject(ISLAND_CLOSE);
   });
 
-  it('lets go of the field\'s width and height when the field goes while it is open', async () => {
-    asDesktop(true);
-    const form = document.createElement('form');
-    form.id = SEARCH_FIELD_FORM_ID;
-    document.body.append(form);
+  it('follows the page to its new bar when the bar it grew in goes while open (/sentenze → /)', () => {
+    asDesktop(false);
+    const first = bar({ over: true });
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    await waitFor(() => expect(box.style.getPropertyValue('--palette-max-h')).not.toBe(''));
-    expect(box.style.width).not.toBe('');
-    form.remove();
+    expect(first.slot).toContainElement(screen.getByRole('combobox'));
+    first.holder.remove();
+    const second = bar({ from: 'field' });
     rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(box.style.width).toBe('');
-    expect(box.style.getPropertyValue('--palette-max-h')).toBe('');
+    expect(second.slot).toContainElement(screen.getByRole('combobox'));
+    expect(band().firstElementChild!.firstElementChild).not.toHaveClass('pt-[calc(3.5rem+env(safe-area-inset-top))]');
   });
 
-  it('lets the pointer through its veil while it closes: a tap on the pill opens it again', async () => {
+  it('without Web Animations draws the field at once, nothing left hidden', () => {
     asDesktop(true);
-    recordAnimations();
-    pillAndPanel();
-    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const veil = () => document.querySelector<HTMLElement>('[data-palette-veil]')!;
-    expect(veil().style.pointerEvents).toBe('');
-    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(veil().style.pointerEvents).toBe('none');
-    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(veil().style.pointerEvents).toBe('');
-  });
-
-  it('opened on a phone after a computer, with nothing to hang from, keeps no width from the computer\'s field', async () => {
-    // A window that narrows: the media query tells its listeners.
-    let wide = true;
-    const listeners = new Set<(event: MediaQueryListEvent) => void>();
-    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
-      get matches() { return wide; }, media: query, onchange: null,
-      addListener: () => {}, removeListener: () => {},
-      addEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
-      removeEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => listeners.delete(listener),
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList);
-    const form = document.createElement('form');
-    form.id = SEARCH_FIELD_FORM_ID;
-    form.setAttribute('data-compact', '');
-    document.body.append(form);
-    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Menu di ricerca' }).style.width).not.toBe(''));
-    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu di ricerca' })).toBeNull());
-    // The window narrowed to a phone's: the computer's field is hidden there (0 px), the phone's keyboard is watched.
-    act(() => {
-      wide = false;
-      listeners.forEach((listener) => listener({ matches: false } as MediaQueryListEvent));
-    });
-    vi.stubGlobal('visualViewport', { height: 700, addEventListener: vi.fn(), removeEventListener: vi.fn() });
-    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    await act(() => new Promise((done) => setTimeout(done, 50)));
-    expect(box.style.width).toBe('');
-  });
-
-  it('without Web Animations draws the panel at once, nothing left hidden', () => {
-    asDesktop(true);
+    bar();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const root = shapeOf().parentElement!;
     expect(root.style.opacity).toBe('');
@@ -711,8 +651,8 @@ describe('CommandPalette — on a phone, the keyboard (R2)', () => {
 
     rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(listen).toHaveBeenCalledWith('resize', expect.any(Function));
-    const dialog = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    expect(dialog.style.getPropertyValue('--palette-max-h')).toBe('min(40rem, calc(500px - 1rem - env(safe-area-inset-top)))');
+    const column = screen.getByRole('region', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.max-w-3xl')!;
+    expect(column.style.getPropertyValue('--palette-max-h')).toBe('calc(500px - 3.5rem - env(safe-area-inset-top))');
 
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(unlisten).toHaveBeenCalledWith('resize', listen.mock.calls[0][1]);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { RotateCcw, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import type { TrashEntry } from '../../../services/trashService';
@@ -48,6 +48,8 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
   const [needsTarget, setNeedsTarget] = useState<string | null>(null);
   const [target, setTarget] = useState('');
   const [confirmPurge, setConfirmPurge] = useState(false);
+  const [purgeFrom, setPurgeFrom] = useState<HTMLElement | null>(null);
+  const rowRef = useRef<HTMLLIElement>(null);
   const title = titleOf(entry, showSource);
 
   const restore = async (targetDossierId?: string) => {
@@ -62,13 +64,21 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
   const purge = async () => {
     setConfirmPurge(false);
     setBusy(true);
+    // Where the focus goes once this row has left the list: the next row, else the one before, else the list's page.
+    const row = rowRef.current;
+    const neighbour = (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector<HTMLElement>('button:not([disabled])');
+    const page = row?.parentElement?.parentElement?.querySelector<HTMLElement>('button:not([disabled])');
     const done = await onPurge(entry);
     setBusy(false);
+    // Once the list has drawn itself without this row.
+    if (done) requestAnimationFrame(() => {
+      if (!row?.isConnected) (neighbour?.isConnected ? neighbour : page)?.focus({ preventScroll: true });
+    });
     showToast(done ? 'Eliminato definitivamente' : 'Impossibile eliminare. Riprova.', done ? 'success' : 'error');
   };
 
   return (
-    <li className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+    <li ref={rowRef} tabIndex={-1} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
       <div className="flex flex-col gap-2 md:flex-row md:items-start">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-900 dark:text-white">{title}</p>
@@ -87,7 +97,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
           </button>
           <button
             type="button"
-            onClick={() => setConfirmPurge(true)}
+            onClick={(event) => { setPurgeFrom(event.currentTarget); setConfirmPurge(true); }}
             disabled={busy}
             aria-label={`Elimina definitivamente ${title}`}
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-red-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
@@ -126,6 +136,9 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
         message={`${title} lascia il cestino e non si potrà più ripristinare. Il resto del cestino e le tue pratiche non saranno toccati.`}
         confirmLabel="Elimina definitivamente"
         focusCancel
+        origin={purgeFrom}
+        // Confirmed, the button is busy: the focus waits on the row until it leaves the list (`purge`).
+        focusBack={() => rowRef.current}
         onConfirm={() => void purge()}
         onCancel={() => setConfirmPurge(false)}
       />

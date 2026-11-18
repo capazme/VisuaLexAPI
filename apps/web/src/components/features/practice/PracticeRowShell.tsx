@@ -1,10 +1,13 @@
-import type { CSSProperties, ReactNode } from 'react';
-import { ChevronDown, FolderPlus, MoreHorizontal, PanelRightOpen, Star, X } from 'lucide-react';
+import { useMemo, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { ChevronDown, FolderPlus, MoreHorizontal, PanelRightOpen, Star, StickyNote, X } from 'lucide-react';
 import { useAddToDossier, useHeldInLabel, type DossierTarget } from '../dossier/addFromResult';
 import { HeldInMark } from '../dossier/HeldInMark';
 import { cn } from '../../../lib/utils';
 import { MenuButton } from '../../ui/MenuButton';
+import { Expand } from '../../ui/Expand';
 import { rowDossierItems, type RowDossier } from './inDossier';
+import { RowMovePicker, RowNoteComposer } from './RowDossierPanels';
+import { useFontiTools } from './fontiTools';
 
 const ICON_BUTTON =
   'flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20';
@@ -70,15 +73,28 @@ export function PracticeRowShell({
   const outside = dossier !== undefined && !dossier.inDossier;
   const starred = dossier?.important === true;
   const corpus = dossier ? undefined : corpusItem;
+  const notes = dossier?.inDossier ? dossier.notes : 0;
+  const notesWords = notes === 1 ? '1 nota' : `${notes} note`;
+  // Opening, the focus stays where it is: on the heading clicked, on the act's arrows or chips that revealed the row.
+  const focusWhereItIs = useMemo<RefObject<HTMLElement | null>>(() => ({
+    get current() { return document.activeElement instanceof HTMLElement ? document.activeElement : null; },
+  }), []);
+  // A note or a move asked from «⋯» (LC86), under the row.
+  const [panel, setPanel] = useState<'note' | 'move' | null>(null);
   const heldIn = useHeldInLabel(corpus);
   const adding = useAddToDossier(corpus);
   // The toggle's name replaces its content: it carries the mark's words, and the star's (LC58).
-  const name = outside
+  const name = (outside
     ? `${shownName}, non nella pratica`
     : starred
       ? `${shownName}, importante`
-      : heldIn ? `${shownName}, ${heldIn.charAt(0).toLowerCase()}${heldIn.slice(1)}` : shownName;
+      : heldIn ? `${shownName}, ${heldIn.charAt(0).toLowerCase()}${heldIn.slice(1)}` : shownName)
+    + (notes > 0 ? `, ${notesWords}` : '');
   const regionId = `practice-row-${rowKey}`;
+  // «Seleziona» on in «Fonti» (LC88): a row of the dossier carries a checkbox, and the Space on its heading ticks it.
+  const tools = useFontiTools();
+  const selectable = tools?.selecting === true && dossier !== undefined && dossier.itemIds.length > 0;
+  const ticked = selectable && dossier.itemIds.some((id) => tools.selected.has(id));
   // One subject, one mounted reading surface (T5): a row shown in a window folds, whatever its stored
   // state, and comes back as it was when the window closes. Its header then points at the window.
   const folded = beside?.shown === true;
@@ -93,18 +109,36 @@ export function PracticeRowShell({
       className="group @container scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-lg py-1 md:pl-2 md:pr-1"
     >
       <div className="flex items-center gap-1 rounded-lg transition-colors hover:bg-slate-50 md:gap-2 dark:hover:bg-slate-800/60">
+        {/* Outside the toggle (gotcha 22): its own control, 44 px to touch. */}
+        {selectable && (
+          <label className="-ml-2 flex min-h-[44px] min-w-[44px] flex-shrink-0 cursor-pointer items-center justify-center md:ml-0 md:min-h-0 md:min-w-0 md:p-1">
+            <input
+              type="checkbox"
+              checked={ticked}
+              onChange={() => tools.toggle(dossier.itemIds)}
+              aria-label={`Seleziona ${removeName}`}
+              // The theme's colours, as the app's other checkboxes: never a white box in the dark.
+              className="h-4 w-4 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:accent-primary-300 dark:[color-scheme:dark]"
+            />
+          </label>
+        )}
         {/* The toggle wraps only text: the remove button stays outside it (gotcha 22). */}
         <div
           role="button"
           tabIndex={0}
           // Folded because a window shows the subject, the header does not expand: it goes to the window.
-          aria-label={folded ? `Vai alla finestra su ${name}` : `${isOpen ? 'Comprimi' : 'Espandi'} ${name}`}
+          // While selecting, the heading says whether the row is ticked: the Space on it ticks it.
+          aria-label={(folded ? `Vai alla finestra su ${name}` : `${isOpen ? 'Comprimi' : 'Espandi'} ${name}`)
+            + (selectable ? (ticked ? ', selezionato' : ', non selezionato') : '')}
           aria-expanded={folded ? undefined : isOpen}
           aria-controls={isOpen ? regionId : undefined}
           onClick={folded ? beside.onOpen : onToggle}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === ' ' && selectable) {
+              e.preventDefault();
+              tools.toggle(dossier.itemIds);
+            } else if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               (folded ? beside.onOpen : onToggle)();
             }
@@ -117,6 +151,13 @@ export function PracticeRowShell({
             className={cn('flex-shrink-0 text-slate-400 transition-transform', !isOpen && '-rotate-90')}
           />
           {header}
+          {/* The dossier's notes about it (LC86), said on the row, open or closed. */}
+          {notes > 0 && (
+            <span aria-hidden title={notesWords} className="flex flex-shrink-0 items-center gap-0.5 text-xs text-amber-800 dark:text-amber-300">
+              <StickyNote size={13} aria-hidden />
+              {notes}
+            </span>
+          )}
           {starred && (
             <span aria-hidden title="Importante" className="flex-shrink-0 text-amber-600 dark:text-amber-400">
               <Star size={14} aria-hidden className="fill-amber-400" />
@@ -165,7 +206,11 @@ export function PracticeRowShell({
           </button>
         ))}
         {dossier ? (
-          <MenuButton label={`Azioni su ${removeName}`} triggerClassName={MENU_TRIGGER} items={rowDossierItems(dossier, onRemove)}>
+          <MenuButton
+            label={`Azioni su ${removeName}`}
+            triggerClassName={MENU_TRIGGER}
+            items={rowDossierItems(dossier, onRemove, { note: dossier.addNote && (() => setPanel('note')), move: () => setPanel('move') })}
+          >
             <MoreHorizontal size={16} aria-hidden />
           </MenuButton>
         ) : (
@@ -204,7 +249,30 @@ export function PracticeRowShell({
           <HeldInMark label={heldIn} className="max-w-full" />
         </div>
       )}
-      {isOpen && (
+      {dossier && (
+        <>
+          {dossier.addNote && (
+            <Expand open={panel === 'note'} onClose={() => setPanel(null)}>
+              <RowNoteComposer name={removeName} onSave={dossier.addNote} onDone={() => setPanel(null)} />
+            </Expand>
+          )}
+          <Expand open={panel === 'move'} onClose={() => setPanel(null)}>
+            <RowMovePicker onMove={dossier.moveTo} onDone={() => setPanel(null)} />
+          </Expand>
+        </>
+      )}
+      {dossier ? (
+        // A dossier's «Fonti» (LC86, L-73): the row opens in place, the space growing under its heading and pushing the
+        // rest down (`Expand`, the island's times). The focus stays where it was; no Esc, which is the reader's. Clipped
+        // on the height alone, and with `clip`, not `hidden`: the reader's toolbar keeps sticking to the page's
+        // scroller and the glosses' margin is not cut at the side. Brought into view on opening, it keeps the row's heading
+        // (its 44 px, the command that closes it) clear under the act's sticky head.
+        <Expand open={isOpen} initialFocusRef={focusWhereItIs} className="scroll-mt-[calc(var(--practice-head,0px)+3rem)] overflow-x-visible overflow-y-clip">
+          <div id={regionId} className="pb-3 pt-1 md:pl-6 md:pr-2" style={regionStyle}>
+            {children}
+          </div>
+        </Expand>
+      ) : isOpen && (
         // Opacity only, 150 ms: a row opens tens of times a day, and a transform here would move the
         // reader's sticky toolbar and fixed popovers while it plays (gotchas 22, 26).
         <div id={regionId} className="animate-in fade-in duration-150 pb-3 pt-1 md:pl-6 md:pr-2" style={regionStyle}>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { closeNotification, notificationStore, notify, RESTORED_MS, undoNotification, UNDO_MS } from '../components/ui/notifications/notifications';
+import { closeNotification, notificationStore, notify, RESTORED_MS, undoNotification, UNDO_MS, type NotificationInput } from '../components/ui/notifications/notifications';
 
 export interface UndoableActionOptions<T> {
   /** Action to execute */
@@ -41,7 +41,7 @@ export interface UseUndoableActionReturn {
  *   action: () => deleteItem(id),
  *   undo: () => restoreItem(item),
  *   message: "Elemento eliminato",
- *   duration: 5000
+ *   duration: 10000
  * });
  */
 export function useUndoableAction<T>({
@@ -166,11 +166,14 @@ export function showUndoToast<T>({
   undo,
   message,
   duration = UNDO_MS,
+  link,
 }: {
   action: () => T | Promise<T>;
   undo: (result: T) => void | Promise<void>;
   message: string;
   duration?: number;
+  /** A second button beside «Annulla», as «Apri il cestino». */
+  link?: NotificationInput['action'];
 }): Promise<boolean> {
   return Promise.resolve(action()).then((result) => new Promise<boolean>((resolve) => {
     let resolved = false;
@@ -178,6 +181,7 @@ export function showUndoToast<T>({
       type: 'success',
       message,
       duration,
+      action: link,
       onUndo: async () => {
         resolved = true;
         try {

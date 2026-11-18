@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServiceHealthState } from '../../../services/healthService';
 
@@ -23,14 +23,11 @@ vi.mock('../../../hooks/useServiceHealth', async () => {
     },
   };
 });
-vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
-vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 // The planner's host reads the tasks from the server: not under test here.
 vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
-vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <p>Scorciatoie da Tastiera</p> : null) }));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
@@ -91,21 +88,33 @@ describe('Layout — the services\' probe, in one place (S1)', () => {
 });
 
 // «Scorciatoie (?)» became «Scorciatoie» in the user menu (S1): the key itself is unchanged.
+// LC84: the shortcuts are a part of the Impostazioni page, `#scorciatoie`.
 describe('Layout — the ? key', () => {
+  const atRoutes = () => render(
+    <MemoryRouter initialEntries={['/pratiche']}>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route path="pratiche" element={<p>Pagina dossier</p>} />
+          <Route path="impostazioni" element={<p>Scorciatoie da tastiera</p>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+
   it('still opens the shortcuts, outside a field', () => {
-    at();
-    expect(screen.queryByText('Scorciatoie da Tastiera')).toBeNull();
+    atRoutes();
+    expect(screen.queryByText('Scorciatoie da tastiera')).toBeNull();
     fireEvent.keyDown(window, { key: '?' });
-    expect(screen.getByText('Scorciatoie da Tastiera')).toBeInTheDocument();
+    expect(screen.getByText('Scorciatoie da tastiera')).toBeInTheDocument();
   });
 
   it('is a letter on an element that stands for a field (the search page\'s field, R2)', () => {
-    at();
+    atRoutes();
     const field = document.createElement('button');
     field.setAttribute('data-text-field', '');
     document.body.append(field);
     fireEvent.keyDown(field, { key: '?' });
-    expect(screen.queryByText('Scorciatoie da Tastiera')).toBeNull();
+    expect(screen.queryByText('Scorciatoie da tastiera')).toBeNull();
     field.remove();
   });
 });

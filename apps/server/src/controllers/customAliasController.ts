@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AliasType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { boundedText, parseBody } from '../utils/bodyLimits';
 import { AppError } from '../middleware/errorHandler';
 
 // ── Validation ────────────────────────────────────────────────────────────
@@ -13,26 +14,26 @@ const TRIGGER_RE = /^[a-zA-Z0-9\-_.]+$/;
 const aliasTypeEnum = z.enum(['shortcut', 'reference']);
 
 const searchParamsShape = z.object({
-  act_type: z.string(),
-  act_number: z.string().optional(),
-  date: z.string().optional(),
-  article: z.string().optional(),
+  act_type: boundedText(200, 'tipo di atto'),
+  act_number: boundedText(100, 'numero').optional(),
+  date: boundedText(100, 'data').optional(),
+  article: boundedText(5_000, 'articolo').optional(),
 }).optional().nullable();
 
 const createCustomAliasSchema = z.object({
-  trigger: z.string().min(2).regex(TRIGGER_RE, 'invalid trigger characters'),
+  trigger: boundedText(100, 'abbreviazione').min(2).regex(TRIGGER_RE, 'invalid trigger characters'),
   type: aliasTypeEnum,
-  expandTo: z.string().min(1),
+  expandTo: boundedText(1_000, 'testo esteso').min(1),
   searchParams: searchParamsShape,
-  description: z.string().optional().nullable(),
+  description: boundedText(1_000, 'descrizione').optional().nullable(),
 });
 
 const updateCustomAliasSchema = z.object({
-  trigger: z.string().min(2).regex(TRIGGER_RE).optional(),
+  trigger: boundedText(100, 'abbreviazione').min(2).regex(TRIGGER_RE).optional(),
   type: aliasTypeEnum.optional(),
-  expandTo: z.string().min(1).optional(),
+  expandTo: boundedText(1_000, 'testo esteso').min(1).optional(),
   searchParams: searchParamsShape,
-  description: z.string().optional().nullable(),
+  description: boundedText(1_000, 'descrizione').optional().nullable(),
   usageCount: z.number().int().nonnegative().optional(),
   lastUsedAt: z.string().datetime().optional().nullable(),
 });
@@ -79,7 +80,7 @@ export const listCustomAliases = async (req: Request, res: Response) => {
 export const createCustomAlias = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError(401, 'Not authenticated');
 
-  const data = createCustomAliasSchema.parse(req.body);
+  const data = parseBody(createCustomAliasSchema, req.body);
   const triggerLower = data.trigger.toLowerCase().trim();
 
   // @@unique([userId, trigger]) gives us a DB-level guarantee; catch the
@@ -108,7 +109,7 @@ export const updateCustomAlias = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError(401, 'Not authenticated');
 
   const { id } = req.params;
-  const data = updateCustomAliasSchema.parse(req.body);
+  const data = parseBody(updateCustomAliasSchema, req.body);
 
   const existing = await prisma.customAlias.findFirst({
     where: { id, userId: req.user.id },

@@ -119,7 +119,9 @@ export const checkNorma = async (req: Request, res: Response) => {
   // would read as a change against the HTML text, and back again. Touch the watch if
   // there is one, register nothing otherwise — the watcher refuses empty
   // text the same way.
-  if (!snapshotData.article_text || isAknText(normaData)) {
+  // A recital is never watched (spec 2026-11-17 §6.3): it has no versions, and its text is not an article's.
+  const recital = Object.prototype.hasOwnProperty.call(normaData.norma_data, 'considerando');
+  if (!snapshotData.article_text || isAknText(normaData) || recital) {
     if (existing) {
       await prisma.normaWatch.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } });
     }

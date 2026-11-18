@@ -105,6 +105,19 @@ describe('omnilex_elimina_voci_dossier', () => {
     await client.close();
   });
 
+  it('names a recital by its citation and a note about it as «Nota su …» (spec 2026-11-17 §6.4)', async () => {
+    env.stub.dossiers[0].items.push(
+      { id: 'r1', item_type: 'norm', title: 'considerando 26, reg. (UE) 2016/679', citation: 'considerando 26, reg. (UE) 2016/679', content: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' }, about_item_id: null },
+      { id: 'r2', item_type: 'note', title: 'Nota', citation: null, content: 'Sul dato anonimo.', about_item_id: 'r1' },
+    );
+    const client = await connect();
+    await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['r1', 'r2'] } });
+    expect(asked[0].message).toContain('- considerando 26, reg. (UE) 2016/679');
+    expect(asked[0].message).toContain('Nota su considerando 26, reg. (UE) 2016/679');
+    expect(asked[0].message).not.toMatch(/- Norma\b/);
+    await client.close();
+  });
+
   it('asks with the dossier, each citation, the count, the 30 days and the notes that stay', async () => {
     const client = await connect();
     await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1', 'i2'] } });

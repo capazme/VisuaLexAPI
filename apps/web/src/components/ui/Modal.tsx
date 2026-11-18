@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 import { useDialogFocus } from './useDialogFocus';
 import { dur, ease } from '../../lib/motion';
+import { IslandSurface, type IslandSource } from './IslandSurface';
 
 export type ModalVariant = 'default' | 'danger' | 'info' | 'success';
 
@@ -29,6 +30,11 @@ export interface ModalProps {
   labelledBy?: string;
   /** Below `sm` the panel takes the whole screen, with no margin or rounding (the planner's task sheet). */
   phoneFullScreen?: boolean;
+  /**
+   * Grows out of this control and goes back into it (`IslandSurface`, LC85), instead of the panel's scale; null fades.
+   * The confirmations' (`ConfirmDialog`): the large dialogs keep their own way until they move into the page.
+   */
+  growFrom?: IslandSource;
   children?: ReactNode;
 }
 
@@ -66,6 +72,7 @@ export function Modal({
   contentClassName,
   labelledBy,
   phoneFullScreen = false,
+  growFrom,
   children,
 }: ModalProps) {
   const reactId = useId();
@@ -103,6 +110,89 @@ export function Modal({
 
   const hasHeader = Boolean(title || icon || showCloseButton);
 
+  const body = (
+    <>
+      {hasHeader && (
+        <div
+          className={cn(
+            'flex items-start gap-4 px-6 py-4 shrink-0',
+            'border-b border-slate-100 dark:border-slate-800'
+          )}
+        >
+          {/* LC21: an icon beside the title only where its colour says something (danger, success); a grey or ink
+              tile beside «Impostazioni» was decoration. */}
+          {icon && (variant === 'danger' || variant === 'success') && (
+            <div
+              className={cn(
+                'shrink-0 flex items-center justify-center w-10 h-10 rounded-lg',
+                variantIconStyles[variant]
+              )}
+              aria-hidden="true"
+            >
+              {icon}
+            </div>
+          )}
+
+          {(title || description) && (
+            <div className="flex-1 min-w-0">
+              {title && (
+                <h2
+                  id={titleId}
+                  className="font-serif text-[22px] font-normal leading-tight text-slate-900 dark:text-slate-100"
+                >
+                  {title}
+                </h2>
+              )}
+              {description && (
+                <p
+                  id={descriptionId}
+                  className="mt-1 text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+                >
+                  {description}
+                </p>
+              )}
+            </div>
+          )}
+
+          {showCloseButton && (
+            <button
+              ref={closeButtonRef}
+              onClick={onClose}
+              aria-label="Chiudi"
+              className={cn(
+                'inline-flex min-h-[44px] min-w-[44px] items-center justify-center md:min-h-0 md:min-w-0 p-1.5 rounded-lg ml-auto shrink-0',
+                'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300',
+                'hover:bg-slate-100 dark:hover:bg-slate-800',
+                'transition-colors duration-150',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-toga-500 focus-visible:ring-offset-2 ring-offset-background'
+              )}
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {children != null && children !== false && (
+        <div className={cn('flex-1 overflow-y-auto p-6', contentClassName)}>
+          {children}
+        </div>
+      )}
+
+      {footer && (
+        <div
+          className={cn(
+            'flex items-center justify-end gap-3 px-6 py-4 shrink-0',
+            'border-t border-slate-100 dark:border-slate-800',
+            'bg-slate-50/50 dark:bg-slate-900/50 rounded-b-2xl'
+          )}
+        >
+          {footer}
+        </div>
+      )}
+    </>
+  );
+
   // Portaled: inside a reading window (transformed, stacked) the dialog would be
   // confined to it, with the dock or another window above.
   return createPortal(
@@ -120,107 +210,46 @@ export function Modal({
           />
 
           <div className={cn('fixed inset-0 flex items-center justify-center p-4 pointer-events-none', phoneFullScreen && 'max-sm:p-0', Z_INDEX.modal)}>
-            <motion.div
-              ref={dialogRef}
-              role={role}
-              aria-modal="true"
-              aria-labelledby={titleId ?? labelledBy}
-              aria-describedby={descriptionId}
-              initial={hidden}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={hidden}
-              transition={panel}
-              onClick={(e) => e.stopPropagation()}
-              className={cn(
-                'w-full pointer-events-auto',
-                'bg-white dark:bg-slate-900',
-                'rounded-2xl shadow-lg',
-                'border border-slate-200 dark:border-slate-800',
-                'max-h-[90vh] flex flex-col',
-                sizeStyles[size],
-                phoneFullScreen && 'max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:border-0',
-                className
-              )}
-            >
-              {hasHeader && (
-                <div
-                  className={cn(
-                    'flex items-start gap-4 px-6 py-4 shrink-0',
-                    'border-b border-slate-100 dark:border-slate-800'
-                  )}
-                >
-                  {/* LC21: an icon beside the title only where its colour says something (danger, success); a grey or ink
-                      tile beside «Impostazioni» was decoration. */}
-                  {icon && (variant === 'danger' || variant === 'success') && (
-                    <div
-                      className={cn(
-                        'shrink-0 flex items-center justify-center w-10 h-10 rounded-lg',
-                        variantIconStyles[variant]
-                      )}
-                      aria-hidden="true"
-                    >
-                      {icon}
-                    </div>
-                  )}
-
-                  {(title || description) && (
-                    <div className="flex-1 min-w-0">
-                      {title && (
-                        <h2
-                          id={titleId}
-                          className="font-serif text-[22px] font-normal leading-tight text-slate-900 dark:text-slate-100"
-                        >
-                          {title}
-                        </h2>
-                      )}
-                      {description && (
-                        <p
-                          id={descriptionId}
-                          className="mt-1 text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
-                        >
-                          {description}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {showCloseButton && (
-                    <button
-                      ref={closeButtonRef}
-                      onClick={onClose}
-                      aria-label="Chiudi"
-                      className={cn(
-                        'inline-flex min-h-[44px] min-w-[44px] items-center justify-center md:min-h-0 md:min-w-0 p-1.5 rounded-lg ml-auto shrink-0',
-                        'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300',
-                        'hover:bg-slate-100 dark:hover:bg-slate-800',
-                        'transition-colors duration-150',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-toga-500 focus-visible:ring-offset-2 ring-offset-background'
-                      )}
-                    >
-                      <X size={20} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {children != null && children !== false && (
-                <div className={cn('flex-1 overflow-y-auto p-6', contentClassName)}>
-                  {children}
-                </div>
-              )}
-
-              {footer && (
-                <div
-                  className={cn(
-                    'flex items-center justify-end gap-3 px-6 py-4 shrink-0',
-                    'border-t border-slate-100 dark:border-slate-800',
-                    'bg-slate-50/50 dark:bg-slate-900/50 rounded-b-2xl'
-                  )}
-                >
-                  {footer}
-                </div>
-              )}
-            </motion.div>
+            {growFrom !== undefined ? (
+              <IslandSurface
+                ref={dialogRef}
+                source={growFrom}
+                role={role}
+                aria-modal="true"
+                aria-labelledby={titleId ?? labelledBy}
+                aria-describedby={descriptionId}
+                onClick={(e) => e.stopPropagation()}
+                className={cn('w-full pointer-events-auto max-h-[90vh] flex flex-col', sizeStyles[size], className)}
+                surfaceClassName="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800"
+              >
+                {body}
+              </IslandSurface>
+            ) : (
+              <motion.div
+                ref={dialogRef}
+                role={role}
+                aria-modal="true"
+                aria-labelledby={titleId ?? labelledBy}
+                aria-describedby={descriptionId}
+                initial={hidden}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={hidden}
+                transition={panel}
+                onClick={(e) => e.stopPropagation()}
+                className={cn(
+                  'w-full pointer-events-auto',
+                  'bg-white dark:bg-slate-900',
+                  'rounded-2xl shadow-lg',
+                  'border border-slate-200 dark:border-slate-800',
+                  'max-h-[90vh] flex flex-col',
+                  sizeStyles[size],
+                  phoneFullScreen && 'max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:border-0',
+                  className
+                )}
+              >
+                {body}
+              </motion.div>
+            )}
           </div>
         </>
       )}

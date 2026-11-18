@@ -16,7 +16,9 @@ are keyed by. Only the fetch moves.
 """
 from __future__ import annotations
 
+import asyncio
 import re
+import weakref
 from urllib.parse import parse_qs, quote, urljoin, urlparse
 
 import aiohttp
@@ -109,8 +111,7 @@ async def fetch_from_cellar(url: str) -> str:
 
     Two requests: the CELEX resource answers a 303 to the Italian expression's document, then
     the document. The redirect is followed here, not by aiohttp: CELLAR points to plain http,
-    and the client does not re-check a redirect's host, so each hop is moved to https and
-    checked against the allow-list before it is asked."""
+    so each hop is moved to https and checked against the allow-list before it is asked."""
     celex = celex_of(url)
     if celex is None:
         raise DocumentNotFoundError(f"Nessun CELEX da chiedere a CELLAR per {url[:80]}", urn=url)
@@ -144,11 +145,46 @@ async def fetch_from_cellar(url: str) -> str:
     return result.text
 
 
+# Browsers open at once for EUR-Lex, in this process (item 14 of the security inventory). Each
+# Chromium takes hundreds of MB: without a cap, a burst of acts CELLAR could not serve opened one
+# each and could exhaust the service's memory for every reader. A call waits this long for a free
+# browser, then is told to retry.
+BROWSER_SLOTS = 2
+BROWSER_WAIT_SECONDS = 20.0
+
+# One semaphore per event loop: production runs one, the tests open a fresh loop per test.
+_slots: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore]" = weakref.WeakKeyDictionary()
+
+
+def _browser_slots() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    slots = _slots.get(loop)
+    if slots is None:
+        slots = _slots[loop] = asyncio.Semaphore(BROWSER_SLOTS)
+    return slots
+
+
 async def fetch_with_playwright(url: str, timeout_ms: int = 30000) -> str:
     """EUR-Lex's page through a real browser, which passes the firewall's challenge. Only a
-    declared host is visited (`is_allowed`); what the page then loads is not re-checked."""
+    declared host is visited (`is_allowed`); what the page then loads is not re-checked. At most
+    `BROWSER_SLOTS` browsers at once; a call that finds none free within `BROWSER_WAIT_SECONDS`
+    is refused with a 503 that says to retry."""
     if not is_allowed(url):
         raise NetworkError(f"Host non consentito: {url[:80]}", status_code=403)
+    slots = _browser_slots()
+    try:
+        await asyncio.wait_for(slots.acquire(), timeout=BROWSER_WAIT_SECONDS)
+    except TimeoutError:
+        log.warning("EUR-Lex: no browser free", slots=BROWSER_SLOTS, waited_s=BROWSER_WAIT_SECONDS)
+        raise NetworkError("EUR-Lex è occupato da altre consultazioni: riprova tra poco",
+                           status_code=503) from None
+    try:
+        return await _visit_with_browser(url, timeout_ms)
+    finally:
+        slots.release()
+
+
+async def _visit_with_browser(url: str, timeout_ms: int) -> str:
     log.info("Consulting EUR-Lex with Playwright")
     log.debug("Consulting EUR-Lex with Playwright", url=url)
     async with async_playwright() as p:

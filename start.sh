@@ -280,7 +280,7 @@ STORES_STARTED=1
 "${COMPOSE[@]}" up -d --wait postgres redis falkordb qdrant
 
 echo -e "\n${YELLOW}[2/5] Python API (:$VISUALEX_API_PORT)...${NC}"
-( cd "$PROJECT_ROOT/services/visualex" && PORT="$VISUALEX_API_PORT" exec "$VENV/bin/python" app.py ) &
+( cd "$PROJECT_ROOT/services/visualex" && PORT="$VISUALEX_API_PORT" HOST="$([ "$MERLT_ENABLED" = "true" ] && echo 0.0.0.0 || echo 127.0.0.1)" exec "$VENV/bin/python" app.py ) &
 API_PID=$!
 
 echo -e "\n${YELLOW}[3/5] Server (:3001)...${NC}"

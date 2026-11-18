@@ -4,14 +4,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
-vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
-vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
-vi.mock('../../ui/FeedbackModal', () => ({ FeedbackModal: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
-vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
 vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
@@ -65,7 +61,9 @@ describe('Layout — the page loaded with its route', () => {
     // An observer that has not answered yet: what the bar reads while the page is on its way.
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
     at('/pratiche');
-    expect(screen.getByTestId('layout-content')).toBeEmptyDOMElement();
+    // Only `PageSlide`'s frame (LC84), with nothing drawn in it.
+    expect(screen.getByTestId('layout-content')).toHaveTextContent(/^$/);
+    expect(screen.getByTestId('layout-content').querySelector('p, h1, h2, section, main')).toBeNull();
     expect(screen.queryByText('Pratiche')).toBeNull();
     await act(async () => { arrival.open(); });
     expect(await screen.findByRole('heading', { level: 1, name: 'Pratiche' })).toBeInTheDocument();

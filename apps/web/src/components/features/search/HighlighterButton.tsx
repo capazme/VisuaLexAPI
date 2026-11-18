@@ -10,6 +10,7 @@ import { MenuButton } from '../../ui/MenuButton';
 import { CHANGE_MEANINGS_LABEL, highlightColorItems, SECTION_HEADING } from './highlightColorItems';
 import { TOOL_PRESSED } from './toolbarToggle';
 import { keepForMenu, readAtPress, takeAtPress, takeForMenu, useReadingToolLife } from './readingToolLife';
+import { useOpenSettings } from '../settings/settingsRoute';
 
 export interface HighlighterButtonProps {
   /** The look of the bar's buttons, given to each half (and the gear). */
@@ -53,7 +54,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
   const on = useAppStore((s) => s.readingTool === 'highlight');
   const setReadingTool = useAppStore((s) => s.setReadingTool);
   const setHighlighterInk = useAppStore((s) => s.setHighlighterInk);
-  const openSettings = useAppStore((s) => s.openSettings);
+  const openSettings = useOpenSettings();
   const meanings = useHighlightColorMeanings();
   const turnOff = useCallback(() => setReadingTool(null), [setReadingTool]);
   useReadingToolLife('highlight', on, turnOff);
@@ -126,7 +127,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
         <button
           type="button"
           // As the menu's clicks, it never reaches the card it sits in (a dossier's row).
-          onClick={(event) => { event.stopPropagation(); openSettings('highlightColors'); }}
+          onClick={(event) => { event.stopPropagation(); openSettings('colori'); }}
           aria-label={CHANGE_MEANINGS_LABEL}
           title={CHANGE_MEANINGS_LABEL}
           className={cn(

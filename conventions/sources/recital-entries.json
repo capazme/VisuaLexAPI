@@ -1,0 +1,377 @@
+{
+  "version": 1,
+  "about": "The content of a dossier entry that is an EU recital: a norma entry with the key considerando (spec docs/superpowers/specs/2026-11-17-eu-recitals-design.md §2.4, §6.2, G-538). Each case is the input and either the entry kept (without _dossierMeta) with the star apart, or the Italian reason it is refused. Asserted by the server's schemas/recitalEntry.ts and the web's utils/sources/recitalEntry.ts.",
+  "cases": [
+    {
+      "id": "gdpr-26",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "entry": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26"
+      }
+    },
+    {
+      "id": "gdpr-26-starred",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "_dossierMeta": {
+          "important": true
+        }
+      },
+      "entry": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "star": {
+        "important": true
+      }
+    },
+    {
+      "id": "type-in-another-case",
+      "input": {
+        "tipo_atto": "Regolamento UE",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "entry": {
+        "tipo_atto": "Regolamento UE",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26"
+      }
+    },
+    {
+      "id": "full-date",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016-04-27",
+        "considerando": "26"
+      },
+      "entry": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016-04-27",
+        "considerando": "26"
+      }
+    },
+    {
+      "id": "directive",
+      "input": {
+        "tipo_atto": "direttiva ue",
+        "numero_atto": "2555",
+        "data": "2022",
+        "considerando": "1"
+      },
+      "entry": {
+        "tipo_atto": "direttiva ue",
+        "numero_atto": "2555",
+        "data": "2022",
+        "considerando": "1"
+      }
+    },
+    {
+      "id": "an-article-too",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "numero_articolo": "5"
+      },
+      "reason": "Campo «numero_articolo» non ammesso in un considerando: una voce è un articolo o un considerando"
+    },
+    {
+      "id": "an-annex",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "allegato": "I"
+      },
+      "reason": "Campo «allegato» non ammesso in un considerando"
+    },
+    {
+      "id": "a-version",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "versione": "vigente"
+      },
+      "reason": "Campo «versione» non ammesso in un considerando"
+    },
+    {
+      "id": "a-source-address",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita"
+      },
+      "reason": "Campo «url» non ammesso in un considerando"
+    },
+    {
+      "id": "an-unknown-key",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "testo": "…"
+      },
+      "reason": "Campo «testo» non ammesso in un considerando"
+    },
+    {
+      "id": "an-article-after-another-key",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "allegato": "I",
+        "numero_articolo": "5"
+      },
+      "reason": "Campo «numero_articolo» non ammesso in un considerando: una voce è un articolo o un considerando"
+    },
+    {
+      "id": "a-part",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "parte": "1-2"
+      },
+      "reason": "Campo «parte» non ammesso in un considerando"
+    },
+    {
+      "id": "a-version-date",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "data_versione": "2020-01-01"
+      },
+      "reason": "Campo «data_versione» non ammesso in un considerando"
+    },
+    {
+      "id": "a-real-act-type",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "tipo_atto_reale": "regolamento ue"
+      },
+      "reason": "Campo «tipo_atto_reale» non ammesso in un considerando"
+    },
+    {
+      "id": "an-urn",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "urn": "https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita"
+      },
+      "reason": "Campo «urn» non ammesso in un considerando"
+    },
+    {
+      "id": "a-forum-wrapper",
+      "input": {
+        "articleRef": {
+          "tipo_atto": "regolamento ue",
+          "numero_atto": "679",
+          "data": "2016",
+          "considerando": "26"
+        }
+      },
+      "reason": "Campo «articleRef» non ammesso in un considerando"
+    },
+    {
+      "id": "act-number-leading-zero",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "0679",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "reason": "Numero dell'atto non valido («0679»)"
+    },
+    {
+      "id": "an-italian-act",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_atto": "241",
+        "data": "1990-08-07",
+        "considerando": "3"
+      },
+      "reason": "Solo i regolamenti e le direttive dell'Unione hanno considerando numerati («legge»)"
+    },
+    {
+      "id": "a-treaty",
+      "input": {
+        "tipo_atto": "TFUE",
+        "numero_atto": "1",
+        "data": "2016",
+        "considerando": "1"
+      },
+      "reason": "Solo i regolamenti e le direttive dell'Unione hanno considerando numerati («TFUE»)"
+    },
+    {
+      "id": "leading-zero",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "026"
+      },
+      "reason": "Numero del considerando non valido («026»)"
+    },
+    {
+      "id": "letters",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26a"
+      },
+      "reason": "Numero del considerando non valido («26a»)"
+    },
+    {
+      "id": "non-ascii-digits",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "٢٦"
+      },
+      "reason": "Numero del considerando non valido («٢٦»)"
+    },
+    {
+      "id": "five-digits",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "10000"
+      },
+      "reason": "Numero del considerando non valido («10000»)"
+    },
+    {
+      "id": "empty-recital",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": ""
+      },
+      "reason": "Numero del considerando mancante"
+    },
+    {
+      "id": "recital-not-a-string",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": 26
+      },
+      "reason": "Campo «considerando» non valido: deve essere un testo"
+    },
+    {
+      "id": "recital-null",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": null
+      },
+      "reason": "Numero del considerando mancante"
+    },
+    {
+      "id": "no-act-type",
+      "input": {
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "reason": "Tipo di atto mancante"
+    },
+    {
+      "id": "no-act-number",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "reason": "Numero dell'atto mancante"
+    },
+    {
+      "id": "act-number-with-letters",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679a",
+        "data": "2016",
+        "considerando": "26"
+      },
+      "reason": "Numero dell'atto non valido («679a»)"
+    },
+    {
+      "id": "no-date",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "considerando": "26"
+      },
+      "reason": "Data dell'atto mancante"
+    },
+    {
+      "id": "bad-date",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "27/04/2016",
+        "considerando": "26"
+      },
+      "reason": "Data dell'atto non valida (anno, oppure anno-mese-giorno) («27/04/2016»)"
+    },
+    {
+      "id": "bad-star",
+      "input": {
+        "tipo_atto": "regolamento ue",
+        "numero_atto": "679",
+        "data": "2016",
+        "considerando": "26",
+        "_dossierMeta": {
+          "important": "sì"
+        }
+      },
+      "reason": "Campo «_dossierMeta» non valido"
+    },
+    {
+      "id": "not-an-object",
+      "input": [
+        "considerando 26"
+      ],
+      "reason": "Considerando non leggibile"
+    }
+  ]
+}

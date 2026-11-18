@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useContext, useMemo, lazy, Suspense, Component, type ReactNode } from 'react';
+import { UNSAFE_LocationContext, useLocation, useNavigate, useOutlet, type Location } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
@@ -8,14 +8,12 @@ import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { SettingsModal } from '../ui/SettingsModal';
 import { CorpusPracticesDialog } from '../features/practice/CorpusPracticesDialog';
-import { FeedbackButton } from '../ui/FeedbackButton';
-import { FeedbackModal } from '../ui/FeedbackModal';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
 import { NotificationHost } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
-import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
+import { PageSlide } from '../ui/PageSlide';
+import { SETTINGS_PATH, useOpenSettings, useSettingsRequests } from '../features/settings/settingsRoute';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 import { FindWindow } from '../features/search/FindWindow';
@@ -42,6 +40,7 @@ import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
 import { isMacPlatform } from '../ui/notifications/undoShortcut';
+import { stackRoomStore } from '../ui/notifications/stackRoom';
 import { FULL_PAGE_FRAME, PAGE_FRAME } from './frame';
 
 /**
@@ -91,19 +90,32 @@ function CompareWaiting() {
   );
 }
 
+/**
+ * The address a page was drawn at, kept for it (LC84): `PageSlide` keeps the leaving page's element, whose route is its
+ * own (`useOutlet`), but whatever in it reads `useLocation` (a title from the address, Opus's) would read the new one
+ * and draw the coming page twice. The router has no public way to give a subtree its own location (`<Routes location>`
+ * starts a new tree of routes), hence its context.
+ */
+function AtLocation({ location, children }: { location: Location; children: ReactNode }) {
+  const context = useContext(UNSAFE_LocationContext);
+  const value = useMemo(() => ({ ...context, location }), [context, location]);
+  return <UNSAFE_LocationContext.Provider value={value}>{children}</UNSAFE_LocationContext.Provider>;
+}
+
 export function Layout() {
-  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette, settingsDialog, openSettings, closeSettings } = useAppStore(useShallow(s => ({
+  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
     settings: s.settings,
     updateSettings: s.updateSettings,
     sidebarVisible: s.sidebarVisible,
     toggleSidebar: s.toggleSidebar,
     toggleSearchPanel: s.toggleSearchPanel,
     openCommandPalette: s.openCommandPalette,
-    // In the store, not here: a reader's gear opens it at «Significato dei colori» from wherever it is drawn.
-    settingsDialog: s.settingsDialog,
-    openSettings: s.openSettings,
-    closeSettings: s.closeSettings,
   })));
+  // Impostazioni is a page (LC84): the sidebar's entries, «?» and every gear ask for it, and the layout goes there.
+  const openSettings = useOpenSettings();
+  useSettingsRequests();
+  // The route's page as it is now: kept by `PageSlide` while it leaves, it goes on drawing the page it was.
+  const outlet = useOutlet();
   const { isAuthenticated } = useAuth();
   const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -115,8 +127,6 @@ export function Layout() {
   }, [logoSweep]);
   // The phone's drawer is closed as the shell draws: its sweep plays at its first opening in the session (LC18).
   const [drawerSweep, setDrawerSweep] = useState(false);
-  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
   const desktopSidebar = useDesktopSidebar();
   const reduceMotion = useReducedMotion();
@@ -126,8 +136,11 @@ export function Layout() {
   const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname, search } = location;
   const onSearchPage = pathname === '/';
+  const slidePage = pathname === SETTINGS_PATH ? 'impostazioni' : /^\/admin(\/|$)/.test(pathname) ? 'admin' : 'app';
+  const notificationRoom = stackRoomStore((s) => s.room);
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
   // Below lg (from lg the top bar holds the field, compact: LC21, the anti-slop review's FAIL of the 15th).
@@ -169,7 +182,7 @@ export function Layout() {
   const lgUp = useMediaQuery('(min-width: 1024px)');
   const drawerDrawn = !lgUp;
   // LC21: from lg every page but the search page and the lesson has the top bar, which holds the controls that floated
-  // («Commenti», «Tutto schermo») and the version's news; the search page's own bar holds them too. In full screen and
+  // («Tutto schermo») and the version's news; the search page's own bar holds them too. In full screen and
   // below lg they float as before.
   // LC27 (Luca, 15 Nov: «il passaggio a full screen è veramente brutto»): from lg the top bar stays in full screen too,
   // with its controls where they always are; full screen only hides the sidebar and widens the frame.
@@ -211,7 +224,7 @@ export function Layout() {
   // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
   // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
   // address is read when the welcome ends, not when this callback was made.
-  const { startTour, prepareTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+  const { startTour, prepareTour, hasSeenTour, tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (type) => {
       if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
@@ -302,18 +315,18 @@ export function Layout() {
       // Open keyboard shortcuts with '?' (Shift + /)
       if (e.key === '?' && !isTyping) {
         e.preventDefault();
-        setKeyboardShortcutsOpen(true);
+        openSettings('scorciatoie');
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage]);
+  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage, openSettings]);
 
-  // The controls of the top bar (LC21): the version's news, «Commenti», «Tutto schermo», compact and in line.
+  // The controls of the top bar (LC21): the version's news and «Tutto schermo», compact and in line. «Commenti» left
+  // it for the bug beside «Impostazioni» in the sidebar (LC92).
   const barControls = (
     <>
       <ChangelogNotification inBar />
-      {isAuthenticated && <FeedbackButton onOpen={() => setFeedbackOpen(true)} className="h-8 px-3 text-[13px] shadow-none" />}
       <button
         type="button"
         onClick={() => updateSettings({ focusMode: !settings.focusMode })}
@@ -364,8 +377,8 @@ export function Layout() {
             onToggleWide={desktopSidebar.toggle}
             closeMobile={() => { }}
             openSettings={() => openSettings()}
-            openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
-            openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
+            openKeyboardShortcuts={() => openSettings('scorciatoie')}
+            openFeedback={isAuthenticated ? () => openSettings('segnala') : undefined}
             serviceHealth={serviceHealth}
             logoSweep={logoSweep}
           />
@@ -382,8 +395,8 @@ export function Layout() {
             layout="drawer"
             closeMobile={closeDrawer}
             openSettings={() => openSettings()}
-            openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
-            openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
+            openKeyboardShortcuts={() => openSettings('scorciatoie')}
+            openFeedback={isAuthenticated ? () => openSettings('segnala') : undefined}
             serviceHealth={serviceHealth}
             logoSweep={drawerSweep}
           />
@@ -407,19 +420,6 @@ export function Layout() {
           showPhoneBar && phoneBar.hidden && 'max-md:[--phone-bar-offset:0px]',
         )}
       >
-        {/* «Commenti» (D-253), for a signed-in user from md: left of «Tutto schermo», 8 px from it, at its height and
-            in the same places — in the bar's right end between md and lg, at the window's top right from lg and in full
-            screen. Below md it is the user menu's «Commenti» (M1). */}
-        {isAuthenticated && !controlsInBar && (
-          <FeedbackButton
-            onOpen={() => setFeedbackOpen(true)}
-            className={cn(
-              'hidden md:inline-flex fixed top-4 right-[4.25rem] z-50',
-              !settings.focusMode && 'max-lg:right-14 max-lg:top-[calc(env(safe-area-inset-top)+0.375rem)]',
-            )}
-          />
-        )}
-
         {/* The full screen (U1, L-47: `focusMode` in the settings): it widens the frame, never narrows it. A toggle, so
             its name stays «Tutto schermo» and `aria-pressed` says the state; the `title` says what a press does. */}
         {!controlsInBar && <motion.button
@@ -463,9 +463,11 @@ export function Layout() {
         {showSearchBar && (
           <div
             data-testid="search-bar"
+            data-palette-bar=""
             // The phone's bar on this page (M1): 56 px below lg, the menu button beside the field and the iPhone's top
             // edge above it; 72 px from lg. From md «Commenti» and the Focus toggle float at the top right: the field ends before them,
             // with 8 px of air between md and lg (10.5 rem: the toggle's 4 px and 44, 8 of gap, about 103 for «Commenti»; it was 9.75).
+            // LC92: «Commenti» left the top right; the room is kept as it was until it is measured again in a browser.
             // Positioned in the dropdown band, so the line under the field paints over the practice's sticky headings
             // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
             className={cn(
@@ -476,8 +478,14 @@ export function Layout() {
           >
             <MenuToggle {...menuToggle} />
             <SearchField />
+            {/* L-75: the search's field grows out of this one, in its place. */}
+            <div data-palette-slot="" className="absolute bottom-0 left-12 right-4 flex h-14 items-center empty:hidden md:right-[10.5rem]" />
           </div>
         )}
+
+        {/* The search (⌘K): its field grows in the bar above, its lists are a band here, under the bars, that pushes the
+            page down (L-75: nothing over the content). */}
+        <GlobalSearch />
 
         {/* Content Area. `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the
             sidebar, the floating buttons and the search bar stay still. */}
@@ -503,31 +511,43 @@ export function Layout() {
             // top row keeps clear (`FOCUS_BUTTON_CLEARANCE`): from md in full screen, which draws no bar for them to sit
             // in; from lg otherwise; never over the search page's field, which ends before them. 11 rem: the toggle's
             // 60 px from the edge, 8 of gap, about 96 for «Commenti» and 8 of air.
+            // LC92: «Commenti» left the top right; the room is kept as it was until it is measured again in a browser.
             // Only where the controls still float: full screen below lg.
             settings.focusMode && !lgUp && 'md:[--focus-button-room:11rem]',
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
             // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-10',
           )}>
-            <RoutePage>
-              <Outlet />
-            </RoutePage>
+            {/* Impostazioni (LC84) and Amministrazione (LC93) come in as pages of their own and go back the other way;
+                every other change of page keeps its own transition, so the key changes only entering and leaving them. */}
+            <PageSlide pageKey={slidePage} back={slidePage === 'app'}>
+              <AtLocation location={location}>
+                <div data-page-place className="contents">
+                  <RoutePage>
+                    {outlet}
+                  </RoutePage>
+                </div>
+              </AtLocation>
+            </PageSlide>
           </div>
+          {/* LC85: while notifications show at the bottom, the page can scroll its last rows above them. Not on the
+              search page, whose practice columns are the scroller's height and scroll on their own. */}
+          {!onSearchPage && notificationRoom > 0 && <div aria-hidden data-notification-room="" style={{ height: notificationRoom }} />}
         </div>
       </main>
 
       {/* LC60: the Corpus's practices a browser kept become pratiche, once, by the user's choice. */}
       <CorpusPracticesDialog />
-      <SettingsModal isOpen={settingsDialog.open} section={settingsDialog.section} onClose={closeSettings} onRestartTour={resetAndStartTour} />
       <WelcomeGuide />
 
-      {/* Keyboard Shortcuts Modal */}
-      <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
-
-      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
-
       {/* Version changelog notification */}
-      {!controlsInBar && <ChangelogNotification />}
+      {/* LC92: hidden while the phone's drawer is open (at 390 it covered the drawer's foot and took its clicks); kept
+          mounted, so it comes back as it was when the drawer closes. */}
+      {!controlsInBar && (
+        <div data-testid="news-floating-host" className="contents" hidden={sidebarOpen && drawerDrawn}>
+          <ChangelogNotification />
+        </div>
+      )}
 
       {/* Global Undo Toast Container */}
       <NotificationHost />
@@ -539,9 +559,6 @@ export function Layout() {
 
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
-
-      {/* The palette (⌘K) and the managers it opens, on every page */}
-      <GlobalSearch />
 
       {/* The planner's quick add («c»), its toast and the count beside «Oggi», on every page */}
       <PlannerHost enabled={isAuthenticated} />

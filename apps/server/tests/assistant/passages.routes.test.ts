@@ -187,6 +187,14 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
       expect(response.body.testo).toBe(RAW);
     });
 
+    it('refuses a recital in its own words, with no request (spec 2026-11-17 §6.3)', async () => {
+      const recitalId = (await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice))
+        .send({ itemType: 'norm', title: 'x', content: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' } })).body.id;
+      const response = await text(recitalId);
+      expect(response.status).toBe(400);
+      expect(response.body.detail).toBe('Il testo di un considerando non si legge ancora da qui: aprilo nel lettore di LexCraft.');
+    });
+
     it('refuses a note, a source that cannot answer, and another user’s dossier', async () => {
       expect((await text(noteId)).body.detail).toBe('Questa voce non ha un testo: è una nota.');
       articleStatus = 502;

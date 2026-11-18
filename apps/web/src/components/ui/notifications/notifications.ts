@@ -12,8 +12,11 @@ export type CloseReason = 'timeout' | 'dismiss' | 'undo' | 'evicted' | 'external
 
 /** At most this many on each edge: a fourth closes the oldest (K1a). */
 export const STACK_MAX = 3;
-/** «Annulla»'s time (K1a: it stays 5 seconds). */
-export const UNDO_MS = 5000;
+/**
+ * «Annulla»'s time, and the least any notification with «Annulla» stays (LC85, the consultant and Papiniano: often it is
+ * the only way back). Held while the pointer is on it or the focus in it (`countdown.ts`). Plain ones may be shorter.
+ */
+export const UNDO_MS = 10000;
 /** How long «Ripristinato» stays after «Annulla». */
 export const RESTORED_MS = 1500;
 
@@ -124,17 +127,19 @@ export function holdNotification(id: number, reason: HoldReason, on: boolean) {
 export function notify(input: NotificationInput): number {
   const id = nextId++;
   const position = input.position ?? 'bottom';
+  // An «Annulla» never shorter than `UNDO_MS`, whatever its caller asked (one that stays until closed stays so).
+  const duration = input.onUndo && input.duration > 0 ? Math.max(input.duration, UNDO_MS) : input.duration;
   const entry: NotificationEntry = {
     id,
     type: input.type,
     message: input.message,
     position,
-    duration: input.duration,
+    duration,
     undoable: Boolean(input.onUndo),
     action: input.action,
     ariaLive: input.ariaLive,
     closing: null,
-    clock: { remaining: input.duration, held: false },
+    clock: { remaining: duration, held: false },
   };
   const own: Handlers = { countdown: null, onUndo: input.onUndo, onClose: input.onClose };
   handlers.set(id, own);
@@ -152,36 +157,38 @@ export function notify(input: NotificationInput): number {
     announced: politeness === 'off' ? s.announced : { ...s.announced, [politeness]: { id, message: input.message } },
   }));
 
-  if (input.duration > 0) {
+  if (duration > 0) {
     own.countdown = startCountdown(
-      input.duration,
+      duration,
       () => closeNotification(id, 'timeout'),
       () => {
         const c = own.countdown;
         if (c) patch(id, { clock: { remaining: c.remaining(), held: c.held() } });
       },
     );
-    if (own.countdown.held()) patch(id, { clock: { remaining: input.duration, held: true } });
+    if (own.countdown.held()) patch(id, { clock: { remaining: duration, held: true } });
   }
   return id;
 }
 
 /**
- * `entry` drawn where `after` is (just after it in the list, which the stack shows newest first), or where `after`
- * stood if it is gone already (`undoneSlots`); else at the end, the newest.
+ * `entry` drawn where `after` is: just before it in the list, which the stack shows newest first, so it takes its slot
+ * and nothing moves once `after` has gone (LC85, Papiniano: «Ripristinato» was drawn over it, then dropped 63 px); or
+ * where `after` stood if it is gone already (`undoneSlots`); else at the end, the newest.
  */
 function placeAfter(entries: NotificationEntry[], entry: NotificationEntry, after: number | undefined): NotificationEntry[] {
   if (after === undefined) return [...entries, entry];
-  let at = entries.findIndex((e) => e.id === after);
-  if (at < 0 && undoneSlots.has(after)) {
-    const before = undoneSlots.get(after);
-    at = before === null ? -1 : entries.findIndex((e) => e.id === before);
-    if (before !== null && at < 0) return [...entries, entry];
-  } else if (at < 0) {
-    return [...entries, entry];
+  const at = entries.findIndex((e) => e.id === after);
+  if (at >= 0) {
+    undoneSlots.delete(after);
+    return [...entries.slice(0, at), entry, ...entries.slice(at)];
   }
+  if (!undoneSlots.has(after)) return [...entries, entry];
+  const before = undoneSlots.get(after);
   undoneSlots.delete(after);
-  return [...entries.slice(0, at + 1), entry, ...entries.slice(at + 1)];
+  const slot = before === null ? -1 : entries.findIndex((e) => e.id === before);
+  if (before !== null && slot < 0) return [...entries, entry];
+  return [...entries.slice(0, slot + 1), entry, ...entries.slice(slot + 1)];
 }
 
 /** A stack on screen counts itself while it is mounted (`NotificationHost`). */

@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -6,6 +6,7 @@ import { spring } from '../../../lib/motion';
 import { useWorkspaceCovered } from '../../../hooks/useWorkspaceCovered';
 import { NotificationCard } from './NotificationCard';
 import { footBarStore } from './footBar';
+import { stackRoomStore } from './stackRoom';
 import { isEditableTarget, isUndoCovered, isUndoShortcut, undoShortcutKeys, undoShortcutLabel } from './undoShortcut';
 import {
   announce,
@@ -96,9 +97,25 @@ export function NotificationHost() {
 
 function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'bottom'; entries: NotificationEntry[]; still: boolean; shortcutFor?: number }) {
   const footRoom = footBarStore((s) => s.room);
-  if (entries.length === 0) return null;
+  const ref = useRef<HTMLDivElement>(null);
+  const shown = entries.length > 0;
+  // The bottom stack says how much of the window's foot it takes, so the page keeps that room free under its content.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (position !== 'bottom' || !el) return;
+    const measure = () => stackRoomStore.setState({ room: Math.max(0, Math.round(window.innerHeight - el.getBoundingClientRect().top)) });
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(el);
+    return () => {
+      observer?.disconnect();
+      stackRoomStore.setState({ room: 0 });
+    };
+  }, [position, shown, footRoom]);
+  if (!shown) return null;
   return (
     <div
+      ref={ref}
       // The bar's room, on this stack alone (never the root's style: see `footBar.ts`).
       style={position === 'bottom' && footRoom > 0 ? ({ '--foot-bar': `${footRoom}px` } as CSSProperties) : undefined}
       className={cn(

@@ -13,7 +13,6 @@ const CANCEL_FIRST: [string, string][] = [
   ['components/features/bulletin/EditSuggestionDialog.tsx', 'Revocare questo item?'],
   ['components/features/bulletin/EditSuggestionDialog.tsx', 'Revocare ${pendingCount}'],
   ['components/features/studia/CardDetail.tsx', 'Ritirare la proposta?'],
-  ['components/features/studia/CardDetail.tsx', 'Eliminare la scheda?'],
   ['components/features/studia/corsi/CoursePage.tsx', 'Il programma finisce con'],
   ['components/features/studia/corsi/CoursePage.tsx', 'Ritirare il modulo'],
   ['components/features/search/discussionControls.tsx', 'Segnalare ai moderatori?'],
@@ -21,6 +20,7 @@ const CANCEL_FIRST: [string, string][] = [
   ['components/features/practice/CorpusPracticesDialog.tsx', 'Non salvare le raccolte?'], // LC60: what is not saved is lost
   ['components/features/atti/PraticaFilesPanel.tsx', 'Prima di caricare il primo file'], // the notice is read before the first upload
   ['components/features/studia/lezione/LessonSession.tsx', 'Interrompere la lezione?'], // a lesson left is not resumed
+  ['pages/AdminPage.tsx', 'Eliminare ${deleting'], // LC93: an account erased is gone for good
 ];
 /** Undone by another step, so the focus may start on the action. */
 const ACTION_FIRST: [string, string][] = [

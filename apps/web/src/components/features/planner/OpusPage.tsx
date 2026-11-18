@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { scrollParentOf } from '../practice/practiceView';
 import { CalendarDays, CalendarCheck, Inbox, Trash2 } from 'lucide-react';
@@ -7,22 +7,29 @@ import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { QUIET_BUTTON } from '../studia/progress/tokens';
 import { FOCUS_RING } from '../../../constants/interactions';
+import { plannerStore } from './plannerStore';
+import { setFootBarRoom } from '../../ui/notifications/footBar';
 
 /** The planner's three views, tabs of the page since Work's bar lists only its five entries (D-315, LC8): the short
- *  word on a phone, as the Forum's tabs, so the three share a 320 px row. */
+ *  word on a phone, where they are the bar at the foot, the full name from `md`, one name each (LC83). */
 const VIEWS = [
   { to: '/work/scadenziario', label: 'Scadenziario', short: 'Scadenziario', icon: CalendarCheck },
   { to: '/work/prossimi', label: 'Prossimi giorni', short: 'Prossimi', icon: CalendarDays },
   { to: '/work/ingresso', label: "Lista d'ingresso", short: 'Ingresso', icon: Inbox },
 ];
 
+/** Below `lg` a framed square with the icon, the words for a screen reader (LC38): at 768 px the title, the tabs and
+ *  both options in words do not fit one row (LC83). From `lg` the words in full. */
+const HEADER_BUTTON = cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 max-lg:w-11 max-lg:justify-end max-lg:px-0 max-lg:no-underline');
+const HEADER_ICON = 'inline-flex items-center max-lg:size-9 max-lg:justify-center max-lg:rounded-lg max-lg:border max-lg:border-slate-300 dark:max-lg:border-slate-700';
+
 /**
- * Opus's page (the planner, wave 1): the view's name as the title, the section's phrase over it (L-37), over its views —
- * «Scadenziario» (Opus's home), «Prossimi giorni», «Lista d'ingresso» — which are the page's tabs (LC8; the sidebar has «Scadenziario»
- * among Work's five entries); «Dossier» stays an entry of Work. In the sections' frame (`PageFrame`, W2), its title the one the
- * section switcher focuses (T1); the views take the frame's width, the lists' rows with room for the dossier at their
- * right end (P2b). The tasks' trash is a view of its
- * own: a task's trash is on the task, not among the dossiers' (`/api/trash`).
+ * Opus's page (the planner): one compact header (LC83) — «Scadenze» once, its three views beside it as tabs
+ * («Scadenziario», Opus's home, «Prossimi giorni», «Lista d'ingresso»), then the trash on the same row («Raggruppa» is
+ * in «Scadenziario» itself, over its rows);
+ * from `md` it stays at the top while the view scrolls (LC27). On a phone the tabs are the bar at the screen's foot
+ * (LC33) and the trash an icon beside the title. «Dossier» stays an entry of Work. The tasks' trash is a view of
+ * its own, under its own title: a task's trash is on the task, not among the dossiers' (`/api/trash`).
  */
 export function OpusPage() {
   const { pathname } = useLocation();
@@ -30,10 +37,32 @@ export function OpusPage() {
   // the tools that are coming.
   const inView = VIEWS.some((view) => pathname.startsWith(view.to));
   const inTrash = pathname.startsWith('/work/cestino');
-  const viewTop = useRef<HTMLDivElement>(null);
-  /** Scrolled past the tabs, a change of view puts the scroller back where they stick; above them, nothing moves. */
+  const inboxCount = plannerStore((s) => s.inboxCount);
+  const tabs = useRef<HTMLDivElement>(null);
+  const tabsShown = inView || inTrash;
+  // On a phone the views' bar is held at the screen's foot: its room there (its height and the safe area under it,
+  // `footBarStore`), so the notifications rise over it and the page keeps both free (LC85, Papiniano on #585). From md
+  // the bar is in the header: no room.
+  useLayoutEffect(() => {
+    const bar = tabs.current;
+    if (!tabsShown || !bar) return;
+    const measure = () => setFootBarRoom(getComputedStyle(bar).position === 'fixed'
+      ? Math.max(0, Math.round(document.documentElement.clientHeight - bar.getBoundingClientRect().top))
+      : 0);
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(bar);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      setFootBarRoom(0);
+    };
+  }, [tabsShown]);
+  /** Scrolled past the header, a change of view puts the scroller back where it sticks; above it, nothing moves. */
   const keepPlace = () => {
-    const mark = viewTop.current;
+    // The frame's top, where the header sits before it sticks: the header itself reads where it is stuck.
+    const mark = tabs.current?.closest<HTMLElement>('[data-page-width]');
     const scroller = mark ? scrollParentOf(mark) : null;
     if (!mark || !scroller) return;
     const stuckAt = mark.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
@@ -41,45 +70,33 @@ export function OpusPage() {
   };
   return (
     <PageFrame
-      // The view's name, from the one list of the pages' names (L-37).
-      title={pageName(pathname) ?? 'Scadenziario'}
+      // «Scadenze» over the three views; the trash and the tools that are coming keep their own name (L-37).
+      title={inView ? 'Scadenze' : pageName(pathname) ?? 'Scadenze'}
       kicker="opus"
       section="opus"
       className="h-full"
-      // On a phone the trash is an icon beside the title (LC33, after Todoist: the title, then the list).
+      // On a phone the options are icons beside the title (LC33, after Todoist: the title, then the list).
       actionBeside
-      action={inView && (
-        // On a phone a small framed button with the icon (LC38, Luca: «senza scritta. Basta ci metti il pulsante»): its frame
-        // drawn 36 px inside the 44 px link, named «Cestino dei compiti»; from md the words in full.
-        <Link to="/work/cestino" aria-label="Cestino dei compiti" className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center max-md:w-11 max-md:justify-end max-md:px-0 max-md:no-underline')}>
-          <span className="inline-flex items-center gap-1.5 max-md:size-9 max-md:justify-center max-md:rounded-lg max-md:border max-md:border-slate-300 dark:max-md:border-slate-700">
-            <Trash2 size={15} aria-hidden />
-            <span aria-hidden className="max-md:hidden">Cestino dei compiti</span>
-          </span>
-        </Link>
-      )}
-    >
-      <div className="flex w-full min-w-0 flex-col gap-4 max-md:-mt-3 max-md:gap-0">
-        {/* Links, not `ui/SegmentedTabs` (buttons over one panel): each view has its address. Its look, the mark still. */}
-        {/* LC27 (Luca, 15 Nov): the views' tabs stay at the top while the view scrolls, and a new view starts right under
-            them, never with a jump to the page's top; it comes in with a short fade (none under reduced motion). */}
-        <div ref={viewTop} aria-hidden />
-        {(inView || inTrash) && (
-          // On a phone the views are a bar at the screen's foot, where the thumb is (LC33, after Todoist's «In arrivo ·
-          // Oggi · Prossime»); from md the tabs at the top, sticky.
-          <div className={cn(
-            'sticky top-0 z-10 -mx-2 bg-slate-50 px-2 py-2 dark:bg-slate-950',
-            'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:z-30 max-md:mx-0 max-md:border-t max-md:border-slate-200 max-md:bg-card max-md:px-3 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:pt-1.5 max-md:dark:border-slate-800',
-          )}>
-          <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 max-md:bg-transparent max-md:p-0 dark:bg-slate-800 max-md:dark:bg-transparent sm:w-fit">
+      headerClassName={(inView || inTrash) ? 'md:sticky md:top-[var(--phone-bar-offset,0px)] md:z-10 md:bg-slate-50 md:py-1.5 md:dark:bg-slate-950' : undefined}
+      beside={(inView || inTrash) && (
+        // Links, not `ui/SegmentedTabs` (buttons over one panel): each view has its address. On a phone the views are a
+        // bar at the screen's foot, where the thumb is (LC33, after Todoist's «In arrivo · Oggi · Prossime»); from md
+        // the tabs beside the title.
+        <div
+          ref={tabs}
+          className={cn(
+            'md:mr-auto',
+            'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:border-t max-md:border-slate-200 max-md:bg-card max-md:px-3 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:pt-1.5 max-md:dark:border-slate-800',
+          )}
+        >
+          <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 max-md:bg-transparent max-md:p-0 dark:bg-slate-800 max-md:dark:bg-transparent md:w-fit">
             {VIEWS.map((view) => (
               <NavLink
                 key={view.to}
                 to={view.to}
                 onClick={keepPlace}
-                aria-label={view.label}
                 className={({ isActive }) => cn(
-                  'flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-md px-2 text-sm font-medium transition-colors sm:flex-none sm:px-4',
+                  'flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-md px-2 text-sm font-medium transition-colors md:flex-none md:px-4',
                   'max-md:flex-col max-md:gap-0.5 max-md:py-1.5 max-md:text-xs max-md:shadow-none',
                   FOCUS_RING,
                   isActive
@@ -88,17 +105,37 @@ export function OpusPage() {
                 )}
               >
                 <view.icon aria-hidden size={20} strokeWidth={1.75} className="md:hidden" />
-                <span aria-hidden className="sm:hidden">{view.short}</span>
-                <span aria-hidden className="hidden sm:inline">{view.label}</span>
+                <span className="inline-flex items-baseline">
+                  {/* One name at each width: the other is `display: none`, so a screen reader reads one too. */}
+                  <span className="md:hidden">{view.short}</span>
+                  <span className="hidden md:inline">{view.label}</span>
+                  {/* The inbox's count, the one view with no group to carry it (LC83). */}
+                  {view.to === '/work/ingresso' && pathname.startsWith(view.to) && inboxCount !== null && inboxCount > 0 && (
+                    <span data-tab-count className="ml-1.5 font-normal tabular-nums opacity-75">
+                      <span className="sr-only">, </span>
+                      {inboxCount}
+                      <span className="sr-only">{inboxCount === 1 ? ' compito' : ' compiti'}</span>
+                    </span>
+                  )}
+                </span>
               </NavLink>
             ))}
           </nav>
-          </div>
-        )}
-        {/* At least a screen tall: a view that mounts empty while it loads never shortens the page under the reader. */}
-        <div key={pathname} className={cn('min-h-[calc(100dvh-8rem)] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150', (inView || inTrash) && 'max-md:pb-24')}>
-          <Outlet />
         </div>
+      )}
+      action={inView && (<>
+        <Link to="/work/cestino" aria-label="Cestino dei compiti" className={HEADER_BUTTON}>
+          <span className={HEADER_ICON}>
+            <Trash2 size={15} aria-hidden />
+          </span>
+          <span aria-hidden className="max-lg:hidden">Cestino</span>
+        </Link>
+      </>)}
+    >
+      {/* At least a screen tall: a view that mounts empty while it loads never shortens the page under the reader. It
+          comes in with a short fade (none under reduced motion). */}
+      <div key={pathname} className={cn('min-h-[calc(100dvh-8rem)] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150', (inView || inTrash) && 'max-md:pb-24')}>
+        <Outlet />
       </div>
     </PageFrame>
   );

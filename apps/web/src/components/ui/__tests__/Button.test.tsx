@@ -85,4 +85,11 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Salva' })).toHaveClass('dark:disabled:bg-slate-700', 'dark:disabled:text-slate-400', 'dark:disabled:opacity-100', 'disabled:opacity-50');
     expect(screen.getByRole('button', { name: 'Annulla' })).not.toHaveClass('dark:disabled:bg-slate-700');
   });
+
+  it('draws `link` as underlined words, at the touch height, with no side padding nor fill', () => {
+    render(<Button variant="link">Vedi tutte</Button>);
+    const button = screen.getByRole('button', { name: 'Vedi tutte' });
+    expect(button).toHaveClass('underline', 'px-0', 'bg-transparent', 'min-h-11', 'md:min-h-9');
+    expect(button).not.toHaveClass('px-4');
+  });
 });

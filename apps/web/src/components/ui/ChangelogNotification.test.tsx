@@ -97,6 +97,25 @@ describe('ChangelogNotification', () => {
     ]);
   });
 
+  it('keeps the pill after a reload in the same session, the check not made again, until it is opened or closed (LC91)', async () => {
+    localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
+    const fetched = answer('1.9.1');
+    const first = render(<ChangelogNotification />);
+    expect(await screen.findByRole('button', { name: 'Vedi' })).toBeInTheDocument();
+    first.unmount();
+
+    // The reload: within the throttle, no second request, the pill all the same.
+    render(<ChangelogNotification />);
+    expect(await screen.findByRole('button', { name: 'Vedi' })).toBeInTheDocument();
+    expect(fetched).toHaveBeenCalledTimes(1);
+
+    // Opened and closed: marked seen, and a reload no longer shows it.
+    await userEvent.click(screen.getByRole('button', { name: 'Vedi' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Chiudi' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(localStorage.getItem(VERSION_STORAGE_KEY)).toBe('1.9.1');
+  });
+
   it('says «Correzioni e miglioramenti» for a version this bundle has no note of, and does not mark it seen', async () => {
     // A tab opened before a deploy: the server names the new version, the bundle has the old notes.
     localStorage.setItem(VERSION_STORAGE_KEY, '99.0.0');

@@ -10,15 +10,17 @@ import type { ArticleData, Norma } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
 import { useSimpleReading } from './simpleReading';
 import { removePracticeActWithUndo } from './practiceUndo';
-import { useActItemIds } from './inDossier';
-import { removeItemsWithUndo } from '../dossier/removeItemsWithUndo';
+import { articleItemIds, removeFromDossierAndTable, useActItemIds } from './inDossier';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIDDEN_SCROLLBAR } from '../../../constants/interactions';
 import { TreeViewPanel } from '../search/TreeViewPanel';
 import { AnnexSuggestion } from '../search/AnnexSuggestion';
 import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { LazyStudyMode as StudyMode } from '../workspace/LazyStudyMode';
-import { shownAnnex } from '../dossier/dossierLayout';
+import { articleLabel, layoutDossier, shownAnnex } from '../dossier/dossierLayout';
+import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
+import { matchesQuery, useFontiTools } from './fontiTools';
+import { useActDetails } from '../dossier/useActDetails';
 import { PracticeArticleRow } from './PracticeArticleRow';
 import { PracticeArticleEntry } from './PracticeIndexEntry';
 import type { PracticeLayout } from './PracticeColumn';
@@ -105,6 +107,43 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // dossier» (to the trash, with «Annulla»; the rows stay on the table): a removal from the table alone would come back
   // with the next re-sync.
   const { dossier: hostDossier, ids: dossierIds } = useActItemIds(act);
+  // In a dossier's «Fonti» (LC86) a closed row has no text yet: its rubric comes from the act's index, read once per
+  // act as the old list read it (`useActDetails`).
+  const heldDossier = useAppStore((s) => (hostDossier ? s.dossiers.find((d) => d.id === hostDossier.id) : undefined));
+  const dossierItems = heldDossier?.items;
+  const dossierBlock = useMemo(() => (dossierItems ? layoutDossier(dossierItems).acts.find((a) => a.key === act.key) : undefined), [dossierItems, act.key]);
+  const { rubricaOf, title: actTitle } = useActDetails(dossierBlock);
+  // «Fonti»'s filter (LC88): the act by its name shows all its rows; else a row by its number, its rubric or the text of
+  // the dossier's notes about it. An act left with no row closes, until the filter changes.
+  const tools = useFontiTools();
+  const query = tools?.query ?? '';
+  // Not memoised: the rubrics arrive after the query, and `rubricaOf` is what says they did.
+  const shownArticles = !query || matchesQuery(query, actHeading(act.norma), actTitle) ? act.articles
+    : act.articles.filter((article) => {
+      const text = article.article_text;
+      const rubrica = (text ? getRubricText(text, parseArticleStructure(text)) : null) ?? rubricaOf(article.norma_data);
+      const ids = new Set(articleItemIds(heldDossier, article.norma_data));
+      const notes = (dossierItems ?? []).filter((i) => i.type === 'note' && i.aboutItemId && ids.has(i.aboutItemId)).map((i) => String(i.data));
+      return matchesQuery(query, articleLabel(article.norma_data), article.norma_data.numero_articolo, rubrica, ...notes);
+    });
+  // The dossier's entries shown: the articles' own, and the notes about them, which open with them.
+  const shownIds = shownArticles.flatMap((article) => articleItemIds(heldDossier, article.norma_data));
+  const shownNoteIds = (dossierItems ?? []).filter((i) => i.type === 'note' && i.aboutItemId && shownIds.includes(i.aboutItemId)).map((i) => i.id);
+  const shownKey = [...shownIds, ...shownNoteIds].join('|');
+  const report = tools?.report;
+  useEffect(() => { report?.(act.id, shownKey ? shownKey.split('|') : []); }, [report, act.id, shownKey]);
+  useEffect(() => () => report?.(act.id, []), [report, act.id]);
+  const hiddenByFilter = query !== '' && shownArticles.length === 0;
+  const folded = act.isCollapsed || hiddenByFilter;
+  // An act the filter closed opens on its heading as any other: the filter goes, and the act opens.
+  const toggleAct = () => {
+    if (!hiddenByFilter) {
+      toggleActCollapse(practiceId, act.id);
+      return;
+    }
+    tools?.clear();
+    if (act.isCollapsed) toggleActCollapse(practiceId, act.id);
+  };
   // A separator only under a command: on a computer an act has none above its removal (the tests of 16-11; LC60: the
   // Ricerca's act lost «Sposta in un'altra pratica»).
   const commandsAbove = !toolsShown;
@@ -143,7 +182,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     }
     return null;
   }, [openKeys, byKey]);
-  const current = (activeKey && byKey.get(activeKey)) || act.articles[0];
+  // While filtering, the head names a row the filter shows: the one read if shown, else the first shown, else none.
+  const active = activeKey ? byKey.get(activeKey) : undefined;
+  const current = query ? (active && shownArticles.includes(active) ? active : shownArticles[0]) : (active || act.articles[0]);
   const studyArticle = (studyKey && byKey.get(studyKey)) || current;
   // Study Mode's tools write notes keyed by the article, not the version: never on a past text (gotcha 32).
   const isLocked = (article: ArticleData | undefined) =>
@@ -174,7 +215,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     addArticlesToPractice(practiceId, norma, loaded, { reveal: 'first' });
   }, [addArticlesToPractice, practiceId]);
   const {
-    treeData, treeMetadata, treeLoading, rubriche, abrogati, rubricheParts, currentAnnex, allArticleIds,
+    treeData, treeMetadata, rubriche, abrogati, rubricheParts, currentAnnex, allArticleIds,
     loadingArticle, fetchTree, handleAnnexSelect, handleLoadArticle, loadedArticleIds,
   } = useAnnexNavigation({ norma: act.norma, articles: act.articles, addArticles: landInAct, activeArticle: current });
 
@@ -275,7 +316,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {...listeners}
           aria-label={`Sposta ${heading}`}
           // Lettura semplice (LC28): one act, nothing to reorder.
-          className={cn(plain ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
+          // 44 px to grab on a computer too (LC86); its reach goes into the panel's margin, the grip where it was.
+          className={cn(plain ? 'hidden' : 'hidden md:flex', 'min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-300 hover:text-slate-500 md:-my-2 md:-ml-3 md:-mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
@@ -288,13 +330,13 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             <div
               role="button"
               tabIndex={0}
-              aria-expanded={!act.isCollapsed}
-              onClick={() => toggleActCollapse(practiceId, act.id)}
+              aria-expanded={!folded}
+              onClick={toggleAct}
               onKeyDown={(e) => {
                 if (e.target !== e.currentTarget) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  toggleActCollapse(practiceId, act.id);
+                  toggleAct();
                 }
               }}
               // The act's title, in the reader's serif (R3): 22 px; 17 px in the index, a heading among its entries.
@@ -307,7 +349,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 <ChevronDown
                   size={16}
                   aria-hidden
-                  className={cn('flex-shrink-0 text-slate-400 transition-transform', act.isCollapsed && '-rotate-90')}
+                  className={cn('flex-shrink-0 text-slate-400 transition-transform', folded && '-rotate-90')}
                 />
               )}
               {/* A cut act name says nothing: on a phone it wraps; on a computer, cut beside the tools or in the index, its
@@ -352,7 +394,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white')}
                 >
                   <GitBranch size={16} aria-hidden />
-                  <span className="hidden lg:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>
+                  {/* Its name, loading or not (LC86): the tree's arrival shows in the space it opens. */}
+                  <span className="hidden lg:inline">Struttura</span>
                 </button>
                 <button
                   type="button"
@@ -386,7 +429,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
               hostDossier && dossierIds.length > 0
                 ? {
                   label: 'Togli dalla pratica', icon: FolderMinus, danger: true, separatorBefore: commandsAbove,
-                  onSelect: () => removeItemsWithUndo(hostDossier.id, dossierIds, dossierIds.length === 1
+                  onSelect: () => removeFromDossierAndTable(hostDossier.id, dossierIds, dossierIds.length === 1
                     ? 'Articolo tolto dalla pratica' : `${dossierIds.length} articoli tolti dalla pratica`, hostDossier.onTrashChanged),
                 }
                 : { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: commandsAbove, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
@@ -417,11 +460,11 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         rubricheParts={rubricheParts}
       />
 
-      {!act.isCollapsed && isIndex && (
+      {!folded && isIndex && (
         <div className="py-1">
-          {act.articles.length > 0 && (
+          {shownArticles.length > 0 && (
             <ul aria-label={`Articoli sul tavolo di ${heading}`} className="space-y-0.5">
-              {act.articles.map((article) => (
+              {shownArticles.map((article) => (
                 <PracticeArticleEntry key={practiceArticleKey(article)} practiceId={practiceId} actId={act.id} article={article} />
               ))}
             </ul>
@@ -444,17 +487,18 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         </div>
       )}
 
-      {!act.isCollapsed && !isIndex && (
+      {!folded && !isIndex && (
         <div className="py-1">
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
           {/* Lettura semplice (LC70): no line of its own; the selector and the loading are in the status line. */}
-          {!simple && (act.articles.length > 1 || loadingArticle || (showNavigation && !navInHead)) && (
+          {!simple && ((act.articles.length > 1 && !hostDossier) || loadingArticle || (showNavigation && !navInHead)) && (
             // On a phone one row: the chips scroll sideways beside the arrows (R3: two rows of chips came before the text).
             // The arrows first, the left arrow's glyph on the text's edge (LC68: no empty half row before them).
             <div className="flex items-center gap-x-3 gap-y-1 py-1 md:flex-wrap md:py-1.5">
               {showNavigation && !navInHead && navigation('-ml-3 shrink-0 md:-ml-1')}
               {/* A compact index, with more than one article: one alone says nothing it does not say below (R3). */}
-              {act.articles.length > 1 && (
+              {/* Not in a dossier's «Fonti» (LC86): its rows are right below, the chips would repeat them. */}
+              {act.articles.length > 1 && !hostDossier && (
                 <ul aria-label={`Articoli sul tavolo di ${heading}`} className={cn('practice-act-index flex min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex-wrap md:overflow-visible', HIDDEN_SCROLLBAR)}>
                   {act.articles.map((article) => {
                     const key = practiceArticleKey(article);
@@ -501,7 +545,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             </div>
           )}
 
-          {act.articles.map((article) => {
+          {shownArticles.map((article) => {
             const key = practiceArticleKey(article);
             const { numero_articolo: numero, allegato } = article.norma_data;
             return (
@@ -513,6 +557,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 onCrossReference={onCrossReference}
                 onOpenStudyMode={() => openStudy(article)}
                 statusEnd={statusEnd}
+                rubrica={rubricaOf(article.norma_data)}
                 annexSuggestion={annexes && openKeys.includes(key) ? (
                   <AnnexSuggestion
                     className="mb-3"

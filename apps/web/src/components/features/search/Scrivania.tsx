@@ -14,6 +14,7 @@ import { kindLabel } from '../dossier/dossierKinds';
 import { greeting } from './scrivaniaGreeting';
 import { HIDDEN_SCROLLBAR, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
+import { useOpenSettings } from '../settings/settingsRoute';
 
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 
@@ -31,13 +32,13 @@ const ROW =
 
 export function Scrivania() {
   const navigate = useNavigate();
-  const { dossiers, quickNorms, selectQuickNorm, triggerSearch, openQuickNormsManager } = useAppStore(useShallow((s) => ({
+  const { dossiers, quickNorms, selectQuickNorm, triggerSearch } = useAppStore(useShallow((s) => ({
     dossiers: s.dossiers,
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
     triggerSearch: s.triggerSearch,
-    openQuickNormsManager: s.openQuickNormsManager,
   })));
+  const openSettings = useOpenSettings();
 
   const now = new Date();
   const day = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(now);
@@ -59,7 +60,7 @@ export function Scrivania() {
     >
       <div className="mx-auto w-full max-w-[760px]">
         <p className="text-sm font-medium first-letter:uppercase text-slate-500 dark:text-slate-400">{day}</p>
-        <h1 className="mt-1 font-serif text-[34px] font-medium leading-tight tracking-tight text-slate-900 dark:text-slate-50 md:mt-2 md:text-6xl">
+        <h1 data-page-title="" className="mt-1 font-serif text-[34px] font-medium leading-tight tracking-tight text-slate-900 dark:text-slate-50 md:mt-2 md:text-6xl">
           {greeting(hour)}
         </h1>
 
@@ -139,7 +140,7 @@ export function Scrivania() {
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="scrivania-frequenti" className="font-serif text-2xl font-medium text-slate-900 max-md:text-xl dark:text-slate-50">Ricerche frequenti</h2>
             <button
-              onClick={openQuickNormsManager}
+              onClick={() => openSettings('norme-rapide')}
               className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:py-1 dark:text-primary-300 dark:hover:bg-primary-950"
             >
               <Plus aria-hidden="true" size={14} /> Gestisci

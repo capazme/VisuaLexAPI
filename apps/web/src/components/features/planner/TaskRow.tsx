@@ -1,5 +1,6 @@
+import { useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, ChevronRight, Folder, Hourglass, ListTree, MoreHorizontal, Pencil, Plus, Repeat, Tag, Trash2 } from 'lucide-react';
+import { CalendarDays, CheckCheck, ChevronRight, Folder, Hourglass, ListTree, MoreHorizontal, Pencil, Plus, Repeat, Tag, Trash2 } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -15,6 +16,8 @@ export interface TaskRowActions {
   onTick: (task: Task) => void;
   onOpen: (task: Task, focus?: 'subtask') => void;
   onTrash: (task: Task) => void;
+  /** «Completa per sempre»: offered on a repeating task only. */
+  onCompleteForever: (task: Task) => void;
 }
 
 interface Props extends TaskRowActions {
@@ -32,22 +35,50 @@ interface Props extends TaskRowActions {
 const time = (value: string | null) => (value ? ` · ${value}` : '');
 
 /**
+ * On one line (a wide list, 1024 px) the labels and the dossier shrink with the room the other signs leave, down to
+ * «U…» and «R». One that would be cut under two letters' width is not drawn (LC91): all shown, measured, the cut ones
+ * hidden, in one frame, at each render of the row (any sign may take room) and when its width changes.
+ */
+function useHideWhenCut(signs: React.RefObject<HTMLDivElement | null>) {
+  useLayoutEffect(() => {
+    const box = signs.current;
+    if (!box) return undefined;
+    const check = () => {
+      const parts = [...box.querySelectorAll<HTMLElement>('[data-squeezable]')];
+      parts.forEach((part) => { part.style.display = ''; });
+      for (const part of parts) {
+        const text = part.querySelector<HTMLElement>('.truncate');
+        const em = parseFloat(getComputedStyle(part).fontSize) || 12;
+        if (text && text.scrollWidth > text.clientWidth && text.clientWidth < 2 * em) part.style.display = 'none';
+      }
+    };
+    check();
+    const row = box.closest('li');
+    const observer = typeof ResizeObserver === 'function' && row ? new ResizeObserver(check) : null;
+    if (observer && row) observer.observe(row);
+    return () => observer?.disconnect();
+  });
+}
+
+/**
  * One task, on two levels as the list's rows are (P2b): the tick (a real checkbox, so Space ticks it; its ring the
  * priority's), the title (opens the task's sheet), its description in one grey line, then a line of signs — the
- * planned day in its colour and in words (`rowDay`: «Domani», «venerdì», «Ieri · in ritardo di 1 giorno»), the
+ * planned day in its colour and in words (`rowDay`: «Domani», «ven 23», «Ieri · in ritardo di 1 giorno»), the
  * deadline bordered with its count, the subtasks' counter (which opens them in place), the repetition, the priority in
  * words, the labels — with the dossier at its right end, in grey; and «⋯». The list moves between rows with the arrows
  * (`TaskList`).
  */
-export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, onOpen, onTrash, children }: Props) {
+export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, onOpen, onTrash, onCompleteForever, children }: Props) {
   const dossierTitle = useAppStore((s) => (task.dossierId ? s.dossiers.find((d) => d.id === task.dossierId)?.title : undefined));
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
   const plannedShown = task.plannedDate !== null && !(task.plannedDate === dayShown && !task.plannedTime);
+  const signs = useRef<HTMLDivElement>(null);
+  useHideWhenCut(signs);
   const hasSigns = Boolean(plannedShown || due || (subtasks && subtasks.count > 0) || task.recurrence || task.priority < 4 || task.labels.length > 0 || (showDossier && task.dossierId));
 
   return (
     <li data-task-row data-task-id={task.id} className="relative min-w-0">
-      <div className="group relative flex items-start gap-1 border-b border-slate-200 py-0.5 pr-0.5 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/30">
+      <div className="group relative flex items-start gap-1 border-b border-slate-200 py-0.5 pr-0.5 transition-colors @2xl:items-center @2xl:py-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/30">
         <TaskCheckbox
           label={`Segna come fatto: ${task.title}${task.priority < 4 ? `, priorità ${PRIORITY_LABEL[task.priority].toLowerCase()}` : ''}`}
           priority={task.priority}
@@ -55,7 +86,10 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
           focusTarget
         />
 
-        <div className={cn('min-w-0 flex-1', hasSigns ? 'pb-2' : 'pb-0.5')}>
+        {/* A wide list (from 42 rem, the row's own width, so a dossier's narrow panel keeps two lines): one line, the
+            title at the left and the signs at the right before «⋯», 44–48 px tall (LC83). */}
+        <div className={cn('min-w-0 flex-1 @2xl:flex @2xl:items-center @2xl:gap-4 @2xl:pb-0', hasSigns ? 'pb-2' : 'pb-0.5')}>
+          <div className="min-w-0 @2xl:flex-1">
           <button
             type="button"
             data-task-title
@@ -69,8 +103,9 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
               <LinkedText text={task.description} />
             </p>
           )}
+          </div>
           {hasSigns && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <div ref={signs} className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 @2xl:mt-0 @2xl:max-w-[60%] @2xl:flex-nowrap @2xl:justify-end">
               {task.plannedDate && plannedShown && (
                 <span className={cn(META, DAY_TONE[dayTone(task.plannedDate, today)])}>
                   <CalendarDays size={12} aria-hidden />
@@ -90,7 +125,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
               )}
               {due && task.dueDate && (
                 // On a phone the deadline is a short word in its colour, no box (LC33, after Todoist's red date).
-                <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold max-md:border-transparent! max-md:bg-transparent! max-md:px-0 max-md:py-0', DEADLINE_TONE[due.tone])}>
+                <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold @2xl:shrink-0 @2xl:whitespace-nowrap max-md:border-transparent! max-md:bg-transparent! max-md:px-0 max-md:py-0', DEADLINE_TONE[due.tone])}>
                   <Hourglass size={12} aria-hidden />
                   <span className="max-md:sr-only">
                     {due.tone === 'today'
@@ -129,7 +164,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
                 </span>
               )}
               {task.labels.map((label) => (
-                <span key={label} className={cn(META, 'max-w-full rounded bg-slate-100 px-1.5 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300')}>
+                <span key={label} data-squeezable className={cn(META, 'max-w-full rounded bg-slate-100 px-1.5 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300')}>
                   <Tag size={11} aria-hidden />
                   <span className="sr-only">Etichetta: </span>
                   {/* Shown as the dossiers' tags are, its first letter capitalised; stored as typed. */}
@@ -138,9 +173,10 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
               ))}
               {showDossier && task.dossierId && (
                 <Link
+                  data-squeezable
                   to={`/pratiche?dossier=${encodeURIComponent(task.dossierId)}`}
                   // At the line's right end; 44 px tall for a finger, laid over the gaps where a pointer is precise.
-                  className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%]', FOCUS_RING)}
+                  className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%] @2xl:ml-0 @2xl:min-w-0 @2xl:max-w-[14rem] @2xl:shrink', FOCUS_RING)}
                 >
                   <span className="sr-only">Pratica: </span>
                   <span className="truncate">{dossierTitle ?? 'Pratica'}</span>
@@ -158,6 +194,7 @@ export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, 
             { label: 'Modifica', icon: Pencil, onSelect: () => onOpen(task) },
             // One level: a subtask takes none, whether it is drawn under its parent or as a row of its own.
             ...(task.parentId ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => onOpen(task, 'subtask') }]),
+            ...(task.recurrence ? [{ label: 'Completa per sempre', icon: CheckCheck, onSelect: () => onCompleteForever(task) }] : []),
             { label: 'Sposta nel cestino', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => onTrash(task) },
           ]}
         >

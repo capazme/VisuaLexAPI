@@ -4,6 +4,10 @@ import { prisma } from './lib/prisma';
 import { startNormaWatcher } from './utils/normaWatcher';
 import { startDeadLetterSweeper } from './services/merlt/deadLetterLog';
 import { startMerltErasureWorker } from './services/merlt/userData';
+import { startCommunitySweeper } from './forum/sweep';
+import { installProcessGuards } from './utils/processGuards';
+import { describeUnexpectedError } from './middleware/errorHandler';
+import { cookieSecure } from './auth/webSession';
 import {
   scheduleStuckJobSweeper,
   DEFAULT_EXTRACT_STALE_AFTER_MS,
@@ -49,9 +53,17 @@ const deadLetterSweeper: NodeJS.Timeout | null =
 // Erasures MERL-T has not confirmed yet are retried (services/merlt/userData.ts).
 const merltErasureWorker: NodeJS.Timeout | null =
   config.nodeEnv !== 'test' ? startMerltErasureWorker() : null;
+// The Forum's terms (copies of reported texts, details and notes of closed reports, read notifications)
+// hold even when nobody writes there (forum/sweep.ts).
+const stopCommunitySweeper: (() => void) | null =
+  config.nodeEnv !== 'test' ? startCommunitySweeper() : null;
 
 const server = app.listen(config.port, () => {
   normaWatcherInterval = startNormaWatcher();
+  if (!cookieSecure()) {
+    // A.1, «Plain HTTP»: right on localhost and in the private phase over plain HTTP, wrong behind HTTPS.
+    console.warn(`[webSession] the session cookie is not Secure (first allowed origin: ${config.cors.origins[0] ?? 'none'}; SESSION_COOKIE_SECURE overrides)`);
+  }
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -83,7 +95,7 @@ const server = app.listen(config.port, () => {
 // short, which is safe: each of its writes is atomic, and the next run starts
 // again from the least recently seen watch.
 let shuttingDown = false;
-function shutdown(signal: NodeJS.Signals): void {
+function shutdown(signal: NodeJS.Signals | 'uncaughtException', exitCode = 0): void {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[shutdown] received ${signal}, closing server...`);
@@ -91,11 +103,12 @@ function shutdown(signal: NodeJS.Signals): void {
   if (normaWatcherInterval) clearInterval(normaWatcherInterval);
   if (deadLetterSweeper) clearInterval(deadLetterSweeper);
   if (merltErasureWorker) clearInterval(merltErasureWorker);
+  stopCommunitySweeper?.();
   server.close(() => {
     prisma
       .$disconnect()
-      .catch((err) => console.error('[shutdown] prisma disconnect failed:', err))
-      .finally(() => process.exit(0));
+      .catch((err) => console.error(`[shutdown] prisma disconnect failed: ${describeUnexpectedError(err)}`))
+      .finally(() => process.exit(exitCode));
   });
   // close() drops the idle keep-alive sockets only once. A socket that was
   // mid-request stays open for the whole keep-alive timeout (~6 s) after its
@@ -109,5 +122,7 @@ function shutdown(signal: NodeJS.Signals): void {
   }, 10_000).unref();
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+// An error nobody caught no longer ends the server for everyone (utils/processGuards.ts).
+installProcessGuards(() => shutdown('uncaughtException', 1));

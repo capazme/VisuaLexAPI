@@ -28,7 +28,7 @@ from visualex_api.tools.exceptions import (
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.tools.treextractor import _parse_normattiva_tree
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
-    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller, _no_history_writes,
+    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller,
 )
 from tests.validity_pages import page
 
@@ -183,7 +183,7 @@ class TestTheRequest:
         ctrl = NormaController()
         body = {"act_type": "legge", "date": "2006-12-27", "act_number": "296", "article": "1", "comma": "773"}
         with patch("app.get_tree", new=AsyncMock(return_value=("Empty response from server", 0, {}))), \
-                patch("app.fetch_act_index", new=AsyncMock(return_value=None)), patch("app.add_to_history"):
+                patch("app.fetch_act_index", new=AsyncMock(return_value=None)):
             for route in ("/fetch_norma_data", "/fetch_article_text", "/fetch_all_data", "/stream_article_text"):
                 response = await ctrl.app.test_client().post(route, json=body)
                 assert response.status_code == 503, route

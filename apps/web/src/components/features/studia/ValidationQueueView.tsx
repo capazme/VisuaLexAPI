@@ -5,7 +5,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { Materia, Scheda } from '../../../types/studia';
-import { FormSelect } from '../../ui/FormSelect';
+import { Select } from '../../ui/Select';
 import { Toast } from '../../ui/Toast';
 import { ArticleReadOnly } from './ArticleReadOnly';
 import { MATERIA_LABEL, anchorLabel, cardTitle, normaFromAnchor } from './studiaLabels';
@@ -163,12 +163,12 @@ export function ValidationQueueView() {
     <section className="flex min-h-0 flex-col gap-4">
       <header className="flex flex-wrap items-center justify-end gap-3">
         <div className="w-full md:w-64">
-          <FormSelect aria-label="Materia" value={materia ?? ''} onChange={(e) => chooseMateria(e.target.value)} className="min-h-[44px] rounded-xl">
+          <Select aria-label="Materia" value={materia ?? ''} onChange={(e) => chooseMateria(e.target.value)}>
             <option value="">Tutte le materie</option>
             {MATERIE.map((m) => (
               <option key={m} value={m}>{MATERIA_LABEL[m]}</option>
             ))}
-          </FormSelect>
+          </Select>
         </div>
       </header>
 

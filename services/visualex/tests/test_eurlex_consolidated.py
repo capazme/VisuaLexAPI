@@ -101,8 +101,7 @@ class TestRequestThreading:
         # create_norma_visitata_from_data probes the tree for the annex lookup
         # and the AKN index for the existence check; both are network.
         with patch("app.get_tree", AsyncMock(return_value=([], 0, {}))), \
-             patch("app.fetch_act_index", AsyncMock(return_value=None)), \
-             patch("app.add_to_history"):
+             patch("app.fetch_act_index", AsyncMock(return_value=None)):
             yield
 
     async def test_fetch_norma_data_carries_the_consolidated_url(self, client):

@@ -22,6 +22,8 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showRevokeAll, setShowRevokeAll] = useState(false);
+  // The button a revocation's confirmation grows from and gives the focus back to (LC85).
+  const [revokeFrom, setRevokeFrom] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
 
   const grouped = useMemo(() => {
@@ -93,7 +95,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
                       item={item}
                       actions={
                         <button
-                          onClick={() => setPendingRevokeId(item.id)}
+                          onClick={(event) => { setRevokeFrom(event.currentTarget); setPendingRevokeId(item.id); }}
                           title="Revoca"
                           disabled={busy}
                           className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
@@ -129,7 +131,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
             </button>
             {pendingCount > 0 && (
               <button
-                onClick={() => setShowRevokeAll(true)}
+                onClick={(event) => { setRevokeFrom(event.currentTarget); setShowRevokeAll(true); }}
                 disabled={busy}
                 className="px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg disabled:opacity-50"
               >
@@ -162,6 +164,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
           message="L'item verrà rimosso dal thread e l'autore non potrà più prenderlo."
           confirmLabel="Revoca"
           focusCancel
+          origin={revokeFrom}
           onConfirm={() => handleRevoke(pendingRevokeId)}
           onCancel={() => setPendingRevokeId(null)}
         />
@@ -176,6 +179,7 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
           confirmLabel="Revoca tutti"
           focusCancel
           onConfirm={handleRevokeAll}
+          origin={revokeFrom}
           onCancel={() => setShowRevokeAll(false)}
         />
       )}

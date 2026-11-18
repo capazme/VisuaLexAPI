@@ -74,6 +74,8 @@ export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, 
     <header
       ref={barRef}
       data-testid="phone-top-bar"
+      // It lies over the content: the search's band starts under it (`CommandPalette`).
+      data-palette-bar="over"
       onFocus={onReveal}
       className={cn(
         // `vlx-phone-bar`: named during a section change (index.css, T1), so the page's picture passes under it.
@@ -85,13 +87,13 @@ export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, 
     >
       {/* `px-1`: the menu's icon lines up with the page's 16 px margin. From md the room of «Commenti» and «Tutto
           schermo», as the search field's bar: 10.5 rem, 8 px of air at 768 (LC4). */}
-      <div className="flex h-14 items-center gap-1 px-1 md:pr-[10.5rem]">
+      <div className="relative flex h-14 items-center gap-1 px-1 md:pr-[10.5rem] [&:has([data-palette-slot]:not(:empty))>[data-bar-title]]:invisible">
         <MenuToggle {...menu} />
         {/* Keyed by the name: the page's, once the title has scrolled out, fades in, 150 ms; at once under reduced motion
             (G8; inspired by iOS's large titles, written from scratch). Empty, it keeps its place between the buttons. */}
         {/* The section beside the menu, always, crisp (LC34, Luca: «non ha senso che Work sia scritto lì e non accanto alle
             tre lineette»); the page's name after it once the title has scrolled out, as the desk's path («Learn › Oggi»). */}
-        <p className="flex min-w-0 flex-1 items-center gap-1.5 truncate pl-1 text-[15px] font-semibold text-slate-900 dark:text-slate-50">
+        <p data-bar-title="" className="flex min-w-0 flex-1 items-center gap-1.5 truncate pl-1 text-[15px] font-semibold text-slate-900 dark:text-slate-50">
           <span data-bar-section className="shrink-0">{section}</span>
           {title && (
             <span key={title} data-bar-name className="flex min-w-0 items-center gap-1.5 font-normal text-slate-600 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150 dark:text-slate-400">
@@ -121,6 +123,8 @@ export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, 
           <Search aria-hidden className={ISLAND_LENS} />
           <span aria-hidden>Cerca</span>
         </button>
+        {/* L-75: the search's field grows out of «Cerca» leftwards, over the bar's title, up to the menu button. */}
+        <div data-palette-slot="" className="absolute inset-y-0 left-12 right-4 flex items-center empty:hidden md:right-[calc(10.5rem+0.75rem)]" />
       </div>
     </header>
   );

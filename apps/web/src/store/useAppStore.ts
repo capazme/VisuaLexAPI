@@ -118,6 +118,18 @@ function upsertById<T extends { id: string }>(list: T[], entity: T): void {
     else list.push(entity);
 }
 
+/**
+ * Notes the server refused as too long (400 «too_long», a field over its length): kept on screen under their
+ * temporary id, so what was written is not lost; an edit sends them again as new notes (`updateAnnotation`).
+ */
+const unsavedAnnotations = new Set<string>();
+
+/** The server's words for a field over its length (`{ error: 'too_long', detail }`), or null for any other failure. */
+function tooLongDetail(err: unknown): string | null {
+    const data = (err as { data?: { error?: string; detail?: string } } | null)?.data;
+    return data?.error === 'too_long' ? data.detail ?? 'La nota è troppo lunga.' : null;
+}
+
 interface SearchPanelState {
     isCollapsed: boolean;
     position: { x: number; y: number };
@@ -224,10 +236,9 @@ interface AppState {
     /** A citation to put in the palette's box as it opens («Cerca nella barra di ricerca» on a decision
      *  that was not found); taken once by the palette. Session-only, absent from `partialize`. */
     commandPaletteQuery: string | null;
-    quickNormsManagerOpen: boolean;
-    aliasManagerOpen: boolean;
-    /** Impostazioni (`SettingsModal`, mounted by `Layout`), and the section it opens at: session-only, absent from `partialize`. */
-    settingsDialog: { open: boolean; section: SettingsSection | null };
+    /** Impostazioni asked for, at a part or its top (LC84: a page, `/impostazioni`): `Layout` goes there and clears it,
+     *  so a reader's gear opens it from any component, router or not. Session-only, absent from `partialize`. */
+    settingsRequest: { section: SettingsSection | null } | null;
     /**
      * The reading tool on (A4): the highlighter, which applies its ink to every selection as it is released, or the note
      * tool, which opens the editor of a note (or a gloss) on it, until its button is pressed again or Esc. One for the
@@ -500,13 +511,9 @@ interface AppState {
     openCommandPaletteWith: (query: string) => void;
     takeCommandPaletteQuery: () => string | null;
     closeCommandPalette: () => void;
-    openQuickNormsManager: () => void;
-    closeQuickNormsManager: () => void;
-    openAliasManager: () => void;
-    closeAliasManager: () => void;
-    /** Opens Impostazioni, at `section` when given (the reader's gear opens it at «Significato dei colori»). */
+    /** Asks for Impostazioni, at `section` when given (the reader's gear asks for «Significato dei colori»). */
     openSettings: (section?: SettingsSection) => void;
-    closeSettings: () => void;
+    clearSettingsRequest: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
@@ -868,9 +875,7 @@ const appStore = createStore<AppState>()(
             sidebarVisible: true,
             commandPaletteOpen: false,
             commandPaletteQuery: null,
-            quickNormsManagerOpen: false,
-            aliasManagerOpen: false,
-            settingsDialog: { open: false, section: null },
+            settingsRequest: null,
             readingTool: null,
             noteToolKind: 'note',
             highlighterEraser: false,
@@ -1558,32 +1563,16 @@ const appStore = createStore<AppState>()(
                 return query;
             },
 
+            openSettings: (section) => set((state) => {
+                state.settingsRequest = { section: section ?? null };
+            }),
+
+            clearSettingsRequest: () => set((state) => {
+                state.settingsRequest = null;
+            }),
+
             closeCommandPalette: () => set((state) => {
                 state.commandPaletteOpen = false;
-            }),
-
-            openQuickNormsManager: () => set((state) => {
-                state.quickNormsManagerOpen = true;
-            }),
-
-            closeQuickNormsManager: () => set((state) => {
-                state.quickNormsManagerOpen = false;
-            }),
-
-            openAliasManager: () => set((state) => {
-                state.aliasManagerOpen = true;
-            }),
-
-            closeAliasManager: () => set((state) => {
-                state.aliasManagerOpen = false;
-            }),
-
-            openSettings: (section) => set((state) => {
-                state.settingsDialog = { open: true, section: section ?? null };
-            }),
-
-            closeSettings: () => set((state) => {
-                state.settingsDialog = { open: false, section: null };
             }),
 
             toggleSearchPanel: () => set((state) => {
@@ -2380,6 +2369,13 @@ const appStore = createStore<AppState>()(
                     .catch((err) => {
                         savingDone(`annotation:${tempId}`, null);
                         console.error('Failed to sync annotation:', err);
+                        // Too long: a retry cannot succeed, so the note stays with its text and the server says why.
+                        const detail = tooLongDetail(err);
+                        if (detail) {
+                            unsavedAnnotations.add(tempId);
+                            get().pushSyncError(detail);
+                            return;
+                        }
                         set((state) => {
                             state.annotations = state.annotations.filter(a => a.id !== tempId);
                         });
@@ -2416,6 +2412,17 @@ const appStore = createStore<AppState>()(
             updateAnnotation: (id, newText) => {
                 const previous = get().annotations.find(a => a.id === id);
                 if (!previous || previous.text === newText) return;
+                // Never saved (too long): the edit, shortened, is sent as the note it was meant to be.
+                if (unsavedAnnotations.delete(id)) {
+                    set((state) => {
+                        state.annotations = state.annotations.filter(a => a.id !== id);
+                    });
+                    const anchor = previous.anchorText !== undefined && previous.startOffset !== undefined
+                        ? { anchorText: previous.anchorText, startOffset: previous.startOffset }
+                        : undefined;
+                    get().addAnnotation(previous.normaKey, previous.articleId, newText, anchor);
+                    return;
+                }
                 // Optimistic update first so the UI reflects the edit
                 // immediately; revert in catch if the server rejects.
                 set((state) => {
@@ -2425,6 +2432,12 @@ const appStore = createStore<AppState>()(
                 annotationService.update(id, { content: newText }).catch((err) => {
                     if (err?.status === 404) return;
                     console.error('Failed to sync annotation update:', err);
+                    // Too long: the edit stays on screen, the server keeps the text before it, and says why.
+                    const detail = tooLongDetail(err);
+                    if (detail) {
+                        get().pushSyncError(detail);
+                        return;
+                    }
                     set((state) => {
                         const a = state.annotations.find(x => x.id === id);
                         if (a) a.text = previous.text;

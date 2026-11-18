@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, LocateFixed, PenLine, Plus, Send, X } from 'lucide-react';
@@ -8,8 +8,9 @@ import { articleDiscussionService, type DiscussionAnchor } from '../../../servic
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../hooks/useAuth';
 import { ReplyForm, ReportButton, TOUCH, VoteButton } from './discussionControls';
+import { AlignedGlosses, type GlossAlignment } from './AlignedGlosses';
 import { voteFailure } from './voteFailure';
-import { FormSelect } from '../../ui/FormSelect';
+import { Select } from '../../ui/Select';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
 import type { Materia } from '../../../types/studia';
 
@@ -69,6 +70,10 @@ interface Props {
   layout?: 'panel' | 'margin';
   /** The number of discussions on the article (`margin`): the «Glosse» button shows it. */
   onCountChange?: (count: number) => void;
+  /** `margin` beside the text (LC90): the glosses on a passage at the height of their words. Under the text: a list. */
+  align?: GlossAlignment;
+  /** The gloss whose passage is lit in the text (chosen here or from the text): marked, and joined to its words. */
+  litThreadId?: string | null;
 }
 
 /** The replies to a thread, as the Forum counts them (`replyCount`): not the comments under them, nor an emptied one. */
@@ -102,6 +107,8 @@ export function ArticleDiscussionPanel({
   passageTextAvailable = true,
   layout = 'panel',
   onCountChange,
+  align,
+  litThreadId = null,
 }: Props) {
   const isMargin = layout === 'margin';
   const marginHeadingId = useId();
@@ -212,6 +219,28 @@ export function ArticleDiscussionPanel({
     composerRef.current?.querySelector<HTMLElement>(draft ? 'textarea' : 'input')?.focus({ preventScroll: true });
   }, [isMargin, isOpen, composerOpen, draft]);
 
+  // In the margin the composer goes with the publication: the focus goes to the gloss published (on a passage, the one
+  // chosen, its words lit), not to the page. After the margin's own focus above, which the draft consumed calls again.
+  const published = useRef<string | null>(null);
+  useEffect(() => {
+    const id = published.current;
+    const toggle = id ? document.getElementById(`article-thread-${id}`)?.querySelector<HTMLElement>('button') : null;
+    if (!toggle) return;
+    published.current = null;
+    toggle.focus();
+  }, [threads]);
+
+  // The gloss the focus is on, in the margin: going from under the text to beside it, the glosses on a passage are drawn
+  // again aligned (another list), and the one that had the focus takes it back.
+  const focusedCard = useRef<string | null>(null);
+  const aligned = !!align;
+  useLayoutEffect(() => {
+    const id = focusedCard.current;
+    const at = document.activeElement;
+    if (!id || (at && at !== document.body)) return;
+    document.getElementById(id)?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+  }, [aligned]);
+
   // Scroll to focused thread when present in threads list
   useEffect(() => {
     if (!focusThreadId || isLoading) return;
@@ -278,6 +307,7 @@ export function ArticleDiscussionPanel({
       if (newThread.passage !== null) {
         onFocusThread?.(newThread.id);
       }
+      if (isMargin) published.current = newThread.id;
     } catch {
       setError('Impossibile pubblicare la glossa.');
     }
@@ -403,7 +433,7 @@ export function ArticleDiscussionPanel({
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {/* Optional: the Forum's Community filters by it (the server keeps it only when sent). */}
-          <FormSelect
+          <Select
             size="sm"
             aria-label="Materia (facoltativa)"
             value={materia}
@@ -411,7 +441,7 @@ export function ArticleDiscussionPanel({
           >
             <option value="">Materia (facoltativa)</option>
             {(Object.keys(MATERIA_LABEL) as Materia[]).map(key => <option key={key} value={key}>{MATERIA_LABEL[key]}</option>)}
-          </FormSelect>
+          </Select>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={cancelComposer} className="px-3 py-1.5 text-xs text-slate-500">
               Annulla
@@ -486,7 +516,13 @@ export function ArticleDiscussionPanel({
               <article
                 key={thread.id}
                 id={`article-thread-${thread.id}`}
-                className={cn('rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900', isMargin ? 'p-3' : 'p-4')}
+                data-lit={isMargin && litThreadId === thread.id ? '' : undefined}
+                className={cn(
+                  'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900',
+                  isMargin ? 'p-3' : 'p-4',
+                  // Its passage lit in the text: the same tint as the words' underline.
+                  isMargin && litThreadId === thread.id && 'border-[hsl(var(--primary)/0.55)] dark:border-[hsl(var(--primary)/0.55)]',
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <button
@@ -617,6 +653,8 @@ export function ArticleDiscussionPanel({
         aria-labelledby={marginHeadingId}
         data-gloss-margin=""
         className="space-y-3 outline-none"
+        onFocus={event => { focusedCard.current = (event.target as HTMLElement).closest('article[id^="article-thread-"]')?.id ?? null; }}
+        onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) focusedCard.current = null; }}
         onKeyDown={event => {
           if (event.key !== 'Escape') return;
           event.stopPropagation();
@@ -679,7 +717,9 @@ export function ArticleDiscussionPanel({
             {onPassages.length > 0 && (
               <h4 data-gloss-row="" className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sui passaggi</h4>
             )}
-            {onPassages.map(row)}
+            {align ? (
+              <AlignedGlosses threads={onPassages} {...align} litId={litThreadId} render={renderThread} />
+            ) : onPassages.map(row)}
           </>
         )}
       </section>

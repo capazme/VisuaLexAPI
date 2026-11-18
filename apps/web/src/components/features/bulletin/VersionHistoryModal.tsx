@@ -18,6 +18,7 @@ export function VersionHistoryModal({ environment, onClose, onRestored }: Versio
   const [error, setError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [confirmVersion, setConfirmVersion] = useState<SharedEnvironmentVersion | null>(null);
+  const [confirmFrom, setConfirmFrom] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +112,7 @@ export function VersionHistoryModal({ environment, onClose, onRestored }: Versio
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setConfirmVersion(version)}
+                  onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirmVersion(version); }}
                   disabled={restoringId !== null}
                   className="shrink-0"
                 >
@@ -126,6 +127,7 @@ export function VersionHistoryModal({ environment, onClose, onRestored }: Versio
 
       <ConfirmDialog
         open={confirmVersion !== null}
+        origin={confirmFrom}
         variant="danger"
         title={confirmVersion ? `Ripristinare la v${confirmVersion.version}?` : 'Ripristinare versione?'}
         message="Il contenuto attuale verrà sostituito con quello di questa versione. Lo stato attuale viene salvato come nuova versione, quindi l'operazione è reversibile."

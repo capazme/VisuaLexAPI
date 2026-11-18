@@ -138,8 +138,9 @@ export interface ArticleTreeResponse {
 
 // --- New Utility Features Types ---
 
-/** A section of Impostazioni that can be opened directly (the reader's gear opens «Significato dei colori»). */
-export type SettingsSection = 'highlightColors';
+/** A part of the Impostazioni page, its anchor (`/impostazioni#colori`): the reader's gear opens «Significato dei colori». */
+export type SettingsSection = 'aspetto' | 'colori' | 'norme-rapide' | 'alias' | 'scorciatoie' | 'aiuto' | 'sviluppo'
+    | 'amministrazione' | 'dati' | 'merlt' | 'app-collegate' | 'segnala' | 'informazioni';
 
 export interface AppSettings {
     theme: 'light' | 'dark';

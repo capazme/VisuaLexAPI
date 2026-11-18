@@ -61,7 +61,8 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming, prac
   const save = usePracticeSaveActions(practice?.id ?? '');
   // LC68: one act names the table by its own heading; the table's head is not drawn and its «⋯» rides the act's.
   const oneAct = practice !== undefined && !bound && isOneActPractice(practice);
-  const simple = practice !== undefined && isSimplePractice(practice);
+  // A dossier's «Fonti» (LC86): its one article a closed row as any other, never Lettura semplice.
+  const simple = practice !== undefined && isSimplePractice(practice) && !bound;
   const renamePractice = useAppStore((s) => s.renamePractice);
   const [editing, setEditing] = useState(false);
   const rename = useMemo(() => ({
@@ -185,7 +186,7 @@ function PhonePracticeHead({ practice, save, editing, rename }: {
         {editing ? (
           <PracticeNameInput initial={practice.label} onDone={rename.done} className="min-h-[44px] w-full font-serif text-lg" />
         ) : (
-          <h2 className={cn('flex min-h-[44px] min-w-0 items-center font-serif text-lg font-medium text-slate-900 dark:text-white', countLine && 'min-[390px]:max-w-[70%] min-[390px]:shrink-0')}>
+          <h2 data-page-title="" className={cn('flex min-h-[44px] min-w-0 items-center font-serif text-lg font-medium text-slate-900 dark:text-white', countLine && 'min-[390px]:max-w-[70%] min-[390px]:shrink-0')}>
             <span className="truncate">{practice.label}</span>
           </h2>
         )}

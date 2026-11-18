@@ -25,8 +25,6 @@ from visualex_api.tools.config import (
     FETCH_QUEUE_WORKERS,
     FETCH_QUEUE_DELAY,
 )
-from visualex_api.tools.history_manager import history_manager
-from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper, text_source_of
 from visualex_api.services.eurlex_scraper import EurlexScraper
@@ -71,7 +69,7 @@ from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
-from visualex_api.tools.sources import cite_act, cite_article
+from visualex_api.tools.sources import cite_act, cite_article, cite_recital, recital_numbers
 from visualex_api.tools.act_identity import identifies_act
 from visualex_api.tools.norm_query import act_names, read_norm_query
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
@@ -233,9 +231,29 @@ class NormAddress:
     checked: list = field(default_factory=list)
 
 
+def _recital_reading(params: dict, source: str | None) -> dict:
+    """/parse_query's answer for a recital clause (spec 2026-11-17 §3.2). Recognised, so the
+    palette never falls through to a topic search; no URN, so a reader that does not know
+    `recital` finds neither an article nor an address. `display`: the recital's citation when the
+    act is ready, «considerando 26» when it is missing, nothing when the reading is refused."""
+    parsed = {k: v for k, v in params.items() if k != "refusal"}
+    answer = {"recognized": True, "parsed": parsed, "identifies_act": identifies_act(parsed),
+              "urn": None, "display": None, "source": source}
+    if params.get("refusal"):
+        answer["refusal"] = params["refusal"]
+    elif answer["identifies_act"]:
+        answer["display"] = cite_recital({"tipo_atto": parsed["act_type"], "numero_atto": parsed.get("act_number"),
+                                          "data": parsed.get("date"), "considerando": parsed["recital"]})
+    else:
+        answer["display"] = f"considerando {recital_numbers(parsed['recital'])}"
+    return answer
+
+
 def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
     """Each string read as /parse_query reads one; one that makes the reading raise is
-    unrecognised, and counted. Returns (results in order, failures)."""
+    unrecognised, and counted. A recital clause is answered as not recognised this round: the
+    document analysis keeps its behaviour (spec 2026-11-17 §3.2). Returns (results in order,
+    failures)."""
     results, failed = [], 0
     for query in queries:
         try:
@@ -243,6 +261,8 @@ def _read_norm_queries(queries: list[str]) -> tuple[list[dict], int]:
         except Exception:
             params, source = None, None
             failed += 1
+        if params is not None and params.get("recital"):
+            params, source = None, None
         results.append({
             "recognized": params is not None,
             "parsed": params,
@@ -275,18 +295,12 @@ else:
     ALLOWED_ORIGINS = _default_allowed_origins
 
 
-def add_to_history(data: dict):
-    """Aggiunge ricerca alla history con persistenza."""
-    if history_manager.add(data):
-        log.debug("Added to history", data=data)
-
-
 # Inizializzazione degli scraper
 normattiva_scraper = NormattivaScraper()
 eurlex_scraper = EurlexScraper()
 
-# /health/detailed probes three live sources on the shared throttled client and
-# circuit breakers; the frontend banner polls it, so N open tabs multiply that
+# /health/detailed probes three live sources on the shared throttled client; the
+# frontend banner polls it, so N open tabs multiply that
 # load. One cached result is shared by every caller for HEALTH_DETAILED_TTL
 # seconds, with a lock so concurrent cold callers trigger a single probe
 # instead of one each. Module-level (like the scrapers above): there is one
@@ -478,7 +492,6 @@ class NormaController:
         if not data:
             return jsonify({'error': 'Request body required'}), 400
         log.info("Received data for stream_article_text", data=data)
-        add_to_history(data)
         # This is the endpoint the search box actually calls. Nothing caught the
         # exceptions raised while building the NormaVisitata list, so a rejected
         # article ("non presente in ...") or a missing act_type reached Quart's
@@ -496,6 +509,16 @@ class NormaController:
         # Never less than the framework's 60 s a short request had before.
         budget = min(max(len(normavisitate) * STREAM_SECONDS_PER_ARTICLE, STREAM_MIN_SECONDS), STREAM_MAX_SECONDS)
         deadline = asyncio.get_running_loop().time() + budget
+
+        # The closing line (G-488), for a client that asks with `"end_line": true`: every stream the
+        # server ends itself ends with `{"kind": "end", "sent": N, "total": M}`, after the time
+        # budget's line too, so a body that stops without it was cut on the way (a proxy, a crash, a
+        # dropped connection). Asked for, not always sent: the search panel as it is and the archive
+        # read every line as an article.
+        end_line = isinstance(data, dict) and data.get('end_line') is True
+
+        def closing(sent):
+            return json.dumps({'kind': 'end', 'sent': sent, 'total': len(normavisitate)}) + "\n"
 
         async def read_one(scraper, nv):
             article_text, url, validity, extra = await self._document_in_force(
@@ -547,10 +570,15 @@ class NormaController:
                         'kind': 'time_budget',
                         'missing': missing,
                     }) + "\n"
+                    if end_line:
+                        yield closing(index)
                     return
 
                 # Send result immediately
                 yield json.dumps(result) + "\n"
+
+            if end_line:
+                yield closing(len(normavisitate))
 
         # Return streaming response with proper headers
         response = Response(
@@ -663,20 +691,9 @@ class NormaController:
         # Internal: the server's POST /api/dossiers/:id/decisions only (design 2026-10-12 §2.1).
         # Not routed by the ingress (/parse_query* does not cover it) nor proxied by Vite.
         self.app.add_url_rule('/parse_decision', view_func=self.parse_decision, methods=['POST'])
-        self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
-        self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
-        self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
-        # Dossier endpoints
-        self.app.add_url_rule('/dossiers', view_func=self.get_dossiers, methods=['GET'])
-        self.app.add_url_rule('/dossiers', view_func=self.create_dossier, methods=['POST'])
-        self.app.add_url_rule('/dossiers/sync', view_func=self.sync_dossiers, methods=['PUT'])
-        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.get_dossier, methods=['GET'])
-        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.update_dossier, methods=['PUT'])
-        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.delete_dossier, methods=['DELETE'])
-        self.app.add_url_rule('/dossiers/<dossier_id>/items', view_func=self.add_dossier_item, methods=['POST'])
-        self.app.add_url_rule('/dossiers/<dossier_id>/items/<item_id>', view_func=self.remove_dossier_item, methods=['DELETE'])
-        self.app.add_url_rule('/dossiers/<dossier_id>/items/<item_id>/status', view_func=self.update_item_status, methods=['PUT'])
-        self.app.add_url_rule('/dossiers/import', view_func=self.import_dossier, methods=['POST'])
+        # No /history nor /dossiers here (item 15 of the security inventory): they were global, with no
+        # login, one search history and one set of dossiers for whoever reached the port; nothing called
+        # them. The history and the dossiers are the server's, per user (/api/history, /api/dossiers).
         self.app.add_url_rule('/export_pdf', view_func=self.export_pdf, methods=['POST'])
         self.app.add_url_rule('/health', view_func=self.health, methods=['GET'])
         self.app.add_url_rule('/health/detailed', view_func=self.health_detailed, methods=['GET'])
@@ -687,7 +704,7 @@ class NormaController:
         return jsonify({
             "service": "VisuaLex API",
             "status": "running",
-            "docs": None,  # Swagger is not implemented on this root app (see visualex_api/app.py for the prefixed variant)
+            "docs": None,  # no Swagger
             "frontend": "http://localhost:5173",
         })
 
@@ -698,8 +715,7 @@ class NormaController:
         log.info("Creating NormaVisitata from data", data=data)
 
         # The root controller never validated its input: a missing act_type
-        # surfaced as a generic 500 instead of a 400. The /api twin already
-        # does this (visualex_api/app.py:309-312).
+        # surfaced as a generic 500 instead of a 400.
         if 'act_type' not in data or not data.get('act_type'):
             raise ValidationError("Campo obbligatorio mancante: act_type")
         if 'article' not in data or data.get('article') in (None, ''):
@@ -1393,8 +1409,7 @@ class NormaController:
         """Map an exception to the status its class documents.
 
         `exceptions.py` states ValidationError -> 400 and
-        ResourceNotFoundError -> 404, and the /api twin honours that in
-        `handle_error` (visualex_api/app.py:224). The root controller returned
+        ResourceNotFoundError -> 404. The root controller returned
         500 for every failure, so "act_type mancante" was indistinguishable
         from a Normattiva outage for any client that branches on the status.
         """
@@ -1431,14 +1446,14 @@ class NormaController:
         """Parse a natural language query into structured API params + URN.
 
         Used by the MERL-T contribution picker so the user can type
-        "art 1453 cc" instead of a NIR URN. Mirrors the parser in
-        `visualex_api/app.py` but additionally builds the canonical URN via the
+        "art 1453 cc" instead of a NIR URN. It builds the canonical URN via the
         same pipeline as `fetch_norma_data`, so the FE gets a ready-to-paste
         URN string without a second round-trip.
 
         Returns:
             { recognized: bool, parsed?: {...api params}, urn?: str,
-              display?: str, source?: 'alias' | 'nl_parser' }
+              display?: str, source?: 'alias' | 'nl_parser' | 'recital',
+              refusal?: 'recital_not_eu' | 'recital_with_article' }
         """
         try:
             data = await request.get_json() or {}
@@ -1451,6 +1466,8 @@ class NormaController:
             parsed_params, source = read_norm_query(query)
             if parsed_params is None:
                 return jsonify({"parsed": None, "recognized": False, "identifies_act": False})
+            if parsed_params.get("recital"):
+                return jsonify(_recital_reading(parsed_params, source))
 
             # 3. Best-effort URN: build a NormaVisitata with the same pipeline
             # `fetch_norma_data` uses, then pick its .urn. If the URN cannot be
@@ -1725,7 +1742,6 @@ class NormaController:
             if not data:
                 return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_article_text", data=data)
-            add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
             upcoming_asked, until = _upcoming_of(data)
@@ -1902,9 +1918,14 @@ class NormaController:
         """
         try:
             data = await request.get_json() or {}
+            # A list or a scalar as the body, or a type that is not text: a 400 in words, never a 500.
+            if not isinstance(data, dict):
+                raise ValidationError("Corpo della richiesta non valido: atteso un oggetto JSON")
             act_type = data.get('act_type')
             if not act_type:
                 raise ValidationError("Campo obbligatorio mancante: act_type")
+            if not isinstance(act_type, str):
+                raise ValidationError("Campo act_type non valido: atteso un testo")
             if normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
                 raise ValidationError(
                     "fetch_recitals accetta solo atti EUR-Lex (regolamento ue, direttiva ue)"
@@ -2211,7 +2232,6 @@ class NormaController:
             if not data:
                 return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_all_data", data=data)
-            add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
             upcoming_asked, until = _upcoming_of(data)
@@ -2258,156 +2278,6 @@ class NormaController:
             return jsonify(processed_results)
         except Exception as e:
             return self._error_response(e, 'fetch_all_data')
-
-    async def get_history(self):
-        try:
-            return jsonify({'history': history_manager.get_all()})
-        except Exception as e:
-            log.error("Error in get_history", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def clear_history(self):
-        """Svuota tutta la history."""
-        try:
-            history_manager.clear()
-            return jsonify({'success': True, 'message': 'History cleared'})
-        except Exception as e:
-            log.error("Error in clear_history", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def delete_history_item(self, timestamp):
-        """Elimina un singolo item dalla history."""
-        try:
-            success = history_manager.remove(timestamp)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Item not found'}), 404
-        except Exception as e:
-            log.error("Error in delete_history_item", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    # ==================== Dossier Endpoints ====================
-
-    async def get_dossiers(self):
-        """Restituisce tutti i dossier."""
-        try:
-            return jsonify({'dossiers': dossier_manager.get_all()})
-        except Exception as e:
-            log.error("Error in get_dossiers", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def get_dossier(self, dossier_id):
-        """Restituisce un dossier specifico."""
-        try:
-            dossier = dossier_manager.get_by_id(dossier_id)
-            if dossier:
-                return jsonify(dossier)
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in get_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def create_dossier(self):
-        """Crea un nuovo dossier."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            title = data.get('title', 'Nuovo Dossier')
-            description = data.get('description', '')
-            dossier = dossier_manager.create(title, description)
-            return jsonify(dossier), 201
-        except Exception as e:
-            log.error("Error in create_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def update_dossier(self, dossier_id):
-        """Aggiorna un dossier."""
-        try:
-            data = await request.get_json()
-            dossier = dossier_manager.update(dossier_id, data)
-            if dossier:
-                return jsonify(dossier)
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in update_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def delete_dossier(self, dossier_id):
-        """Elimina un dossier."""
-        try:
-            success = dossier_manager.delete(dossier_id)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in delete_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def add_dossier_item(self, dossier_id):
-        """Aggiunge un item a un dossier."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            item_data = data.get('data')
-            item_type = data.get('type', 'norma')
-            item = dossier_manager.add_item(dossier_id, item_data, item_type)
-            if item:
-                return jsonify(item), 201
-            return jsonify({'error': 'Dossier not found'}), 404
-        except Exception as e:
-            log.error("Error in add_dossier_item", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def remove_dossier_item(self, dossier_id, item_id):
-        """Rimuove un item da un dossier."""
-        try:
-            success = dossier_manager.remove_item(dossier_id, item_id)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Item not found'}), 404
-        except Exception as e:
-            log.error("Error in remove_dossier_item", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def update_item_status(self, dossier_id, item_id):
-        """Aggiorna lo status di un item."""
-        try:
-            data = await request.get_json()
-            status = data.get('status', 'unread')
-            success = dossier_manager.update_item_status(dossier_id, item_id, status)
-            if success:
-                return jsonify({'success': True})
-            return jsonify({'error': 'Item not found'}), 404
-        except Exception as e:
-            log.error("Error in update_item_status", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def import_dossier(self):
-        """Importa un dossier (da share link)."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            dossier = dossier_manager.import_dossier(data)
-            return jsonify(dossier), 201
-        except Exception as e:
-            log.error("Error in import_dossier", error=str(e))
-            return jsonify({'error': str(e)}), 500
-
-    async def sync_dossiers(self):
-        """Sincronizza tutti i dossier (sovrascrive dal frontend)."""
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            dossiers = data.get('dossiers', [])
-            dossier_manager.sync_all(dossiers)
-            return jsonify({'success': True, 'count': len(dossiers)})
-        except Exception as e:
-            log.error("Error in sync_dossiers", error=str(e))
-            return jsonify({'error': str(e)}), 500
 
     # ==================== Health Endpoints ====================
 
@@ -2650,7 +2520,11 @@ class NormaController:
 def main():
     controller = NormaController()
     app = controller.app
-    host = os.getenv('HOST', '0.0.0.0')
+    # Development only (production runs `hypercorn asgi:app` in its container): this machine alone by
+    # default, so a laptop on a café's network does not serve the API to the room. MERL-T's containers
+    # reach it from the Docker network, so `start.sh` passes HOST=0.0.0.0 when MERLT_ENABLED=true; by
+    # hand, `HOST=0.0.0.0 python app.py` gives the old behaviour.
+    host = os.getenv('HOST', '127.0.0.1')
     port = int(os.getenv('PORT', 5000))
     app.run(host=host, port=port)
 

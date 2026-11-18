@@ -23,10 +23,50 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (~6 s, measured), past what a process manager waits before its SIGKILL (pm2,
   on the old server, waited 1.6 s).
 - `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
-  authenticated 300/min (by userId), writes 200/min. `RateLimiterRedis` when
-  `REDIS_ENABLED=true`, else in-memory with a startup warning.
+  authenticated 300/min (by userId), writes 200/min. Every limiter comes from
+  `createLimiter`: `RateLimiterRedis` when `REDIS_ENABLED=true`, else in-memory
+  with a startup warning. On Redis, a store error (down, not ready; a Redis that hangs without erring is not covered, there is no command timeout) hands the
+  count to an in-memory limiter with the same limits (the insurance limiter),
+  so a limit holds per process; the fail-open branches are only a last resort.
+  The session check (`GET /api/auth/me`, G-484) has its own counter,
+  `SESSION_CHECK_POINTS` (600) a minute per user or address, mounted in `app.ts`
+  after `delegatedAuth` and before the general limiter, which it skips.
+- `src/routes/auth.ts` — failed sign-ins and registrations: 5 per 15 minutes per
+  address (shared, as before, with the wrong passwords of `PUT /auth/change-password`,
+  `POST /auth/contributions/remove` and `DELETE /auth/account`); failed sign-ins per account (the SHA-256 of the
+  email as typed, trimmed and lower-cased, existing or not): 10 an hour from any
+  address; refreshes: 30 a minute per address. Counted on arrival (a burst is
+  held too) and given back on success. A refusal is 429 with `Retry-After`.
+  Someone who knows an email can block that sign-in for up to an hour: the
+  accepted price of stopping guesses spread over many addresses.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
-  connection errors fail open.
+  connection errors go to the limiters' memory fallback.
+- **The web's session (A.1, step 1 of `docs/superpowers/specs/2026-11-16-web-session-cookies-design.md`).**
+  `src/auth/webSession.ts`: a session is a `WebSession` row (SHA-256 of the
+  secret, a coarse device label, no IP); the browser holds the secret in an
+  `HttpOnly; SameSite=Strict; Path=/` cookie, `__Host-vx_session` and `Secure`
+  when the first `ALLOWED_ORIGINS` entry is https (`SESSION_COOKIE_SECURE`
+  overrides), `vx_session` otherwise. 7 days idle, 30 at most
+  (`SESSION_IDLE_DAYS`, `SESSION_MAX_DAYS`); `lastUsedAt` written at most every
+  10 minutes; dead rows swept at most daily on a sign-in.
+  `middleware/webSession.ts`, mounted on `/api` before the ingress's login check
+  and the limiters, sets `req.user` and `req.webSessionId`; a Bearer token takes
+  precedence until the web has moved. Sign-in opens a session only for a request
+  with `X-VisuaLex-Client: web` (answering the user, no tokens), otherwise the
+  tokens as before. Routes: `POST /auth/logout`, `GET /auth/sessions`,
+  `DELETE /auth/sessions/:id`, `POST /auth/logout-all`. What ends sessions
+  (D3): one's own password change (all but the one in use), the
+  administrator's reset and `db:reset-admin` (all, and every OAuth grant
+  revoked), a deactivation (all), account deletion (cascade).
+- `src/middleware/csrfGuard.ts` — on `/api` after `delegatedAuth`: a
+  POST/PUT/PATCH/DELETE that carries the session cookie or the web header must
+  carry `X-VisuaLex-Client: web` and, when an `Origin` is present, one in
+  `ALLOWED_ORIGINS` or the request's own host; otherwise **403**
+  `code: "csrf_refused"`. Exempt: exchanged tokens, `/api/merlt/internal/*`,
+  and (until step 3) a Bearer token or a request with neither cookie nor
+  header. The scraping gate applies the same rule to a cookie-authenticated
+  write named by `X-Forwarded-Method`. In tests, `authHeader` sends the cookie
+  and the header; `bearerHeader` the old JWT; `cookieOnly` the cookie alone.
 - `src/middleware/auth.ts` — `authenticate` answers **401** only when the
   session is over: no token, a token that does not verify, the wrong type, a
   missing or disabled user. When it cannot read the user (the database is
@@ -220,6 +260,18 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   owners, 29 October 2026: no active users yet); widening the words means raising the version, and a grant with a lower
   one reads no note until the user connects again. A grant made before `dossier:text` existed has it only
   once the user connects again.
+- **Recitals in a dossier** (spec `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §6, G-538): a
+  recital of an EU regulation or directive is a `norm` item whose content has the key `considerando`, with no
+  kind of its own and no migration. The key decides: such a content is checked by `schemas/recitalEntry.ts`
+  (the act's type, number and date, the recital's number, the web's star; anything else refused,
+  `numero_articolo` first; cases shared with the web in `conventions/sources/recital-entries.json`) on
+  `POST /items` and `PUT /items/:itemId`, and titled with its citation («considerando 26, reg. (UE)
+  2016/679», `norms/recital.ts`); a PUT never turns an article into a recital or back. Every reader of a
+  `norm` item reads the key (§6.3 of the spec): `citeStoredItem` cites it; `rebuildNormEntry` keeps it for
+  published content (environments, the study import, the recovery, «Aggiungi ai miei dossier»); Forum
+  suggestions and course citations refuse it in words; the assistant's text (`RecitalHasNoText`), the
+  add-by-reference route and the saved-norm watcher leave it out. Marks on a recital use its identity
+  `celex:32016R0679~rct26` as `normaKey`, with an empty `articleId`.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
   and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most
@@ -345,6 +397,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
+  The older controllers' free-text fields have a maximum length (`utils/bodyLimits.ts`: `boundedText`,
+  `boundedTags`, `parseBody`; item 14 of the security inventory): a text or a list over it is a 400
+  `{ detail: "Campo «nota»: al massimo 50.000 caratteri.", error: "too_long" }`, every other failure
+  as above. An error nobody caught (`utils/processGuards.ts`): a rejection is logged and the server keeps
+  running; an exception is logged, then the graceful shutdown ends the process; neither logs its message.
 - **The Forum's content** (`SharedEnvironment.content`; spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D6–D7). The server trusts
   none of it: `utils/publishedContent.ts` rebuilds every row from an allow-list — a dossier's
@@ -507,8 +564,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   reply or a comment **outlives its author's account** (`user_id` SET NULL; every view says «utente
   cancellato» and a null author is nobody's own, G-307); a report names its item by a **plain id, no
   foreign key**, and keeps `reported_text` (the item as reported) for the moderators until 90 days after
-  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes, also deletes
-  notifications read 90 days ago); `article_comment_reports`, `forum_notifications`,
+  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes and checked hourly by
+  a timer `index.ts` starts, also deletes notifications read 90 days ago, and erases a closed report's
+  `details` and `resolution_note` 12 months after it was closed, G-503, and turns a moderation log
+  entry's `reason` into «(tolto dopo 12 mesi)» 12 months after it was written, G-550, and names a
+  deleted account «utente cancellato» in the log's `user` targets, G-504); `article_comment_reports`, `forum_notifications`,
   `forum_moderation_log`, `users.forum_moderator`; accepted answer, edit/delete marks (emptied text is
   `''`, a CHECK), lock, `materia`, `licence_text_id` (the version of `CONTRIBUTO_COMMUNITY` a row was
   written under). `GET /auth/export` adds the user's votes, reports (never their copy, who closed them or
@@ -563,7 +623,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   locks every glossa and then every reply the deletion writes (the ones the person voted, wrote, locked or
   released), each by id, then deletes the votes (`lingo/deleteUserAccount.ts`): left to the cascade and
   the SET NULLs, the rows would be locked in any order, a reply before its glossa, and could deadlock with
-  a reply being written or voted.
+  a reply being written or voted. In the same transaction the moderation log keeps every act on the person
+  and names them «utente cancellato» (`target_id` of kind `user` and `profile`, and `profile:<id>` on
+  report rows; G-504); the sweep repairs the `user` rows of accounts deleted any other way, never the
+  profile rows, since a profile takes a new id on a move to a pseudonym.
   **The minimal profile** (spec §B, D-246, D-247, D-249, G-477, G-479; migration
   `20261116100001_forum_profiles`; `forum/profiles.ts`, `controllers/forumProfileController.ts`):
   `forum_profiles`, one per person, deleted with the account, under the real name **or** a pseudonym, never
@@ -591,7 +654,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   /moderation/profile-reports/:profileId/resolve { action: confirm | dismiss, reason }` (confirm withdraws
   the name: «nome ritirato» everywhere, no writing, no change of profile) and `…/restore { reason }`; logged
   as `withdraw_name`, `restore_name` (target `profile`) or `dismiss` (target `report`, `profile:<id>`). The
-  sweep erases a closed report's details after 90 days. The export carries the profile and the reports one
+  sweep erases a closed report's details after 90 days, and the owners' note after 12 months (G-503). The export carries the profile and the reports one
   made.
   **Communities by subject** (spec §C, D-214, D-267, G-478; migration `20261116100002_forum_communities`;
   `controllers/forumCommunitiesController.ts`, `forum/roles.ts`, `forum/validation.ts`, `forum/appeals.ts`,
@@ -626,7 +689,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   cleared when shown): `POST /forum/appeals { kind, itemId, text }` by the author of a hidden item, once per
   hiding (the `report` counter); the owners' `GET /moderation/appeals` and `POST /moderation/appeals/:id/decide
   { action: uphold | reject, reason }` (uphold shows the item, logged `unhide`; reject logged
-  `appeal_rejected`; the author told, `appeal`); showing an item by any route closes its pending appeal as
+  `appeal_rejected`; the author told, `appeal`; the queue's `hidingReason` is the log's, so after 12 months
+  it reads «(tolto dopo 12 mesi)» and only the category is left, G-550); showing an item by any route closes its pending appeal as
   upheld with a fixed note, never the moderator's free reason (it may name who reported); the author's deletion of the item deletes its appeals; the hidden notice carries `appeal`
   (`pending` | `rejected` | null). The profiles carry `roles` (public) and `validatedCount`; `GET
   /forum/profiles/:profileId/validated` lists the visible contributions at the threshold. The export
@@ -718,7 +782,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must name that version's id and the acceptance is stored with the proposal; otherwise 409
   `{ detail, richiedeTesto }` with the current version, nothing written. The card records the
   version in `propostaTestoId`. `POST /:id/ritira`: proposed → draft at any time, deleting the
-  card's votes and clearing `propostaTestoId`. `routes/lingoValidazione.ts`:
+  card's votes and clearing `propostaTestoId`. `POST /:id/togli` (G-556, session only): the author
+  removes a validated or under-review card — deleted when nobody else uses it (no one else has it in
+  review, and it is in no course someone else wrote or follows) and answered `{ esito: "cancellata" }`,
+  otherwise its author becomes null and the answer is `{ esito: "senza_nome", detail }`; another state is
+  a 409, another person's card a 404; the card row is locked first
+  (`lingo/removeOwnContributions.ts`). `DELETE /api/lingo/validazione/:cardId/motivazione` (G-557,
+  session only): the validator erases the reason of their vote, the judgement stays; a remark whose
+  reason was erased reaches the card's author as `motivazione: ""`. `routes/lingoValidazione.ts`:
   `GET /api/lingo/validazione/coda?materia=&limit=` (1–20) and `POST /api/lingo/validazione/:cardId
   { giudizio, motivazione? }` (reason 1–2,000 characters, required unless `APPROVATA`), for
   validators only: `User.lingoValidatore`, set by an administrator through `PUT /admin/users/:id`
@@ -855,9 +926,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   409, a correction never) and `POST /:id/esami` are a connected application's only (the session gets 403;
   `lingo:courses:write`, counters `corso` 3 and `modulo` 40 a day); `GET /` (session and `lingo:courses:read`)
   lists the caller's courses; `GET /:id/struttura` (token only) gives the assistant the content with its keys
-  except an exam's not yet handed in, the flags and the judgements; `PATCH /:id { titolo?, moduliPrevisti? }`,
-  `DELETE /:id`, `DELETE /:id/moduli/:moduloId` (a module never opened; 409 once a state row exists) and `GET
-  /:id/export` are the session's. Every read and write is scoped to the author: anything else is 404. The lesson
+  except an exam's not yet handed in, the flags and the judgements; `PATCH /:id { titolo?, moduliPrevisti?,
+  obiettivo?, dataEsame? }`, `DELETE /:id`, `DELETE /:id/moduli/:moduloId` (a module never opened; 409 once a state row exists) and `GET
+  /:id/export` are the session's. **The learner's goal and exam date** (G-488; migration
+  `20261117120000_lingo_course_goal`) sit on the enrolment, not the course: `obiettivo { tipo, nota }` (a kind of
+  `LingoCorsoObiettivo`, `ESAME_AVVOCATO`, `ESAME_MATERIA`, `AGGIORNAMENTO_NORMATIVO`, `ALTRO`, and a sentence of
+  1–200 characters, only with a kind: a CHECK; `''` is no sentence) and `dataEsame` (a Rome day, from today to
+  five years on when set, kept once it passes); null clears either, a goal replaces kind and sentence together.
+  `goalView` puts both on `GET /`, `GET /:id`, `/oggi` (in `corso`) and the PATCH's answer; the exports carry the
+  columns. Every read and write is scoped to the author: anything else is 404. The lesson
   is a closed Markdown subset (`lingo/courseFormat.ts`): HTML, links but `[testo](#cN)`, images, code, other
   heading levels, nested lists and every control character but `\n` are refused, never stripped; each `#cN`
   names an entry of the enrolment's dossier, a norm or a decision, stored as a copy of its identity
@@ -952,7 +1029,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   finishes before the states are read (plan, decision 14). Their votes outlive them, anonymous
   (`LingoValidazioneCard.utenteId` `SET NULL`), as do the text versions they wrote
   (`autoreId` `SET NULL`); their acceptances go. A card's votes go with the card: one
-  restored from the trash comes back without them. `GET /auth/export` includes the user's cards
+  restored from the trash comes back without them. Before leaving, the person can remove
+  everything they wrote for others at once (G-558): `POST /auth/contributions/remove { password }`,
+  session only, one transaction (`account/removeAllContributions.ts`) — their glosse, then their
+  replies and comments, newest first, by the author's own delete rule (`deleteOwnThreadIn`,
+  `deleteOwnCommentIn` in `controllers/communityController.ts`); the Forum validations they gave;
+  their proposed cards withdrawn; their validated or under-review cards by G-556; their votes' reasons
+  erased (G-557). It answers `{ glosse: {cancellate, svuotate}, risposte: {cancellate, svuotate},
+  validazioniForum, schede: {ritirate, cancellate, senzaNome}, motivazioni }`; a wrong password is a
+  400 and changes nothing. `GET /auth/export` includes the user's cards
   as `data.lingoCards`, their votes as `data.lingoValidazioni` (card id, verdict, reason, time)
   and their acceptances as `data.lingoAccettazioni` (key, version, time). Review data is personal: `LingoStatoRipasso`
   (`lingo_stato_ripasso`, one row per user and card, indexed by `(utente_id, due_at)`),
@@ -987,7 +1072,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
   the tick's body is the occurrence seen, required for a repeating task (400 without), a stale one
   409, so a double tick never moves it twice. Any other tick closes the task and its open
-  subtasks at one instant, and reopening reopens what closed at that instant. Routes
+  subtasks at one instant, and reopening reopens what closed at that instant. `{ forever: true }`
+  («Completa per sempre») closes a repeating task that way too, with its rule cleared and no next
+  occurrence; its origin and kept day stay stored, so `reopen { recurrence }` puts the rule back in
+  the same transaction and the series resumes from its kept day. Routes
   (`routes/tasks.ts`, `/api/tasks`, session only — not in the delegated table): `GET
   ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
   `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT
@@ -1162,11 +1250,13 @@ port with another local process).
 
 ## Container image
 
-`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries only
-what `node dist/index.js` needs, on Debian slim with openssl for Prisma's query engine,
+`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries the
+production dependencies and `dist/`, on Debian slim with openssl for Prisma's query engine,
 as user `node`, with an exec-form `CMD` so SIGTERM reaches the graceful shutdown.
-`migrate` is a one-shot (`prisma migrate deploy`) and exists because `prisma` and `tsx`
-are development dependencies. `.dockerignore` excludes every `.env*`: a secret never
+`migrate` is a one-shot (`prisma migrate deploy`) from the build stage, which has the
+`prisma/` folder (schema and migrations) the runtime does not. `prisma` is a production
+dependency since G-555, so the blocking `npm audit` covers the CLI that writes to the
+production database; the runtime therefore holds it too, unused. `.dockerignore` excludes every `.env*`: a secret never
 enters an image. The admin seed runs compiled: `node dist/utils/seed.js`.
 
 Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it shares with

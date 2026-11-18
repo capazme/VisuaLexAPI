@@ -1,5 +1,5 @@
-"""/health/detailed probes three live sources on the shared throttled client
-and circuit breakers; the frontend banner polls it, so N open tabs multiply
+"""/health/detailed probes three live sources on the shared throttled client;
+the frontend banner polls it, so N open tabs multiply
 that load. A server-side TTL cache shares one probe result across callers.
 
 Uses the real Quart app (same trick as test_article_existence.py's `client`

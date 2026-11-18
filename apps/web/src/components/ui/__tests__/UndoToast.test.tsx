@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { NotificationHost, Toast } from '../Toast';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
-import { closeNotification, notificationStore, notify, offerShortcutUndo, resetNotifications } from '../notifications/notifications';
+import { closeNotification, notificationStore, notify, offerShortcutUndo, resetNotifications, UNDO_MS } from '../notifications/notifications';
 import { setFootBarRoom } from '../notifications/footBar';
+import { stackRoomStore } from '../notifications/stackRoom';
 
 // jsdom runs no animation to its end on its own: an exit is ended by hand, as the card would at its end.
 const endExits = () => act(() => notificationStore.getState().entries.filter((e) => e.closing).forEach((e) => notificationStore.setState((s) => ({ entries: s.entries.filter((x) => x.id !== e.id) }))));
@@ -17,6 +18,77 @@ const list = () => screen.getByRole('list');
 const cards = () => within(list()).queryAllByRole('listitem');
 
 describe('NotificationHost (K1a)', () => {
+  it('draws «Ripristinato» in the slot of the «Annulla» it answers, under it while it closes, so nothing drops once it has gone (LC85)', async () => {
+    // Closings that do not end: the undone one stays drawn while «Ripristinato» arrives, as for its 220 ms in a browser.
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: () => ({ cancel: () => {}, onfinish: null, effect: null }),
+      configurable: true,
+      writable: true,
+    });
+    onTestFinished(() => {
+      Reflect.deleteProperty(Element.prototype, 'animate');
+    });
+    render(<NotificationHost />);
+    let older: Promise<boolean> | undefined;
+    await act(async () => {
+      older = showUndoToast({ action: () => 1, undo: vi.fn(), message: 'Prima rimossa' });
+      void showUndoToast({ action: () => 2, undo: vi.fn(), message: 'Seconda rimossa' });
+    });
+    await act(async () => {
+      fireEvent.click(within(cards()[0]).getByRole('button', { name: 'Annulla' }));
+    });
+    // Newest first: the closing one on top, «Ripristinato» where it stood, the older one below, unmoved.
+    const shown = cards().map((c) => c.textContent ?? '');
+    expect(shown.findIndex((t) => t.includes('Ripristinato'))).toBe(shown.findIndex((t) => t.includes('Prima rimossa')) - 1);
+    expect(shown.findIndex((t) => t.includes('Seconda rimossa'))).toBe(0);
+    expect(shown.findIndex((t) => t.includes('Ripristinato'))).toBe(1);
+    void older;
+  });
+
+  it('keeps any «Annulla» at least 10 s, whatever its caller asked, held while the pointer is on it; a plain one may be shorter (LC85)', async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    render(<NotificationHost />);
+    const closed: string[] = [];
+    act(() => {
+      notify({ type: 'success', message: 'Completato per sempre', duration: 3000, onUndo: vi.fn(), onClose: () => closed.push('annulla') });
+      notify({ type: 'info', message: 'Copiato', duration: 3000, onClose: () => closed.push('semplice') });
+    });
+    await act(async () => vi.advanceTimersByTime(3000));
+    expect(closed).toEqual(['semplice']);
+    // The pointer on it holds its time, as long as it stays.
+    const card = screen.getByText('Completato per sempre').closest('[data-card]')!;
+    // jsdom has no PointerEvent: a mouse event with its pointer type (React reads enter and leave from over and out).
+    const pointer = (type: string) => {
+      const event = new MouseEvent(type, { bubbles: true });
+      Object.defineProperty(event, 'pointerType', { value: 'mouse' });
+      act(() => {
+        card.dispatchEvent(event);
+      });
+    };
+    pointer('pointerover');
+    await act(async () => vi.advanceTimersByTime(30_000));
+    expect(closed).toEqual(['semplice']);
+    pointer('pointerout');
+    await act(async () => vi.advanceTimersByTime(UNDO_MS - 3000 - 1));
+    expect(closed).toEqual(['semplice']);
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(closed).toEqual(['semplice', 'annulla']);
+  });
+
+  it('says how much of the window\'s foot the bottom stack takes while it shows, so the page keeps it free (LC85)', async () => {
+    render(<NotificationHost />);
+    expect(stackRoomStore.getState().room).toBe(0);
+    let id = 0;
+    act(() => { id = notify({ type: 'success', message: 'Nota salvata', duration: 0 }); });
+    // jsdom lays nothing out: the stack's top is at 0, so it takes the whole window's height.
+    expect(stackRoomStore.getState().room).toBe(window.innerHeight);
+    act(() => closeNotification(id, 'dismiss'));
+    await vi.waitFor(() => expect(stackRoomStore.getState().room).toBe(0));
+  });
+
   it('keeps the bottom stack 32 px from the foot from `md`, with nothing floating there to clear', async () => {
     render(<NotificationHost />);
     await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
@@ -57,6 +129,15 @@ describe('NotificationHost (K1a)', () => {
   });
 
   it('takes nothing while it leaves: a last-moment «Annulla» is not a restore', async () => {
+    // A closing that does not end (`IslandSurface` runs on Web Animations, which jsdom lacks: it would be gone at once).
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: () => ({ cancel: () => {}, onfinish: null, effect: null }),
+      configurable: true,
+      writable: true,
+    });
+    onTestFinished(() => {
+      Reflect.deleteProperty(Element.prototype, 'animate');
+    });
     const undo = vi.fn();
     render(<NotificationHost />);
     let outcome: Promise<boolean> | undefined;
@@ -65,7 +146,7 @@ describe('NotificationHost (K1a)', () => {
     });
     const annulla = screen.getByRole('button', { name: 'Annulla' });
     act(() => closeNotification(notificationStore.getState().entries[0].id, 'timeout'));
-    // Still drawn while it closes into its line, but it answers nothing.
+    // Still drawn while it goes back into its pill, but it answers nothing.
     expect(annulla).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Chiudi notifica' })).toBeDisabled();
     expect(annulla.closest('[inert]')).not.toBeNull();
@@ -90,6 +171,21 @@ describe('NotificationHost (K1a)', () => {
       expect.stringContaining('Elemento 3'),
       expect.stringContaining('Elemento 2'),
     ]);
+  });
+
+  it('with «Annulla» and a second button, lets them go under the text when the row has no room; one button keeps one row (LC91)', () => {
+    render(<NotificationHost />);
+    act(() => {
+      notify({ type: 'success', message: 'Scheda nel cestino', duration: 10000, onUndo: vi.fn(), action: { label: 'Apri il cestino', onClick: vi.fn() } });
+      notify({ type: 'success', message: 'Nota rimossa', duration: 10000, onUndo: vi.fn() });
+    });
+    const textOf = (message: string) => within(list()).getByText(message);
+    // The text keeps 13 rem of its own; the buttons and ✕ wrap as one group, at the right (jsdom lays nothing out).
+    expect(textOf('Scheda nel cestino')).toHaveClass('basis-[min(13rem,100%)]');
+    expect(textOf('Scheda nel cestino').parentElement).toHaveClass('flex-wrap');
+    expect(within(textOf('Scheda nel cestino').parentElement!).getByRole('button', { name: 'Apri il cestino' }).parentElement).toHaveClass('ml-auto');
+    expect(textOf('Nota rimossa')).not.toHaveClass('basis-[min(13rem,100%)]');
+    expect(textOf('Nota rimossa').parentElement).not.toHaveClass('flex-wrap');
   });
 
   it('closes with Esc from inside it, and with ✕', async () => {
@@ -124,7 +220,7 @@ describe('NotificationHost (K1a)', () => {
     await act(async () => vi.advanceTimersByTime(20_000));
     expect(settled).not.toHaveBeenCalled();
     act(() => screen.getByRole('button', { name: 'Annulla' }).blur());
-    await act(async () => vi.advanceTimersByTime(5000));
+    await act(async () => vi.advanceTimersByTime(UNDO_MS));
     expect(settled).toHaveBeenCalledWith(true);
   });
 
@@ -223,7 +319,7 @@ describe('NotificationHost (K1a)', () => {
     act(() => close.focus());
     fireEvent.click(close, { detail: 1 });
     expect(within(card('Importazione in attesa')).getByRole('button', { name: 'Annulla' })).not.toHaveFocus();
-    await act(async () => vi.advanceTimersByTime(5000));
+    await act(async () => vi.advanceTimersByTime(UNDO_MS));
     expect(settled).toHaveBeenCalledWith(true);
   });
 

@@ -12,9 +12,22 @@ import { verifyToken, verifyTokenType } from '../utils/jwt';
 const ANONYMOUS_POINTS = 100; // requests per window
 const AUTHENTICATED_POINTS = 300;
 const WRITE_POINTS = 200;
+// The session check (GET /api/auth/me, G-484) has its own counter, outside the general one: the web asks
+// it at every load, and a page that makes many calls used to spend the quota it needed (#459).
+export const SESSION_CHECK_POINTS = 600;
 const WINDOW_SECONDS = 60; // 1 minute
 
+/**
+ * A limiter on Redis when it is enabled, in this process's memory otherwise. On Redis, an error of the store
+ * (Redis down or not ready) hands the count to a limiter in memory with the same limits (the
+ * insurance limiter), so a limit still holds, per process, instead of letting every request through.
+ */
 export function createLimiter(keyPrefix: string, points: number, windowSeconds = WINDOW_SECONDS): RateLimiterAbstract {
+  const memory = new RateLimiterMemory({
+    keyPrefix,
+    points,
+    duration: windowSeconds,
+  });
   const redis = getRedisClient();
   if (redis) {
     return new RateLimiterRedis({
@@ -22,18 +35,17 @@ export function createLimiter(keyPrefix: string, points: number, windowSeconds =
       keyPrefix,
       points,
       duration: windowSeconds,
+      rejectIfRedisNotReady: true,
+      insuranceLimiter: memory,
     });
   }
-  return new RateLimiterMemory({
-    keyPrefix,
-    points,
-    duration: windowSeconds,
-  });
+  return memory;
 }
 
 const anonLimiter = createLimiter('rl:anon', ANONYMOUS_POINTS);
 const authLimiter = createLimiter('rl:auth', AUTHENTICATED_POINTS);
 const writeLimiter = createLimiter('rl:write', WRITE_POINTS);
+const sessionCheckLimiter = createLimiter('rl:session-check', SESSION_CHECK_POINTS);
 
 // Surface the chosen backend at startup so dev/prod mismatches are not silent.
 const backend = anonLimiter instanceof RateLimiterRedis ? 'redis' : 'memory';
@@ -47,13 +59,15 @@ if (backend === 'memory') {
 }
 
 /**
- * Try to identify the user from the Authorization header without failing.
- * Returns userId if valid access token, null otherwise.
+ * The user a request counts for, without failing: the one `delegatedAuth` or `webSession` set, else the one a
+ * valid Bearer access token names; null otherwise.
  */
 function identifyUser(req: Request): string | null {
-  // An exchanged token: the MCP server calls for every user from one address,
-  // so counting it by address would throttle them all together.
-  if (req.delegation && req.user) return req.user.id;
+  // An exchanged token (the MCP server calls for every user from one address,
+  // so counting it by address would throttle them all together) or the web's
+  // session cookie (an office behind one address would share the anonymous
+  // tier): `delegatedAuth` or `webSession` already set the user.
+  if (req.user) return req.user.id;
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return null;
   const payload = verifyToken(header.substring(7));
@@ -103,8 +117,33 @@ export const globalRateLimiter = async (
       sendTooManyRequests(res, err);
       return;
     }
-    // Limiter internal error — fail-open to avoid blocking all traffic
+    // Neither Redis nor the memory behind it answered (the insurance limiter of createLimiter):
+    // fail-open, as a last resort, to avoid blocking all traffic.
     console.error('Rate limiter internal error (fail-open):', err);
+    next();
+  }
+};
+
+/**
+ * The session check's own limit (G-484): `SESSION_CHECK_POINTS` a minute per user, or per address without a
+ * valid token. Mounted in `app.ts` on GET /api/auth/me before the general limiter, which that route skips.
+ */
+export const sessionCheckRateLimiter = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  const key = identifyUser(req) || getClientIp(req);
+  try {
+    const result = await sessionCheckLimiter.consume(key);
+    setRateLimitHeaders(res, result, SESSION_CHECK_POINTS);
+    next();
+  } catch (err) {
+    if (err instanceof RateLimiterRes) {
+      sendTooManyRequests(res, err);
+      return;
+    }
+    console.error('Session check rate limiter internal error (fail-open):', err);
     next();
   }
 };

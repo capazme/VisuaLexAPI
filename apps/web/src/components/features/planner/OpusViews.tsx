@@ -1,145 +1,65 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, FolderOpen, ListFilter, Plus, RotateCcw } from 'lucide-react';
-import { MenuButton } from '../../ui/MenuButton';
+import { ChevronRight, FolderOpen, RotateCcw } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { addDaysToIsoDate, todayInRome } from '../../../utils/dateUtils';
 import type { Task, TaskView } from '../../../types/tasks';
-import { FOCUS_RING, QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { FOCUS_RING, SECONDARY_BUTTON } from '../studia/progress/tokens';
 import { dossierRecency } from '../dossier/dossierUtils';
 import { kindLabel } from '../dossier/dossierKinds';
 import { QuickAddField } from './QuickAddField';
 import { restoreTask } from './taskActions';
-import { blockHeading, dayHeading, groupUpcoming, longDay, splitToday, UPCOMING_DAYS, weekStart } from './taskDates';
+import { blockHeading, dayHeading, groupUpcoming, splitToday, UPCOMING_DAYS } from './taskDates';
 import type { TaskDraft } from './taskDraft';
 import { TaskList } from './TaskList';
 import { scrollParentOf } from '../practice/practiceView';
 import { TaskSheetScope } from './TaskSheetScope';
-import { InlineAddTask, TaskGroup } from './TaskGroup';
-import { StudyTodayRow } from './StudyTodayRow';
+import { TaskGroup } from './TaskGroup';
 import { WeekStrip } from './WeekStrip';
 import { TaskListSkeleton, TaskViewEmpty, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { useTaskView } from './useTaskView';
-import { Illustration } from '../../ui/Illustration';
-
-/** Below md (the phone's layout), followed as the window changes. */
-function usePhone(): boolean {
-  const query = '(max-width: 767px)';
-  const read = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
-  const [phone, setPhone] = useState(read);
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined;
-    const list = window.matchMedia(query);
-    const change = () => setPhone(list.matches);
-    list.addEventListener('change', change);
-    return () => list.removeEventListener('change', change);
-  }, []);
-  return phone;
-}
-
-const GROUPING_KEY = 'visualex-opus-today-grouping';
-type Grouping = 'date' | 'dossier';
-
-/** The grouping «Oggi» was left on, in this browser: a convenience, so a storage that throws reads as the default. */
-function storedGrouping(): Grouping {
-  try {
-    return localStorage.getItem(GROUPING_KEY) === 'dossier' ? 'dossier' : 'date';
-  } catch {
-    return 'date';
-  }
-}
+import { plannerStore } from './plannerStore';
 
 interface FrameProps {
   view: TaskView;
   heading: string;
-  /** The line under the heading, from the server's day: the day itself, or what the view holds. */
-  line: string | ((today: string) => string);
+  /** The trash's line under its title: what happens to what is there. The planner's views say nothing of themselves (LC83). */
+  line?: string;
   defaults?: (today: string) => Partial<TaskDraft>;
-  /** Beside the heading: the view's options («Raggruppa»). */
-  options?: ReactNode;
-  /** Above the rows, under the quick add: Gymnasium's day on «Oggi», the week's strip on «Prossimi giorni». */
-  before?: ReactNode | ((today: string, tasks: Task[]) => ReactNode);
+  /** Above the rows, under the quick add: the week's strip on «Prossimi giorni». */
+  before?: (today: string, tasks: Task[]) => ReactNode;
   children: (tasks: Task[], today: string, optimistic: ReturnType<typeof useTaskView>['optimistic']) => ReactNode;
-  /** What an empty view shows; without it the view draws its groups all the same (the days of the week). */
+  /** What an empty view shows; without it the view draws its groups all the same. */
   empty?: ReactNode;
 }
 
 /**
- * One view of Opus: its heading, the quick add (not in the trash), then the tasks as the view groups them, in one
+ * One view of Opus: the quick add (not in the trash), then the tasks as the view groups them, in one
  * `TaskSheetScope` (the rows' order and the task's sheet). The first read holds the rows' places; a failed read says
- * so with «Riprova» and keeps what was on screen; «today» is the server's day.
+ * so with «Riprova» and keeps what was on screen; «today» is the server's day. One way to add, the field, in the flow
+ * at every width (LC83, L-73): no button floats over the list, no sheet rises over it.
  */
-function ViewFrame({ view, heading, line, defaults, options, before, children, empty }: FrameProps) {
+function ViewFrame({ view, heading, line, defaults, before, children, empty }: FrameProps) {
   const state = useTaskView(view);
   const today = state.answer?.today ?? todayInRome();
   const tasks = state.answer?.tasks ?? [];
-  // How many, under the title (LC33, after Todoist's «Oggi · 7 attività»): the tasks, not their subtasks.
+  // The inbox has no group to carry its count: its tab does (LC83). The tasks, not their subtasks.
   const count = state.answer ? tasks.filter((task) => !task.parentId).length : null;
-  // On a phone the quick add is not on the page: «+» at the thumb opens it from the screen's foot (LC33).
-  const [adding, setAdding] = useState(false);
-  const addRef = useRef<HTMLDivElement>(null);
-  const plusRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!adding) return undefined;
-    const plus = plusRef.current;
-    addRef.current?.querySelector<HTMLInputElement>('input')?.focus();
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setAdding(false); };
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('keydown', close);
-      // Closed: the focus back on «+», the way it came (R-32).
-      requestAnimationFrame(() => plus?.focus({ preventScroll: true }));
-    };
-  }, [adding]);
-  // On a phone the quick add is a sheet (a dialog, in the body); from md the page's own field.
-  const phone = usePhone();
+    if (view !== 'inbox') return undefined;
+    plannerStore.getState().setInboxCount(count);
+    return () => plannerStore.getState().setInboxCount(null);
+  }, [view, count]);
   return (
     <section aria-labelledby={`opus-${view}`} className="min-w-0 space-y-5 pb-8">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 max-md:flex-nowrap max-md:items-center">
-        <div className="min-w-0">
-          {/* Where the focus goes when the last row leaves (`focusAwayFrom`). Said to a screen reader only: the page's
-              title above already names the view (`OpusPage`, L-37). */}
-          <h2 id={`opus-${view}`} tabIndex={-1} data-focus-fallback className="sr-only">{heading}</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {typeof line === 'function' ? line(today) : line}
-            {count !== null && count > 0 && ` · ${count === 1 ? '1 compito' : `${count} compiti`}`}
-          </p>
-        </div>
-        {options}
-      </div>
+      {/* Where the focus goes when the last row leaves (`focusAwayFrom`). Said to a screen reader only: the tab names
+          the view. */}
+      <h2 id={`opus-${view}`} tabIndex={-1} data-focus-fallback className="sr-only">{heading}</h2>
+      {line && <p className="text-sm text-slate-600 dark:text-slate-400">{line}</p>}
       {/* Keyed on the day: a page left open overnight proposes the new day, not the one it was opened on. */}
-      {defaults && (<>
-        {/* From md in the page; on a phone a sheet from the foot, over a scrim, opened by «+» — the sheet, the scrim and
-            «+» in the body, over everything (the views' bar too). */}
-        {!phone && <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />}
-        {typeof document !== 'undefined' && createPortal(<>
-          {phone && adding && (<>
-            <button type="button" aria-label="Chiudi" tabIndex={-1} onClick={() => setAdding(false)} className="fixed inset-0 z-40 bg-slate-950/30" />
-            <div
-              ref={addRef}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Aggiungi un compito"
-              className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-lg [&>form]:border-0 [&>form]:bg-transparent"
-            >
-              <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />
-            </div>
-          </>)}
-          <button
-            ref={plusRef}
-            type="button"
-            onClick={() => setAdding(true)}
-            aria-label="Aggiungi un compito"
-            aria-expanded={adding}
-            className={cn('fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-slate-900 text-white shadow-lg active:scale-95 md:hidden dark:bg-slate-100 dark:text-slate-900', adding && 'invisible', FOCUS_RING)}
-          >
-            <Plus size={26} aria-hidden />
-          </button>
-        </>, document.body)}
-      </>)}
-      {typeof before === 'function' ? before(today, tasks) : before}
+      {defaults && <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />}
+      {before?.(today, tasks)}
       <div aria-busy={state.status === 'loading'} className={cn('space-y-6', state.status === 'loading' && state.answer && 'opacity-60 transition-opacity')}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
         {state.answer === null ? (
@@ -153,28 +73,6 @@ function ViewFrame({ view, heading, line, defaults, options, before, children, e
         {state.answer?.truncated && <TruncatedNote />}
       </div>
     </section>
-  );
-}
-
-/** «Raggruppa: per data / per dossier», the view's option, in a menu. */
-function GroupingMenu({ value, onChange }: { value: Grouping; onChange: (value: Grouping) => void }) {
-  const label = value === 'date' ? 'per data' : 'per pratica';
-  return (
-    <MenuButton
-      label={`Raggruppa: ${label}`}
-      triggerClassName={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 px-2 max-md:w-11 max-md:justify-end max-md:px-0 max-md:hover:bg-transparent font-normal no-underline hover:no-underline hover:bg-slate-100 dark:hover:bg-slate-800')}
-      items={(['date', 'dossier'] as const).map((choice) => ({
-        label: choice === 'date' ? 'Per data' : 'Per pratica',
-        checked: choice === value,
-        onSelect: () => onChange(choice),
-      }))}
-    >
-      {/* On a phone a framed square, as the trash beside the title (LC38). */}
-      <span className="inline-flex items-center max-md:size-9 max-md:justify-center max-md:rounded-lg max-md:border max-md:border-slate-300 dark:max-md:border-slate-700">
-        <ListFilter size={15} aria-hidden />
-      </span>
-      <span className="max-md:sr-only">Raggruppa: {label}</span>
-    </MenuButton>
   );
 }
 
@@ -192,29 +90,20 @@ function byDossier(tasks: Task[], titleOf: (id: string) => string): { dossierId:
 }
 
 const NEXT_ROW = cn(
-  'group flex min-h-[44px] w-full items-center gap-3 border-t border-slate-200 py-2.5 text-left transition-colors hover:bg-slate-100/60 dark:border-slate-800 dark:hover:bg-slate-900/60',
+  'flex min-h-[44px] w-full items-center gap-3 border-t border-slate-200 px-1 text-left text-sm transition-colors hover:bg-slate-100/60 dark:border-slate-800 dark:hover:bg-slate-900/60',
   FOCUS_RING,
 );
 
 /**
- * An empty «Oggi» (LC30, the owner: «Mi pare un po' vuota»): one quiet line, then where to go from here, from what the
- * app already holds — the dossiers last worked on (the Corpus desk's «Riprendi», by `dossierRecency`: created or last
- * added to, not opened) and the next days. Gymnasium's row stays above, in `before`. No counts: the planner keeps none
- * for tomorrow, and a second read for one number is not worth it.
+ * An empty «Scadenziario» (LC83): one line — the field is right above it — then «Riprendi», the dossiers last worked
+ * on (the Corpus desk's, by `dossierRecency`: created or last added to, not opened), one row each.
  */
 function TodayEmpty() {
   const dossiers = useAppStore((s) => s.dossiers);
   const recent = [...dossiers].sort((a, b) => dossierRecency(b) - dossierRecency(a)).slice(0, 3);
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        {/* LC35: the desk in order, an engraving. */}
-        <Illustration name="work-oggi-vuota" className="h-20 w-20" />
-        <div>
-          <p className="font-serif text-lg text-slate-900 dark:text-slate-50">Nessun compito per oggi</p>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Quello che aggiungi qui è per oggi.</p>
-        </div>
-      </div>
+      <p className="text-slate-700 dark:text-slate-300">Nessun compito per oggi</p>
       {recent.length > 0 && (
         <section aria-labelledby="opus-today-riprendi">
           <h3 id="opus-today-riprendi" className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Riprendi</h3>
@@ -222,11 +111,9 @@ function TodayEmpty() {
             {recent.map((d) => (
               <li key={d.id}>
                 <Link to={`/pratiche?dossier=${encodeURIComponent(d.id)}`} className={NEXT_ROW}>
-                  <span className="min-w-0 flex-1">
-                    <span title={d.title} className="block truncate font-serif text-base text-slate-900 dark:text-slate-50">{d.title}</span>
-                    <span className="block text-sm text-slate-600 dark:text-slate-400">
-                      {kindLabel(d.kind)} · {d.items.length === 1 ? '1 voce' : `${d.items.length} voci`}
-                    </span>
+                  <span title={d.title} className="min-w-0 flex-1 truncate text-slate-900 dark:text-slate-50">{d.title}</span>
+                  <span className="shrink-0 text-slate-600 dark:text-slate-400">
+                    {kindLabel(d.kind)} · {d.items.length === 1 ? '1 voce' : `${d.items.length} voci`}
                   </span>
                   <ChevronRight size={16} aria-hidden className="shrink-0 text-slate-500" />
                 </Link>
@@ -235,38 +122,52 @@ function TodayEmpty() {
           </ul>
         </section>
       )}
-      <Link to="/work/prossimi" className={cn(QUIET_BUTTON, 'inline-flex w-fit items-center gap-1')}>
-        Vedi i prossimi giorni <ChevronRight size={15} aria-hidden />
-      </Link>
+    </div>
+  );
+}
+
+/** «Raggruppa» of «Scadenziario», in the page over its rows (L-73, LC91): two buttons, the one in use pressed. */
+function GroupingToggle() {
+  const grouping = plannerStore((s) => s.grouping);
+  return (
+    <div role="group" aria-label="Raggruppa" className="flex w-fit gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+      {(['date', 'dossier'] as const).map((choice) => (
+        <button
+          key={choice}
+          type="button"
+          aria-pressed={grouping === choice}
+          onClick={() => plannerStore.getState().setGrouping(choice)}
+          className={cn(
+            'min-h-[44px] rounded-md px-4 text-sm font-medium transition-colors',
+            FOCUS_RING,
+            grouping === choice
+              ? 'bg-card text-slate-900 shadow-sm dark:bg-toga-400 dark:text-ink-950'
+              : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
+          )}
+        >
+          {choice === 'date' ? 'Per data' : 'Per pratica'}
+        </button>
+      ))}
     </div>
   );
 }
 
 /**
- * «Oggi»: Gymnasium's day on one line, then by date — the missed deadlines first, then the tasks late on their planned
- * day, then today's — or by dossier; a new task is for today.
+ * «Scadenziario»: by date — the missed deadlines first, then the tasks late on their planned day, then today's, whose
+ * rows do not say «Oggi» again — or by dossier, as «Raggruppa» over the rows says (`GroupingToggle`). A new task is
+ * for today.
  */
 export function TodayView() {
-  const [grouping, setGrouping] = useState<Grouping>(storedGrouping);
+  const grouping = plannerStore((s) => s.grouping);
   const dossiers = useAppStore((s) => s.dossiers);
   const navigate = useNavigate();
   const titleOf = (id: string) => dossiers.find((d) => d.id === id)?.title ?? 'Pratica';
-  const choose = (value: Grouping) => {
-    setGrouping(value);
-    try {
-      localStorage.setItem(GROUPING_KEY, value);
-    } catch {
-      // Kept for this visit only.
-    }
-  };
   return (
     <ViewFrame
       view="today"
       heading="Scadenziario"
-      line={(today) => longDay(today, today)}
       defaults={(day) => ({ plannedDate: day })}
-      options={<GroupingMenu value={grouping} onChange={choose} />}
-      before={<StudyTodayRow />}
+      before={(_day, tasks) => tasks.length > 0 && <GroupingToggle />}
       empty={<TodayEmpty />}
     >
       {(tasks, day, optimistic) => {
@@ -277,7 +178,6 @@ export function TodayView() {
               foldKey={`today:dossier:${group.dossierId ?? 'inbox'}`}
               heading={group.title}
               count={group.tasks.length}
-              add={{ view: 'today', today: day, defaults: { plannedDate: day, ...(group.dossierId ? { dossierId: group.dossierId } : {}) } }}
               actions={group.dossierId ? [{ label: 'Apri la pratica', icon: FolderOpen, onSelect: () => navigate(`/pratiche?dossier=${encodeURIComponent(group.dossierId!)}`) }] : []}
             >
               <TaskList label={group.title} tasks={group.tasks} today={day} optimistic={optimistic} showDossier={false} subtasksOpen />
@@ -285,7 +185,6 @@ export function TodayView() {
           ));
         }
         const { missedDeadline, late, today: rest } = splitToday(tasks, day);
-        const add = { view: 'today' as const, today: day, defaults: { plannedDate: day } };
         return (
           <>
             {missedDeadline.length > 0 && (
@@ -298,10 +197,11 @@ export function TodayView() {
                 <TaskList label="In ritardo" tasks={late} today={day} optimistic={optimistic} subtasksOpen />
               </TaskGroup>
             )}
-            {/* Always, with its «+ Aggiungi compito», even when only late tasks are listed. */}
-            <TaskGroup foldKey="today:today" heading="Oggi" count={rest.length} add={add}>
-              {rest.length > 0 && <TaskList label="Oggi" tasks={rest} today={day} optimistic={optimistic} subtasksOpen />}
-            </TaskGroup>
+            {rest.length > 0 && (
+              <TaskGroup foldKey="today:today" heading={blockHeading(day, day)} count={rest.length}>
+                <TaskList label={dayHeading(day, day)} tasks={rest} today={day} optimistic={optimistic} subtasksOpen dayShown={day} />
+              </TaskGroup>
+            )}
           </>
         );
       }}
@@ -310,19 +210,18 @@ export function TodayView() {
 }
 
 /**
- * «Prossimi giorni» (P2c): the week's strip, then one block per day of the chosen week that the view can show — its
- * heading («22 ott · Domani · giovedì»), its tasks, «+ Aggiungi compito» for that day — even an empty one. A task
- * sits under its planned date when that is in the seven days, else under its deadline (`groupUpcoming`). The server
- * answers today and the six days after it (`view=upcoming`), so the weeks are the one or two those days touch.
+ * «Prossimi giorni» (P2c): the strip of the seven days the server answers (`view=upcoming`: today and the six after
+ * it), then one block per day — its heading («Oggi · mar 17», «Domani · mer 18», «Gio 19»), its tasks — even an empty
+ * one, so a day chosen in the strip has a place to scroll to; with no task in the seven days, one line instead. A task sits under its planned date when that is in the
+ * seven days, else under its deadline (`groupUpcoming`).
  */
 export function UpcomingView() {
   const [chosen, setChosen] = useState<string | null>(null);
   const select = (day: string) => {
     setChosen(day);
-    // After the block is drawn (a day of another week appears with its week), the content scroller alone moves, so
-    // the block's heading stops just under the strip where it sticks (its `top`, the phone's bar, and its height).
-    // Not `scrollIntoView`: it also scrolls the layout's `overflow: hidden` ancestors when the scroller is at its end,
-    // and the whole page, strip and all, slides up with no way back (seen in a headless pass at 390 and 1366 px).
+    // The content scroller alone moves, so the block's heading stops just under the strip where it sticks (its `top`,
+    // the phone's bar, and its height). Not `scrollIntoView`: it also scrolls the layout's `overflow: hidden` ancestors
+    // when the scroller is at its end, and the whole page, strip and all, slides up with no way back.
     requestAnimationFrame(() => {
       const block = document.getElementById(`opus-day-${day}`);
       const scroller = block && scrollParentOf(block);
@@ -334,19 +233,20 @@ export function UpcomingView() {
       scroller.scrollTo?.({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
     });
   };
-  const lastOf = (today: string) => addDaysToIsoDate(today, UPCOMING_DAYS - 1);
-  // A day chosen before midnight, now past or out of reach, gives way to today.
-  const selectedFor = (today: string) => (chosen && chosen >= today && chosen <= lastOf(today) ? chosen : today);
+  const daysFrom = (today: string) => Array.from({ length: UPCOMING_DAYS }, (_, i) => addDaysToIsoDate(today, i));
+  // A day chosen before midnight, now past, gives way to today.
+  const selectedFor = (today: string) => (chosen && daysFrom(today).includes(chosen) ? chosen : today);
   return (
     <ViewFrame
       view="upcoming"
       heading="Prossimi giorni"
-      line={(today) => `I compiti pianificati o in scadenza da oggi a ${longDay(lastOf(today), today)}.`}
       defaults={(day) => ({ plannedDate: day })}
+      // Nothing in the seven days: one line, not seven groups at 0 (LC91).
+      empty={<p className="text-slate-700 dark:text-slate-300">Nessun compito nei prossimi giorni</p>}
       before={(today, tasks) => (
         <WeekStrip
           today={today}
-          last={lastOf(today)}
+          days={daysFrom(today)}
           selected={selectedFor(today)}
           counts={new Map(groupUpcoming(tasks, today).map((group) => [group.day, group.tasks.length]))}
           onSelect={select}
@@ -355,58 +255,29 @@ export function UpcomingView() {
     >
       {(tasks, today, optimistic) => {
         const byDay = new Map(groupUpcoming(tasks, today).map((group) => [group.day, group.tasks]));
-        const monday = weekStart(selectedFor(today));
-        const days = Array.from({ length: 7 }, (_, i) => addDaysToIsoDate(monday, i)).filter((day) => day >= today && day <= lastOf(today));
-        // The server's seven days that run into the next week: said under this one, not left behind the arrow.
-        const nextMonday = addDaysToIsoDate(monday, 7);
-        const later = [...byDay.entries()].filter(([day]) => day >= nextMonday).reduce((n, [, list]) => n + list.length, 0);
-        const blocks = days.map((day) => {
+        return daysFrom(today).map((day) => {
           const listed = byDay.get(day) ?? [];
           return (
-            <TaskGroup
-              key={day}
-              anchorId={`opus-day-${day}`}
-              foldKey={`upcoming:${day}`}
-              heading={blockHeading(day, today)}
-              count={listed.length}
-              add={{ view: 'upcoming', today, defaults: { plannedDate: day } }}
-            >
+            <TaskGroup key={day} anchorId={`opus-day-${day}`} foldKey={`upcoming:${day}`} heading={blockHeading(day, today)} count={listed.length}>
               {listed.length > 0 && <TaskList label={dayHeading(day, today)} tasks={listed} today={today} optimistic={optimistic} subtasksOpen dayShown={day} />}
             </TaskGroup>
           );
         });
-        return (
-          <>
-            {blocks}
-            {later > 0 && (
-              <button type="button" onClick={() => select(nextMonday)} className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5')}>
-                La settimana dopo: {later === 1 ? '1 compito' : `${later} compiti`} fino a {longDay(lastOf(today), today)}
-                <ChevronRight size={16} aria-hidden />
-              </button>
-            )}
-          </>
-        );
       }}
     </ViewFrame>
   );
 }
 
-/** «Lista d'ingresso»: the tasks of no dossier, their subtasks behind each row's counter, and «+ Aggiungi compito». */
+/** «Lista d'ingresso»: the tasks of no dossier, their subtasks behind each row's counter; its count on its tab. */
 export function InboxView() {
   return (
     <ViewFrame
       view="inbox"
       heading="Lista d'ingresso"
-      line="I compiti che non appartengono a una pratica."
       defaults={() => ({})}
-      empty={<TaskViewEmpty title="La lista d'ingresso è vuota" line="Un compito senza pratica arriva qui." art="work-ingresso-vuoto" />}
+      empty={<p className="text-slate-700 dark:text-slate-300">La lista d'ingresso è vuota</p>}
     >
-      {(tasks, day, optimistic) => (
-        <div>
-          <TaskList label="Lista d'ingresso" tasks={tasks} today={day} optimistic={optimistic} />
-          <InlineAddTask view="inbox" today={day} defaults={{}} />
-        </div>
-      )}
+      {(tasks, day, optimistic) => <TaskList label="Lista d'ingresso" tasks={tasks} today={day} optimistic={optimistic} />}
     </ViewFrame>
   );
 }
