@@ -35,9 +35,6 @@ vi.mock('./dossierPdf', async (importOriginal) => {
 });
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () => ({ title: 'Titolo' }) }));
-vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
-// A decision's reader asks its court: what is tested here is the page (its own tests: `DossierDecisionsSection.test.tsx`).
-vi.mock('./DossierDecisionReader', () => ({ DossierDecisionReader: () => null }));
 // The act's index, reduced to what it hands over: this many articles of a law.
 const tree = vi.hoisted(() => ({ count: 0 }));
 vi.mock('./TreeNavigatorModal', () => ({
@@ -91,11 +88,6 @@ const dossier: Dossier = {
   ],
 };
 
-// LC86: the old «Fonti» list (its acts' blocks, its filter, its selection, «Espandi tutto», its two columns) is in the
-// code but never drawn; the one «Fonti» is the reading (`DossierReadingView`, its own tests). PR 2 brings the filter and
-// the selection onto it and removes the old list with these tests.
-const oldFonti = it.skip;
-
 let toast: UndoToast | null = null;
 let unregister: () => void = () => {};
 
@@ -129,16 +121,6 @@ afterEach(() => {
 });
 
 describe('DossierDetailView — the page by act', () => {
-  oldFonti('names each act once, in the order the acts entered, with its articles by number', () => {
-    renderView();
-    expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
-    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent ?? '');
-    // The count twice in the text: in the name's flow while narrow (hidden from a screen reader), and the heading's own.
-    expect(headings.filter((h) => h.startsWith('l. '))).toEqual([`${L247}2 articoli2 articoli`, `${L49}1 articolo1 articolo`]);
-    const block = screen.getByRole('region', { name: L247 });
-    expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);
-  });
-
   it('takes the dossier\'s title as the page\'s h1', () => {
     renderView();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(dossier.title);
@@ -189,30 +171,6 @@ describe('DossierDetailView — the page by act', () => {
     expect(items('Altre azioni')).toEqual(['Modifica', 'Aggiungi ai preferiti', 'Elimina la pratica']);
   });
 
-  oldFonti("removes a whole act as one trash entry behind one undo toast, and «Annulla» restores it (question 181)", async () => {
-    const { rerender } = renderView();
-    fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dalla pratica" }));
-    await waitFor(() => expect(toast?.message).toBe('2 articoli rimossi'));
-    // One call for the act's articles, none of the others.
-    expect(dossierService.trashItems).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(dossierService.trashItems).mock.calls[0][0]).toBe('d1');
-    expect([...vi.mocked(dossierService.trashItems).mock.calls[0][1]].sort()).toEqual(['a1', 'a3']);
-    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b1', 'n1']);
-    rerender();
-    expect(screen.queryByRole('region', { name: L247 })).toBeNull();
-    // The server has them back, with their own ids: the page reads the dossier again.
-    vi.mocked(dossierService.getById).mockResolvedValueOnce({
-      id: 'd1', name: 'Ricorso Rossi', is_pinned: false, created_at: '', updated_at: '', tags: [],
-      items: ['a1', 'a3', 'b1', 'n1'].map((id) => ({ id, item_type: 'note' as const, title: 'Nota', content: id, position: 0, status: 'unread' as const, created_at: '' })),
-    });
-    await act(async () => { await toast?.onUndo(); });
-    expect(trashService.restore).toHaveBeenCalledWith('t1');
-    expect(dossierService.getById).toHaveBeenCalledWith('d1');
-    // Back where they were (the dossier's order before the removal), not where the server appended them.
-    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a3', 'b1', 'a1', 'n1']);
-  });
-
   it('removes a note in one call, and the page trash is read again after the move and after «Annulla»', async () => {
     const reload = vi.fn();
     appStore.setState({ dossiers: [structuredClone(dossier)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
@@ -227,179 +185,9 @@ describe('DossierDetailView — the page by act', () => {
     expect(trashService.restore).toHaveBeenCalledWith('t1');
     expect(reload).toHaveBeenCalledTimes(2);
   });
-
-  oldFonti('a multiple selection is one call and one trash entry, with no confirmation: «Annulla» puts it back (K1a)', async () => {
-    renderView();
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
-    expect(screen.queryByRole('alertdialog')).toBeNull();
-    await waitFor(() => expect(toast?.message).toBe('3 elementi rimossi'));
-    expect(dossierService.trashItems).toHaveBeenCalledTimes(1);
-    expect([...vi.mocked(dossierService.trashItems).mock.calls[0][1]].sort()).toEqual(['a1', 'a3', 'b1']);
-    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['n1']);
-  });
-
-  oldFonti('refused by the server: everything is back, with an error and no toast', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(dossierService.trashItems).mockRejectedValueOnce(new Error('down'));
-    renderView();
-    fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dalla pratica" }));
-    await waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dalla pratica. Riprova.'));
-    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a3', 'b1', 'a1', 'n1']);
-    expect(toast).toBeNull();
-    error.mockRestore();
-  });
-
-  oldFonti('filters by the act, and turns dragging off while filtering', () => {
-    renderView();
-    expect(screen.getByRole('button', { name: `Sposta ${L247}` })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '21 aprile' } });
-    expect(screen.queryByRole('region', { name: L247 })).toBeNull();
-    expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: `Sposta ${L49}` })).toBeNull();
-  });
-
-  oldFonti('reads the title of the whole act while the search shows part of it', () => {
-    renderView();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: 'art. 3' } });
-    const block = screen.getByRole('region', { name: L247 });
-    expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 3']);
-    // The act's title and rubriche are asked for both its articles, so the search reads nothing again.
-    const last = actDetailsAskedFor.filter((b) => b.key === 'legge|247|2012-12-31').at(-1);
-    expect(last?.articles).toHaveLength(2);
-  });
-});
-
-describe('DossierDetailView — decisions', () => {
-  const CITATION = 'Corte cost., sent. 13 gennaio 2014, n. 1';
-  // Stored with a label of an older style: the page shows the citation recomputed (source convention, Q9).
-  const withDecision: Dossier = { ...dossier, items: [...dossier.items,
-    { id: 's1', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, tipo: 'sentenza', data_deposito: '2014-01-13', etichetta: 'Corte cost. 1/2014' } }] };
-
-  oldFonti('lists a decision under «Giurisprudenza», after the acts, never among the notes', () => {
-    renderView(withDecision);
-    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
-    // A row opened in place, as an article's (D7a), no more a link to a preview.
-    expect(within(decisions).getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
-    expect(within(screen.getByRole('region', { name: /Note \(1\)/ })).queryByText(CITATION)).toBeNull();
-    const lastAct = screen.getByRole('region', { name: L49 });
-    expect(lastAct.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Not a note: the header's count of decisions comes with the dossier-by-act round's PR 3.
-    expect(screen.getByText(/2 fonti · 3 articoli · 1 nota/)).toBeInTheDocument();
-  });
-
-  oldFonti('sets the acts and the decisions in two columns from lg, «Norme» | «Giurisprudenza», the norms first below it (D7a)', () => {
-    renderView(withDecision);
-    const norms = screen.getByRole('region', { name: 'Norme' });
-    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
-    expect(within(norms).getByRole('region', { name: L247 })).toBeInTheDocument();
-    expect(within(norms).getByRole('region', { name: L49 })).toBeInTheDocument();
-    expect(norms).not.toContainElement(decisions);
-    expect(norms.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const grid = norms.parentElement!;
-    expect(grid).toHaveClass('flex', 'flex-col', 'lg:grid', 'lg:grid-cols-2');
-    // The acts under «Norme», a level down.
-    expect(within(norms).getByRole('heading', { level: 3, name: `${L247} 2 articoli` })).toBeInTheDocument();
-    // The rule between the columns, from lg only.
-    expect(decisions.parentElement).toHaveClass('lg:border-l', 'lg:pl-5');
-    expect(grid).toContainElement(decisions);
-  });
-
-  oldFonti('keeps one column, with no «Norme» title, when the dossier holds no decision', () => {
-    renderView();
-    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
-    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
-    expect(screen.getByRole('region', { name: L247 })).toBeInTheDocument();
-  });
-
-  oldFonti('gives the decisions alone the whole width', () => {
-    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
-    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
-    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
-    expect(decisions.parentElement?.className ?? '').not.toMatch(/lg:border-l/);
-  });
-
-  oldFonti('selects the decisions with the articles, «Seleziona tutti» taking both', () => {
-    renderView(withDecision);
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
-    expect(screen.getByText('4 selezionati')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).getByRole('button', { name: 'Deseleziona elemento' })).toBeInTheDocument();
-  });
-
-  oldFonti('keeps the acts mounted while a search leaves one kind on screen', () => {
-    renderView(withDecision);
-    const act247 = screen.getByRole('region', { name: L247 });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '247' } });
-    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
-    expect(screen.getByRole('region', { name: L247 })).toBe(act247);
-  });
-
-  oldFonti('«Espandi tutto» opens the articles and leaves an open decision open', () => {
-    renderView(withDecision);
-    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
-    fireEvent.click(screen.getByRole('button', { name: 'Espandi tutto' }));
-    expect(screen.getByRole('button', { name: `Comprimi ${CITATION}` })).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
-    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  oldFonti('in a dossier of decisions alone, opens nothing with «Espandi tutto» but closes an open decision with «Comprimi tutto»', () => {
-    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
-    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
-    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
-    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
-  });
-
-  oldFonti('draws no empty block of acts over the decisions alone', () => {
-    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
-    const column = screen.getByRole('region', { name: 'Giurisprudenza (1)' }).parentElement!;
-    expect(column.previousElementSibling).toHaveClass('hidden');
-  });
-
-  oldFonti('finds a decision by its citation', () => {
-    renderView(withDecision);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '13 gennaio 2014' } });
-    expect(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: L247 })).toBeNull();
-  });
-
-  oldFonti('removes a decision behind the undo toast; «Annulla» restores the trash entry, the decision with its own id', async () => {
-    renderView(withDecision);
-    fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CITATION} dalla pratica` }));
-    await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
-    expect(dossierService.trashItems).toHaveBeenCalledWith('d1', ['s1']);
-    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).not.toContain('s1');
-    vi.mocked(dossierService.getById).mockResolvedValueOnce({
-      id: 'd1', name: 'Ricorso Rossi', is_pinned: false, created_at: '', updated_at: '', tags: [],
-      items: [{ id: 's1', item_type: 'sentenza', title: CITATION, content: withDecision.items[4].data as never, position: 0, status: 'unread', created_at: '' }],
-    });
-    await act(async () => { await toast?.onUndo(); });
-    expect(trashService.restore).toHaveBeenCalledWith('t1');
-    expect(dossierService.addItem).not.toHaveBeenCalled();
-    expect(appStore.getState().dossiers[0].items.filter((i) => i.type === 'sentenza').map((i) => i.id)).toEqual(['s1']);
-  });
 });
 
 describe('DossierDetailView — notes about an article', () => {
-  oldFonti('shows a note about an article with it, not among the free notes', () => {
-    const withNote = structuredClone(dossier);
-    withNote.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Sul primo articolo.', aboutItemId: 'a1', createdBy: { clientName: 'Claude Code' } });
-    appStore.setState({ dossiers: [withNote], pendingDossierItemIds: {}, pendingDossierOrders: {} });
-    render(<MemoryRouter><DossierDetailView dossier={withNote} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
-    const notes = screen.getByRole('region', { name: /Note \(1\)/ });
-    expect(within(notes).queryByText('Sul primo articolo.')).toBeNull();
-    expect(screen.getByTitle('1 nota')).toBeInTheDocument();
-    expect(screen.getByText(/2 fonti · 3 articoli · 2 note/)).toBeInTheDocument();
-  });
-
   it('writes a note to the dossier through the notes route', async () => {
     renderView();
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
@@ -408,28 +196,6 @@ describe('DossierDetailView — notes about an article', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
     await waitFor(() => expect(dossierService.addNote).toHaveBeenCalledWith('d1', { text: 'Nuova nota' }));
     await waitFor(() => expect(appStore.getState().dossiers[0].items.some((i) => i.id === 'srv-note')).toBe(true));
-  });
-});
-
-describe('DossierDetailView — search keeps an article and its notes together', () => {
-  const withNote = (): Dossier => {
-    const d = structuredClone(dossier);
-    d.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Termine di decadenza.', aboutItemId: 'b1' });
-    return d;
-  };
-  oldFonti('a note found keeps its article on screen, with the note under it', () => {
-    const d = withNote();
-    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
-    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: 'decadenza' } });
-    expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: /Note \(/ })).toBeNull();
-  });
-  oldFonti('the closed row names its notes for a screen reader', () => {
-    const d = withNote();
-    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
-    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole('button', { name: /^Espandi .*articolo 1, 1 nota$/ })).toBeInTheDocument();
   });
 });
 
@@ -642,20 +408,6 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' })).toHaveClass('whitespace-nowrap', 'min-h-[44px]');
   });
 
-  oldFonti('draws an article as a row of two levels — the article, a grey line, the signs — with 44 px controls', () => {
-    renderView({
-      ...dossier,
-      items: [{ id: 'a3', type: 'norma', addedAt: '2026-10-12T08:00:00Z', actCitation: L247, data: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' } }],
-    });
-    const block = screen.getByRole('region', { name: L247 });
-    const title = within(block).getByText('art. 3');
-    // No rubric read (the act's index is mocked empty): the grey line says when it was added.
-    expect(within(block).getByText('Aggiunto il 12 ottobre 2026')).toHaveClass('text-[13px]');
-    expect(title).toHaveClass('text-[15px]');
-    expect(within(block).getByRole('button', { name: 'Segna come importante' })).toHaveClass('h-11', 'w-11');
-    expect(within(block).getByRole('button', { name: 'Rimuovi articolo dalla pratica' })).toHaveClass('h-11', 'w-11');
-  });
-
   it('writes no grey line it cannot fill: no «Aggiunto il» without a date', () => {
     renderView();
     expect(screen.queryByText(/^Aggiunto il\s*$/)).toBeNull();
@@ -672,13 +424,6 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(words.compareDocumentPosition(date) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(words.parentElement).toContainElement(date);
     expect(within(notes).getByRole('button', { name: 'Rimuovi nota' })).toHaveClass('h-11', 'w-11');
-  });
-
-  oldFonti('writes the search at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
-    renderView(dossier);
-    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' });
-    expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
-    expect(search).not.toHaveClass('text-base');
   });
 });
 
