@@ -38,7 +38,7 @@ routing:
 
   # LLM classification (usato come fallback in hybrid, o standalone con strategy=llm)
   llm_classification:
-    model: "google/gemini-2.0-flash-001"
+    model: "google/gemini-3.5-flash-lite"
 
 # --- Neural Gating ---
 neural_gating:
@@ -64,16 +64,16 @@ experts:
   # LLM models per expert
   models:
     literal:
-      model: "google/gemini-2.5-flash"
+      model: "google/gemini-3.5-flash-lite"
       temperature: 0.2
     systemic:
-      model: "google/gemini-2.5-flash"
+      model: "google/gemini-3.5-flash-lite"
       temperature: 0.3
     principles:
-      model: "google/gemini-2.5-flash"
+      model: "google/gemini-3.5-flash-lite"
       temperature: 0.4
     precedent:
-      model: "google/gemini-2.5-flash"
+      model: "google/gemini-3.5-flash-lite"
       temperature: 0.3
 
 # --- Synthesis ---
@@ -82,7 +82,7 @@ synthesis:
   mode: "auto"
 
   # Modello per sintesi LLM
-  model: "google/gemini-2.5-flash"
+  model: "google/gemini-3.5-flash-lite"
   temperature: 0.3
 
   # Calibrazione confidenza (alpha-blending con DisagreementNet)

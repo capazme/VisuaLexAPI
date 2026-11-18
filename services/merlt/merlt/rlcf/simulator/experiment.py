@@ -15,6 +15,7 @@ Il runner gestisce:
 - Tracking evoluzione pesi e authority
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import asyncio
 import logging
 from dataclasses import dataclass, field
@@ -164,7 +165,7 @@ class ExperimentConfig:
 
     # Valutazione
     use_llm_judge: bool = True
-    llm_judge_model: str = "google/gemini-2.5-flash"
+    llm_judge_model: str = DEFAULT_FAST_MODEL
     objective_weight: float = 0.4
     subjective_weight: float = 0.6
 

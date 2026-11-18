@@ -450,7 +450,7 @@ class DocumentParserService:
                                 descrizione=entity_data.descrizione or "",
                                 verbatim_excerpt=snippet,
                                 llm_confidence=entity_data.confidence or 0.8,
-                                llm_model="google/gemini-2.5-flash",
+                                llm_model=extractor._get_llm_config()["model"],
                                 potential_duplicate_of=potential_dup,
                                 status="draft",
                                 # #3: ephemeral — purged after this TTL if not promoted.
@@ -467,7 +467,7 @@ class DocumentParserService:
                                 ambito=legal_domain or "",
                                 fonte="llm_extraction",
                                 llm_confidence=entity_data.confidence or 0.8,
-                                llm_model="google/gemini-2.5-flash",
+                                llm_model=extractor._get_llm_config()["model"],
                                 llm_reasoning=snippet,  # Context snippet
                                 contributed_by=user_id,
                                 contributor_authority=0.5,
@@ -600,7 +600,7 @@ class DocumentParserService:
                         descrizione=rel.descrizione or "",
                         verbatim_excerpt=snippet,
                         llm_confidence=rel.confidence,
-                        llm_model="google/gemini-2.5-flash",
+                        llm_model=extractor._llm_config()["model"],
                         status="draft",
                         expires_at=datetime.now() + timedelta(hours=STAGING_TTL_HOURS),
                     )
@@ -616,7 +616,7 @@ class DocumentParserService:
                         certezza=rel.confidence,
                         fonte="llm_extraction",
                         llm_confidence=rel.confidence,
-                        llm_model="google/gemini-2.5-flash",
+                        llm_model=extractor._llm_config()["model"],
                         contributed_by=user_id,
                         contributor_authority=0.5,
                         validation_status="pending",

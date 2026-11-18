@@ -28,6 +28,7 @@ Usage:
     result = await pipeline.ingest_with_history(norma_visitata)
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import structlog
 import re
 from datetime import datetime, timezone
@@ -409,7 +410,7 @@ Esempi:
 
     try:
         import os
-        model = os.getenv("LLM_PARSING_MODEL", "mistralai/mistral-7b-instruct")
+        model = os.getenv("LLM_PARSING_MODEL", DEFAULT_FAST_MODEL)
 
         parsed = await llm_service.generate_json_completion(
             prompt=prompt,
@@ -511,7 +512,7 @@ Esempi:
 
     try:
         import os
-        model = os.getenv("LLM_PARSING_MODEL", "mistralai/mistral-7b-instruct")
+        model = os.getenv("LLM_PARSING_MODEL", DEFAULT_FAST_MODEL)
 
         # Usa generate_json_completion con structured output
         parsed = await llm_service.generate_json_completion(
