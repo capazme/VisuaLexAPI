@@ -401,6 +401,9 @@ POST unless noted, JSON bodies.
   display text
 - `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
+  Routed by the ingress's `@legal` and Vite's proxy, behind the login
+  (ADR-001), priced 1 point by the scrape gate (the default; spec
+  `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §8).
   Reads the OJ page the tree already uses; a consolidated text has no
   preamble and answers an empty list. Normattiva acts get a 400. The text
   is a data contract like `article_text` (root rule 23, spec
