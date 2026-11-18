@@ -174,6 +174,8 @@ describe('StudiaPage', () => {
     const user = userEvent.setup();
     const gear = screen.getByRole('button', { name: 'Impostazioni dello studio' });
     await user.click(gear);
+    // Opened a frame later, the panel takes the focus (`ui/Expand`): a field typed in before would lose it halfway.
+    await waitFor(() => expect(gear).toHaveAttribute('aria-expanded', 'true'));
     const field = await screen.findByLabelText('Ripassi al giorno');
     await user.clear(field);
     await user.type(field, '30');
