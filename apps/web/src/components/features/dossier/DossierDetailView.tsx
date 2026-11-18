@@ -8,50 +8,27 @@ import {
   Search,
   Edit2,
   Share2,
-  FolderInput,
   FileJson,
   TreeDeciduous,
   Star,
-  X,
-  GripVertical,
   StickyNote,
-  ChevronsUpDown,
-  ChevronsDownUp,
   Plus,
   MoreHorizontal,
-  CheckSquare,
   History,
 } from 'lucide-react';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { useNavigate } from 'react-router-dom';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
-import { dragAnnouncements } from '../practice/dragAnnouncements';
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { EmptyState } from '../../ui/EmptyState';
 import type { Dossier, DossierItem, DossierKind } from '../../../types';
 import {
-  formatTimestampLong, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, shareableDossier,
+  formatTimestampLong, encodeDossierShare, shareableDossier,
 } from './dossierUtils';
-import { countsLine, dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
+import { countsLine, layoutDossier } from './dossierLayout';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { removeItemsWithUndo } from './removeItemsWithUndo';
-import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
-import { DossierDecisionsSection } from './DossierDecisionsSection';
 import { buildPdfBlocks, countMarksUnavailable, countUnavailable, loadDossierDecisions, loadDossierTexts, pdfCountsLine, writeDossierPdf } from './dossierPdf';
 import { loadPdfMarks } from './dossierPdfMarks';
 import { DossierPdfDialog, type DossierPdfOptions } from './DossierPdfDialog';
@@ -61,6 +38,9 @@ import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import { DossierAttiPanel } from '../atti/DossierAttiPanel';
 import { DossierReadingView } from './DossierReadingView';
+import { FontiToolbar } from './FontiToolbar';
+import { FontiToolsContext, matchesQuery, type FontiTools } from '../practice/fontiTools';
+import { removeFromDossierAndTable } from '../practice/inDossier';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
 import { DeadlineCard } from '../../../features/deadlines/DeadlineCard';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
@@ -68,14 +48,10 @@ import { scrollParentOf } from '../practice/practiceView';
 
 const VIEW_PANEL = 'dossier-view';
 type DossierView = 'fonti' | 'atti' | 'compiti';
-/** LC86: the sources and the reading are one tab, «Fonti». The old list stays in the code, never drawn, until PR 2
- *  brings its filter and its selection onto the reading and removes it. */
-const LEGACY_FONTI = false;
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { kindLabel } from './dossierKinds';
 import { DossierForumActions } from './DossierForumActions';
-import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { AddNoteModal } from './AddNoteModal';
 import { saveBlob } from '../../../utils/saveBlob';
@@ -85,10 +61,7 @@ import { cn } from '../../../lib/utils';
 import { PageFrame } from '../../layout/PageFrame';
 import { sectionOfDossierKind } from '../../../features/sections/useSection';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { COLUMN_HEADING, COLUMN_SCROLLS, HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
-import { FIELD, ICON_BUTTON } from '../planner/plannerStyles';
-import { CitedNormsContext, useCitedNorms } from './useCitedNorms';
-import { CitedNormChoice } from './CitedNormChoice';
+import { HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -108,16 +81,12 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     dossiers,
     updateDossier,
     toggleDossierPin,
-    setDossierItemOrder,
-    updateDossierItemStatus,
     moveToDossier,
-    triggerSearch,
     addToDossier,
     addNoteToDossier,
   } = useAppStore();
   const navigate = useNavigate();
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   // The view shown (LC21): the sources, or the dossier's tasks.
   // `?vista=atti`: the way back from an act lands on the dossier's acts.
   const viewTop = useRef<HTMLDivElement>(null);
@@ -134,11 +103,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [attiCount, setAttiCount] = useState<number | null>(null);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [showBulkActions, setShowBulkActions] = useState(false);
-  const [moveToModalOpen, setMoveToModalOpen] = useState(false);
+  const [selecting, setSelecting] = useState(false);
   // undefined = closed; null = open on a blank form; an act = open on that act's index.
   const [treeNavigatorAct, setTreeNavigatorAct] = useState<{ tipo_atto: string; numero_atto: string; data: string } | null | undefined>(undefined);
-  const [foldedActs, setFoldedActs] = useState<Set<string>>(new Set());
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   // The note being written: about the dossier (no article), or about one article.
   const [noteTarget, setNoteTarget] = useState<{ aboutItemId?: string; heading: string } | null>(null);
@@ -160,121 +127,46 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     return () => { cancelled = true; };
   }, [dossier.id]);
 
-  // Items filtered by free-text query. Drag-reorder still operates on
-  // the full `dossier.items` array, so indexes stay absolute even while filtered.
-  const visibleItems = useMemo(() => {
-    const q = itemSearchQuery.trim().toLowerCase();
-    if (!q) return dossier.items;
-    const matches = (item: DossierItem) => {
-      if (item.type === 'norma') {
-        const d = item.data;
-        return (
-          d.tipo_atto?.toLowerCase().includes(q) ||
-          d.numero_articolo?.toString().toLowerCase().includes(q) ||
-          d.numero_atto?.toString().toLowerCase().includes(q) ||
-          d.data?.toString().toLowerCase().includes(q) ||
-          !!item.citation?.toLowerCase().includes(q) ||
-          !!item.actCitation?.toLowerCase().includes(q)
-        );
-      }
-      // A decision is found by its citation as the page shows it (source convention, Q9).
-      if (item.type === 'sentenza') return decisionCitationOf(item.data).toLowerCase().includes(q);
-      return typeof item.data === 'string' && item.data.toLowerCase().includes(q);
-    };
-    // An article and the notes about it are found together: a note found keeps
-    // its article on screen, an article found keeps its notes.
-    const found = new Set(dossier.items.filter(matches).map((i) => i.id));
-    dossier.items.forEach((i) => {
-      if (i.type === 'note' && i.aboutItemId && found.has(i.id)) found.add(i.aboutItemId);
-    });
-    dossier.items.forEach((i) => {
-      if (i.type === 'note' && i.aboutItemId && found.has(i.aboutItemId)) found.add(i.id);
-    });
-    return dossier.items.filter((i) => found.has(i.id));
-  }, [dossier.items, itemSearchQuery]);
-
-  const hasFilter = itemSearchQuery.trim().length > 0;
-  // The page's sections: notes first, then one block per act (spec §1-2).
-  const layout = useMemo(() => layoutDossier(visibleItems), [visibleItems]);
   const fullLayout = useMemo(() => layoutDossier(dossier.items), [dossier.items]);
-  const fullBlocks = useMemo(() => new Map(fullLayout.acts.map((a) => [a.key, a])), [fullLayout]);
-  // What a screen reader hears while an act is dragged: its heading, never its key.
-  const actAnnouncements = useMemo(() => {
-    const heading = (id: string | number) => fullBlocks.get(String(id))?.heading ?? '';
-    return dragAnnouncements(heading);
-  }, [fullBlocks]);
   // What it holds, in one line, as the list's card says it (S7c).
   const dossierCounts = countsLine(dossier.items);
-  const visibleArticleIds = useMemo(() => layout.acts.flatMap((a) => a.articles.map((i) => i.id)), [layout]);
 
-  const toggleExpanded = (id: string) => setExpandedIds((prev) => {
+  // «Fonti»'s filter and selection (LC88), handed to the reading's rows through `FontiToolsContext`.
+  const query = itemSearchQuery.trim().toLowerCase();
+  const shownNotes = useMemo(
+    () => fullLayout.notes.filter((note) => matchesQuery(query, note.data)),
+    [fullLayout.notes, query],
+  );
+  // One rule for every count (LC88): the dossier's entries, as the tab «Fonti» and the header count them; «N di M» is
+  // the entries the filter shows of all of them. A row only on the table («Non nella pratica») counts for nothing.
+  const [shownByGroup, setShownByGroup] = useState<Record<string, string[]>>({});
+  const reportRows = useCallback((group: string, ids: string[]) => setShownByGroup((prev) => (
+    (prev[group] ?? []).join('|') === ids.join('|') ? prev : { ...prev, [group]: ids }
+  )), []);
+  const shownRows = new Set([...Object.values(shownByGroup).flat(), ...shownNotes.map((n) => n.id)])
+    .size;
+  const totalRows = dossier.items.length;
+  const clearFilter = useCallback(() => setItemSearchQuery(''), []);
+  const filterRef = useRef<HTMLInputElement>(null);
+  const toggleSelection = useCallback((ids: string[]) => setSelectedItems((prev) => {
     const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d). Stable callbacks, so the
-  // context's value, and every decision's reader with it, changes only with the dossier, its acts and its search
-  // (`reveal` reads which items are on screen), not on every render.
-  const unfoldAct = useCallback((key: string) => setFoldedActs((prev) => {
-    if (!prev.has(key)) return prev;
-    const next = new Set(prev);
-    next.delete(key);
+    if (ids.every((id) => next.has(id))) ids.forEach((id) => next.delete(id));
+    else ids.forEach((id) => next.add(id));
     return next;
   }), []);
-  const expand = useCallback((id: string) => setExpandedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id))), []);
-  const clearSearch = useCallback(() => setItemSearchQuery(''), []);
-  const cited = useCitedNorms({ items: dossier.items, visibleItems, acts: fullLayout.acts, unfoldAct, expand, clearSearch });
-  const toggleFolded = (key: string) => setFoldedActs((prev) => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
-  // "Espandi tutto" opens every block and every article, a decision open staying open (D7a: never all the decisions,
-  // each a request to its court's source); "Comprimi tutto" closes every row, the decisions too — the only thing it
-  // offers in a dossier of decisions alone, once one is open.
-  const visibleDecisionIds = layout.decisions.map((item) => item.id);
-  const allExpanded = visibleArticleIds.length > 0
-    ? visibleArticleIds.every((id) => expandedIds.has(id))
-    : visibleDecisionIds.some((id) => expandedIds.has(id));
-  const toggleExpandAll = () => {
-    if (allExpanded) {
-      setExpandedIds(new Set());
-    } else {
-      setFoldedActs(new Set());
-      setExpandedIds((prev) => new Set([...prev, ...visibleArticleIds]));
-    }
-  };
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  // Acts reorder; their articles follow them, in display order (spec §4).
-  const handleActDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const keys = fullLayout.acts.map((a) => a.key);
-    const from = keys.indexOf(String(active.id));
-    const to = keys.indexOf(String(over.id));
-    if (from < 0 || to < 0) return;
-    const moved = [...keys];
-    moved.splice(to, 0, moved.splice(from, 1)[0]);
-    setDossierItemOrder(dossier.id, dossierItemOrder(dossier.items, fullLayout, moved));
-  };
-
-  const toggleItemSelection = (itemId: string) => {
-    setSelectedItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-  };
-
-  // The articles and the decisions on screen: notes carry no checkbox, so selecting "all" must not take them.
-  const selectAllItems = () => {
-    setSelectedItems(new Set([...visibleArticleIds, ...visibleDecisionIds]));
+  const fontiTools = useMemo<FontiTools>(() => ({
+    query, selecting, selected: selectedItems, toggle: toggleSelection, report: reportRows, clear: clearFilter,
+  }), [query, selecting, selectedItems, toggleSelection, reportRows, clearFilter]);
+  // A gesture that reveals a row (a cited norm, a reference, the act's arrows or structure) must find it drawn: the
+  // filter that would hide it is emptied, as the old list's search was.
+  useEffect(() => appStore.subscribe((state, prev) => {
+    const reveal = state.pendingReveal;
+    if (!reveal || reveal === prev.pendingReveal) return;
+    if (state.practices.some((p) => p.id === reveal.practiceId && p.dossierId === dossier.id)) setItemSearchQuery('');
+  }), [dossier.id]);
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelectedItems(new Set());
   };
 
   const clearSelection = () => setSelectedItems(new Set());
@@ -293,30 +185,17 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     const ids = dossier.items.filter((i) => selectedItems.has(i.id)).map((i) => i.id);
     clearSelection();
     if (ids.length === 0) return;
-    removeItemsWithUndo(dossier.id, ids, ids.length === 1 ? 'Elemento rimosso' : `${ids.length} elementi rimossi`, trashChanged);
+    // Their rows leave the table too once «Annulla» is out of time (LC88).
+    removeFromDossierAndTable(dossier.id, ids, ids.length === 1 ? 'Elemento rimosso' : `${ids.length} elementi rimossi`, trashChanged);
   };
 
   const handleMoveToDossier = (targetDossierId: string) => {
-    if (selectedItems.size === 0) return;
-    moveToDossier(dossier.id, targetDossierId, Array.from(selectedItems));
-    clearSelection();
-    setMoveToModalOpen(false);
-  };
-
-  // Notes are read in place (expanded row), so only norma items have a
-  // dashboard destination.
-  const openItemOnDashboard = (item: DossierItem) => {
-    if (item.type !== 'norma') return;
-    navigate('/');
-    triggerSearch(searchParamsFromNorma(item.data));
-  };
-
-
-  // All the act's articles, as one trash entry behind one undo toast.
-  const handleRemoveAct = (block: ActBlock) => {
-    const ids = block.articles.map((item) => item.id).filter((id) => dossier.items.some((i) => i.id === id));
+    const ids = dossier.items.filter((i) => selectedItems.has(i.id)).map((i) => i.id);
     if (ids.length === 0) return;
-    removeItemsWithUndo(dossier.id, ids, ids.length === 1 ? 'Articolo rimosso' : `${ids.length} articoli rimossi`, trashChanged);
+    const target = dossiers.find((d) => d.id === targetDossierId);
+    moveToDossier(dossier.id, targetDossierId, ids);
+    clearSelection();
+    showToast(`${ids.length === 1 ? '1 elemento spostato' : `${ids.length} elementi spostati`} in «${target?.title ?? "un'altra pratica"}»`, 'success');
   };
 
   const exportDossierJSON = () => {
@@ -472,75 +351,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     }
   };
 
-  const twoColumns = layout.acts.length > 0 && layout.decisions.length > 0;
-
-  // The acts, in the order dragged; the decisions, in stored order (D7a: each column its own).
-  const actsList = (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleActDragEnd}
-      accessibility={{
-        announcements: actAnnouncements,
-        screenReaderInstructions: { draggable: "Per spostare l'atto premi Spazio, poi le frecce su e giù, e di nuovo Spazio per lasciarlo; Esc annulla." },
-      }}
-    >
-      <SortableContext items={layout.acts.map((a) => a.key)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-3">
-          {layout.acts.map((block) => (
-            <DossierActBlock
-              key={block.key}
-              block={block}
-              // Under «Norme» when the decisions stand beside the acts.
-              headingLevel={twoColumns ? 3 : 2}
-              flashedId={cited.flashedId}
-              act={fullBlocks.get(block.key) ?? block}
-              dragDisabled={hasFilter}
-              isFolded={foldedActs.has(block.key)}
-              onToggleFold={() => toggleFolded(block.key)}
-              expandedIds={expandedIds}
-              onToggleExpand={toggleExpanded}
-              selectedIds={selectedItems}
-              showCheckbox={showBulkActions}
-              onToggleSelect={toggleItemSelection}
-              onAddArticles={() => setTreeNavigatorAct({
-                tipo_atto: block.articles[0].data.tipo_atto,
-                numero_atto: block.articles[0].data.numero_atto || '',
-                data: block.articles[0].data.data || '',
-              })}
-              onRemoveAct={() => handleRemoveAct(fullBlocks.get(block.key) ?? block)}
-              onOpenItem={openItemOnDashboard}
-              onRemoveItem={handleRemoveSingle}
-              onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
-              showToast={showToast}
-              attachedNotes={layout.attached}
-              onAddNote={(item) => setNoteTarget({
-                aboutItemId: item.id,
-                heading: `Nota su ${item.citation ?? (item.type === 'norma' ? `art. ${item.data.numero_articolo}` : 'questo articolo')}`,
-              })}
-              onRemoveNote={handleRemoveSingle}
-            />
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
-  );
-  const decisionsList = (
-    <DossierDecisionsSection
-      decisions={layout.decisions}
-      expandedIds={expandedIds}
-      onToggleExpand={toggleExpanded}
-      selectedIds={selectedItems}
-      showCheckbox={showBulkActions}
-      onToggleSelect={toggleItemSelection}
-      onRemove={handleRemoveSingle}
-      onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
-      // The right column scrolls on its own beside the norms (D7d): the section «Giurisprudenza» is the scroller.
-      className={twoColumns ? COLUMN_SCROLLS : undefined}
-      tabIndex={twoColumns ? 0 : undefined}
-    />
-  );
-
   // The header's actions in one row (D3), each 44 px as the planner's controls (S7c). A label never wraps inside its
   // button (D3b): when the window is narrow the row wraps, as a row. Only on the buttons: their menus wrap their items.
   const rowButton = cn(HEADER_BUTTON, 'whitespace-nowrap');
@@ -580,8 +390,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         items={[
           { label: 'Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
           { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
-          // The selection comes back on the one «Fonti» with PR 2 (LC86).
-          ...(LEGACY_FONTI ? [{ label: showBulkActions ? 'Annulla selezione' : 'Seleziona elementi', icon: CheckSquare, onSelect: () => { setShowBulkActions((v) => !v); clearSelection(); } }] : []),
           { label: 'Elimina la pratica', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => {
             // No confirmation: the dossier goes to the trash and the notification's «Annulla» restores it (K1a).
             deleteDossierWithUndo(dossier, trashChanged);
@@ -707,147 +515,36 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         {/* «Fonti» (LC86): the reading — each act a block, each article a closed row that opens in place —, then the
             dossier's own notes, then what was removed lately. Kept mounted while another tab is shown: its open rows
             and its reading stay as they were. */}
-        <div hidden={view !== 'fonti'}>
+        <div
+          hidden={view !== 'fonti'}
+          // Esc ends the selection, wherever the focus is in «Fonti», unless something in it took the key first.
+          onKeyDown={(e) => { if (e.key === 'Escape' && selecting && !e.defaultPrevented) stopSelecting(); }}
+        >
           {dossier.items.length === 0 ? emptyDossier : (
-            <div className="space-y-6">
-              <DossierReadingView dossier={dossier} showToast={showToast} onTrashChanged={trashChanged} />
-              <DossierNotesSection notes={fullLayout.notes} onRemove={handleRemoveSingle} />
-            </div>
+            <FontiToolsContext.Provider value={fontiTools}>
+              <FontiToolbar
+                dossierId={dossier.id}
+                active={view === 'fonti'}
+                query={itemSearchQuery}
+                onQuery={setItemSearchQuery}
+                shown={shownRows}
+                total={totalRows}
+                selecting={selecting}
+                onSelecting={(on) => (on ? setSelecting(true) : stopSelecting())}
+                selectedCount={dossier.items.filter((i) => selectedItems.has(i.id)).length}
+                onMove={handleMoveToDossier}
+                onRemove={deleteSelection}
+                inputRef={filterRef}
+              />
+              <div className="space-y-6">
+                <DossierReadingView dossier={dossier} showToast={showToast} onTrashChanged={trashChanged} />
+                <DossierNotesSection notes={shownNotes} onRemove={handleRemoveSingle} />
+              </div>
+            </FontiToolsContext.Provider>
           )}
           {trash && recentlyRemoved}
         </div>
-        {LEGACY_FONTI && <div hidden={view !== 'fonti'}>
-        {dossier.items.length > 0 && (
-          <div className="mb-4 flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-              <input
-                type="text"
-                value={itemSearchQuery}
-                onChange={(e) => setItemSearchQuery(e.target.value)}
-                placeholder="Cerca in questa pratica…"
-                aria-label="Cerca negli elementi della pratica"
-                className={cn(FIELD, 'pl-9 pr-11')}
-              />
-              {itemSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setItemSearchQuery('')}
-                  aria-label="Azzera ricerca"
-                  className={cn(ICON_BUTTON, 'absolute right-0 top-1/2 -translate-y-1/2')}
-                >
-                  <X size={16} aria-hidden />
-                </button>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={toggleExpandAll}
-              // Decisions alone: nothing to open, only open ones to close.
-              disabled={visibleArticleIds.length === 0 && !allExpanded}
-              className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap disabled:opacity-40')}
-              aria-pressed={allExpanded}
-            >
-              {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
-              {allExpanded ? 'Comprimi tutto' : 'Espandi tutto'}
-            </button>
-          </div>
-        )}
-
-        {showBulkActions && dossier.items.length > 0 && (
-          <div className="mb-4 flex flex-col items-stretch gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-center gap-3 flex-wrap">
-              <button onClick={selectAllItems} className={cn('min-h-[44px] rounded px-2 text-sm font-medium text-primary-700 hover:underline dark:text-primary-300', FOCUS_RING)}>
-                Seleziona tutti
-              </button>
-              <span className="text-sm text-slate-600 dark:text-slate-400">{selectedItems.size} selezionati</span>
-              <button
-                onClick={() => { setShowBulkActions(false); clearSelection(); }}
-                className={cn('min-h-[44px] rounded px-2 text-sm text-slate-700 hover:underline dark:text-slate-300', FOCUS_RING)}
-              >
-                Annulla selezione
-              </button>
-            </div>
-            {selectedItems.size > 0 && (
-              <div className="flex items-center gap-2">
-                <button onClick={() => setMoveToModalOpen(true)} className={cn(HEADER_BUTTON, 'flex-1 justify-center md:flex-none')}>
-                  <FolderInput size={16} />
-                  <span className="md:inline">Sposta</span>
-                </button>
-                <button onClick={deleteSelection} className={cn('inline-flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-lg bg-red-50 px-3 text-sm font-medium text-red-700 hover:bg-red-100 md:flex-none dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60', FOCUS_RING)}>
-                  <Trash2 size={16} />
-                  <span className="md:inline">Elimina</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {hasFilter && layout.acts.length > 1 && (
-          <div className="mb-2 flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-            <GripVertical size={12} className="opacity-60" aria-hidden />
-            Riordina disabilitato con filtri attivi
-          </div>
-        )}
-
-        <div id="tour-dossier-items" className="space-y-4">
-          {dossier.items.length === 0 ? emptyDossier : visibleItems.length === 0 ? (
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
-              <EmptyState
-                variant="search"
-                title="Nessun elemento corrisponde ai filtri"
-                description="La ricerca non ha trovato corrispondenze in questa pratica."
-                action={
-                  <button
-                    type="button"
-                    onClick={() => setItemSearchQuery('')}
-                    className={cn(HEADER_BUTTON, 'justify-center')}
-                  >
-                    <X size={18} />
-                    Azzera filtri
-                  </button>
-                }
-              />
-            </div>
-          ) : (
-            <>
-              <DossierNotesSection notes={layout.notes} onRemove={handleRemoveSingle} />
-              {/* Acts and decisions both (D7a): two columns from lg, «Norme» | «Giurisprudenza», a rule between them;
-                  below lg the norms, then the decisions. One kind alone takes the width, untitled as before. The same
-                  elements either way, only their classes changing, so a search that leaves one kind remounts nothing
-                  (an open article keeps its text). From lg each column scrolls on its own, as tall as the window
-                  (D7d): a decision stays where it is read while a norm it cites opens beside it, and the other way. */}
-              <CitedNormsContext.Provider value={cited.citedNorms}>
-                <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
-                  {/* Hidden, still mounted, while no act is on screen: no empty block and no gap over the decisions. */}
-                  <section
-                    ref={cited.columnRef}
-                    aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined}
-                    tabIndex={twoColumns ? 0 : undefined}
-                    className={cn('min-w-0', twoColumns && cn('lg:pr-5', COLUMN_SCROLLS), layout.acts.length === 0 && 'hidden')}
-                  >
-                    {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
-                    {actsList}
-                  </section>
-                  <div className={cn('min-w-0 empty:hidden', twoColumns && 'border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800')}>{decisionsList}</div>
-                </div>
-              </CitedNormsContext.Provider>
-            </>
-          )}
         </div>
-
-        {trash && recentlyRemoved}
-        </div>}
-        </div>
-
-        {moveToModalOpen && (
-          <MoveToDossierModal
-            currentDossierId={dossier.id}
-            dossiers={dossiers}
-            onMove={handleMoveToDossier}
-            onClose={() => setMoveToModalOpen(false)}
-          />
-        )}
 
         {editingDossier && (
           <EditDossierModal
@@ -862,17 +559,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             initialAct={treeNavigatorAct ?? undefined}
             onClose={() => setTreeNavigatorAct(undefined)}
             onImport={handleTreeImport}
-          />
-        )}
-
-        {cited.choice && (
-          <CitedNormChoice
-            key={cited.choice.link.dataset.cacheKey ?? cited.choice.citation.article}
-            citation={cited.choice.citation}
-            link={cited.choice.link}
-            onClose={cited.closeChoice}
-            onOpenOnDashboard={cited.openOnDashboard}
-            showToast={showToast}
           />
         )}
 

@@ -558,8 +558,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   reply or a comment **outlives its author's account** (`user_id` SET NULL; every view says «utente
   cancellato» and a null author is nobody's own, G-307); a report names its item by a **plain id, no
   foreign key**, and keeps `reported_text` (the item as reported) for the moderators until 90 days after
-  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes, also deletes
-  notifications read 90 days ago); `article_comment_reports`, `forum_notifications`,
+  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes and checked hourly by
+  a timer `index.ts` starts, also deletes notifications read 90 days ago, and erases a closed report's
+  `details` and `resolution_note` 12 months after it was closed, G-503, and turns a moderation log
+  entry's `reason` into «(tolto dopo 12 mesi)» 12 months after it was written, G-550, and names a
+  deleted account «utente cancellato» in the log's `user` targets, G-504); `article_comment_reports`, `forum_notifications`,
   `forum_moderation_log`, `users.forum_moderator`; accepted answer, edit/delete marks (emptied text is
   `''`, a CHECK), lock, `materia`, `licence_text_id` (the version of `CONTRIBUTO_COMMUNITY` a row was
   written under). `GET /auth/export` adds the user's votes, reports (never their copy, who closed them or
@@ -614,7 +617,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   locks every glossa and then every reply the deletion writes (the ones the person voted, wrote, locked or
   released), each by id, then deletes the votes (`lingo/deleteUserAccount.ts`): left to the cascade and
   the SET NULLs, the rows would be locked in any order, a reply before its glossa, and could deadlock with
-  a reply being written or voted.
+  a reply being written or voted. In the same transaction the moderation log keeps every act on the person
+  and names them «utente cancellato» (`target_id` of kind `user` and `profile`, and `profile:<id>` on
+  report rows; G-504); the sweep repairs the `user` rows of accounts deleted any other way, never the
+  profile rows, since a profile takes a new id on a move to a pseudonym.
   **The minimal profile** (spec §B, D-246, D-247, D-249, G-477, G-479; migration
   `20261116100001_forum_profiles`; `forum/profiles.ts`, `controllers/forumProfileController.ts`):
   `forum_profiles`, one per person, deleted with the account, under the real name **or** a pseudonym, never
@@ -642,7 +648,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   /moderation/profile-reports/:profileId/resolve { action: confirm | dismiss, reason }` (confirm withdraws
   the name: «nome ritirato» everywhere, no writing, no change of profile) and `…/restore { reason }`; logged
   as `withdraw_name`, `restore_name` (target `profile`) or `dismiss` (target `report`, `profile:<id>`). The
-  sweep erases a closed report's details after 90 days. The export carries the profile and the reports one
+  sweep erases a closed report's details after 90 days, and the owners' note after 12 months (G-503). The export carries the profile and the reports one
   made.
   **Communities by subject** (spec §C, D-214, D-267, G-478; migration `20261116100002_forum_communities`;
   `controllers/forumCommunitiesController.ts`, `forum/roles.ts`, `forum/validation.ts`, `forum/appeals.ts`,
@@ -677,7 +683,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   cleared when shown): `POST /forum/appeals { kind, itemId, text }` by the author of a hidden item, once per
   hiding (the `report` counter); the owners' `GET /moderation/appeals` and `POST /moderation/appeals/:id/decide
   { action: uphold | reject, reason }` (uphold shows the item, logged `unhide`; reject logged
-  `appeal_rejected`; the author told, `appeal`); showing an item by any route closes its pending appeal as
+  `appeal_rejected`; the author told, `appeal`; the queue's `hidingReason` is the log's, so after 12 months
+  it reads «(tolto dopo 12 mesi)» and only the category is left, G-550); showing an item by any route closes its pending appeal as
   upheld with a fixed note, never the moderator's free reason (it may name who reported); the author's deletion of the item deletes its appeals; the hidden notice carries `appeal`
   (`pending` | `rejected` | null). The profiles carry `roles` (public) and `validatedCount`; `GET
   /forum/profiles/:profileId/validated` lists the visible contributions at the threshold. The export
@@ -1222,11 +1229,13 @@ port with another local process).
 
 ## Container image
 
-`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries only
-what `node dist/index.js` needs, on Debian slim with openssl for Prisma's query engine,
+`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries the
+production dependencies and `dist/`, on Debian slim with openssl for Prisma's query engine,
 as user `node`, with an exec-form `CMD` so SIGTERM reaches the graceful shutdown.
-`migrate` is a one-shot (`prisma migrate deploy`) and exists because `prisma` and `tsx`
-are development dependencies. `.dockerignore` excludes every `.env*`: a secret never
+`migrate` is a one-shot (`prisma migrate deploy`) from the build stage, which has the
+`prisma/` folder (schema and migrations) the runtime does not. `prisma` is a production
+dependency since G-555, so the blocking `npm audit` covers the CLI that writes to the
+production database; the runtime therefore holds it too, unused. `.dockerignore` excludes every `.env*`: a secret never
 enters an image. The admin seed runs compiled: `node dist/utils/seed.js`.
 
 Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it shares with
