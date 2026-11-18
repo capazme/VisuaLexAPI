@@ -204,12 +204,13 @@ export function SharedEnvironmentCard({
                       )}
                       {onDelete && (
                         <button
-                          onClick={() => {
+                          onClick={(event) => {
                             // The focus goes back to the menu's button, as `MenuButton` does: the confirmation is drawn
-                            // from it and returns the focus there (K1b).
+                            // from it and returns the focus there (K1b). Without it, this entry, whose rectangle the
+                            // confirmation keeps as it opens, before the menu unmounts it (`originOf`).
                             const menuButton = menuRef.current?.querySelector<HTMLButtonElement>('button') ?? null;
                             menuButton?.focus();
-                            onDelete(environment, menuButton);
+                            onDelete(environment, menuButton ?? event.currentTarget);
                             setShowMenu(false);
                           }}
                           className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"

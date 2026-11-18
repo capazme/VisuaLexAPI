@@ -104,7 +104,8 @@ export function WireConfirm({
     setWasOpen(open);
     if (open) {
       setFrom(origin);
-      setSource(originOf(origin));
+      // A function source would be taken by `setState` for an updater: wrapped.
+      setSource(() => originOf(origin));
       setConfirmed(false);
       // Its buttons answer only once they are seen (`READY_MS`).
       setReady(false);
