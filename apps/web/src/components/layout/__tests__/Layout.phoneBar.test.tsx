@@ -9,8 +9,6 @@ vi.mock('../Sidebar', () => ({
   Sidebar: ({ layout, closeMobile }: { layout?: string; closeMobile: () => void }) =>
     layout === 'drawer' ? <aside><button type="button" onClick={closeMobile}>Voce del menu</button></aside> : null,
 }));
-vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
-vi.mock('../../ui/FeedbackModal', () => ({ FeedbackModal: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
