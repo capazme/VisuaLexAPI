@@ -8,7 +8,7 @@ import { taskService } from '../../../services/taskService';
 import type { TaskView } from '../../../types/tasks';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { Button } from '../../ui/Button';
-import { FIELD_HELP } from '../../ui/controlStyles';
+import { CARD_RADIUS, CONTROL_BORDER, CONTROL_RADIUS, FIELD_HELP } from '../../ui/controlStyles';
 import { belongsTo, draftProblem, emptyDraft, inputFromDraft, MAX_TITLE, type TaskDraft } from './taskDraft';
 import { PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
 import { draftWithLine, readQuickAddLine, suggestDossiers, type DossierName, type FoundPart } from './quickAddLine';
@@ -170,7 +170,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           setTitle('', 0);
         }
       }}
-      className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+      // A box that holds things: `Card`'s paper, corners and outline (LC110).
+      className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER)}
     >
       {/* The field keeps its hint whole — 12 em of its own text, «Aggiungi un compito» and its padding with some room,
           whatever the reader's text size (the field stays 16 px on a phone while the page's rem shrinks) — but never
@@ -197,7 +198,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
             aria-controls={suggestions.length > 0 ? `${id}-dossiers` : undefined}
             aria-activedescendant={suggestions[active] ? `${id}-dossier-${active}` : undefined}
             autoComplete="off"
-            className={cn('min-h-[44px] min-w-[min(12em,100%)] flex-1 rounded-lg bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400', FIELD_TEXT)}
+            className={cn(CONTROL_RADIUS, 'min-h-[44px] min-w-[min(12em,100%)] flex-1 bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400', FIELD_TEXT)}
           />
         </div>
         <div className="ml-auto flex items-center gap-1">
@@ -231,7 +232,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
                 type="button"
                 onClick={() => dismiss(part)}
                 aria-label={`${partLabel(part, today)}: togli, «${part.raw}» resta nel titolo`}
-                className={cn('group inline-flex min-h-[44px] max-w-full items-center rounded-lg px-0.5', FOCUS_RING)}
+                className={cn('group inline-flex min-h-[44px] max-w-full items-center px-0.5', CONTROL_RADIUS, FOCUS_RING)}
               >
                 <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-900 group-hover:border-primary-400 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-100">
                   <span className="truncate">{partLabel(part, today)}</span>

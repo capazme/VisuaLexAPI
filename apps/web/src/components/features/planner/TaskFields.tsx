@@ -83,6 +83,7 @@ export function TaskFields({ draft, onChange, withText = false, dossierLocked = 
                 value={draft.plannedTime}
                 disabled={!draft.plannedDate}
                 onChange={(e) => set('plannedTime', e.target.value)}
+                className="px-2"
               />
             </div>
           </div>
@@ -109,6 +110,7 @@ export function TaskFields({ draft, onChange, withText = false, dossierLocked = 
                 value={draft.dueTime}
                 disabled={!draft.dueDate}
                 onChange={(e) => set('dueTime', e.target.value)}
+                className="px-2"
               />
             </div>
           </div>

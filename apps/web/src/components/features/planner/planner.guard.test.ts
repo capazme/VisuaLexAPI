@@ -25,6 +25,13 @@ describe('Opus, no bare controls', () => {
     expect(local).toEqual([]);
   });
 
+  // The consultant's rule (LC106): 4 px for what is pressed or typed in (`CONTROL_RADIUS`), 8 px for what holds things
+  // (`Card`, `CARD_RADIUS`); the 6, 10 and 16 px of before are gone.
+  it('rounds its boxes at 8 px and its controls at 4, none at 6, 10 or 16', () => {
+    const rounded = files.flatMap((name) => read(name).split('\n').flatMap((line, at) => (/\brounded-(t-)?(lg|xl|2xl)\b/.test(line) ? [`${name}:${at + 1}`] : [])));
+    expect(rounded).toEqual([]);
+  });
+
   it('writes no duration by hand: the motion tokens (`--dur-*`) or the components\' own', () => {
     const timed = files.flatMap((name) => read(name).split('\n').flatMap((line, at) => (/\bduration-(\d|\[)/.test(line) ? [`${name}:${at + 1}`] : [])));
     expect(timed).toEqual([]);

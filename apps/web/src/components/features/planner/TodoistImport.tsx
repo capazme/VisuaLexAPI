@@ -2,7 +2,8 @@ import { useId, useState, type ChangeEvent } from 'react';
 import { Expand } from '../../ui/Expand';
 import { taskService } from '../../../services/taskService';
 import { Button } from '../../ui/Button';
-import { FIELD_HELP, FIELD_LABEL } from '../../ui/controlStyles';
+import { CARD_RADIUS, CONTROL_BORDER, FIELD_HELP, FIELD_LABEL } from '../../ui/controlStyles';
+import { cn } from '../../../lib/utils';
 import { failureMessage, plannerStore } from './plannerStore';
 import { NotTodoistCsvError, planTodoistImport, runTodoistImport, type ImportNote, type ImportPlan } from './todoistCsv';
 
@@ -130,7 +131,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
   };
 
   return (
-    <Expand id={id} open={open} onClose={onClose} className="rounded-lg border border-slate-200 dark:border-slate-700">
+    <Expand id={id} open={open} onClose={onClose} className={cn(CARD_RADIUS, CONTROL_BORDER)}>
       <div className="space-y-3 p-3">
         <div className="space-y-1">
           <label htmlFor={inputId} className={FIELD_LABEL}>Importa da Todoist (CSV)</label>
@@ -143,7 +144,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
             accept=".csv,text/csv"
             onChange={(event) => void chooseFile(event)}
             disabled={running}
-            className="block min-h-[44px] w-full max-w-full text-sm text-slate-700 file:mr-3 file:min-h-[44px] file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:border-slate-600 dark:file:bg-slate-900 dark:file:text-slate-200"
+            className="block min-h-[44px] w-full max-w-full text-sm text-slate-700 file:mr-3 file:min-h-[44px] file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:border-slate-600 dark:file:bg-slate-900 dark:file:text-slate-200"
           />
         </div>
         {fileError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{fileError}</p>}

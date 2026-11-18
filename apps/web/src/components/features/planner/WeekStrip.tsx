@@ -40,7 +40,7 @@ export function WeekStrip({ today, days, selected, counts, onSelect }: Props) {
                 aria-label={`${longDay(day, today)}${isToday ? ', oggi' : ''}${count > 0 ? `, ${count === 1 ? '1 compito' : `${count} compiti`}` : ''}`}
                 onClick={() => onSelect(day)}
                 className={cn(
-                  'relative flex min-h-[44px] w-full flex-col items-center justify-center rounded-t-lg px-0.5 text-xs leading-tight text-slate-700 hover:bg-slate-100 sm:text-sm dark:text-slate-300 dark:hover:bg-slate-800',
+                  'relative flex min-h-[44px] w-full flex-col items-center justify-center rounded-t-md px-0.5 text-xs leading-tight text-slate-700 hover:bg-slate-100 sm:text-sm dark:text-slate-300 dark:hover:bg-slate-800',
                   isToday && 'font-semibold text-slate-900 dark:text-slate-50',
                   FOCUS_RING,
                 )}

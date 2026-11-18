@@ -231,7 +231,7 @@ function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimis
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {error && (
-        <p role="alert" className="mx-4 mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 md:mx-6 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+        <p role="alert" className="mx-4 mt-3 rounded-[8px] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 md:mx-6 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
           {error}
         </p>
       )}
@@ -531,15 +531,15 @@ function Subtasks({ parent, subtasks, today, failed, optimistic, addRequest, inp
         >
           <label htmlFor={`${id}-title`} className="sr-only">Nuovo sottocompito</label>
           <div className="min-w-0 flex-1 basis-56">
-          <Input
-            ref={inputRef}
-            id={`${id}-title`}
-            value={title}
-            maxLength={MAX_TITLE}
-            placeholder="Titolo del sottocompito"
-            onChange={(e) => setTitle(e.target.value)}
-            autoComplete="off"
-          />
+            <Input
+              ref={inputRef}
+              id={`${id}-title`}
+              value={title}
+              maxLength={MAX_TITLE}
+              placeholder="Titolo del sottocompito"
+              onChange={(e) => setTitle(e.target.value)}
+              autoComplete="off"
+            />
           </div>
           <Button type="submit" variant="secondary" disabled={busy || !title.trim()}>
             Aggiungi<span className="sr-only"> il sottocompito</span>

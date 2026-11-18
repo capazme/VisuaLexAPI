@@ -167,7 +167,7 @@ export interface SegmentedTabLinksProps {
 
 const FOOT_TRACK = 'max-md:bg-transparent max-md:p-0 max-md:dark:bg-transparent';
 const FOOT_SEGMENT = 'max-md:min-h-11 max-md:flex-1 max-md:py-1.5 max-md:text-xs';
-const FOOT_MARK = 'max-md:bg-ink-200 max-md:shadow-none max-md:dark:bg-ink-700';
+const FOOT_MARK = 'max-md:bg-ink-200 max-md:dark:bg-ink-700';
 // On the bar's dark tint the chosen words are light, not the ink drawn on the toga mark.
 const FOOT_TONE = 'max-md:dark:text-slate-50';
 

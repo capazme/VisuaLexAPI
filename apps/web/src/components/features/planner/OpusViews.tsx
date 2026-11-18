@@ -7,6 +7,7 @@ import { addDaysToIsoDate, todayInRome } from '../../../utils/dateUtils';
 import type { Task, TaskView } from '../../../types/tasks';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { Button } from '../../ui/Button';
+import { CARD_RADIUS } from '../../ui/controlStyles';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { dossierRecency } from '../dossier/dossierUtils';
 import { kindLabel } from '../dossier/dossierKinds';
@@ -289,7 +290,7 @@ export function TaskTrashView() {
       {(tasks, _day, optimistic) => (
         <ul aria-label="Compiti nel cestino" className="grid grid-cols-1 gap-1">
           {tasks.map((task) => (
-            <li key={task.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+            <li key={task.id} className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/40', CARD_RADIUS)}>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] text-slate-900 [overflow-wrap:anywhere] dark:text-slate-50">{task.title}</p>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
