@@ -332,9 +332,13 @@ describe('the task sheet', () => {
     const sheet = await openSheet([task('a', { plannedDate: TODAY })], 'Compito a', 'today');
     expect(within(sheet).queryByRole('button', { name: 'Completa per sempre' })).toBeNull();
     fireEvent.click(within(sheet).getByRole('button', { name: 'Altre azioni sul compito' }));
+    expect(screen.getByRole('menuitem', { name: 'Sposta nel cestino' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Completa per sempre' })).toBeNull();
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Azioni: Compito a' }));
+    expect(screen.getByRole('menuitem', { name: 'Sposta nel cestino' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Completa per sempre' })).toBeNull();
   });
 

@@ -993,7 +993,9 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   (`optimistic.landed`, the write counter): a read that started before, or a failed one keeping the last answer,
   would show it again, not done — then `POST /complete` — a repeating task with its current
   `plannedDate` (the server needs it, and a stale one is a 409) — and the undo toast: «Annulla» reopens, or for a
-  repeating task (`recurred`) puts the planned date back with a `PUT`. A deletion goes to the trash with its
+  repeating task (`recurred`) puts the planned date back with a `PUT`. «Completa per sempre» (a repeating task only:
+  the row's «⋯», the sheet's «⋯», and under the sheet's repetition) is `POST /complete { forever }`, the «Serie
+  chiusa» toast, and «Annulla» `POST /reopen { recurrence }` with the rule it had. A deletion goes to the trash with its
   subtasks, «Annulla» restores. A refusal shows the row again and the server's Italian `detail` in the planner's toast
   — and a 4xx (409, 404) makes the views read again, or the stale row would be refused the same way at every try
   (`PlannerHost`, at the top: the undo toast holds the bottom). Every write bumps `plannerStore.version` and every view
