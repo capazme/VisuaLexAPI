@@ -1,5 +1,7 @@
 """Tests for smart preset alias resolver — 50+ alias variations."""
 
+from datetime import date
+
 import pytest
 from visualex_api.tools.alias_resolver import resolve_alias, get_all_presets
 
@@ -95,8 +97,10 @@ class TestExactAliasResolution:
         assert r["act_number"] == "58"
 
     def test_tuir(self):
-        r = resolve_alias("tuir")
-        assert r["act_number"] == "917"
+        # Dated (G-577): the d.p.r. 917/1986 until 31 December 2026, then the annex of the d.lgs. 117/2026.
+        assert resolve_alias("tuir", date(2026, 12, 31))["act_number"] == "917"
+        r = resolve_alias("tuir", date(2027, 1, 1))
+        assert (r["act_number"], r["annex"]) == ("117", "1")
 
     def test_tuel(self):
         r = resolve_alias("tuel")

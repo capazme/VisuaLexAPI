@@ -215,9 +215,7 @@ ATTI_NOTI = {
     "cdc": {"tipo_atto": "codice del consumo", "data": "", "numero_atto": ""},
     "tub": {"tipo_atto": "decreto legislativo", "data": "1993", "numero_atto": "385"},
     "tuf": {"tipo_atto": "decreto legislativo", "data": "1998", "numero_atto": "58"},
-    "tuir": {"tipo_atto": "decreto del presidente della repubblica", "data": "1986", "numero_atto": "917"},
-    "testo unico delle imposte sui redditi": {"tipo_atto": "decreto del presidente della repubblica", "data": "1986-12-22", "numero_atto": "917"},
-    "testo unico imposte sui redditi": {"tipo_atto": "decreto del presidente della repubblica", "data": "1986-12-22", "numero_atto": "917"},
+    # «TUIR» and its long names follow the date: dated_names.py (G-577).
     # EU treaties — Norma.url() routes these to the fixed CELEX pages in EURLEX
     "tue": {"tipo_atto": "TUE", "data": "", "numero_atto": ""},
     "trattato sull'unione europea": {"tipo_atto": "TUE", "data": "", "numero_atto": ""},
@@ -286,7 +284,8 @@ _ATTI_DENOMINATI_SPEC: list[tuple[str, str, str, list[str]]] = [
         "disposizioni di attuazione del codice di procedura penale", "disp. att. cpp"]),
     ("decreto legislativo", "2003-06-30", "196", ["codice della privacy"]),
     ("decreto legislativo", "2006-04-03", "152", [
-        "codice dell'ambiente", "codice ambiente", "testo unico ambientale", "tua"]),
+        # «TUA» alone is also the testo unico accise: ambiguous (act_resolver.AMBIGUOUS_NAMES, G-577).
+        "codice dell'ambiente", "codice ambiente", "testo unico ambientale"]),
     ("decreto legislativo", "2017-07-03", "117", ["codice del terzo settore"]),
     ("decreto legislativo", "2023-03-31", "36", ["nuovo codice appalti"]),
     ("decreto legislativo", "2006-04-12", "163", [
@@ -415,10 +414,9 @@ _ATTI_DENOMINATI_SPEC: list[tuple[str, str, str, list[str]]] = [
         "statuto del contribuente", "statuto dei diritti del contribuente"]),
     ("decreto legislativo", "2000-03-10", "74", [
         "legge sui reati tributari", "reati tributari"]),
-    ("decreto del presidente della repubblica", "1986-04-26", "131", [
-        "testo unico dell'imposta di registro", "testo unico imposta di registro", "tur"]),
-    ("decreto del presidente della repubblica", "1972-10-26", "633", [
-        "testo unico iva", "decreto iva"]),
+    # D.p.r. 131/1986 («TUR», «testo unico dell'imposta di registro») and the «testo unico iva»
+    # follow the date: dated_names.py (G-577).
+    ("decreto del presidente della repubblica", "1972-10-26", "633", ["decreto iva"]),
     ("decreto del presidente della repubblica", "1973-09-29", "600", [
         "disposizioni comuni in materia di accertamento delle imposte sui redditi",
         "decreto accertamento"]),
@@ -434,6 +432,9 @@ _ATTI_DENOMINATI_SPEC: list[tuple[str, str, str, list[str]]] = [
         "ordinamento degli organi speciali di giurisdizione tributaria ed organizzazione degli uffici di collaborazione"]),
     ("decreto legislativo", "1992-12-30", "504", [
         "riordino della finanza degli enti territoriali"]),
+    # «TUA» in the Agenzia delle dogane's practice, and so ambiguous on its own (G-577).
+    ("decreto legislativo", "1995-10-26", "504", [
+        "testo unico accise", "testo unico delle accise", "tu accise"]),
     ("decreto legge", "1994-09-30", "564", ["disposizioni urgenti in materia fiscale"]),
     ("decreto legislativo", "1990-10-31", "346", [
         "testo unico sulle successioni e donazioni", "testo unico successioni e donazioni",

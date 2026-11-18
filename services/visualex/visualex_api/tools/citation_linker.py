@@ -19,6 +19,7 @@ from .article_clause import ARTICLE_CLAUSE_SOURCE
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import NORMATTIVA_SEARCH
 from .nl_parser import build_eu_act_pattern, eu_act_from_groups
+from .regional_law import regional_law_spans
 
 # Pre-build lowercase lookup for case-insensitive resolution
 _SEARCH_LOWER = {k.lower(): v for k, v in NORMATTIVA_SEARCH.items()}
@@ -270,6 +271,17 @@ def extract_citations(
             used_starts.insert(i, c.start)
             used_ends.insert(i, c.end)
 
+    # A regional law is never read as a State law (G-577): its citation, with the article written
+    # before it, is taken before any pass, so no pattern links «legge 65/2014 della Regione
+    # Toscana» to the legge 65/2014; and it ends the context, so a bare «art. 4» after it does
+    # not fall to the act named before it.
+    regional = regional_law_spans(text)
+    for start, end in regional:
+        if not _overlaps(start, end):
+            i = bisect_right(used_starts, start)
+            used_starts.insert(i, start)
+            used_ends.insert(i, end)
+
     def _register_eu(m: re.Match, list_group: int, act_start: int, act_end: int,
                      resolved: tuple[str, str, str]) -> None:
         """One Citation for a single article (the whole match, act included);
@@ -408,7 +420,10 @@ def extract_citations(
     # the year travel with the act type — with the type alone, an EU act was
     # unreachable and a numbered national one opened the wrong act.
     current_context = (context_act_type, None, None) if context_act_type else None
+    regional_starts, k = [start for start, _ in regional], 0
     for c in citations:
+        while k < len(regional_starts) and regional_starts[k] < c.start:
+            current_context, k = None, k + 1
         if c.act_type:
             if c.act_number or c.act_type.casefold() not in _NUMBERED_ACT_TYPES:
                 current_context = (c.act_type, c.act_number, c.date)
