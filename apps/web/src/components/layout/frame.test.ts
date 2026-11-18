@@ -10,8 +10,8 @@ describe('the frame (U1)', () => {
     expect(PAGE_FRAME.split(' ')).toEqual(['mx-auto', 'box-content', 'px-4', 'md:px-8', '2xl:px-12']);
   });
 
-  it('widens `Layout` to the full screen\'s frame for the pages that say `full`', () => {
-    expect(FULL_PAGE_FRAME).toBe('has-[[data-page-width=full]]:max-w-frame-full');
+  it('widens `Layout` to the full screen\'s frame for the pages that say `full`, not for one leaving (LC84)', () => {
+    expect(FULL_PAGE_FRAME).toBe('has-[[data-page-width=full]:not([inert]_*)]:max-w-frame-full');
   });
 });
 

@@ -1,12 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { StudyModeSettings } from './StudyModeSettings';
-import { appStore } from '../../../../store/useAppStore';
 
-afterEach(() => appStore.getState().closeSettings());
-
-describe('StudyModeSettings — the way to the colours\' meanings', () => {
-  it('its last entry opens Impostazioni at «Significato dei colori»', () => {
+describe('StudyModeSettings — no way out to the colours\' meanings (LC84)', () => {
+  it('has no entry to Impostazioni: going there would leave Study Mode and lose its state', () => {
     render(
       <StudyModeSettings
         isOpen
@@ -19,9 +16,6 @@ describe('StudyModeSettings — the way to the colours\' meanings', () => {
         onThemeChange={vi.fn()}
       />,
     );
-    const entry = screen.getByRole('button', { name: 'Cambia il significato dei colori' });
-    expect(entry).toHaveClass('min-h-[44px]');
-    fireEvent.click(entry);
-    expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
+    expect(screen.queryByRole('button', { name: 'Cambia il significato dei colori' })).toBeNull();
   });
 });

@@ -93,6 +93,7 @@ describe('QuickAddField — the line read', () => {
 
   const title = () => screen.getByLabelText('Nuovo compito');
   const chips = () => screen.queryByRole('list', { name: 'Letto nella riga' });
+  const summaryLine = () => document.getElementById(title().getAttribute('aria-describedby')!)!;
 
   it('reads several symbols together and saves the line without them', async () => {
     render(<QuickAddField view="today" today={TODAY} defaults={{}} />);
@@ -152,12 +153,24 @@ describe('QuickAddField — the line read', () => {
     expect(title()).toHaveValue('Atto #Ve');
   });
 
-  it('reads no dossier in the dossier panel', async () => {
+  it('reads no dossier in the dossier panel, and says so instead of ignoring the # in silence (LC83)', async () => {
     render(<QuickAddField view="dossier" today={TODAY} defaults={{ dossierId: 'd2' }} dossierLocked />);
     const user = userEvent.setup();
     await user.type(title(), 'Atto #Rossi');
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(chips()).toBeNull();
+    expect(summaryLine()).toHaveTextContent('In una pratica il compito resta qui: «#» resta nel titolo.');
+  });
+
+  it('sums up only once something is typed, with the time and the labels, and says it aloud (LC83)', async () => {
+    render(<QuickAddField view="inbox" today={TODAY} defaults={{}} />);
+    const line = summaryLine();
+    expect(line).toHaveAttribute('aria-live', 'polite');
+    expect(line).toBeEmptyDOMElement();
+    await userEvent.type(title(), 'Udienza domani alle 10 @cliente');
+    expect(line).toHaveTextContent("Per domani alle 10:00 · etichetta «cliente» · nella lista d'ingresso");
+    await userEvent.clear(title());
+    expect(line).toBeEmptyDOMElement();
   });
 
   it('adds a new label as typed', async () => {
@@ -181,5 +194,7 @@ describe('QuickAddField — the line read', () => {
     render(<QuickAddField view="inbox" today={TODAY} defaults={{}} />);
     await userEvent.type(title(), 'domani p1');
     expect(screen.getByRole('button', { name: /Aggiungi/ })).toBeDisabled();
+    // Still summed up, and said aloud: the line was read (LC83).
+    expect(summaryLine()).toHaveTextContent("Per domani · priorità urgente · nella lista d'ingresso");
   });
 });
