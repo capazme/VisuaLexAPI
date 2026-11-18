@@ -24,6 +24,11 @@ where the web owner places them in the web plan (G-537). The dossier entry is a 
 no migration (G-538). The line of §5.2 stands as proposed (G-539). The citation of EU acts before 2015 is fixed
 in a pull request of its own, outside this plan (G-540).
 
+**Status (18 November 2026):**
+- **Merged into `develop`:** PR 1a (#577), PR 2 (#578), PR 1b (#579) and PR 3 (#580). Tasks 1–11 are done.
+- **Waiting for the web owner's plan:** PR 4a and 4b (Tasks 12–18).
+- **G-540, #581, open:** it merges after the web owner's PR on `normLabels.ts`. Whichever of #581 and that PR merges second gives the golden case `eprivacy-cons-2` its labels.
+
 ## Global Constraints
 
 - Six pull requests into `develop`, in the order 1a → 1b → 2 → 3 → 4a → 4b (1a and 1b may swap). Each merges
