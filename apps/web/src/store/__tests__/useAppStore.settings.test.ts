@@ -45,6 +45,6 @@ describe('persist: the colours\' meanings, as a reload finds them', () => {
     const saved = (appStore.persist.getOptions() as unknown as { partialize: (s: AppState) => Record<string, unknown> })
       .partialize(appStore.getState());
     expect(saved.settings).toHaveProperty('highlightColorMeanings');
-    expect(saved).not.toHaveProperty('settingsDialog');
+    expect(saved).not.toHaveProperty('settingsRequest');
   });
 });

@@ -9,7 +9,7 @@ const s = () => appStore.getState();
 describe('structure window ownership', () => {
     beforeEach(() => {
         appStore.setState({
-            structureWindow: { blockId: null, position: { x: 100, y: 100 } },
+            structureWindow: { blockId: null },
         });
     });
 
@@ -26,13 +26,11 @@ describe('structure window ownership', () => {
         expect(s().structureWindow.blockId).toBe('block-2');
     });
 
-    it('closing clears the owner but keeps the parked position', () => {
-        s().setStructureWindowPosition({ x: 42, y: 24 });
+    it('closing clears the owner', () => {
         s().openStructureWindow('block-1');
         s().closeStructureWindow();
 
         expect(s().structureWindow.blockId).toBeNull();
-        expect(s().structureWindow.position).toEqual({ x: 42, y: 24 });
     });
 });
 

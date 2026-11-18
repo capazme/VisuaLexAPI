@@ -56,7 +56,7 @@ beforeEach(() => {
   viewport(true);
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, phoneReader: null,
-    practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
+    practiceNotice: null, structureWindow: { blockId: null }, readingBackStack: [],
   });
 });
 afterEach(() => {

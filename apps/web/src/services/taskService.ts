@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { Task, TaskInput, TaskView, TaskViewAnswer, TickAnswer } from '../types/tasks';
+import type { Task, TaskInput, RecurrenceRule, TaskView, TaskViewAnswer, TickAnswer } from '../types/tasks';
 
 /**
  * The planner's tasks (`/api/tasks`, the user's session only). Every answer is mapped from the
@@ -76,8 +76,8 @@ export const taskService = {
   },
 
   /** `plannedDate`, for a repeating task, is the occurrence the user ticked: a stale second tick is a 409, not a double move. */
-  async complete(id: string, plannedDate?: string): Promise<TickAnswer> {
-    const response = await apiClient.post(`${path(id)}/complete`, plannedDate ? { plannedDate } : {});
+  async complete(id: string, plannedDate?: string, forever?: boolean): Promise<TickAnswer> {
+    const response = await apiClient.post(`${path(id)}/complete`, { ...(plannedDate ? { plannedDate } : {}), ...(forever ? { forever } : {}) });
     const data = response.data as { task: TaskWire; recurred: { previous_planned_date: string; planned_date: string } | null };
     return {
       task: taskFromApi(data.task),
@@ -85,8 +85,9 @@ export const taskService = {
     };
   },
 
-  async reopen(id: string): Promise<Task> {
-    const response = await apiClient.post(`${path(id)}/reopen`);
+  /** `recurrence`: the rule a «Completa per sempre» took away, put back with the reopen. */
+  async reopen(id: string, recurrence?: RecurrenceRule): Promise<Task> {
+    const response = await apiClient.post(`${path(id)}/reopen`, recurrence ? { recurrence } : undefined);
     return taskFromApi(response.data.task);
   },
 

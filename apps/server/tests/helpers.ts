@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import expressApp from '../src/app';
+import { createWebSession, sessionCookieName } from '../src/auth/webSession';
 
 const prisma = new PrismaClient();
 
@@ -26,7 +27,10 @@ export interface TestUser {
   id: string;
   email: string;
   username: string;
+  /** A user's access JWT, as the web sent it before the session cookie (A.1): `bearerHeader`. */
   token: string;
+  /** The secret of a web session opened for the user (A.1): `authHeader` sends it as the session cookie. */
+  session: string;
 }
 
 export async function createTestUser(username: string): Promise<TestUser> {
@@ -46,10 +50,25 @@ export async function createTestUser(username: string): Promise<TestUser> {
     process.env.JWT_SECRET || 'test-secret',
     { expiresIn: '1h' },
   );
-  return { id: user.id, email: user.email, username: user.username, token };
+  const session = await createWebSession(user.id, 'vitest');
+  return { id: user.id, email: user.email, username: user.username, token, session };
 }
 
+/**
+ * The web as it will be (A.1): the session cookie, and the header every write must carry (middleware/csrfGuard.ts).
+ * The header goes on reads too, as the web's axios client will send it: harmless there.
+ */
 export function authHeader(user: TestUser) {
+  return { Cookie: `${sessionCookieName()}=${user.session}`, 'X-VisuaLex-Client': 'web' };
+}
+
+/** The session cookie alone, without the web's header: what a request from another site would carry. */
+export function cookieOnly(user: TestUser) {
+  return { Cookie: `${sessionCookieName()}=${user.session}` };
+}
+
+/** The web as it is until it moves to the cookie: a user's access JWT. */
+export function bearerHeader(user: TestUser) {
   return { Authorization: `Bearer ${user.token}` };
 }
 

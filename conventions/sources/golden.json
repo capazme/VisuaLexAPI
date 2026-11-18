@@ -336,6 +336,29 @@
       "labels": {"citation": {"value": "art. 101 TFUE", "status": "decided"}, "short": {"value": "art. 101 TFUE", "status": "decided"}, "act_heading": {"value": "Trattato sul funzionamento dell'Unione europea", "status": "proposed"}}
     }
   ],
+  "recitals": [
+    {
+      "id": "gdpr-cons-26",
+      "note": "A recital of an EU regulation (spec docs/superpowers/specs/2026-11-17-eu-recitals-design.md §2): its act's CELEX with ~rct and its number, EUR-Lex's own name for it (div#rct_26). The word «considerando» is always written out, never «cons.» and never «art.».",
+      "input": {"tipo_atto": "regolamento ue", "numero_atto": "679", "data": "2016", "considerando": "26"},
+      "identity": {"act": {"value": "celex:32016R0679", "status": "current"}, "recital": {"value": "celex:32016R0679~rct26", "status": "proposed"}},
+      "labels": {"citation": {"value": "considerando 26, reg. (UE) 2016/679", "status": "proposed"}, "short": {"value": "considerando 26 reg. (UE) 2016/679", "status": "proposed"}, "unit": {"value": "Considerando 26", "status": "proposed"}}
+    },
+    {
+      "id": "nis2-cons-1",
+      "note": "A recital of an EU directive, as a regulation's.",
+      "input": {"tipo_atto": "direttiva ue", "numero_atto": "2555", "data": "2022", "considerando": "1"},
+      "identity": {"act": {"value": "celex:32022L2555", "status": "current"}, "recital": {"value": "celex:32022L2555~rct1", "status": "proposed"}},
+      "labels": {"citation": {"value": "considerando 1, dir. (UE) 2022/2555", "status": "proposed"}, "short": {"value": "considerando 1 dir. (UE) 2022/2555", "status": "proposed"}, "unit": {"value": "Considerando 1", "status": "proposed"}}
+    },
+    {
+      "id": "eprivacy-cons-2",
+      "note": "A recital of a directive from before 2015: its identity only. Its labels borrow the act's citation, whose form for acts before 2015 is fixed by a pull request of its own (G-540); they go in with whichever of the two merges second.",
+      "input": {"tipo_atto": "direttiva ue", "numero_atto": "58", "data": "2002", "considerando": "2"},
+      "identity": {"act": {"value": "celex:32002L0058", "status": "current"}, "recital": {"value": "celex:32002L0058~rct2", "status": "proposed"}},
+      "labels": {}
+    }
+  ],
   "decisions": [
     {
       "id": "cass-civ-su-31310-2024",

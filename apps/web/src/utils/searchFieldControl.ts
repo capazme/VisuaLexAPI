@@ -40,6 +40,23 @@ export const ISLAND_SURFACE = 'border border-border bg-card';
 export const ISLAND_FOCUS = 'hover:border-foreground/30 focus:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground focus-visible:ring-offset-0';
 /** A pill thinner than a finger: its target is 44 px tall, centred on its drawn edge (40 px: 2 above and below). */
 export const ISLAND_TARGET = "after:absolute after:inset-x-0 after:inset-y-[calc(50%-22px)] after:content-['']";
+/**
+ * LC81: the pill and the panel's field are one object, so the shape grows without a jump. Below lg (the phone's and the
+ * search page's pill) 40 px and the field's type (16 px on a phone); from lg (the top bar's pill) 32 px and 13 px. The
+ * lens sits 12 px in, the words 36 px in, on both.
+ */
+export const ISLAND_SHAPE = 'relative flex h-10 min-w-0 items-center rounded-full pl-9 pr-3 lg:h-8 lg:pr-2';
+export const ISLAND_TEXT = 'text-[length:max(1rem,16px)] md:text-sm lg:text-[13px]';
+export const ISLAND_LENS = 'pointer-events-none absolute left-3 size-4 shrink-0 text-slate-400 lg:size-[15px]';
+/** The pill's words and its hint, the field's text and placeholder. */
+export const ISLAND_WORDS = 'text-slate-900 dark:text-white';
+export const ISLAND_HINT = 'text-slate-500 dark:text-slate-400';
+export const ISLAND_PLACEHOLDER = 'Norma, sentenza o tema';
+/**
+ * `ISLAND_FOCUS` for the panel's field, on its frame. An input matches `:focus-visible` after a tap too, so the frame
+ * reads how the focus came (`data-keyboard`, set by the panel): 2 px from the keyboard, the 1 px edge from a pointer.
+ */
+export const ISLAND_FIELD_FOCUS = 'hover:border-foreground/30 data-[keyboard]:has-[input:focus]:border-foreground data-[keyboard]:has-[input:focus]:ring-1 data-[keyboard]:has-[input:focus]:ring-foreground';
 
 let listener: Listener | null = null;
 let pending: { request: SearchFieldRequest; at: number } | null = null;

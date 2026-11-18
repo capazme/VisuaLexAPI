@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { OpusPage } from './OpusPage';
+import { plannerStore } from './plannerStore';
 
 function renderAt(path: string) {
   render(
@@ -26,8 +27,53 @@ describe('Work\'s page', () => {
     const views = screen.getByRole('navigation', { name: 'Viste di Work' });
     const links = [...views.querySelectorAll('a')];
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['/work/scadenziario', '/work/prossimi', '/work/ingresso']);
-    expect(links.filter((a) => a.getAttribute('aria-current') === 'page').map((a) => a.getAttribute('aria-label'))).toEqual([current]);
+    expect(links.filter((a) => a.getAttribute('aria-current') === 'page').map((a) => a.querySelector('.hidden.md\\:inline')?.textContent)).toEqual([current]);
     expect(screen.getByRole('link', { name: 'Cestino dei compiti' })).toBeInTheDocument();
+  });
+
+  it.each(['/work/scadenziario', '/work/prossimi', '/work/ingresso'])('on %s says «Scadenze» once, the tabs beside it in the one header (LC83)', (path) => {
+    renderAt(path);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Scadenze$/);
+    expect(screen.getAllByText('Scadenze')).toHaveLength(1);
+    const header = screen.getByRole('banner');
+    expect(header).toContainElement(screen.getByRole('navigation', { name: 'Viste di Work' }));
+    expect(header).toContainElement(screen.getByRole('link', { name: 'Cestino dei compiti' }));
+    // Nothing fixed over the list: on a phone the tabs are the bar at the foot, outside the view.
+    const fixed = [...document.querySelectorAll('[class*="max-md:fixed"], [class~="fixed"]')];
+    expect(fixed).toHaveLength(1);
+    expect(fixed[0]).toHaveClass('max-md:bottom-0');
+    expect(screen.getByText('vista').closest('[class*="fixed"]')).toBeNull();
+  });
+
+  it('gives each tab one name per width, the other not drawn, so a screen reader reads one (LC83)', () => {
+    renderAt('/work/prossimi');
+    for (const link of screen.getByRole('navigation', { name: 'Viste di Work' }).querySelectorAll('a')) {
+      expect(link).not.toHaveAttribute('aria-label');
+      const names = [...link.querySelectorAll('span')].filter((span) => !span.children.length && !span.classList.contains('sr-only'));
+      expect(names.map((span) => span.className)).toEqual(['md:hidden', 'hidden md:inline']);
+    }
+  });
+
+  it('puts «Raggruppa» beside the trash on «Scadenziario» only, and the choice reaches the view', () => {
+    renderAt('/work/scadenziario');
+    fireEvent.click(screen.getByRole('button', { name: 'Raggruppa: per data' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Per pratica' }));
+    expect(plannerStore.getState().grouping).toBe('dossier');
+    act(() => plannerStore.getState().setGrouping('date'));
+    localStorage.removeItem('visualex-opus-today-grouping');
+  });
+
+  it.each(['/work/prossimi', '/work/ingresso'])('on %s has no «Raggruppa»', (path) => {
+    renderAt(path);
+    expect(screen.queryByRole('button', { name: /Raggruppa/ })).toBeNull();
+  });
+
+  it("counts the inbox on its tab while it is open", () => {
+    act(() => plannerStore.getState().setInboxCount(4));
+    renderAt('/work/ingresso');
+    const tab = screen.getByRole('link', { name: /Lista d'ingresso/ });
+    expect(tab).toHaveTextContent("Lista d'ingresso, 4 compiti");
+    act(() => plannerStore.getState().setInboxCount(null));
   });
 
   it('on the trash shows the tabs, a way back, none marked, and no link to the trash itself', () => {

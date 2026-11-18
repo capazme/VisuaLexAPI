@@ -43,7 +43,7 @@ beforeEach(() => {
   savedMatchMedia = window.matchMedia;
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
+    practiceNotice: null, structureWindow: { blockId: null }, readingBackStack: [],
     decisionFocusRequest: null,
   });
 });

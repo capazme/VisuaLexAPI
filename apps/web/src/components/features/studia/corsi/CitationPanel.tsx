@@ -55,7 +55,7 @@ export function CitationPanel({ citation, desktop, onClose, leaveThen, showToast
 
   let body;
   if (norma) {
-    // In the phone's sheet no gear to Impostazioni: the sheet keeps the focus, a dialog over it would fight it.
+    // No gear to Impostazioni in a lesson (LC84): Impostazioni is a page, and going there would end the lesson.
     body = (
       <DossierItemReader
         norma={norma}
@@ -66,7 +66,7 @@ export function CitationPanel({ citation, desktop, onClose, leaveThen, showToast
           })
         }
         showToast={showToast}
-        meaningsGear={desktop}
+        meaningsGear={false}
       />
     );
   } else if (decision) {

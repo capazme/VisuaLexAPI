@@ -1,7 +1,7 @@
 // The Scrivania on a phone (M1): no keyboard shortcut on a touch screen, the examples as pills in one sideways row,
 // the page's 16 px margin, the block centred when it is shorter than the window.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
 import { HIDDEN_SCROLLBAR } from '../../../constants/interactions';
@@ -58,5 +58,15 @@ describe('the Scrivania\'s ways to the Corpus tools', () => {
     expect(example).not.toHaveClass('underline');
     expect(example).not.toHaveClass('font-serif');
     expect(tools.className).not.toMatch(/(^|\s)hidden(\s|$)|max-md:hidden/);
+  });
+});
+
+describe('Scrivania — «Gestisci» of the frequent searches (LC84)', () => {
+  it('asks for Impostazioni at its quick norms', () => {
+    appStore.setState({ settingsRequest: null });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /Gestisci/ }));
+    expect(appStore.getState().settingsRequest).toEqual({ section: 'norme-rapide' });
+    appStore.setState({ settingsRequest: null });
   });
 });

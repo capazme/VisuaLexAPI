@@ -12,7 +12,7 @@ vi.mock('../../services/accountService', () => ({ accountService: {} }));
 import { get, post, put } from '../../services/api';
 import * as authService from '../../services/authService';
 import { Sidebar } from '../../components/layout/Sidebar';
-import { SettingsModal } from '../../components/ui/SettingsModal';
+import { SettingsPage } from '../../components/features/settings/SettingsPage';
 import { DevRoute } from './DevRoute';
 import { appStore } from '../../store/useAppStore';
 
@@ -36,7 +36,7 @@ describe('the development mode, end to end in the web', () => {
     render(
       <MemoryRouter initialEntries={['/labs/grafo']}>
         <Sidebar theme="light" isOpen closeMobile={vi.fn()} openSettings={vi.fn()} openKeyboardShortcuts={vi.fn()} toggleTheme={vi.fn()} serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }} />
-        <SettingsModal isOpen onClose={vi.fn()} />
+        <SettingsPage />
         <Routes>
           <Route path="/" element={<p>Pagina di ricerca</p>} />
           <Route path="/labs/grafo" element={<DevRoute><p>Pagina del grafo</p></DevRoute>} />

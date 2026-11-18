@@ -64,3 +64,16 @@ read from first since EUR-Lex answers a server with a WAF challenge (`services/e
 
 `tests/test_eurlex_cellar.py` reads each pair and asks the same of both: tree, rubriche,
 title, recitals and every article's text.
+
+Added 2026-11-17 — recitals (spec `docs/superpowers/specs/2026-11-17-eu-recitals-design.md`):
+
+- `dir_2000_31_oj_legacy_preamble_trimmed.html` — CELLAR's page of dir. 2000/31/CE (CELEX
+  32000L0031), asked as above (one request, `Accept-Language: it`). The legacy class-less markup:
+  65 recitals as `<p>(N) …</p>` after «considerando quanto segue:», no paragraph between two of
+  them. Trimmed to `<title>` and, inside `div#TexteOnly` > `txt_te`, the paragraphs from the first
+  through the enacting formula («HANNO ADOTTATO LA PRESENTE DIRETTIVA:»); the page's wrapper `<p>`
+  around `txt_te` is left out.
+- `frozen_recitals.json` and `frozen_eu_articles.json` — not pages: the SHA-256 and length of each
+  recital's and each EU article's projection (the text without `\n`), recorded once for
+  `test_recitals_text_frozen.py` and `test_eurlex_article_text_frozen.py` (root `CLAUDE.md`, rule
+  23). Never re-recorded to make a test pass.
