@@ -20,6 +20,7 @@ import { InboxView, TodayView } from './OpusViews';
 import { plannerStore } from './plannerStore';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
 import { appStore } from '../../../store/useAppStore';
+import { resetNotifications } from '../../ui/notifications/notifications';
 
 const TODAY = '2026-10-20';
 
@@ -56,6 +57,9 @@ beforeEach(() => {
 afterEach(() => {
   unregister();
   toasts[toasts.length - 1]?.onDismiss();
+  // Every notification left, «Ripristinato» and older «Annulla» too: a countdown still running when the file ends
+  // fires after jsdom is gone («document is not defined», an unhandled error that fails the run).
+  resetNotifications();
 });
 
 async function openSheet(tasks: Task[], title: string, view: 'inbox' | 'today' = 'inbox') {
