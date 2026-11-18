@@ -1229,11 +1229,13 @@ port with another local process).
 
 ## Container image
 
-`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries only
-what `node dist/index.js` needs, on Debian slim with openssl for Prisma's query engine,
+`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries the
+production dependencies and `dist/`, on Debian slim with openssl for Prisma's query engine,
 as user `node`, with an exec-form `CMD` so SIGTERM reaches the graceful shutdown.
-`migrate` is a one-shot (`prisma migrate deploy`) and exists because `prisma` and `tsx`
-are development dependencies. `.dockerignore` excludes every `.env*`: a secret never
+`migrate` is a one-shot (`prisma migrate deploy`) from the build stage, which has the
+`prisma/` folder (schema and migrations) the runtime does not. `prisma` is a production
+dependency since G-555, so the blocking `npm audit` covers the CLI that writes to the
+production database; the runtime therefore holds it too, unused. `.dockerignore` excludes every `.env*`: a secret never
 enters an image. The admin seed runs compiled: `node dist/utils/seed.js`.
 
 Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it shares with
