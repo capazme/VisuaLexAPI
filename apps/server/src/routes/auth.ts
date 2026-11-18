@@ -13,7 +13,8 @@ const router = Router();
  * behind it when Redis fails), no longer in each process's memory alone.
  *
  * - Failed sign-ins and registrations from one address: 5 in 15 minutes, as before. Sign-in and registration
- *   share the count, as before.
+ *   share the count, as before, and so do the account's routes that check its password (changing it,
+ *   deleting the account): a stolen session cannot be used to guess it.
  * - Failed sign-ins for one account, from any address: 10 in an hour. The account is the email as typed,
  *   trimmed and lower-cased, whether or not an account has it, so the answer says nothing about which emails
  *   exist; the key is its SHA-256, so no email is written in Redis. Someone who knows a person's email can

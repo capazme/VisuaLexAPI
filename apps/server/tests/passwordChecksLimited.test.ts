@@ -26,6 +26,9 @@ describe('changing the password', () => {
     const right = await request(app).put('/api/auth/change-password').set(authHeader(user)).set(at)
       .send({ current_password: 'test-password', new_password: 'Abcdefg1' });
     expect(right.status).toBe(200);
+    // The right one gave its point back: one more wrong guess is the fifth, not the sixth.
+    expect((await request(app).put('/api/auth/change-password').set(authHeader(user)).set(at)
+      .send({ current_password: 'Wrong-guess1', new_password: 'Abcdefg2' })).status).toBe(400);
   });
 });
 
