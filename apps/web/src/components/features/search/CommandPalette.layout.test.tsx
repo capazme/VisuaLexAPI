@@ -26,7 +26,8 @@ import type { CustomAlias, QuickNorm } from '../../../types';
 
 function asDesktop(desktop: boolean) {
   vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
-    matches: desktop, media: query, onchange: null,
+    // The island reads «riduci movimento» from here (LC85); every other query is the width's.
+    matches: query.includes('reduced-motion') ? motionPref.reduced : desktop, media: query, onchange: null,
     addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {},
     dispatchEvent: () => false,
   }) as unknown as MediaQueryList);
@@ -187,9 +188,16 @@ describe('CommandPalette — the island (LC69)', () => {
     expect(grow.keyframes.at(-1)).toMatchObject({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
     expect(grow.options).toMatchObject(ISLAND_OPEN);
     const show = runOn(contentOf());
-    expect(show.keyframes[0]).toEqual({ clipPath: 'inset(0px 208px 368px 208px round 16px)', opacity: 0 });
-    expect(show.keyframes.at(-1)).toMatchObject({ clipPath: 'inset(0px 0px 0px 0px round 0px)', opacity: 1 });
+    expect(show.keyframes[0]).toEqual({ clipPath: 'inset(0px 208px 368px 208px round 16px)' });
+    expect(show.keyframes.at(-1)).toMatchObject({ clipPath: 'inset(0px 0px 0px 0px round 0px)' });
     expect(show.options).toMatchObject(ISLAND_OPEN);
+    // LC81: the field is the pill from the first frame, seen at once, on its box (FLIP: a move and its width) …
+    const field = runOn(document.querySelector('[data-island-field]')!);
+    expect(field.keyframes[0]).toEqual({ transform: 'translate(336px, 10px)', minWidth: '352px', maxWidth: '352px', opacity: 1 });
+    expect(field.keyframes.at(-1)).toMatchObject({ transform: 'translate(0px, 0px)', opacity: 1 });
+    expect(field.options).toMatchObject(ISLAND_OPEN);
+    // … and the rest of the content fades in around it, from a quarter of the way.
+    expect(runOn(screen.getByRole('button', { name: 'Chiudi' })).keyframes).toEqual([{ opacity: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 1 }]);
     // The veil by the same technique, time and curve: no Framer Motion animation left.
     const veil = document.querySelector('[data-palette-veil]')!;
     expect(runOn(veil).options).toMatchObject(ISLAND_OPEN);
@@ -217,7 +225,7 @@ describe('CommandPalette — the island (LC69)', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
     expect(runOn(shapeOf()).keyframes[0]).toMatchObject({ top: '0px', right: '0px', bottom: '356px', left: '0px', borderRadius: '12px' });
-    expect(runOn(contentOf()).keyframes[0]).toEqual({ clipPath: 'inset(0px 0px 356px 0px round 12px)', opacity: 0 });
+    expect(runOn(contentOf()).keyframes[0]).toEqual({ clipPath: 'inset(0px 0px 356px 0px round 12px)' });
     expect(form.style.opacity).toBe('0');
   });
 
@@ -258,7 +266,9 @@ describe('CommandPalette — the island (LC69)', () => {
     const shrink = runOn(shapeOf());
     expect(shrink.keyframes.at(-1)).toMatchObject({ top: '0px', right: '208px', bottom: '368px', left: '208px', opacity: 0 });
     expect(shrink.options).toMatchObject(ISLAND_CLOSE);
-    expect(runOn(contentOf()).keyframes.at(-1)).toMatchObject({ clipPath: 'inset(0px 208px 368px 208px round 16px)', opacity: 0 });
+    expect(runOn(contentOf()).keyframes.at(-1)).toMatchObject({ clipPath: 'inset(0px 208px 368px 208px round 16px)' });
+    // LC81: the field lands on the pill, and gives way to it in the shape's crossfade.
+    expect(runOn(document.querySelector('[data-island-field]')!).keyframes.at(-1)).toMatchObject({ transform: 'translate(336px, 10px)', maxWidth: '352px', opacity: 0 });
     const back = runOn(pill);
     expect(back.keyframes).toEqual([{ opacity: 0 }, { opacity: 0, offset: 0.99 }, { opacity: 1 }]);
     expect(back.options).toMatchObject(ISLAND_CLOSE);
@@ -413,7 +423,7 @@ describe('CommandPalette — the field and the steps', () => {
     const crumb = screen.getByRole('button', { name: 'Torna indietro: Codice civile' });
     expect(crumb).toHaveTextContent('Codice civile');
     await user.click(crumb);
-    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Norma, sentenza o tema/)).toBeInTheDocument();
   });
 
   it('goes back a step with Backspace on the empty field it opens with, from the keyboard alone (R2, Bill)', async () => {
@@ -421,12 +431,12 @@ describe('CommandPalette — the field and the steps', () => {
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     // «Codice penale», Enter: the article's field, empty, has the focus.
-    await user.type(screen.getByPlaceholderText(/^Atto o citazione/), 'codice penale{Enter}');
+    await user.type(screen.getByPlaceholderText(/^Norma, sentenza o tema/), 'codice penale{Enter}');
     const box = await screen.findByRole('textbox', { name: "Numero dell'articolo" });
     await waitFor(() => expect(box).toHaveFocus());
     expect(box).toHaveValue('');
     await user.keyboard('{Backspace}');
-    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Norma, sentenza o tema/)).toBeInTheDocument();
   });
 
   it('a held Backspace stops at an empty field, and the date gives way to the number first (R2)', async () => {
@@ -593,7 +603,7 @@ describe('CommandPalette — the keys', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     // still on the first step: Enter did not reach cmdk's list (no act in the field's crumb)
-    expect(screen.getByPlaceholderText(/^Atto o citazione/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Norma, sentenza o tema/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Torna indietro/ })).toBeNull();
   });
 
@@ -657,13 +667,15 @@ describe('CommandPalette — the field and its line', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const box = screen.getByRole('combobox');
     expect(box).toHaveClass('focus-visible:ring-0', 'focus-visible:ring-offset-0');
-    expect(box.parentElement).toHaveClass('border', 'focus-within:ring-2');
+    // LC81: one edge, the pill's rule: 2 px only from the keyboard (`data-keyboard`), never the tinted ring of old.
+    expect(box.parentElement).toHaveClass('border', 'data-[keyboard]:has-[input:focus]:ring-1');
+    expect(box.parentElement!.className).not.toMatch(/focus-within/);
   });
 
   it('never draws a field under 16 px, so Safari on an iPhone does not zoom into it, with the text size «piccolo» too', async () => {
     asDesktop(false);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(screen.getByRole('combobox')).toHaveClass('text-[length:max(1.125rem,16px)]');
+    expect(screen.getByRole('combobox')).toHaveClass('text-[length:max(1rem,16px)]');
     await userEvent.setup().click(screen.getByRole('button', { name: /Filtri avanzati/ }));
     const years = screen.getAllByRole('spinbutton');
     expect(years.length).toBeGreaterThan(0);

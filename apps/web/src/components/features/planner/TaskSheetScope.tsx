@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Task } from '../../../types/tasks';
 import { cn } from '../../../lib/utils';
-import { completeWithUndo, trashWithUndo, type Optimistic } from './taskActions';
+import { completeForeverWithUndo, completeWithUndo, trashWithUndo, type Optimistic } from './taskActions';
 import { focusWhenRowLeaves, moveBetweenRows } from './moveBetweenRows';
 import { TaskSheet } from './TaskSheet';
 
@@ -132,6 +132,7 @@ export function TaskSheetScope({ tasks, today, optimistic, className, children }
           onOpenTask={(task) => setOpen({ ...open, task, focus: undefined })}
           onDone={(task, parent) => leave(task, parent, (t) => void completeWithUndo(t, today, optimistic))}
           onTrash={(task, parent) => leave(task, parent, (t) => void trashWithUndo(t, optimistic))}
+          onCompleteForever={(task, parent) => leave(task, parent, (t) => void completeForeverWithUndo(t, optimistic))}
           onSaved={(saved) => setOpen((o) => (o && o.task.id === saved.id ? { ...o, task: saved } : o))}
           onClose={close}
         />

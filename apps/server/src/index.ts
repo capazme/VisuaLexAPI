@@ -4,6 +4,7 @@ import { prisma } from './lib/prisma';
 import { startNormaWatcher } from './utils/normaWatcher';
 import { startDeadLetterSweeper } from './services/merlt/deadLetterLog';
 import { startMerltErasureWorker } from './services/merlt/userData';
+import { cookieSecure } from './auth/webSession';
 import {
   scheduleStuckJobSweeper,
   DEFAULT_EXTRACT_STALE_AFTER_MS,
@@ -52,6 +53,10 @@ const merltErasureWorker: NodeJS.Timeout | null =
 
 const server = app.listen(config.port, () => {
   normaWatcherInterval = startNormaWatcher();
+  if (!cookieSecure()) {
+    // A.1, «Plain HTTP»: right on localhost and in the private phase over plain HTTP, wrong behind HTTPS.
+    console.warn(`[webSession] the session cookie is not Secure (first allowed origin: ${config.cors.origins[0] ?? 'none'}; SESSION_COOKIE_SECURE overrides)`);
+  }
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║

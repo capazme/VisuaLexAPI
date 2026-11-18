@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useContext, useMemo, lazy, Suspense, Component, type ReactNode } from 'react';
+import { UNSAFE_LocationContext, useLocation, useNavigate, useOutlet, type Location } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
@@ -8,14 +8,14 @@ import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { SettingsModal } from '../ui/SettingsModal';
 import { CorpusPracticesDialog } from '../features/practice/CorpusPracticesDialog';
 import { FeedbackButton } from '../ui/FeedbackButton';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
 import { NotificationHost } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
-import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
+import { PageSlide } from '../ui/PageSlide';
+import { SETTINGS_PATH, useOpenSettings, useSettingsRequests } from '../features/settings/settingsRoute';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 import { FindWindow } from '../features/search/FindWindow';
@@ -42,6 +42,7 @@ import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
 import { isMacPlatform } from '../ui/notifications/undoShortcut';
+import { stackRoomStore } from '../ui/notifications/stackRoom';
 import { FULL_PAGE_FRAME, PAGE_FRAME } from './frame';
 
 /**
@@ -91,19 +92,32 @@ function CompareWaiting() {
   );
 }
 
+/**
+ * The address a page was drawn at, kept for it (LC84): `PageSlide` keeps the leaving page's element, whose route is its
+ * own (`useOutlet`), but whatever in it reads `useLocation` (a title from the address, Opus's) would read the new one
+ * and draw the coming page twice. The router has no public way to give a subtree its own location (`<Routes location>`
+ * starts a new tree of routes), hence its context.
+ */
+function AtLocation({ location, children }: { location: Location; children: ReactNode }) {
+  const context = useContext(UNSAFE_LocationContext);
+  const value = useMemo(() => ({ ...context, location }), [context, location]);
+  return <UNSAFE_LocationContext.Provider value={value}>{children}</UNSAFE_LocationContext.Provider>;
+}
+
 export function Layout() {
-  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette, settingsDialog, openSettings, closeSettings } = useAppStore(useShallow(s => ({
+  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
     settings: s.settings,
     updateSettings: s.updateSettings,
     sidebarVisible: s.sidebarVisible,
     toggleSidebar: s.toggleSidebar,
     toggleSearchPanel: s.toggleSearchPanel,
     openCommandPalette: s.openCommandPalette,
-    // In the store, not here: a reader's gear opens it at «Significato dei colori» from wherever it is drawn.
-    settingsDialog: s.settingsDialog,
-    openSettings: s.openSettings,
-    closeSettings: s.closeSettings,
   })));
+  // Impostazioni is a page (LC84): the sidebar's entries, «?» and every gear ask for it, and the layout goes there.
+  const openSettings = useOpenSettings();
+  useSettingsRequests();
+  // The route's page as it is now: kept by `PageSlide` while it leaves, it goes on drawing the page it was.
+  const outlet = useOutlet();
   const { isAuthenticated } = useAuth();
   const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -115,7 +129,6 @@ export function Layout() {
   }, [logoSweep]);
   // The phone's drawer is closed as the shell draws: its sweep plays at its first opening in the session (LC18).
   const [drawerSweep, setDrawerSweep] = useState(false);
-  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
   const desktopSidebar = useDesktopSidebar();
@@ -126,8 +139,10 @@ export function Layout() {
   const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname, search } = location;
   const onSearchPage = pathname === '/';
+  const notificationRoom = stackRoomStore((s) => s.room);
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); the full screen (`focusMode`) hides it, ⌘K still opens the palette.
   // Below lg (from lg the top bar holds the field, compact: LC21, the anti-slop review's FAIL of the 15th).
@@ -211,7 +226,7 @@ export function Layout() {
   // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
   // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
   // address is read when the welcome ends, not when this callback was made.
-  const { startTour, prepareTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+  const { startTour, prepareTour, hasSeenTour, tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (type) => {
       if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
@@ -302,12 +317,12 @@ export function Layout() {
       // Open keyboard shortcuts with '?' (Shift + /)
       if (e.key === '?' && !isTyping) {
         e.preventDefault();
-        setKeyboardShortcutsOpen(true);
+        openSettings('scorciatoie');
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage]);
+  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage, openSettings]);
 
   // The controls of the top bar (LC21): the version's news, «Commenti», «Tutto schermo», compact and in line.
   const barControls = (
@@ -364,7 +379,7 @@ export function Layout() {
             onToggleWide={desktopSidebar.toggle}
             closeMobile={() => { }}
             openSettings={() => openSettings()}
-            openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            openKeyboardShortcuts={() => openSettings('scorciatoie')}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
             logoSweep={logoSweep}
@@ -382,7 +397,7 @@ export function Layout() {
             layout="drawer"
             closeMobile={closeDrawer}
             openSettings={() => openSettings()}
-            openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            openKeyboardShortcuts={() => openSettings('scorciatoie')}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
             logoSweep={drawerSweep}
@@ -509,20 +524,27 @@ export function Layout() {
             // md:py-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-10',
           )}>
-            <RoutePage>
-              <Outlet />
-            </RoutePage>
+            {/* Impostazioni comes in as a page of its own and goes back the other way (LC84); every other change of page
+                keeps its own transition, so the key changes only entering and leaving it. */}
+            <PageSlide pageKey={pathname === SETTINGS_PATH ? 'impostazioni' : 'app'} back={pathname !== SETTINGS_PATH}>
+              <AtLocation location={location}>
+                <div data-page-place className="contents">
+                  <RoutePage>
+                    {outlet}
+                  </RoutePage>
+                </div>
+              </AtLocation>
+            </PageSlide>
           </div>
+          {/* LC85: while notifications show at the bottom, the page can scroll its last rows above them. Not on the
+              search page, whose practice columns are the scroller's height and scroll on their own. */}
+          {!onSearchPage && notificationRoom > 0 && <div aria-hidden data-notification-room="" style={{ height: notificationRoom }} />}
         </div>
       </main>
 
       {/* LC60: the Corpus's practices a browser kept become pratiche, once, by the user's choice. */}
       <CorpusPracticesDialog />
-      <SettingsModal isOpen={settingsDialog.open} section={settingsDialog.section} onClose={closeSettings} onRestartTour={resetAndStartTour} />
       <WelcomeGuide />
-
-      {/* Keyboard Shortcuts Modal */}
-      <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
 
       <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 

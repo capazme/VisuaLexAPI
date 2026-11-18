@@ -58,10 +58,13 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
   // say how it went, then hands the focus to «Pubblica nel Forum».
   const [deleting, setDeleting] = useState<NonNullable<Dossier['published']> | null>(null);
   const publishRef = useRef<HTMLButtonElement>(null);
+  // The «Forum» menu's button: the confirmation grows from it and gives it the focus back (LC85).
+  const [deleteFrom, setDeleteFrom] = useState<HTMLElement | null>(null);
   // It takes away others' «Mi piace» and proposals: drawn from the «Forum» button (K1b), which says the outcome.
   const confirmation = (
     <WireConfirm
       open={confirmDelete}
+      origin={deleteFrom}
       variant="danger"
       title="Eliminare la copia pubblicata?"
       message="La copia pubblicata, i suoi «Mi piace» e le proposte ricevute vengono eliminati. La tua pratica resta com'è; chi l'ha già scaricata ne conserva la copia."
@@ -141,7 +144,8 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
                 onSelect: () => void act(() => sharedEnvironmentService.republish(published.sharedEnvironmentId), 'Di nuovo nel Forum'),
               },
           { label: 'Apri i dossier pubblici', icon: FolderOpen, onSelect: () => navigate('/forum') },
-          { label: 'Elimina dai dossier pubblici', icon: Trash2, danger: true, separatorBefore: true, disabled: busy, onSelect: () => {
+          { label: 'Elimina dai dossier pubblici', icon: Trash2, danger: true, separatorBefore: true, disabled: busy, onSelect: (_event, trigger) => {
+              setDeleteFrom(trigger);
               setDeleting(published);
               setConfirmDelete(true);
             } },

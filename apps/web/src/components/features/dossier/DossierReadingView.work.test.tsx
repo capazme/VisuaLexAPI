@@ -12,6 +12,8 @@ vi.mock('../../../services/dossierService', () => ({
     updateItem: vi.fn(async () => ({})), writesInFlight: () => 0,
   },
 }));
+// The act's index (LC86: a closed row's rubric) asks no source here: the source is mocked for the texts.
+vi.mock('./useActDetails', async (importOriginal) => ({ ...(await importOriginal<typeof import('./useActDetails')>()), useActDetails: () => ({ title: null, rubricaOf: () => null }) }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActTree: () => Promise.resolve([]), fetchActRubriche: () => Promise.resolve({}) }));
 // The readers record what they are given: the dossier entry they read (D7b, the notes).
 vi.mock('../search/ArticleTabContent', () => ({
@@ -67,7 +69,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, searchTrigger: null,
     practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null,
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    structureWindow: { blockId: null },
     dossiers: [dossierOf([norma('5', { status: 'important' }), norma('7'), sentenza])],
     pendingDossierItemIds: {}, pendingDossierOrders: {}, lastSyncError: null,
   });
@@ -105,17 +107,16 @@ describe('the star («importante») in «Lettura»', () => {
   });
 });
 
-describe('the star in the simple reading (one article alone, no row «⋯»)', () => {
-  it('stands over the text with its name, and writes the status', () => {
+describe('one article alone is a closed row as any other (LC86: no simple reading in «Fonti»)', () => {
+  it('its star is in the row\'s «⋯», and writes the status', () => {
     appStore.setState({ dossiers: [dossierOf([norma('7')])] });
     render(<Page />);
-    const first = bound().acts[0];
-    act(() => { s().setPracticeArticleText(bound().id, first.id, practiceArticleKey(first.articles[0]), { ...first.articles[0], article_text: 'Art. 7\nTesto.' }); });
-    // One name, the state in aria-pressed (LC61).
-    expect(screen.getByRole('button', { name: 'Importante' })).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(screen.getByRole('button', { name: 'Importante' }));
+    const row = within(rowEl('24', '7'));
+    expect(row.getByRole('button', { name: /^Espandi/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'Importante' })).toBeNull();
+    fireEvent.click(row.getByRole('button', { name: /^Azioni su/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Segna come importante' }));
     expect(s().dossiers[0].items[0].status).toBe('important');
-    expect(screen.getByRole('button', { name: 'Importante' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

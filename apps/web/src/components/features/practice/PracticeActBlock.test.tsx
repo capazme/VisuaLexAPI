@@ -30,7 +30,7 @@ vi.mock('../search/ArticleTabContent', async () => {
 vi.mock('../search/TreeViewPanel', () => ({
   TreeViewPanel: (props: Record<string, unknown>) => {
     h.trees.push(props);
-    return null;
+    return <div data-testid="structure" id={props.id as string} />;
   },
 }));
 vi.mock('../workspace/ArticleNavigation', () => ({
@@ -58,13 +58,13 @@ const s = () => appStore.getState();
 const L24_URN: Norma = { ...L24, urn: 'urn:nir:stato:legge:2017-03-08;24' };
 const PAST = { data_versione: '2007-12-29' };
 const answer = (body: unknown) => ({ ok: true, json: () => Promise.resolve(body) });
-const lastTree = () => h.trees.at(-1) as { variant: string; isOpen: boolean; onArticleSelect: (n: string, a: string | null) => void };
+const lastTree = () => h.trees.at(-1) as { isOpen: boolean; onArticleSelect: (n: string, a: string | null) => void };
 const lastNav = () => h.navs.at(-1) as { onNavigate: (id: string) => void; onLoadArticle: (id: string) => void };
 
 function setUp(norma: Norma, articles: ArticleData[]) {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [],
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    structureWindow: { blockId: null },
   });
   return s().addArticlesToPractice(null, norma, articles);
 }
@@ -306,18 +306,22 @@ describe('PracticeActBlock: «⋯»', () => {
 });
 
 describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => {
-  it('on a desktop Struttura owns the window', async () => {
+  it('on a desktop Struttura opens the act\'s index', async () => {
     const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
     render(<Block practiceId={practiceId} actId={actId} />);
     const structure = screen.getByRole('button', { name: 'Struttura della norma' });
-    // It opens a window: expanded, not pressed (R3b).
+    // It opens a space in the card: expanded, not pressed (R3b).
     expect(structure).toHaveAttribute('aria-expanded', 'false');
     expect(structure).not.toHaveAttribute('aria-pressed');
     fireEvent.click(structure);
     expect(s().structureWindow.blockId).toBe(actId);
     expect(screen.getByRole('button', { name: 'Struttura della norma' })).toHaveAttribute('aria-expanded', 'true');
-    await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'window', isOpen: true })));
-    expect(h.trees.every((t) => t.variant === 'window')).toBe(true);
+    // In the card (LC77): right under its heading, before its text, and named by the command.
+    const space = screen.getByTestId('structure');
+    expect(space.previousElementSibling?.tagName).toBe('HEADER');
+    expect(space.closest('section')).toHaveAttribute('data-act-id', actId);
+    expect(screen.getByRole('button', { name: 'Struttura della norma' })).toHaveAttribute('aria-controls', space.id);
+    await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ isOpen: true })));
   });
 
   it('on a phone width the act\'s tools are entries of «⋯», not buttons (R3)', () => {
@@ -333,14 +337,13 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     ]);
   });
 
-  it('on a phone width Struttura opens the drawer, not the window', async () => {
+  it('on a phone width Struttura opens the index here, not through the store', async () => {
     h.desktop = false;
     const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
     render(<Block practiceId={practiceId} actId={actId} />);
     fireEvent.click(screen.getByRole('button', { name: ACT_MENU }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Struttura della norma' }));
-    await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
-    expect(h.trees.every((t) => t.variant === 'drawer')).toBe(true);
+    await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ isOpen: true })));
     expect(s().structureWindow.blockId).toBeNull();
   });
 
@@ -348,13 +351,13 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     h.desktop = false;
     const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
     render(<Block practiceId={practiceId} actId={actId} />);
-    expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: false }));
+    expect(lastTree()).toEqual(expect.objectContaining({ isOpen: false }));
     // the palette's «Apri l'indice e sfoglia» lands on this act (`addActIndexToPractice`)
     act(() => { s().addActIndexToPractice(practiceId, L24); });
-    await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
+    await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ isOpen: true })));
     act(() => { (lastTree() as unknown as { onClose: () => void }).onClose(); });
     expect(s().structureWindow.blockId).toBeNull();
-    expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: false }));
+    expect(lastTree()).toEqual(expect.objectContaining({ isOpen: false }));
   });
 
   it('a pick from the index of an article not on the table loads it into this act and reveals it', async () => {

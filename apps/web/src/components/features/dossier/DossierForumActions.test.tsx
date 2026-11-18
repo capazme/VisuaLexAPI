@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Dossier } from '../../../types';
@@ -61,5 +61,43 @@ describe('DossierForumActions', () => {
     await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
     fireEvent.click(screen.getByRole('button', { name: 'Elimina dai dossier pubblici' }));
     await waitFor(() => expect(service.delete).toHaveBeenCalledWith('e1'));
+  });
+});
+
+describe('DossierForumActions, a confirmation asked by a menu entry (LC85, Papiniano on #585)', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(Element.prototype, 'animate');
+    vi.restoreAllMocks();
+  });
+
+  it('grows out of the «Forum» button, the entry being gone, and gives that button the focus back', async () => {
+    const runs: { el: Element; keyframes: Keyframe[] }[] = [];
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: function (this: Element, keyframes: Keyframe[]) {
+        runs.push({ el: this, keyframes });
+        return { cancel: () => {}, onfinish: null, effect: { target: this } };
+      },
+      configurable: true,
+      writable: true,
+    });
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    const own = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      // The «Forum» button 120 × 36 at 900,200; the card 384 × 196 in the middle (Papiniano's numbers).
+      if (this.getAttribute('aria-label') === 'Forum: Nel Forum · v3') return rect(900, 200, 120, 36);
+      if (this.getAttribute('role') === 'alertdialog') return rect(528, 350, 384, 196);
+      return own.call(this);
+    });
+    show({ ...base, published: published(true) });
+    const forum = screen.getByRole('button', { name: 'Forum: Nel Forum · v3' });
+    fireEvent.click(forum);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina dai dossier pubblici' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Eliminare la copia pubblicata?' });
+    const shape = dialog.querySelector('[data-island-shape]')!;
+    expect(runs.find((run) => run.el === shape)?.keyframes[0]).toMatchObject({ top: '-150px', left: '372px', right: '-108px', bottom: '310px' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(forum).toHaveFocus());
+    expect(service.delete).not.toHaveBeenCalled();
   });
 });

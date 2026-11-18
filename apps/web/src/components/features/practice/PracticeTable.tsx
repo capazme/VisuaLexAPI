@@ -54,7 +54,8 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
     tryStartTour('practice');
   });
   if (!practice) return null;
-  const simple = layout === 'overview' && isSimplePractice(practice);
+  // A dossier's «Fonti» (LC86): its one article a closed row as any other, never Lettura semplice.
+  const simple = layout === 'overview' && isSimplePractice(practice) && !bound;
   // LC68: one act with more articles is named by its own heading too; the head would repeat it as «c.c.».
   const headless = layout === 'overview' && isOneActPractice(practice) && practice.beside.length === 0;
   return (
@@ -63,8 +64,10 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
       data-testid="practice-table"
       // Lettura semplice (LC28): the article takes the room it needs, the measure; the whole frame only when its margin
       // has notes or glosses to set beside the text (`AnnotationMargin` needs 52rem for its column). LC70: so does one
-      // act with more articles, the same card as with one (Luca: «se apro due articoli si scassa tutto»).
-      className={cn('w-full space-y-3', headless && 'max-w-[44rem] has-[[data-margin-content]]:max-w-none')}
+      // act with more articles, the same card as with one (Luca: «se apro due articoli si scassa tutto»). LC74: an
+      // article's glosses widen it to the right by their margin (21.25rem and its 1.5rem), the text where it was.
+      data-glosses-room={headless ? '' : undefined}
+      className={cn('w-full space-y-3', headless && 'max-w-[44rem] has-[[data-margin-content]]:max-w-none has-[[data-glosses-beside]]:max-w-[66.75rem]')}
     >
       <PracticeHeader practice={practice} compact={layout === 'index'} simple={simple} headless={headless}>
         <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />

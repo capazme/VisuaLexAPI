@@ -173,7 +173,7 @@ export function registerCourseTools(server: McpServer, config: McpConfig, run: R
   server.registerTool(
     'lingolex_crea_percorso',
     {
-      title: 'Crea un percorso di Gymnasium',
+      title: 'Crea un percorso di Learn',
       description:
         'Crea un percorso di studio (vuoto) sulla pratica di studio già creata con le sue norme e sentenze. ' +
         'Solo dopo che l’utente ha confermato il programma; regole in lingolex_schema_card.',

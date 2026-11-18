@@ -5,6 +5,9 @@ import { ReadingToolbar, type ReadingToolbarProps } from './ReadingToolbar';
 import { StatusLineEnd } from './statusLineEnd';
 import { NOT_YET_REASON, READ_ONLY_REASON, UNRELIABLE_REASON } from '../../../utils/versionDisplay';
 import { appStore } from '../../../store/useAppStore';
+// Impostazioni is a page (LC84): the gear opens it at «Significato dei colori» (`#colori`).
+const openSettings = vi.hoisted(() => vi.fn());
+vi.mock('../settings/settingsRoute', () => ({ useOpenSettings: () => openSettings }));
 
 function setup(over: Partial<ReadingToolbarProps> = {}) {
     const props: ReadingToolbarProps = {
@@ -110,7 +113,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         const names = within(desktopRow(container)).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent);
         expect(names).toEqual([
             'Note, 2', 'Evidenziazioni, 3', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
-            'Strumento nota (nota personale)', 'Tipo di nota', 'Alla pratica', 'Altre azioni sull’articolo',
+            'Strumento nota (nota personale)', 'Tipo di nota', 'Alla pratica', 'Glosse', 'Altre azioni sull’articolo',
         ]);
         // The count is seen beside the word.
         expect(within(desktopRow(container)).getByRole('button', { name: 'Note, 2' })).toHaveTextContent('Note2');
@@ -123,7 +126,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         // Close together, the last one's target reaching into the page's margin: the status keeps one line at 320 (R3b).
         expect(phoneRow(container)).toHaveClass('-mr-3');
         expect(phoneRow(container)).not.toHaveClass('gap-1');
-        expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Evidenziatore (giallo)', 'Alla pratica', 'Altre azioni sull’articolo']);
+        expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Evidenziatore (giallo)', 'Alla pratica', 'Glosse', 'Altre azioni sull’articolo']);
         buttons.forEach((b) => expect(b).toHaveClass('min-h-[44px]', 'min-w-[44px]'));
     });
 
@@ -133,7 +136,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
             const { container } = setup();
             const buttons = within(phoneRow(container)).getAllByRole('button');
             expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual([
-                'Evidenziatore (giallo)', 'Strumento nota (nota personale)', 'Alla pratica', 'Altre azioni sull’articolo',
+                'Evidenziatore (giallo)', 'Strumento nota (nota personale)', 'Alla pratica', 'Glosse', 'Altre azioni sull’articolo',
             ]);
             fireEvent.click(within(phoneRow(container)).getByRole('button', { name: 'Strumento nota (nota personale)' }));
             expect(appStore.getState().readingTool).toBeNull();
@@ -153,7 +156,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
     it('the computer\'s «⋯» holds every other tool', () => {
         const { container } = setup({ find: { isOpen: false, onToggle: vi.fn() }, url: 'https://example.org/art' });
         expect(entryNames(openMore(desktopRow(container)))).toEqual([
-            'Aggiungi alle norme rapide', 'Glosse sull’articolo', 'Cerca nel testo', 'Copia',
+            'Aggiungi alle norme rapide', 'Cerca nel testo', 'Copia',
             'Condividi link', 'Esporta…', 'Testo alla data…', 'Confronta con…',
         ]);
     });
@@ -161,7 +164,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
     it('the phone\'s «⋯» adds Study Mode and the source, which its row does not show', () => {
         const { container } = setup({ find: { isOpen: false, onToggle: vi.fn() }, url: 'https://example.org/art' });
         expect(entryNames(openMore(phoneRow(container)))).toEqual([
-            'Aggiungi alle norme rapide', 'Glosse sull’articolo', 'Cerca nel testo', 'Copia', 'Modalità studio', 'Apri la fonte',
+            'Aggiungi alle norme rapide', 'Cerca nel testo', 'Copia', 'Modalità studio', 'Apri la fonte',
             'Condividi link', 'Esporta…', 'Testo alla data…', 'Confronta con…', 'Cambia il significato dei colori',
         ]);
     });
@@ -174,8 +177,6 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         };
         run('Aggiungi alle norme rapide');
         expect(props.onToggleQuickNorm).toHaveBeenCalledTimes(1);
-        run('Glosse sull’articolo');
-        expect(props.onToggleDiscussion).toHaveBeenCalledTimes(1);
         run('Copia');
         expect(props.onOpenCopyModal).toHaveBeenCalledTimes(1);
         run('Condividi link');
@@ -202,7 +203,6 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         const { container } = setup({ isPinnedQuick: true, isDiscussionOpen: true });
         const names = entryNames(openMore(desktopRow(container)));
         expect(names).toContain('Togli dalle norme rapide');
-        expect(names).toContain('Chiudi le glosse');
     });
 
     it('opens the notes and the highlights from their words', () => {
@@ -217,6 +217,37 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
     });
 });
 
+describe('ReadingToolbar — «Glosse», a button of its own before «⋯» (LC74)', () => {
+    it('is out of «⋯», just before it on both rows, and toggles the margin', () => {
+        const props = setup();
+        for (const row of [desktopRow(props.container), phoneRow(props.container)]) {
+            const buttons = within(row).getAllByRole('button');
+            expect(buttons.at(-2)).toHaveAttribute('data-glosses-button');
+            expect(buttons.at(-2)).toHaveClass('vlx-hover-tile');
+            expect(entryNames(openMore(row)).some((name) => /glosse/i.test(name ?? ''))).toBe(false);
+        }
+        fireEvent.click(within(desktopRow(props.container)).getByRole('button', { name: 'Glosse' }));
+        expect(props.onToggleDiscussion).toHaveBeenCalledTimes(1);
+    });
+
+    it('carries the count: «Glosse 3» on a computer, the icon and the number on a phone, named «Glosse, 3» on both', () => {
+        const { container } = setup({ discussionCount: 3 });
+        expect(within(desktopRow(container)).getByRole('button', { name: 'Glosse, 3' })).toHaveTextContent('Glosse3');
+        const phone = within(phoneRow(container)).getByRole('button', { name: 'Glosse, 3' });
+        expect(phone).toHaveTextContent('3');
+        expect(phone).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    });
+
+    it('stays pressed while the margin is open', () => {
+        const closed = setup();
+        within(desktopRow(closed.container)).getAllByRole('button', { name: 'Glosse' }).forEach((b) => expect(b).toHaveAttribute('aria-pressed', 'false'));
+        closed.container.remove();
+        const { container } = setup({ isDiscussionOpen: true });
+        expect(within(desktopRow(container)).getByRole('button', { name: 'Glosse' })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(phoneRow(container)).getByRole('button', { name: 'Glosse' })).toHaveAttribute('aria-pressed', 'true');
+    });
+});
+
 describe('ReadingToolbar — a past text is a reading', () => {
     it('switches off the tools keyed by article, and says why', () => {
         const { container } = setup({ lockedReason: READ_ONLY_REASON });
@@ -226,12 +257,13 @@ describe('ReadingToolbar — a past text is a reading', () => {
             expect(button).toBeDisabled();
             expect(button.title).toContain(READ_ONLY_REASON);
         }
+        const glosses = within(row).getByRole('button', { name: 'Glosse' });
+        expect(glosses).toBeDisabled();
+        expect(glosses.title).toContain(READ_ONLY_REASON);
         const menu = openMore(row);
-        for (const name of ['Aggiungi alle norme rapide', 'Glosse sull’articolo']) {
-            const entry = within(menu).getByRole('menuitem', { name: new RegExp(name) });
-            expect(entry).toBeDisabled();
-            expect(entry).toHaveTextContent(READ_ONLY_REASON);
-        }
+        const entry = within(menu).getByRole('menuitem', { name: /Aggiungi alle norme rapide/ });
+        expect(entry).toBeDisabled();
+        expect(entry).toHaveTextContent(READ_ONLY_REASON);
         const phoneMenu = openMore(phoneRow(container));
         expect(within(phoneMenu).getByRole('menuitem', { name: /Modalità studio/ })).toBeDisabled();
     });
@@ -351,14 +383,14 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
 describe('ReadingToolbar — the compact form of a light window (spec §4.1)', () => {
     const find = { isOpen: false, onToggle: vi.fn() };
 
-    it('the computer\'s row holds notes, highlights, the highlighter, the note tool and «⋯»: discussions, the magnifier and copy', () => {
+    it('the computer\'s row holds notes, highlights, the highlighter, the note tool, «Glosse» and «⋯»: the magnifier and copy', () => {
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = desktopRow(container);
         expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual([
             'Note', 'Evidenziazioni', 'Evidenziatore (giallo)', 'Colore dell’evidenziatore', 'Cambia il significato dei colori',
-            'Strumento nota (nota personale)', 'Tipo di nota', 'Altre azioni sull’articolo',
+            'Strumento nota (nota personale)', 'Tipo di nota', 'Glosse', 'Altre azioni sull’articolo',
         ]);
-        expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
+        expect(entryNames(openMore(row))).toEqual(['Cerca nel testo', 'Copia']);
     });
 
     it('the phone\'s row holds the highlighter\'s toggle and «⋯»: no quick norm, dossier, Study Mode or source link', () => {
@@ -366,8 +398,8 @@ describe('ReadingToolbar — the compact form of a light window (spec §4.1)', (
         const row = phoneRow(container);
         // The card's padding is its edge (the full-screen reader): no reach into it, which cut the focus ring (R3b).
         expect(row).not.toHaveClass('-mr-3');
-        expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Evidenziatore (giallo)', 'Altre azioni sull’articolo']);
-        expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia', 'Cambia il significato dei colori']);
+        expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Evidenziatore (giallo)', 'Glosse', 'Altre azioni sull’articolo']);
+        expect(entryNames(openMore(row))).toEqual(['Cerca nel testo', 'Copia', 'Cambia il significato dei colori']);
     });
 
     it('keeps the status and the annex, which say which text this is', () => {
@@ -409,7 +441,9 @@ describe('ReadingToolbar — the highlighter and its inks (H1, A4)', () => {
         const { container } = setup();
         const menu = openMore(phoneRow(container));
         // Long now: capped under the bar, it scrolls on its own, so the last colour is never off the screen.
-        expect(menu).toHaveClass('overflow-y-auto', 'max-h-[calc(100dvh-12rem)]');
+        // The list scrolls inside the surface (`IslandSurface`, LC85): the box would clip the shape growing from the «⋯».
+        expect(menu).toHaveClass('max-h-[calc(100dvh-12rem)]');
+        expect(menu.querySelector('[data-island-content]')).toHaveClass('overflow-y-auto');
         expect(within(menu).getByText('Colore dell’evidenziatore: uso suggerito')).toBeInTheDocument();
         const choices = within(menu).getAllByRole('menuitemradio');
         // Named for what they set, never «Evidenzia in…», which reads as «highlight now».
@@ -457,7 +491,7 @@ describe('ReadingToolbar — the colours mean what the user says', () => {
         expect(gear).toHaveAttribute('title', 'Cambia il significato dei colori');
         expect(within(row).queryByRole('button', { name: /\?|aiuto|spiega/i })).toBeNull();
         fireEvent.click(gear);
-        expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
+        expect(openSettings).toHaveBeenCalledWith('colori');
     });
 
     it('on a phone the gear is the entry after the inks in the «⋯»', () => {
@@ -467,7 +501,7 @@ describe('ReadingToolbar — the colours mean what the user says', () => {
         expect(items.at(-1)).toHaveAccessibleName('Cambia il significato dei colori');
         expect(items.at(-2)).toHaveAccessibleName(/^Evidenziatore senza colore/);
         fireEvent.click(items.at(-1)!);
-        expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
+        expect(openSettings).toHaveBeenCalledWith('colori');
     });
 
     it('a text that takes no highlight shows neither the colour nor its gear', () => {
@@ -490,7 +524,7 @@ describe('ReadingToolbar — «Copia link Normattiva»', () => {
 
     it('is in the compact form too', () => {
         const { container } = setup({ onCopyLink: vi.fn(), compact: true });
-        expect(entryNames(openMore(desktopRow(container)))).toEqual(['Glosse sull’articolo', 'Copia', 'Copia link Normattiva']);
+        expect(entryNames(openMore(desktopRow(container)))).toEqual(['Copia', 'Copia link Normattiva']);
     });
 
     it('is not offered without an address', () => {
@@ -518,8 +552,8 @@ describe('ReadingToolbar — the tabs\' ground under the pointer (LC72)', () => 
     it('is on every command of the bar, on a computer and on a phone', () => {
         const { container } = setup();
         const desktop = within(desktopRow(container)).getAllByRole('button');
-        // Note, Evidenziazioni, the highlighter, its inks, its meanings, the note tool, its kind, «Alla pratica», «⋯».
-        expect(desktop).toHaveLength(9);
+        // Note, Evidenziazioni, the highlighter, its inks, its meanings, the note tool, its kind, «Alla pratica», «Glosse», «⋯».
+        expect(desktop).toHaveLength(10);
         for (const button of desktop) expect(button, button.getAttribute('aria-label') ?? button.textContent ?? '').toHaveClass('vlx-hover-tile');
         for (const button of within(phoneRow(container)).getAllByRole('button')) expect(button).toHaveClass('vlx-hover-tile');
     });

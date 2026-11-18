@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronDown, FileDown, FolderMinus, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { DRAG_ROLE_DESCRIPTION } from './dragAnnouncements';
@@ -18,7 +18,8 @@ import { TreeViewPanel } from '../search/TreeViewPanel';
 import { AnnexSuggestion } from '../search/AnnexSuggestion';
 import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { LazyStudyMode as StudyMode } from '../workspace/LazyStudyMode';
-import { shownAnnex } from '../dossier/dossierLayout';
+import { layoutDossier, shownAnnex } from '../dossier/dossierLayout';
+import { useActDetails } from '../dossier/useActDetails';
 import { PracticeArticleRow } from './PracticeArticleRow';
 import { PracticeArticleEntry } from './PracticeIndexEntry';
 import type { PracticeLayout } from './PracticeColumn';
@@ -64,8 +65,8 @@ function chipLabel(article: ArticleData): string {
  * heading with its tools (Studio, Struttura, PDF, «⋯»), an index of the act's rows on top, then the
  * rows one under the other. In the overview (U2) it is a panel of the grid, its tools beside its title; in the reading
  * view's index, its heading with «⋯» (the tools inside it, as on a phone) and its articles one entry a line, each
- * opening beside. The structure window is the desktop's (`structureWindow.blockId`), the drawer the phone's: one per
- * breakpoint (gotcha 26).
+ * opening beside. The structure (LC77) opens in the block, between its heading and its rows: on a computer when the store
+ * names this act (`structureWindow.blockId`), on a phone when toggled here or named by the store.
  */
 export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference, layout }: PracticeActBlockProps) {
   const {
@@ -105,6 +106,11 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // dossier» (to the trash, with «Annulla»; the rows stay on the table): a removal from the table alone would come back
   // with the next re-sync.
   const { dossier: hostDossier, ids: dossierIds } = useActItemIds(act);
+  // In a dossier's «Fonti» (LC86) a closed row has no text yet: its rubric comes from the act's index, read once per
+  // act as the old list read it (`useActDetails`).
+  const dossierItems = useAppStore((s) => (hostDossier ? s.dossiers.find((d) => d.id === hostDossier.id)?.items : undefined));
+  const dossierBlock = useMemo(() => (dossierItems ? layoutDossier(dossierItems).acts.find((a) => a.key === act.key) : undefined), [dossierItems, act.key]);
+  const { rubricaOf } = useActDetails(dossierBlock);
   // A separator only under a command: on a computer an act has none above its removal (the tests of 16-11; LC60: the
   // Ricerca's act lost «Sposta in un'altra pratica»).
   const commandsAbove = !toolsShown;
@@ -121,6 +127,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // On a phone the index is the drawer (§8). «Apri l'indice e sfoglia» points the structure window at
   // the act it drops (§5.1): on a phone that request opens this act's drawer too.
   const drawerOpen = drawerToggled || (!isDesktop && isStructureWindowOpen);
+  const structureOpen = isDesktop ? isStructureWindowOpen : drawerOpen;
+  const structureId = useId();
   const closeDrawer = () => {
     setDrawerToggled(false);
     if (isStructureWindowOpen) closeStructureWindow();
@@ -172,7 +180,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     addArticlesToPractice(practiceId, norma, loaded, { reveal: 'first' });
   }, [addArticlesToPractice, practiceId]);
   const {
-    treeData, treeMetadata, treeLoading, rubriche, abrogati, rubricheParts, currentAnnex, allArticleIds,
+    treeData, treeMetadata, rubriche, abrogati, rubricheParts, currentAnnex, allArticleIds,
     loadingArticle, fetchTree, handleAnnexSelect, handleLoadArticle, loadedArticleIds,
   } = useAnnexNavigation({ norma: act.norma, articles: act.articles, addArticles: landInAct, activeArticle: current });
 
@@ -273,7 +281,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {...listeners}
           aria-label={`Sposta ${heading}`}
           // Lettura semplice (LC28): one act, nothing to reorder.
-          className={cn(plain ? 'hidden' : 'hidden md:block', 'rounded text-slate-300 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
+          // 44 px to grab on a computer too (LC86); its reach goes into the panel's margin, the grip where it was.
+          className={cn(plain ? 'hidden' : 'hidden md:flex', 'min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-300 hover:text-slate-500 md:-my-2 md:-ml-3 md:-mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
@@ -344,12 +353,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                   type="button"
                   onClick={toggleStructure}
                   aria-label="Struttura della norma"
-                  // It opens a window (the index): expanded, not pressed (R3b).
-                  aria-expanded={isStructureWindowOpen}
+                  // It opens a space (the index): expanded, not pressed (R3b).
+                  aria-expanded={structureOpen}
+                  aria-controls={structureId}
                   className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white')}
                 >
                   <GitBranch size={16} aria-hidden />
-                  <span className="hidden lg:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>
+                  {/* Its name, loading or not (LC86): the tree's arrival shows in the space it opens. */}
+                  <span className="hidden lg:inline">Struttura</span>
                 </button>
                 <button
                   type="button"
@@ -395,6 +406,25 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         </div>
       </header>
 
+      {/* The index (LC77): in the card, under its heading, pushing the rows down; it does not close on a pick. Outside
+          the folded part: a folded act still opens its structure. */}
+      <TreeViewPanel
+        id={structureId}
+        isOpen={structureOpen}
+        onClose={isDesktop ? closeStructureWindow : closeDrawer}
+        treeData={treeData || []}
+        urn={act.norma.urn || ''}
+        title={structureTitle(heading)}
+        loadedArticles={loadedArticleIds}
+        activeArticle={current ? getUniqueArticleId(current) : undefined}
+        onArticleSelect={(articleNumber, targetAnnex) => openArticle(articleNumber, targetAnnex)}
+        annexes={treeMetadata?.annexes}
+        currentAnnex={currentAnnex}
+        rubriche={rubriche}
+        abrogati={abrogati}
+        rubricheParts={rubricheParts}
+      />
+
       {!act.isCollapsed && isIndex && (
         <div className="py-1">
           {act.articles.length > 0 && (
@@ -426,13 +456,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
         <div className="py-1">
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
           {/* Lettura semplice (LC70): no line of its own; the selector and the loading are in the status line. */}
-          {!simple && (act.articles.length > 1 || loadingArticle || (showNavigation && !navInHead)) && (
+          {!simple && ((act.articles.length > 1 && !hostDossier) || loadingArticle || (showNavigation && !navInHead)) && (
             // On a phone one row: the chips scroll sideways beside the arrows (R3: two rows of chips came before the text).
             // The arrows first, the left arrow's glyph on the text's edge (LC68: no empty half row before them).
             <div className="flex items-center gap-x-3 gap-y-1 py-1 md:flex-wrap md:py-1.5">
               {showNavigation && !navInHead && navigation('-ml-3 shrink-0 md:-ml-1')}
               {/* A compact index, with more than one article: one alone says nothing it does not say below (R3). */}
-              {act.articles.length > 1 && (
+              {/* Not in a dossier's «Fonti» (LC86): its rows are right below, the chips would repeat them. */}
+              {act.articles.length > 1 && !hostDossier && (
                 <ul aria-label={`Articoli sul tavolo di ${heading}`} className={cn('practice-act-index flex min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex-wrap md:overflow-visible', HIDDEN_SCROLLBAR)}>
                   {act.articles.map((article) => {
                     const key = practiceArticleKey(article);
@@ -491,6 +522,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 onCrossReference={onCrossReference}
                 onOpenStudyMode={() => openStudy(article)}
                 statusEnd={statusEnd}
+                rubrica={rubricaOf(article.norma_data)}
                 annexSuggestion={annexes && openKeys.includes(key) ? (
                   <AnnexSuggestion
                     className="mb-3"
@@ -512,26 +544,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           })}
         </div>
       )}
-
-      {/* The index: a window on the desktop, a drawer on the phone; neither closes on a pick. */}
-      <TreeViewPanel
-        variant={isDesktop ? 'window' : 'drawer'}
-        isOpen={isDesktop ? isStructureWindowOpen : drawerOpen}
-        onClose={isDesktop ? closeStructureWindow : closeDrawer}
-        treeData={treeData || []}
-        urn={act.norma.urn || ''}
-        title={structureTitle(heading)}
-        loadedArticles={loadedArticleIds}
-        activeArticle={current ? getUniqueArticleId(current) : undefined}
-        onArticleSelect={(articleNumber, targetAnnex) => openArticle(articleNumber, targetAnnex)}
-        annexes={treeMetadata?.annexes}
-        currentAnnex={currentAnnex}
-        rubriche={rubriche}
-        abrogati={abrogati}
-        rubricheParts={rubricheParts}
-      />
-
-
 
       {/* Mounted only with an article in hand: StudyMode dereferences it, and an act opened from the
           index has none until the first pick. */}

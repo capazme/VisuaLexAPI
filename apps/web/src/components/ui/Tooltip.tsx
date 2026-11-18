@@ -95,8 +95,9 @@ export function Tooltip({
       <AnimatePresence>
         {isVisible && (
           <motion.div
-            initial={instant ? false : { opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
+            // A short fade and nothing else: it is small, so no shape grows (LC85).
+            initial={instant ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0 } }}
             transition={{ duration: dur.press, ease: ease.out }}
             className={cn(

@@ -500,6 +500,18 @@ describe('the trash', () => {
     expect(refused.body.quota).toBe('trash');
   });
 
+  it('a recital entry round-trips unchanged, listed by its citation (spec 2026-11-17 §6.3)', async () => {
+    const recital = { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26', _dossierMeta: { important: true } };
+    const recitalId = await addItem(dossierId, { itemType: 'norm', title: 'x', content: recital });
+    const { bearer } = await connected(alice);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [recitalId] })).status).toBe(200);
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    expect(entry.items).toEqual([{ itemType: 'norm', citation: 'considerando 26, reg. (UE) 2016/679', actCitation: 'reg. (UE) 2016/679' }]);
+    expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+    const after = await prisma.dossierItem.findUniqueOrThrow({ where: { id: recitalId } });
+    expect(after).toMatchObject({ itemType: 'norm', title: 'considerando 26, reg. (UE) 2016/679', content: recital });
+  });
+
   it('a sentenza entry round-trips unchanged, listed by its type and its citation', async () => {
     const sentenza = { corte: 'corte_costituzionale', numero: 1, anno: 2014, tipo: 'sentenza',
       data_deposito: '2014-01-13', etichetta: 'Corte cost., sent. 13 gennaio 2014, n. 1', _dossierMeta: { important: true } };

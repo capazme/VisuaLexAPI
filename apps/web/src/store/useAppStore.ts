@@ -130,8 +130,6 @@ export interface StructureWindowState {
      * it would open a window owned by nothing.
      */
     blockId: string | null;
-    /** Where the user parked it. Persisted: that is the point of a movable window. */
-    position: { x: number; y: number };
 }
 
 /** The reading tools (A4): the highlighter, and the note tool (§6). */
@@ -226,10 +224,9 @@ interface AppState {
     /** A citation to put in the palette's box as it opens («Cerca nella barra di ricerca» on a decision
      *  that was not found); taken once by the palette. Session-only, absent from `partialize`. */
     commandPaletteQuery: string | null;
-    quickNormsManagerOpen: boolean;
-    aliasManagerOpen: boolean;
-    /** Impostazioni (`SettingsModal`, mounted by `Layout`), and the section it opens at: session-only, absent from `partialize`. */
-    settingsDialog: { open: boolean; section: SettingsSection | null };
+    /** Impostazioni asked for, at a part or its top (LC84: a page, `/impostazioni`): `Layout` goes there and clears it,
+     *  so a reader's gear opens it from any component, router or not. Session-only, absent from `partialize`. */
+    settingsRequest: { section: SettingsSection | null } | null;
     /**
      * The reading tool on (A4): the highlighter, which applies its ink to every selection as it is released, or the note
      * tool, which opens the editor of a note (or a gloss) on it, until its button is pressed again or Esc. One for the
@@ -502,13 +499,9 @@ interface AppState {
     openCommandPaletteWith: (query: string) => void;
     takeCommandPaletteQuery: () => string | null;
     closeCommandPalette: () => void;
-    openQuickNormsManager: () => void;
-    closeQuickNormsManager: () => void;
-    openAliasManager: () => void;
-    closeAliasManager: () => void;
-    /** Opens Impostazioni, at `section` when given (the reader's gear opens it at «Significato dei colori»). */
+    /** Asks for Impostazioni, at `section` when given (the reader's gear asks for «Significato dei colori»). */
     openSettings: (section?: SettingsSection) => void;
-    closeSettings: () => void;
+    clearSettingsRequest: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
@@ -528,7 +521,6 @@ interface AppState {
     // Structure Window Actions
     openStructureWindow: (blockId: string) => void;
     closeStructureWindow: () => void;
-    setStructureWindowPosition: (position: { x: number; y: number }) => void;
 
     // Reading Back-Stack Actions
     /**
@@ -871,9 +863,7 @@ const appStore = createStore<AppState>()(
             sidebarVisible: true,
             commandPaletteOpen: false,
             commandPaletteQuery: null,
-            quickNormsManagerOpen: false,
-            aliasManagerOpen: false,
-            settingsDialog: { open: false, section: null },
+            settingsRequest: null,
             readingTool: null,
             noteToolKind: 'note',
             highlighterEraser: false,
@@ -1407,10 +1397,7 @@ const appStore = createStore<AppState>()(
             decisionFocusRequest: null,
             windowFocusRequest: null,
             phoneReader: null,
-            structureWindow: {
-                blockId: null,
-                position: { x: Math.max(16, window.innerWidth - 400), y: 96 },
-            },
+            structureWindow: { blockId: null },
             readingBackStack: [],
 
             updateSettings: (newSettings) => set((state) => {
@@ -1564,32 +1551,16 @@ const appStore = createStore<AppState>()(
                 return query;
             },
 
+            openSettings: (section) => set((state) => {
+                state.settingsRequest = { section: section ?? null };
+            }),
+
+            clearSettingsRequest: () => set((state) => {
+                state.settingsRequest = null;
+            }),
+
             closeCommandPalette: () => set((state) => {
                 state.commandPaletteOpen = false;
-            }),
-
-            openQuickNormsManager: () => set((state) => {
-                state.quickNormsManagerOpen = true;
-            }),
-
-            closeQuickNormsManager: () => set((state) => {
-                state.quickNormsManagerOpen = false;
-            }),
-
-            openAliasManager: () => set((state) => {
-                state.aliasManagerOpen = true;
-            }),
-
-            closeAliasManager: () => set((state) => {
-                state.aliasManagerOpen = false;
-            }),
-
-            openSettings: (section) => set((state) => {
-                state.settingsDialog = { open: true, section: section ?? null };
-            }),
-
-            closeSettings: () => set((state) => {
-                state.settingsDialog = { open: false, section: null };
             }),
 
             toggleSearchPanel: () => set((state) => {
@@ -1671,10 +1642,6 @@ const appStore = createStore<AppState>()(
 
             closeStructureWindow: () => set((state) => {
                 state.structureWindow.blockId = null;
-            }),
-
-            setStructureWindowPosition: (position) => set((state) => {
-                state.structureWindow.position = position;
             }),
 
             // ── Reading back-stack ───────────────────────────────────────
@@ -3020,10 +2987,6 @@ const appStore = createStore<AppState>()(
             partialize: (state) => ({
                 settings: state.settings,
                 searchPanelState: state.searchPanelState,
-                // Narrowed on purpose: the parked position is worth keeping,
-                // the owning block id is not — it would rehydrate a window
-                // belonging to a block that no longer exists.
-                structureWindow: { position: state.structureWindow.position, blockId: null },
                 // LC60: the Ricerca's table is the session's, and so is a table bound to a dossier (LC51). Only the
                 // Corpus's practices of before stay saved, until the riquadro is answered; the open rows, the pending
                 // reveal and the notice are the session's.

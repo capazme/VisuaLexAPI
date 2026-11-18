@@ -83,6 +83,8 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
   const notice = asked && asked.cardId === card.id ? asked.text : null;
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // The buttons the confirmations grow from and give the focus back to (LC85).
+  const [confirmFrom, setConfirmFrom] = useState<HTMLElement | null>(null);
   const [pending, setPending] = useState(false);
   // A second click before the first answer (the confirm button stays through the dialog's exit
   // animation) must not send a second request: state would still read idle in the same tick.
@@ -155,12 +157,12 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
             </button>
           )}
           {canWithdraw && (
-            <button type="button" onClick={() => setConfirmWithdraw(true)} disabled={pending} className={cn(SECONDARY_BUTTON, ACTION, 'disabled:opacity-60')}>
+            <button type="button" onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirmWithdraw(true); }} disabled={pending} className={cn(SECONDARY_BUTTON, ACTION, 'disabled:opacity-60')}>
               Ritira
             </button>
           )}
           {canDelete && (
-            <button type="button" onClick={() => setConfirmDelete(true)} className={DANGER}>
+            <button type="button" onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirmDelete(true); }} className={DANGER}>
               Elimina
             </button>
           )}
@@ -248,6 +250,7 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
       {notice && <AcceptTextDialog text={notice} busy={pending} onAccept={(textId) => void propose(textId)} onCancel={() => setAsked(null)} />}
       <ConfirmDialog
         open={confirmWithdraw}
+        origin={confirmFrom}
         variant="danger"
         title="Ritirare la proposta?"
         message="La scheda torna una tua bozza; i voti ricevuti si perdono."
@@ -259,6 +262,7 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
       {/* Asked first, the focus on «Annulla» (#457): a card was lost to a click meant to look where the focus went. */}
       <ConfirmDialog
         open={confirmDelete}
+        origin={confirmFrom}
         variant="danger"
         title="Eliminare la scheda?"
         message="La scheda va nel cestino: per 30 giorni la puoi ripristinare da lì."

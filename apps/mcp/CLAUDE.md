@@ -50,6 +50,10 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   (the 429 says when the daily quota renews). A request that got no answer, or a gateway's 502/504, is a `NoAnswer`
   (a `ToolError`): the API may have done it. The client's token never reaches
   the API; the exchanged token never reaches the client.
+- **Recitals** (spec `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §6.4): a recital in a dossier is a
+  `norm` entry, which every tool names by the server's `citation` («considerando 26, reg. (UE) 2016/679»), as an
+  article; reading or glossing its text passes on the server's refusal, and adding one by reference is refused by
+  the server. No code here reads the recital's field.
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
   `omnilex_leggi_dossier`, `omnilex_crea_dossier` (D8 S1, spec
   `docs/superpowers/specs/2026-10-29-d8-dossier-one-call-design.md`: a dossier and, in the same call, optional

@@ -8,11 +8,13 @@ import { Modal } from '../../Modal';
 /** A button that opens the confirmation, as the four places do. */
 function Host({ onConfirm = vi.fn(), onCancelled = vi.fn() }: { onConfirm?: () => void | Promise<string | null | void>; onCancelled?: () => void }) {
   const [open, setOpen] = useState(false);
+  const [from, setFrom] = useState<HTMLElement | null>(null);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)}>Elimina i miei dati</button>
+      <button type="button" onClick={(event) => { setFrom(event.currentTarget); setOpen(true); }}>Elimina i miei dati</button>
       <WireConfirm
         open={open}
+        origin={from}
         variant="danger"
         title="Eliminare i tuoi dati?"
         message="Non si torna indietro."
@@ -86,12 +88,13 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
   it('gives the focus back to a button its action disabled once it is enabled again', async () => {
     function Busy() {
       const [open, setOpen] = useState(false);
+      const [from, setFrom] = useState<HTMLElement | null>(null);
       const [busy, setBusy] = useState(false);
       return (
         <>
-          <button type="button" disabled={busy} onClick={() => setOpen(true)}>Elimina</button>
+          <button type="button" disabled={busy} onClick={(event) => { setFrom(event.currentTarget); setOpen(true); }}>Elimina</button>
           <button type="button" onClick={() => setBusy(false)}>Fine</button>
-          <WireConfirm open={open} title="Eliminare?" message="…" onConfirm={() => { setOpen(false); setBusy(true); }} onCancel={() => setOpen(false)} />
+          <WireConfirm open={open} origin={from} title="Eliminare?" message="…" onConfirm={() => { setOpen(false); setBusy(true); }} onCancel={() => setOpen(false)} />
         </>
       );
     }
@@ -120,10 +123,11 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     const done = vi.fn();
     function Removed() {
       const [open, setOpen] = useState(false);
+      const [from, setFrom] = useState<HTMLElement | null>(null);
       return (
         <>
-          <button type="button" onClick={() => setOpen(true)}>Revoca</button>
-          <WireConfirm open={open} title="Revocare?" message="…" onConfirm={async () => { setOpen(false); return 'Revocata'; }} onCancel={() => setOpen(false)} onOutcomeDone={done} />
+          <button type="button" onClick={(event) => { setFrom(event.currentTarget); setOpen(true); }}>Revoca</button>
+          <WireConfirm open={open} origin={from} title="Revocare?" message="…" onConfirm={async () => { setOpen(false); return 'Revocata'; }} onCancel={() => setOpen(false)} onOutcomeDone={done} />
         </>
       );
     }
@@ -152,10 +156,11 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     const done = vi.fn();
     function Twice() {
       const [open, setOpen] = useState(false);
+      const [from, setFrom] = useState<HTMLElement | null>(null);
       return (
         <>
-          <button type="button" onClick={() => setOpen(true)}>Revoca</button>
-          <WireConfirm open={open} title="Revocare?" message="…" onConfirm={async () => { setOpen(false); return 'Revocata'; }} onCancel={() => setOpen(false)} onOutcomeDone={done} />
+          <button type="button" onClick={(event) => { setFrom(event.currentTarget); setOpen(true); }}>Revoca</button>
+          <WireConfirm open={open} origin={from} title="Revocare?" message="…" onConfirm={async () => { setOpen(false); return 'Revocata'; }} onCancel={() => setOpen(false)} onOutcomeDone={done} />
         </>
       );
     }
@@ -223,7 +228,7 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
 
   it('makes the cancel the evident button when going back is wanted most (U1c), the focus still on it', async () => {
     render(
-      <WireConfirm open emphasis="cancel" title="Interrompere?" message="…" confirmLabel="Interrompi" cancelLabel="Continua" onConfirm={vi.fn()} onCancel={vi.fn()} />,
+      <WireConfirm open origin={null} emphasis="cancel" title="Interrompere?" message="…" confirmLabel="Interrompi" cancelLabel="Continua" onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     const dialog = screen.getByRole('alertdialog');
     const [first, second] = within(dialog).getAllByRole('button');
@@ -241,7 +246,7 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     render(
       <>
         <input aria-label="Campo" autoFocus />
-        <WireConfirm open={false} title="Interrompere?" message="…" focusBack={focusBack} onConfirm={vi.fn()} onCancel={vi.fn()} />
+        <WireConfirm open={false} origin={null} title="Interrompere?" message="…" focusBack={focusBack} onConfirm={vi.fn()} onCancel={vi.fn()} />
       </>,
     );
     expect(focusBack).not.toHaveBeenCalled();

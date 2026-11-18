@@ -16,6 +16,8 @@ vi.mock('../../../hooks/useTour', () => ({
 }));
 vi.mock('../../../services/legalFetch', () => ({ legalFetch: h.legalFetch }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: { addItem: vi.fn(), writesInFlight: () => 0 } }));
+// The act's index (LC86: a closed row's rubric) asks no source here: the source is mocked for the texts.
+vi.mock('./useActDetails', async (importOriginal) => ({ ...(await importOriginal<typeof import('./useActDetails')>()), useActDetails: () => ({ title: null, rubricaOf: () => null }) }));
 vi.mock('../../../utils/actStructureCache', () => ({
   fetchActTree: () => Promise.resolve([]),
   fetchActRubriche: () => Promise.resolve({}),
@@ -94,7 +96,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, searchTrigger: null,
     practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null,
-    structureWindow: { blockId: null, position: { x: 0, y: 0 } }, dossiers: [TWO],
+    structureWindow: { blockId: null }, dossiers: [TWO],
   });
   corpus = s().createPractice('Del Corpus');
   s().addArticlesToPractice(corpus, L241, [article(L241, '2')]);
@@ -115,9 +117,9 @@ describe('the «Lettura» builds the dossier\'s bound table and shows it', () =>
     expect(s().practices.filter(isBoundPractice)).toHaveLength(1);
   });
 
-  it('says, at its head, what happens to what is opened while reading', () => {
+  it('draws no sentence over the blocks (LC86): a row only on the table says so itself', () => {
     render(<DossierReadingView dossier={TWO} showToast={toast} />);
-    expect(screen.getByText('Quello che apri leggendo resta qui finché non lo aggiungi alla pratica.')).toBeInTheDocument();
+    expect(screen.queryByText(/Quello che apri leggendo/)).toBeNull();
   });
 
   it('re-syncs the table when the dossier is refreshed (an item added, by Claude too)', () => {
@@ -146,9 +148,9 @@ describe('what is the Corpus practice\'s is not drawn in the dossier', () => {
     expect(screen.getByTestId('practice-column').className).not.toContain('practice-bar-height');
   });
 
-  it('one article alone (the simple reading): its act\'s «⋯» carries no practice actions either', () => {
+  it('one article alone: its act\'s «⋯» carries no practice actions either', () => {
     render(<DossierReadingView dossier={dossierOf([norma('5')])} showToast={toast} />);
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     for (const label of PRACTICE_ONLY) expect(screen.queryByText(label)).toBeNull();
   });
 

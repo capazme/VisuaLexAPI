@@ -91,6 +91,11 @@ const dossier: Dossier = {
   ],
 };
 
+// LC86: the old «Fonti» list (its acts' blocks, its filter, its selection, «Espandi tutto», its two columns) is in the
+// code but never drawn; the one «Fonti» is the reading (`DossierReadingView`, its own tests). PR 2 brings the filter and
+// the selection onto it and removes the old list with these tests.
+const oldFonti = it.skip;
+
 let toast: UndoToast | null = null;
 let unregister: () => void = () => {};
 
@@ -124,7 +129,7 @@ afterEach(() => {
 });
 
 describe('DossierDetailView — the page by act', () => {
-  it('names each act once, in the order the acts entered, with its articles by number', () => {
+  oldFonti('names each act once, in the order the acts entered, with its articles by number', () => {
     renderView();
     expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent ?? '');
@@ -139,12 +144,11 @@ describe('DossierDetailView — the page by act', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(dossier.title);
   });
 
-  it('puts the notes above the acts', () => {
+  it('puts the dossier\'s notes in a group under the reading (LC86)', () => {
     renderView();
     const notes = screen.getByRole('region', { name: /Note \(1\)/ });
     expect(within(notes).getByText('Verificare la decorrenza')).toBeInTheDocument();
-    const firstAct = screen.getByRole('region', { name: L247 });
-    expect(notes.compareDocumentPosition(firstAct) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('lettura').compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('shows its tags with a capital letter, as typed past the first (D1)', () => {
@@ -166,10 +170,10 @@ describe('DossierDetailView — the page by act', () => {
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-haspopup', 'menu');
     }
+    // LC86: the selection comes back on the one «Fonti» with PR 2.
     expect(screen.queryByText('Seleziona tutti')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
-    expect(screen.getByText('Seleziona tutti')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Seleziona elementi' })).toBeNull();
   });
 
   it('lists what each menu does', () => {
@@ -182,10 +186,10 @@ describe('DossierDetailView — the page by act', () => {
     };
     expect(items('Aggiungi')).toEqual(['Articoli da una norma', 'Nota', 'Cerca un articolo']);
     expect(items('Esporta')).toEqual(['PDF', 'Copia link di condivisione', 'JSON', 'Salva snapshot']);
-    expect(items('Altre azioni')).toEqual(['Modifica', 'Aggiungi ai preferiti', 'Seleziona elementi', 'Elimina la pratica']);
+    expect(items('Altre azioni')).toEqual(['Modifica', 'Aggiungi ai preferiti', 'Elimina la pratica']);
   });
 
-  it("removes a whole act as one trash entry behind one undo toast, and «Annulla» restores it (question 181)", async () => {
+  oldFonti("removes a whole act as one trash entry behind one undo toast, and «Annulla» restores it (question 181)", async () => {
     const { rerender } = renderView();
     fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
     fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dalla pratica" }));
@@ -224,7 +228,7 @@ describe('DossierDetailView — the page by act', () => {
     expect(reload).toHaveBeenCalledTimes(2);
   });
 
-  it('a multiple selection is one call and one trash entry, with no confirmation: «Annulla» puts it back (K1a)', async () => {
+  oldFonti('a multiple selection is one call and one trash entry, with no confirmation: «Annulla» puts it back (K1a)', async () => {
     renderView();
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
@@ -237,7 +241,7 @@ describe('DossierDetailView — the page by act', () => {
     expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['n1']);
   });
 
-  it('refused by the server: everything is back, with an error and no toast', async () => {
+  oldFonti('refused by the server: everything is back, with an error and no toast', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(dossierService.trashItems).mockRejectedValueOnce(new Error('down'));
     renderView();
@@ -249,7 +253,7 @@ describe('DossierDetailView — the page by act', () => {
     error.mockRestore();
   });
 
-  it('filters by the act, and turns dragging off while filtering', () => {
+  oldFonti('filters by the act, and turns dragging off while filtering', () => {
     renderView();
     expect(screen.getByRole('button', { name: `Sposta ${L247}` })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '21 aprile' } });
@@ -258,7 +262,7 @@ describe('DossierDetailView — the page by act', () => {
     expect(screen.queryByRole('button', { name: `Sposta ${L49}` })).toBeNull();
   });
 
-  it('reads the title of the whole act while the search shows part of it', () => {
+  oldFonti('reads the title of the whole act while the search shows part of it', () => {
     renderView();
     fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: 'art. 3' } });
     const block = screen.getByRole('region', { name: L247 });
@@ -275,7 +279,7 @@ describe('DossierDetailView — decisions', () => {
   const withDecision: Dossier = { ...dossier, items: [...dossier.items,
     { id: 's1', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, tipo: 'sentenza', data_deposito: '2014-01-13', etichetta: 'Corte cost. 1/2014' } }] };
 
-  it('lists a decision under «Giurisprudenza», after the acts, never among the notes', () => {
+  oldFonti('lists a decision under «Giurisprudenza», after the acts, never among the notes', () => {
     renderView(withDecision);
     const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
     // A row opened in place, as an article's (D7a), no more a link to a preview.
@@ -287,7 +291,7 @@ describe('DossierDetailView — decisions', () => {
     expect(screen.getByText(/2 fonti · 3 articoli · 1 nota/)).toBeInTheDocument();
   });
 
-  it('sets the acts and the decisions in two columns from lg, «Norme» | «Giurisprudenza», the norms first below it (D7a)', () => {
+  oldFonti('sets the acts and the decisions in two columns from lg, «Norme» | «Giurisprudenza», the norms first below it (D7a)', () => {
     renderView(withDecision);
     const norms = screen.getByRole('region', { name: 'Norme' });
     const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
@@ -304,21 +308,21 @@ describe('DossierDetailView — decisions', () => {
     expect(grid).toContainElement(decisions);
   });
 
-  it('keeps one column, with no «Norme» title, when the dossier holds no decision', () => {
+  oldFonti('keeps one column, with no «Norme» title, when the dossier holds no decision', () => {
     renderView();
     expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
     expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
     expect(screen.getByRole('region', { name: L247 })).toBeInTheDocument();
   });
 
-  it('gives the decisions alone the whole width', () => {
+  oldFonti('gives the decisions alone the whole width', () => {
     renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
     const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
     expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
     expect(decisions.parentElement?.className ?? '').not.toMatch(/lg:border-l/);
   });
 
-  it('selects the decisions with the articles, «Seleziona tutti» taking both', () => {
+  oldFonti('selects the decisions with the articles, «Seleziona tutti» taking both', () => {
     renderView(withDecision);
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
@@ -327,7 +331,7 @@ describe('DossierDetailView — decisions', () => {
     expect(within(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).getByRole('button', { name: 'Deseleziona elemento' })).toBeInTheDocument();
   });
 
-  it('keeps the acts mounted while a search leaves one kind on screen', () => {
+  oldFonti('keeps the acts mounted while a search leaves one kind on screen', () => {
     renderView(withDecision);
     const act247 = screen.getByRole('region', { name: L247 });
     fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '247' } });
@@ -336,7 +340,7 @@ describe('DossierDetailView — decisions', () => {
     expect(screen.getByRole('region', { name: L247 })).toBe(act247);
   });
 
-  it('«Espandi tutto» opens the articles and leaves an open decision open', () => {
+  oldFonti('«Espandi tutto» opens the articles and leaves an open decision open', () => {
     renderView(withDecision);
     fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
     fireEvent.click(screen.getByRole('button', { name: 'Espandi tutto' }));
@@ -345,7 +349,7 @@ describe('DossierDetailView — decisions', () => {
     expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('in a dossier of decisions alone, opens nothing with «Espandi tutto» but closes an open decision with «Comprimi tutto»', () => {
+  oldFonti('in a dossier of decisions alone, opens nothing with «Espandi tutto» but closes an open decision with «Comprimi tutto»', () => {
     renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
     expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
@@ -354,20 +358,20 @@ describe('DossierDetailView — decisions', () => {
     expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
   });
 
-  it('draws no empty block of acts over the decisions alone', () => {
+  oldFonti('draws no empty block of acts over the decisions alone', () => {
     renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
     const column = screen.getByRole('region', { name: 'Giurisprudenza (1)' }).parentElement!;
     expect(column.previousElementSibling).toHaveClass('hidden');
   });
 
-  it('finds a decision by its citation', () => {
+  oldFonti('finds a decision by its citation', () => {
     renderView(withDecision);
     fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' }), { target: { value: '13 gennaio 2014' } });
     expect(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
   });
 
-  it('removes a decision behind the undo toast; «Annulla» restores the trash entry, the decision with its own id', async () => {
+  oldFonti('removes a decision behind the undo toast; «Annulla» restores the trash entry, the decision with its own id', async () => {
     renderView(withDecision);
     fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CITATION} dalla pratica` }));
     await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
@@ -385,7 +389,7 @@ describe('DossierDetailView — decisions', () => {
 });
 
 describe('DossierDetailView — notes about an article', () => {
-  it('shows a note about an article with it, not among the free notes', () => {
+  oldFonti('shows a note about an article with it, not among the free notes', () => {
     const withNote = structuredClone(dossier);
     withNote.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Sul primo articolo.', aboutItemId: 'a1', createdBy: { clientName: 'Claude Code' } });
     appStore.setState({ dossiers: [withNote], pendingDossierItemIds: {}, pendingDossierOrders: {} });
@@ -413,7 +417,7 @@ describe('DossierDetailView — search keeps an article and its notes together',
     d.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Termine di decadenza.', aboutItemId: 'b1' });
     return d;
   };
-  it('a note found keeps its article on screen, with the note under it', () => {
+  oldFonti('a note found keeps its article on screen, with the note under it', () => {
     const d = withNote();
     appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
     render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
@@ -421,7 +425,7 @@ describe('DossierDetailView — search keeps an article and its notes together',
     expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /Note \(/ })).toBeNull();
   });
-  it('the closed row names its notes for a screen reader', () => {
+  oldFonti('the closed row names its notes for a screen reader', () => {
     const d = withNote();
     appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
     render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
@@ -638,7 +642,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' })).toHaveClass('whitespace-nowrap', 'min-h-[44px]');
   });
 
-  it('draws an article as a row of two levels — the article, a grey line, the signs — with 44 px controls', () => {
+  oldFonti('draws an article as a row of two levels — the article, a grey line, the signs — with 44 px controls', () => {
     renderView({
       ...dossier,
       items: [{ id: 'a3', type: 'norma', addedAt: '2026-10-12T08:00:00Z', actCitation: L247, data: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' } }],
@@ -670,7 +674,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(within(notes).getByRole('button', { name: 'Rimuovi nota' })).toHaveClass('h-11', 'w-11');
   });
 
-  it('writes the search at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
+  oldFonti('writes the search at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
     renderView(dossier);
     const search = screen.getByRole('textbox', { name: 'Cerca negli elementi della pratica' });
     expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
@@ -678,47 +682,64 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
   });
 });
 
-describe('DossierDetailView — the «Lettura» tab (LC54 c3)', () => {
+describe('DossierDetailView — one «Fonti» for the sources and the reading (LC86)', () => {
   afterEach(() => { window.history.replaceState(null, '', '/'); });
 
-  it('offers four views in order: Fonti, Lettura, Atti, Compiti; the narrow padding keeps them whole on a phone', () => {
+  it('offers three views in order: Fonti, Atti, Compiti; the narrow padding keeps them whole on a phone', () => {
     renderView();
     const tabs = within(screen.getByRole('tablist', { name: 'Viste della pratica' })).getAllByRole('tab');
-    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Lettura', 'Atti', 'Compiti']);
+    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Atti', 'Compiti']);
     for (const tab of tabs) expect(tab).toHaveClass('px-2.5', 'sm:px-4');
   });
 
-  it('mounts the reading only once it is chosen, with the page\'s dossier', () => {
+  it('opens on «Fonti», which is the reading of the page\'s dossier, kept mounted under the other views', () => {
     renderView();
-    expect(screen.queryByTestId('lettura')).toBeNull();
-    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
-    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^Fonti/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('lettura')).toHaveTextContent('d1');
+    fireEvent.click(screen.getByRole('tab', { name: 'Compiti' }));
+    expect(screen.getByTestId('lettura')).not.toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(screen.getByTestId('lettura')).toBeVisible();
   });
 
-  it('opens on the reading with `?vista=lettura`', () => {
+  it('takes the old `?vista=lettura` to «Fonti», with the reading; `?vista=atti` still opens on the acts', () => {
     window.history.replaceState(null, '', '/pratiche?dossier=d1&vista=lettura');
+    const { unmount } = render(<MemoryRouter><DossierDetailView dossier={dossier} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('tab', { name: /^Fonti/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('lettura')).toBeVisible();
+    unmount();
+    window.history.replaceState(null, '', '/pratiche?dossier=d1&vista=atti');
     renderView();
-    expect(screen.getByRole('tab', { name: 'Lettura' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByTestId('lettura')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Atti/ })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('keeps the tabs at the top in the other views, and lets them scroll away in «Lettura», where the act\'s head sticks (#529)', () => {
+  it('lets the tabs scroll away in «Fonti», where the act\'s head sticks (#529), and keeps them at the top in the others', () => {
     renderView();
     const bar = () => screen.getByRole('tablist', { name: 'Viste della pratica' }).closest('div.-mx-2');
-    expect(bar()).toHaveClass('sticky');
-    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
     expect(bar()).not.toHaveClass('sticky');
-    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Compiti' }));
     expect(bar()).toHaveClass('sticky');
+    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
+    expect(bar()).not.toHaveClass('sticky');
   });
-  it('opens nothing in the Ricerca, from «Lettura» or from «Fonti» (LC60)', () => {
+
+  it('draws nothing over the content (L-73): no dialog on the page', () => {
     renderView();
-    fireEvent.click(screen.getByRole('tab', { name: 'Lettura' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('an empty dossier says so, with its two ways to fill it', () => {
+    renderView({ ...dossier, items: [] });
+    expect(screen.getByText('Pratica vuota')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerca articoli' })).toBeInTheDocument();
+    expect(screen.queryByTestId('lettura')).toBeNull();
+  });
+
+  it('opens nothing in the Ricerca (LC60)', () => {
+    renderView();
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
     expect(screen.queryByRole('menuitem', { name: 'Apri anche in Ricerca' })).toBeNull();
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
-    fireEvent.click(screen.getByRole('tab', { name: /^Fonti/ }));
     expect(screen.queryByRole('button', { name: 'Apri tutto in Ricerca' })).toBeNull();
   });
 });

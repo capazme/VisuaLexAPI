@@ -222,8 +222,10 @@ export function BulletinBoardPage() {
     showToast('Dossier pubblicato aggiornato', 'success');
   };
 
-  // Delete handler
-  const handleDeleteClick = (env: SharedEnvironment) => {
+  // Delete handler. The card menu's button: the confirmation grows from it and gives it the focus back (LC85).
+  const [deleteFrom, setDeleteFrom] = useState<HTMLElement | null>(null);
+  const handleDeleteClick = (env: SharedEnvironment, origin: HTMLElement | null) => {
+    setDeleteFrom(origin);
     setDeletingEnv(env);
     setShownEnv(env);
   };
@@ -617,6 +619,7 @@ export function BulletinBoardPage() {
           menu button (K1b). */}
       <WireConfirm
         open={deletingEnv !== null}
+        origin={deleteFrom}
         variant="danger"
         title={shownEnv ? `Eliminare «${shownEnv.title}» dai dossier pubblici?` : 'Eliminare dai dossier pubblici?'}
         message="La copia pubblicata, le sue versioni, i «Mi piace» e le segnalazioni vengono eliminati. Il tuo dossier resta com'è; chi l'ha già aggiunto ai suoi dossier ne conserva la copia."
