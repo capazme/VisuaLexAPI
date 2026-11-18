@@ -209,6 +209,26 @@ describe('ArticleTabContent — the glosses at the margin (LC74)', () => {
     raf.mockRestore();
   });
 
+  it('a gloss chosen lights its passage in the text; the passage chosen from the text lights its gloss (LC90)', async () => {
+    const { container } = show();
+    fireEvent.click(glossesButton());
+    const margin = await screen.findByRole('region', { name: 'Glosse' });
+    const card = () => margin.querySelector('#article-thread-thread-passage-1')!;
+    // From the margin: its words light up, the gloss is marked.
+    fireEvent.click(await within(margin).findByText('Chiarimento sul pagamento'));
+    expect(container.querySelector('.vlx-thread-focus')).toHaveTextContent(QUOTE);
+    expect(card()).toHaveAttribute('data-lit');
+    // Closed again: neither.
+    fireEvent.click(within(margin).getByText('Chiarimento sul pagamento'));
+    expect(container.querySelector('.vlx-thread-focus')).toBeNull();
+    expect(card()).not.toHaveAttribute('data-lit');
+    // From the text: the passage's sign, then its gloss.
+    fireEvent.click(await screen.findByRole('button', { name: '1 glossa in questo passo' }));
+    fireEvent.click(await screen.findByRole('button', { name: /apri glossa/i }));
+    expect(card()).toHaveAttribute('data-lit');
+    expect(container.querySelector('.vlx-thread-focus')).toHaveTextContent(QUOTE);
+  });
+
   it('closes from its «Chiudi», the focus back on the button', async () => {
     show();
     fireEvent.click(glossesButton());
