@@ -19,9 +19,8 @@ const router = Router();
  *   refusal): 10 in an hour, keyed by the signed-in user's id, so a stolen session cannot guess through many
  *   addresses either. It is not the sign-in's count, so the owner can always sign in. The price: a thief holding
  *   the session can, with 10 wrong tries, stop the owner changing the password or deleting the account for up to
- *   an hour, again each hour. Ending every web session (POST /auth/logout-all) needs no password, so the owner
- *   can throw out a thief holding one; it does not end the access and refresh tokens the web still signs in
- *   with until it moves to the session cookie (spec #517, step 2).
+ *   an hour. Ending every session (POST /auth/logout-all) needs no password: it ends the sessions the server
+ *   holds (cookie sessions, #517).
  * - Failed sign-ins for one account, from any address: 10 in an hour. The account is the email as typed,
  *   trimmed and lower-cased, whether or not an account has it, so the answer says nothing about which emails
  *   exist; the key is its SHA-256, so no email is written in Redis. Someone who knows a person's email can
