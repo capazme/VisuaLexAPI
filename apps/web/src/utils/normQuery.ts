@@ -6,6 +6,7 @@
  */
 import type { CustomAlias } from '../types';
 import { isSearchReady, parseLegalCitation, type ParsedCitation } from './citationParser';
+import { citesRegionalLaw, REGIONAL_LAW_REFUSAL } from './regionalLaw';
 
 export interface NormQueryReading {
   /** The client parser's reading, with the user's aliases; null when it reads nothing. */
@@ -14,10 +15,14 @@ export interface NormQueryReading {
   ready: boolean;
   /** The words to ask the server about (trimmed), or null: the reading is ready, or the words are too short. */
   askServer: string | null;
+  /** Why the words are read as nothing, in the API's sentence: a regional law (G-577). */
+  refusal?: string;
 }
 
 /** The client half of the search's reading: pure, no request. */
 export function readNormQuery(query: string, customAliases: CustomAlias[] = []): NormQueryReading {
+  // Refused here, with no request: the API answers the same (`refusal: "regional_law"`).
+  if (citesRegionalLaw(query)) return { citation: null, ready: false, askServer: null, refusal: REGIONAL_LAW_REFUSAL };
   const citation = query && query.length >= 2 ? parseLegalCitation(query, customAliases) : null;
   const ready = isSearchReady(citation);
   const trimmed = (query ?? '').trim();

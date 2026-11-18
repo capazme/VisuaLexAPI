@@ -13,6 +13,7 @@ import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, hasEuMarker,
 import { expandTwoDigitYear } from './dateUtils';
 import { FULL_ACT_NAMES, toApiArticleNumber } from './citationParser';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
+import { regionalLawSpans } from './regionalLaw';
 import { labelFromParams } from './sources';
 
 // Minimal interface for norma context (subset of NormaVisitata)
@@ -241,6 +242,8 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
     }
     return false;
   };
+  // A regional law is never a State law's citation (G-577): its words are taken before any pattern reads them.
+  for (const [start, end] of regionalLawSpans(cleanText)) markUsed(start, end);
 
   // Helper per aggiungere un match
   const addMatch = (

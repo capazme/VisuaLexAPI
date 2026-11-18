@@ -582,3 +582,19 @@ describe('candidates in linear time', () => {
     expect(performance.now() - start).toBeLessThan(3000);
   });
 });
+
+describe('a regional law is never read as a State law (G-577)', () => {
+  // The text of `test_regional_law.py`: the API's citation linker keeps «art. 5 l. 241/1990» and «art. 9» only.
+  const TEXT = "Ai sensi dell'art. 3 della l.r. Toscana 65/2014 e dell'art. 2 della legge regionale 12 marzo 2015, "
+    + "n. 3. Vedi anche l'art. 4 della legge 10 novembre 2014, n. 65 della Regione Toscana. E l'art. 5 "
+    + "l. 241/1990, l'art. 3 L. 65/2014 (Toscana), l'art. 1 legge Toscana 65/2014. Poi l'art. 9.";
+
+  it.each([
+    ['the server answered', (q: string[]) => ({ answers: new Map(q.map((x) => [x, { recognized: false, parsed: null }])), unanswered: [] })],
+    ['the server is silent', (q: string[]) => ({ answers: new Map(), unanswered: q })],
+  ])('the Region after the candidate keeps it to complete when %s', async (_, ask) => {
+    const run = await analyseDocument(TEXT, { serverNames: recorded.act_names, ask: async (q) => ask(q) });
+    const resolved = run.analysis.citations.filter((c) => c.state === 'resolved').map((c) => [slice(TEXT, c), c.act?.act_number]);
+    expect(resolved).toEqual([['art. 5 l. 241/1990', '241']]);
+  });
+});
