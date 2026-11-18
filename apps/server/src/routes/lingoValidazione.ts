@@ -12,6 +12,7 @@ import { countVoteDay } from '../lingo/studyDays';
 import { votableWhere } from '../lingo/validationQueue';
 import { stateAfterVotes } from '../lingo/validationRule';
 import { leggiSoglie } from '../lingo/validationSettings';
+import { eraseOwnVoteReason } from '../lingo/removeOwnContributions';
 
 /**
  * Validating the community's cards (spec §5, decisions 12–15). Only a
@@ -56,6 +57,14 @@ router.get('/coda', async (req, res) => {
     take: limit,
   });
   res.json({ cards: cards.map(serialize) });
+});
+
+// G-557: the validator erases the reason written with their vote; the judgement stays, since it counted for the card's
+// state. Any time, whatever the card's state. The user's own session only: not in the delegated table.
+router.delete('/:cardId/motivazione', async (req, res) => {
+  const erased = await prisma.$transaction((tx) => eraseOwnVoteReason(tx, req.user!.id, req.params.cardId));
+  if (!erased) throw new AppError(404, 'Nessun tuo voto su questa scheda.');
+  res.status(204).send();
 });
 
 router.post('/:cardId', async (req, res) => {

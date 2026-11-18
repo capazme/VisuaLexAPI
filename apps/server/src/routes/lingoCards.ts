@@ -15,6 +15,7 @@ import { currentText, hasAccepted, serializeText } from '../lingo/texts';
 import { romeDay, startOfRomeDay } from '../lingo/studyDay';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
 import { trashLingoCards } from '../trash/trash';
+import { removeOwnCommunityCard } from '../lingo/removeOwnContributions';
 import { isSwitchOn } from '../assistant/switches';
 import { lockModuleForCards, lockUserRow } from '../lingo/courses';
 import { LIMITS, competenceCode } from '../schemas/lingo/corso';
@@ -294,6 +295,13 @@ router.post('/:id/ritira', async (req, res) => {
     });
   });
   res.json(serialize(card));
+});
+
+// G-556: the author removes a validated or under-review card: deleted when nobody else uses it, otherwise it stays
+// without the author's name and the answer says so (`lingo/removeOwnContributions.ts`). The user's own session only:
+// not in the delegated table.
+router.post('/:id/togli', async (req, res) => {
+  res.json(await prisma.$transaction((tx) => removeOwnCommunityCard(tx, req.user!.id, req.params.id)));
 });
 
 router.patch('/:id', async (req, res) => {
