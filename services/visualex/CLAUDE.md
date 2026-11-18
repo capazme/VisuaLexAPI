@@ -336,7 +336,10 @@ POST unless noted, JSON bodies.
 
 - `/fetch_norma_data` — build norm structure from params
 - `/fetch_article_text` — fetch article text (array response)
-- `/stream_article_text` — stream results as NDJSON, one object per line
+- `/stream_article_text` — stream results as NDJSON, one object per line; with `"end_line": true`
+  in the body, every stream the server ends itself closes with `{"kind": "end", "sent": N,
+  "total": M}` (after a `time_budget` line too), so a body that stops without it was cut on the way
+  (G-488). Only on request: the search panel as it is and the archive read every line as an article
 - `/fetch_brocardi_info` — 410 Gone: Brocardi is no longer a source (D-078)
 - `/fetch_all_data` — article text and `norma_data` (and `validity`) in one call
 - `/fetch_tree` — article tree for a complete URN. An article Normattiva splits into parts is one

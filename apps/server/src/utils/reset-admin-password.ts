@@ -17,7 +17,7 @@
  */
 
 import { prisma } from '../lib/prisma';
-import { hashPassword } from './password';
+import { hashPassword, meetsPasswordRule } from './password';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -32,8 +32,8 @@ async function main() {
     process.exit(1);
   }
 
-  if (newPassword.length < 8) {
-    console.error('Error: password must be at least 8 characters');
+  if (!meetsPasswordRule(newPassword)) {
+    console.error('Error: password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number');
     process.exit(1);
   }
 
@@ -51,17 +51,26 @@ async function main() {
 
   const hashedPassword = await hashPassword(newPassword);
 
-  const updated = await prisma.user.update({
-    where: { id: user.id },
-    data: { password: hashedPassword },
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      isAdmin: true,
-      isActive: true,
-    },
-  });
+  // As the administrator's reset on the admin page (A.1, D3): a lost or compromised password, so every web session
+  // of the account ends and every connected application is revoked. Written here rather than imported, so the
+  // command needs nothing but the database.
+  const now = new Date();
+  const [updated, sessions] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        isAdmin: true,
+        isActive: true,
+      },
+    }),
+    prisma.webSession.deleteMany({ where: { userId: user.id } }),
+    prisma.oAuthToken.updateMany({ where: { grant: { userId: user.id }, revokedAt: null }, data: { revokedAt: now } }),
+    prisma.oAuthGrant.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: now } }),
+  ]);
 
   console.log('\nPassword reset successfully:');
   console.log(`  ID: ${updated.id}`);
@@ -69,6 +78,7 @@ async function main() {
   console.log(`  Username: ${updated.username}`);
   console.log(`  Is Admin: ${updated.isAdmin}`);
   console.log(`  Is Active: ${updated.isActive}`);
+  console.log(`  Web sessions ended: ${sessions.count}; connected applications revoked.`);
   console.log('\nYou can now log in at http://localhost:5173 with the new password.');
 }
 
