@@ -4,7 +4,7 @@ import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
 import { prefersReducedMotion } from '../../features/sections/sectionTransition';
 
 /** Web Animations here (jsdom has none): without them it opens and closes at once. */
-/** The fade reduced motion keeps, as `index.css` gives every opacity change. */
+/** The closing fade reduced motion keeps, as `index.css` gives every opacity change. */
 const REDUCED_FADE = { duration: 150, easing: 'linear' } as const;
 const canAnimate = () => typeof Element.prototype.animate === 'function';
 
@@ -80,9 +80,10 @@ export function Expand({ id, open, onClose, initialFocusRef, className, children
     outer.style.removeProperty('height');
     if (open) reveal();
 
-    // Under reduced motion only the fade, by the app's own rule (`index.css`: 150 ms): the island's 220 ms ease-out had
-    // the content gone in a third of it and the space standing empty for the rest, read as a delay (Papiniano, #599).
-    const timing = prefersReducedMotion() ? REDUCED_FADE : open ? ISLAND_OPEN : ISLAND_CLOSE;
+    // Under reduced motion the closing is the app's own fade (`index.css`: 150 ms): the island's 220 ms ease-out had the
+    // content gone in a third of it and the space standing empty for the rest, read as a delay (Papiniano, #599). The
+    // opening keeps the island's time: a shorter fade there showed a row's late content settling (46 px in Fonti).
+    const timing = open ? ISLAND_OPEN : prefersReducedMotion() ? REDUCED_FADE : ISLAND_CLOSE;
     const fill: FillMode = open ? 'none' : 'forwards';
     const fade = inner.animate([{ opacity: fromOpacity }, { opacity: open ? 1 : 0 }], { ...timing, fill });
     const anims = [fade];

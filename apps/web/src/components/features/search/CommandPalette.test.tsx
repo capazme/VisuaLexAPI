@@ -666,6 +666,29 @@ describe('CommandPalette — in the page, not over it (L-75)', () => {
     pill.remove();
   });
 
+  it('after a choice that changes the page, skips the title of the page left and gives the focus to the new one as it comes', async () => {
+    const onClose = vi.fn();
+    const onSearch = vi.fn();
+    // A page of its own each: the router mounts the new one, a new title.
+    const page = (title: string) => <main><h1 key={title}>{title}</h1></main>;
+    const { rerender } = render(<>{page('Pratiche')}<CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
+    const box = screen.getByRole('combobox');
+    fireEvent.change(box, { target: { value: 'art. 2043 c.c.' } });
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(onSearch).toHaveBeenCalled();
+    const before = `${window.location.pathname}${window.location.search}`;
+    // The router has changed the address; the page left is still drawn as the menu closes.
+    window.history.pushState({}, '', '/altrove');
+    const seen: string[] = [];
+    document.addEventListener('focusin', (event) => seen.push((event.target as HTMLElement).textContent ?? ''));
+    rerender(<>{page('Pratiche')}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    rerender(<>{page('Ricerca')}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ricerca' })).toHaveFocus());
+    expect(seen).not.toContain('Pratiche');
+    window.history.pushState({}, '', before);
+  });
+
   it('closes on a click outside the field and the band, not on one inside', () => {
     const onClose = vi.fn();
     render(<><button type="button">Fuori</button><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);

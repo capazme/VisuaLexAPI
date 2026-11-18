@@ -162,36 +162,53 @@ function Matched({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
+/** The page's title, made reachable by the focus while it holds it (as `focusPage` does for `<main>`). */
+function focusTitle(title: HTMLElement) {
+  if (!title.hasAttribute('tabindex')) {
+    title.setAttribute('tabindex', '-1');
+    title.addEventListener('blur', () => title.removeAttribute('tabindex'), { once: true });
+  }
+  title.focus({ preventScroll: true });
+}
+
+/** How long a page reached by a choice may take to draw its title (its code and its first data). */
+const LANDING_MS = 3000;
+
 /**
- * After a choice, or with the opener gone: the focus on what the page that drew next holds — what opened took it
- * already, else the page's title — never the body. Looked for over the next frames, about half a second (a page that
- * loads its code first; the page left, whose title goes a frame later); what takes the focus meanwhile keeps it.
- * Returns the cleanup.
+ * After a choice (Papiniano, #599): the focus on the page it led to — what took the focus there by itself keeps it,
+ * else the page's title — never the pill, never the body. `left`: the choice changed the address, so the title on screen
+ * now is the page being left (the router draws the new one a commit later): only another one is the landing's. The
+ * page's DOM is watched until the title comes, at most `LANDING_MS`; then `<main>`. Returns the cleanup.
  */
-function focusLanding(): () => void {
-  let frame = 0;
-  let tries = 30;
-  // The title given, while the page may still change under it (the page left draws one more frame, its title with it).
+function focusLanding(left: boolean): () => void {
+  const leaving = left ? document.querySelector<HTMLElement>('main h1') : null;
   let given: HTMLElement | null = null;
-  const look = () => {
+  const look = (): boolean => {
     const active = document.activeElement;
-    const free = !active || active === document.body;
-    // Something else took the focus (a result that focuses itself): it keeps it.
-    if (!free && active !== given) return;
+    // Something on the page took the focus by itself (a result that focuses itself): it keeps it.
+    if (active && active !== document.body && active !== given) return true;
     const title = document.querySelector<HTMLElement>('main h1');
-    if (free && title) {
-      if (!title.hasAttribute('tabindex')) {
-        title.setAttribute('tabindex', '-1');
-        title.addEventListener('blur', () => title.removeAttribute('tabindex'), { once: true });
-      }
-      title.focus({ preventScroll: true });
+    if (!title || title === leaving) return false;
+    if (title !== given) {
+      focusTitle(title);
       given = title;
     }
-    if (tries-- > 0) frame = requestAnimationFrame(look);
-    else if (document.activeElement === document.body) focusPage();
+    return true;
   };
-  frame = requestAnimationFrame(look);
-  return () => cancelAnimationFrame(frame);
+  if (look() && !left) return () => {};
+  const observer = new MutationObserver(() => {
+    if (look()) stop();
+  });
+  const timer = window.setTimeout(() => {
+    stop();
+    if (!document.activeElement || document.activeElement === document.body) focusPage();
+  }, LANDING_MS);
+  function stop() {
+    observer.disconnect();
+    window.clearTimeout(timer);
+  }
+  observer.observe(document.body, { childList: true, subtree: true });
+  return stop;
 }
 
 /** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
@@ -688,9 +705,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   // Closed: the focus goes back to what opened it (the pill, the field), if it was in the field or the band.
   const openNow = useRef(isOpen);
+  // The address as it opened: a choice that changed it leads to another page, whose title is still to come.
+  const openedAt = useRef('');
   useLayoutEffect(() => {
     const was = openNow.current;
     openNow.current = isOpen;
+    if (isOpen) openedAt.current = `${window.location.pathname}${window.location.search}`;
     if (isOpen || !was) return;
     const active = document.activeElement;
     const ours = !active || active === document.body || bandRef.current?.contains(active) || fieldBoxRef.current?.contains(active);
@@ -699,7 +719,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     if (!chose && opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
     else {
       if (active instanceof HTMLElement) active.blur();
-      return focusLanding();
+      return focusLanding(`${window.location.pathname}${window.location.search}` !== openedAt.current);
     }
     // Once per closing; the opener is the one taken as it opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
