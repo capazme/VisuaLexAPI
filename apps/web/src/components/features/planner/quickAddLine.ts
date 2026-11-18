@@ -29,6 +29,8 @@ export interface ReadLine {
   parts: FoundPart[];
   /** The `#…` being typed where the caret is, when it names no dossier yet: what the suggestions filter by. */
   dossierQuery: { start: number; end: number; query: string } | null;
+  /** In a dossier's panel, a `#` that opens a word: it stays text, and the field says the task stays there. */
+  lockedHash: boolean;
 }
 
 export interface ReadOptions {
@@ -88,8 +90,13 @@ export function readQuickAddLine(text: string, today: string, options: ReadOptio
     if (value && value.recurrence === null) add({ kind: 'due', value }, match.index, match.index + match[0].length);
   }
   let pendingHash: number | null = null;
+  let lockedHash = false;
   for (const match of text.matchAll(/#/g)) {
-    if (options.dossierLocked || !atWordStart(text, match.index)) continue;
+    if (!atWordStart(text, match.index)) continue;
+    if (options.dossierLocked) {
+      lockedHash = true;
+      continue;
+    }
     const found = dossierAt(text, match.index, options.dossiers);
     if (found && add({ kind: 'dossier', id: found.dossier.id, title: found.dossier.title }, match.index, found.end)) continue;
     pendingHash = match.index;
@@ -124,7 +131,7 @@ export function readQuickAddLine(text: string, today: string, options: ReadOptio
     const query = text.slice(pendingHash + 1, caret);
     if (!/[#@{}\n]/.test(query) && query.length <= 60) dossierQuery = { start: pendingHash, end: caret, query };
   }
-  return { title, parts, dossierQuery };
+  return { title, parts, dossierQuery, lockedHash };
 }
 
 /** The dossiers a `#…` being typed may mean, those that begin with it first; at most `limit`. */

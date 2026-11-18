@@ -32,6 +32,10 @@ export interface PageFrameProps {
   line?: ReactNode;
   /** The page's main action, beside the title from `md`, under it on a phone. */
   action?: ReactNode;
+  /** Between the title and the action on one row (Opus's tabs, LC83). */
+  beside?: ReactNode;
+  /** The header's own classes (Opus's: it sticks at the top from `md`). */
+  headerClassName?: string;
   /** The action stays beside the title on a phone too, at its first line: icon buttons only (the dossier list's «⋯»
    *  and «+», M1). */
   actionBeside?: boolean;
@@ -55,7 +59,7 @@ export interface PageFrameProps {
  * body narrows to the reading measure, never the title. A section's page names itself in the title and its section
  * over it (`kicker`, L-37). Outside it: the Scrivania, the lesson, the reader and the practice, the login.
  */
-export function PageFrame({ title, kicker, line, action, actionBeside = false, section, titleId, titleHidden = false, width = 'work', className, children }: PageFrameProps) {
+export function PageFrame({ title, kicker, line, action, beside, headerClassName, actionBeside = false, section, titleId, titleHidden = false, width = 'work', className, children }: PageFrameProps) {
   // The title says only the page's name («Oggi» in Opus and in Gymnasium): the line over it describes it, so the focus
   // the section switcher puts on the title also says which section it is in.
   const kickerId = useId();
@@ -70,6 +74,7 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
         // No full-screen button floats on a phone: the action at the content's right edge there (LC38).
         action && cn(FOCUS_BUTTON_CLEARANCE, 'max-md:pr-0'),
         titleHidden && 'sr-only',
+        headerClassName,
       )}>
         <div className="min-w-0">
           {/* LC21, LC34: the bars say the section (the top bar from lg, the phone bar beside the menu); the line stays for a screen reader, which the title's
@@ -84,6 +89,7 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
           </h1>
           {line && <p className="mt-1 max-w-prose text-slate-600 dark:text-slate-400">{line}</p>}
         </div>
+        {beside}
         {action && <div className="flex shrink-0 gap-2">{action}</div>}
       </header>
       {width === 'reading' ? <div className="flex min-w-0 max-w-measure flex-col gap-6">{children}</div> : children}
