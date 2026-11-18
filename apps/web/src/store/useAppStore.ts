@@ -185,10 +185,13 @@ export interface ImportRefused {
     refused: string;
 }
 
-/** A 409's Italian words, as `services/api.ts` rejects them; anything else is not a cap. */
+/** The codes of the server's caps (`apps/server/src/utils/dossierCaps.ts`); another 409 («Already exists») is not one. */
+const CAP_CODES = new Set(['dossier_limit', 'dossier_items_limit', 'account_items_limit']);
+
+/** A cap's Italian words, as `services/api.ts` rejects them (`message` is the server's `detail`); anything else: null. */
 const capRefusal = (err: unknown): string | null => {
-    const e = err as { status?: number; message?: unknown } | null;
-    return e?.status === 409 && typeof e.message === 'string' && e.message ? e.message : null;
+    const e = err as { status?: number; message?: unknown; data?: { error?: unknown } } | null;
+    return e?.status === 409 && CAP_CODES.has(String(e.data?.error)) && typeof e.message === 'string' && e.message ? e.message : null;
 };
 
 interface AppState {

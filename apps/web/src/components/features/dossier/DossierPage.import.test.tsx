@@ -56,6 +56,27 @@ describe('DossierPage: after an import', () => {
     expect((vi.mocked(importDossier).mock.calls[0] as unknown as [{ items: unknown[] }])[0].items).toHaveLength(1);
   });
 
+  it('says in the page when nothing came in, and still offers the dossier made', async () => {
+    const { region } = await importWith([badDecision], { id: 'srv', imported: 0, failed: 0 });
+    await waitFor(() => expect(said(region)).toHaveTextContent('Pratica importata in parte: 0 voci importate, 1 scartata'));
+    // The pressed «Importa» is gone: the focus is on what comes next.
+    expect(within(region).getByRole('button', { name: 'Apri la pratica' })).toHaveFocus();
+  });
+
+  it('does not close on Esc while the server works, so its outcome is still said', async () => {
+    let answer: (value: unknown) => void = () => {};
+    const importDossier = vi.fn(() => new Promise((resolve) => { answer = resolve; }));
+    appStore.setState({ dossiers: [], importDossier } as never);
+    render(<MemoryRouter initialEntries={[link([note])]}><DossierPage /></MemoryRouter>);
+    const region = await screen.findByRole('region', { name: 'Importa una pratica' });
+    fireEvent.click(within(region).getByRole('button', { name: 'Importa' }));
+    expect(said(region)).toHaveTextContent('Importo la pratica…');
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.getByRole('region', { name: 'Importa una pratica' })).toBe(region);
+    answer({ id: 'srv', imported: 0, failed: 1 });
+    await waitFor(() => expect(said(region)).toHaveTextContent('Pratica importata in parte: 0 voci importate, 1 scartata'));
+  });
+
   it('says how many items came in when the server refused the rest at its cap (409, G-576), in its words', async () => {
     const words = 'Una pratica può contenere al massimo 2.000 voci. Questa ne ha già 2.000.';
     const { region } = await importWith([note, note, note], { id: 'srv', imported: 1, failed: 2, refusals: [words] });

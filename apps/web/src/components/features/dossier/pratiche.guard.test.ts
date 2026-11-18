@@ -22,7 +22,7 @@ describe('Pratiche, no bare controls', () => {
   // LC107 (L-73): nothing over the content. «Modifica» and «Importa» open in the page; the windows still listed here
   // go in F3's other PR (nota, PDF, pubblica, norma, aggiungi, cestino), and no new one comes in.
   it('opens no new window over the content', () => {
-    const windows = files.filter((name) => /(?<!\[)role="dialog"|fixed inset-0|<(Modal|ConfirmDialog)\b/.test(readFileSync(join(DIR, name), 'utf8')));
+    const windows = [...files].sort().filter((name) => /(?<!\[)role="dialog"|fixed inset-0|<(Modal|ConfirmDialog)\b/.test(readFileSync(join(DIR, name), 'utf8')));
     expect(windows).toEqual([
       'AddNoteModal.tsx', 'AddToDossierPopover.tsx', 'DossierPdfDialog.tsx', 'PublishDossierDialog.tsx', 'TrashEntryRow.tsx', 'TreeNavigatorModal.tsx',
     ]);

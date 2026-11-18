@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { FolderInput } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { importReport, importToastType, type ImportCheck } from './dossierUtils';
@@ -34,29 +34,44 @@ interface Result {
  * Italian) stays here and says how many items came in and why the others did not, in the server's words.
  */
 export function ImportDossierPanel({ check, onClose, onOpen, showToast, className }: Props) {
-  // The preview stays drawn while the space closes.
+  // The preview stays drawn while the space closes; a new check (the same file chosen again) starts afresh.
   const [shown, setShown] = useState(check);
-  if (check && check !== shown) setShown(check);
+  const [round, setRound] = useState(0);
+  if (check && check !== shown) {
+    setShown(check);
+    setRound(round + 1);
+  }
+  // While the server works, Esc does not close: the outcome would have nowhere to be said.
+  const [busy, setBusy] = useState(false);
   const headingId = useId();
 
   return (
     <Expand
       open={check !== null}
-      onClose={onClose}
+      onClose={busy ? undefined : onClose}
       role="region"
       aria-labelledby={headingId}
       className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}
     >
-      {shown && <ImportBody key={shown.dossier.id + shown.dossier.title} check={shown} headingId={headingId} onClose={onClose} onOpen={onOpen} showToast={showToast} />}
+      {shown && (
+        <ImportBody key={round} check={shown} headingId={headingId} busy={busy} setBusy={setBusy} onClose={onClose} onOpen={onOpen} showToast={showToast} />
+      )}
     </Expand>
   );
 }
 
-function ImportBody({ check, headingId, onClose, onOpen, showToast }: Omit<Props, 'check' | 'className'> & { check: ImportCheck; headingId: string }) {
+function ImportBody({ check, headingId, busy, setBusy, onClose, onOpen, showToast }: Omit<Props, 'check' | 'className'> & {
+  check: ImportCheck;
+  headingId: string;
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
+}) {
   const importDossier = useAppStore((s) => s.importDossier);
   const { dossier, discarded } = check;
-  const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  // The pressed «Importa» is gone with the outcome: the focus goes to what comes next, a button, never a field.
+  const nextRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (result) nextRef.current?.focus({ preventScroll: true }); }, [result]);
 
   const confirm = async () => {
     setBusy(true);
@@ -114,15 +129,15 @@ function ImportBody({ check, headingId, onClose, onOpen, showToast }: Omit<Props
       )}
 
       {/* The outcome in the flow: what came in, and the server's words for what did not. */}
-      <p role="status" className={cn(result ? 'text-sm font-medium' : 'sr-only', result?.type === 'error' ? 'text-red-700 dark:text-red-300' : 'text-slate-800 dark:text-slate-200')}>
+      <p role="status" className={cn(result || busy ? 'text-sm font-medium' : 'sr-only', result?.type === 'error' ? 'text-red-700 dark:text-red-300' : 'text-slate-800 dark:text-slate-200')}>
         {busy ? 'Importo la pratica…' : result?.message}
       </p>
 
       <div className="flex flex-wrap justify-end gap-3">
         {result ? (
           <>
-            <Button type="button" variant="quiet" onClick={onClose}>Chiudi</Button>
-            {result.dossierId && <Button type="button" onClick={() => onOpen(result.dossierId!)}>Apri la pratica</Button>}
+            <Button ref={result.dossierId ? undefined : nextRef} type="button" variant="quiet" onClick={onClose}>Chiudi</Button>
+            {result.dossierId && <Button ref={nextRef} type="button" onClick={() => onOpen(result.dossierId!)}>Apri la pratica</Button>}
           </>
         ) : (
           <>
