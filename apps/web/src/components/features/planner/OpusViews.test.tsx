@@ -340,12 +340,12 @@ describe('«Oggi» in groups', () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY, dossierId: 'd1' })]));
     renderAt(<TodayView />);
     await screen.findByRole('button', { name: 'Compito a' });
-    // A toggle in the page, not a menu: two buttons, the one in use pressed.
-    const toggle = screen.getByRole('group', { name: 'Raggruppa' });
-    expect(within(toggle).getByRole('button', { name: 'Per data' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(within(toggle).getByRole('button', { name: 'Per pratica' }));
-    expect(within(toggle).getByRole('button', { name: 'Per pratica' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(toggle).getByRole('button', { name: 'Per data' })).toHaveAttribute('aria-pressed', 'false');
+    // A choice in the page, not a menu (LC110: `SegmentedTabs size="sm"`, a radiogroup): the one in use checked.
+    const toggle = screen.getByRole('radiogroup', { name: 'Raggruppa' });
+    expect(within(toggle).getByRole('radio', { name: 'Per data' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(within(toggle).getByRole('radio', { name: 'Per pratica' }));
+    expect(within(toggle).getByRole('radio', { name: 'Per pratica' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(toggle).getByRole('radio', { name: 'Per data' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Ricorso Rossi, 1 compito', "Lista d'ingresso, 1 compito"]);
     expect(localStorage.getItem('visualex-opus-today-grouping')).toBe('dossier');
     act(() => plannerStore.getState().setGrouping('date'));

@@ -3,9 +3,10 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The planner (Opus, wave 1) is drawn in Gymnasium's style: every control 44 px at every width — no `md:` override
- * shrinks a target on a computer — no text under 11 px, and no word that suggests a computed deadline (the deadline is
- * the one the user writes; «termine calcolato» comes with wave 2 and its warning).
+ * The planner (Opus, wave 1) is drawn in Gymnasium's style: its controls take the common heights (LC110: 44 px on a
+ * phone, 36 from md, a row's icons 44 at every width) — no `md:` height of its own —, no text under 11 px, and no
+ * word that suggests a computed deadline (the deadline is the one the user writes; «termine calcolato» comes with
+ * wave 2 and its warning).
  */
 // The suite runs from `apps/web`, as `theme.test.ts` assumes.
 const DIR = resolve(process.cwd(), 'src/components/features/planner');
@@ -16,7 +17,7 @@ describe("the planner's targets, type and words", () => {
     expect(SOURCES).toEqual(expect.arrayContaining(['TaskRow.tsx', 'QuickAddField.tsx', 'TaskDialog.tsx', 'OpusViews.tsx', 'plannerStyles.ts']));
   });
 
-  it.each(SOURCES)('%s keeps its targets at 44 px from `md` up', (file) => {
+  it.each(SOURCES)('%s writes no height of its own from `md` up: the common components carry it', (file) => {
     const source = readFileSync(join(DIR, file), 'utf8');
     expect(source).not.toMatch(/\bmd:(?:min-h|min-w|h)-(?!\[44px\])/);
   });

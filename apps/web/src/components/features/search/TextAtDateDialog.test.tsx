@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TextAtDateDialog, type TextAtDateDialogProps } from './TextAtDateDialog';
+import { CONTROL_HEIGHT, FIELD_CONTROL } from '../../ui/controlStyles';
 
 function setup(over: Partial<TextAtDateDialogProps> = {}) {
     const props: TextAtDateDialogProps = {
@@ -15,6 +16,13 @@ const confirm = () => screen.getByRole('button', { name: /Mostra il testo/ });
 const type = (value: string) => fireEvent.change(dateField(), { target: { value } });
 
 describe('TextAtDateDialog', () => {
+    // LC111: the common field, so in the dark the browser's calendar is drawn dark too.
+    it('draws its date as the common field, with the dark rule', () => {
+        setup();
+        expect(dateField()).toHaveClass(...FIELD_CONTROL.split(' '));
+        expect(dateField()).toHaveClass('dark:[color-scheme:dark]');
+    });
+
     it('renders nothing while closed', () => {
         setup({ isOpen: false });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -108,7 +116,8 @@ describe('TextAtDateDialog', () => {
     it('keeps a 44px touch target on mobile on every control', () => {
         setup();
         const target = ['min-h-[44px]', 'md:min-h-0'];
-        expect(dateField()).toHaveClass(...target);
+        // The date is the common field (LC111): 44 px on a phone, 36 from md.
+        expect(dateField()).toHaveClass(...CONTROL_HEIGHT.md.split(' '));
         expect(screen.getByLabelText('Testo originale').closest('label')).toHaveClass(...target);
         expect(screen.getByRole('button', { name: 'Annulla' })).toHaveClass(...target);
         expect(confirm()).toHaveClass(...target);

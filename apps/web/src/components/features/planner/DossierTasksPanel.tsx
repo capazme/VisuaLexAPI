@@ -8,7 +8,7 @@ import { QuickAddField } from './QuickAddField';
 import { TaskList } from './TaskList';
 import { TaskSheetScope } from './TaskSheetScope';
 import { TodoistImport } from './TodoistImport';
-import { ICON_BUTTON } from './plannerStyles';
+import { MENU_TRIGGER } from './plannerStyles';
 import { TaskListSkeleton, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { useTaskView } from './useTaskView';
 
@@ -39,7 +39,7 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
         </h3>
         <MenuButton
           label="Altre azioni sui compiti"
-          triggerClassName={ICON_BUTTON}
+          triggerClassName={MENU_TRIGGER}
           items={[{ label: 'Importa da Todoist (CSV)', icon: Upload, onSelect: () => setImportingFor(dossierId) }]}
         >
           <MoreHorizontal size={18} aria-hidden />

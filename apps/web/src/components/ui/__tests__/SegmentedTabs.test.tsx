@@ -179,6 +179,27 @@ describe('SegmentedTabLinks', () => {
     expect(document.querySelectorAll('[data-segmented-mark]')).toHaveLength(1);
     expect(prossimi.querySelector('[data-segmented-mark]')).not.toBeNull();
   });
+
+  // LC110: Opus's views, at their header's height from md and a bar at the screen's foot on a phone.
+  it('in the small size stands at the fields\' height and corners', () => {
+    render(<MemoryRouter initialEntries={['/viste/oggi']}><SegmentedTabLinks size="sm" links={LINKS} label="Viste" /></MemoryRouter>);
+    expect(screen.getByRole('navigation', { name: 'Viste' })).toHaveClass('p-0.5', 'rounded-md');
+    for (const link of screen.getAllByRole('link')) expect(link).toHaveClass('min-h-10', 'md:min-h-8', 'rounded-md');
+  });
+
+  it('as a foot bar puts each icon over its words on a phone, the mark tinted, the icon hidden from md', () => {
+    const links = LINKS.map((link) => ({ ...link, icon: <svg data-icon /> }));
+    render(<MemoryRouter initialEntries={['/viste/oggi']}><SegmentedTabLinks size="sm" footBar links={links} label="Viste" /></MemoryRouter>);
+    const nav = screen.getByRole('navigation', { name: 'Viste' });
+    expect(nav).toHaveClass('max-md:bg-transparent', 'max-md:p-0');
+    const oggi = screen.getByRole('link', { name: 'Oggi' });
+    // 44 px for a thumb on the bar, the links sharing its width.
+    expect(oggi).toHaveClass('max-md:min-h-11', 'max-md:flex-1');
+    expect(oggi.querySelector('[data-icon]')!.parentElement).toHaveClass('md:hidden');
+    expect(oggi.querySelector('[data-icon]')!.parentElement).toHaveAttribute('aria-hidden');
+    expect(oggi.querySelector('[data-icon]')!.closest('.max-md\\:flex-col')).not.toBeNull();
+    expect(oggi.querySelector('[data-segmented-mark]')).toHaveClass('max-md:bg-ink-200');
+  });
 });
 
 // LC106: the small row stands among the fields at their height and corners.

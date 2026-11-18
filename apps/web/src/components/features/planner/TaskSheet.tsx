@@ -7,7 +7,11 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
 import type { Task, TaskInput } from '../../../types/tasks';
-import { FOCUS_RING, QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { FOCUS_RING } from '../studia/progress/tokens';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Textarea } from '../../ui/Textarea';
 import { LinkedText } from './LinkedText';
 import { completeWithUndo, type Optimistic } from './taskActions';
 import { draftFromTask, draftProblem, MAX_DESCRIPTION, MAX_TITLE } from './taskDraft';
@@ -16,7 +20,7 @@ import { PRIORITY_LABEL, shortDay } from './taskDates';
 import { TaskCheckbox } from './TaskCheckbox';
 import { TaskSheetFields, type SheetSave } from './TaskSheetFields';
 import { useTaskView } from './useTaskView';
-import { FIELD, FIELD_HINT, ICON_BUTTON, META } from './plannerStyles';
+import { MENU_TRIGGER, META } from './plannerStyles';
 
 export interface TaskSheetProps {
   task: Task;
@@ -124,6 +128,7 @@ export function TaskSheet(props: TaskSheetProps) {
             {parent && (
               <>
                 <span aria-hidden>/</span>
+                {/* bare-button: a step of the path, drawn as the link before it. */}
                 <button
                   type="button"
                   onClick={() => onOpenTask(parent)}
@@ -135,15 +140,11 @@ export function TaskSheet(props: TaskSheetProps) {
               </>
             )}
           </nav>
-          <button type="button" aria-label="Compito precedente" aria-keyshortcuts="k" disabled={!neighbours.previous} onClick={() => step(-1)} className={cn(ICON_BUTTON, 'disabled:opacity-40 disabled:hover:bg-transparent')}>
-            <ChevronUp size={18} aria-hidden />
-          </button>
-          <button type="button" aria-label="Compito successivo" aria-keyshortcuts="j" disabled={!neighbours.next} onClick={() => step(1)} className={cn(ICON_BUTTON, 'disabled:opacity-40 disabled:hover:bg-transparent')}>
-            <ChevronDown size={18} aria-hidden />
-          </button>
+          <IconButton size="lg" aria-label="Compito precedente" aria-keyshortcuts="k" disabled={!neighbours.previous} onClick={() => step(-1)} icon={<ChevronUp size={18} aria-hidden />} />
+          <IconButton size="lg" aria-label="Compito successivo" aria-keyshortcuts="j" disabled={!neighbours.next} onClick={() => step(1)} icon={<ChevronDown size={18} aria-hidden />} />
           <MenuButton
             label="Altre azioni sul compito"
-            triggerClassName={ICON_BUTTON}
+            triggerClassName={MENU_TRIGGER}
             items={[
               ...(task.parentId ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => setRequest((r) => ({ id: task.id, n: r.id === task.id ? r.n + 1 : 1 })) }]),
               ...(task.recurrence ? [{ label: 'Completa per sempre', icon: CheckCheck, onSelect: () => onCompleteForever(task, parent) }] : []),
@@ -152,9 +153,7 @@ export function TaskSheet(props: TaskSheetProps) {
           >
             <MoreHorizontal size={18} aria-hidden />
           </MenuButton>
-          <button type="button" aria-label="Chiudi" onClick={onClose} className={ICON_BUTTON}>
-            <X size={18} aria-hidden />
-          </button>
+          <IconButton size="lg" aria-label="Chiudi" onClick={onClose} icon={<X size={18} aria-hidden />} />
         </header>
         <SheetBody key={task.id} {...props} task={task} headingId={headingId} listed={listed} familyFailed={family.status === 'error'} familyOptimistic={family.optimistic} parent={parent} addRequest={addRequest} addFieldRef={addFieldRef} />
       </div>
@@ -232,7 +231,7 @@ function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimis
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {error && (
-        <p role="alert" className="mx-4 mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 md:mx-6 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+        <p role="alert" className="mx-4 mt-3 rounded-[8px] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 md:mx-6 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
           {error}
         </p>
       )}
@@ -361,7 +360,7 @@ function DescriptionField({ value, onCommit }: { value: string; onCommit: (text:
     return (
       <div className="mt-1 grid gap-1">
         <label htmlFor={`${id}-description`} className="sr-only">Descrizione</label>
-        <textarea
+        <Textarea
           ref={ref}
           id={`${id}-description`}
           value={text}
@@ -379,19 +378,17 @@ function DescriptionField({ value, onCommit }: { value: string; onCommit: (text:
               finish(true);
             }
           }}
-          aria-describedby={`${id}-hint`}
-          className={cn(FIELD, 'py-2')}
+          helperText="Gli indirizzi web diventano link. Si salva quando esci dal campo."
         />
-        <p id={`${id}-hint`} className={FIELD_HINT}>Gli indirizzi web diventano link. Si salva quando esci dal campo.</p>
       </div>
     );
   }
 
   if (!value) {
     return (
-      <button type="button" onClick={start} className={cn(QUIET_BUTTON, 'mx-0 px-1 font-normal text-slate-600 dark:text-slate-400')}>
+      <Button type="button" variant="quiet" onClick={start} className="justify-self-start px-1 font-normal">
         Aggiungi una descrizione
-      </button>
+      </Button>
     );
   }
 
@@ -406,9 +403,7 @@ function DescriptionField({ value, onCommit }: { value: string; onCommit: (text:
       >
         <LinkedText text={value} />
       </p>
-      <button type="button" aria-label="Modifica la descrizione" onClick={start} className={ICON_BUTTON}>
-        <Pencil size={15} aria-hidden />
-      </button>
+      <IconButton size="lg" aria-label="Modifica la descrizione" onClick={start} icon={<Pencil size={15} aria-hidden />} />
     </div>
   );
 }
@@ -502,6 +497,7 @@ function Subtasks({ parent, subtasks, today, failed, optimistic, addRequest, inp
                 onTick={() => tick(child)}
               />
               <div className="min-w-0 flex-1 py-1">
+                {/* bare-button: the subtask's title, which opens it, as a task's on its row. */}
                 <button
                   type="button"
                   onClick={() => onOpenTask(child)}
@@ -534,25 +530,25 @@ function Subtasks({ parent, subtasks, today, failed, optimistic, addRequest, inp
           className="mt-2 flex flex-wrap gap-2"
         >
           <label htmlFor={`${id}-title`} className="sr-only">Nuovo sottocompito</label>
-          <input
-            ref={inputRef}
-            id={`${id}-title`}
-            value={title}
-            maxLength={MAX_TITLE}
-            placeholder="Titolo del sottocompito"
-            onChange={(e) => setTitle(e.target.value)}
-            className={cn(FIELD, 'min-w-0 flex-1 basis-56')}
-            autoComplete="off"
-          />
-          <button type="submit" disabled={busy || !title.trim()} className={SECONDARY_BUTTON}>
+          <div className="min-w-0 flex-1 basis-56">
+            <Input
+              ref={inputRef}
+              id={`${id}-title`}
+              value={title}
+              maxLength={MAX_TITLE}
+              placeholder="Titolo del sottocompito"
+              onChange={(e) => setTitle(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <Button type="submit" variant="secondary" disabled={busy || !title.trim()}>
             Aggiungi<span className="sr-only"> il sottocompito</span>
-          </button>
+          </Button>
         </form>
       ) : (
-        <button ref={addButtonRef} type="button" onClick={() => setAdding(true)} className={cn(QUIET_BUTTON, 'mx-0 mt-1 inline-flex items-center gap-2 px-1 font-normal text-slate-700 dark:text-slate-300')}>
-          <Plus size={16} aria-hidden className="text-primary-700 dark:text-primary-300" />
+        <Button ref={addButtonRef} type="button" variant="quiet" onClick={() => setAdding(true)} icon={<Plus size={16} aria-hidden className="text-primary-700 dark:text-primary-300" />} className="mt-1 px-1 font-normal">
           Aggiungi un sottocompito
-        </button>
+        </Button>
       )}
       {error && <p role="alert" className="mt-2 text-sm text-red-800 dark:text-red-200">{error}</p>}
     </section>

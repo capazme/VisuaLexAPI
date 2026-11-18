@@ -3,7 +3,7 @@ import { Modal } from '../../ui/Modal';
 import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
 import type { Task } from '../../../types/tasks';
-import { INK_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { Button } from '../../ui/Button';
 import { draftProblem, emptyDraft, inputFromDraft, type TaskDraft } from './taskDraft';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
@@ -60,16 +60,16 @@ export function TaskDialog({ defaults, onClose, onCreated }: Props) {
       initialFocusRef={titleRef}
       footer={
         <div className="flex w-full justify-end gap-2">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>Annulla</button>
-          <button type="submit" form={formId} disabled={busy} className={INK_BUTTON}>
+          <Button type="button" variant="secondary" onClick={onClose}>Annulla</Button>
+          <Button type="submit" form={formId} disabled={busy}>
             {busy ? 'Salvo…' : 'Aggiungi'}
-          </button>
+          </Button>
         </div>
       }
     >
       <form id={formId} onSubmit={save} noValidate className="grid gap-5">
         {error && (
-          <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+          <p role="alert" className="rounded-[8px] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
             {error}
           </p>
         )}

@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef } from 'react';
-import { Link, NavLink, useLocation, useOutlet } from 'react-router-dom';
+import { Link, useLocation, useOutlet } from 'react-router-dom';
 import { scrollParentOf } from '../practice/practiceView';
 import { CalendarDays, CalendarCheck, Inbox, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { ViewSlide } from '../../layout/ViewSlide';
-import { QUIET_BUTTON } from '../studia/progress/tokens';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { SegmentedTabLinks } from '../../ui/SegmentedTabs';
+import { buttonClassName } from '../../ui/buttonStyles';
 import { plannerStore } from './plannerStore';
 import { setFootBarRoom } from '../../ui/notifications/footBar';
 
@@ -22,10 +22,10 @@ const VIEWS = [
 /** The views in the tabs' order, the trash after them (its way back is the tabs): the order of their slide (LC98). */
 const VIEW_ORDER = [...VIEWS.map((view) => view.to.split('/')[2]), 'cestino'];
 
-/** Below `lg` a framed square with the icon, the words for a screen reader (LC38): at 768 px the title, the tabs and
- *  both options in words do not fit one row (LC83). From `lg` the words in full. */
-const HEADER_BUTTON = cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 max-lg:w-11 max-lg:justify-end max-lg:px-0 max-lg:no-underline');
-const HEADER_ICON = 'inline-flex items-center max-lg:size-9 max-lg:justify-center max-lg:rounded-lg max-lg:border max-lg:border-slate-300 dark:max-lg:border-slate-700';
+/** `Button variant="secondary"`'s look (LC110). Below `lg` `IconButton`'s square with the icon, the words for a screen
+ *  reader (LC38): at 768 px the title, the tabs and both options in words do not fit one row (LC83). From `lg` the
+ *  words in full. */
+const HEADER_BUTTON = cn(buttonClassName('secondary'), 'max-lg:min-w-11 max-lg:px-0 md:max-lg:min-w-9');
 
 /**
  * Opus's page (the planner): one compact header (LC83) — «Scadenze» once, its three views beside it as tabs
@@ -84,9 +84,8 @@ export function OpusPage() {
       actionBeside
       headerClassName={(inView || inTrash) ? 'md:sticky md:top-[var(--phone-bar-offset,0px)] md:z-10 md:bg-slate-50 md:py-1.5 md:dark:bg-slate-950' : undefined}
       beside={(inView || inTrash) && (
-        // Links, not `ui/SegmentedTabs` (buttons over one panel): each view has its address. On a phone the views are a
-        // bar at the screen's foot, where the thumb is (LC33, after Todoist's «In arrivo · Oggi · Prossime»); from md
-        // the tabs beside the title.
+        // `SegmentedTabLinks` (LC110): each view has its address. On a phone the views are a bar at the screen's foot,
+        // where the thumb is (LC33, after Todoist's «In arrivo · Oggi · Prossime»); from md the tabs beside the title.
         <div
           ref={tabs}
           className={cn(
@@ -94,22 +93,18 @@ export function OpusPage() {
             'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:border-t max-md:border-slate-200 max-md:bg-card max-md:px-3 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:pt-1.5 max-md:dark:border-slate-800',
           )}
         >
-          <nav aria-label="Viste di Work" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 max-md:bg-transparent max-md:p-0 dark:bg-slate-800 max-md:dark:bg-transparent md:w-fit">
-            {VIEWS.map((view) => (
-              <NavLink
-                key={view.to}
-                to={view.to}
-                onClick={keepPlace}
-                className={({ isActive }) => cn(
-                  'flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-md px-2 text-sm font-medium transition-colors md:flex-none md:px-4',
-                  'max-md:flex-col max-md:gap-0.5 max-md:py-1.5 max-md:text-xs max-md:shadow-none',
-                  FOCUS_RING,
-                  isActive
-                    ? 'bg-card text-slate-900 shadow-sm max-md:bg-ink-200 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 max-md:dark:bg-ink-700 max-md:dark:text-slate-50'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
-                )}
-              >
-                <view.icon aria-hidden size={20} strokeWidth={1.75} className="md:hidden" />
+          <SegmentedTabLinks
+            label="Viste di Work"
+            size="sm"
+            footBar
+            onNavigate={keepPlace}
+            className="w-full md:w-fit"
+            // 13 px from md, as the section tabs; 12 under the icons of the bar at the foot (the consultant, LC111).
+            tabClassName="whitespace-nowrap md:px-4 md:text-[13px]"
+            links={VIEWS.map((view) => ({
+              to: view.to,
+              icon: <view.icon size={20} strokeWidth={1.75} />,
+              label: (
                 <span className="inline-flex items-baseline">
                   {/* One name at each width: the other is `display: none`, so a screen reader reads one too. */}
                   <span className="md:hidden">{view.short}</span>
@@ -123,16 +118,14 @@ export function OpusPage() {
                     </span>
                   )}
                 </span>
-              </NavLink>
-            ))}
-          </nav>
+              ),
+            }))}
+          />
         </div>
       )}
       action={inView && (<>
         <Link to="/work/cestino" aria-label="Cestino dei compiti" className={HEADER_BUTTON}>
-          <span className={HEADER_ICON}>
-            <Trash2 size={15} aria-hidden />
-          </span>
+          <Trash2 size={15} aria-hidden />
           <span aria-hidden className="max-lg:hidden">Cestino</span>
         </Link>
       </>)}
