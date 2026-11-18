@@ -41,6 +41,8 @@ export function FontiToolbar({
       if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
+      // A dialog open over the page keeps its keys.
+      if (document.querySelector('[role="dialog"]')) return;
       e.preventDefault();
       inputRef.current?.focus();
     };
@@ -69,8 +71,7 @@ export function FontiToolbar({
             placeholder="Filtra le fonti… ( / )"
             aria-label="Filtra le fonti della pratica"
             aria-keyshortcuts="/"
-            // 16 px on a phone: Safari zooms under it.
-            className={cn(FIELD, 'pl-9 pr-11 text-base md:text-sm')}
+            className={cn(FIELD, 'pl-9 pr-11')}
           />
           {query && (
             <button type="button" onClick={() => { onQuery(''); inputRef.current?.focus(); }} aria-label="Svuota il filtro" className={cn(ICON_BUTTON, 'absolute right-0 top-1/2 -translate-y-1/2')}>

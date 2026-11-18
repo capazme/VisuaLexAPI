@@ -118,18 +118,15 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // the dossier's notes about it. An act left with no row closes, until the filter changes.
   const tools = useFontiTools();
   const query = tools?.query ?? '';
-  const shownArticles = useMemo(() => {
-    if (!query || matchesQuery(query, actHeading(act.norma), actTitle)) return act.articles;
-    return act.articles.filter((article) => {
+  // Not memoised: the rubrics arrive after the query, and `rubricaOf` is what says they did.
+  const shownArticles = !query || matchesQuery(query, actHeading(act.norma), actTitle) ? act.articles
+    : act.articles.filter((article) => {
       const text = article.article_text;
       const rubrica = (text ? getRubricText(text, parseArticleStructure(text)) : null) ?? rubricaOf(article.norma_data);
       const ids = new Set(articleItemIds(heldDossier, article.norma_data));
       const notes = (dossierItems ?? []).filter((i) => i.type === 'note' && i.aboutItemId && ids.has(i.aboutItemId)).map((i) => String(i.data));
       return matchesQuery(query, articleLabel(article.norma_data), article.norma_data.numero_articolo, rubrica, ...notes);
     });
-  // `rubricaOf` is new on each render; the act's title stands for what it reads.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, act.articles, act.norma, actTitle, heldDossier, dossierItems]);
   const report = tools?.report;
   useEffect(() => { report?.(act.id, shownArticles.length, act.articles.length); }, [report, act.id, shownArticles.length, act.articles.length]);
   useEffect(() => () => report?.(act.id, 0, 0), [report, act.id]);

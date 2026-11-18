@@ -153,6 +153,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const fontiTools = useMemo<FontiTools>(() => ({
     query, selecting, selected: selectedItems, toggle: toggleSelection, report: reportRows,
   }), [query, selecting, selectedItems, toggleSelection, reportRows]);
+  // A gesture that reveals a row (a cited norm, a reference, the act's arrows or structure) must find it drawn: the
+  // filter that would hide it is emptied, as the old list's search was.
+  useEffect(() => appStore.subscribe((state, prev) => {
+    const reveal = state.pendingReveal;
+    if (!reveal || reveal === prev.pendingReveal) return;
+    if (state.practices.some((p) => p.id === reveal.practiceId && p.dossierId === dossier.id)) setItemSearchQuery('');
+  }), [dossier.id]);
   const stopSelecting = () => {
     setSelecting(false);
     setSelectedItems(new Set());

@@ -151,6 +151,23 @@ describe('the filter of «Fonti» (LC88)', () => {
     expect(status()).toHaveTextContent('1 di 5');
   });
 
+  it('writes at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
+    renderPage();
+    expect(field()).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+    expect(field()).not.toHaveClass('text-base');
+  });
+
+  it('is emptied when a gesture reveals a row it hides (a cited norm, a reference, the act\'s arrows)', () => {
+    renderPage();
+    filter('responsab');
+    expect(rowOf(L24, '7')).toBeNull();
+    const table = s().practices.find(isBoundPractice)!;
+    const held = table.acts.find((a) => a.articles.some((r) => r.norma_data.numero_articolo === '7'))!;
+    act(() => { s().revealPracticeRow(table.id, held.id, practiceArticleKey(held.articles.find((r) => r.norma_data.numero_articolo === '7')!)); });
+    expect(field()).toHaveValue('');
+    expect(within(rowOf(L24, '7')!).getByRole('button', { name: /^Comprimi / })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('Esc empties the field and every row comes back; `/` reaches the field from the page', () => {
     renderPage();
     fireEvent.keyDown(document.body, { key: '/' });
@@ -224,6 +241,16 @@ describe('«Seleziona» on «Fonti» (LC88)', () => {
     expect(within(rowOf(L24, '5')!).getByRole('checkbox')).not.toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Fine' }));
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  });
+
+  it('Esc in «Sposta in…» closes only the list: the ticks stay', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona' }));
+    tick(rowOf(L24, '5'));
+    fireEvent.click(screen.getByRole('button', { name: 'Sposta in…' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Ricorso Bianchi' }), { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Sposta in…' })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(rowOf(L24, '5')!).getByRole('checkbox')).toBeChecked();
   });
 
   it('draws nothing over the list: no dialog, nothing fixed', () => {
