@@ -143,7 +143,8 @@ function useLastRead(dossierId: string, practiceId: string | undefined, rootRef:
           ? rootRef.current?.querySelector<HTMLElement>(`[data-practice-row="${CSS.escape(reading.rowKey)}"]`)
           : null;
         const scroller = row ? scrollParentOf(row) : null;
-        if (!row || !scroller || !reading) return;
+        // «Fonti» hidden under another tab draws no row: a scroll there says nothing of the reading.
+        if (!row || !scroller || !reading || row.getClientRects().length === 0) return;
         const offset = Math.round(Math.max(0, scroller.getBoundingClientRect().top - row.getBoundingClientRect().top));
         keepLastRead(dossierId, { act: reading.act, article: reading.article, offset: Math.min(offset, row.offsetHeight) });
       });

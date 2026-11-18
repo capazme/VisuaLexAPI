@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { ChevronDown, FolderPlus, MoreHorizontal, PanelRightOpen, Star, StickyNote, X } from 'lucide-react';
 import { useAddToDossier, useHeldInLabel, type DossierTarget } from '../dossier/addFromResult';
 import { HeldInMark } from '../dossier/HeldInMark';
@@ -74,7 +74,10 @@ export function PracticeRowShell({
   const corpus = dossier ? undefined : corpusItem;
   const notes = dossier?.inDossier ? dossier.notes : 0;
   const notesWords = notes === 1 ? '1 nota' : `${notes} note`;
-  const toggleRef = useRef<HTMLDivElement>(null);
+  // Opening, the focus stays where it is: on the heading clicked, on the act's arrows or chips that revealed the row.
+  const focusWhereItIs = useMemo<RefObject<HTMLElement | null>>(() => ({
+    get current() { return document.activeElement instanceof HTMLElement ? document.activeElement : null; },
+  }), []);
   // A note or a move asked from «⋯» (LC86), under the row.
   const [panel, setPanel] = useState<'note' | 'move' | null>(null);
   const heldIn = useHeldInLabel(corpus);
@@ -103,7 +106,6 @@ export function PracticeRowShell({
       <div className="flex items-center gap-1 rounded-lg transition-colors hover:bg-slate-50 md:gap-2 dark:hover:bg-slate-800/60">
         {/* The toggle wraps only text: the remove button stays outside it (gotcha 22). */}
         <div
-          ref={toggleRef}
           role="button"
           tabIndex={0}
           // Folded because a window shows the subject, the header does not expand: it goes to the window.
@@ -184,7 +186,7 @@ export function PracticeRowShell({
           <MenuButton
             label={`Azioni su ${removeName}`}
             triggerClassName={MENU_TRIGGER}
-            items={rowDossierItems(dossier, onRemove, { note: () => setPanel('note'), move: () => setPanel('move') })}
+            items={rowDossierItems(dossier, onRemove, { note: dossier.addNote && (() => setPanel('note')), move: () => setPanel('move') })}
           >
             <MoreHorizontal size={16} aria-hidden />
           </MenuButton>
@@ -226,9 +228,11 @@ export function PracticeRowShell({
       )}
       {dossier && (
         <>
-          <Expand open={panel === 'note'} onClose={() => setPanel(null)}>
-            <RowNoteComposer name={removeName} onSave={dossier.addNote} onDone={() => setPanel(null)} />
-          </Expand>
+          {dossier.addNote && (
+            <Expand open={panel === 'note'} onClose={() => setPanel(null)}>
+              <RowNoteComposer name={removeName} onSave={dossier.addNote} onDone={() => setPanel(null)} />
+            </Expand>
+          )}
           <Expand open={panel === 'move'} onClose={() => setPanel(null)}>
             <RowMovePicker onMove={dossier.moveTo} onDone={() => setPanel(null)} />
           </Expand>
@@ -236,11 +240,11 @@ export function PracticeRowShell({
       )}
       {dossier ? (
         // A dossier's «Fonti» (LC86, L-73): the row opens in place, the space growing under its heading and pushing the
-        // rest down (`Expand`, the island's times). The focus stays on the heading; no Esc, which is the reader's. Clipped
+        // rest down (`Expand`, the island's times). The focus stays where it was; no Esc, which is the reader's. Clipped
         // on the height alone, and with `clip`, not `hidden`: the reader's toolbar keeps sticking to the page's
         // scroller and the glosses' margin is not cut at the side. Brought into view on opening, it keeps the row's heading
         // (its 44 px, the command that closes it) clear under the act's sticky head.
-        <Expand open={isOpen} initialFocusRef={toggleRef} className="scroll-mt-[calc(var(--practice-head,0px)+3rem)] overflow-x-visible overflow-y-clip">
+        <Expand open={isOpen} initialFocusRef={focusWhereItIs} className="scroll-mt-[calc(var(--practice-head,0px)+3rem)] overflow-x-visible overflow-y-clip">
           <div id={regionId} className="pb-3 pt-1 md:pl-6 md:pr-2" style={regionStyle}>
             {children}
           </div>

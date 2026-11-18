@@ -102,6 +102,15 @@ describe('the rows of «Fonti»', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('opened from elsewhere (the act\'s arrows, a chip), leaves the focus where it was', () => {
+    render(<Page />);
+    const away = within(rowEl('5')).getByRole('button', { name: /^Azioni su/ });
+    away.focus();
+    act(() => { s().revealPracticeRow(bound().id, keyOf('7').act.id, keyOf('7').articleKey); });
+    expect(toggleOf('7')).toHaveAttribute('aria-expanded', 'true');
+    expect(document.activeElement).toBe(away);
+  });
+
   it('the decisions stand in their own group under the acts, their rows opening in place too', () => {
     render(<Page />);
     const decisions = screen.getByTestId('practice-decisions');
@@ -158,6 +167,13 @@ describe('a row\'s «⋯»: a note and a move, under the row (L-73)', () => {
     await act(async () => { fireEvent.click(within(rowEl('7')).getByRole('button', { name: 'Aggiungi la nota' })); });
     expect(addNote).toHaveBeenCalledWith('dos-1', 'Da rileggere', 'n24-7');
     expect(within(rowEl('7')).queryByRole('textbox')).toBeNull();
+  });
+
+  it('a decision\'s «⋯» offers no note: the server takes notes about articles only', () => {
+    render(<Page />);
+    fireEvent.click(within(screen.getByTestId('practice-decisions')).getByRole('button', { name: /^Azioni su/ }));
+    expect(screen.queryByRole('menuitem', { name: 'Aggiungi una nota' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: "Sposta in un'altra pratica" })).toBeInTheDocument();
   });
 
   it('«Sposta in un\'altra pratica» lists the other dossiers under the row and moves the entry there', () => {
