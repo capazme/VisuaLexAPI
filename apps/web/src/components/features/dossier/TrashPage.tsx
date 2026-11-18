@@ -33,7 +33,8 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
       </button>
       {/* The title as on every section page (W2), under the way back. */}
       <header className="mb-6">
-        <h1 className={PAGE_TITLE}>Cestino</h1>
+        {/* Where the focus lands coming from the list (LC98, `ViewSlide`). */}
+        <h1 data-page-title="" className={PAGE_TITLE}>Cestino</h1>
         <p className="mt-1 max-w-prose text-sm text-slate-500 dark:text-slate-400">
           Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni, come ciò che elimini tu: le pratiche, le voci che togli da una pratica, le schede di studio.
         </p>

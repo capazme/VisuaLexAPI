@@ -2,7 +2,7 @@
 
 Il browser parla solo con il BFF Node (`/api/merlt/*`). Il BFF autentica l'utente VisuaLex, applica i guard e inietta `user_id` nel corpo o nella query verso MERL-T. Non inoltra né il JWT né alcun header `X-User-ID`.
 
-Ogni client BFF invia `MERLT_API_KEY` come `X-API-Key` quando la variabile è impostata. MERL-T rende `verify_api_key` opzionale: `services/merlt/merlt/app.py` fa `app.dependency_overrides[verify_api_key] = optional_api_key`. La chiave serve quindi solo alle route `require_role("admin")`, marcate **ADMIN** qui sotto. **OPT** vuol dire che MERL-T accetta la richiesta anche senza chiave: su quelle route il solo cancello è il BFF, e per questo `:8000` non va mai esposto.
+Ogni client BFF invia `MERLT_API_KEY` come `X-API-Key` quando la variabile è impostata. Dalla correzione A.2 ogni route di MERL-T chiede la chiave: `services/merlt/merlt/app.py` include ogni router dietro `verify_api_key`, e restano aperte solo `/health` e `/`. Le route `require_role("admin")`, marcate **ADMIN** qui sotto, chiedono anche il ruolo admin. **OPT** vuol dire ora: chiave richiesta, nessun ruolo.
 
 Fonte di verità: `apps/server/src/routes/merlt/index.ts` (montaggio e feature flag) e i router in `apps/server/src/routes/merlt/*.ts`. Le tabelle elencano le route effettivamente montate al 2026-09-25.
 
@@ -119,14 +119,14 @@ Un voto che chiude il consenso aggiorna la cache authority del votante.
 | `/ops/ingestion/batches/:batchId/promote` | POST | `auth` + `admin` | `POST /api/v1/ingestion/mechanical/batches/{id}/promote` | **ADMIN** | `IngestionAdminPanel` |
 | `/ops/ingestion/batches/:batchId/reject` | POST | `auth` + `admin` | `POST /api/v1/ingestion/mechanical/batches/{id}/reject` | **ADMIN** | `IngestionAdminPanel` |
 
-Come rispondono le route ops quando MERL-T rifiuta la chiave:
+Come rispondono le route quando MERL-T rifiuta la chiave:
 
-- `ops.ts` risponde 503 `merlt_auth_misconfigured` a un 401/403 upstream.
+- ogni route, ops comprese, risponde 503 `merlt_auth_misconfigured` a un 401/403 upstream (ogni client lancia `MerltAuthError`): è un difetto di configurazione del server, mai un 401 dell'utente. L'esportazione dei dati (`userData.ts`, che chiama MERL-T per conto suo) risponde il proprio 503 «MERL-T non è raggiungibile».
 - `opsIngestion.ts` lascia passare solo 404 e 409; ogni altro 4xx diventa 503 `merlt_unavailable`.
 
 ## Note di contratto
 
-- **Errori.** Un errore di rete, un timeout o un 5xx di MERL-T diventa 503 `merlt_unavailable`. I 4xx di MERL-T passano invariati sulle route experts. I corpi invalidi rispondono 400 `invalid_body`, con gli `issues` di Zod.
+- **Errori.** Un errore di rete, un timeout o un 5xx di MERL-T diventa 503 `merlt_unavailable`. I 4xx di MERL-T passano invariati sulle route experts, tranne 401 e 403: la chiave del server rifiutata diventa 503 `merlt_auth_misconfigured`. I corpi invalidi rispondono 400 `invalid_body`, con gli `issues` di Zod.
 - **Consenso.** È persistito lato server (Prisma `MerltUserPreference` più l'audit append-only `MerltConsentAudit`). Il `localStorage` del frontend è solo una cache di avvio. L'audit non è consultabile da alcuna route.
 - **Upload.** È multipart: multer lo valida nel BFF, che poi lo inoltra a MERL-T come `multipart/form-data`.
 - **Callback verso il BFF.** Le tre route `/internal/*` vogliono lo stesso `MERLT_INTERNAL_SECRET` che compose passa a merlt-api e a merlt-worker (default `dev-internal-secret`).

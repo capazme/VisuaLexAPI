@@ -557,8 +557,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   the layout's content area, not `<main>`, so the bars at the top and the floating buttons hold still. It is named only
   while a transition runs (`lib/pageTransition.ts`, the class `vlx-page-changing` on the root; the sign-in page's
   entrance goes through it too): a `view-transition-name` makes a stacking context (gotcha 22), and `<main>` keeps
-  its own with `isolate`. The content fades out in 100 ms, then the new one fades in rising by 5 px in 140 ms,
-  `--ease-out`: 240 ms, no overlap, nothing drawn over the screen; the root and the groups do not animate (a group's
+  its own with `isolate`. The content fades out in `--dur-press`, then the new one fades in rising by 5 px in
+  `--dur-press`, `--ease-out`: 240 ms (`dur.panel`, LC98: the `--dur-*` of `:root` mirror `lib/motion.ts`), no overlap, nothing drawn over the screen; the root and the groups do not animate (a group's
   default 250 ms would outlast the change, `theme.test.ts` checks the budget), the root's pictures do not blend
   (`mix-blend-mode: normal`: the default `plus-lighter` adds old and new, the old sidebar's entries showing through
   the new, a light page washed out), and `::view-transition` takes no pointer, so a tap reaches the page. The
@@ -3157,7 +3157,7 @@ writes the old toga value out (`authorityColor.ts`, the highlight's blue icon in
 under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
 windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
 drop, and `shadow-xs`–`shadow` as a faint warm top edge and a darker drop (LC30: `shadow-sm` and up carry a 1 px light top
-edge in the light too; a shared field carries `inset-shadow-xs`, `--tw-inset-shadow`, so its ring still shows) —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s
+edge in the light too; a shared field carries `inset-shadow-xs`, `--tw-inset-shadow`, so its ring still shows) —; flat paper, no gradient but the comparison's hatch (`GapCell`; `Skeleton` is flat since LC98); `index.css`'s
 `@apply` is read too. `Button` presses to 0.97 in
 120 ms; a hover that moves or grows something sits under `[@media(hover:hover)_and_(pointer:fine)]` (`HOVER_LIFT`).
 
@@ -3312,7 +3312,13 @@ meant to stay split; add new features as new files, not inside the shells:
   navigation (`settingsRoute.ts`, `useSettingsRequests`), keeping where it came from (`settingsFrom` in the history's
   state): «Indietro» and Esc (pressed in the page or with the focus nowhere) go back there, or to `/` when it was
   opened by its address. It comes in with `PageSlide` and leaves the other way (`back`): `Layout`'s key for it changes
-  only entering and leaving Impostazioni. What opens inside it opens in the page (`Expand`).
+  only entering and leaving Impostazioni. What opens inside it opens in the page (`Expand`). A section's views (Pratiche's
+  list, dossier and trash; Learn's and Opus's views) move the same way through `layout/ViewSlide` (LC98), in their order,
+  the focus then on the page's `data-page-title`; what arrives after a wait comes in through `ui/Arrive` over a `Skeleton`.
+  «Indietro» above a page's frame is `ui/BackLink` (LC104, Amministrazione): the focus lands on the title reached or,
+  toward an anchor (`/impostazioni#amministrazione`), on the anchored part's heading once drawn; the browser's own focus
+  of an anchored part that is no control drops it to the body, and `focusLanding` gives it back. `ui/Switch` (one size,
+  44 × 24), `ui/Textarea` (on `controlStyles`, as `Input`) and `ui/Card` (one box, no variants) are the common ones.
 - `features/workspace/` — what a practice's rows borrow from the old workspace: `LazyStudyMode` (the
   `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are lazy the same way) and
   `ArticleNavigation` (an act's previous/next arrows). The floating tabs, their dock and their panels are gone

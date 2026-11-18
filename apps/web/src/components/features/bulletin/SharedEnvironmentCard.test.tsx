@@ -49,10 +49,11 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
     expect(screen.queryByText('Ai miei dossier')).not.toBeInTheDocument();
   });
 
-  it('names the card’s «⋯» menu and gives it a 44 px touch target on a phone', () => {
+  it('names the card’s «⋯» menu and gives it a 44 px touch target on a phone, 32 on a computer', () => {
     renderCard(base);
     const menu = screen.getByRole('button', { name: 'Azioni su «Ricorso Rossi»' });
-    expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
+    // 32 px on a computer, as the other «⋯» (LC103; it was 24).
+    expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-8', 'md:min-w-8');
   });
 
   it('gives «Mi piace» and «Aggiungi ai miei dossier» a 44 px touch target on a phone', () => {
@@ -165,5 +166,50 @@ describe('SharedEnvironmentCard — who added it, and the views', () => {
     );
     expect(screen.getByText('aggiunto da 3')).toBeInTheDocument();
     expect(screen.getByText('1 visualizzazione')).toBeInTheDocument();
+  });
+});
+
+// LC103: the card's «⋯» is a `MenuButton`, and a «⋯» with nothing in it is not drawn.
+describe('SharedEnvironmentCard — its «⋯»', () => {
+  it('closes on Escape and gives the focus back to its button', async () => {
+    const onSuggest = vi.fn();
+    render(<SharedEnvironmentCard environment={base} onLike={vi.fn()} onImport={vi.fn()} onReport={vi.fn()} onSuggest={onSuggest} />);
+    const trigger = screen.getByRole('button', { name: 'Azioni su «Ricorso Rossi»' });
+    await userEvent.click(trigger);
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Suggerisci contenuto', 'Segnala']);
+    expect(screen.getByRole('menuitem', { name: 'Suggerisci contenuto' })).toHaveFocus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Segnala' })).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('draws no «⋯» on the user\'s own card in Explore, where it has no action', () => {
+    renderCard({ ...base, isOwner: true });
+    expect(screen.queryByRole('button', { name: 'Azioni su «Ricorso Rossi»' })).toBeNull();
+  });
+
+  it('keeps the owner\'s actions in «I miei pubblicati», and «Elimina» grows from the «⋯», focused again', async () => {
+    const onDelete = vi.fn();
+    render(
+      <SharedEnvironmentCard
+        environment={{ ...base, isOwner: true }}
+        onLike={vi.fn()}
+        onImport={vi.fn()}
+        onReport={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={onDelete}
+        onWithdraw={vi.fn()}
+        onViewVersions={vi.fn()}
+        showOwnerActions
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Azioni su «Ricorso Rossi»' });
+    await userEvent.click(trigger);
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Modifica', 'Versioni', 'Ritira', 'Elimina']);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
+    expect(onDelete).toHaveBeenCalledWith({ ...base, isOwner: true }, trigger);
+    expect(trigger).toHaveFocus();
   });
 });

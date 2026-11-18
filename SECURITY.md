@@ -77,7 +77,7 @@ checks none of them.
 | Destination | What it is | What it receives |
 |---|---|---|
 | MERL-T (`merlt-api`, `merlt-worker`) | FastAPI + RQ containers on the same host (`docker-compose.merlt.yml`). Every port is bound to `127.0.0.1` | Everything listed per consent level below, stored in its own Postgres, FalkorDB, Qdrant and the `merlt_uploads` volume |
-| OpenRouter (`openrouter.ai`) | The LLM API the experts, the synthesizer and the note extractor call, with `OPENROUTER_API_KEY` | Q&A questions with the retrieved legal context, and the text of uploaded notes during extraction |
+| OpenRouter (`openrouter.ai`) | The LLM API the experts, the synthesizer and the note extractor call, with `OPENROUTER_API_KEY`. Every call asks for providers that neither train on the text nor keep it (`provider.data_collection: "deny"`, `provider.zdr: true`, G-456); a model with no such provider is refused | Q&A questions with the retrieved legal context, and the text of uploaded notes during extraction |
 | `mcp-legal-it` | An MCP server of Italian legal tools, vendored as the git submodule `vendor/mcp-legal-it` and run as a container | Tool arguments the LLM derives from the question (search terms, references). The public sources it queries in turn are defined by the submodule, not by this repository |
 
 What leaves depends on the consent level. The BFF stores it

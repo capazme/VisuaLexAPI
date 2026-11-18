@@ -56,7 +56,7 @@ Prerequisiti del prodotto base: Docker con Compose v2, Node con npm 11 (la CI us
    Poi imposta questi valori:
    - `DATABASE_URL` (il Postgres dello stack: `postgresql://visualex:visualex@localhost:5436/visualex_platform`) e `JWT_SECRET`, per il BFF.
    - `MERLT_INTERNAL_SECRET`. L'esempio usa già `dev-internal-secret`, lo stesso default di compose. Se lo cambi, `start.sh` rilegge il valore da `apps/server/.env` e lo esporta anche a compose, così i due lati restano allineati.
-   - `MERLT_API_KEY`: una stringa lunga e casuale. `start.sh` la esporta anche come `MERLT_ADMIN_API_KEY`, e merlt-api la registra al boot come chiave `admin` (per hash, in modo idempotente). Senza chiave, training RLCF e ingestion meccanica rispondono 401 upstream, cioè 503 lato BFF.
+   - `MERLT_API_KEY`: una stringa lunga e casuale. `start.sh` la esporta anche come `MERLT_ADMIN_API_KEY`, e merlt-api la registra al boot come chiave `admin` (per hash, in modo idempotente). Senza chiave ogni route di MERL-T risponde 401 upstream, cioè 503 `merlt_auth_misconfigured` lato BFF.
    - `MERLT_ENABLED` può restare `"false"`. `MERLT_ENABLED=true ./start.sh` vince comunque, perché dotenv non sovrascrive una variabile già presente nell'ambiente.
 
 5. **Dai la chiave LLM a compose.** Compose legge `OPENROUTER_API_KEY` dalla shell o da `infra/.env`, che crei copiando [`infra/.env.example`](../../infra/.env.example). Senza chiave il Q&A e l'estrazione dagli appunti non funzionano.
@@ -124,7 +124,7 @@ Il dettaglio di ogni passo, con le chiamate di rete attese, è in [smoke-checkli
 |---|---|---|
 | `MERLT_ENABLED` | `true` nel codice, `"false"` nell'esempio | Kill switch dell'intero `/api/merlt` (404 `merlt_disabled`) |
 | `MERLT_API_URL` | `http://localhost:8000` | Base URL di MERL-T |
-| `MERLT_API_KEY` | vuota | Inviata come `X-API-Key` da ogni client. Obbligatoria solo per `/rlcf/training/start` e `/ingestion/mechanical/*` |
+| `MERLT_API_KEY` | vuota | Inviata come `X-API-Key` da ogni client. Obbligatoria per ogni route di MERL-T tranne `/health` e `/` |
 | `MERLT_TIMEOUT_MS` | 5000 nei client se assente (l'esempio mette 60000) | Timeout di merltClient, graphClient, opsClient, opsIngestionClient |
 | `MERLT_EXPERTS_TIMEOUT_MS` / `MERLT_EXPERTS_ASYNC_TIMEOUT_MS` | 120000 / 10000 | Q&A sync / submit async |
 | `MERLT_NER_TIMEOUT_MS` | 10000 | nerClient |
@@ -144,7 +144,7 @@ Il dettaglio di ogni passo, con le chiamate di rete attese, è in [smoke-checkli
 | `MERLT_POSTGRES_DB` / `_USER` / `_PASSWORD` | `merlt` | postgres, api, worker |
 | `MERLT_POSTGRES_PORT`, `MERLT_REDIS_PORT`, `MERLT_FALKOR_PORT`, `MERLT_QDRANT_PORT`, `MERLT_QDRANT_GRPC_PORT`, `MERLT_API_PORT`, `MCP_LEGAL_IT_PORT` | 5436, 6381, 6382, 6343, 6344, 8000, 8011 | porte host |
 | `MERLT_INTERNAL_SECRET` | `dev-internal-secret` | api, worker |
-| `MERLT_API_KEY` → `MERLT_ADMIN_API_KEY` | vuota (la seed viene saltata) | api (chiave admin seminata al boot) |
+| `MERLT_API_KEY` → `MERLT_ADMIN_API_KEY` | vuota (nessuna chiave resta attiva: ogni route risponde 401) | api (chiave admin seminata al boot; le altre vengono disattivate) |
 | `OPENROUTER_API_KEY` | vuota | api, worker |
 | `MERLT_GRAPH_NAME` / `MERLT_QDRANT_COLLECTION` | `merl_t_legal` / `merl_t_legal_chunks` | api, worker |
 | `MERLT_SKIP_SEED` / `MERLT_SKIP_EMBEDDINGS` | `false` / `true` | api (il worker ha sempre `MERLT_SKIP_SEED=true`) |
@@ -228,6 +228,6 @@ Redis invece non è durabile: coda RQ e cache si perdono a ogni recreate.
 |---|---|---|
 | `compose up` fallisce su `vendor/mcp-legal-it` | submodule non inizializzato | `git submodule update --init --recursive vendor/mcp-legal-it` |
 | Job «in corso» fino al timeout | callback rifiutata (500 `internal_auth_not_configured` o 401), worker fermo, o sotto-flag spento (404) | Allinea `MERLT_INTERNAL_SECRET` fra BFF e compose; controlla `docker compose ... ps`; lascia accesi graph/contribution |
-| Ops RLCF o ingestion → 503 `merlt_auth_misconfigured` / `merlt_unavailable` | `MERLT_API_KEY` vuota o diversa dalla chiave seminata | Imposta `MERLT_API_KEY` in `apps/server/.env` e ricrea merlt-api, così la chiave viene seminata |
+| Qualunque route MERL-T → 503 `merlt_auth_misconfigured` (l'esportazione dei dati: «MERL-T non è raggiungibile») | `MERLT_API_KEY` vuota o diversa dalla chiave seminata | Imposta `MERLT_API_KEY` in `apps/server/.env` e ricrea merlt-api, così la chiave viene seminata |
 | Training NER sempre `queued` | il worker non ascolta `merlt_ner_train` | Ripristina la lista code nel `command` del worker e ricrea merlt-worker |
 | `curl /api/merlt/health` → 401 | `merltRoutes` montato dopo i router con auth catch-all | Vedi il gotcha 1 di Slice 1 in `CLAUDE.md` |

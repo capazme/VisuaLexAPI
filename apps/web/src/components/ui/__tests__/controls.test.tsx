@@ -7,7 +7,10 @@ import { Button } from '../Button';
 import { IconButton } from '../IconButton';
 import { Input } from '../Input';
 import { Select } from '../Select';
-import { CONTROL_HEIGHT, CONTROL_RADIUS, type ControlSize } from '../controlStyles';
+import { Textarea } from '../Textarea';
+import { Switch } from '../Switch';
+import { Card } from '../Card';
+import { CONTROL_BORDER, CONTROL_HEIGHT, CONTROL_RADIUS, type ControlSize } from '../controlStyles';
 
 const SRC = resolve(process.cwd(), 'src');
 const classes = (el: HTMLElement) => el.className.split(/\s+/);
@@ -75,7 +78,7 @@ describe('Button, IconButton, Input and Select speak one language', () => {
   });
 
   it('carry no `glass` look, in the components nor in their uses', () => {
-    for (const file of ['Input.tsx', 'Select.tsx', 'controlStyles.ts', 'Field.tsx']) {
+    for (const file of ['Input.tsx', 'Select.tsx', 'Textarea.tsx', 'Card.tsx', 'controlStyles.ts', 'Field.tsx']) {
       expect(readFileSync(join(SRC, 'components', 'ui', file), 'utf8')).not.toMatch(/glass|backdrop-blur/);
     }
     const uses = sources(SRC).filter((file) => /variant=["']glass["']/.test(readFileSync(file, 'utf8')));
@@ -104,5 +107,55 @@ describe('Button, IconButton, Input and Select speak one language', () => {
     render(<Input label="Numero" />);
     expect(screen.getByText('Categoria').className).toBe(screen.getByText('Numero').className);
     expect(screen.getByText('Categoria')).not.toHaveClass('uppercase');
+  });
+});
+
+// LC104: a text area beside a field has its radius (the consultant on #616: 6 against 4 in the same card form).
+describe('Textarea, Switch and Card', () => {
+  it('give the text area the radius, border and label of Input and Select', () => {
+    render(
+      <>
+        <Input label="Istituto" />
+        <Select label="Materia"><option>Civile</option></Select>
+        <Textarea label="Domanda" />
+      </>,
+    );
+    const area = screen.getByRole('textbox', { name: 'Domanda' });
+    for (const el of [screen.getByRole('textbox', { name: 'Istituto' }), screen.getByRole('combobox'), area]) {
+      expect(radii(el)).toEqual([CONTROL_RADIUS]);
+      expect(el).toHaveClass(...CONTROL_BORDER.split(' '));
+    }
+    expect(screen.getByText('Domanda').className).toBe(screen.getByText('Istituto').className);
+  });
+
+  it('wire the text area\'s message, red without marking it invalid when a limit is passed', () => {
+    render(<Textarea label="Risposta" helperText="5 caratteri di troppo" warning />);
+    const area = screen.getByRole('textbox', { name: 'Risposta' });
+    expect(area).toHaveAccessibleDescription('5 caratteri di troppo');
+    expect(area).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByText('5 caratteri di troppo')).toHaveClass('text-red-600');
+  });
+
+  it('draw one switch: its role, its state, a 44 × 24 track', () => {
+    const changes: boolean[] = [];
+    const { rerender } = render(<Switch aria-label="Modalità sviluppo" checked={false} onCheckedChange={(v) => changes.push(v)} />);
+    const toggle = screen.getByRole('switch', { name: 'Modalità sviluppo' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    toggle.click();
+    expect(changes).toEqual([true]);
+    rerender(<Switch aria-label="Modalità sviluppo" checked onCheckedChange={(v) => changes.push(v)} />);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    // jsdom draws nothing: the size is read from the classes (w-11 h-6 = 44 × 24), the hit area 44 on a phone.
+    expect(toggle.querySelector('[data-switch-track]')).toHaveClass('w-11', 'h-6');
+    expect(toggle).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+  });
+
+  it('draw one card, with no variant: the fields\' radius and border, no shadow at rest', () => {
+    render(<Card data-testid="card">Contenuto</Card>);
+    const card = screen.getByTestId('card');
+    expect(radii(card)).toEqual([CONTROL_RADIUS]);
+    expect(card).toHaveClass(...CONTROL_BORDER.split(' '));
+    expect(classes(card).filter((c) => /^shadow/.test(c))).toEqual([]);
+    expect(readFileSync(join(SRC, 'components', 'ui', 'Card.tsx'), 'utf8')).not.toMatch(/variant/);
   });
 });

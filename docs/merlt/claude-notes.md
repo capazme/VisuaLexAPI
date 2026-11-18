@@ -180,23 +180,23 @@ interpolates. That value defaults to `dev-internal-secret`, and
 no `X-User-ID` is forwarded. MERL-T learns who the user is only from the
 `user_id` the BFF injects into the body.
 
-`services/merlt/merlt/app.py` overrides `verify_api_key` with `optional_api_key`, so only
-`require_role("admin")` routes need the key. Of the routes the BFF proxies,
-those are `/rlcf/training/start` and `/ingestion/mechanical/*`. The `/admin/*`
-routes (config, engine reinitialize, graph hygiene) and `/ner/*` declare only
-`verify_api_key`, so MERL-T itself leaves them open. The BFF `requireAdmin` is
-their only gate, and `:8000` must never be exposed.
+Every MERL-T route needs the key (scan A.2): `services/merlt/merlt/app.py`
+includes every router behind `verify_api_key`, and only `/health` and `/` stay
+open. With no key configured every route answers 401. The `require_role("admin")`
+routes (`/rlcf/training/*`, `/ingestion/mechanical/*`) also need the admin role;
+the BFF's `requireAdmin` still guards the admin pages on its side.
 
-The admin key is seeded at boot from `MERLT_ADMIN_API_KEY`; compose passes it
-`${MERLT_API_KEY}`. A fresh stack therefore no longer needs the manual
-`POST /api/v1/api-keys/bootstrap`, which nothing ever called.
+The key is seeded at boot from `MERLT_ADMIN_API_KEY`; compose passes it
+`${MERLT_API_KEY}`. The seed deactivates every other active key, and no route
+hands one out (the old bootstrap route is gone).
 
-When MERL-T refuses the key:
-
-- the `ops.ts` routes answer 503 `merlt_auth_misconfigured` on an upstream
-  401/403;
-- `opsIngestion.ts` collapses every upstream 4xx except 404/409 to 503
-  `merlt_unavailable`.
+When MERL-T refuses the key (401 or 403), every client throws `MerltAuthError`
+and every route answers 503 `merlt_auth_misconfigured` (the data export, which
+calls MERL-T on its own in `userData.ts`, answers its 503 «MERL-T non è
+raggiungibile»): a fault of the server's
+configuration, never relayed as the user's 401 (the web would read that as an
+expired session and spend a token refresh on each call). `opsIngestion.ts` still
+collapses every other upstream 4xx except 404/409 to 503 `merlt_unavailable`.
 
 **Job nets (`services/merlt/jobWatchdog.ts`).** `apps/server/src/index.ts` schedules
 the watchdog every 5 min; it is off in tests. The watchdog is what unblocks a

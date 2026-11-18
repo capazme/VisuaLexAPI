@@ -16,6 +16,8 @@ import {
   MerltNetworkError,
   MerltServerError,
   MerltBadRequestError,
+  MerltAuthError,
+  isKeyRefusal,
 } from './merltClient';
 
 export interface NerClientConfig {
@@ -130,6 +132,10 @@ export class NerClient {
         `MERL-T ${response.status} on ${path}: ${text.slice(0, 200)}`,
         response.status
       );
+    }
+
+    if (isKeyRefusal(response.status)) {
+      throw new MerltAuthError(path, response.status);
     }
 
     if (response.status >= 400) {

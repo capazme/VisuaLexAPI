@@ -18,6 +18,7 @@ import { TaskSheetScope } from './TaskSheetScope';
 import { TaskGroup } from './TaskGroup';
 import { WeekStrip } from './WeekStrip';
 import { TaskListSkeleton, TaskViewEmpty, TaskViewError, TruncatedNote } from './TaskViewStates';
+import { Arrive } from '../../ui/Arrive';
 import { useTaskView } from './useTaskView';
 import { plannerStore } from './plannerStore';
 
@@ -62,14 +63,15 @@ function ViewFrame({ view, heading, line, defaults, before, children, empty }: F
       {before?.(today, tasks)}
       <div aria-busy={state.status === 'loading'} className={cn('space-y-6', state.status === 'loading' && state.answer && 'opacity-60 transition-opacity')}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
-        {state.answer === null ? (
-          state.status === 'loading' && <TaskListSkeleton />
-        ) : (
-          // Mounted on an empty view too: a sheet open on the last task stays open when the task leaves the view.
-          <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic} className="space-y-8">
-            {tasks.length === 0 && empty ? empty : children(tasks, today, state.optimistic)}
-          </TaskSheetScope>
-        )}
+        {/* The rows come in once the first read answers (LC98); a read again keeps them, dimmed. */}
+        <Arrive loading={state.answer === null && state.status === 'loading'} placeholder={<TaskListSkeleton />}>
+          {state.answer !== null && (
+            // Mounted on an empty view too: a sheet open on the last task stays open when the task leaves the view.
+            <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic} className="space-y-8">
+              {tasks.length === 0 && empty ? empty : children(tasks, today, state.optimistic)}
+            </TaskSheetScope>
+          )}
+        </Arrive>
         {state.answer?.truncated && <TruncatedNote />}
       </div>
     </section>

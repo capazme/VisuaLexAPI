@@ -7,7 +7,9 @@
  * Errors:
  *  - MerltTimeoutError    → BFF responds 503 (network/timeout)
  *  - MerltServerError     → BFF responds 503 (5xx from MERL-T)
- *  - MerltBadRequestError → BFF passes status through (4xx from MERL-T)
+ *  - MerltAuthError       → BFF responds 503 merlt_auth_misconfigured (401/403 from MERL-T:
+ *                           it refused the server's key, a configuration fault, never the user's)
+ *  - MerltBadRequestError → BFF passes status through (other 4xx from MERL-T)
  *  - generic Error        → unexpected (logged, BFF responds 500)
  */
 
@@ -51,6 +53,30 @@ export class MerltBadRequestError extends MerltClientError {
     super(message, status);
     this.name = 'MerltBadRequestError';
   }
+}
+
+/**
+ * MERL-T refused the server's key (401 or 403): MERLT_API_KEY is empty, or differs from the key
+ * MERL-T seeded at boot. A fault of the server's configuration, never the person's: relayed as a
+ * 401 it would read as an expired session in the web, which would spend a token refresh on every
+ * refused call. Every client throws it, and the routes answer 503 `merlt_auth_misconfigured`.
+ * `status` keeps MERL-T's own answer, for the logs.
+ */
+export class MerltAuthError extends MerltClientError {
+  constructor(path: string, status: number) {
+    super(`MERL-T refused the server's API key (${status}) on ${path}: check MERLT_API_KEY`, status);
+    this.name = 'MerltAuthError';
+  }
+}
+
+/** Whether MERL-T's answer is a refusal of the server's key. */
+export function isKeyRefusal(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+/** The 503 detail for a failed MERL-T call: a refused key is a configuration fault, not an outage. */
+export function merltUnavailableDetail(err: unknown): 'merlt_auth_misconfigured' | 'merlt_unavailable' {
+  return err instanceof MerltAuthError ? 'merlt_auth_misconfigured' : 'merlt_unavailable';
 }
 
 export interface MerltClientConfig {
@@ -185,6 +211,10 @@ export class MerltClient {
         `MERL-T ${response.status} on ${path}: ${text.slice(0, 200)}`,
         response.status
       );
+    }
+
+    if (isKeyRefusal(response.status)) {
+      throw new MerltAuthError(path, response.status);
     }
 
     if (response.status >= 400) {

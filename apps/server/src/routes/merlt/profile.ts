@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { createMerltClient, MerltClientError } from '../../services/merlt/merltClient';
+import { createMerltClient, MerltAuthError, MerltClientError } from '../../services/merlt/merltClient';
 import { getOrSyncAuthority } from '../../services/merlt/authorityCache';
 
 const router = Router();
@@ -42,6 +42,10 @@ router.get('/profile', async (req: Request, res: Response): Promise<void> => {
       syncedAt: profile.syncedAt.toISOString(),
     });
   } catch (err) {
+    if (err instanceof MerltAuthError) {
+      res.status(503).json({ detail: 'merlt_auth_misconfigured' });
+      return;
+    }
     if (err instanceof MerltClientError) {
       res.status(err.status && err.status < 500 ? err.status : 503).json({
         detail: 'merlt_error',

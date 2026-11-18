@@ -565,7 +565,10 @@ describe('«Le mie schede», delete', () => {
   it('gives the focus to the next card of the list, never to the body (LC89)', async () => {
     trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
     await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
-    await waitFor(() => expect(screen.getByRole('link', { name: /Domanda r2\?/ })).toHaveFocus());
+    // Found once (the list stays beside the card): a getByRole by name in every poll starved the router's
+    // navigation, a time-sliced transition, past the wait on a busy machine.
+    const next = screen.getByRole('link', { name: /Domanda r2\?/ });
+    await waitFor(() => expect(next).toHaveFocus());
   });
 
   it('«Apri il cestino» leads to the trash, where the card can be restored once the notification is gone', async () => {

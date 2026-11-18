@@ -20,7 +20,7 @@ from fastapi import APIRouter, HTTPException, Query, status, Depends, Response
 from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from merlt.api.auth import verify_api_key, require_role, get_current_user_id
+from merlt.api.auth import verify_api_key, require_role
 from merlt.experts.models import ApiKey
 from merlt.api.models.profile_models import (
     FullProfileResponse,
@@ -659,11 +659,8 @@ async def get_full_profile(
     user_id: str = Query(..., description="User ID from auth context"),
     session: AsyncSession = Depends(get_db_session_dependency),
     api_key: ApiKey = Depends(verify_api_key),
-    jwt_user_id: Optional[str] = Depends(get_current_user_id),
 ) -> FullProfileResponse:
     """Ritorna profilo completo utente."""
-    if jwt_user_id and jwt_user_id != user_id and api_key is None:
-        raise HTTPException(status_code=403, detail="Cannot access another user's profile")
     log.info("API: get_full_profile", user_id=user_id)
 
     try:

@@ -218,7 +218,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       kicker={sectionOfDossierKind(sectionKind)}
       // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
       section={sectionOfDossierKind(sectionKind)}
-      className="animate-in fade-in duration-200"
       // On a phone the title keeps its row with «⋯» (Importa, Cestino) and «+» beside it (M1); from md the three buttons.
       actionBeside={!isDesktop}
       action={isDesktop ? (

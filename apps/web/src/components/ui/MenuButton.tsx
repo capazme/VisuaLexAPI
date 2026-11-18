@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
-import { IslandSurface } from './IslandSurface';
+import { MenuSurface } from './MenuSurface';
 
 export interface MenuItem {
   label: string;
@@ -59,8 +59,8 @@ export interface MenuButtonProps {
 /**
  * A button that opens a list of actions (WAI-ARIA menu button): arrows, Home
  * and End move, Escape and Tab close, focus returns to the trigger, a click
- * outside closes. Clicks never reach the card it sits in. The dossier's menus. The list grows out of the trigger and
- * goes back into it (`IslandSurface`, LC85).
+ * outside closes. Clicks never reach the card it sits in. The dossier's menus. The list appears under the trigger,
+ * aligned to its edge, by a fade and a 4 px shift (`MenuSurface`, LC102).
  */
 export function MenuButton({ label, title, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
@@ -73,6 +73,7 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const menuId = useId();
 
+  const above = placement === 'auto' ? opensAbove : placement === 'above';
   const enabled = items.map((item, index) => (item.disabled ? -1 : index)).filter((index) => index >= 0);
   const focusItem = (index: number | undefined) => {
     if (index !== undefined) itemRefs.current[index]?.focus();
@@ -136,8 +137,20 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
     } else if (event.key === 'Tab') close(false);
   };
 
+  // A «⋯» that opens nothing is not drawn (LC103).
+  if (items.length === 0) return null;
+
   return (
-    <div ref={wrapperRef} className={cn('relative', className)} onClick={(e) => e.stopPropagation()}>
+    <div
+      ref={wrapperRef}
+      className={cn('relative', className)}
+      onClick={(e) => e.stopPropagation()}
+      // The focus taken elsewhere (the Cronologia's «/» to its search) closes it, as Tab does (LC103). Only towards an
+      // element: a click on Safari leaves `relatedTarget` null, and the click outside has its own handler.
+      onBlur={(e) => {
+        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpenAt(null);
+      }}
+    >
       <button
         ref={triggerRef}
         type="button"
@@ -157,25 +170,21 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
       </button>
       <AnimatePresence>
       {open && (
-        <IslandSurface
+        <MenuSurface
           key="menu"
-          source={triggerRef.current}
           id={menuId}
           role="menu"
           aria-label={label}
           aria-describedby={heading ? `${menuId}-heading` : undefined}
           onKeyDown={onMenuKey}
+          above={above}
           className={cn(
             Z_INDEX.dropdown,
-            'absolute flex w-56 flex-col',
-            (placement === 'auto' ? opensAbove : placement === 'above') ? 'bottom-full mb-1' : 'mt-1',
+            'absolute w-56 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
+            above ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
             menuClassName,
-            // The list scrolls inside (below); the box would clip the shape growing from the trigger outside it.
-            'overflow-visible',
           )}
-          surfaceClassName="rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800"
-          contentClassName="relative min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg py-1"
         >
           {heading && (
             <p id={`${menuId}-heading`} role="presentation" className="px-3 pb-1.5 pt-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
@@ -183,7 +192,8 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
             </p>
           )}
           {items.map((item, index) => (
-            <div key={item.label}>
+            // Two items may share a label (two pratiche of one title, in the Cronologia's «⋯»).
+            <div key={`${index}:${item.label}`}>
               {item.separatorBefore && <div className="my-1 border-t border-slate-200 dark:border-slate-700" aria-hidden />}
               {/* Seen, not read: the items under it carry it in their `ariaLabel`. */}
               {item.sectionHeading && (
@@ -235,7 +245,7 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
               </button>
             </div>
           ))}
-        </IslandSurface>
+        </MenuSurface>
       )}
       </AnimatePresence>
     </div>
