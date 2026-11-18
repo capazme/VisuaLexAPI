@@ -7,7 +7,8 @@ import { besideRefFor, decisionOrder, decisionRowKey, decisionWindowId, type Pra
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
 import { PracticeDecisionEntry } from './PracticeIndexEntry';
-import { decisionEntrySentenza, useDecisionInDossier } from './inDossier';
+import { decisionEntrySentenza, decisionItemIds, useDecisionInDossier } from './inDossier';
+import { useHostDossier } from './readingHost';
 import { PRACTICE_VT, openPracticeWindow, practiceTransitionName } from './practiceSwitch';
 import type { PracticeLayout } from './PracticeColumn';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
@@ -37,9 +38,12 @@ export function PracticeDecisionsSection({ practiceId, layout }: { practiceId: s
   const ordered = useMemo(() => all.filter((entry) => matchesQuery(
     query, entry.label, formatDecisionDeposit({ tipo: entry.tipo, data_deposito: entry.depositDate }),
   )), [all, query]);
+  const host = useHostDossier();
+  const held = useAppStore((s) => (host ? s.dossiers.find((d) => d.id === host.id) : undefined));
+  const shownKey = ordered.flatMap((entry) => decisionItemIds(held, entry)).join('|');
   const report = tools?.report;
-  useEffect(() => { report?.('decisions', ordered.length, all.length); }, [report, ordered.length, all.length]);
-  useEffect(() => () => report?.('decisions', 0, 0), [report]);
+  useEffect(() => { report?.('decisions', shownKey ? shownKey.split('|') : []); }, [report, shownKey]);
+  useEffect(() => () => report?.('decisions', []), [report]);
   const headingId = useId();
 
   if (ordered.length === 0) return null;

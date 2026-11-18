@@ -2,10 +2,10 @@ import { FolderInput, FolderMinus, FolderPlus, Star, StickyNote, X } from 'lucid
 import { useContext, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
-import type { Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
+import type { Dossier, DossierItem, DossierSentenzaData, NormaVisitata } from '../../../types';
 import type { MenuItem } from '../../ui/MenuButton';
 import { decisionKey, identityOf } from '../../../utils/decisionLinks';
-import type { PracticeAct, PracticeDecision } from '../../../utils/practice';
+import { practiceArticleKey, type PracticeAct, type PracticeDecision } from '../../../utils/practice';
 import { dossierItemOrder, layoutDossier } from '../dossier/dossierLayout';
 import { dossierContainsDecision, sentenzaFromDecision } from '../dossier/dossierUtils';
 import { removeItemsWithUndo } from '../dossier/removeItemsWithUndo';
@@ -30,6 +30,39 @@ export function decisionItemIds(dossier: Dossier | undefined, entry: PracticeDec
   if (!dossier || !entry.identified) return [];
   const key = decisionKey(identityOf(entry.reference));
   return dossier.items.filter((i) => i.type === 'sentenza' && decisionKey(i.data) === key).map((i) => i.id);
+}
+
+/**
+ * After «Togli dalla pratica» stands, «Annulla» out of time (LC88): the rows of the entries removed leave the dossier's
+ * table too, unless another copy is still in the dossier. Until then they stay, marked «Non nella pratica», so «Annulla»
+ * puts back what was on screen.
+ */
+export function dropFromTable(dossierId: string, items: DossierItem[]): void {
+  const s = appStore.getState();
+  const table = s.practices.find((p) => p.dossierId === dossierId);
+  const dossier = s.dossiers.find((d) => d.id === dossierId);
+  if (!table) return;
+  items.forEach((item) => {
+    if (item.type === 'norma') {
+      if (articleItemIds(dossier, item.data).length > 0) return;
+      const key = dossierArticleKey(item.data);
+      table.acts.forEach((a) => a.articles
+        .filter((r) => dossierArticleKey(r.norma_data) === key)
+        .forEach((r) => s.removePracticeArticle(table.id, a.id, practiceArticleKey(r))));
+    } else if (item.type === 'sentenza') {
+      const key = decisionKey(item.data);
+      if (dossier?.items.some((i) => i.type === 'sentenza' && decisionKey(i.data) === key)) return;
+      table.decisions
+        .filter((d) => d.identified && decisionKey(identityOf(d.reference)) === key)
+        .forEach((d) => s.removePracticeDecision(table.id, d.id));
+    }
+  });
+}
+
+/** «Togli dalla pratica» on the dossier's table: to the trash behind «Annulla», then off the table once it stands. */
+export function removeFromDossierAndTable(dossierId: string, ids: string[], message: string, onTrashChanged?: () => void): void {
+  const items = appStore.getState().dossiers.find((d) => d.id === dossierId)?.items.filter((i) => ids.includes(i.id)) ?? [];
+  removeItemsWithUndo(dossierId, ids, message, onTrashChanged, () => dropFromTable(dossierId, items));
 }
 
 /** What a row of a dossier's «Lettura» says and does about the dossier. */
@@ -71,7 +104,7 @@ function useRowDossier(find: (d: Dossier | undefined) => string[], add: ((dossie
     itemIds: ids,
     important,
     ...(add ? { add: () => { add(host.id); host.showToast?.(added, 'success'); } } : {}),
-    remove: () => removeItemsWithUndo(host.id, ids, removed, host.onTrashChanged),
+    remove: () => removeFromDossierAndTable(host.id, ids, removed, host.onTrashChanged),
     toggleImportant: () => appStore.getState().updateDossierItemStatus(host.id, ids[0], important ? 'unread' : 'important'),
     notes,
     ...(notesAbout ? {

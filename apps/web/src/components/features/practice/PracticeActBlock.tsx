@@ -10,8 +10,7 @@ import type { ArticleData, Norma } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
 import { useSimpleReading } from './simpleReading';
 import { removePracticeActWithUndo } from './practiceUndo';
-import { articleItemIds, useActItemIds } from './inDossier';
-import { removeItemsWithUndo } from '../dossier/removeItemsWithUndo';
+import { articleItemIds, removeFromDossierAndTable, useActItemIds } from './inDossier';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIDDEN_SCROLLBAR } from '../../../constants/interactions';
 import { TreeViewPanel } from '../search/TreeViewPanel';
@@ -127,10 +126,24 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
       const notes = (dossierItems ?? []).filter((i) => i.type === 'note' && i.aboutItemId && ids.has(i.aboutItemId)).map((i) => String(i.data));
       return matchesQuery(query, articleLabel(article.norma_data), article.norma_data.numero_articolo, rubrica, ...notes);
     });
+  // The dossier's entries shown: the articles' own, and the notes about them, which open with them.
+  const shownIds = shownArticles.flatMap((article) => articleItemIds(heldDossier, article.norma_data));
+  const shownNoteIds = (dossierItems ?? []).filter((i) => i.type === 'note' && i.aboutItemId && shownIds.includes(i.aboutItemId)).map((i) => i.id);
+  const shownKey = [...shownIds, ...shownNoteIds].join('|');
   const report = tools?.report;
-  useEffect(() => { report?.(act.id, shownArticles.length, act.articles.length); }, [report, act.id, shownArticles.length, act.articles.length]);
-  useEffect(() => () => report?.(act.id, 0, 0), [report, act.id]);
-  const folded = act.isCollapsed || (query !== '' && shownArticles.length === 0);
+  useEffect(() => { report?.(act.id, shownKey ? shownKey.split('|') : []); }, [report, act.id, shownKey]);
+  useEffect(() => () => report?.(act.id, []), [report, act.id]);
+  const hiddenByFilter = query !== '' && shownArticles.length === 0;
+  const folded = act.isCollapsed || hiddenByFilter;
+  // An act the filter closed opens on its heading as any other: the filter goes, and the act opens.
+  const toggleAct = () => {
+    if (!hiddenByFilter) {
+      toggleActCollapse(practiceId, act.id);
+      return;
+    }
+    tools?.clear();
+    if (act.isCollapsed) toggleActCollapse(practiceId, act.id);
+  };
   // A separator only under a command: on a computer an act has none above its removal (the tests of 16-11; LC60: the
   // Ricerca's act lost «Sposta in un'altra pratica»).
   const commandsAbove = !toolsShown;
@@ -169,7 +182,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
     }
     return null;
   }, [openKeys, byKey]);
-  const current = (activeKey && byKey.get(activeKey)) || act.articles[0];
+  // While filtering, the head names a row the filter shows: the one read if shown, else the first shown, else none.
+  const active = activeKey ? byKey.get(activeKey) : undefined;
+  const current = query ? (active && shownArticles.includes(active) ? active : shownArticles[0]) : (active || act.articles[0]);
   const studyArticle = (studyKey && byKey.get(studyKey)) || current;
   // Study Mode's tools write notes keyed by the article, not the version: never on a past text (gotcha 32).
   const isLocked = (article: ArticleData | undefined) =>
@@ -316,12 +331,12 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
               role="button"
               tabIndex={0}
               aria-expanded={!folded}
-              onClick={() => toggleActCollapse(practiceId, act.id)}
+              onClick={toggleAct}
               onKeyDown={(e) => {
                 if (e.target !== e.currentTarget) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  toggleActCollapse(practiceId, act.id);
+                  toggleAct();
                 }
               }}
               // The act's title, in the reader's serif (R3): 22 px; 17 px in the index, a heading among its entries.
@@ -414,7 +429,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
               hostDossier && dossierIds.length > 0
                 ? {
                   label: 'Togli dalla pratica', icon: FolderMinus, danger: true, separatorBefore: commandsAbove,
-                  onSelect: () => removeItemsWithUndo(hostDossier.id, dossierIds, dossierIds.length === 1
+                  onSelect: () => removeFromDossierAndTable(hostDossier.id, dossierIds, dossierIds.length === 1
                     ? 'Articolo tolto dalla pratica' : `${dossierIds.length} articoli tolti dalla pratica`, hostDossier.onTrashChanged),
                 }
                 : { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: commandsAbove, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },

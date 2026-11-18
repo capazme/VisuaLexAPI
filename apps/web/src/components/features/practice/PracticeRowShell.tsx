@@ -117,7 +117,8 @@ export function PracticeRowShell({
               checked={ticked}
               onChange={() => tools.toggle(dossier.itemIds)}
               aria-label={`Seleziona ${removeName}`}
-              className="h-4 w-4 rounded border-slate-300 text-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600"
+              // The theme's colours, as the app's other checkboxes: never a white box in the dark.
+              className="h-4 w-4 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:accent-primary-300 dark:[color-scheme:dark]"
             />
           </label>
         )}

@@ -13,8 +13,11 @@ export interface FontiTools {
   selected: ReadonlySet<string>;
   /** Ticks the entries if any of them is not ticked yet, else unticks them all. */
   toggle: (itemIds: string[]) => void;
-  /** A group of rows says how many it shows of how many it has (an act by its id, the decisions), for «N di M». */
-  report: (group: string, shown: number, total: number) => void;
+  /** A group of rows (an act by its id, the decisions) says which dossier entries it shows, for «N di M»: one rule,
+   *  the dossier's entries, as the tab «Fonti» counts them; a row only on the table counts for nothing. */
+  report: (group: string, itemIds: string[]) => void;
+  /** Empties the filter: an act it closed opens again on a click. */
+  clear: () => void;
 }
 
 export const FontiToolsContext = createContext<FontiTools | null>(null);

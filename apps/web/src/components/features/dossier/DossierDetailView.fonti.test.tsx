@@ -23,7 +23,8 @@ vi.mock('../../../utils/actStructureCache', () => ({ fetchActTree: () => Promise
 vi.mock('../search/ArticleTabContent', () => ({ ArticleTabContent: () => <div data-testid="reader" /> }));
 vi.mock('../decisions/DecisionEntryView', () => ({ DecisionEntryView: () => <div data-testid="decision-reader" /> }));
 vi.mock('../search/TreeViewPanel', () => ({ TreeViewPanel: () => null }));
-vi.mock('../workspace/ArticleNavigation', () => ({ ArticleNavigation: () => null }));
+// The act's selector, reduced to the article it names.
+vi.mock('../workspace/ArticleNavigation', () => ({ ArticleNavigation: ({ activeArticleId }: { activeArticleId: string | null }) => <span data-testid="act-current">{activeArticleId ?? ''}</span> }));
 vi.mock('../workspace/LazyStudyMode', () => ({ LazyStudyMode: () => null }));
 vi.mock('../decisions/DecisionSearchTabView', () => ({ DecisionSearchTabView: () => null }));
 // The other views read from the server: not what is tested here.
@@ -61,8 +62,9 @@ const renderPage = () => render(<MemoryRouter><Page /></MemoryRouter>);
 
 const rowOf = (act: typeof L24, numero: string) => {
   const table = s().practices.find(isBoundPractice)!;
-  const held = table.acts.find((a) => a.articles.some((r) => r.norma_data.numero_atto === act.numero_atto))!;
-  const article = held.articles.find((r) => r.norma_data.numero_articolo === numero)!;
+  const held = table.acts.find((a) => a.articles.some((r) => r.norma_data.numero_atto === act.numero_atto));
+  const article = held?.articles.find((r) => r.norma_data.numero_articolo === numero);
+  if (!held || !article) return null;
   return document.querySelector<HTMLElement>(`[data-practice-row="${articleRowKey(table.id, held.id, practiceArticleKey(article))}"]`);
 };
 const field = () => screen.getByRole('textbox', { name: 'Filtra le fonti della pratica' });
@@ -107,8 +109,8 @@ describe('the filter of «Fonti» (LC88)', () => {
     expect(rowOf(L49, '1')).toBeNull();
     expect(decisions()).toBeNull();
     expect(freeNote()).toBeNull();
-    // three articles, one decision, one note of the dossier
-    expect(status()).toHaveTextContent('1 di 5');
+    // the dossier's entries, as the tab counts them: the article and the note about it, of six
+    expect(status()).toHaveTextContent('2 di 6');
   });
 
   it('finds an article by its number', () => {
@@ -116,7 +118,7 @@ describe('the filter of «Fonti» (LC88)', () => {
     filter('art. 7');
     expect(rowOf(L24, '7')).not.toBeNull();
     expect(rowOf(L24, '5')).toBeNull();
-    expect(status()).toHaveTextContent('1 di 5');
+    expect(status()).toHaveTextContent('1 di 6');
   });
 
   it('finds an article by the text of a note about it', () => {
@@ -131,7 +133,7 @@ describe('the filter of «Fonti» (LC88)', () => {
     filter('n. 49');
     expect(rowOf(L49, '1')).not.toBeNull();
     expect(actToggle('24')).toHaveAttribute('aria-expanded', 'false');
-    expect(status()).toHaveTextContent('1 di 5');
+    expect(status()).toHaveTextContent('1 di 6');
   });
 
   it('finds a decision by its citation', () => {
@@ -140,7 +142,7 @@ describe('the filter of «Fonti» (LC88)', () => {
     expect(within(decisions()!).getByRole('button', { name: /^Espandi .*31310/ })).toBeInTheDocument();
     expect(rowOf(L24, '5')).toBeNull();
     expect(rowOf(L49, '1')).toBeNull();
-    expect(status()).toHaveTextContent('1 di 5');
+    expect(status()).toHaveTextContent('1 di 6');
   });
 
   it('finds a note of the dossier by its text', () => {
@@ -148,7 +150,7 @@ describe('the filter of «Fonti» (LC88)', () => {
     filter('termine');
     expect(freeNote()).toBeInTheDocument();
     expect(decisions()).toBeNull();
-    expect(status()).toHaveTextContent('1 di 5');
+    expect(status()).toHaveTextContent('1 di 6');
   });
 
   it('writes at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
@@ -166,6 +168,36 @@ describe('the filter of «Fonti» (LC88)', () => {
     act(() => { s().revealPracticeRow(table.id, held.id, practiceArticleKey(held.articles.find((r) => r.norma_data.numero_articolo === '7')!)); });
     expect(field()).toHaveValue('');
     expect(within(rowOf(L24, '7')!).getByRole('button', { name: /^Comprimi / })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('counts as the tab «Fonti» and the header: the dossier\'s entries', () => {
+    renderPage();
+    expect(screen.getByRole('tab', { name: /Fonti/ })).toHaveTextContent('6');
+    filter('n. 49');
+    expect(status()).toHaveTextContent('1 di 6');
+  });
+
+  it('an act the filter closed opens on its heading, and the filter goes', () => {
+    renderPage();
+    filter('responsab');
+    expect(actToggle('49')).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(actToggle('49'));
+    expect(field()).toHaveValue('');
+    expect(actToggle('49')).toHaveAttribute('aria-expanded', 'true');
+    expect(rowOf(L49, '1')).not.toBeNull();
+    // the keyboard does the same
+    filter('responsab');
+    fireEvent.keyDown(actToggle('49'), { key: 'Enter' });
+    expect(field()).toHaveValue('');
+    expect(rowOf(L49, '1')).not.toBeNull();
+  });
+
+  it('the act\'s head names a row the filter shows, never one it hides', () => {
+    renderPage();
+    const head = () => within(screen.getByRole('region', { name: /n\. 24$/ })).getByTestId('act-current');
+    expect(head()).toHaveTextContent('5');
+    filter('art. 7');
+    expect(head()).toHaveTextContent('7');
   });
 
   it('Esc empties the field and every row comes back; `/` reaches the field from the page', () => {
@@ -214,6 +246,27 @@ describe('«Seleziona» on «Fonti» (LC88)', () => {
     vi.mocked(dossierService.getById).mockResolvedValueOnce({ id: 'dos-1', name: 'Ricorso Rossi', is_pinned: false, created_at: '', updated_at: '', tags: [], items: [] });
     await act(async () => { await toast?.onUndo(); });
     expect(trashService.restore).toHaveBeenCalledWith('t1');
+    // undone: nothing left the table
+    expect(s().practices.find(isBoundPractice)!.acts.flatMap((a) => a.articles)).toHaveLength(3);
+  });
+
+  it('once «Annulla» is out of time, the rows removed leave the table too', async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona' }));
+    tick(rowOf(L24, '5'));
+    fireEvent.click(screen.getByRole('button', { name: 'Togli dalla pratica' }));
+    await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
+    // still there, «Non nella pratica», while «Annulla» can put it back
+    await waitFor(() => expect(within(rowOf(L24, '5')!).getByText('Non nella pratica')).toBeInTheDocument());
+    await act(async () => { toast?.onDismiss(); });
+    await waitFor(() => expect(rowOf(L24, '5')).toBeNull());
+    expect(rowOf(L24, '7')).not.toBeNull();
+  });
+
+  it('draws its checkboxes in the theme\'s colours, never a white box in the dark', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona' }));
+    expect(within(rowOf(L24, '5')!).getByRole('checkbox')).toHaveClass('accent-primary-600', 'dark:accent-primary-300', 'dark:[color-scheme:dark]');
   });
 
   it('«Sposta in…» lists the other dossiers under the bar, in the page, and moves the ticked entries', () => {

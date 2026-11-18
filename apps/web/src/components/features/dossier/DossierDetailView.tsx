@@ -40,6 +40,7 @@ import { DossierAttiPanel } from '../atti/DossierAttiPanel';
 import { DossierReadingView } from './DossierReadingView';
 import { FontiToolbar } from './FontiToolbar';
 import { FontiToolsContext, matchesQuery, type FontiTools } from '../practice/fontiTools';
+import { removeFromDossierAndTable } from '../practice/inDossier';
 import { DossierTasksPanel } from '../planner/DossierTasksPanel';
 import { DeadlineCard } from '../../../features/deadlines/DeadlineCard';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
@@ -136,13 +137,16 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     () => fullLayout.notes.filter((note) => matchesQuery(query, note.data)),
     [fullLayout.notes, query],
   );
-  const [rowCounts, setRowCounts] = useState<Record<string, { shown: number; total: number }>>({});
-  const reportRows = useCallback((group: string, shown: number, total: number) => setRowCounts((prev) => (
-    prev[group]?.shown === shown && prev[group]?.total === total ? prev : { ...prev, [group]: { shown, total } }
+  // One rule for every count (LC88): the dossier's entries, as the tab «Fonti» and the header count them; «N di M» is
+  // the entries the filter shows of all of them. A row only on the table («Non nella pratica») counts for nothing.
+  const [shownByGroup, setShownByGroup] = useState<Record<string, string[]>>({});
+  const reportRows = useCallback((group: string, ids: string[]) => setShownByGroup((prev) => (
+    (prev[group] ?? []).join('|') === ids.join('|') ? prev : { ...prev, [group]: ids }
   )), []);
-  const counted = Object.values(rowCounts);
-  const shownRows = counted.reduce((n, c) => n + c.shown, shownNotes.length);
-  const totalRows = counted.reduce((n, c) => n + c.total, fullLayout.notes.length);
+  const shownRows = new Set([...Object.values(shownByGroup).flat(), ...shownNotes.map((n) => n.id)])
+    .size;
+  const totalRows = dossier.items.length;
+  const clearFilter = useCallback(() => setItemSearchQuery(''), []);
   const filterRef = useRef<HTMLInputElement>(null);
   const toggleSelection = useCallback((ids: string[]) => setSelectedItems((prev) => {
     const next = new Set(prev);
@@ -151,8 +155,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     return next;
   }), []);
   const fontiTools = useMemo<FontiTools>(() => ({
-    query, selecting, selected: selectedItems, toggle: toggleSelection, report: reportRows,
-  }), [query, selecting, selectedItems, toggleSelection, reportRows]);
+    query, selecting, selected: selectedItems, toggle: toggleSelection, report: reportRows, clear: clearFilter,
+  }), [query, selecting, selectedItems, toggleSelection, reportRows, clearFilter]);
   // A gesture that reveals a row (a cited norm, a reference, the act's arrows or structure) must find it drawn: the
   // filter that would hide it is emptied, as the old list's search was.
   useEffect(() => appStore.subscribe((state, prev) => {
@@ -181,7 +185,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     const ids = dossier.items.filter((i) => selectedItems.has(i.id)).map((i) => i.id);
     clearSelection();
     if (ids.length === 0) return;
-    removeItemsWithUndo(dossier.id, ids, ids.length === 1 ? 'Elemento rimosso' : `${ids.length} elementi rimossi`, trashChanged);
+    // Their rows leave the table too once «Annulla» is out of time (LC88).
+    removeFromDossierAndTable(dossier.id, ids, ids.length === 1 ? 'Elemento rimosso' : `${ids.length} elementi rimossi`, trashChanged);
   };
 
   const handleMoveToDossier = (targetDossierId: string) => {
