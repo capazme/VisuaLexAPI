@@ -411,6 +411,38 @@ describe('ticking', () => {
     expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).recurrenceDay).toBe(29);
   });
 
+  it('«Completa per sempre» closes a repeating task without the rule or a next occurrence; «Annulla» puts it back', async () => {
+    const user = await createTestUser('tasks-recur-forever');
+    const task = await created(user, { title: 'Fattura', plannedDate: '2027-01-31', recurrence: RECURRENCE_RULES.monthly, recurrenceFrom: 'pianificata' });
+    expect(await tickOnTime(user.id, task.id, 1)).toEqual(['2027-02-28']);
+    const forever = () => request(app).post(`/api/tasks/${task.id}/complete`).set(authHeader(user)).send({ plannedDate: '2027-02-28', forever: true });
+    const reopen = (body: Record<string, unknown>) => request(app).post(`/api/tasks/${task.id}/reopen`).set(authHeader(user)).send(body);
+    for (let i = 0; i < 2; i += 1) {
+      const closed = await forever();
+      expect(closed.status).toBe(200);
+      expect(closed.body.recurred).toBeNull();
+      expect(closed.body.task).toMatchObject({ recurrence: null, planned_date: '2027-02-28' });
+      expect(closed.body.task.completed_at).not.toBeNull();
+      expect(await prisma.task.count({ where: { userId: user.id } })).toBe(1);
+      const undone = await reopen({ recurrence: RECURRENCE_RULES.monthly });
+      expect(undone.status).toBe(200);
+      expect(undone.body.task).toMatchObject({ recurrence: RECURRENCE_RULES.monthly, recurrence_from: 'pianificata', completed_at: null, planned_date: '2027-02-28' });
+    }
+    // The kept day came back with the rule: 28 February goes on to 31 March, not the 28th.
+    expect(await tickOnTime(user.id, task.id, 1)).toEqual(['2027-03-31']);
+    expect((await reopen({ recurrence: 'FREQ=HOURLY' })).status).toBe(400);
+  });
+
+  it('«Completa per sempre» still needs the occurrence seen, and a stale one is a 409', async () => {
+    const user = await createTestUser('tasks-recur-forever-seen');
+    const today = romeDay(new Date());
+    const task = await created(user, { title: 'r', plannedDate: today, recurrence: RECURRENCE_RULES.daily });
+    const forever = (body: Record<string, unknown>) => request(app).post(`/api/tasks/${task.id}/complete`).set(authHeader(user)).send({ forever: true, ...body });
+    expect((await forever({})).status).toBe(400);
+    expect((await forever({ plannedDate: addDays(today, -1) })).status).toBe(409);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).recurrence).toBe(RECURRENCE_RULES.daily);
+  });
+
   it('a new day the user picks, the rule or its origin changed, is the day kept from then on', async () => {
     const user = await createTestUser('tasks-recur-new-day');
     const task = await created(user, { title: 'Fattura', plannedDate: '2027-01-31', recurrence: RECURRENCE_RULES.monthly });

@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, Inbox, MoreHorizontal, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { CheckCheck, ChevronDown, ChevronUp, Folder, Inbox, MoreHorizontal, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
@@ -30,6 +30,8 @@ export interface TaskSheetProps {
   /** The task's own tick: the sheet hands it back, since its row is the view's. */
   onDone: (task: Task, parent: Task | null) => void;
   onTrash: (task: Task, parent: Task | null) => void;
+  /** «Completa per sempre», for a repeating task: handed back like the tick. */
+  onCompleteForever: (task: Task, parent: Task | null) => void;
   /** The server's copy after a change saved here: the view's copy may be in no list any more (moved to a dossier). */
   onSaved: (task: Task) => void;
   onClose: () => void;
@@ -55,7 +57,7 @@ function typing(target: EventTarget | null): boolean {
  * what the server does not keep yet (reminders, an assignee, comments).
  */
 export function TaskSheet(props: TaskSheetProps) {
-  const { neighbours, onStep, onClose, onOpenTask, onTrash } = props;
+  const { neighbours, onStep, onClose, onOpenTask, onTrash, onCompleteForever } = props;
   const headingId = useId();
   const bodyRef = useRef<HTMLDivElement>(null);
   // The field to add a subtask: where the focus starts when the sheet was opened for one.
@@ -144,7 +146,8 @@ export function TaskSheet(props: TaskSheetProps) {
             triggerClassName={ICON_BUTTON}
             items={[
               ...(task.parentId ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => setRequest((r) => ({ id: task.id, n: r.id === task.id ? r.n + 1 : 1 })) }]),
-              { label: 'Sposta nel cestino', icon: Trash2, danger: true, separatorBefore: !task.parentId, onSelect: () => onTrash(task, parent) },
+              ...(task.recurrence ? [{ label: 'Completa per sempre', icon: CheckCheck, onSelect: () => onCompleteForever(task, parent) }] : []),
+              { label: 'Sposta nel cestino', icon: Trash2, danger: true, separatorBefore: !task.parentId || Boolean(task.recurrence), onSelect: () => onTrash(task, parent) },
             ]}
           >
             <MoreHorizontal size={18} aria-hidden />
@@ -170,7 +173,7 @@ interface BodyProps extends TaskSheetProps {
 }
 
 /** One task's body, drawn again for each task the arrows open (its edits are its own). */
-function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimistic, parent, addRequest, addFieldRef, onOpenTask, onDone, onSaved }: BodyProps) {
+function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimistic, parent, addRequest, addFieldRef, onOpenTask, onDone, onCompleteForever, onSaved }: BodyProps) {
   // What the sheet shows: what was changed here while the writes travel, then the server's answer, until a newer copy
   // of the task comes from the view.
   const [local, setLocal] = useState<Task | null>(null);
@@ -250,7 +253,7 @@ function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimis
         </div>
 
         <aside aria-label="Campi del compito" className="min-w-0 border-y border-slate-200 bg-slate-50 px-4 py-1 md:col-start-2 md:row-span-2 md:row-start-1 md:border-y-0 md:border-l md:px-5 md:py-3 dark:border-slate-800 dark:bg-slate-950/40">
-          <TaskSheetFields task={shown} today={today} onSave={save} />
+          <TaskSheetFields task={shown} today={today} onSave={save} onCompleteForever={() => onCompleteForever(shown, parent)} />
         </aside>
 
         <div className="min-w-0 px-4 pb-10 pt-4 md:pl-[3.75rem] md:pr-6">

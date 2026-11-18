@@ -23,9 +23,21 @@ Python API and MERL-T. Design: `docs/superpowers/specs/2026-10-04-source-convent
                "attributes": { "tipo": "sentenza", "data_deposito": "2024-12-06" }, "rv": ["…"], "legacy_keys": ["…"] },
     "identity": { "fields": E, "key": E, "path": E, "reference_path": E },   // reference_path: a reference with no archive, which the route resolves
     "labels": { "citation": E, "short": E, "short_with_rv": E }
+  }],
+  "recitals": [{
+    "id": "gdpr-cons-26", "note": "…",
+    "input": { "tipo_atto": "regolamento ue", "numero_atto": "679", "data": "2016", "considerando": "26" },
+    "identity": { "act": E, "recital": E },            // celex:32016R0679~rct26
+    "labels": { "citation": E, "short": E, "unit": E } // «considerando 26, reg. (UE) 2016/679», «… reg. …», «Considerando 26»
   }]
 }
 ```
+
+A recital of an EU regulation or directive has a section of its own, `recitals`
+(spec `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §2): the suites
+that read `norms` require `numero_articolo` and check every label with the
+article's functions, and a recital has none. Its identity is the act's CELEX with
+`~rct` and the number; the word «considerando» is always written out.
 
 `input` is the source as VisuaLex stores it: a norm is a `norma_data` (the
 fields the reader and the dossier keep), a decision is a reference with the
@@ -58,7 +70,7 @@ holding `conventions/`, and fails when it is not there.
 | Suite | Test |
 |---|---|
 | web | `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (today: shape, decided citations, current decision paths and reference paths); `apps/web/src/utils/__tests__/decisionCitationParser.test.ts` (`decision_citations`); `apps/web/src/utils/__tests__/decisionCitationMatcher.test.ts` (`decision_citations_in_text`) |
-| Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys); `services/visualex/tests/test_nl_parser_convention.py` (every citation and short label reads back through the parser to its norm); `services/visualex/tests/test_decision_citation.py` (`decision_citations`, through `/parse_decision`) |
+| Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys; `recitals`: identities and citations); `services/visualex/tests/test_nl_parser_convention.py` (every citation and short label reads back through the parser to its norm); `services/visualex/tests/test_recital_query.py` (every `recitals` label reads back to its recital); `services/visualex/tests/test_decision_citation.py` (`decision_citations`, through `/parse_decision`) |
 | server, MCP, MERL-T | added by each area's adoption PR (plan `docs/superpowers/plans/2026-10-04-source-convention.md`) |
 
 ## Changing it

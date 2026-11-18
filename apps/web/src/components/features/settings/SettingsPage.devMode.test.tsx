@@ -3,29 +3,29 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const auth = vi.fn();
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => auth() }));
-vi.mock('../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
-vi.mock('../../services/accountService', () => ({ accountService: {} }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => auth() }));
+vi.mock('../../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../../../services/accountService', () => ({ accountService: {} }));
 
-import { SettingsModal } from './SettingsModal';
+import { SettingsPage } from './SettingsPage';
 
 const setDevMode = vi.fn();
 
 function open() {
   return render(
     <MemoryRouter>
-      <SettingsModal isOpen onClose={vi.fn()} />
+      <SettingsPage />
     </MemoryRouter>,
   );
 }
 
 beforeEach(() => {
   setDevMode.mockReset().mockResolvedValue(undefined);
-  // The version box asks /version when the modal opens; it is not under test.
+  // The version box asks /version when the page opens; it is not under test.
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 });
 
-describe('SettingsModal — «Modalità sviluppo»', () => {
+describe('Impostazioni — «Modalità sviluppo»', () => {
   it('is not there for an account the administrator has not enabled', () => {
     auth.mockReturnValue({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode });
     open();
@@ -57,7 +57,7 @@ describe('SettingsModal — «Modalità sviluppo»', () => {
     auth.mockReturnValue({ isAdmin: true, canUseDevMode: false, devMode: false, setDevMode });
     render(
       <MemoryRouter>
-        <SettingsModal isOpen onClose={vi.fn()} onRestartTour={vi.fn()} />
+        <SettingsPage />
       </MemoryRouter>,
     );
     for (const name of [/Chiaro/, /Scuro/, /Rivedi la guida iniziale/, /Pannello Admin/]) {

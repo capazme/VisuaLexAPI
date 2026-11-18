@@ -105,6 +105,7 @@ export default defineConfig({
       '/fetch_brocardi_info': PYTHON_API,
       '/fetch_all_data': PYTHON_API,
       '/fetch_tree': PYTHON_API,
+      '/fetch_recitals': PYTHON_API,
       '/fetch_rubriche': PYTHON_API,
       '/fetch_alias_catalog': PYTHON_API,
       '/fetch_decision': PYTHON_API,

@@ -1,12 +1,6 @@
-import { Modal } from './Modal';
 import { Command, Keyboard } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { isMacPlatform } from './notifications/undoShortcut';
-
-interface KeyboardShortcutsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+import { cn } from '../../../lib/utils';
+import { isMacPlatform } from '../../ui/notifications/undoShortcut';
 
 interface ShortcutItem {
   keys: string[];
@@ -36,7 +30,7 @@ const shortcutGroups: ShortcutGroup[] = [
     title: 'Visualizzazione',
     shortcuts: [
       { keys: [modKey, 'Shift', 'F'], description: 'Tutto schermo: entra o esci' },
-      { keys: ['Esc'], description: 'Chiudi modal/pannello' },
+      { keys: ['Esc'], description: 'Chiudi un pannello, o torna indietro dalle Impostazioni' },
       // The newest «Annulla» of the notifications (L-36), or the last gesture on a highlight, which shows none (A4);
       // outside fields and editors, where it is the browser's undo.
       { keys: [modKey, 'Z'], description: 'Annulla l’ultima azione con «Annulla» o l’ultimo gesto sulle evidenziazioni (fuori dai campi di testo)' },
@@ -113,9 +107,9 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutItem }) {
   );
 }
 
-export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsModalProps) {
+/** The keyboard's shortcuts, a part of the Impostazioni page (LC84: it was a dialog of its own); «?» brings it in view. */
+export function KeyboardShortcutsSection() {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Scorciatoie da Tastiera" size="md">
       <div className="space-y-6">
         {/* Header info */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-900/30">
@@ -156,6 +150,5 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
           </p>
         </div>
       </div>
-    </Modal>
   );
 }

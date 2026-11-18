@@ -12,6 +12,28 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-11-18
+
+Scadenze without the clutter, Impostazioni as a real page, and the server's security fixes of the night
+(G-553). One migration (web_sessions). MERL-T stays off.
+
+### Work
+
+- Scadenze: one header, one «Aggiungi», no empty spaces or interface descriptions (LC83).
+- Impostazioni is a page (`/impostazioni`) that slides in and back, not a modal (LC84).
+
+### Security (server)
+
+- Passwords set by the administrator follow the sign-up rule (#551).
+- Sign-in limited per account on Redis as well as per address, refresh limited, the session check on its
+  own limit (#552).
+- The server side of a web session in a cookie, kept on the server and revocable (#555, step 1; the web
+  moves later). Migration `20261117130000_web_sessions`.
+- One refusal for a taken email or username; sign-in no longer tells which emails exist (#567).
+- An unexpected error's log line says what failed and where, never what it carried (#563).
+- The article stream closes with an end line when the client asks (#550).
+- CI: the npm audit blocks only on what ships (#582).
+
 ## [1.34.0] - 2026-11-17
 
 Glosses in the margin with their own button, the act structure opening in the page, the search pill and

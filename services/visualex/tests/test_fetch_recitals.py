@@ -94,6 +94,11 @@ class TestEndpoint:
         assert response.status_code == 400
         assert "EUR-Lex" in (await response.get_json())["error"]
 
+    @pytest.mark.parametrize("body", [["regolamento ue"], "regolamento ue", {"act_type": 679, "act_number": "679", "date": "2016"}])
+    async def test_a_body_that_is_not_an_object_or_a_type_that_is_not_text_is_a_400(self, client, body):
+        response = await client.post('/fetch_recitals', json=body)
+        assert response.status_code == 400
+
     async def test_missing_act_type_is_a_400(self, client):
         response = await client.post("/fetch_recitals", json={"date": "2016"})
         assert response.status_code == 400
