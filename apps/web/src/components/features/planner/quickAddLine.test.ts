@@ -55,6 +55,10 @@ describe('readQuickAddLine', () => {
     expect(line.parts).toEqual([]);
     expect(line.title).toBe('Atto #Rossi');
     expect(line.dossierQuery).toBeNull();
+    // Not in silence: the field says the task stays in this dossier (LC83).
+    expect(line.lockedHash).toBe(true);
+    expect(read('Atto mario#rossi', { dossierLocked: true }).lockedHash).toBe(false);
+    expect(read('Atto #Rossi').lockedHash).toBe(false);
   });
 
   it('takes a new label as typed', () => {
