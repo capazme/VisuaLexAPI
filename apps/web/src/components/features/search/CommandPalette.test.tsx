@@ -674,6 +674,15 @@ describe('CommandPalette — in the page, not over it (L-75)', () => {
     pill.remove();
   });
 
+  it('closed with no choice, opened from the body, does not move the focus to the page\'s title nor to <main> (LC94)', () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    const onClose = vi.fn();
+    const { rerender } = render(<>{ricerca}<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    rerender(<>{ricerca}<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} /></>);
+    expect(screen.getByRole('heading', { name: 'Ricerca del 18 novembre' })).not.toHaveFocus();
+    expect(document.querySelector('main')).not.toHaveFocus();
+  });
+
   it('after a choice on a page with no marked title, gives the focus to <main> at once', async () => {
     const onClose = vi.fn();
     const { rerender } = render(<><main><p>Senza titolo</p></main><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);

@@ -715,11 +715,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     const ours = !active || active === document.body || bandRef.current?.contains(active) || fieldBoxRef.current?.contains(active);
     if (!ours) return;
     // A choice made: the focus goes where it led, not back to the pill (Papiniano, #599: it fell to the body).
-    if (!chose && opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
-    else {
-      if (active instanceof HTMLElement) active.blur();
-      return focusLanding(`${window.location.pathname}${window.location.search}` !== openedAt.current);
+    if (!chose) {
+      if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
+      // No choice and no opener to go back to: never moved to the page (LC94), only out of the band as it folds.
+      else if (active instanceof HTMLElement && bandRef.current?.contains(active)) active.blur();
+      return;
     }
+    if (active instanceof HTMLElement) active.blur();
+    return focusLanding(`${window.location.pathname}${window.location.search}` !== openedAt.current);
     // Once per closing; the opener is the one taken as it opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
