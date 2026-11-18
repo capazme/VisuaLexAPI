@@ -53,6 +53,11 @@
 		reverse_proxy {$SERVER_UPSTREAM:server:3001}
 	}
 	handle /api/* {
+		# MERL-T's callbacks to the server come from inside the stack, with a secret of their
+		# own: they have no reason to be reachable from the network. Matched like introspection
+		# below: the exact path and anything under it, in any case.
+		@merltInternal path /api/merlt/internal /api/merlt/internal/*
+		respond @merltInternal 404
 		request_body {
 			max_size 10MB
 		}

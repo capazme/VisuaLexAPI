@@ -2,6 +2,7 @@ import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { FOCUS_RING } from '../../constants/interactions';
+import { CONTROL_RADIUS } from './controlStyles';
 import { cn } from '../../lib/utils';
 import { markTransition, panelEntrance, PANEL_ENTRANCE_TIMING } from './segmentedTabsMotion';
 
@@ -40,6 +41,11 @@ export interface SegmentedTabsProps<T extends string> {
   className?: string;
   /** Each tab's width and padding. */
   tabClassName?: string;
+  /**
+   * `sm` (LC106): a choice set among the fields of a row, the whole row as tall as they are — 44 px on a phone, 36
+   * from md (`CONTROL_HEIGHT.md`) — and their 4 px corners (`CONTROL_RADIUS`).
+   */
+  size?: 'md' | 'sm';
 }
 
 const tabId = (panelId: string, id: string) => `${panelId}-tab-${id}`;
@@ -48,13 +54,18 @@ const tabId = (panelId: string, id: string) => `${panelId}-tab-${id}`;
 const MARK_STYLE = { borderRadius: 6, boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' };
 
 const TRACK = 'flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800';
+// The small row: 2 px of track round segments of 40 and 32 px make `CONTROL_HEIGHT.md`'s 44 and 36.
+const TRACK_SM = cn('p-0.5', CONTROL_RADIUS);
+const SEGMENT_SM = 'min-h-10 px-3 text-xs md:min-h-8';
+/** The small mark's corners: 2 px inside the track's 4. */
+const MARK_STYLE_SM = { ...MARK_STYLE, borderRadius: 2 };
 // The words change colour over the mark's slide (`spring.snappy`, 0.3 s).
 const SEGMENT = 'relative flex min-h-[44px] items-center justify-center rounded-md text-sm font-medium transition-colors duration-300';
 const segmentTone = (active: boolean) =>
   active ? 'text-slate-900 dark:text-ink-950' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white';
 
 /** The chosen segment's mark, measured again only when `choice` changes, not on every render of the page around it. */
-function SegmentedMark({ choice }: { choice: string }) {
+function SegmentedMark({ choice, small = false }: { choice: string; small?: boolean }) {
   const reduced = useReducedMotion() ?? false;
   return (
     <motion.span
@@ -65,13 +76,14 @@ function SegmentedMark({ choice }: { choice: string }) {
       className="absolute inset-0 bg-white dark:bg-toga-400"
       // The corners and the shadow in `style`, which Framer corrects as the mark stretches between tabs of different
       // widths; as classes they were squashed during the slide.
-      style={MARK_STYLE}
+      style={small ? MARK_STYLE_SM : MARK_STYLE}
       transition={markTransition(reduced)}
     />
   );
 }
 
-export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, panelId, id, className, tabClassName }: SegmentedTabsProps<T>) {
+export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, panelId, id, className, tabClassName, size = 'md' }: SegmentedTabsProps<T>) {
+  const small = size === 'sm';
   const group = useId();
   const base = panelId ?? group;
 
@@ -94,7 +106,7 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
 
   return (
     <LayoutGroup id={group}>
-      <div id={id} role={panelId ? 'tablist' : 'radiogroup'} aria-label={label} onKeyDown={onKeyDown} className={cn(TRACK, className)}>
+      <div id={id} role={panelId ? 'tablist' : 'radiogroup'} aria-label={label} onKeyDown={onKeyDown} className={cn(TRACK, small && TRACK_SM, className)}>
         {tabs.map((tab) => {
           const active = tab.id === value;
           return (
@@ -107,9 +119,9 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
                 : { role: 'radio', 'aria-checked': active })}
               tabIndex={active ? 0 : -1}
               onClick={() => onChange(tab.id)}
-              className={cn(SEGMENT, FOCUS_RING, segmentTone(active), tabClassName)}
+              className={cn(SEGMENT, small && cn(SEGMENT_SM, CONTROL_RADIUS), FOCUS_RING, segmentTone(active), tabClassName)}
             >
-              {active && <SegmentedMark choice={value} />}
+              {active && <SegmentedMark choice={value} small={small} />}
               <span className="relative flex items-center gap-2">{tab.label}</span>
               {tab.extra}
             </button>

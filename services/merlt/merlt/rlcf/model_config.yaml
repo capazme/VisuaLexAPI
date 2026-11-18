@@ -60,7 +60,7 @@ multilevel_authority:
     general_base: 0.05        # Lambda base (da track_record.update_factor)
 
 ai_model:
-  name: openai/gpt-3.5-turbo
+  name: google/gemini-3.5-flash-lite
   temperature: 0.7
   max_tokens: 1000
   top_p: 0.9

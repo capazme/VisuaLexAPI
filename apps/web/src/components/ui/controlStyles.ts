@@ -8,6 +8,9 @@ export type ControlSize = 'sm' | 'md' | 'lg';
 
 export const CONTROL_RADIUS = 'rounded-md';
 
+/** A box that holds things (`Card`): 8 px, against the 4 px of what is pressed or typed in (the consultant's rule, LC106). */
+export const CARD_RADIUS = 'rounded-[8px]';
+
 /** 44 px on a phone (the touch target); 32, 36 and 44 px on a desktop. `min-h`, so a long label wraps. */
 export const CONTROL_HEIGHT: Record<ControlSize, string> = {
   sm: 'min-h-11 md:min-h-8',

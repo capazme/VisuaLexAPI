@@ -23,6 +23,8 @@ Example:
     >>> print(f"Nodes: {overview['knowledge_graph']['total_nodes']}")
 """
 
+from merlt.config.llm_models import DEFAULT_EXPERT_MODEL
+from merlt.config.runtime_config import get_runtime_config
 import asyncio
 import os
 import time
@@ -726,6 +728,8 @@ async def get_node_details(
           "metrics": {"nodes": 27740, "edges": 43935, ...}
         }
     """
+    # The experts' model as configured now (G-575), not a fixed label.
+    expert_model = get_runtime_config().get_str("expert_model", DEFAULT_EXPERT_MODEL)
     # Base node configs (no metrics - fetched dynamically)
     node_configs = {
         "falkordb": {
@@ -755,25 +759,25 @@ async def get_node_details(
         "literal": {
             "label": "LiteralExpert",
             "description": "Interpreta la norma secondo il significato proprio delle parole (Art. 12 Preleggi). Fornisce il testo esatto e struttura dell'articolo.",
-            "config": {"model": "openrouter/claude-3-sonnet"},
+            "config": {"model": expert_model},
             "links": {"code": "merlt/experts/literal.py"},
         },
         "systemic": {
             "label": "SystemicExpert",
             "description": "Interpretazione sistematica della norma nel contesto dell'ordinamento giuridico.",
-            "config": {"model": "openrouter/claude-3-sonnet"},
+            "config": {"model": expert_model},
             "links": {"code": "merlt/experts/systemic.py"},
         },
         "principles": {
             "label": "PrinciplesExpert",
             "description": "Individua l'intenzione del legislatore e i principi sottesi alla norma.",
-            "config": {"model": "openrouter/claude-3-sonnet"},
+            "config": {"model": expert_model},
             "links": {"code": "merlt/experts/principles.py"},
         },
         "precedent": {
             "label": "PrecedentExpert",
             "description": "Analizza la giurisprudenza applicativa della norma.",
-            "config": {"model": "openrouter/claude-3-sonnet"},
+            "config": {"model": expert_model},
             "links": {"code": "merlt/experts/precedent.py"},
         },
         "gating": {

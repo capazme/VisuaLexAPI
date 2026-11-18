@@ -116,6 +116,18 @@ expect "another well-known name is a 404" 404 "$(code "$B/.well-known/openid-con
 expect "not the app's page with a 200" 404 "$(code "$B/.well-known/anything")"
 expect "and the scrapers never heard of any of it" "$before" "$(scraper_calls)"
 
+# 7a'. MERL-T's callbacks to the server come from inside the stack: from the network every
+#      spelling the server would route there is a 404, and the server never sees it
+before_server="$(verify_calls)"
+for spelling in /api/merlt/internal /api/merlt/internal/job-callback /api/merlt/internal/job-callback/ \
+  /API/MERLT/Internal/qa-callback /api//merlt/internal/qa-callback /api/merlt//internal/qa-callback \
+  /api/merlt/contrib/../internal/extraction-callback; do
+  expect "MERL-T's callback is a 404 from the network ($spelling)" 404 "$(code --path-as-is -X POST -d '{}' "$B$spelling")"
+done
+expect "and the server never saw any of them" "$before_server" "$(verify_calls)"
+curl -s -o /dev/null -m 10 "$B/api/probe"
+expect "while the rest of /api still reaches the server" "/api/probe" "$(seen 13001 'd["last"]["path"]')"
+
 # 7b. the client's address: kept from a trusted hop, overwritten from anyone else
 curl -s -o /dev/null -m 10 -H 'X-Forwarded-For: 100.64.1.2' "$B/api/probe"
 xff="$(seen 13001 'd["last"]["xff"]')"

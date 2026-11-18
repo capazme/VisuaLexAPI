@@ -6,6 +6,7 @@ import { NoteEditBox } from '../search/NoteEditBox';
 import { assistantProposalsStore, editNoteEntryText, setNoteEntryState } from '../../../store/assistantProposals';
 import { CurrentDossierContext } from './currentDossier';
 import { ROW_REMOVE } from './dossierStyles';
+import { IconButton } from '../../ui/IconButton';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -35,9 +36,7 @@ export function AiNoteEntryReview({ note, children, meta, onRemove }: Props) {
       <>
         {children}
         {meta}
-        <button type="button" onClick={onRemove} aria-label="Rimuovi nota" className={ROW_REMOVE}>
-          <Trash2 size={15} aria-hidden />
-        </button>
+        <IconButton size="lg" onClick={onRemove} aria-label="Rimuovi nota" className={ROW_REMOVE} icon={<Trash2 aria-hidden />} />
       </>
     );
   }

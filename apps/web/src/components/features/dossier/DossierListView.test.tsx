@@ -232,21 +232,20 @@ describe('DossierListView — the category menu (D1)', () => {
     expect(values()).toEqual(['', 'penale']);
   });
 
-  it('gives both menus the same look, 44 px at every width (S7c) and half the row each on a phone', () => {
+  it('draws the category menu with the common `Select`, beside the order while it fits (LC106)', () => {
     appStore.setState({ dossiers: listed });
     renderList();
-    for (const name of ['Ordina le pratiche', 'Filtra per categoria']) {
-      expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('flex-1 min-w-0'));
-      expect(screen.getByRole('combobox', { name })).toHaveClass('min-h-[44px]');
-      expect(screen.getByRole('combobox', { name }).className).not.toMatch(/md:min-h-0/);
-    }
+    const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
+    expect(menu).toHaveClass('appearance-none', 'rounded-md', 'min-h-11');
+    expect(menu.closest('.flex-1')).toHaveClass('min-w-[8rem]');
+    expect(menu.closest('.flex-wrap')).toContainElement(screen.getByRole('radiogroup', { name: 'Ordina le pratiche' }));
   });
 
   it('has no menu when no dossier has a category, and the order menu stays', () => {
     appStore.setState({ dossiers: [dossier([CIVIL])] });
     renderList();
     expect(screen.queryByRole('combobox', { name: 'Filtra per categoria' })).toBeNull();
-    expect(screen.getByRole('combobox', { name: 'Ordina le pratiche' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Ordina le pratiche' })).toBeInTheDocument();
   });
 
   it('shows «Tutte le categorie» again when the chosen category leaves the list', () => {
@@ -275,6 +274,50 @@ describe('DossierListView — the category menu (D1)', () => {
 });
 
 // On a phone the title keeps its row (M1): «⋯» with «Importa» and «Cestino», and «+» for a new dossier, beside it.
+// LC106 (Luca, 18-11): the order is a choice in a row, «Data · Nome · Elementi», not a menu saying «Ordina».
+describe('DossierListView — the order, a choice in a row', () => {
+  const at = (id: string, title: string, createdAt: string, items: number): Dossier => ({
+    ...dossier(Array.from({ length: items }, () => CIVIL)), id, title, createdAt,
+  });
+  const order = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+
+  it('is a radio group of three, the chosen one alone in the Tab order, with no «Ordina» in sight', () => {
+    appStore.setState({ dossiers: [at('a', 'Alfa', '2026-01-01T00:00:00Z', 1)] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const group = screen.getByRole('radiogroup', { name: 'Ordina le pratiche' });
+    expect(group).toHaveAttribute('id', 'tour-dossier-sort');
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map((r) => r.textContent)).toEqual(['Data', 'Nome', 'Elementi']);
+    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+    expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1]);
+    expect(screen.queryByText(/Ordina/)).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Ordina le pratiche' })).toBeNull();
+  });
+
+  it('reorders the list: by date, by name, by items, with the arrows as with a click', () => {
+    appStore.setState({
+      dossiers: [
+        at('a', 'Bravo', '2026-03-01T00:00:00Z', 1),
+        at('b', 'Charlie', '2026-01-01T00:00:00Z', 3),
+        at('c', 'Alfa', '2026-02-01T00:00:00Z', 2),
+      ],
+    });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(order()).toEqual(['Bravo', 'Alfa', 'Charlie']);
+    fireEvent.click(screen.getByRole('radio', { name: 'Nome' }));
+    expect(order()).toEqual(['Alfa', 'Bravo', 'Charlie']);
+    const name = screen.getByRole('radio', { name: 'Nome' });
+    name.focus();
+    fireEvent.keyDown(name, { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: 'Elementi' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Elementi' })).toHaveFocus();
+    expect(order()).toEqual(['Charlie', 'Alfa', 'Bravo']);
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Elementi' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: 'Data' })).toHaveAttribute('aria-checked', 'true');
+    expect(order()).toEqual(['Bravo', 'Alfa', 'Charlie']);
+  });
+});
+
 describe('DossierListView — the heading on a phone', () => {
   const page = (trashCount = 0, onOpenTrash = vi.fn()) => {
     appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
@@ -287,8 +330,8 @@ describe('DossierListView — the heading on a phone', () => {
     expect(header).toHaveClass('flex-row', 'items-center', 'justify-between');
     const create = screen.getByRole('button', { name: 'Nuova pratica' });
     expect(create).toHaveAttribute('id', 'tour-dossier-create');
-    expect(create).toHaveClass('h-11', 'w-11');
-    expect(screen.getByRole('button', { name: 'Altre azioni sulle pratiche' })).toHaveClass('h-11', 'w-11');
+    expect(create).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: 'Altre azioni sulle pratiche' })).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.queryByRole('button', { name: 'Importa una pratica da file JSON' })).toBeNull();
   });
 
@@ -329,7 +372,9 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     expect(within(card).queryByRole('button', { name: 'Apri Pratica Rossi in Ricerca' })).toBeNull();
     for (const name of ['Azioni su Pratica Rossi']) {
       const control = within(card).getByRole('button', { name });
-      expect(control).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+      // `IconButton size="lg"`'s look: 44 px at every width.
+      expect(control).toHaveClass('min-h-11', 'min-w-11');
+      expect(control.className).not.toMatch(/md:min-[hw]-/);
       expect(control.className).not.toMatch(/opacity-0/);
     }
     // No icon of a folder, no «N elementi» badge.
@@ -374,7 +419,7 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     expect(empty.children[1]).toBe(screen.getByRole('heading', { name: 'Nessuna pratica di lavoro' }));
     expect(empty.innerHTML).not.toContain('--vlx-section-');
     for (const svg of empty.querySelectorAll('svg')) expect(svg.closest('button')).not.toBeNull();
-    expect(within(empty).getByRole('button', { name: 'Crea la tua prima pratica' })).toHaveClass('min-h-[44px]', 'bg-primary-600');
-    expect(within(empty).getByRole('button', { name: 'Pronti da LexCraft' })).toHaveClass('min-h-[44px]');
+    expect(within(empty).getByRole('button', { name: 'Crea la tua prima pratica' })).toHaveClass('min-h-11', 'bg-toga-600');
+    expect(within(empty).getByRole('button', { name: 'Pronti da LexCraft' })).toHaveClass('min-h-11');
   });
 });

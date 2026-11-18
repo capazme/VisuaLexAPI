@@ -183,6 +183,7 @@ describe('AddToDossierPopover with a decision', () => {
       screen.getByRole('textbox', { name: 'Nome della nuova pratica' }),
       screen.getByRole('button', { name: 'Crea e aggiungi' }),
     ];
-    for (const control of controls) expect(control.className).toContain('min-h-[44px]');
+    // The rows and the field keep their own 44 px; the buttons take `Button`'s (`min-h-11` below md, LC106).
+    for (const control of controls) expect(control.className).toMatch(/min-h-\[44px\]|min-h-11/);
   });
 });

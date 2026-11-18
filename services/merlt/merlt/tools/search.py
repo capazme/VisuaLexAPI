@@ -262,7 +262,7 @@ class SemanticSearchTool(BaseTool):
         expert_type = expert_type or self.default_expert_type
 
         log.debug(
-            f"semantic_search - query='{query[:50]}...', "
+            f"semantic_search - query_chars={len(query)}, "
             f"top_k={top_k}, expert={expert_type}, source_types={source_types}"
         )
 
@@ -319,7 +319,7 @@ class SemanticSearchTool(BaseTool):
 
             log.info(
                 f"semantic_search completed - "
-                f"query='{query[:30]}...', "
+                f"query_chars={len(query)}, "
                 f"results={len(results)}, "
                 f"top_score={results[0]['final_score']:.3f}" if results else "no results"
             )

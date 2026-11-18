@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { Dossier, DossierKind } from '../../../types';
 import { DossierKindChoice } from './DossierKindChoice';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { Textarea } from '../../ui/Textarea';
 
 interface Props {
   dossier: Dossier;
@@ -27,47 +30,23 @@ export function EditDossierModal({ dossier, onClose, onSave }: Props) {
         <div className="p-6">
           <h3 className="font-semibold text-lg text-slate-900 dark:text-white mb-4">Modifica pratica</h3>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Titolo</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrizione</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tag (separati da virgola)</label>
-              <input
-                value={tagsInput}
-                onChange={(e) => setTagsInput(e.target.value)}
-                placeholder="diritto civile, contratti, obbligazioni"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              />
-            </div>
+            <Input label="Titolo" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Textarea label="Descrizione" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="resize-none" />
+            <Input
+              label="Tag (separati da virgola)"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="diritto civile, contratti, obbligazioni"
+            />
             <DossierKindChoice value={kind} onChange={setKind} />
           </div>
           <div className="flex justify-end gap-3 mt-6">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
+            <Button variant="quiet" onClick={onClose}>
               Annulla
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-            >
+            </Button>
+            <Button onClick={handleSave}>
               Salva
-            </button>
+            </Button>
           </div>
         </div>
       </div>

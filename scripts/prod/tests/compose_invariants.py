@@ -77,6 +77,8 @@ def prod(cfg, lan_bind):
         check(hosts["ingress"] == [lan_bind], "and it is published exactly on that address")
     else:
         check(not beyond, "by default nothing is published beyond the loopback, the ingress included")
+    check(not hosts.get("merlt-api"), "merlt-api publishes nothing: only the server calls it, by container name")
+    check(not hosts.get("mcp-legal-it"), "mcp-legal-it publishes nothing: only MERL-T calls it, by container name")
 
     check(networks(services, "ingress") == {"edge", "app"}, "ingress: edge and app")
     check(networks(services, "server") == {"app", "data", "mcp"}, "server: app, data, and the MCP's network")

@@ -373,17 +373,16 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(screen.getByText('Ricorso in appello')).toBeInTheDocument();
   });
 
-  it('draws the header\'s actions in one row under the title, every one 44 px', () => {
+  it('draws the header\'s actions in one row under the title, 44 px on a phone (`Button`\'s heights, LC106)', () => {
     renderView();
     const open = screen.getByRole('button', { name: 'Aggiungi' });
     const row = open.closest('.flex-wrap') as HTMLElement;
     for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) expect(row).toContainElement(screen.getByRole('button', { name }));
     // Under the title, not beside it: a long name would be squeezed.
     expect(screen.getByRole('heading', { level: 1 }).closest('header')).not.toContainElement(open);
-    expect(open).toHaveClass('min-h-[44px]');
-    expect(screen.getByRole('button', { name: 'Aggiungi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
-    expect(screen.getByRole('button', { name: 'Altre azioni' })).toHaveClass('h-11', 'w-11');
-    for (const button of within(row).getAllByRole('button')) expect(button.className).not.toMatch(/md:min-h-0/);
+    expect(open).toHaveClass('min-h-11', 'min-w-11', 'rounded-md');
+    expect(screen.getByRole('button', { name: 'Altre azioni' })).toHaveClass('min-h-11', 'min-w-11');
+    for (const button of within(row).getAllByRole('button')) expect(button).toHaveClass('min-h-11');
   });
 
   it('keeps a long title clear of the actions: they come after the description and the facts, each label on one line (D3b)', () => {
@@ -405,7 +404,7 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
 
   it('keeps the Forum\'s label on one line once the dossier is published (D3b)', () => {
     renderView({ ...dossier, published: { sharedEnvironmentId: 'e1', version: 3, isActive: true, updatedAt: '' } });
-    expect(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' })).toHaveClass('whitespace-nowrap', 'min-h-[44px]');
+    expect(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' })).toHaveClass('whitespace-nowrap', 'min-h-11');
   });
 
   it('writes no grey line it cannot fill: no «Aggiunto il» without a date', () => {
@@ -423,7 +422,11 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     // The date under the words, never beside them, so a phone's row keeps the note's width.
     expect(words.compareDocumentPosition(date) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(words.parentElement).toContainElement(date);
-    expect(within(notes).getByRole('button', { name: 'Rimuovi nota' })).toHaveClass('h-11', 'w-11');
+    // `IconButton size="lg"`: 44 px square at every width.
+    expect(within(notes).getByRole('button', { name: 'Rimuovi nota' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(within(notes).getByRole('button', { name: 'Rimuovi nota' }).className).not.toMatch(/md:min-[hw]-/);
+    // A box that holds: `Card`, 8 px.
+    expect(notes).toHaveClass('rounded-[8px]');
   });
 });
 

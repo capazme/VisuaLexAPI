@@ -175,7 +175,7 @@ class PrincipleLookupTool(BaseTool):
             ToolResult con lista di principi trovati
         """
         log.debug(
-            f"principle_lookup - query='{query}', "
+            f"principle_lookup - query_chars={len(query)}, "
             f"levels={principle_level}, top_k={top_k}"
         )
 
@@ -227,7 +227,7 @@ class PrincipleLookupTool(BaseTool):
 
             log.info(
                 f"principle_lookup completed - "
-                f"query='{query}', found={len(unique_principles)}"
+                f"query_chars={len(query)}, found={len(unique_principles)}"
             )
 
             return ToolResult.ok(

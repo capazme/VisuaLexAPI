@@ -22,6 +22,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { createLimiter } from '../middleware/rateLimiter';
 import type { PublishedContent } from '../utils/publishedContent';
+import { assertDossierRoom } from '../utils/dossierCaps';
 
 /** Imports a user may run in an hour: one small request can create a hundred dossiers. */
 export const IMPORTS_PER_HOUR = 30;
@@ -193,6 +194,13 @@ export async function importStudyDossiers(userId: string, content: PublishedCont
     : [];
 
   await prisma.$transaction(async (tx) => {
+    // The caps (G-576) on everything this import adds, before anything is written: all or nothing.
+    const sizes = content.dossiers.map((dossier) => (Array.isArray(dossier.items) ? dossier.items.length : 0));
+    await assertDossierRoom(tx, userId, {
+      dossiers: content.dossiers.length,
+      items: sizes.reduce((sum, n) => sum + n, 0),
+      largestNewDossier: Math.max(0, ...sizes),
+    });
     for (const dossier of content.dossiers) {
       const entries = Array.isArray(dossier.items) ? (dossier.items as Row[]) : [];
       const ids = new Map(entries.map((entry) => [String(entry.id), randomUUID()]));

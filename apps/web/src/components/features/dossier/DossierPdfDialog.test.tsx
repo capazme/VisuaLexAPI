@@ -83,7 +83,7 @@ describe('DossierPdfDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole('button', { name: /Scarica PDF/ }).className).toContain('min-h-[44px]');
+    expect(screen.getByRole('button', { name: /Scarica PDF/ })).toHaveClass('min-h-11', 'md:min-h-9');
     expect(screen.getByRole('radio', { name: 'Testo completo' }).closest('label')?.className).toContain('min-h-[44px]');
   });
 

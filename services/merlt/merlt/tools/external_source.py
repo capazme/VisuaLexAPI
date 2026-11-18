@@ -233,7 +233,7 @@ class ExternalSourceTool(BaseTool):
             source_priority = [s for s in source_priority if s in ["graph", "normattiva"]]
 
         log.info(
-            f"external_source - query='{query}', priority={source_priority}"
+            f"external_source - query_chars={len(query)}, priority={source_priority}"
         )
 
         for idx, source in enumerate(source_priority):
@@ -255,7 +255,7 @@ class ExternalSourceTool(BaseTool):
                     fallback_used = (idx > 0)
                     log.info(
                         f"external_source completed - "
-                        f"query='{query}', source={source}, fallback={fallback_used}"
+                        f"query_chars={len(query)}, source={source}, fallback={fallback_used}"
                     )
 
                     return ToolResult.ok(
@@ -275,7 +275,7 @@ class ExternalSourceTool(BaseTool):
                 log.warning(f"Errore con sorgente {source}: {e}")
                 continue
 
-        log.error(f"external_source failed - query='{query}' non trovata")
+        log.error(f"external_source failed - query_chars={len(query)} non trovata")
         return ToolResult.fail(
             error=f"Fonte non trovata per query '{query}' in nessuna sorgente",
             tool_name=self.name

@@ -12,6 +12,7 @@ References:
     RLCF.md Section 3.6 - Dynamic Task Handler System
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import os
 import aiohttp
 import asyncio
@@ -61,6 +62,19 @@ def _openrouter_headers(api_key: str) -> Dict[str, str]:
         "HTTP-Referer": "https://visualex.org",
         "X-OpenRouter-Title": "VisuaLex",
     }
+
+
+def _provider_error(status: int, body: str) -> str:
+    """What may be logged of a failed call: the status, OpenRouter's error code and its own short
+    message, never the error's metadata, where the provider's raw text sits (it may echo the
+    request, the person's question included)."""
+    code, message = None, ""
+    try:
+        error = json.loads(body).get("error") or {}
+        code, message = error.get("code"), str(error.get("message") or "")
+    except (ValueError, AttributeError):
+        pass
+    return f"{status} (code {code}): {message[:200]}" if message else f"{status} (code {code})"
 
 
 @dataclass
@@ -248,14 +262,15 @@ Please provide a concise legal summary highlighting key points, obligations, and
             ) as response:
                 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
                 
                 data = await response.json()
                 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
                 
                 ai_content = data["choices"][0]["message"]["content"]
@@ -375,7 +390,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        model: str = "google/gemini-2.5-flash",
+        model: str = DEFAULT_FAST_MODEL,
         temperature: float = 0.1,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
         api_key: Optional[str] = None,
@@ -439,14 +454,15 @@ Please provide a concise legal summary highlighting key points, obligations, and
             ) as response:
 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
@@ -477,7 +493,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
     async def generate_response_async(
         self,
         prompt: str,
-        model: str = "google/gemini-2.5-flash",
+        model: str = DEFAULT_FAST_MODEL,
         temperature: float = 0.7,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
         system_prompt: Optional[str] = None,
@@ -530,7 +546,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
             prompt: Prompt utente
             json_schema: Schema JSON (usato nel prompt per guidare il modello)
             system_prompt: Prompt di sistema opzionale
-            model: ID modello OpenRouter (default: gemini-2.0-flash-001)
+            model: ID modello OpenRouter (default: LLM_PARSING_MODEL, poi DEFAULT_FAST_MODEL)
             temperature: Temperatura sampling (0.0-1.0)
             max_tokens: Max tokens da generare
             api_key: API key opzionale (default: env OPENROUTER_API_KEY)
@@ -555,7 +571,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 raise ValueError("OpenRouter API key not provided")
 
             # Usa modello da env se non specificato
-            model = model or os.getenv("LLM_PARSING_MODEL", "google/gemini-2.5-flash")
+            model = model or os.getenv("LLM_PARSING_MODEL", DEFAULT_FAST_MODEL)
 
             # Genera esempio JSON dallo schema
             schema_example = self._generate_json_example(json_schema)
@@ -597,18 +613,19 @@ JSON:"""
             ) as response:
 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
-                log.info(f"Raw completion: {completion[:200]}...")
+                log.info("JSON completion received", chars=len(completion))
 
                 # Prova a parsare direttamente
                 try:
@@ -668,7 +685,8 @@ JSON:"""
                 return result
 
         except json.JSONDecodeError as e:
-            log.error(f"Failed to parse JSON response: {e}. Raw: {completion[:500] if 'completion' in dir() else 'N/A'}")
+            # The model's text stays out of the log: only where the parse failed.
+            log.error("Failed to parse JSON response", error=type(e).__name__, position=e.pos)
             raise
         except Exception as e:
             log.error(f"Error generating JSON completion: {str(e)}")
