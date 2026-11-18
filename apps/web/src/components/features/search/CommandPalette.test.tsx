@@ -637,6 +637,35 @@ describe('CommandPalette — in the page, not over it (L-75)', () => {
     expect(band.closest('.fixed')).toBeNull();
   });
 
+  it('closes as the focus goes out to the page (Tab), not as it moves inside', () => {
+    const onClose = vi.fn();
+    render(<><button type="button">Fuori</button><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    act(() => screen.getByRole('button', { name: 'Chiudi' }).focus());
+    act(() => screen.getByRole('combobox').focus());
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => screen.getByRole('button', { name: 'Fuori' }).focus());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('after a choice, gives the focus to the page it led to (its title), not back to the pill nor to the body', async () => {
+    const pill = document.createElement('button');
+    document.body.append(pill);
+    pill.focus();
+    const onClose = vi.fn();
+    const onSearch = vi.fn();
+    const { rerender } = render(<><main><h1>Ricerca</h1></main><CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
+    const box = screen.getByRole('combobox');
+    fireEvent.change(box, { target: { value: 'art. 2043 c.c.' } });
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(onSearch).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    rerender(<><main><h1>Ricerca</h1></main><CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ricerca' })).toHaveFocus());
+    expect(pill).not.toHaveFocus();
+    pill.remove();
+  });
+
   it('closes on a click outside the field and the band, not on one inside', () => {
     const onClose = vi.fn();
     render(<><button type="button">Fuori</button><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);

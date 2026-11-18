@@ -27,6 +27,7 @@ import { rememberSearch } from '../rassegne/searchMemory';
 import { provenance } from '../rassegne/rassegnaFilters';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 import { useOpenSettings } from '../settings/settingsRoute';
+import { focusPage } from '../../../utils/focusPage';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -159,6 +160,38 @@ function Matched({ text, query }: { text: string; query: string }) {
   });
   if (at < text.length) parts.push(text.slice(at));
   return <>{parts}</>;
+}
+
+/**
+ * After a choice, or with the opener gone: the focus on what the page that drew next holds — what opened took it
+ * already, else the page's title — never the body. Looked for over the next frames, about half a second (a page that
+ * loads its code first; the page left, whose title goes a frame later); what takes the focus meanwhile keeps it.
+ * Returns the cleanup.
+ */
+function focusLanding(): () => void {
+  let frame = 0;
+  let tries = 30;
+  // The title given, while the page may still change under it (the page left draws one more frame, its title with it).
+  let given: HTMLElement | null = null;
+  const look = () => {
+    const active = document.activeElement;
+    const free = !active || active === document.body;
+    // Something else took the focus (a result that focuses itself): it keeps it.
+    if (!free && active !== given) return;
+    const title = document.querySelector<HTMLElement>('main h1');
+    if (free && title) {
+      if (!title.hasAttribute('tabindex')) {
+        title.setAttribute('tabindex', '-1');
+        title.addEventListener('blur', () => title.removeAttribute('tabindex'), { once: true });
+      }
+      title.focus({ preventScroll: true });
+      given = title;
+    }
+    if (tries-- > 0) frame = requestAnimationFrame(look);
+    else if (document.activeElement === document.body) focusPage();
+  };
+  frame = requestAnimationFrame(look);
+  return () => cancelAnimationFrame(frame);
 }
 
 /** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
@@ -632,19 +665,25 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   const bandRef = useRef<HTMLDivElement>(null);
   const fieldBoxRef = useRef<HTMLDivElement>(null);
-  // A click outside the field and the band closes it, as the veil's did; the page under takes the click as well.
+  // A click outside the field and the band closes it, as the veil's did; the page under takes the click as well. So does
+  // the focus going out to the page, by Tab (Papiniano, #599): the same «outside».
   useEffect(() => {
     if (!isOpen) return undefined;
-    const down = (event: PointerEvent) => {
+    const outside = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (bandRef.current?.contains(target) || fieldBoxRef.current?.contains(target) || place.source?.contains(target)) return;
+      // By the DOM, not the refs: a field drawn anew (a step, a new bar) takes the focus before its ref is set.
+      if (target.closest('#command-menu-root, [data-palette-slot]') || place.source?.contains(target)) return;
       // A dialog opened over it is its own.
       if (target.closest('[aria-modal="true"]')) return;
       onClose();
     };
-    document.addEventListener('pointerdown', down);
-    return () => document.removeEventListener('pointerdown', down);
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('focusin', outside);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('focusin', outside);
+    };
   }, [isOpen, onClose, place.source]);
 
   // Closed: the focus goes back to what opened it (the pill, the field), if it was in the field or the band.
@@ -656,8 +695,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     const active = document.activeElement;
     const ours = !active || active === document.body || bandRef.current?.contains(active) || fieldBoxRef.current?.contains(active);
     if (!ours) return;
-    if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
-    else if (active instanceof HTMLElement) active.blur();
+    // A choice made: the focus goes where it led, not back to the pill (Papiniano, #599: it fell to the body).
+    if (!chose && opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
+    else {
+      if (active instanceof HTMLElement) active.blur();
+      return focusLanding();
+    }
     // Once per closing; the opener is the one taken as it opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
