@@ -10,10 +10,11 @@ from dataclasses import dataclass
 from datetime import date as _date
 from typing import Optional
 
-from .act_resolver import ambiguous_act, resolve_atto
+from .act_resolver import act_typed_with, ambiguous_act, resolve_atto
 from .article_clause import ARTICLE_CLAUSE_SOURCE
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import ANNEX_SIGLE, NORMATTIVA_SEARCH, NORMATTIVA_URN_CODICI, code_row_of_annex
+from .regional_law import cites_regional_law
 from .sources import SIGLA_BY_ANNEX
 
 # Italian month names → month number
@@ -168,6 +169,8 @@ class ParsedQuery:
     # One article only: the comma it names, or the part («701-800») its label names.
     comma: Optional[str] = None
     part: Optional[str] = None
+    # A dated name's notice («dal 1° gennaio 2027 …», dated_names.py).
+    notice: Optional[str] = None
 
     def to_api_params(self) -> dict:
         """Convert to API request parameters, omitting None values."""
@@ -186,6 +189,8 @@ class ParsedQuery:
             params["parte"] = self.part
         elif self.comma:
             params["comma"] = self.comma
+        if self.notice:
+            params["notice"] = self.notice
         return params
 
     @property
@@ -194,12 +199,14 @@ class ParsedQuery:
         return bool(self.act_type)
 
 
-def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
+def parse_nl_query(raw_input: str, day: Optional[_date] = None) -> Optional[ParsedQuery]:
     """
     Parse a natural language legal query into structured parameters.
 
     Returns ParsedQuery if the input was recognized, None if it couldn't be parsed
-    (caller should fall back to existing parser).
+    (caller should fall back to existing parser). A regional law is None, never a
+    State law (`regional_law`). A dated name («art. 1 tuir») is read at `day`, today in
+    Rome when None (`dated_names`), with its annex and its notice.
 
     Examples:
         "art. 2043 cc"                → ParsedQuery(act_type="codice civile", article="2043")
@@ -212,6 +219,9 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
 
     # Cap input length to prevent regex processing on excessively long strings
     if len(raw_input) > 500:
+        return None
+
+    if cites_regional_law(raw_input):
         return None
 
     raw_input, annex = _extract_annex(raw_input)
@@ -254,14 +264,23 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
         if year_date:
             result.date = year_date
 
-    # A spelling that names two acts («T.U.E.») is refused, never read as one of them.
-    if ambiguous_act(text):
+    # A spelling that names two acts («T.U.E.», «TUA») is refused, never read as one of them,
+    # unless the number or the year typed with it is one act's («TUA 152/2006»).
+    typed = bool(result.act_number or result.date)
+    ambiguous = ambiguous_act(text)
+    if ambiguous and not typed:
         return None
 
     # 5. Identify act type from remaining text: an annex's own sigla first («disp. att. c.p.a.»
     #    is the c.p.a.'s decree at annex 3, never the «c.p.a.» inside it)
     text, annex_code, sigla_annex = _extract_annex_sigla(text)
-    known = None if annex_code else _identify_known_act(text)
+    known = None if annex_code else _identify_known_act(text, day)
+    # A dated name or an ambiguous one with a number or a year: the act that has them
+    # («art. 81 TUIR 917/1986» is the d.p.r. on any day), or nothing (G-577).
+    if not annex_code and typed and (ambiguous or (known and known.get("notice"))):
+        known = act_typed_with(text, result.act_number, result.date, day)
+        if known is None:
+            return None
     if annex_code:
         result.act_type = annex_code
         annex = annex or sigla_annex
@@ -271,6 +290,9 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
             result.act_number = known["numero_atto"]
         if known.get("data") and not result.date:
             result.date = known["data"]
+        if known.get("allegato"):
+            annex = annex or known["allegato"]
+        result.notice = known.get("notice")
     else:
         act_type = _identify_act_type(text)
         if act_type:
@@ -580,13 +602,13 @@ def _extract_year(text: str) -> tuple[str, Optional[str]]:
     return text, None
 
 
-def _identify_known_act(text: str) -> Optional[dict]:
+def _identify_known_act(text: str, day: Optional[_date] = None) -> Optional[dict]:
     """Resolve a full act name to type + number + date, or None.
 
     Runs before the substring scan so a denominato ("statuto dei lavoratori")
-    yields its number and date rather than just a type.
+    yields its number and date rather than just a type. A dated name is read at `day`.
     """
-    return resolve_atto(text)
+    return resolve_atto(text, day)
 
 
 def _identify_act_type(text: str) -> Optional[str]:

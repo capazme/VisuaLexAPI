@@ -204,7 +204,7 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `get_playwright_manager()`
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
   - `map.py` — act-type mappings, plus the act tables the resolver reads
-    (`ATTI_NOTI` 64 aliases, `ATTI_DENOMINATI` 202 aliases over 81 acts, built
+    (`ATTI_NOTI` 61 aliases, `ATTI_DENOMINATI` 200 aliases over 81 acts, built
     from the reviewable `_ATTI_DENOMINATI_SPEC` rows) and `codice_urn(name)`,
     the **case-insensitive** lookup into `NORMATTIVA_URN_CODICI` — six keys
     carry capitals ("codice del Terzo settore"), so a bare `in` test missed
@@ -246,6 +246,24 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     tables in `map.py`. It **never guesses**: an unrecognised name returns `None`
     and `suggest_acts()` offers near misses. Chained after the exact-match paths
     in `alias_resolver` and `nl_parser`, so nothing that resolved before changes.
+    `AMBIGUOUS_NAMES` («T.U.E.», «TUA») resolve to nothing: `ambiguous_act` names, for each act,
+    a name the tables resolve, which `/parse_query` offers as `ambiguous` (G-577).
+  - `dated_names.py` — the names whose act follows the date (G-577): «TUIR», «TUR», «TUIVA» and
+    their long names are the old d.p.r. until 31 December 2026 and the new testo unico, the annex
+    («allegato 1») of d.lgs. 117/2026, 123/2025 and 10/2026, from 1 January 2027, each span with a
+    one-line `notice`. `resolve_atto(name, day)` and every reader above it take the day; today in
+    Rome when none. Only a typed name is read this way: a saved note holds the act's fields, and
+    the fetch never consults the table. They are not presets, since the YAML layer is read first
+    and is fixed. A name typed with an act's number or year is that act on any day
+    (`act_resolver.act_typed_with`: «art. 81 TUIR 917/1986» is the d.p.r., «TUA 152/2006» the
+    codice dell'ambiente), and with another act's number reads nothing.
+  - `regional_law.py` — `cites_regional_law`, `is_regional_act_type` (G-577; mcp-legal-it's
+    patterns, LI-086): a regional law is never read as a State law. The search's reading refuses
+    it first (`refusal: "regional_law"`), `parse_nl_query` and `resolve_atto` read nothing, the
+    fetch answers 400 (`REGIONAL_LAW_REFUSAL`) and `/fetch_norm_links` `not_linkable`, so no
+    Normattiva address is built for one (Normattiva would answer the State's act of that number).
+    `citation_linker` takes each regional citation (`regional_law_spans`, the article before it
+    included, a list of articles too) before its passes, and ends the context there.
   - `egress.py` — `ALLOWED_HOSTS` plus `is_allowed(url)`, checked in
     `ThrottledHttpClient.request`; it refuses a backslash, a control character,
     credentials before the host and a scheme other than http(s), which Chromium would
@@ -348,7 +366,11 @@ POST unless noted, JSON bodies.
   were 14 «articles» numbered «1 (commi 101-200)» (and the existence check found no art. 1); the
   persistent keys carry `|parts`, so a tree stored before is read again
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection. `/parse_query`
-  answers `identifies_act` beside `recognized` (`act_identity.py`). A recital clause
+  answers `identifies_act` beside `recognized` (`act_identity.py`). A dated name («art. 1 tuir»,
+  `tools/dated_names.py`) is read at today's date in Rome: `parsed.annex` when the act's text is an
+  annex, and a top-level `notice`, the one line to show with it. A regional law is not recognised,
+  with `refusal: "regional_law"`. An ambiguous name («art. 1 tua», «T.U.E.») is not recognised, and
+  `ambiguous` lists `{name, parsed, display}` for each act it could mean (G-577). A recital clause
   («considerando 26 GDPR», «cons. 26 reg. 2016/679», lists and ranges up to 150; spec
   `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §3) is taken out first by
   `tools/recital_clause.py` and the rest read as today (`read_norm_query`): the answer is
@@ -361,7 +383,8 @@ POST unless noted, JSON bodies.
 - `/parse_query_batch` — `{"queries": [...]}`, 1 to 200 strings of 1 to 200 characters, the body
   at most 48 KB (anything else a 400 that names the limit) → `{"results": [{recognized, parsed,
   source, identifies_act}]}` in order: each read as `/parse_query` reads one (`read_norm_query`),
-  a recital clause answered as not recognised this round, and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
+  a recital clause and a regional law answered as not recognised, a dated name's `notice` beside
+  `parsed`, and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
   failures and the duration, never a string, and an error by its type only: the strings are the
   citations of a document the user may hold confidential (`tests/test_parse_query_batch.py`
   captures the records). Priced 3 points by the server's scrape gate; routed by the ingress's
