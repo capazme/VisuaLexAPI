@@ -1187,6 +1187,12 @@
   }
 }
 
+/* LC90: in the one-act card of the Ricerca the column is as wide as the glosses' margin beside the text (21.25rem), so the
+   text keeps its width when the glosses go from beside it into the column (the first gloss on a passage). */
+[data-glosses-room] .vlx-glossed .vlx-glossed-grid {
+  grid-template-columns: minmax(0, 1fr) 21.25rem;
+}
+
 /* LC74: a card widened by one article's glosses (`useGlossMargin`) keeps the text of every other article in it where it
    was, at the width the card gave it closed. */
 [data-glosses-room]:has([data-glosses-beside]) [data-article-root]:not([data-glosses-beside]) {

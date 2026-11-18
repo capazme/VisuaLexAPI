@@ -8,6 +8,7 @@ import { articleDiscussionService, type DiscussionAnchor } from '../../../servic
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../hooks/useAuth';
 import { ReplyForm, ReportButton, TOUCH, VoteButton } from './discussionControls';
+import { AlignedGlosses, type GlossAlignment } from './AlignedGlosses';
 import { voteFailure } from './voteFailure';
 import { FormSelect } from '../../ui/FormSelect';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
@@ -69,6 +70,10 @@ interface Props {
   layout?: 'panel' | 'margin';
   /** The number of discussions on the article (`margin`): the «Glosse» button shows it. */
   onCountChange?: (count: number) => void;
+  /** `margin` beside the text (LC90): the glosses on a passage at the height of their words. Under the text: a list. */
+  align?: GlossAlignment;
+  /** The gloss whose passage is lit in the text (chosen here or from the text): marked, and joined to its words. */
+  litThreadId?: string | null;
 }
 
 /** The replies to a thread, as the Forum counts them (`replyCount`): not the comments under them, nor an emptied one. */
@@ -102,6 +107,8 @@ export function ArticleDiscussionPanel({
   passageTextAvailable = true,
   layout = 'panel',
   onCountChange,
+  align,
+  litThreadId = null,
 }: Props) {
   const isMargin = layout === 'margin';
   const marginHeadingId = useId();
@@ -486,7 +493,13 @@ export function ArticleDiscussionPanel({
               <article
                 key={thread.id}
                 id={`article-thread-${thread.id}`}
-                className={cn('rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900', isMargin ? 'p-3' : 'p-4')}
+                data-lit={isMargin && litThreadId === thread.id ? '' : undefined}
+                className={cn(
+                  'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900',
+                  isMargin ? 'p-3' : 'p-4',
+                  // Its passage lit in the text: the same tint as the words' underline.
+                  isMargin && litThreadId === thread.id && 'border-[hsl(var(--primary)/0.55)] dark:border-[hsl(var(--primary)/0.55)]',
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <button
@@ -679,7 +692,9 @@ export function ArticleDiscussionPanel({
             {onPassages.length > 0 && (
               <h4 data-gloss-row="" className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sui passaggi</h4>
             )}
-            {onPassages.map(row)}
+            {align ? (
+              <AlignedGlosses threads={onPassages} {...align} litId={litThreadId} render={renderThread} />
+            ) : onPassages.map(row)}
           </>
         )}
       </section>

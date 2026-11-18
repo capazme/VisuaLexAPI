@@ -71,6 +71,13 @@ export interface AnnotationMarginProps {
     onWideChange?: (wide: boolean) => void;
     /** Whether the reader has room for the column at all, cards or not (Study Mode writes a note elsewhere without). */
     onRoomChange?: (roomy: boolean) => void;
+    /** Whether the text has anything at its margin (`data-margin-content`), told in the commit that draws it (LC74). */
+    onContentChange?: (has: boolean) => void;
+    /**
+     * A block's sign pressed while the aside is shown (its cards are not drawn): true when the aside took it (LC90: the
+     * glosses' margin chooses the gloss on that passage); false leaves the block's sheet to say it all.
+     */
+    onAsideFocus?: (keys: readonly string[]) => boolean;
     /**
      * Shown in the column in place of the cards while it is given (LC74: the article's glosses, opened where the column
      * already is, so the text does not move). The cards come back when it goes.
@@ -119,7 +126,7 @@ const remPx = () => Number.parseFloat(getComputedStyle(document.documentElement)
 export function AnnotationMargin({
     plain, textRootRef, contentKey, notes = [], onUpdateNote, onRemoveNote, draft = null, onSaveDraft, onCancelDraft,
     threads = [], onOpenThread, textHash, glosses = [], glossActions, shownGlossId = null, onShowGlossPassage,
-    onWideChange, onRoomChange, aside, className, children, ref,
+    onWideChange, onRoomChange, onContentChange, onAsideFocus, aside, className, children, ref,
 }: AnnotationMarginProps) {
     const owner = useId();
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -136,9 +143,10 @@ export function AnnotationMargin({
         const width = wrapper.getBoundingClientRect().width;
         setRoomy((was) => width >= (was ? MARGIN_MIN_REM - 1 : MARGIN_MIN_REM) * remPx());
     }, []);
-    // Also after every render, before the paint: a host that changes the reader's layout in the same commit (LC74: the
-    // glosses' margin leaving the side of the text) gets the column in that commit, not a frame later.
-    useLayoutEffect(() => { checkRoom(); });
+    // Also before the paint of the commit that gives or takes the aside: the host changes the reader's layout in it
+    // (LC74: the glosses' margin leaving the side of the text for the column), which gets the column in that commit.
+    const asideShown = aside != null;
+    useLayoutEffect(() => { checkRoom(); }, [checkRoom, asideShown]);
     useLayoutEffect(() => {
         const wrapper = wrapperRef.current;
         if (!wrapper || typeof ResizeObserver === 'undefined') return;
@@ -187,6 +195,11 @@ export function AnnotationMargin({
     }, [plain, notes, hasNotes, threads, hasThreads, glosses, glossActions, hasDraft, draftStart, draftWords]);
 
     const active = roomy && entries.length > 0;
+    const hasContent = entries.length > 0;
+    const reportContent = useRef(onContentChange);
+    useLayoutEffect(() => { reportContent.current = onContentChange; });
+    useLayoutEffect(() => { reportContent.current?.(hasContent); }, [hasContent]);
+    useLayoutEffect(() => () => reportContent.current?.(false), []);
     const [layout, setLayout] = useState<{ tops: Record<string, number>; height: number } | null>(null);
 
     const measure = useCallback(() => {
@@ -214,7 +227,6 @@ export function AnnotationMargin({
         frame.current = requestAnimationFrame(measure);
     }, [measure]);
     // The cards are drawn again when the aside goes: measured and observed anew.
-    const asideShown = aside != null;
     useLayoutEffect(() => {
         if (!active || asideShown) return;
         schedule();
@@ -244,8 +256,9 @@ export function AnnotationMargin({
     const reportWide = useRef(onWideChange);
     const reportRoom = useRef(onRoomChange);
     useEffect(() => { reportWide.current = onWideChange; reportRoom.current = onRoomChange; });
-    // Shown once the cards are placed: before that a sign's press would focus a card not yet drawn.
-    const shown = active && layout !== null;
+    // Shown once the cards are placed: before that a sign's press would focus a card not yet drawn. With the aside, at
+    // once: the aside takes the press.
+    const shown = active && (asideShown || layout !== null);
     useEffect(() => { reportWide.current?.(shown); }, [shown]);
     useEffect(() => { reportRoom.current?.(roomy); }, [roomy]);
 
@@ -261,6 +274,7 @@ export function AnnotationMargin({
     useImperativeHandle(ref, () => ({
         focus: (keys) => {
             if (!shown) return false;
+            if (asideShown) return onAsideFocus?.(keys) ?? false;
             const first = entries.find((e) => keys.includes(e.key));
             return !!first && focusCard(first.key);
         },
@@ -274,7 +288,7 @@ export function AnnotationMargin({
             }
             return true;
         },
-    }), [shown, entries, focusCard, hasDraft, draftText]);
+    }), [shown, asideShown, onAsideFocus, entries, focusCard, hasDraft, draftText]);
 
     // The words of the card hovered or focused (a note's, a discussion's), painted in the text; a gloss shows its own.
     const [passageOf, setPassageOf] = useState<string | null>(null);
@@ -390,7 +404,7 @@ export function AnnotationMargin({
     const escapeFrom = (entry: Entry) => signAt(textRootRef.current, entry.start, entry.end)?.focus({ preventScroll: true });
 
     return (
-        <div ref={wrapperRef} data-annotation-margin="" data-margin-content={entries.length > 0 ? '' : undefined} className={cn(active && 'vlx-glossed', className)}>
+        <div ref={wrapperRef} data-annotation-margin="" data-margin-content={hasContent ? '' : undefined} className={cn(active && 'vlx-glossed', className)}>
             <div className="vlx-glossed-grid">
                 <div className="min-w-0">{children}</div>
                 {active && (
