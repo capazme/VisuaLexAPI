@@ -4,7 +4,9 @@ import helmet from 'helmet';
 import 'express-async-errors';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
-import { globalRateLimiter, writeRateLimiter } from './middleware/rateLimiter';
+import { globalRateLimiter, sessionCheckRateLimiter, writeRateLimiter } from './middleware/rateLimiter';
+import { authenticate } from './middleware/auth';
+import { getCurrentUser } from './controllers/authController';
 import { createScrapeGate } from './middleware/scrapeGate';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
@@ -91,6 +93,10 @@ app.get('/api/features', features);
 // table of routes, scopes and daily quota, before the general limiter so that
 // it is counted per user rather than per address.
 app.use('/api', delegatedAuth);
+
+// The session check, which the web asks at every load: its own limit, wider than the general one and outside
+// it (G-484), so that a page making many calls does not make the check fail and look like a lost session (#459).
+app.get('/api/auth/me', sessionCheckRateLimiter, authenticate, getCurrentUser);
 
 // Rate limiting: anonymous 100/min, authenticated 300/min, writes 200/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory

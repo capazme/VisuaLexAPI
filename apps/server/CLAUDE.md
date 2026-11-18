@@ -23,10 +23,23 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (~6 s, measured), past what a process manager waits before its SIGKILL (pm2,
   on the old server, waited 1.6 s).
 - `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
-  authenticated 300/min (by userId), writes 200/min. `RateLimiterRedis` when
-  `REDIS_ENABLED=true`, else in-memory with a startup warning.
+  authenticated 300/min (by userId), writes 200/min. Every limiter comes from
+  `createLimiter`: `RateLimiterRedis` when `REDIS_ENABLED=true`, else in-memory
+  with a startup warning. On Redis, a store error (down, not ready; a Redis that hangs without erring is not covered, there is no command timeout) hands the
+  count to an in-memory limiter with the same limits (the insurance limiter),
+  so a limit holds per process; the fail-open branches are only a last resort.
+  The session check (`GET /api/auth/me`, G-484) has its own counter,
+  `SESSION_CHECK_POINTS` (600) a minute per user or address, mounted in `app.ts`
+  after `delegatedAuth` and before the general limiter, which it skips.
+- `src/routes/auth.ts` — failed sign-ins and registrations: 5 per 15 minutes per
+  address (shared, as before); failed sign-ins per account (the SHA-256 of the
+  email as typed, trimmed and lower-cased, existing or not): 10 an hour from any
+  address; refreshes: 30 a minute per address. Counted on arrival (a burst is
+  held too) and given back on success. A refusal is 429 with `Retry-After`.
+  Someone who knows an email can block that sign-in for up to an hour: the
+  accepted price of stopping guesses spread over many addresses.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
-  connection errors fail open.
+  connection errors go to the limiters' memory fallback.
 - `src/middleware/auth.ts` — `authenticate` answers **401** only when the
   session is over: no token, a token that does not verify, the wrong type, a
   missing or disabled user. When it cannot read the user (the database is
