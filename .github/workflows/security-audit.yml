@@ -29,11 +29,11 @@ jobs:
           inputs: services/visualex/requirements.txt
 
   # What ships blocks; development tools are shown and never block (G-552). The runtime images
-  # install with `npm ci --omit=dev` and the web ships as built files. Two exceptions run on the
-  # deployment host all the same: the Prisma CLI (a development dependency), which the one-shot
-  # `migrate` container runs from the build stage against the database, and the web's build tools,
-  # on our own sources. The cost: a future high advisory in a development tool, these included, no
-  # longer blocks.
+  # install with `npm ci --omit=dev` and the web ships as built files. The Prisma CLI, which the
+  # one-shot `migrate` container runs against the database, is a production dependency of the
+  # server (G-555), so this job covers it. Development tools still run on the deployment host only
+  # while the images are built: the build tools of the web, the server and the MCP, on our own
+  # sources. The cost: a future high advisory in a development tool, these included, no longer blocks.
   npm-audit:
     name: npm audit, production dependencies
     runs-on: ubuntu-latest
