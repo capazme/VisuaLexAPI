@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
@@ -126,6 +126,18 @@ describe('Impostazioni — the aliases deleted with «Annulla» (L-35)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Annulla/ }));
     expect(await screen.findByRole('button', { name: 'Elimina l’alias cdc' })).toBeInTheDocument();
     expect(remove).not.toHaveBeenCalled();
+    appStore.setState({ customAliases: [] });
+  });
+
+  it('after a deletion the focus goes to the next alias, or to the section\'s heading', async () => {
+    const { appStore } = await import('../../../store/useAppStore');
+    const make = (id: string, trigger: string) => ({ id, trigger, type: 'reference' as const, expandTo: trigger, searchParams: { act_type: 'codice civile' }, createdAt: '', usageCount: 0 });
+    appStore.setState({ customAliases: [make('a1', 'aaa'), make('a2', 'bbb')], removeCustomAlias: vi.fn() });
+    render(<MemoryRouter initialEntries={['/impostazioni#alias']}><SettingsPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina l’alias aaa' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Modifica l’alias bbb' })).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina l’alias bbb' }));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'Alias' })).toHaveFocus());
     appStore.setState({ customAliases: [] });
   });
 });

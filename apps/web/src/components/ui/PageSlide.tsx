@@ -34,6 +34,10 @@ export function PageSlide({ pageKey, back = false, className, children }: PageSl
 
   const enterRef = useRef<HTMLDivElement>(null);
   const leaveRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  // Where the page stood at the last commit (LC84): the leaving page keeps that place and width, so a frame that changes
+  // with the page coming in (the search page's is wider) neither moves it nor is decided by it.
+  const placed = useRef<{ left: number; width: number } | null>(null);
   const first = useRef(true);
 
   useLayoutEffect(() => {
@@ -45,6 +49,11 @@ export function PageSlide({ pageKey, back = false, className, children }: PageSl
     const toward = back ? -1 : 1;
     const enter = enterRef.current;
     const leave = leaveRef.current;
+    const grid = gridRef.current;
+    if (leave && grid && placed.current) {
+      leave.style.left = `${placed.current.left - grid.getBoundingClientRect().left}px`;
+      leave.style.width = `${placed.current.width}px`;
+    }
     const coming = enter?.animate(
       [{ opacity: 0, transform: still ? 'none' : `translateX(${toward * SHIFT}px)` }, { opacity: 1, transform: 'none' }],
       ISLAND_OPEN,
@@ -62,10 +71,17 @@ export function PageSlide({ pageKey, back = false, className, children }: PageSl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.key]);
 
+  // After every commit, after the movement's effect above has read the last one.
+  useLayoutEffect(() => {
+    const box = gridRef.current?.getBoundingClientRect();
+    if (box) placed.current = { left: box.left, width: box.width };
+  });
+
   return (
-    <div className={cn('grid', className)}>
+    <div ref={gridRef} className={cn('relative grid', className)}>
+      {/* Out of the grid's flow: the cell is the coming page's alone. */}
       {leaving && (
-        <div ref={leaveRef} key={leaving.key} inert aria-hidden className="pointer-events-none [grid-area:1/1]">
+        <div ref={leaveRef} key={leaving.key} inert aria-hidden className="pointer-events-none absolute top-0 left-0 w-full">
           {leaving.node}
         </div>
       )}

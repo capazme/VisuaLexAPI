@@ -190,6 +190,16 @@ export function AliasSection() {
     // Deleted with «Annulla» (L-35): it leaves the list at once, and the server is told only once the notification has
     // gone without «Annulla».
     const deleteWithUndo = (alias: CustomAlias) => {
+        // The focus goes to the next alias (its «Modifica»), or to the section's heading when it was the last.
+        const at = aliases.findIndex((a) => a.id === alias.id);
+        const next = aliases[at + 1] ?? aliases[at - 1];
+        requestAnimationFrame(() => {
+            const target = next
+                ? document.querySelector<HTMLElement>(`[data-alias-edit="${CSS.escape(next.id)}"]`)
+                : document.querySelector<HTMLElement>('#alias h3');
+            if (!next) target?.setAttribute('tabindex', '-1');
+            target?.focus();
+        });
         void showUndoToast({
             action: () => { appStore.setState((s) => ({ customAliases: s.customAliases.filter((a) => a.id !== alias.id) })); },
             undo: () => { appStore.setState((s) => ({ customAliases: [...s.customAliases, alias] })); },
@@ -552,6 +562,7 @@ function AliasItem({
                 <button
                     type="button"
                     onClick={() => onStartEdit(alias)}
+                    data-alias-edit={alias.id}
                     aria-label={`Modifica l’alias ${alias.trigger}`}
                     className="grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                 >
