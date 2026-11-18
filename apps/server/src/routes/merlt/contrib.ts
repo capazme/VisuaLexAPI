@@ -16,7 +16,7 @@ import {
   ContribClient,
   type ExtractionCandidate,
 } from '../../services/merlt/contribClient';
-import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
+import { MerltClientError, MerltBadRequestError, merltUnavailableDetail } from '../../services/merlt/merltClient';
 
 /**
  * MERL-T contribution layer BFF routes (Slice 2c — "Apprendi dai miei appunti").
@@ -156,7 +156,7 @@ router.post(
       res.status(201).json({ documentId: result.document_id, duplicate: result.duplicate });
     } catch (err) {
       if (err instanceof MerltClientError) {
-        res.status(503).json({ detail: 'merlt_unavailable' });
+        res.status(503).json({ detail: merltUnavailableDetail(err) });
         return;
       }
       throw err;
@@ -197,7 +197,7 @@ router.post(
       }
     } catch (err) {
       if (err instanceof MerltClientError) {
-        res.status(503).json({ detail: 'merlt_unavailable' });
+        res.status(503).json({ detail: merltUnavailableDetail(err) });
         return;
       }
       throw err;
@@ -248,7 +248,7 @@ router.get(
       res.status(200).json(result);
     } catch (err) {
       if (err instanceof MerltClientError) {
-        res.status(503).json({ detail: 'merlt_unavailable' });
+        res.status(503).json({ detail: merltUnavailableDetail(err) });
         return;
       }
       throw err;
@@ -459,7 +459,7 @@ router.post(
       });
     } catch (err) {
       if (err instanceof MerltClientError) {
-        res.status(503).json({ detail: 'merlt_unavailable' });
+        res.status(503).json({ detail: merltUnavailableDetail(err) });
         return;
       }
       throw err;

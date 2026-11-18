@@ -17,7 +17,7 @@ import {
   SubgraphCache,
 } from '../../services/merlt/subgraphCache';
 import { ensureIngestionJob } from '../../services/merlt/lazyIngest';
-import { MerltClientError } from '../../services/merlt/merltClient';
+import { MerltClientError, merltUnavailableDetail } from '../../services/merlt/merltClient';
 
 /**
  * MERL-T graph layer BFF routes (Slice 2a).
@@ -101,7 +101,7 @@ router.get('/graph/article/:urn', authenticate, async (req: Request, res: Respon
     res.status(200).json(subgraph);
   } catch (err) {
     if (err instanceof MerltClientError) {
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -132,7 +132,7 @@ router.get('/graph/search', authenticate, async (req: Request, res: Response): P
     res.status(200).json(results);
   } catch (err) {
     if (err instanceof MerltClientError) {
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -159,7 +159,7 @@ router.get('/graph/provisional-review', authenticate, validationGuard, async (re
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof MerltClientError) {
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -190,7 +190,7 @@ router.post('/graph/provisional-review/:nodeId', authenticate, validationGuard, 
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof MerltClientError) {
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;

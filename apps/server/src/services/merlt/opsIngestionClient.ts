@@ -17,6 +17,8 @@ import {
   MerltNetworkError,
   MerltServerError,
   MerltBadRequestError,
+  MerltAuthError,
+  isKeyRefusal,
 } from './merltClient';
 
 export interface OpsIngestionClientConfig {
@@ -165,6 +167,10 @@ export class OpsIngestionClient {
         `MERL-T ${response.status} on ${path}: ${text.slice(0, 200)}`,
         response.status
       );
+    }
+
+    if (isKeyRefusal(response.status)) {
+      throw new MerltAuthError(path, response.status);
     }
 
     if (response.status >= 400) {
