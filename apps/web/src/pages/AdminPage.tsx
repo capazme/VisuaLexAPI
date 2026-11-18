@@ -29,8 +29,9 @@ import { FIELD_TEXT, FOCUS_RING } from '../constants/interactions';
 import { scrollParentOf } from '../utils/scrollParent';
 import { FORUM_CATEGORIES } from '../utils/forumCategories';
 import { cn } from '../lib/utils';
+import { focusLanding } from '../utils/focusPage';
 
-type AdminSection = 'utenti' | 'commenti' | 'dossier-pubblicati' | 'segnalazioni' | 'learn' | 'ingestione';
+type AdminSection = 'utenti' | 'problemi-segnalati' | 'pratiche-pubblicate' | 'pratiche-segnalate' | 'learn' | 'ingestione';
 
 const FIELD = cn('w-full min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 md:min-h-9 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT, FOCUS_RING);
 const SELECT = cn('min-h-11 rounded-lg border border-slate-200 bg-white px-2 md:min-h-9 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT, FOCUS_RING);
@@ -101,7 +102,7 @@ function Quiet({ children }: { children: ReactNode }) {
 
 /**
  * Amministrazione as a page of the app (LC93, L-73: «niente sopra il contenuto»), as Impostazioni is (LC84): an index at
- * the left from `lg`, a list at the top below it, an anchor for each part (`/admin#commenti`). A new account and a new
+ * the left from `lg`, a list at the top below it, an anchor for each part (`/admin#problemi-segnalati`). A new account and a new
  * password open in the page (`Expand`); a row's actions are in its «⋯». Erasing an account cannot be undone, so it
  * asks first, growing out of the «⋯» it came from (L-74); a comment or a published dossier goes at once, with
  * «Annulla», and the server erases it only once that notification is gone.
@@ -182,7 +183,7 @@ export function AdminPage() {
       setFeedbacks(data);
       setFeedbackStats(stats);
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel caricamento dei commenti');
+      setError(getErrorMessage(err) || 'Errore nel caricamento dei problemi segnalati');
     } finally {
       setFeedbackLoading(false);
     }
@@ -195,7 +196,7 @@ export function AdminPage() {
       setEnvironments(response.data);
       setEnvPagination({ page: response.pagination.page, pages: response.pagination.pages, total: response.pagination.total });
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel caricamento dei dossier pubblicati');
+      setError(getErrorMessage(err) || 'Errore nel caricamento delle pratiche pubblicate');
     } finally {
       setEnvLoading(false);
     }
@@ -206,7 +207,7 @@ export function AdminPage() {
       setReportsLoading(true);
       setReports(await sharedEnvironmentService.getReports(reportStatusFilter));
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel caricamento delle segnalazioni');
+      setError(getErrorMessage(err) || 'Errore nel caricamento delle pratiche segnalate');
     } finally {
       setReportsLoading(false);
     }
@@ -233,7 +234,12 @@ export function AdminPage() {
 
   // Back where it was opened from, or to the search page when it was opened by its address.
   // The router's index in the history, which the index's `replace` keeps: an address opened directly has none behind it.
-  const goBack = () => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate('/'));
+  // The focus lands on the title of the page reached (`data-page-title`), never on the body (as a ⌘K choice, #599).
+  const goBack = () => {
+    focusLanding(true);
+    if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
+    else navigate('/');
+  };
 
   // The part in the address comes in view, moving the page's scroller alone (gotcha 34), and is followed for a moment
   // while the lists arrive above it; with none the page opens at its top, its title focused (as Impostazioni, LC84).
@@ -385,7 +391,7 @@ export function AdminPage() {
     void showUndoToast({
       action: () => hide(f.id),
       undo: () => unhide(f.id),
-      message: 'Commento eliminato',
+      message: 'Problema eliminato',
     }).then(async (stands) => {
       if (!stands) return;
       try {
@@ -406,7 +412,7 @@ export function AdminPage() {
       else await adminService.withdrawSharedEnvironment(id);
       setEnvironments((prev) => prev.map((e) => (e.id === id ? { ...e, isActive: active } : e)));
     } catch (err) {
-      fail(err, active ? 'Errore nel ripubblicare il dossier pubblicato' : 'Errore nel ritirare il dossier pubblicato');
+      fail(err, active ? 'Errore nel ripubblicare la pratica' : 'Errore nel ritirare la pratica');
     } finally {
       setActionLoading(false);
     }
@@ -416,14 +422,14 @@ export function AdminPage() {
     void showUndoToast({
       action: () => hide(env.id),
       undo: () => unhide(env.id),
-      message: `«${env.title}» eliminato dai dossier pubblici`,
+      message: `«${env.title}» tolta dalle pratiche pubblicate`,
     }).then(async (stands) => {
       if (!stands) return;
       try {
         await adminService.deleteSharedEnvironment(env.id);
         await loadEnvironments(envPagination.page);
       } catch (err) {
-        fail(err, 'Errore nell’eliminazione del dossier pubblicato');
+        fail(err, 'Errore nell’eliminazione della pratica pubblicata');
       }
       unhide(env.id);
     });
@@ -453,9 +459,9 @@ export function AdminPage() {
   const newComments = feedbackStats?.new ?? 0;
   const index: Array<{ id: AdminSection; name: string; badge?: number; shown?: boolean }> = [
     { id: 'utenti', name: 'Utenti', badge: pending },
-    { id: 'commenti', name: 'Commenti', badge: newComments },
-    { id: 'dossier-pubblicati', name: 'Dossier pubblicati' },
-    { id: 'segnalazioni', name: 'Segnalazioni' },
+    { id: 'problemi-segnalati', name: 'Problemi segnalati', badge: newComments },
+    { id: 'pratiche-pubblicate', name: 'Pratiche pubblicate' },
+    { id: 'pratiche-segnalate', name: 'Pratiche segnalate' },
     { id: 'learn', name: 'Learn', shown: studiaVisible },
     { id: 'ingestione', name: 'Ingestione MERL-T', shown: opsVisible },
   ];
@@ -472,7 +478,9 @@ export function AdminPage() {
       <PageFrame title="Amministrazione" titleId="admin-title">
         <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
           <nav aria-label="Parti dell’amministrazione" className="lg:sticky lg:top-0 lg:self-start">
-            <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-0.5">
+            {/* LC92's list, as Impostazioni': plain rows, a thin line between them and 44 px on a phone, text alone from lg;
+                the current part in bold with a mark at its left. */}
+            <ul className="divide-y divide-slate-200 dark:divide-slate-800 lg:divide-y-0">
               {index.filter((part) => part.shown !== false).map((part) => (
                 <li key={part.id}>
                   <a
@@ -480,9 +488,9 @@ export function AdminPage() {
                     onClick={goTo(part.id)}
                     aria-current={location.hash === `#${part.id}` ? 'location' : undefined}
                     className={cn(
-                      'flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
-                      'lg:min-h-0 lg:border-transparent lg:py-1.5 lg:dark:border-transparent',
-                      'aria-[current=location]:bg-slate-100 aria-[current=location]:font-medium aria-[current=location]:text-slate-900 dark:aria-[current=location]:bg-slate-800 dark:aria-[current=location]:text-slate-50',
+                      'flex min-h-[44px] items-center gap-2 border-l-2 border-transparent pl-3 text-sm text-slate-700 transition-colors hover:text-slate-950 dark:text-slate-300 dark:hover:text-slate-50',
+                      'lg:min-h-0 lg:py-1.5',
+                      'aria-[current=location]:border-slate-900 aria-[current=location]:font-semibold aria-[current=location]:text-slate-950 dark:aria-[current=location]:border-slate-100 dark:aria-[current=location]:text-slate-50',
                       FOCUS_RING,
                     )}
                   >
@@ -490,7 +498,7 @@ export function AdminPage() {
                     {!!part.badge && (
                       <span className="ml-auto text-xs tabular-nums text-slate-500 dark:text-slate-400">
                         <span aria-hidden>{part.badge}</span>
-                        <span className="sr-only">{part.id === 'utenti' ? `, ${part.badge} in attesa` : `, ${part.badge} nuovi`}</span>
+                        <span className="sr-only">{part.id === 'utenti' ? `, ${part.badge} in attesa` : `, ${part.badge} da leggere`}</span>
                       </span>
                     )}
                   </a>
@@ -654,15 +662,15 @@ export function AdminPage() {
               )}
             </Part>
 
-            {/* ── Commenti ── */}
+            {/* ── Problemi segnalati («Segnala un problema») ── */}
             <Part
-              id="commenti"
-              title="Commenti"
+              id="problemi-segnalati"
+              title="Problemi segnalati"
               count={shownFeedbacks.length || undefined}
               controls={
                 <>
                   <select
-                    aria-label="Stato dei commenti"
+                    aria-label="Stato dei problemi"
                     value={feedbackFilter.status || ''}
                     onChange={(e) => setFeedbackFilter({ ...feedbackFilter, status: (e.target.value as FeedbackStatus) || undefined })}
                     className={SELECT}
@@ -671,7 +679,7 @@ export function AdminPage() {
                     {(Object.keys(FEEDBACK_STATUS) as FeedbackStatus[]).map((s) => <option key={s} value={s}>{FEEDBACK_STATUS[s]}</option>)}
                   </select>
                   <select
-                    aria-label="Tipo di commento"
+                    aria-label="Tipo di problema"
                     value={feedbackFilter.type || ''}
                     onChange={(e) => setFeedbackFilter({ ...feedbackFilter, type: (e.target.value as FeedbackType) || undefined })}
                     className={SELECT}
@@ -687,9 +695,9 @@ export function AdminPage() {
                 <p className={cn('mb-3', MUTED)}>{feedbackStats.bugs === 1 ? '1 errore' : `${feedbackStats.bugs} errori`}, {feedbackStats.suggestions === 1 ? '1 suggerimento' : `${feedbackStats.suggestions} suggerimenti`}</p>
               )}
               {feedbackLoading && shownFeedbacks.length === 0 ? (
-                <Quiet>Caricamento dei commenti…</Quiet>
+                <Quiet>Caricamento dei problemi segnalati…</Quiet>
               ) : shownFeedbacks.length === 0 ? (
-                <Quiet>Nessun commento trovato</Quiet>
+                <Quiet>Nessun problema segnalato</Quiet>
               ) : (
                 <ul className={LIST}>
                   {shownFeedbacks.map((f) => (
@@ -704,7 +712,7 @@ export function AdminPage() {
                         <p className={cn('mt-1 break-words', MUTED)}>{f.user.username} · {f.user.email}</p>
                       </div>
                       <RowMenu
-                        label="Azioni sul commento"
+                        label="Azioni sul problema"
                         items={[
                           ...(f.status === 'new' ? [{ label: 'Segna come letto', disabled: actionLoading, onSelect: () => void handleUpdateFeedbackStatus(f.id, 'read') }] : []),
                           ...(f.status !== 'resolved' ? [{ label: 'Segna come risolto', disabled: actionLoading, onSelect: () => void handleUpdateFeedbackStatus(f.id, 'resolved') }] : []),
@@ -718,10 +726,10 @@ export function AdminPage() {
               )}
             </Part>
 
-            {/* ── Dossier pubblicati ── */}
+            {/* ── Pratiche pubblicate (the Forum) ── */}
             <Part
-              id="dossier-pubblicati"
-              title="Dossier pubblicati"
+              id="pratiche-pubblicate"
+              title="Pratiche pubblicate"
               count={envPagination.total || undefined}
               controls={
                 <>
@@ -730,13 +738,13 @@ export function AdminPage() {
                       type="search"
                       value={envSearch}
                       onChange={(e) => setEnvSearch(e.target.value)}
-                      placeholder="Cerca un dossier pubblicato…"
-                      aria-label="Cerca un dossier pubblicato"
+                      placeholder="Cerca una pratica pubblicata…"
+                      aria-label="Cerca una pratica pubblicata"
                       className={cn(FIELD, 'w-56')}
                     />
                     <Button type="submit" size="sm" variant="secondary">Cerca</Button>
                   </form>
-                  <select aria-label="Stato dei dossier pubblicati" value={envStatusFilter} onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')} className={SELECT}>
+                  <select aria-label="Stato delle pratiche pubblicate" value={envStatusFilter} onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')} className={SELECT}>
                     <option value="all">Tutti</option>
                     <option value="active">Attivi</option>
                     <option value="withdrawn">Ritirati</option>
@@ -746,13 +754,13 @@ export function AdminPage() {
               }
             >
               {envLoading && shownEnvironments.length === 0 ? (
-                <Quiet>Caricamento dei dossier pubblicati…</Quiet>
+                <Quiet>Caricamento delle pratiche pubblicate…</Quiet>
               ) : shownEnvironments.length === 0 ? (
-                <Quiet>Nessun dossier pubblicato trovato</Quiet>
+                <Quiet>Nessuna pratica pubblicata trovata</Quiet>
               ) : (
                 <>
                   <div aria-hidden className={cn(COLUMN_HEAD, ENV_COLUMNS)}>
-                    <span>Dossier</span><span>Autore</span><span>Stato</span><span>Uso</span><span />
+                    <span>Pratica</span><span>Autore</span><span>Stato</span><span>Uso</span><span />
                   </div>
                   <ul className={LIST}>
                     {shownEnvironments.map((env) => (
@@ -797,10 +805,10 @@ export function AdminPage() {
               )}
             </Part>
 
-            {/* ── Segnalazioni ── */}
+            {/* ── Pratiche segnalate (the Forum's reports) ── */}
             <Part
-              id="segnalazioni"
-              title="Segnalazioni"
+              id="pratiche-segnalate"
+              title="Pratiche segnalate"
               count={reports.length || undefined}
               controls={
                 <>
@@ -815,9 +823,9 @@ export function AdminPage() {
               }
             >
               {reportsLoading && reports.length === 0 ? (
-                <Quiet>Caricamento delle segnalazioni…</Quiet>
+                <Quiet>Caricamento delle pratiche segnalate…</Quiet>
               ) : reports.length === 0 ? (
-                <Quiet>Nessuna segnalazione trovata</Quiet>
+                <Quiet>Nessuna pratica segnalata</Quiet>
               ) : (
                 <ul className={LIST}>
                   {reports.map((r) => (

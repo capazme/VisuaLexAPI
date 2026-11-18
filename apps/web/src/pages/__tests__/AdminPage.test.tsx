@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const useAuthMock = vi.fn();
 vi.mock('../../hooks/useAuth', () => ({
@@ -118,19 +118,20 @@ describe('AdminPage — Ingestione part gating (MERL-T ops)', () => {
   });
 });
 
-describe('AdminPage — the comments part', () => {
-  it('is called «Commenti», as the form users write in (LC4)', async () => {
+describe('AdminPage — the reported problems part', () => {
+  it('is called «Problemi segnalati», after «Segnala un problema», and the Forum\'s reports «Pratiche segnalate» (LC93)', async () => {
     renderAdminPage();
     await ready();
-    expect(screen.getByRole('link', { name: 'Commenti' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Feedback' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Problemi segnalati' })).toHaveAttribute('href', '#problemi-segnalati');
+    expect(screen.getByRole('link', { name: 'Pratiche segnalate' })).toHaveAttribute('href', '#pratiche-segnalate');
+    expect(screen.queryByRole('link', { name: /Commenti|Feedback/ })).not.toBeInTheDocument();
   });
 
-  it('says «commenti» inside the part too: the heading and the empty list', async () => {
+  it('says it inside the part too: the heading and the empty list', async () => {
     renderAdminPage();
     await ready();
-    expect(screen.getByRole('heading', { name: 'Commenti' })).toBeInTheDocument();
-    expect(await screen.findByText('Nessun commento trovato')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Problemi segnalati' })).toBeInTheDocument();
+    expect(await screen.findByText('Nessun problema segnalato')).toBeInTheDocument();
     expect(screen.queryByText(/feedback/i)).not.toBeInTheDocument();
   });
 });
@@ -296,7 +297,7 @@ describe('AdminPage — a page, nothing over it (LC93)', () => {
     await ready();
     expect(screen.getByRole('heading', { level: 1, name: 'Amministrazione' })).toBeInTheDocument();
     const index = screen.getByRole('navigation', { name: 'Parti dell’amministrazione' });
-    for (const [name, id] of [['Utenti', 'utenti'], ['Commenti', 'commenti'], ['Dossier pubblicati', 'dossier-pubblicati'], ['Segnalazioni', 'segnalazioni']]) {
+    for (const [name, id] of [['Utenti', 'utenti'], ['Problemi segnalati', 'problemi-segnalati'], ['Pratiche pubblicate', 'pratiche-pubblicate'], ['Pratiche segnalate', 'pratiche-segnalate']]) {
       expect(within(index).getByRole('link', { name })).toHaveAttribute('href', `#${id}`);
       expect(screen.getByRole('heading', { level: 2, name: new RegExp(`^${name}( \\d+)?$`) })).toBeInTheDocument();
       expect(document.getElementById(id)).not.toBeNull();
@@ -346,7 +347,7 @@ describe('AdminPage — a page, nothing over it (LC93)', () => {
       { id: 'f1', type: 'bug', message: 'Non si apre', status: 'new', created_at: '2026-11-01T10:00:00Z', user: { id: 'b', username: 'bob', email: 'bob@example.com' } },
     ] as never);
     renderAdminPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Azioni sul commento' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Azioni sul problema' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
     await waitFor(() => expect(screen.queryByText('Non si apre')).not.toBeInTheDocument());
     expect(adminService.deleteFeedback).not.toHaveBeenCalled();
@@ -362,13 +363,13 @@ describe('AdminPage — a page, nothing over it (LC93)', () => {
     let toast: UndoToast | null = null;
     const stop = registerUndoToastListener((t) => { toast = t; });
     renderAdminPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Azioni sul commento' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Azioni sul problema' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
     await waitFor(() => expect(toast).not.toBeNull());
 
     // A reload brings the comment back from the server: it stays out while the notification shows.
     const reloads = vi.mocked(adminService.listFeedbacks).mock.calls.length;
-    fireEvent.click(within(document.getElementById('commenti') as HTMLElement).getByRole('button', { name: 'Aggiorna' }));
+    fireEvent.click(within(document.getElementById('problemi-segnalati') as HTMLElement).getByRole('button', { name: 'Aggiorna' }));
     await waitFor(() => expect(vi.mocked(adminService.listFeedbacks).mock.calls.length).toBeGreaterThan(reloads));
     expect(screen.queryByText('Non si apre')).not.toBeInTheDocument();
 
@@ -377,5 +378,24 @@ describe('AdminPage — a page, nothing over it (LC93)', () => {
     expect(adminService.deleteFeedback).not.toHaveBeenCalled();
     stop();
     vi.mocked(adminService.listFeedbacks).mockResolvedValue([]);
+  });
+});
+
+describe('AdminPage — «Indietro»', () => {
+  it('goes back and puts the focus on the title of the page reached, never on the body', async () => {
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <main>
+          <Routes>
+            <Route path="/" element={<h1 data-page-title="">Ricerca</h1>} />
+            <Route path="/admin" element={<AdminPage />} />
+          </Routes>
+        </main>
+      </MemoryRouter>
+    );
+    await ready();
+    fireEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+    const title = await screen.findByRole('heading', { name: 'Ricerca' });
+    await waitFor(() => expect(document.activeElement).toBe(title));
   });
 });
