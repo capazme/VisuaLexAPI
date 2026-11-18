@@ -12,6 +12,25 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-11-18
+
+Loading and a change of view with one movement, «Novità» with the rule of the notifications, steadier tests,
+and MERL-T behind its key on every route. No migration. MERL-T stays off.
+
+### Interface
+
+- Loading and a change of view move with one movement in Pratiche, Learn and Opus (LC98, alignment 4 of 14).
+- «Novità» stands above the bottom bar and follows the same rule as the notifications (LC101).
+
+### MERL-T
+
+- Every route needs the key, except /health and /; no key route, no websocket, no API pages in production
+  (#623). MERL-T stays off until G-575.
+
+### Tests
+
+- Two flaky focus tests made steady, ReportProblemSection and MyCardsView (LC100).
+
 ## [1.39.0] - 2026-11-18
 
 EU acts before 2015 cited in the Official Journal's form, the first shared components of the interface
