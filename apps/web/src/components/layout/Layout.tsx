@@ -478,6 +478,7 @@ export function Layout() {
         {showSearchBar && (
           <div
             data-testid="search-bar"
+            data-palette-bar=""
             // The phone's bar on this page (M1): 56 px below lg, the menu button beside the field and the iPhone's top
             // edge above it; 72 px from lg. From md «Commenti» and the Focus toggle float at the top right: the field ends before them,
             // with 8 px of air between md and lg (10.5 rem: the toggle's 4 px and 44, 8 of gap, about 103 for «Commenti»; it was 9.75).
@@ -491,8 +492,14 @@ export function Layout() {
           >
             <MenuToggle {...menuToggle} />
             <SearchField />
+            {/* L-75: the search's field grows out of this one, in its place. */}
+            <div data-palette-slot="" className="absolute bottom-0 left-12 right-4 flex h-14 items-center empty:hidden md:right-[10.5rem]" />
           </div>
         )}
+
+        {/* The search (⌘K): its field grows in the bar above, its lists are a band here, under the bars, that pushes the
+            page down (L-75: nothing over the content). */}
+        <GlobalSearch />
 
         {/* Content Area. `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the
             sidebar, the floating buttons and the search bar stay still. */}
@@ -561,9 +568,6 @@ export function Layout() {
 
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
-
-      {/* The palette (⌘K) and the managers it opens, on every page */}
-      <GlobalSearch />
 
       {/* The planner's quick add («c»), its toast and the count beside «Oggi», on every page */}
       <PlannerHost enabled={isAuthenticated} />

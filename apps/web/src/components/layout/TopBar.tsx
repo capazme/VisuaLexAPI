@@ -48,9 +48,17 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
   const leaf = deeper && heading && heading !== page ? heading : null;
 
   return (
-    <div data-testid="top-bar" className="relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:flex dark:border-slate-800">
+    <div
+      data-testid="top-bar"
+      data-palette-bar=""
+      className={cn(
+        'relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:flex dark:border-slate-800',
+        // L-75: while the search's field is in the bar (its slot not empty), the field takes the path's place.
+        '[&:has([data-palette-slot]:not(:empty))>[data-bar-path]]:hidden',
+      )}
+    >
       {/* The path keeps clear of the centred search (LC40): half the bar less half the pill and a gap. */}
-      <nav aria-label="Percorso" className="min-w-0 flex-1 pr-[calc(11rem+1rem)] [max-width:calc(50%)]">
+      <nav aria-label="Percorso" data-bar-path="" className="min-w-0 flex-1 pr-[calc(11rem+1rem)] [max-width:calc(50%)]">
         <ol className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] text-slate-600 dark:text-slate-400">
           <li className="shrink-0">
             <Link to={section.home} className={cn('rounded-sm hover:text-slate-900 dark:hover:text-slate-100', FOCUS_RING)}>
@@ -101,8 +109,11 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         <kbd aria-hidden className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 font-mono text-[11px] text-slate-500 dark:border-slate-700">{PALETTE_SHORTCUT}</kbd>
       </button>}
       </div>
-      <span className="flex-1" aria-hidden />
+      <span data-bar-path="" className="flex-1" aria-hidden />
       {actions}
+      {/* L-75: the search's field, grown out of the pill (`CommandPalette`), between the bar's start and its controls.
+          After them in the page's order, so Tab goes from the field to the lists under the bar. */}
+      <div data-palette-slot="" className="-order-1 flex min-w-0 flex-1 items-center justify-center empty:hidden" />
     </div>
   );
 }

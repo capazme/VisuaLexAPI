@@ -93,6 +93,8 @@ export function focusSearchFieldOrPalette(text?: string): void {
 export function openSearchMenu(): void {
   // Already open: nothing, as before R2 (the field's words would overwrite what is being typed in the box).
   if (appStore.getState().commandPaletteOpen) return;
+  // Under a modal dialog (the comparison, a confirmation): the menu opens in the page, under it, unseen (L-75).
+  if (document.querySelector('[aria-modal="true"]')) return;
   if (listener) listener({});
   else appStore.getState().openCommandPalette();
 }
