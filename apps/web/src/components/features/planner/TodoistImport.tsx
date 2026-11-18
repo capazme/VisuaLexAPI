@@ -13,26 +13,42 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 interface Progress {
   key: string;
   created: Map<number, string>;
+  /** The day an earlier import of this file in this dossier ended well. */
+  importedAt: string | null;
 }
 
-/** Kept in the tab too, so a reload after «connessione interrotta» resumes; a storage that throws keeps it in memory only. */
-function storedRows(key: string): Map<number, string> {
+/**
+ * The tab's memory of the imports, so a reload after «connessione interrotta» resumes: one entry per dossier and file
+ * (its size and date, never its name), with only the ids of the rows created and of their tasks, never their text.
+ * An import that ends well leaves only its day. One key of the session's own (`sessionEnd.ts`), removed at sign-out.
+ */
+const IMPORT_KEY = 'visualex.opus.todoist-import';
+type Stored = Record<string, { rows?: [number, string][]; importedAt?: string }>;
+
+function readStored(): Stored {
   try {
-    const raw = sessionStorage.getItem(key);
-    const entries: unknown = raw ? JSON.parse(raw) : [];
-    return new Map(Array.isArray(entries) ? entries.filter((e): e is [number, string] => Array.isArray(e) && typeof e[0] === 'number' && typeof e[1] === 'string') : []);
+    const value: unknown = JSON.parse(sessionStorage.getItem(IMPORT_KEY) ?? '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Stored) : {};
   } catch {
-    return new Map();
+    return {};
   }
 }
 
-function storeRows(key: string, rows: Map<number, string>) {
+function writeStored(key: string, entry: Stored[string]) {
   try {
-    sessionStorage.setItem(key, JSON.stringify([...rows]));
+    sessionStorage.setItem(IMPORT_KEY, JSON.stringify({ ...readStored(), [key]: entry }));
   } catch {
     // Memory only.
   }
 }
+
+function storedProgress(key: string): Progress {
+  const entry = readStored()[key];
+  const rows = Array.isArray(entry?.rows) ? entry.rows.filter((e): e is [number, string] => Array.isArray(e) && typeof e[0] === 'number' && typeof e[1] === 'string') : [];
+  return { key, created: new Map(rows), importedAt: typeof entry?.importedAt === 'string' ? entry.importedAt : null };
+}
+
+const longDay = (iso: string) => new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
 
 type Outcome = { kind: 'done'; added: number } | { kind: 'failed'; message: string };
 
@@ -44,7 +60,7 @@ function NoteList({ heading, notes }: { heading: string; notes: ImportNote[] }) 
       <ul className="mt-1 space-y-0.5 text-sm text-slate-700 dark:text-slate-300">
         {notes.map((note, i) => (
           <li key={i} className="[overflow-wrap:anywhere]">
-            {note.title} — «{note.phrase}»
+            {note.title} — «{note.phrase}»{note.why && `: ${note.why}`}
           </li>
         ))}
       </ul>
@@ -75,8 +91,8 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
     if (!file) return;
     try {
       const next = planTodoistImport(await file.text(), today);
-      const key = `lexcraft-todoist-import:${dossierId}:${file.name}:${file.size}:${file.lastModified}`;
-      if (progress?.key !== key) setProgress({ key, created: storedRows(key) });
+      const key = `${dossierId}:${file.size}:${file.lastModified}`;
+      if (progress?.key !== key) setProgress(storedProgress(key));
       setPlan(next);
     } catch (error) {
       setFileError(error instanceof NotTodoistCsvError ? error.message : 'Non riesco a leggere il file. Scegli il CSV esportato da Todoist.');
@@ -93,8 +109,11 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
     setOutcome(null);
     // The runner writes each row into this map as it is created; a new map in state draws the counts.
     const rows = new Map(progress.created);
-    const { added, error } = await runTodoistImport(plan, dossierId, rows, taskService.create, () => storeRows(progress.key, rows));
-    setProgress({ key: progress.key, created: rows });
+    const { added, error } = await runTodoistImport(plan, dossierId, rows, taskService.create, () => writeStored(progress.key, { rows: [...rows] }));
+    // Done: the ids go, the day stays (to say the file was imported); the map in memory keeps this view from importing it again.
+    const importedAt = error ? progress.importedAt : new Date().toISOString();
+    if (!error) writeStored(progress.key, { importedAt: importedAt! });
+    setProgress({ key: progress.key, created: rows, importedAt });
     setRunning(false);
     if (added > 0) plannerStore.getState().changed();
     const total = plan.tasks.filter((t) => rows.has(t.row)).length;
@@ -137,8 +156,11 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
               <p className={FIELD_HINT}>{plural(plan.trimmed, 'compito ha', 'compiti hanno')} un titolo o una descrizione troppo lunghi: vengono accorciati.</p>
             )}
 
-            {left === 0 && plan.tasks.length > 0 && !outcome && (
-              <p className="text-sm text-slate-700 dark:text-slate-300">Questo file è già stato importato in questa pratica.</p>
+            {progress?.importedAt && !outcome && (
+              <p className="text-sm text-amber-900 dark:text-amber-200">
+                Questo file è già stato importato in questa pratica il {longDay(progress.importedAt)}
+                {left > 0 && ': importarlo di nuovo crea i compiti una seconda volta'}.
+              </p>
             )}
             <div role="status" aria-live="polite" className="text-sm">
               {outcome?.kind === 'done' && (

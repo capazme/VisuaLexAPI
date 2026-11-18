@@ -64,6 +64,8 @@ export interface ImportTask {
 export interface ImportNote {
   title: string;
   phrase: string;
+  /** Why it does not repeat, when the phrase itself was understood. */
+  why?: string;
 }
 
 export interface ImportPlan {
@@ -199,7 +201,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
       if (input.recurrence) {
         delete input.recurrence;
         delete input.recurrenceFrom;
-        plan.nonRecurring.push({ title: input.title, phrase: datePhrase });
+        plan.nonRecurring.push({ title: input.title, phrase: datePhrase, why: 'ha anche un termine finale, che non si ripete' });
         notes.push(`Ripetizione in Todoist: «${datePhrase}» (non si ripete: il compito ha un termine finale)`);
       }
     } else if (deadlinePhrase) {

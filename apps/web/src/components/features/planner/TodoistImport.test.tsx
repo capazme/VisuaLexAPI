@@ -48,6 +48,19 @@ describe('TodoistImport', () => {
     const titles = create.mock.calls.map(([input]) => input.title);
     expect(new Set(titles).size).toBe(13);
     await waitFor(() => expect(screen.queryByRole('button', { name: /Importa|Riprova/ })).not.toBeInTheDocument());
+    // Only the day is left in the tab: no task ids, no text.
+    const stored = sessionStorage.getItem('visualex.opus.todoist-import')!;
+    expect(Object.values(JSON.parse(stored))).toEqual([{ importedAt: expect.any(String) }]);
+    expect(stored).not.toMatch(/Rileggere|Pratica\.csv/);
+  });
+
+  it('says a file was already imported in this dossier, before «Importa N»', async () => {
+    sessionStorage.setItem('visualex.opus.todoist-import', JSON.stringify({ [`d1:${new Blob([example]).size}:1`]: { importedAt: '2026-11-16T09:00:00Z' } }));
+    render(<TodoistImport id="imp" open onClose={() => {}} dossierId="d1" today={TODAY} />);
+    chooseFile(example);
+    expect(await screen.findByText(/già stato importato in questa pratica il 16 novembre 2026/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Importa 13 compiti' })).toBeInTheDocument();
+    expect(screen.getByText(/«ogni mese»: ha anche un termine finale/)).toBeInTheDocument();
   });
 
   it('resumes after a reload in the same dossier, and starts afresh in another one', async () => {

@@ -76,6 +76,7 @@ describe('planTodoistImport on the example file', () => {
     expect(monthly).toMatchObject({ plannedDate: TODAY, dueDate: '2026-12-15' });
     expect(monthly.recurrence).toBeUndefined();
     expect(plan.nonRecurring.map((n) => n.phrase)).toEqual(['ogni 2 settimane', 'ogni mese']);
+    expect(plan.nonRecurring.map((n) => n.why)).toEqual([undefined, 'ha anche un termine finale, che non si ripete']);
   });
 
   it('lists the dates it did not understand and keeps them in the description', () => {
