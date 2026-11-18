@@ -22,6 +22,7 @@ export function CoursesSwitchAdmin() {
   const [writeFailed, setWriteFailed] = useState(false);
   // Turning off hides the courses from everyone: it asks first; turning on stays one tap (LC12).
   const [askingOff, setAskingOff] = useState(false);
+  const [offFrom, setOffFrom] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -80,9 +81,12 @@ export function CoursesSwitchAdmin() {
             variant={enabled ? 'outline' : 'primary'}
             className={TOUCH_TARGET_RESPONSIVE}
             aria-disabled={saving}
-            onClick={() => {
+            onClick={(event) => {
               if (saving) return;
-              if (enabled) setAskingOff(true);
+              if (enabled) {
+                setOffFrom(event.currentTarget);
+                setAskingOff(true);
+              }
               else void toggle();
             }}
           >
@@ -97,6 +101,7 @@ export function CoursesSwitchAdmin() {
       )}
       <ConfirmDialog
         open={askingOff}
+        origin={offFrom}
         variant="danger"
         title="Spegnere i percorsi?"
         message="Nessuno vedrà più i percorsi finché non li riaccendi; i percorsi già creati restano."

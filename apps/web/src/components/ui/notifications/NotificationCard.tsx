@@ -1,43 +1,33 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { motion, stagger, useAnimate, useDragControls, type AnimationPlaybackControls, type PanInfo } from 'framer-motion';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { motion, useAnimate, useDragControls, type AnimationPlaybackControls, type PanInfo } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { ease } from '../../../lib/motion';
 import type { HoldReason } from './countdown';
 import type { NotificationEntry, NotificationType } from './notifications';
 import { createSwipeGuard } from './swipeGuard';
+import { IslandSurface } from '../IslandSurface';
+import type { SourceRect } from '../IslandSurface';
 
 /**
- * The notification drawn from a line (K1a), inspired by Animorio's «notifica dalla riga», written from scratch with
- * Framer Motion: a thin line grows from the centre to the sides with a tick at each end, opens in height like a slit
- * on the notification, and the words rise from it one after the other. «Annulla»'s time is the line at the bottom,
- * which draws back; held (a pointer, the focus, a finger on it) it stops and its ticks grow. Run out, the notification
- * closes into the line, which draws back to the centre; closed by hand it folds and slides away. Under reduced motion
- * it fades in already open and fades out, and the time line still draws back.
+ * A notification (K1a, LC85): it grows out of a pill at the edge where it appears, which widens into the message, and
+ * goes back into it as it closes (`IslandSurface`, the search island's way, L-76). «Annulla»'s time is the line at the
+ * bottom, which draws back; held (a pointer, the focus, a finger on it) it stops and its ticks grow. Swiped away, it
+ * leaves along the swipe instead, folding as it goes. Under reduced motion it fades in and out, and the time line still
+ * draws back.
  */
 
-/** The motion's times, in seconds (K1a). */
-const NOTIFICATION_S = {
-  /** The line grows from the centre to the sides. */
-  line: 0.3,
-  /** The slit opens on the notification. */
-  open: 0.35,
-  /** Between one word and the next rising from the line. */
-  stagger: 0.06,
-  /** One word's rise. */
-  word: 0.24,
-  /** Run out: the slit closes onto the line, then the line draws back to the centre. */
-  shut: 0.22,
-  retract: 0.2,
-  /** Closed by hand: it folds and slides away. */
-  away: 0.26,
-  /** Under reduced motion: a fade. */
-  fade: 0.15,
-} as const;
+/** The swipe's exit and its fade under reduced motion, in seconds. */
+const NOTIFICATION_S = { away: 0.26, fade: 0.15 } as const;
 
-/** The slit, shut and open: the same four lengths and radius at both ends, so the clip interpolates. */
-const SLIT_SHUT = 'inset(50% 0% 50% 0% round 12px)';
-const SLIT_OPEN = 'inset(0% 0% 0% 0% round 12px)';
+/** The pill it grows from: 120 × 32 at the middle of the edge it appears at, or as wide as it where it is narrower. */
+const PILL = { width: 120, height: 32 };
+const pillAt = (position: 'top' | 'bottom') => (box: DOMRect): SourceRect => {
+  const half = Math.min(PILL.width, box.width) / 2;
+  const middle = box.left + box.width / 2;
+  const top = position === 'top' ? box.top : box.bottom - PILL.height;
+  return { left: middle - half, right: middle + half, top, bottom: top + PILL.height };
+};
 
 const ICONS: Record<NotificationType, typeof Info> = { success: CheckCircle2, error: XCircle, info: Info, warning: AlertCircle };
 const ICON_INK: Record<NotificationType, string> = {
@@ -75,40 +65,11 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
   // Whether a click is one: a press that moved the notification is not (`swipeGuard.ts`).
   const [swipe] = useState(() => createSwipeGuard());
   const timeLine = useRef<AnimationPlaybackControls | null>(null);
-  const entrance = useRef<AnimationPlaybackControls | null>(null);
   const exited = useRef(false);
+  // Swiped away: it leaves along the swipe, not into its pill.
+  const [swiped, setSwiped] = useState(false);
   const Icon = ICONS[entry.type];
   const closing = entry.closing !== null;
-
-  // The entrance, once.
-  useLayoutEffect(() => {
-    const root = scope.current;
-    if (!root) return;
-    if (still) {
-      entrance.current = animate(root, { opacity: [0, 1] }, { duration: NOTIFICATION_S.fade });
-      return;
-    }
-    const half = root.offsetWidth / 2;
-    const out = { ease: ease.out };
-    entrance.current = animate([
-      ['[data-line]', { scaleX: [0, 1] }, { duration: NOTIFICATION_S.line, ...out }],
-      ['[data-tick="start"]', { x: [half, 0] }, { duration: NOTIFICATION_S.line, at: 0, ...out }],
-      ['[data-tick="end"]', { x: [-half, 0] }, { duration: NOTIFICATION_S.line, at: 0, ...out }],
-      ['[data-body]', { clipPath: [SLIT_SHUT, SLIT_OPEN] }, { duration: NOTIFICATION_S.open, ...out }],
-      // The line rides the slit's lower edge, onto the border: a translate by half the card's height, on the clip's
-      // own timeline (a `top` ran on the main thread, ahead of the clip).
-      ['[data-rule]', { y: ['0%', '50%'] }, { duration: NOTIFICATION_S.open, at: '<', ...out }],
-      ['[data-word]', { opacity: [0, 1], y: [6, 0] }, { duration: NOTIFICATION_S.word, delay: stagger(NOTIFICATION_S.stagger), at: `-${NOTIFICATION_S.open - 0.1}`, ...out }],
-      // The message gains a touch of weight as it rises (Inter's own axis), ending at its class's 500.
-      ['[data-message]', { fontWeight: [400, 500] }, { duration: NOTIFICATION_S.word, at: '<', ...out }],
-      // Open, the line gives way to the time line (or to the border), and the clip is let go: a focus ring must not
-      // be cut.
-      ['[data-rule]', { opacity: 0 }, { duration: 0.12, at: NOTIFICATION_S.line + NOTIFICATION_S.open }],
-      ['[data-body]', { clipPath: 'none' }, { duration: 0, at: NOTIFICATION_S.line + NOTIFICATION_S.open }],
-    ]);
-    // Once, when it is drawn.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // «Annulla»'s time: the line at the bottom draws back over what is left, and stops while it is held.
   useEffect(() => {
@@ -125,36 +86,20 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
     return () => timeLine.current?.stop();
   }, [entry.undoable, entry.clock, entry.duration, closing, animate, scope]);
 
-  // The exit, by why it goes. Stopped before its end (StrictMode's second mount, in development), it runs again: a
-  // stopped animation never settles, and the entry would stay drawn for ever.
+  // Swiped away, it leaves along the swipe; every other closing goes back into its pill (`IslandSurface`, below). Stopped
+  // before its end (StrictMode's second mount, in development), it runs again: a stopped animation never settles, and
+  // the entry would stay drawn for ever.
   useEffect(() => {
-    if (!closing || exited.current) return;
+    if (!closing || !swiped || exited.current) return;
     exited.current = true;
     const root = scope.current;
     const done = () => onExited();
     if (!root) return done();
-    // An entrance still on its way would take its values back from the exit, which would then never settle.
-    entrance.current?.stop();
     timeLine.current?.stop();
-    if (still) {
-      animate(root, { opacity: 0 }, { duration: NOTIFICATION_S.fade }).then(done, done);
-      return;
-    }
-    if (entry.closing === 'dismiss') {
-      animate([
-        ['[data-body]', { transformPerspective: 600, rotateX: 50, x: `${swipedTo.current * 110}%`, opacity: 0 }, { duration: NOTIFICATION_S.away, ease: ease.inOut }],
-      ]).then(done, done);
-      return;
-    }
-    const half = root.offsetWidth / 2;
-    animate([
-      ['[data-rule]', { y: '0%', opacity: 1 }, { duration: 0 }],
-      ['[data-word]', { opacity: 0 }, { duration: NOTIFICATION_S.shut / 2 }],
-      ['[data-body]', { clipPath: [SLIT_OPEN, SLIT_SHUT] }, { duration: NOTIFICATION_S.shut, at: 0, ease: ease.out }],
-      ['[data-line]', { scaleX: 0 }, { duration: NOTIFICATION_S.retract, ease: ease.out }],
-      ['[data-tick="start"]', { x: half }, { duration: NOTIFICATION_S.retract, at: '<', ease: ease.out }],
-      ['[data-tick="end"]', { x: -half }, { duration: NOTIFICATION_S.retract, at: '<', ease: ease.out }],
-    ]).then(done, done);
+    const away = still
+      ? animate(root, { opacity: 0 }, { duration: NOTIFICATION_S.fade })
+      : animate(root, { transformPerspective: 600, rotateX: 50, x: `${swipedTo.current * 110}%`, opacity: 0 }, { duration: NOTIFICATION_S.away, ease: ease.inOut });
+    away.then(done, done);
     return () => {
       exited.current = false;
     };
@@ -237,10 +182,10 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
     swipe.ended();
     if (Math.abs(info.offset.x) < SWIPE_PX && Math.abs(info.velocity.x) < SWIPE_SPEED) return;
     swipedTo.current = info.offset.x < 0 ? -1 : 1;
+    setSwiped(true);
     handOff(onDismiss, false);
   };
 
-  const word = 'opacity-0 motion-reduce:opacity-100';
   return (
     <motion.div
       ref={scope}
@@ -267,58 +212,52 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
       data-notification-id={entry.id}
       className={cn('relative w-full touch-pan-y', closing && 'pointer-events-none')}
     >
-      {/* The line the notification is drawn from, with its two ticks; it sits on the slit's lower edge as it opens. The
-          box is as tall as the card, its line at the middle: moved down by half its height, the line lands on the
-          lower border. */}
-      <div data-rule aria-hidden className="pointer-events-none absolute inset-0 z-10">
-        <div className="absolute inset-x-0 top-[calc(50%-1px)] h-px">
-          <div data-line className={cn('h-px w-full origin-center', still && 'hidden', LINE_INK(entry.type))} style={{ transform: still ? undefined : 'scaleX(0)' }} />
-          <div data-tick="start" className={cn('absolute left-0 top-1/2 h-2 w-px -translate-y-1/2', still && 'hidden', LINE_INK(entry.type))} />
-          <div data-tick="end" className={cn('absolute right-0 top-1/2 h-2 w-px -translate-y-1/2', still && 'hidden', LINE_INK(entry.type))} />
-        </div>
-      </div>
-
-      <div
+      <IslandSurface
         data-body
+        source={pillAt(entry.position)}
+        // Every closing but a swipe goes back into the pill; the stack takes it off once it lands.
+        open={!closing || swiped}
+        onClosed={() => {
+          if (exited.current) return;
+          exited.current = true;
+          onExited();
+        }}
         // The page's paper, a thin border, ink: the typography does the work (K1a).
-        className="relative rounded-xl border border-slate-200 bg-background text-slate-800 shadow-lg dark:border-slate-700 dark:text-slate-100"
-        style={{ clipPath: still ? undefined : SLIT_SHUT }}
+        surfaceClassName="rounded-xl border border-slate-200 bg-background shadow-lg dark:border-slate-700"
+        contentClassName="relative rounded-xl text-slate-800 dark:text-slate-100"
       >
         <div className="flex items-center gap-2 py-1.5 pl-4 pr-1.5">
-          <span data-word aria-hidden className={cn('shrink-0', word, ICON_INK[entry.type])}>
+          <span aria-hidden className={cn('shrink-0', ICON_INK[entry.type])}>
             <Icon size={18} />
           </span>
-          <p data-word data-message className={cn('min-w-0 flex-1 py-2 text-sm font-medium leading-snug', word)}>
+          <p className="min-w-0 flex-1 py-2 text-sm font-medium leading-snug">
             {entry.message}
           </p>
           {entry.undoable && (
             <button
               type="button"
-              data-word
               onClick={(event) => handOff(onUndo, byKeys(event))}
               disabled={closing}
               aria-keyshortcuts={shortcut?.keys}
               className={cn(
                 'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                word,
               )}
             >
               Annulla
               {/* Seen, not part of the name («Annulla»): `aria-keyshortcuts` says the key. */}
-              {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">· {shortcut.label}</span>}
+              {/* Not on a phone's width, where no keyboard is likely (Papiniano on #585). */}
+              {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 max-md:hidden dark:text-slate-400">· {shortcut.label}</span>}
             </button>
           )}
           {entry.action && (
             <button
               type="button"
-              data-word
               onClick={entry.action.onClick}
               disabled={closing}
               className={cn(
                 'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                word,
               )}
             >
               {entry.action.label}
@@ -326,14 +265,12 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
           )}
           <button
             type="button"
-            data-word
             onClick={(event) => handOff(onDismiss, byKeys(event))}
             disabled={closing}
             aria-label="Chiudi notifica"
             className={cn(
               'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-              word,
             )}
           >
             <X size={16} />
@@ -357,7 +294,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
             ))}
           </div>
         )}
-      </div>
+      </IslandSurface>
     </motion.div>
   );
 }

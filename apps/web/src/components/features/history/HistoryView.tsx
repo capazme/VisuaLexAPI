@@ -83,6 +83,7 @@ export function HistoryView() {
     const [showDossierList, setShowDossierList] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+    const [clearFrom, setClearFrom] = useState<HTMLElement | null>(null);
     const [createDossierFor, setCreateDossierFor] = useState<SearchHistoryItem | null>(null);
     const [newDossierTitle, setNewDossierTitle] = useState('');
     // Menu position is computed from the trigger's getBoundingClientRect on open
@@ -234,7 +235,8 @@ export function HistoryView() {
         }
     };
 
-    const handleClearHistory = () => {
+    const handleClearHistory = (event: { currentTarget: HTMLElement }) => {
+        setClearFrom(event.currentTarget);
         setClearConfirmOpen(true);
     };
 
@@ -655,6 +657,7 @@ export function HistoryView() {
             {/* Clear-all confirmation */}
             <ConfirmDialog
                 open={clearConfirmOpen}
+                origin={clearFrom}
                 variant="danger"
                 title="Svuotare la cronologia?"
                 message="Tutte le ricerche salvate verranno rimosse. Le pratiche e i segnalibri non saranno toccati."

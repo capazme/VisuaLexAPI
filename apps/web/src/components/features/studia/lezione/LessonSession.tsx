@@ -243,9 +243,16 @@ export function LessonSession() {
   const [fine, setFine] = useState<EsitoEsercizio['fine'] | null>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // «Chiudi la lezione»: the question grows from it, for its click and for Esc alike, and gives it the focus back.
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [leaveFrom, setLeaveFrom] = useState<HTMLElement | null>(null);
   // Leaving loses something only between the first answer and the end.
   const asksToLeave = answered > 0 && fine === null;
-  const leave = useCallback(() => (asksToLeave ? setConfirmLeave(true) : navigate(HOME)), [asksToLeave, navigate]);
+  const leave = useCallback(() => {
+    if (!asksToLeave) return navigate(HOME);
+    setLeaveFrom(closeRef.current);
+    setConfirmLeave(true);
+  }, [asksToLeave, navigate]);
 
   useEffect(() => {
     if (materia === null) return;
@@ -360,6 +367,7 @@ export function LessonSession() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <button
+          ref={closeRef}
           type="button"
           onClick={leave}
           aria-label="Chiudi la lezione"
@@ -386,6 +394,7 @@ export function LessonSession() {
       </div>
       <ConfirmDialog
         open={confirmLeave}
+        origin={leaveFrom}
         title="Interrompere la lezione?"
         message="Le risposte date restano, ma questa lezione non si riprende: la prossima volta ne inizi una nuova."
         confirmLabel="Interrompi"

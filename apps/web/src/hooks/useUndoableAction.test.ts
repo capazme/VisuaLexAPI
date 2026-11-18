@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerUndoToastListener, showUndoToast, type UndoToast } from './useUndoableAction';
-import { notificationStore, resetNotifications } from '../components/ui/notifications/notifications';
+import { notificationStore, resetNotifications, UNDO_MS } from '../components/ui/notifications/notifications';
 
 describe('showUndoToast', () => {
   let seen: Array<UndoToast | null>;
@@ -23,12 +23,12 @@ describe('showUndoToast', () => {
   };
   const lastToast = () => seen[seen.length - 1];
 
-  it('runs out by itself after 5 seconds when nothing is clicked: the action stands', async () => {
+  it('runs out by itself after `UNDO_MS` (10 s) when nothing is clicked: the action stands', async () => {
     const { done } = show();
     await vi.advanceTimersByTimeAsync(0);
     expect(lastToast()?.message).toBe('Elemento rimosso');
-    expect(lastToast()?.timeRemaining).toBe(5000);
-    await vi.advanceTimersByTimeAsync(4999);
+    expect(lastToast()?.timeRemaining).toBe(UNDO_MS);
+    await vi.advanceTimersByTimeAsync(UNDO_MS - 1);
     expect(lastToast()).not.toBeNull();
     await vi.advanceTimersByTimeAsync(1);
     expect(lastToast()).toBeNull();
@@ -76,7 +76,7 @@ describe('showUndoToast', () => {
     expect(first.undo).not.toHaveBeenCalled();
     // The first is the newest «Annulla» on screen again, and runs out on its own time.
     expect(lastToast()?.message).toBe('Elemento rimosso');
-    await vi.advanceTimersByTimeAsync(4500);
+    await vi.advanceTimersByTimeAsync(UNDO_MS - 500);
     await expect(first.done).resolves.toBe(true);
   });
 

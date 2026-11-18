@@ -1,12 +1,17 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
+import { IslandSurface } from './IslandSurface';
 
 export interface MenuItem {
   label: string;
-  /** The click that chose it: a key's (Enter, Space) has `detail` 0. */
-  onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  /**
+   * The click that chose it (a key's, Enter or Space, has `detail` 0), and the menu's trigger, which has the focus back
+   * by then: what a confirmation the item opens grows from (LC85), the item itself being gone.
+   */
+  onSelect: (event: ReactMouseEvent<HTMLButtonElement>, trigger: HTMLButtonElement | null) => void;
   icon?: LucideIcon;
   /** The icon's own colour (a priority's flag), when it says more than the label's. */
   iconClassName?: string;
@@ -54,7 +59,8 @@ export interface MenuButtonProps {
 /**
  * A button that opens a list of actions (WAI-ARIA menu button): arrows, Home
  * and End move, Escape and Tab close, focus returns to the trigger, a click
- * outside closes. Clicks never reach the card it sits in. The dossier's menus.
+ * outside closes. Clicks never reach the card it sits in. The dossier's menus. The list grows out of the trigger and
+ * goes back into it (`IslandSurface`, LC85).
  */
 export function MenuButton({ label, title, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
@@ -149,8 +155,11 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
       >
         {children}
       </button>
+      <AnimatePresence>
       {open && (
-        <div
+        <IslandSurface
+          key="menu"
+          source={triggerRef.current}
           id={menuId}
           role="menu"
           aria-label={label}
@@ -158,11 +167,15 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
           onKeyDown={onMenuKey}
           className={cn(
             Z_INDEX.dropdown,
-            'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
+            'absolute flex w-56 flex-col',
             (placement === 'auto' ? opensAbove : placement === 'above') ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
             menuClassName,
+            // The list scrolls inside (below); the box would clip the shape growing from the trigger outside it.
+            'overflow-visible',
           )}
+          surfaceClassName="rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800"
+          contentClassName="relative min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg py-1"
         >
           {heading && (
             <p id={`${menuId}-heading`} role="presentation" className="px-3 pb-1.5 pt-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
@@ -186,10 +199,11 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
                 aria-label={item.ariaLabel}
                 disabled={item.disabled}
                 tabIndex={-1}
-                onClick={(event) => { close(true); item.onSelect(event); }}
+                onClick={(event) => { close(true); item.onSelect(event, triggerRef.current); }}
                 className={cn(
                   'flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left text-sm md:min-h-0',
-                  'focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40',
+                  // The app's ring drawn inside the item: outside it, the list's scroll would cut its sides off.
+                  'focus-visible:outline-none focus-visible:ring-inset focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-40',
                   item.danger
                     ? 'text-red-600 hover:bg-red-50 focus-visible:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 dark:focus-visible:bg-red-900/20'
                     : 'text-slate-700 hover:bg-slate-100 focus-visible:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:bg-slate-700',
@@ -221,8 +235,9 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
               </button>
             </div>
           ))}
-        </div>
+        </IslandSurface>
       )}
+      </AnimatePresence>
     </div>
   );
 }

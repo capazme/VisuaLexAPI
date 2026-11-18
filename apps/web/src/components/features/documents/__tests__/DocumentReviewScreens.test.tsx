@@ -141,9 +141,9 @@ describe('«Da completare» and the picker (#376 §5)', () => {
     expect(civilRows[0]).toHaveTextContent('scelto da te');
     expect(civilRows[0]).not.toHaveTextContent('applicato a più citazioni');
     expect(civilRows[1]).toHaveTextContent('scelto da te (applicato a più citazioni)');
-    // The notice, with «Annulla» for 8 seconds.
+    // The notice, with «Annulla» for 10 seconds (the least any «Annulla» stays, LC85).
     expect(undo?.message).toBe('Atto applicato a 2 citazioni');
-    expect(notificationStore.getState().entries.at(-1)?.duration).toBe(8000);
+    expect(notificationStore.getState().entries.at(-1)?.duration).toBe(10000);
     await act(async () => { await undo!.onUndo(); });
     expect(visible('5 citazioni in 3 atti · 3 da completare')).toBeInTheDocument();
   });

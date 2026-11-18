@@ -28,6 +28,8 @@ export interface PracticeArticleRowProps {
   annexSuggestion?: ReactNode;
   /** Lettura semplice (LC70): the act's article selector, at the end of the text's status line. */
   statusEnd?: ReactNode;
+  /** From the act's index, for a row whose text is not read yet (a dossier's «Fonti», LC86). */
+  rubrica?: string | null;
 }
 
 /**
@@ -37,7 +39,7 @@ export interface PracticeArticleRowProps {
  * (`practiceRows`, T15), so a reveal opens it from anywhere.
  */
 export function PracticeArticleRow({
-  practiceId, actId, article, onCrossReference, onOpenStudyMode, annexSuggestion, statusEnd,
+  practiceId, actId, article, onCrossReference, onOpenStudyMode, annexSuggestion, statusEnd, rubrica: indexRubrica = null,
 }: PracticeArticleRowProps) {
   const { simple } = useSimpleReading();
   const articleKey = practiceArticleKey(article);
@@ -75,7 +77,8 @@ export function PracticeArticleRow({
   const { norma_data: norma } = article;
   const text = article.article_text || '';
   // From the article's own text: no request (spec §3.2).
-  const rubrica = useMemo(() => (text ? getRubricText(text, parseArticleStructure(text)) : null), [text]);
+  const textRubrica = useMemo(() => (text ? getRubricText(text, parseArticleStructure(text)) : null), [text]);
+  const rubrica = textRubrica ?? indexRubrica;
   // "Testo al 29/12/2007": what was asked for, beside the text, never in it (gotcha 32).
   const historicalLabel = historicalItemLabel(norma);
   // Where a jump out of this row walks back to: the practice, the act, and this row by its key, so
