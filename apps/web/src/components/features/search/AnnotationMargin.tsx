@@ -142,7 +142,10 @@ export function AnnotationMargin({
         if (!wrapper) return;
         const width = wrapper.getBoundingClientRect().width;
         setRoomy((was) => width >= (was ? MARGIN_MIN_REM - 1 : MARGIN_MIN_REM) * remPx());
-    }, []);
+        // The text's measure in px, for the column to come right after it (index.css, LC90).
+        const measure = textRootRef.current ? getComputedStyle(textRootRef.current).maxWidth : '';
+        if (measure.endsWith('px')) wrapper.style.setProperty('--vlx-text-max', measure);
+    }, [textRootRef]);
     // Also before the paint of the commit that gives or takes the aside: the host changes the reader's layout in it
     // (LC74: the glosses' margin leaving the side of the text for the column), which gets the column in that commit.
     const asideShown = aside != null;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, LocateFixed, PenLine, Plus, Send, X } from 'lucide-react';
@@ -219,6 +219,28 @@ export function ArticleDiscussionPanel({
     composerRef.current?.querySelector<HTMLElement>(draft ? 'textarea' : 'input')?.focus({ preventScroll: true });
   }, [isMargin, isOpen, composerOpen, draft]);
 
+  // In the margin the composer goes with the publication: the focus goes to the gloss published (on a passage, the one
+  // chosen, its words lit), not to the page. After the margin's own focus above, which the draft consumed calls again.
+  const published = useRef<string | null>(null);
+  useEffect(() => {
+    const id = published.current;
+    const toggle = id ? document.getElementById(`article-thread-${id}`)?.querySelector<HTMLElement>('button') : null;
+    if (!toggle) return;
+    published.current = null;
+    toggle.focus();
+  }, [threads]);
+
+  // The gloss the focus is on, in the margin: going from under the text to beside it, the glosses on a passage are drawn
+  // again aligned (another list), and the one that had the focus takes it back.
+  const focusedCard = useRef<string | null>(null);
+  const aligned = !!align;
+  useLayoutEffect(() => {
+    const id = focusedCard.current;
+    const at = document.activeElement;
+    if (!id || (at && at !== document.body)) return;
+    document.getElementById(id)?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+  }, [aligned]);
+
   // Scroll to focused thread when present in threads list
   useEffect(() => {
     if (!focusThreadId || isLoading) return;
@@ -285,6 +307,7 @@ export function ArticleDiscussionPanel({
       if (newThread.passage !== null) {
         onFocusThread?.(newThread.id);
       }
+      if (isMargin) published.current = newThread.id;
     } catch {
       setError('Impossibile pubblicare la glossa.');
     }
@@ -630,6 +653,8 @@ export function ArticleDiscussionPanel({
         aria-labelledby={marginHeadingId}
         data-gloss-margin=""
         className="space-y-3 outline-none"
+        onFocus={event => { focusedCard.current = (event.target as HTMLElement).closest('article[id^="article-thread-"]')?.id ?? null; }}
+        onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) focusedCard.current = null; }}
         onKeyDown={event => {
           if (event.key !== 'Escape') return;
           event.stopPropagation();

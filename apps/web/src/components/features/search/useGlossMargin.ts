@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 
 /** The margin beside the text (LC74): about 340 px, 1.5rem from it. */
@@ -107,11 +107,31 @@ export function useGlossMargin({ open, rootRef, columnShown, marginContent = fal
 
     // The margin goes where it is drawn; closed, under the text, empty.
     const slot = shown ? { beside: besideSlot, column: columnSlot, below: belowSlot }[placement] : belowSlot;
+    // What has the focus in the margin, while the reader leaves it there: the margin leaving the side of the text is out
+    // of the page for a commit (its slot there goes before the column's comes), and the focus falls to the page.
+    const lastFocus = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!host) return undefined;
+        const into = (e: FocusEvent) => { lastFocus.current = e.target instanceof HTMLElement ? e.target : null; };
+        const out = (e: FocusEvent) => { if (e.relatedTarget instanceof Node && !host.contains(e.relatedTarget)) lastFocus.current = null; };
+        const press = (e: PointerEvent) => { if (!(e.target instanceof Node && host.contains(e.target))) lastFocus.current = null; };
+        host.addEventListener('focusin', into);
+        host.addEventListener('focusout', out);
+        document.addEventListener('pointerdown', press, true);
+        return () => {
+            host.removeEventListener('focusin', into);
+            host.removeEventListener('focusout', out);
+            document.removeEventListener('pointerdown', press, true);
+        };
+    }, [host]);
     useLayoutEffect(() => {
         if (!host || !slot || host.parentElement === slot) return;
         // A node moved takes the focus out of the page: what had it in the margin takes it again (the margin opened in
-        // the notes' column is focused under the text a commit before its slot is there).
-        const focused = document.activeElement instanceof HTMLElement && host.contains(document.activeElement) ? document.activeElement : null;
+        // the notes' column is focused under the text a commit before its slot is there; the gloss just published, as
+        // the margin goes from beside the text into the column).
+        const at = document.activeElement;
+        const lost = !at || at === document.body;
+        const focused = at instanceof HTMLElement && host.contains(at) ? at : lost && lastFocus.current && host.contains(lastFocus.current) ? lastFocus.current : null;
         slot.appendChild(host);
         focused?.focus({ preventScroll: true });
     }, [host, slot]);
