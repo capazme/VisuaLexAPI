@@ -56,9 +56,10 @@ export interface StudySettingsPanelProps {
  */
 export function StudySettingsPanel({ id, open, onClose, onChanged, communityRequest = 0, aside = false }: StudySettingsPanelProps) {
   return (
-    <Expand id={id} open={open} onClose={onClose} keepMounted role="region" aria-label="Impostazioni dello studio" tabIndex={-1} className="focus:outline-none">
-      {/* 20 px above the line, the card's gap when the panel was a row of its grid; room under the last control in the
-          strip too, whose own padding is small. */}
+    <Expand id={id} open={open} onClose={onClose} keepMounted role="region" aria-label="Impostazioni dello studio" tabIndex={-1} className="-mx-2 px-2 focus:outline-none">
+      {/* `Expand` clips its content: its 8 px of room at the sides keep the switches' focus rings whole. 20 px above
+          the line, the card's gap when the panel was a row of its grid; room under the last control in the strip too,
+          whose own padding is small. */}
       <div className="mt-5 border-t border-slate-200 pb-2 pt-4 dark:border-slate-800">
         <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
       </div>

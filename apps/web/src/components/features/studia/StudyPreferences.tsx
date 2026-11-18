@@ -224,7 +224,7 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
                 {`Schede della comunità · ${preferences.materieComunita.length} di ${subjects.length}`}
               </button>
               {/* A panel in place too (U1b), one level down. */}
-              <Expand id={communityId} open={community} onClose={() => setCommunity(false)}>
+              <Expand id={communityId} open={community} onClose={() => setCommunity(false)} className="-mx-2 px-2">
                 <fieldset className="pt-1">
                   <legend className="sr-only">Schede della comunità</legend>
                   <p className="mb-1 text-sm text-slate-500 dark:text-slate-400">Schede validate dalla comunità, per materia</p>
