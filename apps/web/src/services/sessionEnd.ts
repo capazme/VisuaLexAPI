@@ -56,6 +56,7 @@ export const BROWSER_STORAGE: readonly StorageEntry[] = [
   { area: 'local', key: 'visualex.studia.valida.materia', kind: 'user', what: 'Gymnasium: the subject chosen for validation' },
   { area: 'local', key: 'visualex.studia.percorsi.passo', kind: 'user', what: 'Gymnasium: the step reached in each module' },
   { area: 'session', key: 'visualex.studia.percorsi.lavoro', kind: 'user', what: 'Gymnasium: the work on a module in this tab' },
+  { area: 'local', key: 'visualex-dossier-last-read', kind: 'user', what: 'the last article read in each dossier, and how far into it (LC86)' },
   { area: 'local', key: 'visualex.atti.avviso-visto', kind: 'user', what: 'the notice before the first upload of a case file, seen (shown again after a sign-out)' },
   { area: 'local', key: 'visualex.merlt.consent', kind: 'user', what: 'legacy: the MERL-T consent level, no longer written' },
   { area: 'local', key: 'visualex.merlt.consent-snooze', kind: 'user', what: 'legacy: the old consent banner snoozed, no longer written' },

@@ -16,6 +16,8 @@ vi.mock('../../../hooks/useTour', () => ({
 }));
 vi.mock('../../../services/legalFetch', () => ({ legalFetch: h.legalFetch }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: { addItem: vi.fn(), writesInFlight: () => 0 } }));
+// The act's index (LC86: a closed row's rubric) asks no source here: the source is mocked for the texts.
+vi.mock('./useActDetails', async (importOriginal) => ({ ...(await importOriginal<typeof import('./useActDetails')>()), useActDetails: () => ({ title: null, rubricaOf: () => null }) }));
 vi.mock('../../../utils/actStructureCache', () => ({
   fetchActTree: () => Promise.resolve([]),
   fetchActRubriche: () => Promise.resolve({}),
@@ -146,9 +148,9 @@ describe('what is the Corpus practice\'s is not drawn in the dossier', () => {
     expect(screen.getByTestId('practice-column').className).not.toContain('practice-bar-height');
   });
 
-  it('one article alone (the simple reading): its act\'s «⋯» carries no practice actions either', () => {
+  it('one article alone: its act\'s «⋯» carries no practice actions either', () => {
     render(<DossierReadingView dossier={dossierOf([norma('5')])} showToast={toast} />);
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su l. 8 marzo 2017, n. 24' }));
     for (const label of PRACTICE_ONLY) expect(screen.queryByText(label)).toBeNull();
   });
 

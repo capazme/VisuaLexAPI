@@ -1,9 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { ArticleData, Dossier, Norma, NormaVisitata, SearchParams } from '../../../types';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
-import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
+import { articleRowKey, besideRefFor, practiceArticleKey } from '../../../utils/practice';
+import { scrollParentOf } from '../../../utils/scrollParent';
+import { keepLastRead, lastReadOf } from './lastRead';
 import { deriveVersionInfo } from '../../../utils/versionDisplay';
 import { ReadingHostContext, type ReadingHost } from '../practice/readingHost';
 import { askerPracticeOf, crossReferenceParams, fetchActPdfUrl, openFromAsker, revealHeldCitation } from '../practice/hostGestures';
@@ -49,6 +51,113 @@ async function putOnTable(practiceId: string, params: SearchParams): Promise<voi
   if (asker) openFromAsker(practiceId, besideRefFor({ kind: 'article', actId: landed.actId, articleKey: practiceArticleKey(loaded) }), asker);
 }
 
+/** How long the last article's place is asked for again while its text arrives. */
+const SETTLE_MS = 4000;
+/** What a user's own scroll starts with: it ends the asking. */
+const USER_SCROLL = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+
+/**
+ * «Fonti» opens with its rows closed but the last article read (LC86, L-79), opened again where it was: once per table,
+ * when the dossier's page opens it. Then it follows what is read: the row last opened, and how far into it the scroller
+ * is, kept in this browser (`lastRead.ts`).
+ */
+function useLastRead(dossierId: string, practiceId: string | undefined, rootRef: RefObject<HTMLElement | null>) {
+  const opened = useRef<string | null>(null);
+  const toPlace = useRef<{ rowKey: string; offset: number } | null>(null);
+  useEffect(() => {
+    if (!practiceId) return undefined;
+    if (opened.current !== practiceId) {
+      // Once per table, StrictMode's second run included: a second run would close again the row the first one opened.
+      opened.current = practiceId;
+      const s = appStore.getState();
+      const table = s.practices.find((p) => p.id === practiceId);
+      Object.keys(s.practiceRows).filter((key) => key.startsWith(`${practiceId}/`)).forEach((key) => s.setRowOpen(key, false));
+      const kept = lastReadOf(dossierId);
+      const act = kept ? table?.acts.find((a) => a.key === kept.act) : undefined;
+      if (kept && act && s.revealPracticeRow(practiceId, act.id, kept.article) && kept.offset > 0) {
+        toPlace.current = { rowKey: articleRowKey(practiceId, act.id, kept.article), offset: kept.offset };
+      }
+    }
+    const target = toPlace.current;
+    if (!target) return undefined;
+    // Where it was read: the row's top that far above the scroller's, asked again as the text comes and the row grows,
+    // until the user scrolls or the time is out.
+    let observer: ResizeObserver | null = null;
+    const release = () => {
+      observer?.disconnect();
+      clearTimeout(timer);
+      USER_SCROLL.forEach((type) => window.removeEventListener(type, done, true));
+    };
+    const done = () => {
+      toPlace.current = null;
+      release();
+    };
+    const place = () => {
+      const row = rootRef.current?.querySelector<HTMLElement>(`[data-practice-row="${CSS.escape(target.rowKey)}"]`);
+      const scroller = row ? scrollParentOf(row) : null;
+      if (!row || !scroller) return;
+      if (!observer && typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(place);
+        observer.observe(row);
+      }
+      if (row.offsetHeight <= target.offset) return;
+      scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top + target.offset;
+    };
+    const timer = setTimeout(done, SETTLE_MS);
+    USER_SCROLL.forEach((type) => window.addEventListener(type, done, { capture: true, passive: true }));
+    const frame = requestAnimationFrame(place);
+    return () => {
+      cancelAnimationFrame(frame);
+      release();
+    };
+  }, [dossierId, practiceId, rootRef]);
+
+  // What is read: the article row opened last, and how far into it the page is scrolled.
+  useEffect(() => {
+    if (!practiceId) return undefined;
+    const prefix = `${practiceId}/`;
+    let reading: { rowKey: string; act: string; article: string } | null = null;
+    const follow = (rows: Record<string, true>, before?: Record<string, true>) => {
+      const opened = Object.keys(rows).filter((key) => key.startsWith(prefix) && !before?.[key]);
+      for (const rowKey of opened.reverse()) {
+        const [, actId, ...rest] = rowKey.split('/');
+        const article = rest.join('/');
+        const act = appStore.getState().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+        if (!act || !act.articles.some((a) => practiceArticleKey(a) === article)) continue;
+        reading = { rowKey, act: act.key, article };
+        keepLastRead(dossierId, { act: act.key, article, offset: 0 });
+        return;
+      }
+    };
+    // The row the opening revealed is the one read until another opens.
+    follow(appStore.getState().practiceRows);
+    const unsubscribe = appStore.subscribe((state, prev) => {
+      if (state.practiceRows !== prev.practiceRows) follow(state.practiceRows, prev.practiceRows);
+    });
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const row = reading && appStore.getState().practiceRows[reading.rowKey]
+          ? rootRef.current?.querySelector<HTMLElement>(`[data-practice-row="${CSS.escape(reading.rowKey)}"]`)
+          : null;
+        const scroller = row ? scrollParentOf(row) : null;
+        if (!row || !scroller || !reading) return;
+        const offset = Math.round(Math.max(0, scroller.getBoundingClientRect().top - row.getBoundingClientRect().top));
+        keepLastRead(dossierId, { act: reading.act, article: reading.article, offset: Math.min(offset, row.offsetHeight) });
+      });
+    };
+    // The page's scroller is where the reading moves; captured, so a column that scrolls on its own counts too.
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => {
+      unsubscribe();
+      cancelAnimationFrame(frame);
+      document.removeEventListener('scroll', onScroll, true);
+    };
+  }, [dossierId, practiceId, rootRef]);
+}
+
 interface Props {
   dossier: Dossier;
   showToast: (message: string, type?: ToastType) => void;
@@ -73,6 +182,8 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
   });
   // Builds the table, or re-syncs the one already open (`openDossierPractice` calls `resyncDossierPractice` then).
   useEffect(() => { appStore.getState().openDossierPractice(dossier); }, [dossier]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useLastRead(dossier.id, practiceId, rootRef);
 
   // The tests of 16-11: an item removed in another window kept its row unmarked until the page's poll (its focus read
   // waits 15 s). Here the dossier is read on opening the tab and every time the window comes back, with no wait; the
@@ -130,7 +241,7 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
   }, [showToast]);
 
   return (
-    <div className="space-y-3">
+    <div ref={rootRef} className="space-y-3">
       {/* §14: nothing goes away without saying so. What a gesture puts on the table is not the dossier's (c4 adds it). */}
       <p className="text-sm text-slate-600 dark:text-slate-400">Quello che apri leggendo resta qui finché non lo aggiungi alla pratica.</p>
       {pending > 0 && <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Carico il testo…</p>}

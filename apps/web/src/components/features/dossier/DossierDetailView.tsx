@@ -67,8 +67,10 @@ import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { scrollParentOf } from '../practice/practiceView';
 
 const VIEW_PANEL = 'dossier-view';
-const VISTE = ['lettura', 'atti'] as const;
-type DossierView = 'fonti' | 'lettura' | 'atti' | 'compiti';
+type DossierView = 'fonti' | 'atti' | 'compiti';
+/** LC86: the sources and the reading are one tab, «Fonti». The old list stays in the code, never drawn, until PR 2
+ *  brings its filter and its selection onto the reading and removes it. */
+const LEGACY_FONTI = false;
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { kindLabel } from './dossierKinds';
@@ -127,8 +129,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     setView(next);
     if (scroller && stuckAt !== null && scroller.scrollTop > stuckAt) scroller.scrollTop = stuckAt;
   };
-  // `?vista=lettura` (LC54) opens on the reading.
-  const [view, setView] = useState<DossierView>(() => VISTE.find((v) => v === new URLSearchParams(window.location.search).get('vista')) ?? 'fonti');
+  // `?vista=atti` opens on the acts; `?vista=lettura` (LC54), the reading, is «Fonti» now (LC86).
+  const [view, setView] = useState<DossierView>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
   const [attiCount, setAttiCount] = useState<number | null>(null);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -578,7 +580,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         items={[
           { label: 'Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
           { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
-          { label: showBulkActions ? 'Annulla selezione' : 'Seleziona elementi', icon: CheckSquare, onSelect: () => { setShowBulkActions((v) => !v); clearSelection(); } },
+          // The selection comes back on the one «Fonti» with PR 2 (LC86).
+          ...(LEGACY_FONTI ? [{ label: showBulkActions ? 'Annulla selezione' : 'Seleziona elementi', icon: CheckSquare, onSelect: () => { setShowBulkActions((v) => !v); clearSelection(); } }] : []),
           { label: 'Elimina la pratica', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => {
             // No confirmation: the dossier goes to the trash and the notification's «Annulla» restores it (K1a).
             deleteDossierWithUndo(dossier, trashChanged);
@@ -589,6 +592,37 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         <MoreHorizontal size={18} />
       </MenuButton>
     </div>
+  );
+
+  const emptyDossier = (
+    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
+      <EmptyState
+        variant="dossier"
+        title="Pratica vuota"
+        description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
+        action={
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button onClick={() => navigate('/')} className={cn(HEADER_PRIMARY, 'justify-center')}>
+              <Search size={18} />
+              Cerca articoli
+            </button>
+            <button onClick={() => setTreeNavigatorAct(null)} className={cn(HEADER_BUTTON, 'justify-center')}>
+              <TreeDeciduous size={18} />
+              Importa da norma
+            </button>
+          </div>
+        }
+      />
+    </div>
+  );
+  const recentlyRemoved = trash && (
+    <DossierRecentlyRemoved
+      entries={(trash.entries ?? []).filter((e) => e.kind === 'DOSSIER_ITEMS' && e.dossierId === dossier.id)}
+      dossiers={dossiers}
+      onRestore={trash.restore}
+      onPurge={trash.purge}
+      showToast={showToast}
+    />
   );
 
   return (
@@ -644,13 +678,12 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         {/* LC27 (Luca, 15 Nov): the tabs stay at the top while the view scrolls, and a change of view starts the new
             one right under them, in place — no jump to the page's top, no scrolling to it. */}
         <div ref={viewTop} aria-hidden />
-        {/* In «Lettura» the act's own head sticks at the top while reading (#529, Papiniano): the tabs scroll away there,
+        {/* In «Fonti» the act's own head sticks at the top while reading (#529, Papiniano): the tabs scroll away there,
             or the two sticky heads overlap and the tabs vanish under it. */}
-        <div className={cn('-mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950', view !== 'lettura' && 'sticky top-0 z-10')}>
+        <div className={cn('-mx-2 mb-6 bg-slate-50 px-2 py-2 dark:bg-slate-950', view !== 'fonti' && 'sticky top-0 z-10')}>
         <SegmentedTabs
           tabs={[
             { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
-            { id: 'lettura', label: 'Lettura' },
             { id: 'atti', label: 'Atti', extra: attiCount === null ? undefined : <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{attiCount}</span> },
             { id: 'compiti', label: 'Compiti' },
           ]}
@@ -659,7 +692,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           label="Viste della pratica"
           panelId={VIEW_PANEL}
           className="w-fit max-w-full"
-          // Four tabs whole on a 390 px phone (LC54): less padding below `sm`.
+          // The tabs whole on a 390 px phone (LC54): less padding below `sm`.
           tabClassName="gap-1.5 px-2.5 sm:gap-2 sm:px-4"
         />
         </div>
@@ -668,12 +701,22 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           {dossier.kind !== 'studio' && <DeadlineCard dossierId={dossier.id} />}
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
-        {/* Mounted only once chosen: opening it builds the dossier's reading table (LC54). */}
-        {view === 'lettura' && <DossierReadingView dossier={dossier} showToast={showToast} onTrashChanged={trashChanged} />}
         <div hidden={view !== 'atti'}>
           <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
         </div>
+        {/* «Fonti» (LC86): the reading — each act a block, each article a closed row that opens in place —, then the
+            dossier's own notes, then what was removed lately. Kept mounted while another tab is shown: its open rows
+            and its reading stay as they were. */}
         <div hidden={view !== 'fonti'}>
+          {dossier.items.length === 0 ? emptyDossier : (
+            <div className="space-y-6">
+              <DossierReadingView dossier={dossier} showToast={showToast} onTrashChanged={trashChanged} />
+              <DossierNotesSection notes={fullLayout.notes} onRemove={handleRemoveSingle} />
+            </div>
+          )}
+          {trash && recentlyRemoved}
+        </div>
+        {LEGACY_FONTI && <div hidden={view !== 'fonti'}>
         {dossier.items.length > 0 && (
           <div className="mb-4 flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
@@ -748,27 +791,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         )}
 
         <div id="tour-dossier-items" className="space-y-4">
-          {dossier.items.length === 0 ? (
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
-              <EmptyState
-                variant="dossier"
-                title="Pratica vuota"
-                description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
-                action={
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <button onClick={() => navigate('/')} className={cn(HEADER_PRIMARY, 'justify-center')}>
-                      <Search size={18} />
-                      Cerca articoli
-                    </button>
-                    <button onClick={() => setTreeNavigatorAct(null)} className={cn(HEADER_BUTTON, 'justify-center')}>
-                      <TreeDeciduous size={18} />
-                      Importa da norma
-                    </button>
-                  </div>
-                }
-              />
-            </div>
-          ) : visibleItems.length === 0 ? (
+          {dossier.items.length === 0 ? emptyDossier : visibleItems.length === 0 ? (
             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
               <EmptyState
                 variant="search"
@@ -813,16 +836,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           )}
         </div>
 
-        {trash && (
-          <DossierRecentlyRemoved
-            entries={(trash.entries ?? []).filter((e) => e.kind === 'DOSSIER_ITEMS' && e.dossierId === dossier.id)}
-            dossiers={dossiers}
-            onRestore={trash.restore}
-            onPurge={trash.purge}
-            showToast={showToast}
-          />
-        )}
-        </div>
+        {trash && recentlyRemoved}
+        </div>}
         </div>
 
         {moveToModalOpen && (

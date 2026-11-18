@@ -71,8 +71,9 @@ export function forgetActDetails(): void {
  * while the act is read again (a new annex, a new article) and when a new reading
  * fails; only another act starts blank. The title used to vanish on each of these.
  */
-export function useActDetails(block: ActBlock): ActDetails {
-  const actKey = block.key;
+export function useActDetails(block: ActBlock | undefined): ActDetails {
+  // No block (a reading table's act the dossier does not hold, LC86): nothing read, no request.
+  const actKey = block?.key ?? '';
   const [read, setRead] = useState<{ key: string } & Read>(() => ({
     key: actKey, ...(lastRead.get(actKey) ?? { title: null, byAnnex: {}, codeAnnex: null }),
   }));
@@ -80,11 +81,12 @@ export function useActDetails(block: ActBlock): ActDetails {
   const current: Read = read.key === actKey ? read : (lastRead.get(actKey) ?? { title: null, byAnnex: {}, codeAnnex: null });
 
   // Primitives only, so a new block object for the same act does not load again.
-  const knownUrn = actUrnForBlock(block);
-  const isCode = block.isCode;
-  const storedCodeAnnex = isCode ? (block.articles.find((i) => i.data.allegato)?.data.allegato ?? '') : '';
-  const annexesKey = isCode ? '' : Array.from(new Set(block.articles.map((i) => i.data.allegato || ''))).join('|');
-  const first = block.articles[0]?.data;
+  const knownUrn = block ? actUrnForBlock(block) : null;
+  const isCode = block?.isCode ?? false;
+  const articles = block?.articles ?? [];
+  const storedCodeAnnex = isCode ? (articles.find((i) => i.data.allegato)?.data.allegato ?? '') : '';
+  const annexesKey = isCode ? '' : Array.from(new Set(articles.map((i) => i.data.allegato || ''))).join('|');
+  const first = articles[0]?.data;
   const actType = first?.tipo_atto ?? '';
   const actNumber = first?.numero_atto;
   const actDate = first?.data;

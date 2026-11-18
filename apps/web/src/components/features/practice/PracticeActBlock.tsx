@@ -18,7 +18,8 @@ import { TreeViewPanel } from '../search/TreeViewPanel';
 import { AnnexSuggestion } from '../search/AnnexSuggestion';
 import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { LazyStudyMode as StudyMode } from '../workspace/LazyStudyMode';
-import { shownAnnex } from '../dossier/dossierLayout';
+import { layoutDossier, shownAnnex } from '../dossier/dossierLayout';
+import { useActDetails } from '../dossier/useActDetails';
 import { PracticeArticleRow } from './PracticeArticleRow';
 import { PracticeArticleEntry } from './PracticeIndexEntry';
 import type { PracticeLayout } from './PracticeColumn';
@@ -105,6 +106,11 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
   // dossier» (to the trash, with «Annulla»; the rows stay on the table): a removal from the table alone would come back
   // with the next re-sync.
   const { dossier: hostDossier, ids: dossierIds } = useActItemIds(act);
+  // In a dossier's «Fonti» (LC86) a closed row has no text yet: its rubric comes from the act's index, read once per
+  // act as the old list read it (`useActDetails`).
+  const dossierItems = useAppStore((s) => (hostDossier ? s.dossiers.find((d) => d.id === hostDossier.id)?.items : undefined));
+  const dossierBlock = useMemo(() => (dossierItems ? layoutDossier(dossierItems).acts.find((a) => a.key === act.key) : undefined), [dossierItems, act.key]);
+  const { rubricaOf } = useActDetails(dossierBlock);
   // A separator only under a command: on a computer an act has none above its removal (the tests of 16-11; LC60: the
   // Ricerca's act lost «Sposta in un'altra pratica»).
   const commandsAbove = !toolsShown;
@@ -513,6 +519,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                 onCrossReference={onCrossReference}
                 onOpenStudyMode={() => openStudy(article)}
                 statusEnd={statusEnd}
+                rubrica={rubricaOf(article.norma_data)}
                 annexSuggestion={annexes && openKeys.includes(key) ? (
                   <AnnexSuggestion
                     className="mb-3"

@@ -16,6 +16,8 @@ vi.mock('../../../services/dossierService', () => ({
   },
 }));
 vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn() } }));
+// The act's index (LC86: a closed row's rubric) asks no source here: the source is mocked for the texts.
+vi.mock('./useActDetails', async (importOriginal) => ({ ...(await importOriginal<typeof import('./useActDetails')>()), useActDetails: () => ({ title: null, rubricaOf: () => null }) }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActTree: () => Promise.resolve([]), fetchActRubriche: () => Promise.resolve({}) }));
 // The act's drag, taken from the column's DndContext: jsdom draws no layout for dnd-kit's sensors.
 vi.mock('@dnd-kit/core', async (importOriginal) => {
@@ -231,14 +233,15 @@ describe('«Togli dalla pratica»', () => {
   });
 });
 
-describe('the simple reading (one article alone, no row heading)', () => {
-  it('a lone article not in the dossier says so over its text, with «Aggiungi alla pratica»', () => {
+describe('one article alone is a closed row as any other (LC86: no simple reading in «Fonti»)', () => {
+  it('a lone article not in the dossier says so on its row, with «Aggiungi alla pratica»', () => {
     svc.addItem.mockReturnValue(new Promise(() => {}));
     appStore.setState({ dossiers: [dossierOf([])] });
     render(<Page />);
     arrive();
+    expect(rowOf('241', '3')!.getByRole('button', { name: /^Espandi .*non nella pratica$/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('Non nella pratica')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Aggiungi alla pratica/ }));
     expect(svc.addItem).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Non nella pratica')).toBeNull();
   });
