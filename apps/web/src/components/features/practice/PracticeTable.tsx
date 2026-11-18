@@ -65,9 +65,10 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming, layout, 
       // Lettura semplice (LC28): the article takes the room it needs, the measure; the whole frame only when its margin
       // has notes or glosses to set beside the text (`AnnotationMargin` needs 52rem for its column). LC70: so does one
       // act with more articles, the same card as with one (Luca: «se apro due articoli si scassa tutto»). LC74: an
-      // article's glosses widen it to the right by their margin (21.25rem and its 1.5rem), the text where it was.
+      // article's glosses widen it to the right by their margin (21.25rem and its 1.5rem), the text where it was. LC90:
+      // the notes' column keeps that same width, not the frame's: the text does not slide when the glosses go into it.
       data-glosses-room={headless ? '' : undefined}
-      className={cn('w-full space-y-3', headless && 'max-w-[44rem] has-[[data-margin-content]]:max-w-none has-[[data-glosses-beside]]:max-w-[66.75rem]')}
+      className={cn('w-full space-y-3', headless && 'max-w-[44rem] has-[[data-margin-content]]:max-w-[66.75rem] has-[[data-glosses-beside]]:max-w-[66.75rem]')}
     >
       <PracticeHeader practice={practice} compact={layout === 'index'} simple={simple} headless={headless}>
         <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
@@ -143,6 +144,7 @@ function PracticeHeader({ practice, compact, simple, headless, children }: { pra
         ) : (
           // The page's title, as every section page writes it (`PageFrame`'s `PAGE_TITLE`, R3).
           <h2
+            data-page-title=""
             onDoubleClick={() => setEditing(true)}
             title={compact ? `${practice.label} · doppio clic per rinominare` : 'Doppio clic per rinominare'}
             className={cn('truncate', compact ? INDEX_TITLE : PAGE_TITLE)}

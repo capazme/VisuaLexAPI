@@ -74,12 +74,6 @@ def brocardi():
         yield guard
 
 
-@pytest.fixture(autouse=True)
-def _no_history_writes():
-    with patch("app.add_to_history"):
-        yield
-
-
 async def ask(controller, endpoint, nv, scraper=None, body=None):
     """POST to an endpoint with the article(s), the scraper and Brocardi replaced."""
     scraper = scraper or normattiva_serving()

@@ -20,10 +20,7 @@ TODAY = "2026-10-21"
 
 @pytest.fixture
 def fixed_today(monkeypatch):
-    import visualex_api.app as api_module
-
-    for module in (app_module, api_module):
-        monkeypatch.setattr(module, "today_in_rome", lambda: date(2026, 10, 21))
+    monkeypatch.setattr(app_module, "today_in_rome", lambda: date(2026, 10, 21))
 
 
 @pytest.mark.parametrize(
@@ -93,12 +90,10 @@ def test_a_bare_urn_still_names_its_file():
         "stato_legge_1990-08-07_241__vig2020-01-01.pdf"
 
 
-@pytest.mark.parametrize("server", ["root", "api"])
 async def test_an_address_that_could_poison_the_cache_is_refused_before_the_browser(
-        tmp_path, monkeypatch, fixed_today, server):
-    import visualex_api.app as api_module
+        tmp_path, monkeypatch, fixed_today):
 
-    module, route = (app_module, "/export_pdf") if server == "root" else (api_module, "/api/export_pdf")
+    module, route = app_module, "/export_pdf"
     monkeypatch.chdir(tmp_path)
     (tmp_path / "download").mkdir()
     asked = []
@@ -187,11 +182,9 @@ async def test_the_export_never_writes_outside_the_download_folder(tmp_path, mon
     assert len(asked) == 1
 
 
-@pytest.mark.parametrize("server", ["root", "api"])
-async def test_an_undated_export_is_dated_today_and_cached_under_that_name(tmp_path, monkeypatch, fixed_today, server):
-    import visualex_api.app as api_module
+async def test_an_undated_export_is_dated_today_and_cached_under_that_name(tmp_path, monkeypatch, fixed_today):
 
-    module, route = (app_module, "/export_pdf") if server == "root" else (api_module, "/api/export_pdf")
+    module, route = app_module, "/export_pdf"
     work = tmp_path / "work"
     (work / "download").mkdir(parents=True)
     monkeypatch.chdir(work)
@@ -235,50 +228,10 @@ def test_the_sweep_deletes_only_old_pdfs_directly_in_the_folder(tmp_path):
     assert sweep_exported_pdfs(str(tmp_path / "missing"), now=now) == 0
 
 
-async def test_the_api_twin_exports_through_extract_pdf(tmp_path, monkeypatch, fixed_today):
-    # visualex_api/app.py (the /api server) called `setup_driver` and `close_drivers`,
-    # which PlaywrightManager does not have: every export that missed the cache was a
-    # 500 (inventory row 1.7). It now extracts as the root app does.
-    import visualex_api.app as api_module
-
-    work = tmp_path / "work"
-    (work / "download").mkdir(parents=True)
-    monkeypatch.chdir(work)
-    asked = []
-
-    async def fake_extract(urn):
-        asked.append(urn)
-        target = work / "download" / "suggested.pdf"
-        target.write_bytes(b"%PDF-1.4 test")
-        return str(target)
-
-    monkeypatch.setattr(api_module, "extract_pdf", fake_extract)
-    client = api_module.NormaController().app.test_client()
-
-    urn = BASE + "legge:1990-08-07;241!vig=2026-10-21"
-    response = await client.post("/api/export_pdf", json={"urn": urn})
-
-    assert response.status_code == 200
-    assert (await response.get_data()).startswith(b"%PDF")
-    assert asked == [urn]
-    assert (work / "download" / "stato_legge_1990-08-07_241__vig2026-10-21.pdf").read_bytes() == b"%PDF-1.4 test"
-
-    # Served from the cache the second time: no new extraction.
-    again = await client.post("/api/export_pdf", json={"urn": urn})
-    assert again.status_code == 200
-    assert asked == [urn]
-
-    refused = await client.post("/api/export_pdf", json={"urn": "http://127.0.0.1:5000/"})
-    assert refused.status_code == 400
-    assert asked == [urn]
-
-
-@pytest.mark.parametrize("server", ["root", "api"])
-async def test_a_future_day_is_a_400_before_the_browser(tmp_path, monkeypatch, fixed_today, server):
+async def test_a_future_day_is_a_400_before_the_browser(tmp_path, monkeypatch, fixed_today):
     # As for an article (reject_future_version_date): Normattiva would export today's text under it.
-    import visualex_api.app as api_module
 
-    module, route = (app_module, "/export_pdf") if server == "root" else (api_module, "/api/export_pdf")
+    module, route = app_module, "/export_pdf"
     monkeypatch.chdir(tmp_path)
     (tmp_path / "download").mkdir()
     asked = []
@@ -295,11 +248,9 @@ async def test_a_future_day_is_a_400_before_the_browser(tmp_path, monkeypatch, f
     assert asked == []
 
 
-@pytest.mark.parametrize("server", ["root", "api"])
-async def test_another_authority_is_exported_not_a_500(tmp_path, monkeypatch, fixed_today, server):
-    import visualex_api.app as api_module
+async def test_another_authority_is_exported_not_a_500(tmp_path, monkeypatch, fixed_today):
 
-    module, route = (app_module, "/export_pdf") if server == "root" else (api_module, "/api/export_pdf")
+    module, route = app_module, "/export_pdf"
     work = tmp_path / "work"
     (work / "download").mkdir(parents=True)
     monkeypatch.chdir(work)

@@ -69,6 +69,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
   // Swiped away: it leaves along the swipe, not into its pill.
   const [swiped, setSwiped] = useState(false);
   const Icon = ICONS[entry.type];
+  const both = Boolean(entry.undoable && entry.action);
   const closing = entry.closing !== null;
 
   // «Annulla»'s time: the line at the bottom draws back over what is left, and stops while it is held.
@@ -226,55 +227,59 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
         surfaceClassName="rounded-xl border border-slate-200 bg-background shadow-lg dark:border-slate-700"
         contentClassName="relative rounded-xl text-slate-800 dark:text-slate-100"
       >
-        <div className="flex items-center gap-2 py-1.5 pl-4 pr-1.5">
+        {/* With two buttons the text keeps 13 rem of its own: where the row has no room for them, they go under it,
+            at the right, with ✕ (it went one word to a line at 390 px, #595). One button keeps the single row. */}
+        <div className={cn('flex items-center gap-2 py-1.5 pl-4 pr-1.5', both && 'flex-wrap')}>
           <span aria-hidden className={cn('shrink-0', ICON_INK[entry.type])}>
             <Icon size={18} />
           </span>
-          <p className="min-w-0 flex-1 py-2 text-sm font-medium leading-snug">
+          <p className={cn('min-w-0 flex-1 py-2 text-sm font-medium leading-snug', both && 'basis-[min(13rem,100%)]')}>
             {entry.message}
           </p>
-          {entry.undoable && (
-            <button
-              type="button"
-              onClick={(event) => handOff(onUndo, byKeys(event))}
-              disabled={closing}
-              aria-keyshortcuts={shortcut?.keys}
-              className={cn(
-                'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-              )}
-            >
-              Annulla
-              {/* Seen, not part of the name («Annulla»): `aria-keyshortcuts` says the key. */}
-              {/* Not on a phone's width, where no keyboard is likely (Papiniano on #585). */}
-              {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 max-md:hidden dark:text-slate-400">· {shortcut.label}</span>}
-            </button>
-          )}
-          {entry.action && (
-            <button
-              type="button"
-              onClick={entry.action.onClick}
-              disabled={closing}
-              className={cn(
-                'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-              )}
-            >
-              {entry.action.label}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={(event) => handOff(onDismiss, byKeys(event))}
-            disabled={closing}
-            aria-label="Chiudi notifica"
-            className={cn(
-              'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+          <div className={cn('flex items-center gap-2', both && 'ml-auto')}>
+            {entry.undoable && (
+              <button
+                type="button"
+                onClick={(event) => handOff(onUndo, byKeys(event))}
+                disabled={closing}
+                aria-keyshortcuts={shortcut?.keys}
+                className={cn(
+                  'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                )}
+              >
+                Annulla
+                {/* Seen, not part of the name («Annulla»): `aria-keyshortcuts` says the key. */}
+                {/* Not on a phone's width, where no keyboard is likely (Papiniano on #585). */}
+                {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 max-md:hidden dark:text-slate-400">· {shortcut.label}</span>}
+              </button>
             )}
-          >
-            <X size={16} />
-          </button>
+            {entry.action && (
+              <button
+                type="button"
+                onClick={entry.action.onClick}
+                disabled={closing}
+                className={cn(
+                  'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                )}
+              >
+                {entry.action.label}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(event) => handOff(onDismiss, byKeys(event))}
+              disabled={closing}
+              aria-label="Chiudi notifica"
+              className={cn(
+                'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              )}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* «Annulla»'s time: the line draws back between two ticks, which grow while the time is held. */}

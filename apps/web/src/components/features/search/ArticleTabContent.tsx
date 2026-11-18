@@ -837,7 +837,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // As the side panel was: an article with an id, not a past text (a notice in place of the text keeps its glosses).
     const glossesEnabled = Boolean(discussionAnchor.articleId) && !readOnly;
     const [glossCount, setGlossCount] = useState(0);
-    const glossMargin = useGlossMargin({ open: discussion.open && glossesEnabled, rootRef: articleRootRef, columnShown: marginShown });
+    const [marginContent, setMarginContent] = useState(false);
+    const glossMargin = useGlossMargin({ open: discussion.open && glossesEnabled, rootRef: articleRootRef, columnShown: marginShown, marginContent });
     const glossBeside = glossMargin.shown && glossMargin.placement === 'beside';
     const closeGlosses = discussion.panelProps.onClose;
     // Closed from inside (its «Chiudi», Esc): the focus goes back to the button that opened it, the one on screen.
@@ -849,6 +850,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         const button = [...root.querySelectorAll<HTMLElement>('[data-glosses-button]')].find((b) => b.getClientRects().length > 0);
         button?.focus({ preventScroll: true });
     }, [closeGlosses, glossMargin.host]);
+    // A sign pressed with the glosses in the notes' column (LC90): the gloss on its passage is chosen there, its words lit,
+    // and the focus goes to it; a block with no gloss on a passage opens its sheet.
+    const openThread = discussion.openThread;
+    const chooseGlossFromText = (keys: readonly string[]) => {
+        const id = keys.find((key) => key.startsWith('thread:'))?.slice('thread:'.length);
+        if (!id) return false;
+        openThread(id);
+        requestAnimationFrame(() => document.getElementById(`article-thread-${id}`)?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true }));
+        return true;
+    };
     const sheetOpen = useSignTarget({ openBlock, blockAll, group: openGroup, marginShown, marginRef, closeBlock, openBlockAt });
     const openNoteBeside = useNoteOpener(marginRef, openBlockAt);
     useInlineNoteAnchors(contentRef, itemAnnotations, openNoteBeside);
@@ -1010,6 +1021,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onOpenThread={discussion.openThread}
                     textHash={textHash}
                     onWideChange={setMarginShown}
+                    onContentChange={setMarginContent}
+                    onAsideFocus={chooseGlossFromText}
                     glosses={glosses}
                     glossActions={proposalActions}
                     shownGlossId={shownGlossId}
@@ -1115,6 +1128,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     isOpen={glossMargin.shown}
                     onClose={closeGlossMargin}
                     onCountChange={setGlossCount}
+                    // Beside the text, the glosses on a passage at the height of their words (LC90); under it, a list.
+                    align={glossMargin.placement === 'below' ? undefined : { textRootRef, located: shownThreads, contentKey: processedContent }}
+                    litThreadId={discussion.focusedThreadId}
                 />,
                 glossMargin.host,
             )}

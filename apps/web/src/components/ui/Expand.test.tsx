@@ -95,6 +95,10 @@ describe('Expand', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
     expect(heights()).toHaveLength(0);
     expect(fades()).toHaveLength(1);
+    // Closing, the app's brief fade, not the island's time: no space left standing empty.
+    fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
+    expect(fades()).toHaveLength(2);
+    expect(fades()[1].timing).toMatchObject({ duration: 150, easing: 'linear' });
   });
 
   it('gives the focus to its first field on opening and back to its command on closing', () => {

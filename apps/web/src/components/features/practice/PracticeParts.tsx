@@ -132,5 +132,5 @@ export function TableNameLine({ label, editing, onDone, id }: {
 }) {
   return editing
     ? <PracticeNameInput initial={label} onDone={onDone} className="mb-0.5 w-full py-0.5 text-base md:text-xs" />
-    : <h2 id={id} className="truncate text-xs text-slate-600 dark:text-slate-400">{label}</h2>;
+    : <h2 id={id} data-page-title="" className="truncate text-xs text-slate-600 dark:text-slate-400">{label}</h2>;
 }

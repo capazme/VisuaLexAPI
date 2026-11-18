@@ -612,14 +612,115 @@ describe('CommandPalette — the reviews under a topic (U3)', () => {
   });
 });
 
-describe('CommandPalette — over the workspace', () => {
-  it('leaves Cmd/Ctrl+F to the browser while it is open', () => {
+describe('CommandPalette — in the page, not over it (L-75)', () => {
+  it('opened again, chooses the first row, not the one chosen in the last opening (cmdk lives on between openings)', () => {
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(isWorkspaceCovered()).toBe(true);
-    // Not a dialog in ARIA terms: the mark is all it gains.
-    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+    const chosen = () => document.querySelector('[cmdk-item][data-selected="true"]')?.textContent;
+    const first = chosen();
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    expect(chosen()).not.toBe(first);
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(chosen()).toBe(first);
+  });
+
+  it('covers nothing: no veil, no dialog, no mark over the workspace, so Cmd/Ctrl+F stays the app\'s', () => {
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(isWorkspaceCovered()).toBe(false);
+    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+    expect(document.querySelector('[data-palette-veil]')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // The band, where it is drawn, and nothing in it fixed over the page.
+    const band = screen.getByRole('region', { name: 'Menu di ricerca' });
+    expect(band.querySelector('.fixed')).toBeNull();
+    expect(band.closest('.fixed')).toBeNull();
+  });
+
+  it('closes as the focus goes out to the page (Tab), not as it moves inside', () => {
+    const onClose = vi.fn();
+    render(<><button type="button">Fuori</button><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    act(() => screen.getByRole('button', { name: 'Chiudi' }).focus());
+    act(() => screen.getByRole('combobox').focus());
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => screen.getByRole('button', { name: 'Fuori' }).focus());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  /** A choice in the palette: «art. 2043 c.c.» and Enter. */
+  async function choose() {
+    const box = screen.getByRole('combobox');
+    fireEvent.change(box, { target: { value: 'art. 2043 c.c.' } });
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    fireEvent.keyDown(box, { key: 'Enter' });
+  }
+  // The search page as it is with a practice open: its title an h2, the practice's name, marked as the page's title.
+  const ricerca = <main><h2 key="ricerca" data-page-title="">Ricerca del 18 novembre</h2></main>;
+
+  it('after a choice, gives the focus to the title of the page it led to, an h2 on the search page, not to the pill nor to the body', async () => {
+    const pill = document.createElement('button');
+    document.body.append(pill);
+    pill.focus();
+    const onClose = vi.fn();
+    const onSearch = vi.fn();
+    const { rerender } = render(<>{ricerca}<CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
+    await choose();
+    expect(onSearch).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    rerender(<>{ricerca}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    // At once, in the same commit: never a frame on the body.
+    expect(screen.getByRole('heading', { name: 'Ricerca del 18 novembre' })).toHaveFocus();
+    expect(pill).not.toHaveFocus();
+    pill.remove();
+  });
+
+  it('closed with no choice, opened from the body, does not move the focus to the page\'s title nor to <main> (LC94)', () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    const onClose = vi.fn();
+    const { rerender } = render(<>{ricerca}<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    rerender(<>{ricerca}<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} /></>);
+    expect(screen.getByRole('heading', { name: 'Ricerca del 18 novembre' })).not.toHaveFocus();
+    expect(document.querySelector('main')).not.toHaveFocus();
+  });
+
+  it('after a choice on a page with no marked title, gives the focus to <main> at once', async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<><main><p>Senza titolo</p></main><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    await choose();
+    rerender(<><main><p>Senza titolo</p></main><CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} /></>);
+    expect(document.querySelector('main')).toHaveFocus();
+  });
+
+  it('after a choice that changes the page, holds the focus on <main>, skips the title of the page left, and gives it to the new one as it comes', async () => {
+    const onClose = vi.fn();
+    const onSearch = vi.fn();
+    const pratiche = <main><h1 key="pratiche" data-page-title="">Pratiche</h1></main>;
+    const { rerender } = render(<>{pratiche}<CommandPalette isOpen onClose={onClose} onSearch={onSearch} /></>);
+    await choose();
+    const before = `${window.location.pathname}${window.location.search}`;
+    // The router has changed the address; the page left is still drawn as the menu closes.
+    window.history.pushState({}, '', '/altrove');
+    const seen: Element[] = [];
+    const record = (event: FocusEvent) => seen.push(event.target as Element);
+    const left = screen.getByRole('heading', { name: 'Pratiche' });
+    document.addEventListener('focusin', record);
+    rerender(<>{pratiche}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    expect(document.querySelector('main')).toHaveFocus();
+    rerender(<>{ricerca}<CommandPalette isOpen={false} onClose={onClose} onSearch={onSearch} /></>);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ricerca del 18 novembre' })).toHaveFocus());
+    expect(seen).not.toContain(left);
+    document.removeEventListener('focusin', record);
+    window.history.pushState({}, '', before);
+  });
+
+  it('closes on a click outside the field and the band, not on one inside', () => {
+    const onClose = vi.fn();
+    render(<><button type="button">Fuori</button><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /></>);
+    fireEvent.pointerDown(screen.getByRole('combobox'));
+    fireEvent.pointerDown(screen.getByRole('region', { name: 'Menu di ricerca' }));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Fuori' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 

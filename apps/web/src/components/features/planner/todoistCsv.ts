@@ -70,11 +70,16 @@ export interface ImportNote {
   why?: string;
 }
 
+/** Why a repetition Todoist knows («ogni 2 settimane») does not repeat here: the five rules a task can hold. */
+const OUTSIDE_THE_RULES = 'qui un compito si ripete solo ogni giorno, ogni giorno lavorativo, ogni settimana, ogni mese o ogni anno';
+
 export interface ImportPlan {
   tasks: ImportTask[];
   subtasks: number;
   /** The sections' names, as labels. */
   labels: string[];
+  /** The labels read out of the titles (`@etichetta`), each once, said apart from the sections'. */
+  titleLabels: string[];
   /** Dates and deadlines not understood: kept in the description. */
   unreadDates: ImportNote[];
   /** Repetitions outside the five rules (or beside a deadline): the task does not repeat, the phrase is in the description. */
@@ -194,7 +199,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
   if (at('TYPE') < 0 || at('CONTENT') < 0) throw new NotTodoistCsvError();
   const cell = (record: string[], name: string) => (at(name) < 0 ? '' : (record[at(name)] ?? '').trim());
 
-  const plan: ImportPlan = { tasks: [], subtasks: 0, labels: [], unreadDates: [], nonRecurring: [], trimmed: 0, fromTitles: { labels: 0, deadlines: 0, durations: 0, links: 0 } };
+  const plan: ImportPlan = { tasks: [], subtasks: 0, labels: [], titleLabels: [], unreadDates: [], nonRecurring: [], trimmed: 0, fromTitles: { labels: 0, deadlines: 0, durations: 0, links: 0 } };
   let section: string | null = null;
   // The open tasks above this row, by indent: the last one with a smaller indent is the parent.
   let stack: { indent: number; row: number }[] = [];
@@ -222,7 +227,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
     const read = readTodoistTitle(content, today);
     const titleLabels = read.labels.map((label) => cut(label, MAX_LABEL));
     const labels = [...new Set([...(section ? [section] : []), ...titleLabels])].slice(0, MAX_LABELS);
-    for (const label of titleLabels) if (!plan.labels.includes(label)) plan.labels.push(label);
+    for (const label of titleLabels) if (!plan.titleLabels.includes(label)) plan.titleLabels.push(label);
     plan.fromTitles.labels += titleLabels.length;
     plan.fromTitles.durations += read.durations;
     plan.fromTitles.links += read.links;
@@ -246,7 +251,8 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
       }
     } else if (datePhrase) {
       const repeats = isRepetitionPhrase(datePhrase);
-      (repeats ? plan.nonRecurring : plan.unreadDates).push({ title: input.title, phrase: datePhrase });
+      if (repeats) plan.nonRecurring.push({ title: input.title, phrase: datePhrase, why: OUTSIDE_THE_RULES });
+      else plan.unreadDates.push({ title: input.title, phrase: datePhrase });
       notes.push(repeats ? `Ripetizione in Todoist: «${datePhrase}»` : `Data in Todoist: «${datePhrase}»`);
     }
 

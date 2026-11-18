@@ -43,6 +43,6 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"
 
-# ONE worker. The rate limiter, the circuit breaker and the fetch queue keep
-# their state in memory, per process; more workers would each have their own.
+# ONE worker. The rate limiter and the fetch queue keep their state in memory,
+# per process; more workers would each have their own.
 CMD ["hypercorn", "asgi:app", "--bind", "0.0.0.0:5000", "--workers", "1"]

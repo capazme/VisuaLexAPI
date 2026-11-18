@@ -45,8 +45,9 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
           <MoreHorizontal size={18} aria-hidden />
         </MenuButton>
       </div>
-      <TodoistImport key={dossierId} id={importId} open={importingFor === dossierId} onClose={() => setImportingFor(null)} dossierId={dossierId} today={today} />
-      <QuickAddField key={dossierId} view="dossier" today={today} defaults={{ dossierId }} dossierLocked />
+      {/* Keyed on the dossier, so another dossier opens them fresh; each its own key, siblings as they are. */}
+      <TodoistImport key={`import-${dossierId}`} id={importId} open={importingFor === dossierId} onClose={() => setImportingFor(null)} dossierId={dossierId} today={today} />
+      <QuickAddField key={`add-${dossierId}`} view="dossier" today={today} defaults={{ dossierId }} dossierLocked />
       <div aria-busy={state.status === 'loading'}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
         {state.answer === null ? (

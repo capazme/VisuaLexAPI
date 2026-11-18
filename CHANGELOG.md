@@ -12,6 +12,52 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-11-18
+
+The search island in the flow, glosses at the height of their words, Amministrazione as a page inside the
+app and «Segnala un problema» next to Impostazioni. Web only: no server change, no migration.
+
+### Search
+
+- The search island opens in the flow of the page, without a veil over the content (LC87, L-75); after a
+  choice the focus goes to the new page's title, and closing without a choice leaves it where it was (LC94).
+
+### Reading
+
+- The glosses on a passage stand at the height of their words (LC90, part 2 of 3).
+
+### Interface
+
+- Amministrazione is a page inside the app, like Impostazioni, in one page with an index (LC93).
+- «Commenti» becomes «Segnala un problema», next to Impostazioni; the Settings index in four groups (LC92).
+- A round of small fixes on Scadenze, Learn and the dossier (LC91).
+
+### Notes
+
+- The body of the merge commit of #607 (df29f57f) carries by mistake the text of #605; #607 is LC92.
+
+## [1.37.0] - 2026-11-18
+
+Fonti with a filter and a selection, a Learn card deleted with an undo instead of a confirmation, and the
+server's privacy and safety fixes (Atti, connected apps, Forum reports). No migration. MERL-T stays off.
+
+### Work
+
+- Fonti, filter and selection: the second part of Fonti and Lettura in one tab (LC88).
+
+### Learn
+
+- «Elimina» on a Learn card moves it to the trash at once, with an undo, no confirmation (LC89, L-80).
+
+### Server
+
+- A connected app without the «Leggere i testi» permission gets a norm's identity, not its text (#565).
+- Atti: a save over a newer version is refused; an account holds at most 500 acts (#566).
+- Forum reports and the moderation log drop people's words after 12 months (#583); a deleted person is
+  «utente cancellato» in the log (#584).
+- prisma is a production dependency, so the blocking audit covers it (#593, #594).
+- The spec and plan of the EU recitals, approved (#571).
+
 ## [1.36.0] - 2026-11-18
 
 Fonti and Lettura in one tab, the import from Todoist, «Completa per sempre», menus and notices that grow

@@ -425,58 +425,62 @@ export const editComment = async (req: Request, res: Response) => {
  * copy a report keeps for the moderators (G-308).
  */
 export const deleteThread = async (req: Request, res: Response) => {
-  const userId = req.user!.id;
   await maybeSweepCommunity();
-  const outcome = await prisma.$transaction(async (tx) => {
-    if (!(await lockThread(tx, req.params.threadId))) throw new AppError(404, 'Glossa non trovata');
-    const thread = await tx.articleThread.findUniqueOrThrow({ where: { id: req.params.threadId } });
-    if (thread.deletedAt !== null || (thread.isHidden && !isOwn(thread.userId, userId))) throw new AppError(404, 'Glossa non trovata');
-    if (!isOwn(thread.userId, userId)) throw new AppError(403, 'Puoi cancellare solo le tue glosse');
-    const others = await tx.articleComment.count({ where: { threadId: thread.id, OR: [{ userId: { not: userId } }, { userId: null }] } });
-    // The author's deletion makes an appeal pointless (§C): a glossa gone takes its own and its replies'
-    // appeals, an emptied one its own.
-    if (others === 0) {
-      await tx.forumAppeal.deleteMany({ where: { threadId: thread.id } });
-      await tx.articleThread.delete({ where: { id: thread.id } });
-      return 'deleted' as const;
-    }
-    await tx.forumAppeal.deleteMany({ where: { targetKind: 'thread', targetId: thread.id } });
-    await tx.articleThread.update({ where: { id: thread.id }, data: { title: '', body: '', deletedAt: new Date() } });
-    // What was validated is gone (§C); the replies keep theirs.
-    await withdrawValidations(tx, { threadId: thread.id });
-    return 'emptied' as const;
-  });
+  const outcome = await prisma.$transaction((tx) => deleteOwnThreadIn(tx, req.user!.id, req.params.threadId));
   res.json({ outcome });
 };
+
+/** The rule of `deleteThread`, inside a transaction: also used by the account's «remove my contributions» (G-558). */
+export async function deleteOwnThreadIn(tx: Prisma.TransactionClient, userId: string, threadId: string): Promise<'deleted' | 'emptied'> {
+  if (!(await lockThread(tx, threadId))) throw new AppError(404, 'Glossa non trovata');
+  const thread = await tx.articleThread.findUniqueOrThrow({ where: { id: threadId } });
+  if (thread.deletedAt !== null || (thread.isHidden && !isOwn(thread.userId, userId))) throw new AppError(404, 'Glossa non trovata');
+  if (!isOwn(thread.userId, userId)) throw new AppError(403, 'Puoi cancellare solo le tue glosse');
+  const others = await tx.articleComment.count({ where: { threadId: thread.id, OR: [{ userId: { not: userId } }, { userId: null }] } });
+  // The author's deletion makes an appeal pointless (§C): a glossa gone takes its own and its replies'
+  // appeals, an emptied one its own.
+  if (others === 0) {
+    await tx.forumAppeal.deleteMany({ where: { threadId: thread.id } });
+    await tx.articleThread.delete({ where: { id: thread.id } });
+    return 'deleted';
+  }
+  await tx.forumAppeal.deleteMany({ where: { targetKind: 'thread', targetId: thread.id } });
+  await tx.articleThread.update({ where: { id: thread.id }, data: { title: '', body: '', deletedAt: new Date() } });
+  // What was validated is gone (§C); the replies keep theirs.
+  await withdrawValidations(tx, { threadId: thread.id });
+  return 'emptied';
+}
 
 /**
  * The author deletes a reply or a comment (§5.5): deleted when nothing hangs on it (no row under it,
  * hidden ones included, and not the accepted reply), else emptied in place, its comments kept.
  */
 export const deleteComment = async (req: Request, res: Response) => {
-  const userId = req.user!.id;
   await maybeSweepCommunity();
-  const outcome = await prisma.$transaction(async (tx) => {
-    const found = await tx.articleComment.findUnique({ where: { id: req.params.commentId }, select: { threadId: true } });
-    if (!found || !(await lockThread(tx, found.threadId)) || !(await lockComment(tx, req.params.commentId))) {
-      throw new AppError(404, 'Risposta non trovata');
-    }
-    const comment = await tx.articleComment.findUniqueOrThrow({ where: { id: req.params.commentId }, include: { thread: { select: { acceptedCommentId: true } } } });
-    if (comment.deletedAt !== null || (comment.isHidden && !isOwn(comment.userId, userId))) throw new AppError(404, 'Risposta non trovata');
-    if (!isOwn(comment.userId, userId)) throw new AppError(403, 'Puoi cancellare solo le tue risposte');
-    // Deleted or emptied by its author, an appeal against its hiding is pointless (§C).
-    await tx.forumAppeal.deleteMany({ where: { targetKind: 'comment', targetId: comment.id } });
-    const under = await tx.articleComment.count({ where: { parentId: comment.id } });
-    if (under === 0 && comment.thread.acceptedCommentId !== comment.id) {
-      await tx.articleComment.delete({ where: { id: comment.id } });
-      return 'deleted' as const;
-    }
-    await tx.articleComment.update({ where: { id: comment.id }, data: { body: '', deletedAt: new Date() } });
-    await withdrawValidations(tx, { commentId: comment.id });
-    return 'emptied' as const;
-  });
+  const outcome = await prisma.$transaction((tx) => deleteOwnCommentIn(tx, req.user!.id, req.params.commentId));
   res.json({ outcome });
 };
+
+/** The rule of `deleteComment`, inside a transaction: also used by the account's «remove my contributions» (G-558). */
+export async function deleteOwnCommentIn(tx: Prisma.TransactionClient, userId: string, commentId: string): Promise<'deleted' | 'emptied'> {
+  const found = await tx.articleComment.findUnique({ where: { id: commentId }, select: { threadId: true } });
+  if (!found || !(await lockThread(tx, found.threadId)) || !(await lockComment(tx, commentId))) {
+    throw new AppError(404, 'Risposta non trovata');
+  }
+  const comment = await tx.articleComment.findUniqueOrThrow({ where: { id: commentId }, include: { thread: { select: { acceptedCommentId: true } } } });
+  if (comment.deletedAt !== null || (comment.isHidden && !isOwn(comment.userId, userId))) throw new AppError(404, 'Risposta non trovata');
+  if (!isOwn(comment.userId, userId)) throw new AppError(403, 'Puoi cancellare solo le tue risposte');
+  // Deleted or emptied by its author, an appeal against its hiding is pointless (§C).
+  await tx.forumAppeal.deleteMany({ where: { targetKind: 'comment', targetId: comment.id } });
+  const under = await tx.articleComment.count({ where: { parentId: comment.id } });
+  if (under === 0 && comment.thread.acceptedCommentId !== comment.id) {
+    await tx.articleComment.delete({ where: { id: comment.id } });
+    return 'deleted';
+  }
+  await tx.articleComment.update({ where: { id: comment.id }, data: { body: '', deletedAt: new Date() } });
+  await withdrawValidations(tx, { commentId: comment.id });
+  return 'emptied';
+}
 
 const acceptSchema = z.object({
   commentId: z.string({ message: 'La risposta non è valida' }).guid('La risposta non è valida').nullable(),

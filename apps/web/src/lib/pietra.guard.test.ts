@@ -109,7 +109,7 @@ describe('Pietra\'s colours', () => {
     const bases = [
       join('components', 'ui', 'buttonStyles.ts'),
       join('components', 'ui', 'IconButton.tsx'),
-      join('components', 'ui', 'FeedbackModal.tsx'),
+      join('components', 'features', 'settings', 'ReportProblemSection.tsx'),
       join('components', 'ui', 'AdvancedExportModal.tsx'),
     ];
     const off = sources(src).map((file) => relative(src, file)).flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')

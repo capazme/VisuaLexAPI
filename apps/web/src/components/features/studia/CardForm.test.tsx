@@ -64,12 +64,13 @@ beforeEach(() => {
 afterEach(() => setDesktop(false));
 
 describe('CardForm, on a phone', () => {
+  // The shared height (LC97): 44 px on a phone, 36 px from md, as the buttons beside them.
   it('gives every field a 44 px target', async () => {
     setDesktop(false);
     renderForm(fromReader());
     await userEvent.setup().click(screen.getByRole('button', { name: /\+ Ancora/ }));
     for (const field of [screen.getByLabelText('Materia'), screen.getByLabelText('Istituto'), screen.getByRole('combobox', { name: 'Tipo di scheda' }), screen.getByLabelText('Riferimento dell’ancora')]) {
-      expect(field).toHaveClass('min-h-[44px]', 'md:min-h-0');
+      expect(field).toHaveClass('min-h-11', 'md:min-h-9');
     }
   });
 });

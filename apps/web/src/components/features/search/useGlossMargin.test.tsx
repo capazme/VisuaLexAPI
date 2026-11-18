@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/refs -- the harness reads the hook's state in render; it holds the root's ref, which is only read in its effects */
 import { act, render } from '@testing-library/react';
 import { createPortal } from 'react-dom';
-import { useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 import { useGlossMargin } from './useGlossMargin';
@@ -60,6 +60,30 @@ afterEach(() => {
     delete (Element.prototype as Partial<Element>).animate;
 });
 
+/** The margin's region focuses itself once drawn, as `ArticleDiscussionPanel` does in its effect. */
+function FocusedOnShow() {
+    const ref = useRef<HTMLElement>(null);
+    useEffect(() => { ref.current?.focus(); }, []);
+    return <section ref={ref} tabIndex={-1} data-testid="margin"><div data-gloss-row="">a</div></section>;
+}
+
+/** The text has things at its margin: the glosses open in the notes' column, its slot drawn with them (`AnnotationMargin`'s aside). */
+function ColumnHarness({ open }: { open: boolean }) {
+    const [rootRef] = useState<RefObject<HTMLDivElement | null>>(() => ({ current: null }));
+    const m = useGlossMargin({ open, rootRef, columnShown: true, marginContent: true });
+    return (
+        <div data-testid="outer">
+            <div data-glosses-room="" data-testid="room">
+                <div ref={rootRef}>
+                    {m.shown && m.placement === 'column' && <div ref={m.setColumnSlot} data-testid="column" />}
+                    <div ref={m.setBelowSlot} data-testid="below" />
+                </div>
+            </div>
+            {m.host && createPortal(m.shown ? <FocusedOnShow /> : null, m.host)}
+        </div>
+    );
+}
+
 const state = (c: HTMLElement) => c.querySelector('[data-testid="state"]')!.textContent;
 
 describe('useGlossMargin (LC74)', () => {
@@ -91,6 +115,14 @@ describe('useGlossMargin (LC74)', () => {
         expect(room.keyframes.at(-1)).toEqual({ maxWidth: '704px' });
         await act(async () => { calls.forEach((c) => c.finish()); });
         expect(state(container)).toBe('beside false');
+    });
+
+    it('opened in the notes\' column, the margin keeps the focus it took as its node moves into its slot (LC90)', () => {
+        reducedMotion(false);
+        const { getByTestId, rerender } = render(<ColumnHarness open={false} />);
+        rerender(<ColumnHarness open />);
+        expect(getByTestId('column')).toContainElement(getByTestId('margin'));
+        expect(getByTestId('margin')).toHaveFocus();
     });
 
     it('under reduced motion, only the fade: nothing widens, nothing moves', () => {

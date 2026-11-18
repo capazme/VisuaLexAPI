@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 
 /** The margin beside the text (LC74): about 340 px, 1.5rem from it. */
@@ -58,6 +58,12 @@ interface Options {
     rootRef: RefObject<HTMLElement | null>;
     /** `AnnotationMargin`'s column is shown beside the text. */
     columnShown: boolean;
+    /**
+     * The text has things at its margin (a note, a gloss on a passage: `AnnotationMargin`'s `onContentChange`, told in
+     * the commit that draws them): its card has the notes' column, and the glosses go there, at once when the first one
+     * is published.
+     */
+    marginContent?: boolean;
 }
 
 /** The text's box (its first line's left edge is what the eye follows). */
@@ -73,7 +79,7 @@ const textOf = (root: HTMLElement) => root.querySelector<HTMLElement>('.vlx-art'
  * The margin is one component kept in a node of its own (`host`), moved into the slot of its place: its glosses, its
  * draft and its count stay as the place changes. It is drawn (`shown`) until the closing ends.
  */
-export function useGlossMargin({ open, rootRef, columnShown }: Options) {
+export function useGlossMargin({ open, rootRef, columnShown, marginContent = false }: Options) {
     const [host] = useState(() => (typeof document === 'undefined' ? null : document.createElement('div')));
     const [room, setRoom] = useState({ column: false, beside: false });
     const [shown, setShown] = useState(false);
@@ -81,20 +87,13 @@ export function useGlossMargin({ open, rootRef, columnShown }: Options) {
     const [besideSlot, setBesideSlot] = useState<HTMLElement | null>(null);
     const [columnSlot, setColumnSlot] = useState<HTMLElement | null>(null);
     const [belowSlot, setBelowSlot] = useState<HTMLElement | null>(null);
-    // The text has things at its margin (a note, a gloss on a passage: `AnnotationMargin`'s `data-margin-content`): its
-    // card is the frame's, with the notes' column, and the glosses go there — at once when the first one is published.
-    const [marginContent, setMarginContent] = useState(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- after every render: the attribute is the child's, set in the same commit; it sets only on a change
-    useLayoutEffect(() => {
-        const has = !!rootRef.current?.querySelector('[data-margin-content]');
-        if (has !== marginContent) setMarginContent(has);
-    });
     const placement: GlossPlacement = columnShown || marginContent ? (room.column ? 'column' : 'below') : room.beside ? 'beside' : 'below';
 
     useLayoutEffect(() => {
         const root = rootRef.current;
         if (!root) return undefined;
         const check = () => {
+            recordBeside.current();
             const next = marginRoom(root);
             setRoom((was) => (was.column === next.column && was.beside === next.beside ? was : next));
         };
@@ -108,8 +107,33 @@ export function useGlossMargin({ open, rootRef, columnShown }: Options) {
 
     // The margin goes where it is drawn; closed, under the text, empty.
     const slot = shown ? { beside: besideSlot, column: columnSlot, below: belowSlot }[placement] : belowSlot;
+    // What has the focus in the margin, while the reader leaves it there: the margin leaving the side of the text is out
+    // of the page for a commit (its slot there goes before the column's comes), and the focus falls to the page.
+    const lastFocus = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!host) return undefined;
+        const into = (e: FocusEvent) => { lastFocus.current = e.target instanceof HTMLElement ? e.target : null; };
+        const out = (e: FocusEvent) => { if (e.relatedTarget instanceof Node && !host.contains(e.relatedTarget)) lastFocus.current = null; };
+        const press = (e: PointerEvent) => { if (!(e.target instanceof Node && host.contains(e.target))) lastFocus.current = null; };
+        host.addEventListener('focusin', into);
+        host.addEventListener('focusout', out);
+        document.addEventListener('pointerdown', press, true);
+        return () => {
+            host.removeEventListener('focusin', into);
+            host.removeEventListener('focusout', out);
+            document.removeEventListener('pointerdown', press, true);
+        };
+    }, [host]);
     useLayoutEffect(() => {
-        if (host && slot && host.parentElement !== slot) slot.appendChild(host);
+        if (!host || !slot || host.parentElement === slot) return;
+        // A node moved takes the focus out of the page: what had it in the margin takes it again (the margin opened in
+        // the notes' column is focused under the text a commit before its slot is there; the gloss just published, as
+        // the margin goes from beside the text into the column).
+        const at = document.activeElement;
+        const lost = !at || at === document.body;
+        const focused = at instanceof HTMLElement && host.contains(at) ? at : lost && lastFocus.current && host.contains(lastFocus.current) ? lastFocus.current : null;
+        slot.appendChild(host);
+        focused?.focus({ preventScroll: true });
     }, [host, slot]);
 
     // Asked for: the text's width is taken before the card widens, for the text to keep it, and the card's.
@@ -131,32 +155,21 @@ export function useGlossMargin({ open, rootRef, columnShown }: Options) {
     // The way last animated: a new place for the margin (the window resized) does not start it again.
     const way = useRef<boolean | null>(null);
 
-    // Beside, the card's width is the margin's, held inline: a note or a first gloss on a passage published meanwhile
-    // gives the card the notes' `max-w-none`, which would leave an empty band right of the margin. Inline, it yields to
-    // the animations. Let go when no margin of the card is beside any more.
-    const cappedRoom = useRef<HTMLElement | null>(null);
-    useLayoutEffect(() => {
-        const root = rootRef.current;
-        const room = root?.closest<HTMLElement>('[data-glosses-room]') ?? null;
-        if (shown && placement === 'beside' && room) {
-            room.style.maxWidth = `${44 + SPAN_REM}rem`;
-            cappedRoom.current = room;
-        } else if (cappedRoom.current && !cappedRoom.current.querySelector('[data-glosses-beside]')) {
-            cappedRoom.current.style.maxWidth = '';
-            cappedRoom.current = null;
-        }
-    });
-
     // Where the card and the text are while the margin is beside: the place a move to the column starts from.
+    // Taken as the margin goes beside and again as the frame is resized (`room`'s observer): not at every render.
     const besideAt = useRef<{ card: number; text: number } | null>(null);
+    const recordBeside = useRef(() => {});
     useLayoutEffect(() => {
-        const root = rootRef.current;
-        const text = root && textOf(root);
-        const room = root?.closest<HTMLElement>('[data-glosses-room]');
-        if (shown && placement === 'beside' && text && room) {
-            besideAt.current = { card: room.getBoundingClientRect().width, text: text.getBoundingClientRect().left };
-        }
-    });
+        recordBeside.current = () => {
+            const root = rootRef.current;
+            const text = root && textOf(root);
+            const room = root?.closest<HTMLElement>('[data-glosses-room]');
+            if (shown && placement === 'beside' && text && room) {
+                besideAt.current = { card: room.getBoundingClientRect().width, text: text.getBoundingClientRect().left };
+            }
+        };
+        recordBeside.current();
+    }, [shown, placement, textWidth, rootRef]);
 
     // The first gloss on a passage (or a note) published with the margin beside: the article takes the layout with the
     // notes' column, and the glosses go into it. The card widens to the frame on the island's opening, and the text is

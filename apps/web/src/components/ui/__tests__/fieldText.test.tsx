@@ -5,7 +5,7 @@ import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 import { render, screen } from '@testing-library/react';
 import { Input } from '../Input';
-import { FormSelect } from '../FormSelect';
+import { Select } from '../Select';
 import { CardFilters } from '../../features/studia/CardFilters';
 import { NO_FILTERS } from '../../features/studia/useMyCards';
 import { FIELD_TEXT } from '../../../constants/interactions';
@@ -37,11 +37,11 @@ describe('a field\'s text is 16 px on a phone', () => {
     sixteenBelowMd(screen.getByRole('textbox', { name: 'Numero' }));
   });
 
-  it('in `ui/FormSelect`, on every size', () => {
+  it('in `ui/Select`, on every size', () => {
     render(
       <>
-        <FormSelect aria-label="Medio"><option>Uno</option></FormSelect>
-        <FormSelect aria-label="Piccolo" size="sm"><option>Uno</option></FormSelect>
+        <Select aria-label="Medio"><option>Uno</option></Select>
+        <Select aria-label="Piccolo" size="sm"><option>Uno</option></Select>
       </>,
     );
     sixteenBelowMd(screen.getByRole('combobox', { name: 'Medio' }));

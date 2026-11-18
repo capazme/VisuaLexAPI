@@ -5,10 +5,6 @@ from typing import Any, List, Optional
 BASE_PATH = Path(__file__).resolve().parents[2]
 
 MAX_CACHE_SIZE = 10000
-HISTORY_LIMIT = 50
-HISTORY_FILE = BASE_PATH / "data" / "history.json"
-DOSSIER_FILE = BASE_PATH / "data" / "dossiers.json"
-DOSSIER_LIMIT = 100  # Max number of dossiers
 # How many articles one request may expand to (a range, a comma list, the whole act), counted
 # after deduplication. Each article is a page fetched from the source, so «1-3249» was a whole
 # code for the price of one request (scan A.4). The callers ask far less: the archive CLI sends

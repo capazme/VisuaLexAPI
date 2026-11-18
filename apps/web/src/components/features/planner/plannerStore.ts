@@ -47,7 +47,7 @@ export const plannerStore = create<{
   /** The groups folded on the views («Termini scaduti», a day, a dossier), by their key, for the session. */
   folded: Readonly<Record<string, true>>;
   toggleFolded: (key: string) => void;
-  /** «Raggruppa» of «Scadenziario»: in the page's header (`OpusPage`), read by the view (`TodayView`). */
+  /** «Raggruppa» of «Scadenziario»: over its rows (`GroupingToggle`), read by the view (`TodayView`). */
   grouping: Grouping;
   setGrouping: (grouping: Grouping) => void;
   /** The inbox's tasks, for its tab: the one view with no group to carry its count (LC83). Null until read. */

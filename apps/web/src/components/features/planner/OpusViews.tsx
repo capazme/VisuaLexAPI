@@ -30,7 +30,7 @@ interface FrameProps {
   /** Above the rows, under the quick add: the week's strip on «Prossimi giorni». */
   before?: (today: string, tasks: Task[]) => ReactNode;
   children: (tasks: Task[], today: string, optimistic: ReturnType<typeof useTaskView>['optimistic']) => ReactNode;
-  /** What an empty view shows; without it the view draws its groups all the same (the days of the week). */
+  /** What an empty view shows; without it the view draws its groups all the same. */
   empty?: ReactNode;
 }
 
@@ -126,9 +126,35 @@ function TodayEmpty() {
   );
 }
 
+/** «Raggruppa» of «Scadenziario», in the page over its rows (L-73, LC91): two buttons, the one in use pressed. */
+function GroupingToggle() {
+  const grouping = plannerStore((s) => s.grouping);
+  return (
+    <div role="group" aria-label="Raggruppa" className="flex w-fit gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+      {(['date', 'dossier'] as const).map((choice) => (
+        <button
+          key={choice}
+          type="button"
+          aria-pressed={grouping === choice}
+          onClick={() => plannerStore.getState().setGrouping(choice)}
+          className={cn(
+            'min-h-[44px] rounded-md px-4 text-sm font-medium transition-colors',
+            FOCUS_RING,
+            grouping === choice
+              ? 'bg-card text-slate-900 shadow-sm dark:bg-toga-400 dark:text-ink-950'
+              : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
+          )}
+        >
+          {choice === 'date' ? 'Per data' : 'Per pratica'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
  * «Scadenziario»: by date — the missed deadlines first, then the tasks late on their planned day, then today's, whose
- * rows do not say «Oggi» again — or by dossier, as «Raggruppa» in the page's header says (`OpusPage`). A new task is
+ * rows do not say «Oggi» again — or by dossier, as «Raggruppa» over the rows says (`GroupingToggle`). A new task is
  * for today.
  */
 export function TodayView() {
@@ -141,6 +167,7 @@ export function TodayView() {
       view="today"
       heading="Scadenziario"
       defaults={(day) => ({ plannedDate: day })}
+      before={(_day, tasks) => tasks.length > 0 && <GroupingToggle />}
       empty={<TodayEmpty />}
     >
       {(tasks, day, optimistic) => {
@@ -185,7 +212,7 @@ export function TodayView() {
 /**
  * «Prossimi giorni» (P2c): the strip of the seven days the server answers (`view=upcoming`: today and the six after
  * it), then one block per day — its heading («Oggi · mar 17», «Domani · mer 18», «Gio 19»), its tasks — even an empty
- * one, so a day chosen in the strip has a place to scroll to. A task sits under its planned date when that is in the
+ * one, so a day chosen in the strip has a place to scroll to; with no task in the seven days, one line instead. A task sits under its planned date when that is in the
  * seven days, else under its deadline (`groupUpcoming`).
  */
 export function UpcomingView() {
@@ -214,6 +241,8 @@ export function UpcomingView() {
       view="upcoming"
       heading="Prossimi giorni"
       defaults={(day) => ({ plannedDate: day })}
+      // Nothing in the seven days: one line, not seven groups at 0 (LC91).
+      empty={<p className="text-slate-700 dark:text-slate-300">Nessun compito nei prossimi giorni</p>}
       before={(today, tasks) => (
         <WeekStrip
           today={today}

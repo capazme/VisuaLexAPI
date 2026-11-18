@@ -1,16 +1,18 @@
 import { cn } from '../../lib/utils';
 import { ACTIVE, DISABLED, FOCUS_RING, TRANSITION } from '../../constants/interactions';
+import { CONTROL_BORDER, CONTROL_HEIGHT, CONTROL_RADIUS, type ControlSize } from './controlStyles';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'link';
 /** The earlier names of `quiet` and `secondary`. */
 type ButtonAlias = 'ghost' | 'outline';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonSize = ControlSize;
 
 const VARIANT_ALIASES: Record<ButtonVariant | ButtonAlias, ButtonVariant> = {
   primary: 'primary',
   secondary: 'secondary',
   quiet: 'quiet',
   danger: 'danger',
+  link: 'link',
   ghost: 'quiet',
   outline: 'secondary',
 };
@@ -23,9 +25,10 @@ const variantStyles: Record<ButtonVariant, string> = {
     'dark:bg-toga-400 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 dark:hover:bg-toga-300 dark:active:bg-toga-200'
   ),
   secondary: cn(
-    'border border-ink-200 bg-card text-ink-800',
+    CONTROL_BORDER,
+    'bg-card text-ink-800',
     'hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900 active:bg-ink-100',
-    'dark:border-ink-800 dark:text-ink-100 dark:hover:border-ink-700 dark:hover:bg-ink-800 dark:hover:text-ink-50'
+    'dark:text-ink-100 dark:hover:border-ink-700 dark:hover:bg-ink-800 dark:hover:text-ink-50'
   ),
   quiet: cn(
     'border border-transparent bg-transparent text-ink-600',
@@ -36,15 +39,23 @@ const variantStyles: Record<ButtonVariant, string> = {
     'border border-transparent bg-red-600 text-white',
     'hover:bg-red-700 active:bg-red-800'
   ),
+  // Words in ink, underlined: the quiet action set in a sentence or under a block («Vedi tutte», «Annulla»). The height
+  // stays, so the touch target does too; the side padding goes, so the words sit where the text starts.
+  link: cn(
+    'border border-transparent bg-transparent px-0 text-ink-800',
+    'underline decoration-ink-300 decoration-1 underline-offset-4',
+    'hover:text-ink-950 hover:decoration-ink-600',
+    'dark:text-ink-100 dark:decoration-ink-600 dark:hover:text-ink-50 dark:hover:decoration-ink-300'
+  ),
 };
 
 // 36 px on a desktop, 44 px on a phone (the touch target); `min-h` so a long label wraps instead of clipping.
 // The line height rides on the size (`text-sm/5`): tailwind-merge drops a separate `leading-*` written
 // before a font size.
-const sizeStyles = {
-  sm: 'min-h-11 md:min-h-8 px-3 text-xs/5',
-  md: 'min-h-11 md:min-h-9 px-4 text-sm/5',
-  lg: 'min-h-11 px-5 text-base/5',
+const sizeStyles: Record<ButtonSize, string> = {
+  sm: cn(CONTROL_HEIGHT.sm, 'px-3 text-xs/5'),
+  md: cn(CONTROL_HEIGHT.md, 'px-4 text-sm/5'),
+  lg: cn(CONTROL_HEIGHT.lg, 'px-5 text-base/5'),
 };
 
 /**
@@ -53,7 +64,8 @@ const sizeStyles = {
  */
 export function buttonClassName(variant: ButtonVariant | ButtonAlias = 'primary', size: ButtonSize = 'md'): string {
   return cn(
-    'inline-flex items-center justify-center gap-2 rounded-md py-1.5 text-center font-medium',
+    'inline-flex items-center justify-center gap-2 py-1.5 text-center font-medium',
+    CONTROL_RADIUS,
     TRANSITION,
     // The press answers in 120 ms (Y1) on `--ease-out`, and with it the button's colours (`TRANSITION`'s 150
     // elsewhere): one duration for every property it lists.
@@ -61,7 +73,8 @@ export function buttonClassName(variant: ButtonVariant | ButtonAlias = 'primary'
     FOCUS_RING,
     DISABLED,
     ACTIVE,
-    variantStyles[VARIANT_ALIASES[variant]],
     sizeStyles[size],
+    // After the size: `link` takes back the side padding.
+    variantStyles[VARIANT_ALIASES[variant]],
   );
 }

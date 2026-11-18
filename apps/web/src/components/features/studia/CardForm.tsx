@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type FocusEvent, type FormEvent, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../../ui/Button';
-import { FormSelect } from '../../ui/FormSelect';
+import { Select } from '../../ui/Select';
 import { Input } from '../../ui/Input';
+import { FIELD_LABEL as LABEL } from '../../ui/controlStyles';
 import { SegmentedControl } from '../../ui/SegmentedControl';
 import { studiaService } from '../../../services/studiaService';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -36,8 +37,6 @@ const LIMITS = { istituto: 200, domanda: 2_000, risposta: 4_000, spiegazione: 8_
 const MAX_ANCHORS = 10;
 const MAX_REFERENCE = 200;
 
-const LABEL = 'block text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 ml-1 mb-1';
-const TARGET = 'min-h-[44px] md:min-h-0';
 
 interface AnchorChip {
   key: string;
@@ -345,7 +344,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
         <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-1.5 w-full">
             <label htmlFor={fieldId('materia')} className={LABEL}>Materia</label>
-            <FormSelect
+            <Select
               id={fieldId('materia')}
               ref={focusField === 'materia' ? focusFirst : undefined}
               value={materia}
@@ -355,13 +354,13 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               }}
               error={errors.materia}
               aria-invalid={errors.materia ? true : undefined}
-              className="min-h-[44px] md:min-h-0"
+             
             >
               <option value="" disabled>Seleziona…</option>
               {(Object.keys(MATERIA_LABEL) as Materia[]).map((value) => (
                 <option key={value} value={value}>{MATERIA_LABEL[value]}</option>
               ))}
-            </FormSelect>
+            </Select>
           </div>
           <Input
             id={fieldId('istituto')}
@@ -373,7 +372,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               setErrors((x) => ({ ...x, istituto: undefined }));
             }}
             error={errors.istituto}
-            className="min-h-[44px] md:min-h-0"
+           
             helperText={countdown(istituto.trim().length, LIMITS.istituto) ?? undefined}
             placeholder="es. Risoluzione per inadempimento"
             autoComplete="off"
@@ -392,16 +391,16 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               />
             </div>
           ) : (
-            <FormSelect
+            <Select
               aria-labelledby={fieldId('tipo')}
               value={tipo}
               onChange={(e) => setTipo(e.target.value as TipoScheda)}
-              className="min-h-[44px] md:min-h-0"
+             
             >
               {(Object.keys(TIPO_LABEL) as TipoScheda[]).map((value) => (
                 <option key={value} value={value}>{TIPO_LABEL[value]}</option>
               ))}
-            </FormSelect>
+            </Select>
           )}
         </div>
 
@@ -486,7 +485,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               <Input
                 autoFocus={fieldTakesFocus}
                 aria-label="Riferimento dell’ancora"
-                className="min-h-[44px] md:min-h-0"
+               
                 value={pending}
                 onChange={(e) => {
                   setPending(e.target.value);
@@ -509,14 +508,13 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
                 autoComplete="off"
               />
               {/* One «Annulla» only, the dialog's: the field closes with Esc, or with «Aggiungi» left empty. */}
-              <Button type="button" variant="secondary" className={cn(TARGET, 'shrink-0 self-start')} onClick={addPending}>Aggiungi</Button>
+              <Button type="button" variant="secondary" className="shrink-0 self-start" onClick={addPending}>Aggiungi</Button>
             </div>
           ) : (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className={TARGET}
               disabled={atAnchorLimit}
               onClick={() => {
                 setFieldTakesFocus(true);
@@ -538,8 +536,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:py-4 dark:border-slate-800">
-        <Button type="button" variant="ghost" className={TARGET} onClick={onCancel}>Annulla</Button>
-        <Button type="submit" className={TARGET} disabled={busy}>{busy ? 'Salvo…' : 'Salva'}</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Annulla</Button>
+        <Button type="submit" disabled={busy}>{busy ? 'Salvo…' : 'Salva'}</Button>
       </div>
     </form>
   );

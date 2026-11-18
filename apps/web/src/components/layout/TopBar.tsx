@@ -37,6 +37,37 @@ function listOf(pathname: string): string {
  * the page's two controls, «Commenti» and «Tutto schermo», which until 1.19.0 floated over the page. The search page
  * keeps its own bar, its field.
  */
+/** The field's widest (the lists' column under the bar) and the air it keeps from the bar's controls (the bar's gap). */
+const FIELD_MAX = 768;
+const FIELD_AIR = 12;
+
+/**
+ * L-75: where the search's field may stand in the bar, measured against the controls actually drawn at its right
+ * («Novità» after a release, «Commenti», «Tutto schermo»): centred on the pill when it fits, else moved left just enough
+ * to keep clear of them (Papiniano, #599: a fixed room let the field cover «Novità»). In the bar's own coordinates.
+ */
+function useFieldRoom(bar: HTMLElement | null, controls: HTMLElement | null) {
+  const [room, setRoom] = useState<{ left: number; width: number } | null>(null);
+  useEffect(() => {
+    if (!bar || !controls || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => {
+      const b = bar.getBoundingClientRect();
+      const c = controls.getBoundingClientRect();
+      const start = parseFloat(getComputedStyle(bar).paddingLeft) || 0;
+      const end = (c.width > 0 ? c.left - b.left : b.width - start) - FIELD_AIR;
+      const width = Math.max(0, Math.min(FIELD_MAX, end - start));
+      setRoom({ left: Math.max(start, Math.min(b.width / 2 - width / 2, end - width)), width });
+    };
+    measure();
+    // The window's width moves the bar; a control coming or going («Novità») moves the controls.
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    observer.observe(controls);
+    return () => observer.disconnect();
+  }, [bar, controls]);
+  return room;
+}
+
 export function TopBar({ section, pathname, search = '', scroller, actions, onSearch, field }: { section: Section; pathname: string; search?: string; scroller: HTMLElement | null; actions: ReactNode; onSearch: () => void; field?: ReactNode }) {
   // The search page is «Ricerca» in every section, as the sidebar names it (LC48).
   const page = pathname === '/' ? 'Ricerca' : pageName(pathname);
@@ -46,11 +77,23 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
   const deeper = pathname !== '/' && page !== undefined && (pathname.replace(/\/$/, '') !== list || search.length > 1);
   const heading = usePageHeading(scroller, pathname + search);
   const leaf = deeper && heading && heading !== page ? heading : null;
+  const [bar, setBar] = useState<HTMLDivElement | null>(null);
+  const [controls, setControls] = useState<HTMLDivElement | null>(null);
+  const room = useFieldRoom(bar, controls);
 
   return (
-    <div data-testid="top-bar" className="relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:flex dark:border-slate-800">
+    <div
+      ref={setBar}
+      data-testid="top-bar"
+      data-palette-bar=""
+      className={cn(
+        'relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:flex dark:border-slate-800',
+        // L-75: while the search's field is in the bar (its slot not empty), the field takes the path's place.
+        '[&:has([data-palette-slot]:not(:empty))>[data-bar-path]]:invisible',
+      )}
+    >
       {/* The path keeps clear of the centred search (LC40): half the bar less half the pill and a gap. */}
-      <nav aria-label="Percorso" className="min-w-0 flex-1 pr-[calc(11rem+1rem)] [max-width:calc(50%)]">
+      <nav aria-label="Percorso" data-bar-path="" className="min-w-0 flex-1 pr-[calc(11rem+1rem)] [max-width:calc(50%)]">
         <ol className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] text-slate-600 dark:text-slate-400">
           <li className="shrink-0">
             <Link to={section.home} className={cn('rounded-sm hover:text-slate-900 dark:hover:text-slate-100', FOCUS_RING)}>
@@ -102,7 +145,15 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
       </button>}
       </div>
       <span className="flex-1" aria-hidden />
-      {actions}
+      {/* One box for the controls, measured for the field's room; the bar's gap between them, as before. */}
+      <div ref={setControls} className="flex shrink-0 items-center gap-3">{actions}</div>
+      {/* L-75: the search's field, grown out of the pill (`CommandPalette`) to both sides, in the room the controls leave
+          (`useFieldRoom`). After them in the page's order, so Tab goes from the field to the lists under the bar. */}
+      <div
+        data-palette-slot=""
+        style={room ? { left: room.left, width: room.width } : undefined}
+        className={cn('absolute inset-y-0 flex items-center empty:hidden', !room && 'left-1/2 w-[min(48rem,calc(100%-22rem))] -translate-x-1/2')}
+      />
     </div>
   );
 }

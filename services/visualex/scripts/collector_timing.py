@@ -308,10 +308,6 @@ async def main_async(args) -> int:
     config.PERSISTENT_CACHE_DIR = cache_dir
     workdir = out / "workdir"
     workdir.mkdir(exist_ok=True)
-    # /stream_article_text adds every request to the search history: the run's own files,
-    # never the service's (history_manager and dossier_manager read these names at import).
-    config.HISTORY_FILE = workdir / "history.json"
-    config.DOSSIER_FILE = workdir / "dossiers.json"
     os.chdir(workdir)
 
     import structlog

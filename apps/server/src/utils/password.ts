@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { atLeastUnits } from './utf16Length';
+import { tooLong } from './bodyLimits';
 
 const SALT_ROUNDS = 10;
 
@@ -21,6 +22,10 @@ export const verifyPassword = async (password: string, hashedPassword: string): 
 export const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 export const PASSWORD_RULE_MESSAGE = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
 
-export const passwordSchema = () => z.string().refine(...atLeastUnits(8)).regex(PASSWORD_RULE, PASSWORD_RULE_MESSAGE);
+/** Far above any password a person types; bcrypt reads only the first 72 bytes anyway. */
+export const MAX_PASSWORD_LENGTH = 1_024;
+
+export const passwordSchema = () => z.string().max(MAX_PASSWORD_LENGTH, tooLong('password', MAX_PASSWORD_LENGTH))
+  .refine(...atLeastUnits(8)).regex(PASSWORD_RULE, PASSWORD_RULE_MESSAGE);
 
 export const meetsPasswordRule = (password: string): boolean => password.length >= 8 && PASSWORD_RULE.test(password);

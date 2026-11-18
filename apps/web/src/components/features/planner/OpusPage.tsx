@@ -1,11 +1,10 @@
 import { useLayoutEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { scrollParentOf } from '../practice/practiceView';
-import { CalendarDays, CalendarCheck, Inbox, ListFilter, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarCheck, Inbox, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
-import { MenuButton } from '../../ui/MenuButton';
 import { QUIET_BUTTON } from '../studia/progress/tokens';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { plannerStore } from './plannerStore';
@@ -24,31 +23,12 @@ const VIEWS = [
 const HEADER_BUTTON = cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 max-lg:w-11 max-lg:justify-end max-lg:px-0 max-lg:no-underline');
 const HEADER_ICON = 'inline-flex items-center max-lg:size-9 max-lg:justify-center max-lg:rounded-lg max-lg:border max-lg:border-slate-300 dark:max-lg:border-slate-700';
 
-/** «Raggruppa: per data / per pratica», «Scadenziario»'s option, in the header beside the trash (LC83). */
-function GroupingMenu() {
-  const grouping = plannerStore((s) => s.grouping);
-  const label = grouping === 'date' ? 'per data' : 'per pratica';
-  return (
-    <MenuButton
-      label={`Raggruppa: ${label}`}
-      triggerClassName={cn(HEADER_BUTTON, 'font-normal no-underline hover:no-underline hover:bg-slate-100 max-lg:hover:bg-transparent dark:hover:bg-slate-800')}
-      items={(['date', 'dossier'] as const).map((choice) => ({
-        label: choice === 'date' ? 'Per data' : 'Per pratica',
-        checked: choice === grouping,
-        onSelect: () => plannerStore.getState().setGrouping(choice),
-      }))}
-    >
-      <span className={HEADER_ICON}><ListFilter size={15} aria-hidden /></span>
-      <span className="max-lg:sr-only">Raggruppa: {label}</span>
-    </MenuButton>
-  );
-}
-
 /**
  * Opus's page (the planner): one compact header (LC83) — «Scadenze» once, its three views beside it as tabs
- * («Scadenziario», Opus's home, «Prossimi giorni», «Lista d'ingresso»), then «Raggruppa» and the trash on the same row;
+ * («Scadenziario», Opus's home, «Prossimi giorni», «Lista d'ingresso»), then the trash on the same row («Raggruppa» is
+ * in «Scadenziario» itself, over its rows);
  * from `md` it stays at the top while the view scrolls (LC27). On a phone the tabs are the bar at the screen's foot
- * (LC33) and the two options icons beside the title. «Dossier» stays an entry of Work. The tasks' trash is a view of
+ * (LC33) and the trash an icon beside the title. «Dossier» stays an entry of Work. The tasks' trash is a view of
  * its own, under its own title: a task's trash is on the task, not among the dossiers' (`/api/trash`).
  */
 export function OpusPage() {
@@ -144,7 +124,6 @@ export function OpusPage() {
         </div>
       )}
       action={inView && (<>
-        {pathname.startsWith('/work/scadenziario') && <GroupingMenu />}
         <Link to="/work/cestino" aria-label="Cestino dei compiti" className={HEADER_BUTTON}>
           <span className={HEADER_ICON}>
             <Trash2 size={15} aria-hidden />

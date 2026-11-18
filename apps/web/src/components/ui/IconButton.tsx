@@ -1,14 +1,13 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
-import { FOCUS_RING, DISABLED, ACTIVE, TRANSITION, TOUCH_TARGET_RESPONSIVE } from '../../constants/interactions';
+import { buttonClassName, type ButtonSize, type ButtonVariant } from './buttonStyles';
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** The icon element to render */
   icon: ReactNode;
-  /** Size variant */
-  size?: 'sm' | 'md' | 'lg';
-  /** Visual variant */
-  variant?: 'ghost' | 'outline' | 'solid' | 'danger';
+  size?: ButtonSize;
+  /** `Button`'s variants, but for `link`: an icon has no words to underline. */
+  variant?: Exclude<ButtonVariant, 'link'>;
   /** Whether the button is in a pressed/active state */
   isActive?: boolean;
   /** Show loading spinner */
@@ -17,92 +16,46 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   'aria-label': string;
 }
 
+// Square: as wide as `Button` is tall at each size.
+const squareStyles: Record<ButtonSize, string> = {
+  sm: 'px-0 min-w-11 md:min-w-8',
+  md: 'px-0 min-w-11 md:min-w-9',
+  lg: 'px-0 min-w-11',
+};
+
+const iconSizes: Record<ButtonSize, string> = {
+  sm: '[&>svg]:w-4 [&>svg]:h-4',
+  md: '[&>svg]:w-4 [&>svg]:h-4',
+  lg: '[&>svg]:w-5 [&>svg]:h-5',
+};
+
 /**
- * IconButton - Standardized icon-only button component.
- * Use this for all icon-only interactive elements (close buttons, menu buttons, etc.)
+ * An icon-only button with `Button`'s look (LC97): the same radius, height, border and variants, square. For close,
+ * menu and tool buttons; it needs an `aria-label`.
  */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({
-    icon,
-    size = 'md',
-    variant = 'ghost',
-    isActive = false,
-    loading = false,
-    className,
-    disabled,
-    ...props
-  }, ref) => {
-    const sizeStyles = {
-      sm: 'p-1.5',
-      md: 'p-2',
-      lg: 'p-2.5',
-    };
-
-    const iconSizes = {
-      sm: '[&>svg]:w-4 [&>svg]:h-4',
-      md: '[&>svg]:w-5 [&>svg]:h-5',
-      lg: '[&>svg]:w-6 [&>svg]:h-6',
-    };
-
-    const variantStyles = {
-      ghost: cn(
-        'text-slate-500 dark:text-slate-400',
-        'hover:bg-slate-100 dark:hover:bg-slate-800',
-        'hover:text-slate-700 dark:hover:text-slate-200',
-        isActive && 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
-      ),
-      outline: cn(
-        'text-slate-600 dark:text-slate-300',
-        'border border-slate-200 dark:border-slate-700',
-        'hover:bg-slate-50 dark:hover:bg-slate-800',
-        'hover:border-slate-300 dark:hover:border-slate-600',
-        isActive && 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
-      ),
-      solid: cn(
-        'text-white bg-toga-600 hover:bg-toga-700 active:bg-toga-800',
-        'dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 dark:bg-toga-400 dark:hover:bg-toga-300',
-        isActive && 'bg-toga-700 dark:bg-toga-300'
-      ),
-      danger: cn(
-        'text-slate-500 dark:text-slate-400',
-        'hover:bg-red-50 dark:hover:bg-red-900/20',
-        'hover:text-red-600 dark:hover:text-red-400',
-        isActive && 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
-      ),
-    };
-
-    return (
-      <button
-        ref={ref}
-        type="button"
-        className={cn(
-          // Base styles
-          'inline-flex items-center justify-center rounded-md',
-          TRANSITION,
-          FOCUS_RING,
-          DISABLED,
-          ACTIVE,
-          // Mobile touch target
-          TOUCH_TARGET_RESPONSIVE,
-          // Size
-          sizeStyles[size],
-          iconSizes[size],
-          // Variant
-          variantStyles[variant],
-          className
-        )}
-        disabled={disabled || loading}
-        aria-busy={loading || undefined}
-        {...props}
-      >
-        {loading ? (
-          <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
-        ) : (
-          icon
-        )}
-      </button>
-    );
-  }
+  ({ icon, size = 'md', variant = 'quiet', isActive = false, loading = false, className, disabled, ...props }, ref) => (
+    <button
+      ref={ref}
+      type="button"
+      className={cn(
+        buttonClassName(variant, size),
+        squareStyles[size],
+        iconSizes[size],
+        isActive && 'bg-ink-100 text-ink-900 dark:bg-ink-800 dark:text-ink-50',
+        className
+      )}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading ? (
+        <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
+      ) : (
+        icon
+      )}
+    </button>
+  )
 );
 
 IconButton.displayName = 'IconButton';
