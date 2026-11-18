@@ -81,6 +81,20 @@ describe('at most 2,000 entries per dossier', () => {
     expect(moved.body.error).toBe('dossier_items_limit');
     expect(await prisma.dossierItem.count({ where: { dossierId: other } })).toBe(1);
   });
+
+  it('does not tell the size of someone else\'s dossier through a trash restore', async () => {
+    const user = await createTestUser('cap-items-trash');
+    const other = await createTestUser('cap-items-other');
+    const own = await dossierWith(user, 1, 'Mia');
+    const item = await prisma.dossierItem.findFirstOrThrow({ where: { dossierId: own } });
+    const trashed = await request(app).delete(`/api/dossiers/${own}/items/${item.id}`).set(authHeader(user));
+    expect(trashed.status).toBe(200);
+    const theirs = await dossierWith(other, 2000, 'Altrui');
+    const res = await request(app).post(`/api/trash/${trashed.body.trashId}/restore`).set(authHeader(user)).send({ targetDossierId: theirs });
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(res.body)).not.toContain('2.000');
+    expect(await prisma.dossierItem.count({ where: { dossierId: theirs } })).toBe(2000);
+  });
 });
 
 describe('at most 10,000 entries per account', () => {

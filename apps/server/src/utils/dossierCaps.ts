@@ -8,9 +8,11 @@ import { AppError } from '../middleware/errorHandler';
  * is what bounds that answer (measured on 18 November 2026: 500 dossiers × 10 entries carrying the article's
  * text weigh 14.7 MB).
  *
- * Every path that creates dossiers or entries checks here, inside its own transaction and before it locks
- * anything else: the account's row is locked first, as for the Atti (`routes/atti.ts`), so two writes at once
- * cannot both pass a cap, and the lock order is the same everywhere. A refusal is a 409 whose Italian
+ * Every path that creates dossiers or entries checks here, inside its own transaction: the account's row is
+ * locked, as for the Atti (`routes/atti.ts`), so two writes at once cannot both pass a cap. It is the first lock
+ * of the transaction, except where a path must claim its own row first (a taken suggestion's item, a trash
+ * entry and its published copy); no path locks the account and then those rows, so the order makes no cycle.
+ * A refusal is a 409 whose Italian
  * `detail` names the cap and whose `error` is `dossier_limit`, `dossier_items_limit` or
  * `account_items_limit`.
  */
@@ -49,7 +51,9 @@ export async function assertDossierRoom(tx: Prisma.TransactionClient, userId: st
     throw new AppError(409, perDossier, 'dossier_items_limit');
   }
   if (adding.into && adding.into.items > 0) {
-    const held = await tx.dossierItem.count({ where: { dossierId: adding.into.dossierId } });
+    // Only the account's own dossier counts: a target named by the request (a trash restore) may be someone
+    // else's, and its size must not show through the refusal; the caller's own check then answers 404.
+    const held = await tx.dossierItem.count({ where: { dossierId: adding.into.dossierId, dossier: { userId } } });
     if (held + adding.into.items > MAX_ITEMS_PER_DOSSIER) {
       throw new AppError(409, `${perDossier} Questa ne ha già ${it(held)}.`, 'dossier_items_limit');
     }
