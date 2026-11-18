@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('../../../services/taskService', () => ({ taskService: { create: vi.fn() } }));
@@ -18,6 +18,11 @@ function chooseFile(text: string) {
 }
 
 describe('TodoistImport', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.mocked(taskService.create).mockReset();
+  });
+
   it('previews the file, stops halfway, then resumes without creating a task twice', async () => {
     const create = vi.mocked(taskService.create);
     let calls = 0;
@@ -43,6 +48,31 @@ describe('TodoistImport', () => {
     const titles = create.mock.calls.map(([input]) => input.title);
     expect(new Set(titles).size).toBe(13);
     await waitFor(() => expect(screen.queryByRole('button', { name: /Importa|Riprova/ })).not.toBeInTheDocument());
+  });
+
+  it('resumes after a reload in the same dossier, and starts afresh in another one', async () => {
+    const create = vi.mocked(taskService.create);
+    let calls = 0;
+    create.mockImplementation(async (input) => {
+      calls++;
+      if (calls === 3) throw new Error('rete');
+      return { id: `t${calls}`, title: input.title } as Task;
+    });
+    const first = render(<TodoistImport id="imp" open onClose={() => {}} dossierId="d1" today={TODAY} />);
+    chooseFile(example);
+    fireEvent.click(await screen.findByRole('button', { name: 'Importa 13 compiti' }));
+    expect(await screen.findByText(/Import interrotto: 2 compiti entrati su 13/)).toBeInTheDocument();
+    first.unmount();
+
+    // The page reloaded: the same file in the same dossier goes on from the third task.
+    const again = render(<TodoistImport id="imp" open onClose={() => {}} dossierId="d1" today={TODAY} />);
+    chooseFile(example);
+    expect(await screen.findByRole('button', { name: 'Importa 11 compiti' })).toBeInTheDocument();
+    again.unmount();
+
+    render(<TodoistImport id="imp" open onClose={() => {}} dossierId="d2" today={TODAY} />);
+    chooseFile(example);
+    expect(await screen.findByRole('button', { name: 'Importa 13 compiti' })).toBeInTheDocument();
   });
 
   it('says so for a file that is not a Todoist export', async () => {

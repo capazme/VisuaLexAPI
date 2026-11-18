@@ -21,7 +21,8 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
   const state = useTaskView('dossier', dossierId);
   const today = state.answer?.today ?? todayInRome();
   const tasks = state.answer?.tasks ?? [];
-  const [importing, setImporting] = useState(false);
+  // The dossier the import space is open for: another dossier on the same panel opens closed.
+  const [importingFor, setImportingFor] = useState<string | null>(null);
   const importId = `todoist-import-${dossierId}`;
   return (
     <section aria-labelledby="dossier-tasks-heading" className={cn(TILE, 'mb-6 min-w-0 space-y-3 p-3 md:p-4')}>
@@ -39,12 +40,12 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
         <MenuButton
           label="Altre azioni sui compiti"
           triggerClassName={ICON_BUTTON}
-          items={[{ label: 'Importa da Todoist (CSV)', icon: Upload, onSelect: () => setImporting(true) }]}
+          items={[{ label: 'Importa da Todoist (CSV)', icon: Upload, onSelect: () => setImportingFor(dossierId) }]}
         >
           <MoreHorizontal size={18} aria-hidden />
         </MenuButton>
       </div>
-      <TodoistImport id={importId} open={importing} onClose={() => setImporting(false)} dossierId={dossierId} today={today} />
+      <TodoistImport key={dossierId} id={importId} open={importingFor === dossierId} onClose={() => setImportingFor(null)} dossierId={dossierId} today={today} />
       <QuickAddField key={dossierId} view="dossier" today={today} defaults={{ dossierId }} dossierLocked />
       <div aria-busy={state.status === 'loading'}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}

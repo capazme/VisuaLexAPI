@@ -92,6 +92,9 @@ describe('planTodoistImport on the example file', () => {
     const long = planTodoistImport(`TYPE,CONTENT\ntask,${'x'.repeat(600)}`, TODAY);
     expect(long.tasks[0].input.title).toHaveLength(500);
     expect(long.trimmed).toBe(1);
+    // Never half an emoji at the cut.
+    const emoji = planTodoistImport(`TYPE,CONTENT\ntask,${'x'.repeat(499)}📚`, TODAY);
+    expect(emoji.tasks[0].input.title).toBe('x'.repeat(499));
   });
 });
 

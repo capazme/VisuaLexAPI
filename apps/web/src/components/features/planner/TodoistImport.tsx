@@ -9,10 +9,29 @@ import { NotTodoistCsvError, planTodoistImport, runTodoistImport, type ImportNot
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** What has been created from one file, by its row: kept while the page is open, so a retry or the same file chosen again does not duplicate. */
+/** What has been created from one file in this dossier, by its row: a retry or the same file chosen again does not duplicate. */
 interface Progress {
-  signature: string;
+  key: string;
   created: Map<number, string>;
+}
+
+/** Kept in the tab too, so a reload after «connessione interrotta» resumes; a storage that throws keeps it in memory only. */
+function storedRows(key: string): Map<number, string> {
+  try {
+    const raw = sessionStorage.getItem(key);
+    const entries: unknown = raw ? JSON.parse(raw) : [];
+    return new Map(Array.isArray(entries) ? entries.filter((e): e is [number, string] => Array.isArray(e) && typeof e[0] === 'number' && typeof e[1] === 'string') : []);
+  } catch {
+    return new Map();
+  }
+}
+
+function storeRows(key: string, rows: Map<number, string>) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify([...rows]));
+  } catch {
+    // Memory only.
+  }
 }
 
 type Outcome = { kind: 'done'; added: number } | { kind: 'failed'; message: string };
@@ -37,7 +56,8 @@ function NoteList({ heading, notes }: { heading: string; notes: ImportNote[] }) 
  * «Importa da Todoist (CSV)» (LC80): a space in the flow of «Compiti» (`Expand`, L-73), not a dialog. The file is read
  * in the browser and never sent: a preview says what will be born and what was not understood, then «Importa N
  * compiti» creates them one at a time with the tasks' own API. A failure halfway says how many went in, and «Riprova»
- * goes on from there. The state lives here, outside the space, so closing and opening it again duplicates nothing.
+ * goes on from there. The state lives here, outside the space (and in the tab's storage), so closing and opening it
+ * again, or reloading the page, duplicates nothing. Mounted per dossier (`key`): nothing carries over to another one.
  */
 export function TodoistImport({ id, open, onClose, dossierId, today }: { id: string; open: boolean; onClose: () => void; dossierId: string; today: string }) {
   const inputId = useId();
@@ -55,8 +75,8 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
     if (!file) return;
     try {
       const next = planTodoistImport(await file.text(), today);
-      const signature = `${file.name}:${file.size}:${file.lastModified}`;
-      if (progress?.signature !== signature) setProgress({ signature, created: new Map() });
+      const key = `lexcraft-todoist-import:${dossierId}:${file.name}:${file.size}:${file.lastModified}`;
+      if (progress?.key !== key) setProgress({ key, created: storedRows(key) });
       setPlan(next);
     } catch (error) {
       setFileError(error instanceof NotTodoistCsvError ? error.message : 'Non riesco a leggere il file. Scegli il CSV esportato da Todoist.');
@@ -73,8 +93,8 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
     setOutcome(null);
     // The runner writes each row into this map as it is created; a new map in state draws the counts.
     const rows = new Map(progress.created);
-    const { added, error } = await runTodoistImport(plan, dossierId, rows, taskService.create);
-    setProgress({ signature: progress.signature, created: rows });
+    const { added, error } = await runTodoistImport(plan, dossierId, rows, taskService.create, () => storeRows(progress.key, rows));
+    setProgress({ key: progress.key, created: rows });
     setRunning(false);
     if (added > 0) plannerStore.getState().changed();
     const total = plan.tasks.filter((t) => rows.has(t.row)).length;
@@ -86,7 +106,9 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
       <div className="space-y-3 p-3">
         <div className="space-y-1">
           <label htmlFor={inputId} className={FIELD_LABEL}>Importa da Todoist (CSV)</label>
-          <p className={FIELD_HINT}>Il file resta nel browser: arrivano solo i compiti, come se li scrivessi tu.</p>
+          <p className={FIELD_HINT}>
+            Il file resta nel browser: arrivano solo i compiti, come se li scrivessi tu. Assegnatario, promemoria, durata e autore non si importano.
+          </p>
           <input
             id={inputId}
             type="file"
@@ -115,6 +137,9 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
               <p className={FIELD_HINT}>{plural(plan.trimmed, 'compito ha', 'compiti hanno')} un titolo o una descrizione troppo lunghi: vengono accorciati.</p>
             )}
 
+            {left === 0 && plan.tasks.length > 0 && !outcome && (
+              <p className="text-sm text-slate-700 dark:text-slate-300">Questo file è già stato importato in questa pratica.</p>
+            )}
             <div role="status" aria-live="polite" className="text-sm">
               {outcome?.kind === 'done' && (
                 <p className="text-emerald-800 dark:text-emerald-300">

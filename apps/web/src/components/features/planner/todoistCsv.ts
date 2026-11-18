@@ -129,6 +129,8 @@ function readWhen(phrase: string, today: string): DatePhrase | null {
 }
 
 const clean = (text: string) => text.replace(/\0/g, '');
+/** The first `max` UTF-16 units, without half an emoji at the end (the server would refuse it every time). */
+const cut = (text: string, max: number) => text.slice(0, max).replace(/[\uD800-\uDBFF]$/, '');
 
 /** The file read into tasks, in its order. Throws `NotTodoistCsvError` for a file without Todoist's columns. */
 export function planTodoistImport(text: string, today: string): ImportPlan {
@@ -147,7 +149,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
     const row = index + 1;
     const type = cell(record, 'TYPE').toLowerCase();
     if (type === 'section') {
-      section = clean(cell(record, 'CONTENT')).slice(0, MAX_LABEL).trim() || null;
+      section = cut(clean(cell(record, 'CONTENT')), MAX_LABEL).trim() || null;
       if (section && !plan.labels.includes(section)) plan.labels.push(section);
       stack = [];
       return;
@@ -164,7 +166,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
 
     const priority = Number(cell(record, 'PRIORITY'));
     const input: TaskInput & { title: string } = {
-      title: content.slice(0, MAX_TITLE),
+      title: cut(content, MAX_TITLE),
       priority: ([1, 2, 3, 4].includes(priority) ? priority : 4) as TaskPriority,
       labels: section ? [section] : [],
     };
@@ -206,7 +208,7 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
     }
 
     const description = [clean(cell(record, 'DESCRIPTION')), ...notes].filter(Boolean).join('\n\n');
-    if (description) input.description = description.slice(0, MAX_DESCRIPTION);
+    if (description) input.description = cut(description, MAX_DESCRIPTION);
     if (content.length > MAX_TITLE || description.length > MAX_DESCRIPTION) plan.trimmed++;
     plan.tasks.push({ row, parentRow, input });
   });
@@ -216,13 +218,14 @@ export function planTodoistImport(text: string, today: string): ImportPlan {
 /**
  * Creates the plan's tasks in `dossierId`, one at a time and in order (a parent before its subtasks), skipping the
  * rows already in `created` and writing each new one there. Stops at the first failure: run again with the same
- * `created`, nothing is created twice.
+ * `created`, nothing is created twice. `onCreated` follows each row written there (to keep it past a reload).
  */
 export async function runTodoistImport(
   plan: ImportPlan,
   dossierId: string,
   created: Map<number, string>,
   create: (input: TaskInput & { title: string }) => Promise<{ id: string }>,
+  onCreated?: () => void,
 ): Promise<{ added: number; error: unknown }> {
   let added = 0;
   for (const task of plan.tasks) {
@@ -232,6 +235,7 @@ export async function runTodoistImport(
     try {
       const { id } = await create({ ...task.input, dossierId, parentId });
       created.set(task.row, id);
+      onCreated?.();
       added++;
     } catch (error) {
       return { added, error };
