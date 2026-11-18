@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useRef, useCallback, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MoreHorizontal, RefreshCw, UserPlus } from 'lucide-react';
+import { MoreHorizontal, RefreshCw, UserPlus } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import * as adminService from '../services/adminService';
 import { sharedEnvironmentService } from '../services/sharedEnvironmentService';
@@ -19,6 +19,7 @@ import { CoursesSwitchAdmin } from '../components/features/admin/CoursesSwitchAd
 import { StudiaSoglieAdmin } from '../components/features/admin/StudiaSoglieAdmin';
 import { StudiaTextsAdmin } from '../components/features/admin/StudiaTextsAdmin';
 import { PageFrame } from '../components/layout/PageFrame';
+import { BackLink } from '../components/ui/BackLink';
 import { Button } from '../components/ui/Button';
 import { Expand } from '../components/ui/Expand';
 import { MenuButton, type MenuItem } from '../components/ui/MenuButton';
@@ -29,7 +30,6 @@ import { FIELD_TEXT, FOCUS_RING } from '../constants/interactions';
 import { scrollParentOf } from '../utils/scrollParent';
 import { FORUM_CATEGORIES } from '../utils/forumCategories';
 import { cn } from '../lib/utils';
-import { focusLanding } from '../utils/focusPage';
 
 type AdminSection = 'utenti' | 'problemi-segnalati' | 'pratiche-pubblicate' | 'pratiche-segnalate' | 'learn' | 'ingestione';
 
@@ -234,9 +234,8 @@ export function AdminPage() {
 
   // Back where it was opened from, or to the search page when it was opened by its address.
   // The router's index in the history, which the index's `replace` keeps: an address opened directly has none behind it.
-  // The focus lands on the title of the page reached (`data-page-title`), never on the body (as a ⌘K choice, #599).
+  // `BackLink` puts the focus on the title of the page reached, or of the part its anchor names (#599, #608).
   const goBack = () => {
-    focusLanding(true);
     if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1);
     else navigate('/');
   };
@@ -468,13 +467,7 @@ export function AdminPage() {
 
   return (
     <div ref={root} className="flex flex-col gap-4 pb-12 [&_h1:focus]:outline-none">
-      <button
-        type="button"
-        onClick={goBack}
-        className={cn('inline-flex min-h-[44px] w-fit items-center gap-1.5 rounded-lg px-2 -ml-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:py-1.5 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
-      >
-        <ArrowLeft size={16} aria-hidden /> Indietro
-      </button>
+      <BackLink onBack={goBack} />
       <PageFrame title="Amministrazione" titleId="admin-title">
         <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
           <nav aria-label="Parti dell’amministrazione" className="lg:sticky lg:top-0 lg:self-start">
