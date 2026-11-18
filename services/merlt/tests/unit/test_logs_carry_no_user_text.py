@@ -20,18 +20,23 @@ TEXT = {
     "query", "query_text", "text", "question", "completion", "content", "raw", "raw_content", "answer",
     "response_text", "error_text", "thought", "entity_text", "follow_up", "follow_up_query", "prompt",
     "llm_response", "q",
+    # Italian and other names the package uses for the same things: a proposed entity's name, its
+    # normalized form, a searched term, a dossier's title, an uploaded file's name, a tool's answer.
+    "nome", "normalized", "term", "dossier_title", "filename", "markdown",
 }
 METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical"}
 LOGGERS = {"log", "logger", "logging", "_log", "_logger"}
 
-# (file relative to merlt/, name) → why that file's log lines may keep that text. Left as they are
-# on purpose: the law's own first line (pipeline/parsing.py), URNs and Cypher are not called like a
-# text, so they never reach the check.
+# (file relative to merlt/, the exact expression) → why that file's log lines may keep it. Left as
+# they are on purpose, and never reaching the check because they are not called like a text: the
+# law's own first line (pipeline/parsing.py), URNs, Cypher.
 ALLOWED = {
     # The VisuaLex server's own short answer to a refused callback (`resp.text[:300]`): the
     # server's error, never a person's text.
-    ("worker/tasks.py", "text"): "the server's callback answer",
-    ("worker/extraction_tasks.py", "text"): "the server's callback answer",
+    ("worker/tasks.py", "resp.text"): "the server's callback answer",
+    ("worker/extraction_tasks.py", "resp.text"): "the server's callback answer",
+    # The name of a graph export the pipeline generated (json, csv, cypher), asked by an admin.
+    ("api/pipeline_router.py", "filename=filename"): "a generated export's file name",
 }
 
 
@@ -69,11 +74,11 @@ def _leaks(call: ast.Call) -> list[str]:
     found = []
     for keyword in call.keywords:
         if keyword.arg in TEXT and not _is_length_or_number(keyword.value):
-            found.append(f"{keyword.arg}=")
+            found.append(f"{keyword.arg}={ast.unparse(keyword.value)}")
             safe.update(id(n) for n in ast.walk(keyword.value))
     for sub in ast.walk(call):
         if isinstance(sub, (ast.Name, ast.Attribute)) and id(sub) not in safe and _name(sub) in TEXT:
-            found.append(_name(sub))
+            found.append(ast.unparse(sub))
             safe.update(id(n) for n in ast.walk(sub))
     return found
 
@@ -85,7 +90,7 @@ def _scan() -> list[str]:
         for call in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(call, ast.Call) and _is_log_call(call):
                 for leak in _leaks(call):
-                    if (relative, leak.rstrip("=")) not in ALLOWED:
+                    if (relative, leak) not in ALLOWED:
                         hits.append(f"{relative}:{call.lineno} {leak}")
     return hits
 

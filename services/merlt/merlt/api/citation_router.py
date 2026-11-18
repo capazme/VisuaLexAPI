@@ -276,13 +276,13 @@ async def export_citations(
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
     except Exception as e:
-        log.error("Error writing export file", error=str(e), filename=filename)
+        log.error("Error writing export file", error=str(e), filename_chars=len(filename))
         raise HTTPException(
             status_code=500,
             detail=f"Error writing export file: {str(e)}"
         )
 
-    log.info("Citation export created", filename=filename, citations_count=len(sources))
+    log.info("Citation export created", filename_chars=len(filename), citations_count=len(sources))
 
     return CitationExportResponse(
         success=True,
@@ -343,7 +343,7 @@ async def download_citation_file(
     else:
         media_type = "application/octet-stream"
 
-    log.info("Citation file downloaded", filename=filename)
+    log.info("Citation file downloaded", filename_chars=len(filename))
 
     return FileResponse(
         path=filepath,

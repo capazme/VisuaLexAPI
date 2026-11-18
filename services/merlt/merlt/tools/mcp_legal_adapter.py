@@ -304,7 +304,7 @@ class McpLegalToolAdapter(BaseTool):
             log.info(
                 "mcp_legal_tool_error_body",
                 tool=self.name,
-                preview=markdown[:120],
+                preview_chars=len(markdown),
             )
             return (
                 ToolResult.fail(

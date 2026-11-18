@@ -112,7 +112,7 @@ async def upload_document(
     api_key: ApiKey = Depends(verify_api_key),
 ) -> DocumentUploadResponse:
     """Upload document for later parsing."""
-    log.info("API: upload_document", filename=file.filename, user_id=user_id)
+    log.info("API: upload_document", user_id=user_id)
 
     # Validate file extension
     file_ext = Path(file.filename).suffix.lower()
@@ -184,7 +184,7 @@ async def upload_document(
     await session.commit()
     await session.refresh(doc)
 
-    log.info("Document uploaded", document_id=doc.id, filename=unique_filename, size_mb=file_size / 1024 / 1024)
+    log.info("Document uploaded", document_id=doc.id, stored_as=unique_filename, size_mb=file_size / 1024 / 1024)
 
     return DocumentUploadResponse(
         success=True,
