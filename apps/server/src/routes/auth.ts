@@ -118,8 +118,10 @@ router.put('/auth/dev-mode', authenticate, authController.setDevMode);
 router.get('/auth/sessions', authenticate, authController.listSessions);
 router.delete('/auth/sessions/:id', authenticate, authController.deleteSession);
 router.post('/auth/logout-all', authenticate, authController.logoutAll);
-router.put('/auth/change-password', authenticate, authController.changePassword);
+// These two check the password: a wrong one counts as a failed attempt from the address, as a sign-in does, so a
+// stolen session cannot be used to guess it.
+router.put('/auth/change-password', authenticate, countFailedAttempts({ perAccount: false }), authController.changePassword);
 router.get('/auth/export', authenticate, authController.exportAccountData);
-router.delete('/auth/account', authenticate, authController.deleteAccount);
+router.delete('/auth/account', authenticate, countFailedAttempts({ perAccount: false }), authController.deleteAccount);
 
 export default router;
