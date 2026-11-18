@@ -7,7 +7,7 @@ model id may be written anywhere in the package or its scripts: a stale id would
 until the day it is used, and fail then.
 
 No network: the list is the one kept in the code, read from OpenRouter's public list on the date it
-names. No import of the app.
+names. The app is not started (merlt.config and its runtime settings are read on their own).
 """
 
 import pathlib
@@ -22,10 +22,13 @@ from merlt.config.runtime_config import RuntimeConfig
 SERVICE = pathlib.Path(__file__).resolve().parents[2]
 WHERE = [SERVICE / "merlt", SERVICE / "scripts"]
 
-# A model id as OpenRouter names it: «provider/model». Not inside a URL or a path.
+# A model id as OpenRouter names it: «provider/model», in any case, also as a shell-style default
+# (`${VAR:-provider/model}`). Not inside a URL or a path (preceded by a word character, `.` or `/`).
+# A model name always has a digit or a hyphen, which keeps prose such as «OpenAI/Anthropic» out.
 MODEL_ID = re.compile(
-    r"(?<![\w./:-])(google|anthropic|openai|mistralai|meta-llama|deepseek|x-ai|qwen|cohere|microsoft|"
-    r"nousresearch|perplexity|amazon|nvidia)/[a-z0-9][-a-z0-9.:]*[a-z0-9]"
+    r"(?<![\w./])(google|anthropic|openai|openrouter|mistralai|meta-llama|deepseek|x-ai|z-ai|qwen|cohere|"
+    r"microsoft|nousresearch|perplexity|amazon|nvidia|moonshotai)/(?=[-a-z0-9.:]*[-0-9])[a-z0-9][-a-z0-9.:]*[a-z0-9]",
+    re.IGNORECASE,
 )
 
 
@@ -84,4 +87,8 @@ def test_the_yaml_fallbacks_are_the_real_defaults():
 
 def test_the_check_sees_a_stale_id():
     assert MODEL_ID.search('model = "google/gemini-2.5-flash"').group(0) == "google/gemini-2.5-flash"
+    assert MODEL_ID.search("model: ${X:-google/gemini-2.5-flash}").group(0) == "google/gemini-2.5-flash"
+    assert MODEL_ID.search("'openrouter/claude-3-sonnet'").group(0) == "openrouter/claude-3-sonnet"
+    assert MODEL_ID.search('"Google/Gemini-2.5-Pro"')
     assert not MODEL_ID.search("https://example.org/google/x")
+    assert not MODEL_ID.search("Compatibile con OpenAI/Anthropic function calling")

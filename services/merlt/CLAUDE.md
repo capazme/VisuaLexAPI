@@ -208,7 +208,8 @@ BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
   on `ZERO_RETENTION_MODELS` in `merlt/config/llm_models.py` (G-575), with the two
   defaults `DEFAULT_FAST_MODEL` and `DEFAULT_EXPERT_MODEL`;
   `tests/unit/test_default_models_zero_retention.py` fails on any other model id
-  written in `merlt/` or `scripts/`. When an id loses its zero-retention endpoint,
+  (OpenRouter's `provider/model` form, for the providers it lists) written in a
+  Python or YAML file of `merlt/` or `scripts/`. When an id loses its zero-retention endpoint,
   remove it there and pick another.
 
 Never call the user id «anonymous», «opaque» or «pseudonymous», and never log

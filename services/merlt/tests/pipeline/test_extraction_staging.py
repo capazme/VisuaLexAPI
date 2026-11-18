@@ -31,6 +31,10 @@ class _FakeExtractor:
     def __init__(self, entities):
         self._entities = entities
 
+    def _get_llm_config(self):
+        # The model the extractor calls: the stored row must record it (G-575).
+        return {"model": "test/model-used"}
+
     async def extract(self, _content):
         return self._entities
 
@@ -76,9 +80,11 @@ async def test_staging_creates_extraction_candidates_not_pending():
     assert first.status == "draft"
     assert first.verbatim_excerpt  # the raw context is kept in staging
     assert first.entity_text == "Risoluzione"
+    assert first.llm_model == "test/model-used"  # the extractor's own model, not a literal
 
 
 async def test_pending_mode_still_creates_pending_entities():
     count, added = await _run("pending")
     assert count > 0
     assert all(isinstance(o, PendingEntity) for o in added)
+    assert all(o.llm_model == "test/model-used" for o in added)
