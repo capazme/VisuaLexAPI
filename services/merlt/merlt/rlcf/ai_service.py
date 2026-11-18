@@ -1,6 +1,9 @@
 """
 OpenRouter AI Service for RLCF Framework
 
+Every call carries the provider rule (G-456): only providers that neither train on the text
+nor keep it. See OPENROUTER_PROVIDER_RULE.
+
 Provides realistic AI response generation for legal tasks using OpenRouter API.
 Replaces dummy placeholder responses with actual AI-generated content for
 meaningful evaluation in the RLCF framework.
@@ -34,6 +37,30 @@ _DEFAULT_MAX_TOKENS = int(os.getenv("MERLT_LLM_MAX_TOKENS", "4096"))
 # analysis finishes with a clean HTTP timeout as the floor rather than a hard
 # task cancellation.
 _LLM_HTTP_TIMEOUT_S = int(os.getenv("MERLT_LLM_HTTP_TIMEOUT", "85"))
+
+# The owner's rule for every call to a language model (G-456): only providers that neither train
+# on the text nor keep it, asked on each request. OpenRouter routes a request to one of the
+# model's providers: `data_collection: "deny"` leaves out the endpoints that train on the data,
+# `zdr: true` the ones that keep it (zero data retention). When no endpoint of the model
+# qualifies, OpenRouter refuses the request instead of falling back to one that would keep it.
+# The model is chosen at run time (the admin's configuration, the parsing model, the experts'
+# own), so the rule rides on every request, not on a list of models.
+OPENROUTER_PROVIDER_RULE: Dict[str, Any] = {"data_collection": "deny", "zdr": True}
+
+
+def _with_provider_rule(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """The request body with the provider rule, a fresh copy for each request."""
+    return {**payload, "provider": dict(OPENROUTER_PROVIDER_RULE)}
+
+
+def _openrouter_headers(api_key: str) -> Dict[str, str]:
+    """The headers of a call to OpenRouter; the referer and title say the call is VisuaLex's."""
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://visualex.org",
+        "X-OpenRouter-Title": "VisuaLex",
+    }
 
 
 @dataclass
@@ -210,18 +237,13 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 "top_p": model_config.top_p,
             }
             
-            headers = {
-                "Authorization": f"Bearer {model_config.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://rlcf-framework.com",  # Replace with your domain
-                "X-Title": "RLCF Framework"
-            }
+            headers = _openrouter_headers(model_config.api_key)
             
             log.info(f"Generating AI response for task_type: {task_type}, model: {model_config.name}")
             
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
-                json=payload,
+                json=_with_provider_rule(payload),
                 headers=headers
             ) as response:
                 
@@ -406,18 +428,13 @@ Please provide a concise legal summary highlighting key points, obligations, and
             if response_format:
                 payload["response_format"] = response_format
 
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://rlcf-framework.com",
-                "X-Title": "RLCF Framework"
-            }
+            headers = _openrouter_headers(api_key)
 
             log.info(f"Generating completion with model: {model}")
 
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
-                json=payload,
+                json=_with_provider_rule(payload),
                 headers=headers
             ) as response:
 
@@ -565,12 +582,7 @@ JSON:"""
                 "response_format": {"type": "json_object"}
             }
 
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://rlcf-framework.com",
-                "X-Title": "RLCF Framework"
-            }
+            headers = _openrouter_headers(api_key)
 
             log.info(f"Generating JSON completion with model: {model}")
 
@@ -579,7 +591,7 @@ JSON:"""
 
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
-                json=payload,
+                json=_with_provider_rule(payload),
                 headers=headers,
                 timeout=request_timeout
             ) as response:
