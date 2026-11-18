@@ -68,6 +68,12 @@ describe('Layout — the phone\'s bar and the keyboard', () => {
     expect(bar).toHaveClass('max-md:-translate-y-full');
   });
 
+  it('puts the focus inside the drawer as it opens, not on the menu button under its head (LC98)', () => {
+    const { bar } = page();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
+    expect(screen.getByRole('button', { name: 'Voce del menu' })).toHaveFocus();
+  });
+
   it('gives the focus to the menu button when the drawer closes from inside it', () => {
     const { bar } = page();
     const toggle = within(bar).getByRole('button', { name: 'Apri il menu' });

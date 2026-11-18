@@ -19,6 +19,7 @@ import { ServiceHealthDot, ServiceHealthMenuEntry } from '../ui/ServiceHealthMen
 import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { Z_INDEX } from '../../constants/zIndex';
 import { preparePage } from '../../pageCode';
+import { focusLanding } from '../../utils/focusPage';
 import { dur, ease, spring } from '../../lib/motion';
 import { BookMark } from '../ui/BookMark';
 import { LexCraftLogo } from '../ui/LexCraftLogo';
@@ -221,6 +222,9 @@ function NavItem({ to, icon: Icon, label, shortLabel, onClick, id, badgeCount, b
       onClick={() => {
         hide();
         onClick?.();
+        // From the phone's drawer (LC98): the focus goes to the title of the page reached, as on a computer, not to the
+        // menu button the closing drawer parks it on.
+        if (layout === 'drawer') focusLanding(to !== pathname);
       }}
       // With its words written, the row needs no label of its own.
       {...(words ? {} : handlers)}

@@ -35,6 +35,8 @@ export function ViewSlide({ view, order, className, children }: ViewSlideProps) 
     // The view's own effects ran first: a field or a heading it focused keeps the focus.
     const active = document.activeElement;
     if (active && active !== document.body && box.current?.contains(active) && !active.closest('[inert]')) return undefined;
+    // A title that already has it (the drawer's entry put it there) keeps it.
+    if (active?.matches('main [data-page-title]') && !active.closest('[inert]')) return undefined;
     return focusLanding(false);
   }, [view]);
 

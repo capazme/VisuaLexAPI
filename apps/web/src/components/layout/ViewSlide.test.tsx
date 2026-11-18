@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import { useEffect, useRef } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { Suspense, lazy, useEffect, useRef, type JSX } from 'react';
+import { Link, MemoryRouter, Route, Routes, useLocation, useOutlet } from 'react-router-dom';
 import { ViewSlide } from './ViewSlide';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
 
@@ -97,6 +97,41 @@ describe('ViewSlide (LC98)', () => {
     const { rerender } = render(tree('list'));
     rerender(tree('detail'));
     expect(document.activeElement).toBe(screen.getByText('Scadenze'));
+  });
+
+  it('with a view whose code is on its way (Learn), keeps the view left until it is there, then slides it in with its content', async () => {
+    const calls = recordAnimations();
+    let arrive: (view: { default: () => JSX.Element }) => void = () => {};
+    const Later = lazy(() => new Promise<{ default: () => JSX.Element }>((resolve) => { arrive = resolve; }));
+    function Section() {
+      const { pathname } = useLocation();
+      return <ViewSlide view={pathname.split('/')[2] ?? ''} order={['oggi', 'progressi']}>{useOutlet()}</ViewSlide>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/learn/oggi']}>
+        <main>
+          <Link to="/learn/progressi">Progressi</Link>
+          <Suspense fallback={<p>Caricamento…</p>}>
+            <Routes>
+              <Route path="learn" element={<Section />}>
+                <Route path="oggi" element={<p>Vista Oggi</p>} />
+                <Route path="progressi" element={<Later />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </main>
+      </MemoryRouter>,
+    );
+    await act(async () => screen.getByText('Progressi').click());
+    // The navigation waits: no empty box slides in, the view left stays.
+    expect(screen.getByText('Vista Oggi')).toBeInTheDocument();
+    expect(screen.queryByText('Caricamento…')).toBeNull();
+    expect(calls).toHaveLength(0);
+
+    await act(async () => arrive({ default: () => <h2>I tuoi progressi</h2> }));
+    const coming = calls.find((c) => c.el.contains(screen.getByText('I tuoi progressi')));
+    expect(coming?.frames[0]).toEqual({ opacity: 0, transform: 'translateX(24px)' });
+    expect(coming?.timing).toEqual(ISLAND_OPEN);
   });
 
   it('leaves the focus where the coming view put it', () => {

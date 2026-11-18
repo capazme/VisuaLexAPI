@@ -164,8 +164,8 @@ export function Layout() {
     const active = document.activeElement;
     if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
   };
-  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it from the
-  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or an
+  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it puts the
+  // focus in the drawer, below). An Esc a control inside took (the user menu, the section switcher) or an
   // overlay over the drawer (a modal dialog, a sheet, the palette) is theirs. Only while the drawer is drawn: a window
   // widened past `lg` with it open hides it by CSS and keeps the state, and its Esc belongs to the page (gotcha 26).
   const lgUp = useMediaQuery('(min-width: 1024px)');
@@ -180,6 +180,11 @@ export function Layout() {
   const showSearchBar = showSearchBarRaw && !lgUp;
   // The search page from lg: the top bar with the path and the field, in full screen as well.
   const searchInTopBar = onSearchPage && lgUp;
+  // Opened, the drawer takes the focus on its first control (LC98): the menu button that opened it lies under the drawer's
+  // head, out of sight and out of reach.
+  useEffect(() => {
+    if (sidebarOpen && drawerDrawn) drawerRef.current?.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus({ preventScroll: true });
+  }, [sidebarOpen, drawerDrawn]);
   useEffect(() => {
     if (!sidebarOpen || !drawerDrawn) return;
     const onKeyDown = (e: KeyboardEvent) => {
