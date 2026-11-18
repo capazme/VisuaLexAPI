@@ -120,6 +120,7 @@ router.delete('/auth/sessions/:id', authenticate, authController.deleteSession);
 router.post('/auth/logout-all', authenticate, authController.logoutAll);
 router.put('/auth/change-password', authenticate, authController.changePassword);
 router.get('/auth/export', authenticate, authController.exportAccountData);
+router.post('/auth/contributions/remove', authenticate, authController.removeOwnContributions);
 router.delete('/auth/account', authenticate, authController.deleteAccount);
 
 export default router;

@@ -15,7 +15,7 @@ import { currentText, hasAccepted, serializeText } from '../lingo/texts';
 import { romeDay, startOfRomeDay } from '../lingo/studyDay';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
 import { trashLingoCards } from '../trash/trash';
-import { removeOwnCommunityCard } from '../lingo/removeOwnContributions';
+import { removeOwnCommunityCard, withdrawOwnProposal } from '../lingo/removeOwnContributions';
 import { isSwitchOn } from '../assistant/switches';
 import { lockModuleForCards, lockUserRow } from '../lingo/courses';
 import { LIMITS, competenceCode } from '../schemas/lingo/corso';
@@ -279,21 +279,7 @@ router.post('/:id/proponi', async (req, res) => {
 });
 
 router.post('/:id/ritira', async (req, res) => {
-  const card = await prisma.$transaction(async (tx) => {
-    // Locked like a vote's: a vote that comes in at this moment either lands before (and is deleted here) or finds a draft.
-    const locked = await tx.$queryRaw<{ stato: LingoCardStato }[]>`SELECT stato FROM lingo_cards WHERE id = ${req.params.id} AND autore_id = ${req.user!.id} FOR UPDATE`;
-    if (locked.length !== 1) throw new AppError(404, 'Scheda non trovata.');
-    if (!canTransition(locked[0].stato, 'BOZZA_PERSONALE')) {
-      throw new AppError(409, 'Solo una scheda in attesa di validazione si può ritirare.');
-    }
-    // The votes belong to the proposal being withdrawn: a new proposal starts from none.
-    await tx.lingoValidazioneCard.deleteMany({ where: { cardId: req.params.id } });
-    return tx.lingoCard.update({
-      where: { id: req.params.id },
-      data: { stato: 'BOZZA_PERSONALE', propostaTestoId: null },
-      include: { ancore: true },
-    });
-  });
+  const card = await prisma.$transaction((tx) => withdrawOwnProposal(tx, req.user!.id, req.params.id));
   res.json(serialize(card));
 });
 
