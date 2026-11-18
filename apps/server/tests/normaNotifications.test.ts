@@ -8,6 +8,16 @@ describe('saved norm change notifications', () => {
     user = await createTestUser('norma-watch-user');
   });
 
+  it('registers no watch for a recital (spec 2026-11-17 §6.3)', async () => {
+    const recital = { norma_data: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' }, article_text: 'Testo del considerando' };
+    const res = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: 'celex:32016R0679~rct26', normaData: recital });
+    expect(res.body).toEqual({ watched: false, changed: false });
+    expect(await prisma.normaWatch.count({ where: { userId: user.id } })).toBe(0);
+  });
+
   it('creates a watch, ignores equal snapshots, and records body changes', async () => {
     const first = { norma_data: { tipo_atto: 'legge', numero_atto: '1', data: '2020', numero_articolo: '1' }, article_text: 'Testo uno' };
     const second = { ...first, article_text: 'Testo due' };

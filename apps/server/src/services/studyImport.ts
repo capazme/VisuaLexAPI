@@ -14,6 +14,8 @@
  * they come from someone else, they carry the «da @utente» chip that tells them apart.
  */
 import { randomUUID } from 'node:crypto';
+import { isRecitalContent, rebuildRecitalEntry } from '../schemas/recitalEntry';
+import { citeRecital } from '../norms/recital';
 import type { Prisma } from '@prisma/client';
 import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible';
 import { prisma } from '../lib/prisma';
@@ -108,7 +110,10 @@ function itemRow(entry: Row, dossierId: string, position: number, id: string, ab
   if (entry.type === 'sentenza') {
     return { id, dossierId, itemType: 'sentenza', title: String((data as Row).etichetta), content, position, aboutItemId: null };
   }
-  return { id, dossierId, itemType: 'norm', title: String((data as Row).tipo_atto || 'Norma'), content, position, aboutItemId: null };
+  // A recital (checked upstream by rebuildNormEntry) is titled with its citation, as the server titles one it stores.
+  const recital = isRecitalContent(data) ? rebuildRecitalEntry(data) : null;
+  const title = recital?.ok ? citeRecital(recital.entry) : String((data as Row).tipo_atto || 'Norma');
+  return { id, dossierId, itemType: 'norm', title, content, position, aboutItemId: null };
 }
 
 export async function importStudyDossiers(userId: string, content: PublishedContent, options: StudyImportOptions): Promise<StudyImportReport> {

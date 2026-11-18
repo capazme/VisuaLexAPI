@@ -193,6 +193,16 @@ describe('POST /lingo/corsi/:id/moduli', () => {
     expect(JSON.stringify(note.body)).toMatch(/solo norme e sentenze/);
   });
 
+  it('refuses a citation of a recital entry, in words (spec 2026-11-17 §6.3)', async () => {
+    const { id, dossier } = await course(alice, token);
+    const recital = await prisma.dossierItem.create({ data: { dossierId: dossier.id, itemType: 'norm', title: 'considerando 26, reg. (UE) 2016/679',
+      content: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' }, position: 99 } });
+    const body = moduleBody(null, { blocchi: [{ testo: 'Vedi [qui](#c1).', citazioni: [{ marcatore: 'c1', voce: recital.id }] }] });
+    const refused = await request(app).post(`${CORSI}/${id}/moduli`).set(token).send(body);
+    expect(refused.status).toBe(400);
+    expect(JSON.stringify(refused.body)).toMatch(/Blocco 1, citazione c1: un considerando non si può ancora citare in un percorso/);
+  });
+
   it('with the dossier gone: 409 with citations, accepted without', async () => {
     const { id, dossier } = await course(alice, token);
     await prisma.dossier.delete({ where: { id: dossier.id } });

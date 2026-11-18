@@ -10,6 +10,8 @@ import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '
 import { citeStoredAct } from '../norms/citation';
 import { citeDecision, citeStoredItem } from '../norms/decisionCitation';
 import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/decisionItem';
+import { isRecitalContent, rebuildRecitalEntry } from '../schemas/recitalEntry';
+import { citeRecital } from '../norms/recital';
 import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
 import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
 import { readableContent } from '../utils/publishedContent';
@@ -294,6 +296,22 @@ export const deleteDossier = async (req: Request, res: Response) => {
   res.json(await trashDossier(req.user!.id, req.params.id, null, BY_THE_USER));
 };
 
+const ARTICLE_OR_RECITAL = 'Una voce resta un articolo o un considerando: aggiungila di nuovo.';
+
+/**
+ * A recital's content (a `norm` entry with the key `considerando`, spec 2026-11-17 §6.2, G-538),
+ * closed and checked, with its title: the citation, set here on every write that carries content.
+ * A content that does not hold is a 400 in the fixture's words.
+ */
+function recitalItem(content: unknown): { content: Prisma.InputJsonObject; title: string } {
+  const recital = rebuildRecitalEntry(content);
+  if (!recital.ok) throw new AppError(400, recital.reason);
+  return {
+    content: { ...recital.entry, ...(recital.star ? { _dossierMeta: recital.star } : {}) },
+    title: citeRecital(recital.entry),
+  };
+}
+
 /**
  * Add item to dossier
  */
@@ -303,6 +321,8 @@ export const addDossierItem = async (req: Request, res: Response) => {
 
   // A decision's content is its identity: checked before anything is written (design 2026-10-01 §6).
   const decision = data.itemType === 'sentenza' ? parseDecisionItemContent(data.content) : null;
+  // So is a recital's (spec 2026-11-17 §6.2).
+  const recital = data.itemType === 'norm' && isRecitalContent(data.content) ? recitalItem(data.content) : null;
 
   // Check ownership
   const dossier = await prisma.dossier.findFirst({
@@ -323,8 +343,8 @@ export const addDossierItem = async (req: Request, res: Response) => {
     data: {
       dossierId: id,
       itemType: data.itemType as DossierItemType,
-      title: decision ? decision.etichetta : data.title,
-      content: decision ?? (data.content || null),
+      title: decision ? decision.etichetta : recital ? recital.title : data.title,
+      content: decision ?? recital?.content ?? (data.content || null),
       position: data.position ?? (maxPos._max.position ?? -1) + 1,
       ...(data.status !== undefined && { status: data.status }),
       ...provenanceFromRequest(req),
@@ -436,6 +456,21 @@ export const updateDossierItem = async (req: Request, res: Response) => {
         data.content = decision;
         data.title = decision.etichetta;
       } else {
+        delete data.title;
+      }
+    }
+    // A recital stays a recital and an article an article (spec 2026-11-17 §6.2): its content is
+    // checked and its title is its citation, as for a decision.
+    if (existing?.itemType === 'norm') {
+      const storedRecital = isRecitalContent(existing.content);
+      if (data.content !== undefined) {
+        if (isRecitalContent(data.content) !== storedRecital) throw new AppError(400, ARTICLE_OR_RECITAL);
+        if (storedRecital) {
+          const recital = recitalItem(data.content);
+          data.content = recital.content;
+          data.title = recital.title;
+        }
+      } else if (storedRecital) {
         delete data.title;
       }
     }
