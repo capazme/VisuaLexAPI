@@ -776,7 +776,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must name that version's id and the acceptance is stored with the proposal; otherwise 409
   `{ detail, richiedeTesto }` with the current version, nothing written. The card records the
   version in `propostaTestoId`. `POST /:id/ritira`: proposed → draft at any time, deleting the
-  card's votes and clearing `propostaTestoId`. `routes/lingoValidazione.ts`:
+  card's votes and clearing `propostaTestoId`. `POST /:id/togli` (G-556, session only): the author
+  removes a validated or under-review card — deleted when nobody else uses it (no one else has it in
+  review, and it is in no course someone else wrote or follows) and answered `{ esito: "cancellata" }`,
+  otherwise its author becomes null and the answer is `{ esito: "senza_nome", detail }`; another state is
+  a 409, another person's card a 404; the card row is locked first
+  (`lingo/removeOwnContributions.ts`). `DELETE /api/lingo/validazione/:cardId/motivazione` (G-557,
+  session only): the validator erases the reason of their vote, the judgement stays; a remark whose
+  reason was erased reaches the card's author as `motivazione: ""`. `routes/lingoValidazione.ts`:
   `GET /api/lingo/validazione/coda?materia=&limit=` (1–20) and `POST /api/lingo/validazione/:cardId
   { giudizio, motivazione? }` (reason 1–2,000 characters, required unless `APPROVATA`), for
   validators only: `User.lingoValidatore`, set by an administrator through `PUT /admin/users/:id`
