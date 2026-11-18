@@ -16,7 +16,8 @@
  * Errors:
  *  - MerltTimeoutError    → BFF responds 503 (network/timeout)
  *  - MerltServerError     → BFF responds 503 (5xx from MERL-T)
- *  - MerltBadRequestError → BFF passes status through (4xx from MERL-T)
+ *  - MerltAuthError       → 401/403 from MERL-T: the server's key was refused (503)
+ *  - MerltBadRequestError → BFF passes status through (other 4xx from MERL-T)
  */
 
 import {
@@ -24,6 +25,8 @@ import {
   MerltNetworkError,
   MerltServerError,
   MerltBadRequestError,
+  MerltAuthError,
+  isKeyRefusal,
 } from './merltClient';
 import type {
   SubgraphResponse,
@@ -207,6 +210,10 @@ export class GraphClient {
         `MERL-T ${response.status} on ${path}: ${text.slice(0, 200)}`,
         response.status
       );
+    }
+
+    if (isKeyRefusal(response.status)) {
+      throw new MerltAuthError(path, response.status);
     }
 
     if (response.status >= 400) {

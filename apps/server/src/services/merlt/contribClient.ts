@@ -14,10 +14,18 @@
  *  - POST /api/v1/enrichment/propose-relation       → { pending_id, relation_id }
  *  - POST /api/v1/candidates/{id}/mark-promoted     → { ok }
  *
- * Error mapping is identical to graphClient (timeout/5xx → 503, 4xx → passthrough).
+ * Error mapping is identical to graphClient (timeout/5xx → 503, 401/403 → MerltAuthError, 503;
+ * other 4xx → passthrough).
  */
 
-import { MerltTimeoutError, MerltNetworkError, MerltServerError, MerltBadRequestError } from './merltClient';
+import {
+  MerltTimeoutError,
+  MerltNetworkError,
+  MerltServerError,
+  MerltBadRequestError,
+  MerltAuthError,
+  isKeyRefusal,
+} from './merltClient';
 
 export interface ContribClientConfig {
   baseUrl: string;
@@ -283,6 +291,10 @@ export class ContribClient {
       const text = await response.text().catch(() => '');
       throw new MerltServerError(`MERL-T ${response.status} on ${path}: ${text.slice(0, 200)}`, response.status);
     }
+    if (isKeyRefusal(response.status)) {
+      throw new MerltAuthError(path, response.status);
+    }
+
     if (response.status >= 400) {
       let errBody: unknown = null;
       try {

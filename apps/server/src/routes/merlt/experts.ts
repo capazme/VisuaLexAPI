@@ -24,6 +24,7 @@ import {
 import { getExpertsClient } from '../../services/merlt/expertsClient';
 import {
   MerltClientError,
+  merltUnavailableDetail,
   MerltBadRequestError,
   MerltTimeoutError,
   MerltNetworkError,
@@ -131,7 +132,7 @@ function handleMerltError(err: unknown, res: Response): void {
     return;
   }
   if (err instanceof MerltClientError) {
-    res.status(503).json({ detail: 'merlt_unavailable' });
+    res.status(503).json({ detail: merltUnavailableDetail(err) });
     return;
   }
   throw err;

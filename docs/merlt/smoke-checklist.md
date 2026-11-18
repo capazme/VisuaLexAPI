@@ -312,7 +312,7 @@ La Q&A vive su `/grafo`; `/merlt/chiedi` e `/merlt/qa` reindirizzano lì. **Per 
 
 ### Rete
 - Tutte le route passano da `authenticate`. Le domande (query, query/async, history, trace, refine) vogliono `consentGuard`, cioè Base o Completo. Gli insegnamenti (`feedback/*`, confirm-source) vogliono `contributionGuard`, cioè Completo.
-- MERL-T giù → 503 `merlt_unavailable`; i 4xx passano invariati.
+- MERL-T giù → 503 `merlt_unavailable`; chiave del server rifiutata (401/403) → 503 `merlt_auth_misconfigured`; gli altri 4xx passano invariati.
 - Timeout: `MERLT_EXPERTS_TIMEOUT_MS` (sync, 120 s) e `MERLT_EXPERTS_ASYNC_TIMEOUT_MS` (submit, 10 s). Il watchdog chiude come `timeout` un job Q&A rimasto senza callback per 20 minuti.
 
 ---

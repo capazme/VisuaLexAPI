@@ -7,7 +7,7 @@ import {
   validateRelationRequestSchema,
 } from '../../schemas/merlt/contrib';
 import { createContribClient, ContribClient } from '../../services/merlt/contribClient';
-import { MerltClientError, createMerltClient } from '../../services/merlt/merltClient';
+import { MerltClientError, createMerltClient, merltUnavailableDetail } from '../../services/merlt/merltClient';
 import { getOrSyncAuthority } from '../../services/merlt/authorityCache';
 
 /**
@@ -46,7 +46,7 @@ router.get('/validate/pending', authenticate, validationGuard, async (req: Reque
     res.status(200).json(await client().getPending(limit, req.user.id));
   } catch (err) {
     if (err instanceof MerltClientError) {
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -93,7 +93,7 @@ router.post('/validate/entity', authenticate, validationGuard, async (req: Reque
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof MerltClientError) {
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -121,7 +121,7 @@ router.post('/validate/relation', authenticate, validationGuard, async (req: Req
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof MerltClientError) {
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;

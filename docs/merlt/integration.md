@@ -228,6 +228,6 @@ Redis invece non è durabile: coda RQ e cache si perdono a ogni recreate.
 |---|---|---|
 | `compose up` fallisce su `vendor/mcp-legal-it` | submodule non inizializzato | `git submodule update --init --recursive vendor/mcp-legal-it` |
 | Job «in corso» fino al timeout | callback rifiutata (500 `internal_auth_not_configured` o 401), worker fermo, o sotto-flag spento (404) | Allinea `MERLT_INTERNAL_SECRET` fra BFF e compose; controlla `docker compose ... ps`; lascia accesi graph/contribution |
-| Ops RLCF o ingestion → 503 `merlt_auth_misconfigured` / `merlt_unavailable` | `MERLT_API_KEY` vuota o diversa dalla chiave seminata | Imposta `MERLT_API_KEY` in `apps/server/.env` e ricrea merlt-api, così la chiave viene seminata |
+| Qualunque route MERL-T → 503 `merlt_auth_misconfigured` (l'esportazione dei dati: «MERL-T non è raggiungibile») | `MERLT_API_KEY` vuota o diversa dalla chiave seminata | Imposta `MERLT_API_KEY` in `apps/server/.env` e ricrea merlt-api, così la chiave viene seminata |
 | Training NER sempre `queued` | il worker non ascolta `merlt_ner_train` | Ripristina la lista code nel `command` del worker e ricrea merlt-worker |
 | `curl /api/merlt/health` → 401 | `merltRoutes` montato dopo i router con auth catch-all | Vedi il gotcha 1 di Slice 1 in `CLAUDE.md` |

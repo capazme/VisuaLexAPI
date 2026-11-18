@@ -21,6 +21,7 @@ import {
   createMerltClient,
   MerltClient,
   MerltClientError,
+  merltUnavailableDetail,
   MerltBadRequestError,
 } from '../../services/merlt/merltClient';
 import { getOrSyncAuthority } from '../../services/merlt/authorityCache';
@@ -114,7 +115,7 @@ router.post('/events/article-viewed', async (req: Request, res: Response): Promi
     }
     if (err instanceof MerltClientError) {
       logDeadLetter('article-viewed', merltPayload, err);
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -200,7 +201,7 @@ router.post('/events/highlight-annotation', async (req: Request, res: Response):
     }
     if (err instanceof MerltClientError) {
       logDeadLetter('highlight-annotation', merltPayload, err);
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -256,7 +257,7 @@ router.post('/events/dossier-bookmark', async (req: Request, res: Response): Pro
     }
     if (err instanceof MerltClientError) {
       logDeadLetter('dossier-bookmark', merltPayload, err);
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -310,7 +311,7 @@ router.post('/events/citation-clicked', async (req: Request, res: Response): Pro
     }
     if (err instanceof MerltClientError) {
       logDeadLetter('citation-clicked', merltPayload, err);
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;
@@ -366,7 +367,7 @@ router.post('/events/forum-signal', async (req: Request, res: Response): Promise
     }
     if (err instanceof MerltClientError) {
       logDeadLetter('forum-signal', merltPayload, err);
-      res.status(503).json({ detail: 'merlt_unavailable' });
+      res.status(503).json({ detail: merltUnavailableDetail(err) });
       return;
     }
     throw err;

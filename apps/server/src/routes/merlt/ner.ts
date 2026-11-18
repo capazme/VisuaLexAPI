@@ -5,7 +5,7 @@ import { contributionGuard } from '../../services/merlt/contributionGuard';
 import { requireAdmin } from '../../middleware/merlt/requireAdmin';
 import { nerFeedbackRequestSchema, nerTrainingStartRequestSchema } from '../../schemas/merlt/ner';
 import { getNerClient } from '../../services/merlt/nerClient';
-import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
+import { MerltClientError, MerltBadRequestError, merltUnavailableDetail } from '../../services/merlt/merltClient';
 
 /**
  * MERL-T NER feedback routes (Loop β #2). Thin proxy: authenticate +
@@ -29,7 +29,7 @@ function handleMerltError(err: unknown, res: Response): void {
     return;
   }
   if (err instanceof MerltClientError) {
-    res.status(503).json({ detail: 'merlt_unavailable' });
+    res.status(503).json({ detail: merltUnavailableDetail(err) });
     return;
   }
   throw err;

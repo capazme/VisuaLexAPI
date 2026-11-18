@@ -5,6 +5,7 @@ import {
   MerltClientError,
   MerltServerError,
   MerltBadRequestError,
+  MerltAuthError,
   MerltTimeoutError,
   createMerltClient,
 } from '../../../src/services/merlt/merltClient';
@@ -97,13 +98,15 @@ describe('MerltClient.sendEvent', () => {
     expect(err.body).toEqual({ detail: 'bad payload' });
   });
 
-  it('throws MerltBadRequestError on 401', async () => {
-    nock(BASE).post('/api/v1/tracking/events').reply(401, { detail: 'unauthorized' });
+  it.each([401, 403])('throws MerltAuthError on %i: the server\'s key was refused, never a caller\'s 4xx', async (status) => {
+    nock(BASE).post('/api/v1/tracking/events').reply(status, { detail: 'unauthorized' });
 
     const err = (await client
       .sendEvent({ type: 'x', user_id: 'u1' })
-      .catch((e) => e)) as MerltBadRequestError;
-    expect(err.status).toBe(401);
+      .catch((e) => e)) as MerltAuthError;
+    expect(err).toBeInstanceOf(MerltAuthError);
+    expect(err).not.toBeInstanceOf(MerltBadRequestError);
+    expect(err.status).toBe(status);
   });
 
   it('sets the X-API-Key header (NOT Authorization: Bearer) when apiKey is configured', async () => {
