@@ -12,6 +12,15 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-11-18
+
+The «⋯» menus fade in under their trigger, as Luca chose (variant A), across the app. Web only, no migration.
+
+### Interface
+
+- The «⋯» menus fade in under the button that opens them (LC102, variant A).
+- The «⋯» of Cronologia and Forum use the same menu; no «⋯» opens an empty menu (LC103).
+
 ## [1.40.0] - 2026-11-18
 
 Loading and a change of view with one movement, «Novità» with the rule of the notifications, steadier tests,
