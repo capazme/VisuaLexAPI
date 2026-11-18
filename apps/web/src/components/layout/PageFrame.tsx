@@ -84,7 +84,7 @@ export function PageFrame({ title, kicker, line, action, beside, headerClassName
               {kickerText}
             </p>
           )}
-          <h1 id={titleId} aria-describedby={kickerText ? kickerId : undefined} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
+          <h1 id={titleId} data-page-title="" aria-describedby={kickerText ? kickerId : undefined} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
             {title}
           </h1>
           {line && <p className="mt-1 max-w-prose text-slate-600 dark:text-slate-400">{line}</p>}

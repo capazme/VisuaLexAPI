@@ -187,15 +187,30 @@ describe('Layout — ⌘K opens the palette on every page', () => {
     expect(screen.getByText('Pagina di ricerca')).toBeInTheDocument();
   });
 
-  it('covers the workspace while open, so Cmd/Ctrl+F stays the browser\'s', () => {
+  it('opens in the page, not over it: a band between the bars and the page, which it pushes down (L-75)', () => {
     at('/');
     pressCmdK();
-    expect(isWorkspaceCovered()).toBe(true);
-    const event = new KeyboardEvent('keydown', { key: 'f', metaKey: true, cancelable: true, bubbles: true });
-    act(() => {
-      window.dispatchEvent(event);
-    });
-    expect(event.defaultPrevented).toBe(false);
+    expect(isWorkspaceCovered()).toBe(false);
+    expect(document.querySelector('[data-palette-veil]')).toBeNull();
+    const band = screen.getByRole('region', { name: 'Menu di ricerca' });
+    // In <main>'s column: after the bar, before the scroller holding the page.
+    const root = band.closest('[cmdk-root]')!;
+    expect(root.parentElement).toBe(document.querySelector('main'));
+    expect(root.previousElementSibling).toBe(screen.getByTestId('search-bar'));
+    expect(root.nextElementSibling).toContainElement(screen.getByText('Pagina di ricerca'));
+    expect(band.closest('.fixed')).toBeNull();
+    // The field in the bar, in its slot, where the search page's own field was.
+    expect(screen.getByTestId('search-bar').querySelector('[data-palette-slot]')).toContainElement(screen.getByPlaceholderText(PALETTE_BOX));
+  });
+
+  it('opens nothing under a modal dialog, where the band would be unseen', () => {
+    at('/history');
+    const dialog = document.createElement('div');
+    dialog.setAttribute('aria-modal', 'true');
+    document.body.appendChild(dialog);
+    pressCmdK();
+    expect(appStore.getState().commandPaletteOpen).toBe(false);
+    dialog.remove();
   });
 });
 
@@ -203,7 +218,8 @@ describe('Layout — the search page\'s field', () => {
   it('is drawn on the search page only, above the content', () => {
     at('/');
     expect(screen.getByRole('search', { name: 'Ricerca' })).toBeInTheDocument();
-    expect(screen.getByTestId('search-bar').nextElementSibling).toContainElement(screen.getByText('Pagina di ricerca'));
+    // After the search's band (empty while closed), the page.
+    expect(screen.getByTestId('search-bar').nextElementSibling?.nextElementSibling).toContainElement(screen.getByText('Pagina di ricerca'));
   });
 
   // From lg the bar holds the news, «Commenti» and «Tutto schermo» at its right end (LC21): the field ends before them.
