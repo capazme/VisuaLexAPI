@@ -12,6 +12,18 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-11-19
+
+Opus (Work) on the common controls of the interface alignment, with its finishing touches. Web only, no
+migration. MERL-T stays off.
+
+### Work
+
+- Opus on the common controls: «Aggiungi» and «Dettagli» at 44x44 px on a phone (LC110).
+- The view tabs at 13 px on a computer; «Aggiungi un compito» on the fields' surface, and the focus stays in the
+  field after adding, so the next task can be typed at once; the date of «Testo a una data» is a common field
+  (LC111).
+
 ## [1.44.0] - 2026-11-18
 
 The fiscal testi unici follow the date, regional laws are never read as state laws, and «Modifica pratica» and
