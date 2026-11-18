@@ -32,7 +32,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `SESSION_CHECK_POINTS` (600) a minute per user or address, mounted in `app.ts`
   after `delegatedAuth` and before the general limiter, which it skips.
 - `src/routes/auth.ts` — failed sign-ins and registrations: 5 per 15 minutes per
-  address (shared, as before); failed sign-ins per account (the SHA-256 of the
+  address (shared, as before, with the wrong passwords of `PUT /auth/change-password`,
+  `POST /auth/contributions/remove` and `DELETE /auth/account`); failed sign-ins per account (the SHA-256 of the
   email as typed, trimmed and lower-cased, existing or not): 10 an hour from any
   address; refreshes: 30 a minute per address. Counted on arrival (a burst is
   held too) and given back on success. A refusal is 429 with `Retry-After`.

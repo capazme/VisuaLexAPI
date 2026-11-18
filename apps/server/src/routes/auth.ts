@@ -13,7 +13,8 @@ const router = Router();
  * behind it when Redis fails), no longer in each process's memory alone.
  *
  * - Failed sign-ins and registrations from one address: 5 in 15 minutes, as before. Sign-in and registration
- *   share the count, as before.
+ *   share the count, as before, and so do the account's routes that check its password (changing it,
+ *   deleting the account): a stolen session cannot be used to guess it.
  * - Failed sign-ins for one account, from any address: 10 in an hour. The account is the email as typed,
  *   trimmed and lower-cased, whether or not an account has it, so the answer says nothing about which emails
  *   exist; the key is its SHA-256, so no email is written in Redis. Someone who knows a person's email can
@@ -118,10 +119,11 @@ router.put('/auth/dev-mode', authenticate, authController.setDevMode);
 router.get('/auth/sessions', authenticate, authController.listSessions);
 router.delete('/auth/sessions/:id', authenticate, authController.deleteSession);
 router.post('/auth/logout-all', authenticate, authController.logoutAll);
-router.put('/auth/change-password', authenticate, authController.changePassword);
 router.get('/auth/export', authenticate, authController.exportAccountData);
-// It checks a password, so a wrong one counts as a failed attempt from the address, as a sign-in does.
+// These three check the password: a wrong one counts as a failed attempt from the address, as a sign-in does, so a
+// stolen session cannot be used to guess it.
+router.put('/auth/change-password', authenticate, countFailedAttempts({ perAccount: false }), authController.changePassword);
 router.post('/auth/contributions/remove', authenticate, countFailedAttempts({ perAccount: false }), authController.removeOwnContributions);
-router.delete('/auth/account', authenticate, authController.deleteAccount);
+router.delete('/auth/account', authenticate, countFailedAttempts({ perAccount: false }), authController.deleteAccount);
 
 export default router;
