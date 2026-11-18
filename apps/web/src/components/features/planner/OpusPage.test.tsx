@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { OpusPage } from './OpusPage';
 import { plannerStore } from './plannerStore';
@@ -54,16 +54,7 @@ describe('Work\'s page', () => {
     }
   });
 
-  it('puts «Raggruppa» beside the trash on «Scadenziario» only, and the choice reaches the view', () => {
-    renderAt('/work/scadenziario');
-    fireEvent.click(screen.getByRole('button', { name: 'Raggruppa: per data' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Per pratica' }));
-    expect(plannerStore.getState().grouping).toBe('dossier');
-    act(() => plannerStore.getState().setGrouping('date'));
-    localStorage.removeItem('visualex-opus-today-grouping');
-  });
-
-  it.each(['/work/prossimi', '/work/ingresso'])('on %s has no «Raggruppa»', (path) => {
+  it.each(['/work/scadenziario', '/work/prossimi', '/work/ingresso'])('on %s has no «Raggruppa» in the header: it is a toggle in «Scadenziario» (LC91)', (path) => {
     renderAt(path);
     expect(screen.queryByRole('button', { name: /Raggruppa/ })).toBeNull();
   });

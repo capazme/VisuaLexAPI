@@ -50,7 +50,6 @@ export function dayHeading(day: string, today: string): string {
   return capitalise(long);
 }
 
-const weekdayName = new Intl.DateTimeFormat('it-IT', { weekday: 'long', timeZone: 'UTC' });
 const weekdayShort = new Intl.DateTimeFormat('it-IT', { weekday: 'short', timeZone: 'UTC' });
 
 /** A day's group, one form (LC83): «Oggi · mar 17», «Domani · mer 18», «Gio 19». */
@@ -79,13 +78,17 @@ export function dayTone(day: string, today: string): DayTone {
 }
 
 /**
- * A planned day on a row: «Oggi», «Domani», the weekday for the rest of the week («venerdì»), else as `shortDay`;
+ * A planned day on a row: «Oggi», «Domani», for the rest of the week the form of the days' groups («ven 23», LC91:
+ * one form between the views), else as `shortDay`;
  * a past one says how late it is in words («Ieri · in ritardo di 1 giorno»), never by its colour alone.
  */
 export function rowDay(day: string, today: string): string {
   const offset = daysBetween(today, day);
   if (offset < 0) return `${shortDay(day, today)} · in ritardo di ${-offset} ${offset === -1 ? 'giorno' : 'giorni'}`;
-  if (offset >= 2 && offset <= 6) return weekdayName.format(new Date(utc(day)));
+  if (offset >= 2 && offset <= 6) {
+    const { weekday, date } = stripDay(day);
+    return `${weekday} ${date}`;
+  }
   return shortDay(day, today);
 }
 

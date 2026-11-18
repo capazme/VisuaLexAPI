@@ -336,15 +336,34 @@ describe('«Oggi» in groups', () => {
     expect(screen.queryByRole('region', { name: /^Oggi/ })).toBeNull();
   });
 
-  it('groups by dossier when the header says so, the inbox last, and remembers the choice', async () => {
+  it('groups by dossier with the toggle over the rows, the inbox last, and remembers the choice (LC91)', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY, dossierId: 'd1' })]));
     renderAt(<TodayView />);
     await screen.findByRole('button', { name: 'Compito a' });
-    act(() => plannerStore.getState().setGrouping('dossier'));
+    // A toggle in the page, not a menu: two buttons, the one in use pressed.
+    const toggle = screen.getByRole('group', { name: 'Raggruppa' });
+    expect(within(toggle).getByRole('button', { name: 'Per data' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(toggle).getByRole('button', { name: 'Per pratica' }));
+    expect(within(toggle).getByRole('button', { name: 'Per pratica' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(toggle).getByRole('button', { name: 'Per data' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Ricorso Rossi, 1 compito', "Lista d'ingresso, 1 compito"]);
     expect(localStorage.getItem('visualex-opus-today-grouping')).toBe('dossier');
     act(() => plannerStore.getState().setGrouping('date'));
     localStorage.removeItem('visualex-opus-today-grouping');
+  });
+
+  it('does not draw a label or the dossier that the row would cut under two letters (1024 px, LC91)', async () => {
+    // jsdom lays nothing out: the label's text is given a width of one letter, the dossier's its own.
+    const width = (el: Element, natural: boolean) => (el.classList.contains('truncate') ? (el.textContent === 'Udienza' ? (natural ? 60 : 8) : 80) : 0);
+    const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) { return width(this, false); });
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) { return width(this, true); });
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY, labels: ['udienza'], dossierId: 'd1' })]));
+    renderAt(<TodayView />);
+    await screen.findByRole('button', { name: 'Compito a' });
+    expect(screen.getByText('Udienza').closest('[data-squeezable]')).toHaveStyle({ display: 'none' });
+    expect(screen.getByRole('link', { name: /Ricorso Rossi/ })).not.toHaveStyle({ display: 'none' });
+    client.mockRestore();
+    scroll.mockRestore();
   });
 
   it("writes a row on two levels: the description in one line, the day in words, the subtasks' count that opens them", async () => {
@@ -354,7 +373,8 @@ describe('«Oggi» in groups', () => {
     ]));
     renderAt(<InboxView />);
     expect(await screen.findByText('Sentire il cliente')).toBeInTheDocument();
-    expect(screen.getByText('venerdì')).toBeInTheDocument();
+    // The days' groups' form, «ven 23», not «venerdì» (LC91).
+    expect(screen.getByText('ven 23')).toBeInTheDocument();
     // In a list the subtasks wait behind the counter.
     const counter = screen.getByRole('button', { name: '1 sottocompito' });
     expect(counter).toHaveAttribute('aria-expanded', 'false');
@@ -387,6 +407,13 @@ describe('the other views', () => {
     expect(screen.queryByRole('button', { name: 'Aggiungi compito' })).toBeNull();
     // The block names the day: the row does not repeat it.
     expect(within(screen.getByRole('list', { name: 'Giovedì 22 ottobre' })).queryByText(/giovedì/)).toBeNull();
+  });
+
+  it('says an empty «Prossimi giorni» on one line, not seven groups at 0 (LC91)', async () => {
+    service.list.mockResolvedValue(answer([]));
+    renderAt(<UpcomingView />);
+    expect(await screen.findByText('Nessun compito nei prossimi giorni')).toBeInTheDocument();
+    expect(screen.queryAllByRole('heading', { level: 3 })).toEqual([]);
   });
 
   it("draws the strip from today, each day on one line with its count, and scrolls to the day chosen (LC83)", async () => {
