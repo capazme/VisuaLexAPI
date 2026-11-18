@@ -153,6 +153,23 @@ describe('«Oggi»', () => {
     expect(plannerStore.getState().version).toBe(2);
   });
 
+  it('after «Annulla», gives the focus back to the restored task, not the first one (#585, LC91)', async () => {
+    let done = false;
+    service.list.mockImplementation(async () => answer(['a', 'b', 'c'].filter((id) => !(done && id === 'b')).map((id) => task(id, { plannedDate: TODAY }))));
+    service.complete.mockImplementation(async () => { done = true; return { task: task('b'), recurred: null }; });
+    service.reopen.mockImplementation(async () => { done = false; return task('b'); });
+    renderAt(<TodayView />);
+    const tick = await screen.findByRole('checkbox', { name: 'Segna come fatto: Compito b' });
+    tick.focus();
+    fireEvent.click(tick);
+    await waitFor(() => expect(toasts[toasts.length - 1]?.message).toBe('Compito completato'));
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: 'Segna come fatto: Compito b' })).toBeNull());
+    // The focus went on to the next row while the task was gone.
+    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Segna come fatto: Compito c' }));
+    await act(async () => toasts[toasts.length - 1]!.onUndo());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Segna come fatto: Compito b' })));
+  });
+
   it('ticks a repeating task with its occurrence, and «Annulla» puts its date back', async () => {
     const weekly = task('w', { plannedDate: TODAY, recurrence: 'FREQ=WEEKLY' });
     service.list.mockResolvedValue(answer([weekly]));

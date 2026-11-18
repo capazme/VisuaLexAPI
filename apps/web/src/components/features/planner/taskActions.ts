@@ -3,6 +3,7 @@ import { taskService } from '../../../services/taskService';
 import type { Task } from '../../../types/tasks';
 import { failureMessage, plannerStore } from './plannerStore';
 import { shortDay } from './taskDates';
+import { focusWhenRowReturns } from './moveBetweenRows';
 
 /** How a view hides a row while its write travels, and shows it again when the write is refused. */
 export interface Optimistic {
@@ -49,6 +50,7 @@ export async function completeWithUndo(task: Task, today: string, optimistic: Op
       try {
         if (recurred) await taskService.update(task.id, { plannedDate: recurred.previousPlannedDate });
         else await taskService.reopen(task.id);
+        focusWhenRowReturns(task.id);
       } catch (error) {
         notify(failureMessage(error, 'Non riesco ad annullare. Riprova.'), 'error');
         // Said: no «Ripristinato» after it.
@@ -82,6 +84,7 @@ export async function completeForeverWithUndo(task: Task, optimistic: Optimistic
     undo: async () => {
       try {
         await taskService.reopen(task.id, rule);
+        focusWhenRowReturns(task.id);
       } catch (error) {
         notify(failureMessage(error, 'Non riesco ad annullare. Riprova.'), 'error');
         // Said: no «Ripristinato» after it.
@@ -112,6 +115,7 @@ export async function trashWithUndo(task: Task, optimistic: Optimistic): Promise
     undo: async () => {
       try {
         await taskService.restore(task.id);
+        focusWhenRowReturns(task.id);
       } catch (error) {
         notify(failureMessage(error, 'Non riesco a ripristinare il compito. Riprova.'), 'error');
         // Said: no «Ripristinato» after it.
