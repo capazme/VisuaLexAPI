@@ -104,6 +104,14 @@ describe('removing all of one’s contributions (G-558)', () => {
     expect(await prisma.articleThread.count({ where: { id: glossa } })).toBe(1);
   });
 
+  it('counts a wrong password as a failed attempt, as a sign-in does: the sixth from one address is refused', async () => {
+    const maria = await createTestUser('all-guessing');
+    const guess = () => request(app).post('/api/auth/contributions/remove').set(authHeader(maria))
+      .set({ 'X-Forwarded-For': '203.0.123.9' }).send({ password: 'not-the-password' });
+    for (let i = 0; i < 5; i += 1) expect((await guess()).status).toBe(400);
+    expect((await guess()).status).toBe(429);
+  });
+
   it('is not open to a connected application', async () => {
     const maria = await createTestUser('all-app');
     const glossa = await writeGlossa(maria, 'Resta anche qui');

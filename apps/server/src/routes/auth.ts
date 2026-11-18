@@ -120,7 +120,8 @@ router.delete('/auth/sessions/:id', authenticate, authController.deleteSession);
 router.post('/auth/logout-all', authenticate, authController.logoutAll);
 router.put('/auth/change-password', authenticate, authController.changePassword);
 router.get('/auth/export', authenticate, authController.exportAccountData);
-router.post('/auth/contributions/remove', authenticate, authController.removeOwnContributions);
+// It checks a password, so a wrong one counts as a failed attempt from the address, as a sign-in does.
+router.post('/auth/contributions/remove', authenticate, countFailedAttempts({ perAccount: false }), authController.removeOwnContributions);
 router.delete('/auth/account', authenticate, authController.deleteAccount);
 
 export default router;
