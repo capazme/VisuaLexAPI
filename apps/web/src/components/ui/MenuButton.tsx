@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
+import { IslandSurface } from './IslandSurface';
 
 export interface MenuItem {
   label: string;
@@ -54,7 +56,8 @@ export interface MenuButtonProps {
 /**
  * A button that opens a list of actions (WAI-ARIA menu button): arrows, Home
  * and End move, Escape and Tab close, focus returns to the trigger, a click
- * outside closes. Clicks never reach the card it sits in. The dossier's menus.
+ * outside closes. Clicks never reach the card it sits in. The dossier's menus. The list grows out of the trigger and
+ * goes back into it (`IslandSurface`, LC85).
  */
 export function MenuButton({ label, title, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
@@ -149,8 +152,11 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
       >
         {children}
       </button>
+      <AnimatePresence>
       {open && (
-        <div
+        <IslandSurface
+          key="menu"
+          source={triggerRef.current}
           id={menuId}
           role="menu"
           aria-label={label}
@@ -158,11 +164,15 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
           onKeyDown={onMenuKey}
           className={cn(
             Z_INDEX.dropdown,
-            'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
+            'absolute flex w-56 flex-col',
             (placement === 'auto' ? opensAbove : placement === 'above') ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
             menuClassName,
+            // The list scrolls inside (below); the box would clip the shape growing from the trigger outside it.
+            'overflow-visible',
           )}
+          surfaceClassName="rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800"
+          contentClassName="relative min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg py-1"
         >
           {heading && (
             <p id={`${menuId}-heading`} role="presentation" className="px-3 pb-1.5 pt-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
@@ -221,8 +231,9 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
               </button>
             </div>
           ))}
-        </div>
+        </IslandSurface>
       )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -21,7 +21,8 @@ import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQu
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
 import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
-import { IslandSurface, now } from '../../ui/IslandSurface';
+import { IslandSurface } from '../../ui/IslandSurface';
+import { now } from '../../ui/islandMotion';
 import { useRassegneForTopic } from '../rassegne/useRassegneForTopic';
 import { rememberSearch } from '../rassegne/searchMemory';
 import { provenance } from '../rassegne/rassegnaFilters';

@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type HTMLAttributes, type ReactNode, type Ref } from 'react';
+import { useEffect, useLayoutEffect, useRef, type HTMLAttributes, type ReactNode, type Ref } from 'react';
 import { usePresence } from 'framer-motion';
 import { cn } from '../../lib/utils';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
 import { ISLAND_SURFACE } from '../../utils/searchFieldControl';
+import { now, useReducedMotionLive } from './islandMotion';
 
 /**
  * The island (LC69, written again from scratch after a frame-by-frame look; Luca, 17 Nov: «mixa tutta una serie di
@@ -84,41 +85,6 @@ function fieldOn(field: HTMLElement, box: DOMRect): Keyframe {
   return { transform: `translate(${px(box.left - r.left)}, ${px(box.top - r.top)})`, minWidth: px(box.width), maxWidth: px(box.width) };
 }
 
-/** The values an element shows now (an animation running included), to go on from there. */
-export function now(el: HTMLElement, keys: string[]): Keyframe {
-  const style = getComputedStyle(el) as unknown as Record<string, string>;
-  return Object.fromEntries(keys.map((key) => [key, style[key]]));
-}
-
-const REDUCE = '(prefers-reduced-motion: reduce)';
-const subscribeMotion = (change: () => void) => {
-  const query = typeof window.matchMedia === 'function' ? window.matchMedia(REDUCE) : null;
-  query?.addEventListener?.('change', change);
-  return () => query?.removeEventListener?.('change', change);
-};
-const reducedNow = () => typeof window.matchMedia === 'function' && Boolean(window.matchMedia(REDUCE)?.matches);
-/** «Riduci movimento», followed while the page is open (`matchMedia`'s `change`): Framer's hook reads it once. */
-export function useReducedMotionLive(): boolean {
-  return useSyncExternalStore(subscribeMotion, reducedNow, () => false);
-}
-
-/**
- * The last control pressed, for a surface opened from one that a click did not focus (Safari, a tap): what the
- * confirmations grow from when their caller names nothing.
- */
-let lastPressed: HTMLElement | null = null;
-if (typeof document !== 'undefined') {
-  document.addEventListener('pointerdown', (event) => {
-    lastPressed = (event.target as Element | null)?.closest?.<HTMLElement>('button, a, [role="menuitem"], [role="button"]') ?? null;
-  }, true);
-}
-/** What opened a surface now: the focused control, else the last one pressed, if still on the page. */
-export function openerNow(): HTMLElement | null {
-  const active = document.activeElement;
-  if (active instanceof HTMLElement && active !== document.body) return active;
-  return lastPressed?.isConnected ? lastPressed : null;
-}
-
 export interface IslandSurfaceProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   ref?: Ref<HTMLDivElement>;
   /** What it grows from and goes back into. */
@@ -159,9 +125,11 @@ export function IslandSurface({
   const [presence, safeToRemove] = usePresence();
   const isPresent = open ?? presence;
   const remove = useRef(onClosed ?? safeToRemove);
+  const shown = useRef(isPresent);
   // Before the effects that call it: the closing render's own (a removal at once happens in the same commit).
   useLayoutEffect(() => {
     remove.current = onClosed ?? safeToRemove;
+    shown.current = isPresent;
   });
   // The source hidden while the surface is out (`hideSource`); and the layers' running animations.
   const hidden = useRef<HTMLElement | null>(null);
@@ -177,8 +145,13 @@ export function IslandSurface({
     const root = rootRef.current;
     const shape = shapeRef.current;
     const content = contentRef.current;
+    // Gone at once: after the commit, once `AnimatePresence` (whose layout effect runs after this one) counts the exit.
+    const removeNow = () => queueMicrotask(() => {
+      // Not if it was opened again meanwhile.
+      if (!shown.current) remove.current?.();
+    });
     if (!root || !shape || !content || typeof root.animate !== 'function') {
-      if (!isPresent) remove.current?.();
+      if (!isPresent) removeNow();
       return undefined;
     }
     // Where the layers are now (the other way's animations included), then those animations stopped: the card's own
@@ -280,7 +253,7 @@ export function IslandSurface({
     root.style.pointerEvents = 'none';
     if (!started.current) {
       showSource();
-      remove.current?.();
+      removeNow();
       return undefined;
     }
     const { was, shadow, full, field, rest: others } = take();
@@ -327,7 +300,9 @@ export function IslandSurface({
   };
 
   return (
-    <div ref={setRoot} {...rest} className={cn(className, 'relative')}>
+    // Closing, it takes no key and no click (an Enter on a confirmation going back must not confirm). Placed by its
+    // owner, or `relative` for its shape.
+    <div ref={setRoot} {...rest} inert={!isPresent || undefined} className={cn('relative', className)}>
       <div ref={shapeRef} aria-hidden data-island-shape="" className={cn('pointer-events-none absolute inset-0', surfaceClassName)} />
       <div ref={contentRef} data-island-content="" className={contentClassName}>
         {children}
