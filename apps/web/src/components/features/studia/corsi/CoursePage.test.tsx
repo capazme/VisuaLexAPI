@@ -265,7 +265,9 @@ describe('the course page', () => {
   it('coming back from the exam, focuses the exam\'s command (LC12)', async () => {
     get.mockResolvedValue(page({ esame: examOf({ stato: 'in-corso' }) }));
     renderPage('corso-1', { focus: 'esame' });
-    expect(await screen.findByRole('link', { name: 'Riprendi la prova' })).toHaveFocus();
+    const link = await screen.findByRole('link', { name: 'Riprendi la prova' });
+    // The focus comes in a passive effect, which may run after the link is drawn (a busy machine): wait for it.
+    await waitFor(() => expect(link).toHaveFocus());
   });
 
   it('a failed exam, from the third day, says «Chiedi al tuo assistente un nuovo esame» with the competences under 60%', async () => {
