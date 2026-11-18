@@ -3,6 +3,9 @@
 > Generato da uno swarm multi-agente (26 agenti di assessment + 1 di sintesi, read-only).
 > Branch `visualex-merlt-main`. Sotto, in testa, l'**overlay di verifica manuale**:
 > i claim più gravi sono stati ricontrollati a mano contro il codice e lo stack live.
+>
+> **Superato sulla chiave di MERL-T** (18 novembre 2026, correzione A.2): `optional_api_key` e la route
+> `POST /api/v1/api-keys/bootstrap` non esistono più; ogni route di MERL-T chiede la chiave.
 
 ## Overlay di verifica (controllato a mano dopo lo swarm)
 

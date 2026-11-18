@@ -57,7 +57,6 @@ from merlt.api.dashboard_router import router as dashboard_router
 from merlt.api.profile_router import router as profile_router
 from merlt.api.rlcf_router import router as rlcf_router
 from merlt.api.expert_metrics_router import router as expert_metrics_router
-from merlt.api.ws_router import router as ws_router
 from merlt.api.tracking_router import router as tracking_router
 from merlt.api.ner_router import router as ner_router
 from merlt.api.policy_evolution_router import router as policy_evolution_router
@@ -90,7 +89,6 @@ __all__ = [
     "profile_router",
     "rlcf_router",
     "expert_metrics_router",
-    "ws_router",
     "tracking_router",
     "ner_router",
     "policy_evolution_router",
