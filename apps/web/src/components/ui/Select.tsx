@@ -1,85 +1,55 @@
 import { forwardRef, type SelectHTMLAttributes, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { FOCUS_RING, DISABLED, TRANSITION, FIELD_TEXT } from '../../constants/interactions';
+import { FIELD_TEXT } from '../../constants/interactions';
+import { CONTROL_HEIGHT, FIELD_CONTROL, FIELD_CONTROL_INVALID, type ControlSize } from './controlStyles';
+import { Field } from './Field';
+import { useFieldIds } from './useFieldIds';
 
-export interface FormSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
-  /** Label text */
+export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   label?: string;
-  /** Error message */
   error?: string;
-  /** Helper text */
   helperText?: string;
-  /** Visual variant */
-  variant?: 'default' | 'glass';
   /** Icon to show on the left */
   icon?: ReactNode;
-  /** Size variant */
-  size?: 'sm' | 'md' | 'lg';
+  size?: ControlSize;
 }
 
-/**
- * FormSelect - Standardized select component matching Input styling.
- */
-export const FormSelect = forwardRef<HTMLSelectElement, FormSelectProps>(
-  ({
-    label,
-    error,
-    helperText,
-    variant = 'default',
-    icon,
-    size = 'md',
-    className,
-    children,
-    ...props
-  }, ref) => {
-    const variantStyles = {
-      default: cn(
-        'bg-slate-50 dark:bg-slate-900/50',
-        'border-slate-200 dark:border-slate-700',
-        error && 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
-      ),
-      glass: cn(
-        'bg-white/50 dark:bg-slate-900/20',
-        'backdrop-blur-sm',
-        'border-white/20 dark:border-white/10',
-        error && 'border-red-300/70 dark:border-red-500/50'
-      ),
-    };
+// At least 16 px below md on every size: Safari on an iPhone zooms into a smaller select (`FIELD_TEXT`).
+const textStyles: Record<ControlSize, string> = {
+  sm: 'text-[length:max(1rem,16px)] md:text-xs',
+  md: FIELD_TEXT,
+  lg: 'text-base',
+};
 
-    const sizeStyles = {
-      // At least 16 px below md on every size: Safari on an iPhone zooms into a smaller select (`FIELD_TEXT`).
-      sm: 'py-1.5 text-[length:max(1rem,16px)] md:text-xs',
-      md: cn('py-2.5', FIELD_TEXT),
-      lg: 'py-3 text-base',
-    };
+/**
+ * A native `<select>` with the look of `Input`: no system arrow (`appearance-none`), a chevron in the ink of the
+ * placeholder, the same label and message. The list that opens stays the system's.
+ */
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(
+  ({ label, error, helperText, icon, size = 'md', className, children, id, 'aria-describedby': describedBy, ...props }, ref) => {
+    const { fieldId, messageId, describedByIds } = useFieldIds(id, describedBy, error || helperText);
 
     return (
-      <div className="space-y-1.5 w-full">
-        {label && (
-          <label className="block text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase ml-1 mb-1">
-            {label}
-          </label>
-        )}
-
+      <Field fieldId={fieldId} messageId={messageId} label={label} error={error} helperText={helperText}>
         <div className="relative">
           {icon && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink-500 dark:text-ink-400">
               {icon}
             </div>
           )}
 
           <select
             ref={ref}
+            id={fieldId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedByIds}
             className={cn(
-              'w-full border rounded-xl inset-shadow-xs appearance-none cursor-pointer',
-              TRANSITION,
-              FOCUS_RING.replace('focus-visible:', 'focus:'),
-              'focus:border-primary-500',
-              DISABLED,
-              'text-slate-900 dark:text-slate-100',
-              variantStyles[variant],
-              sizeStyles[size],
+              FIELD_CONTROL,
+              'appearance-none cursor-pointer',
+              CONTROL_HEIGHT[size],
+              textStyles[size],
+              error && FIELD_CONTROL_INVALID,
               icon ? 'pl-10 pr-10' : 'pl-4 pr-10',
               className
             )}
@@ -88,24 +58,13 @@ export const FormSelect = forwardRef<HTMLSelectElement, FormSelectProps>(
             {children}
           </select>
 
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-            <ChevronDown size={16} />
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-ink-500 dark:text-ink-400">
+            <ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" />
           </div>
         </div>
-
-        {(error || helperText) && (
-          <p
-            className={cn(
-              'text-xs ml-1',
-              error ? 'text-red-500 dark:text-red-400 font-medium' : 'text-slate-500 dark:text-slate-400'
-            )}
-          >
-            {error || helperText}
-          </p>
-        )}
-      </div>
+      </Field>
     );
   }
 );
 
-FormSelect.displayName = 'FormSelect';
+Select.displayName = 'Select';

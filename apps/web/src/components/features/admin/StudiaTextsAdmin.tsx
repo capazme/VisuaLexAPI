@@ -8,6 +8,7 @@ import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Input } from '../../ui/Input';
+import { FIELD_LABEL } from '../../ui/controlStyles';
 import { Toast } from '../../ui/Toast';
 import { TextParagraphs } from '../studia/TextParagraphs';
 
@@ -24,7 +25,6 @@ const KEY_LABEL: Record<string, string> = {
 const LIMITS = { titolo: 200, corpo: 8000, conferma: 120, azione: 120 } as const;
 
 const PANEL = 'rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800';
-const FIELD_LABEL = 'mb-1 ml-1 block text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400';
 
 /** The day a version was saved, in Rome, as DD/MM/YYYY. */
 const dayOf = (createdAt: string) => formatDateForDisplay(todayInRome(new Date(createdAt)));
