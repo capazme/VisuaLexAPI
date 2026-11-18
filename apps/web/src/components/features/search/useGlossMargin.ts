@@ -110,8 +110,7 @@ export function useGlossMargin({ open, rootRef, columnShown, marginContent = fal
     useLayoutEffect(() => {
         if (!host || !slot || host.parentElement === slot) return;
         // A node moved takes the focus out of the page: what had it in the margin takes it again (the margin opened in
-        // the notes' column is focused under the text a commit before its slot is there; a gloss being written moves
-        // with the margin when its first passage is published).
+        // the notes' column is focused under the text a commit before its slot is there).
         const focused = document.activeElement instanceof HTMLElement && host.contains(document.activeElement) ? document.activeElement : null;
         slot.appendChild(host);
         focused?.focus({ preventScroll: true });
