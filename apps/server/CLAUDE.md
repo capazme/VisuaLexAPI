@@ -33,7 +33,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   after `delegatedAuth` and before the general limiter, which it skips.
 - `src/routes/auth.ts` — failed sign-ins and registrations: 5 per 15 minutes per
   address (shared, as before, with the wrong passwords of `PUT /auth/change-password`,
-  `POST /auth/contributions/remove` and `DELETE /auth/account`); failed sign-ins per account (the SHA-256 of the
+  `POST /auth/contributions/remove` and `DELETE /auth/account`); failed attempts on those three
+  (a wrong password, or any other refusal) per signed-in user (`rl:password-checks-user`, the
+  user's id): 10 an hour from any address, a count of its own, so it never blocks the owner's
+  sign-in; ending every session (`POST /auth/logout-all`) needs no password, and ends the
+  sessions the server holds (cookie sessions, #517); failed sign-ins per account (the SHA-256 of the
   email as typed, trimmed and lower-cased, existing or not): 10 an hour from any
   address; refreshes: 30 a minute per address. Counted on arrival (a burst is
   held too) and given back on success. A refusal is 429 with `Retry-After`.
