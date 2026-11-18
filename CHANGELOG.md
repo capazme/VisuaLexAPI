@@ -12,6 +12,34 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-11-18
+
+Fonti and Lettura in one tab, the import from Todoist, «Completa per sempre», menus and notices that grow
+from their button, a Learn path's goal and exam date, and the EU recitals in the sources service. One
+migration (lingo_course_goal). MERL-T stays off.
+
+### Work
+
+- Fonti and Lettura are one tab of the pratica (LC86, part 1).
+- Import a Todoist CSV into the tasks of a pratica (LC80).
+- «Completa per sempre» for a recurring task (LC79).
+
+### Interface
+
+- Menus, notices and confirmations open and close from their button like the search island, one
+  component for all (LC85).
+
+### Learn (server)
+
+- A path keeps the learner's goal and exam date (#554, migration `20261117120000_lingo_course_goal`);
+  the link to a path's declaration points to /learn (#553).
+
+### Sources (server and services)
+
+- EU recitals («considerando»): text settled and frozen, reachable behind the login, read in a citation,
+  kept in a pratica as a norm entry (#577, #578, #579, #580). The web reading comes later.
+- The spec of the Forum community's server (#434).
+
 ## [1.35.0] - 2026-11-18
 
 Scadenze without the clutter, Impostazioni as a real page, and the server's security fixes of the night
