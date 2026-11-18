@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { IslandSource } from './IslandSurface';
 
 /** What `IslandSurface` shares with its neighbours (the search's veil, the confirmations). */
 
@@ -21,22 +22,18 @@ export function useReducedMotionLive(): boolean {
 }
 
 /**
- * The last control pressed, for a surface opened from one that a click did not focus (Safari, a tap): what the
- * confirmations grow from when their caller names nothing.
+ * What a confirmation grows from (LC85): the control its caller names, while it is on the page, else the rectangle that
+ * control had as the confirmation opened (a menu's entry, gone by the time the card grows). Nothing named: nothing, a
+ * fade. Never guessed from the focus: a click from a screen reader, or a script, focuses no button.
  */
-let lastPressed: HTMLElement | null = null;
-if (typeof document !== 'undefined') {
-  document.addEventListener('pointerdown', (event) => {
-    lastPressed = (event.target as Element | null)?.closest?.<HTMLElement>('button, a, [role="menuitem"], [role="button"]') ?? null;
-  }, true);
-  // A key since: what opens now was not opened by that press (an Esc, a shortcut).
-  document.addEventListener('keydown', () => {
-    lastPressed = null;
-  }, true);
-}
-/** What opened a surface now: the focused control, else the last one pressed, if still on the page. */
-export function openerNow(): HTMLElement | null {
-  const active = document.activeElement;
-  if (active instanceof HTMLElement && active !== document.body) return active;
-  return lastPressed?.isConnected ? lastPressed : null;
+export function originOf(el: HTMLElement | null | undefined): IslandSource {
+  if (!el?.isConnected) return null;
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return el;
+  const saved = { top: r.top, right: r.right, bottom: r.bottom, left: r.left, radius: Math.min(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, r.height / 2) };
+  return () => {
+    if (!el.isConnected) return saved;
+    const now = el.getBoundingClientRect();
+    return now.width && now.height ? { top: now.top, right: now.right, bottom: now.bottom, left: now.left, radius: saved.radius } : saved;
+  };
 }

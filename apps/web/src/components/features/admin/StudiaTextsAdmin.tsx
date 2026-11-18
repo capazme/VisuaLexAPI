@@ -103,6 +103,7 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
     titolo: current.titolo, corpo: current.corpo, conferma: current.conferma, azione: current.azione,
   });
   const [asking, setAsking] = useState(false);
+  const [askFrom, setAskFrom] = useState<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<'conflict' | 'failed' | null>(null);
 
@@ -175,7 +176,7 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
       )}
 
       <div>
-        <Button disabled={!changed || !complete || saving} onClick={() => setAsking(true)}>
+        <Button disabled={!changed || !complete || saving} onClick={(event) => { setAskFrom(event.currentTarget); setAsking(true); }}>
           Salva come nuova versione
         </Button>
       </div>
@@ -193,6 +194,7 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
 
       <ConfirmDialog
         open={asking}
+        origin={askFrom}
         title="Salvare come nuova versione?"
         message={`Si crea la versione ${next}. Chi ha accettato una versione precedente la vedrà di nuovo alla prossima proposta. Le versioni precedenti restano consultabili.`}
         confirmLabel="Salva"

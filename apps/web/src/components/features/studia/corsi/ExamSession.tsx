@@ -294,7 +294,7 @@ function Exam({ id, esameId }: { id: string; esameId: string }) {
         confirmLabel={confirm?.kind === 'consegna' ? (missing === 0 ? 'Consegna' : 'Consegna lo stesso') : 'Esci'}
         cancelLabel="Continua la prova"
         emphasis="cancel"
-        origin={confirm?.origin}
+        origin={confirm?.origin ?? null}
         focusBack={() => heading.current}
         onConfirm={() => (confirm?.kind === 'consegna' ? void handIn() : back())}
         onCancel={() => setConfirm(null)}

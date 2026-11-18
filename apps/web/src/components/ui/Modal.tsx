@@ -6,7 +6,7 @@ import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 import { useDialogFocus } from './useDialogFocus';
 import { dur, ease } from '../../lib/motion';
-import { IslandSurface } from './IslandSurface';
+import { IslandSurface, type IslandSource } from './IslandSurface';
 
 export type ModalVariant = 'default' | 'danger' | 'info' | 'success';
 
@@ -34,7 +34,7 @@ export interface ModalProps {
    * Grows out of this control and goes back into it (`IslandSurface`, LC85), instead of the panel's scale; null fades.
    * The confirmations' (`ConfirmDialog`): the large dialogs keep their own way until they move into the page.
    */
-  growFrom?: HTMLElement | null;
+  growFrom?: IslandSource;
   children?: ReactNode;
 }
 

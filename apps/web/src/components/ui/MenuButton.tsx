@@ -7,8 +7,11 @@ import { IslandSurface } from './IslandSurface';
 
 export interface MenuItem {
   label: string;
-  /** The click that chose it: a key's (Enter, Space) has `detail` 0. */
-  onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  /**
+   * The click that chose it (a key's, Enter or Space, has `detail` 0), and the menu's trigger, which has the focus back
+   * by then: what a confirmation the item opens grows from (LC85), the item itself being gone.
+   */
+  onSelect: (event: ReactMouseEvent<HTMLButtonElement>, trigger: HTMLButtonElement | null) => void;
   icon?: LucideIcon;
   /** The icon's own colour (a priority's flag), when it says more than the label's. */
   iconClassName?: string;
@@ -196,7 +199,7 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
                 aria-label={item.ariaLabel}
                 disabled={item.disabled}
                 tabIndex={-1}
-                onClick={(event) => { close(true); item.onSelect(event); }}
+                onClick={(event) => { close(true); item.onSelect(event, triggerRef.current); }}
                 className={cn(
                   'flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left text-sm md:min-h-0',
                   // The app's ring drawn inside the item: outside it, the list's scroll would cut its sides off.

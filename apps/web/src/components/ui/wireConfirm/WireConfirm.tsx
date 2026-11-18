@@ -7,7 +7,8 @@ import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 import { cn } from '../../../lib/utils';
 import { isTopmostDialog, openDialog } from '../dialogStack';
 import { IslandSurface } from '../IslandSurface';
-import { openerNow, useReducedMotionLive } from '../islandMotion';
+import { originOf, useReducedMotionLive } from '../islandMotion';
+import type { IslandSource } from '../IslandSurface';
 import { OutcomeTick, type Box } from './OutcomeTick';
 
 /**
@@ -46,11 +47,11 @@ export interface WireConfirmProps {
    */
   focusBack?: () => HTMLElement | null | undefined;
   /**
-   * The button the wire starts from and the focus goes back to. Pass it (`event.currentTarget`): Safari and a tap do not
-   * focus a button they press. Absent, the element focused as it opens — right for a menu's entry, whose menu gives
-   * the focus back to its trigger by code before the entry runs.
+   * The button the card grows from and the focus goes back to (`event.currentTarget`, or a menu's trigger: `MenuButton`
+   * hands it to `onSelect`). Required, so no caller forgets it: Safari, a tap and a screen reader focus no button they
+   * press. Null only where nothing on screen asked (a key).
    */
-  origin?: HTMLElement | null;
+  origin: HTMLElement | null;
   /**
    * The outcome has been said (its tick gone), or there was none to draw: a caller that removes the button (a row, a
    * card) does it now, not while the tick still sits over it.
@@ -98,10 +99,12 @@ export function WireConfirm({
   // The button, kept from the render that opens it: a menu's entry is gone by the time the card is measured.
   const [wasOpen, setWasOpen] = useState(false);
   const [from, setFrom] = useState<HTMLElement | null>(null);
+  const [source, setSource] = useState<IslandSource>(null);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setFrom(origin ?? openerNow());
+      setFrom(origin);
+      setSource(originOf(origin));
       setConfirmed(false);
       // Its buttons answer only once they are seen (`READY_MS`).
       setReady(false);
@@ -240,7 +243,7 @@ export function WireConfirm({
             confirmLabel={confirmLabel}
             variant={variant}
             emphasis={emphasis}
-            from={from}
+            source={source}
             ready={ready}
             cardRef={cardRef}
             cancelRef={cancelRef}
@@ -266,7 +269,7 @@ interface WireLayerProps {
   confirmLabel: string;
   variant: 'default' | 'danger';
   emphasis: 'confirm' | 'cancel';
-  from: HTMLElement | null;
+  source: IslandSource;
   ready: boolean;
   cardRef: RefObject<HTMLDivElement | null>;
   cancelRef: RefObject<HTMLButtonElement | null>;
@@ -276,7 +279,7 @@ interface WireLayerProps {
 }
 
 /** The backdrop and the card: one presence, so the backdrop goes with the card. */
-function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emphasis, from, ready, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
+function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emphasis, source, ready, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
   // Leaving, it takes no click: the backdrop's would cancel twice.
   const present = useIsPresent();
 
@@ -307,7 +310,7 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emp
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
         <IslandSurface
           ref={cardRef}
-          source={from}
+          source={source}
           role="alertdialog"
           aria-modal="true"
           aria-labelledby={`${id}-title`}

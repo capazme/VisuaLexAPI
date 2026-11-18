@@ -46,7 +46,8 @@ export function PreparationPanel({ titolo, missing }: { titolo: string; missing:
 export function EndProgrammeOffer({ deleted, missing, onEnd, busy }: {
   deleted: { ordine: number; titolo: string };
   missing: Mancanze;
-  onEnd: () => void;
+  /** With the button pressed: what the confirmation grows from (LC85). */
+  onEnd: (event: { currentTarget: HTMLElement }) => void;
   busy: boolean;
 }) {
   const count = missing.moduli.contati;
@@ -90,7 +91,8 @@ export interface ModuleActions {
   /** A module never opened: to the trash. */
   onDelete: (modulo: ModuloPagina) => void;
   /** An opened module superseded by a live correction. */
-  onWithdraw: (modulo: ModuloPagina) => void;
+  /** With the button pressed: what the confirmation grows from (LC85). */
+  onWithdraw: (modulo: ModuloPagina, origin: HTMLElement) => void;
   /** The modules with a write out: their buttons wait. */
   busy: ReadonlySet<string>;
 }
@@ -161,7 +163,7 @@ export function ModulesSection({ corsoId, moduli, actions, headingRef, offer }: 
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => actions.onWithdraw(m)}
+                      onClick={(event) => actions.onWithdraw(m, event.currentTarget)}
                       className={cn(SECONDARY_BUTTON, 'disabled:opacity-60')}
                     >
                       Ritira questo modulo

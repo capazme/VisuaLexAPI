@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { AnimatePresence } from 'framer-motion';
 import { IslandSurface } from '../IslandSurface';
-import { openerNow } from '../islandMotion';
+import { originOf } from '../islandMotion';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 
 type Run = { el: Element; keyframes: Keyframe[]; options: KeyframeAnimationOptions; animation: Animation };
@@ -187,17 +187,19 @@ describe('IslandSurface (LC85)', () => {
   });
 });
 
-describe('openerNow: what a confirmation grows from and gives the focus back to', () => {
-  it('is the focused control, else the one last pressed (Safari and a tap focus none), never one pressed before a key', () => {
-    (document.activeElement as HTMLElement | null)?.blur();
-    fireEvent.pointerDown(trigger);
-    expect(openerNow()).toBe(trigger);
-    fireEvent.keyDown(document.body, { key: 'Escape' });
-    expect(openerNow()).toBeNull();
-    const other = document.createElement('button');
-    document.body.append(other);
-    other.focus();
-    expect(openerNow()).toBe(other);
-    other.remove();
+describe('originOf: what a confirmation grows from', () => {
+  it('is the control while it is on the page, and the rectangle it had as the confirmation opened once it is gone', () => {
+    const source = originOf(trigger) as (box: DOMRect) => { top: number; left: number; right: number; bottom: number; radius?: number };
+    const box = rect(0, 0, 400, 400);
+    expect(source(box)).toEqual({ top: 100, left: 300, right: 332, bottom: 132, radius: 16 });
+    // A menu's entry, unmounted by the time the card grows: the saved rectangle.
+    trigger.remove();
+    expect(source(box)).toEqual({ top: 100, left: 300, right: 332, bottom: 132, radius: 16 });
+  });
+
+  it('is nothing where nothing on the page is named', () => {
+    expect(originOf(null)).toBeNull();
+    trigger.remove();
+    expect(originOf(trigger)).toBeNull();
   });
 });

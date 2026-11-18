@@ -15,7 +15,8 @@ interface SharedEnvironmentCardProps {
   onReport: (id: string) => void;
   onSuggest?: (env: SharedEnvironment) => void;
   onEdit?: (env: SharedEnvironment) => void;
-  onDelete?: (env: SharedEnvironment) => void;
+  /** With the menu's button, which the confirmation grows from and gives the focus back to (LC85). */
+  onDelete?: (env: SharedEnvironment, origin: HTMLElement | null) => void;
   onWithdraw?: (env: SharedEnvironment) => void;
   onRepublish?: (env: SharedEnvironment) => void;
   onViewVersions?: (env: SharedEnvironment) => void;
@@ -206,8 +207,9 @@ export function SharedEnvironmentCard({
                           onClick={() => {
                             // The focus goes back to the menu's button, as `MenuButton` does: the confirmation is drawn
                             // from it and returns the focus there (K1b).
-                            menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
-                            onDelete(environment);
+                            const menuButton = menuRef.current?.querySelector<HTMLButtonElement>('button') ?? null;
+                            menuButton?.focus();
+                            onDelete(environment, menuButton);
                             setShowMenu(false);
                           }}
                           className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
