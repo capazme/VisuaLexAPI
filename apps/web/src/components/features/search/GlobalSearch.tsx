@@ -3,26 +3,22 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useSearchActions } from '../../../hooks/useSearchActions';
 import { CommandPalette } from './CommandPalette';
-import { QuickNormsManager } from './QuickNormsManager';
-import { AliasManager } from '../settings/AliasManager';
 
 /**
- * The palette (⌘K) and the two managers it opens, mounted once by `Layout` so that they work on every
- * page (gotcha 27: a store flag only opens a modal that is mounted). What they open lands in the
- * practices, so from another page `useSearchActions` brings the reader to the search page.
+ * The palette (⌘K), mounted once by `Layout` so that it works on every page (gotcha 27: a store flag only opens a
+ * modal that is mounted). What it opens lands in the practices, so from another page `useSearchActions` brings the
+ * reader to the search page. The quick norms and the aliases it used to open over the page are parts of Impostazioni
+ * (LC84).
  */
 export function GlobalSearch() {
-  const { commandPaletteOpen, closeCommandPalette, quickNormsManagerOpen, closeQuickNormsManager } = useAppStore(useShallow((s) => ({
+  const { commandPaletteOpen, closeCommandPalette } = useAppStore(useShallow((s) => ({
     commandPaletteOpen: s.commandPaletteOpen,
     closeCommandPalette: s.closeCommandPalette,
-    quickNormsManagerOpen: s.quickNormsManagerOpen,
-    closeQuickNormsManager: s.closeQuickNormsManager,
   })));
   const actions = useSearchActions();
   const navigate = useNavigate();
 
   return (
-    <>
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={closeCommandPalette}
@@ -31,10 +27,5 @@ export function GlobalSearch() {
         onShowSearch={actions.goToSearch}
         onOpenRassegne={(passo) => navigate('/rassegne', passo ? { state: { passo } } : undefined)}
       />
-      {/* A quick norm used from the manager runs as it always did (a trigger, checked for an annex), and
-          from another page brings the reader to the search page. */}
-      <QuickNormsManager isOpen={quickNormsManagerOpen} onClose={closeQuickNormsManager} onSearch={actions.trigger} />
-      <AliasManager />
-    </>
   );
 }

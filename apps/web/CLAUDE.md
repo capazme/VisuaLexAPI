@@ -772,12 +772,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
   palette with the same words when no field is on screen (the full screen).
-  **The palette is global**: `GlobalSearch` (the palette, `QuickNormsManager`, `AliasManager`) is mounted by
+  **The palette is global**: `GlobalSearch` (the palette) is mounted by
   `Layout`, so ⌘K opens it on every page at once; what it opens lands in the practices through
   `hooks/useSearchActions` (`search`, `browse`, `openDecision`, `openTopic`), which bring the reader to `/` from
   any other page. A typed search (palette, field) is marked (`isTypedSearch`, on a copy of its params, never on a
   quick norm's own) and `SearchPanel` does not run the annex auto-switch on it, as when the palette called the panel
-  directly; a quick norm used from its manager is a plain trigger (`trigger`), checked as before.
+  directly; a quick norm used from Impostazioni › «Norme rapide» is a plain trigger (`trigger`), checked as before.
 - `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and
   `DevRoute` (a route element: without the mode, `<Navigate to="/" replace />`; while `useAuth` is
   still loading it draws nothing, so a reload on a development address is not mistaken for the mode
@@ -1216,13 +1216,12 @@ Three different things. Conflating them is the recurring mistake.
   advertising a shortcut that no longer runs, and the manager badges it
   "sovrascritto".
 
-`AliasManager` is reached **only** from the command palette (gotcha 27; both are mounted by `Layout`'s
-`GlobalSearch`), and in
+The aliases are a part of the Impostazioni page (`AliasSection`, `/impostazioni#alias`, LC84), reached from the
+index there and from the palette's «Gestisci alias»; in
 the palette the presets cost one line of header text at rest — they render as
 rows only once the user types, matched by `queryMatches` (`paletteActs.ts`). `useAliasCatalog`
-keeps its `loaded` flag in component state, so the palette and the manager each
-fetch the catalog once for as long as they stay mounted — two calls per session,
-never repeated, nothing persisted.
+keeps its `loaded` flag in component state, so the palette and the page each
+fetch the catalog once for as long as they stay mounted, nothing persisted.
 
 ### Reading surface
 
@@ -1633,15 +1632,12 @@ colour's meaning reads it through `useHighlightColorMeanings` (`highlightColorIt
 the first letter, not an acronym the user wrote). Beside the highlighter one gear and only that (no «?»: the menu
 already explains; the gear says «change it»), named and titled «Cambia il significato dei colori»
 (`CHANGE_MEANINGS_LABEL`), the trigger's look with 44 px of width on a phone — the article's bar, the decision's, the
-dossier reader's; on the phone's «⋯» the same words are the entry after the inks; none over a lesson; in Study Mode, whose header
-has a gear already (its own settings, «Impostazioni (S)»), the entry is the last of that panel, not a second gear
-(`meaningsGear={false}`); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
-dialog over it would fight it: Impostazioni stays the user menu's there). All open Impostazioni at «Significato dei colori» (`openSettings('highlightColors')`):
-the dialog's state is the store's (`settingsDialog`, session-only), so `Layout`'s `SettingsModal` opens from any reader,
-and with that section it gives the section's first field («Giallo») the focus (`initialFocusRef`) — never the heading:
-`useDialogFocus`'s trap sends Shift+Tab from an element outside its Tab order (`tabIndex -1`) to the dialog's last
-control — and that first focus scrolls the dialog's body alone so the section's heading is at its top (`revealOnFocus`,
-`scrollParentOf`).
+dossier reader's; on the phone's «⋯» the same words are the entry after the inks; none over a lesson; none in Study Mode
+(`meaningsGear={false}`, and since LC84 no entry in its settings panel either: going to the Impostazioni page would
+leave Study Mode and lose its state, Bill); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
+dialog over it would fight it: Impostazioni stays the user menu's there). All open Impostazioni at «Significato dei colori» (`openSettings('colori')`, `/impostazioni#colori`):
+LC84, Impostazioni is a page (`features/settings/SettingsPage`, below). No gear inside a lesson (`CitationPanel`):
+going to the page would end the lesson.
 `HighlightMeaningsSection`, after «Tipografia»: a field per colour (its dot and name as the label, the default as
 placeholder, `maxLength` 40, 44 px on a phone, `FIELD_TEXT`), saved when left or on Enter, an emptied one keeping the
 meaning it had (said in the section's status line), Esc giving up a change without closing the dialog, and «Ripristina
@@ -3292,9 +3288,17 @@ meant to stay split; add new features as new files, not inside the shells:
   checked in `theme.test.ts`), `SearchField.tsx` (the search page's field)
   and `GlobalSearch.tsx` (the palette and the managers it opens, mounted by `Layout` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
-- `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
-  edits, not for where it opens: it is reached from the command palette, not
-  from Settings (gotcha 27). See the Aliases section above.
+- `features/settings/` — **Impostazioni as a page** (LC84, L-73; it was `ui/SettingsModal`): `SettingsPage`, the
+  route `/impostazioni`, with its parts as anchors (`#aspetto`, `#colori`, `#norme-rapide`, `#alias`, `#scorciatoie`,
+  `#aiuto`, `#sviluppo`, `#amministrazione`, `#dati`, `#merlt`, `#app-collegate`, `#informazioni`): an index at the left
+  from `lg`, a list at the top below it; the index changes the anchor with `replace`, and the part comes in view by the
+  page's scroller alone (gotcha 34), followed for two seconds while the page grows (the aliases' catalog arrives late).
+  `KeyboardShortcutsSection`, `AliasSection` and `QuickNormsSection` are its parts (they were dialogs). Every caller asks
+  the store (`openSettings(section)`, `settingsRequest`, session-only) and `Layout` turns the request into the
+  navigation (`settingsRoute.ts`, `useSettingsRequests`), keeping where it came from (`settingsFrom` in the history's
+  state): «Indietro» and Esc (pressed in the page or with the focus nowhere) go back there, or to `/` when it was
+  opened by its address. It comes in with `PageSlide` and leaves the other way (`back`): `Layout`'s key for it changes
+  only entering and leaving Impostazioni. What opens inside it opens in the page (`Expand`).
 - `features/workspace/` — what a practice's rows borrow from the old workspace: `LazyStudyMode` (the
   `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are lazy the same way) and
   `ArticleNavigation` (an act's previous/next arrows). The floating tabs, their dock and their panels are gone
@@ -3541,9 +3545,8 @@ meant to stay split; add new features as new files, not inside the shells:
     and the palette used to render inside `SearchPanel`, so `aliasManagerOpen` and
     ⌘K were inert on `/dossier`, `/history` or any route that is not the search page —
     the flag flipped and nothing appeared until the reader came back to `/`. The palette,
-    `QuickNormsManager` and `AliasManager` now live in `Layout` (`GlobalSearch`); the
-    alias manager is still reached only from the palette, and the Settings entry that
-    used to open it was removed rather than kept as a second door. What the palette opens
+    `QuickNormsManager` and `AliasManager` then lived in `Layout` (`GlobalSearch`); since
+    LC84 they are parts of the Impostazioni page, a route, and need no flag at all. What the palette opens
     lands in the practices, which only `/` draws: `useSearchActions` navigates there.
     Before adding a global-looking "open X" button, check where X is mounted.
 

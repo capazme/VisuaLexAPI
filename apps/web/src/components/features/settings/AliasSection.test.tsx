@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { AliasManager } from './AliasManager';
+import { AliasSection } from './AliasSection';
 import { appStore } from '../../../store/useAppStore';
 import type { CustomAlias } from '../../../types';
 
@@ -15,20 +15,20 @@ const baseAlias: CustomAlias = {
   lastUsedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
 };
 
-describe('AliasManager', () => {
+describe('AliasSection', () => {
   beforeEach(() => {
-    appStore.setState({ aliasManagerOpen: true, customAliases: [baseAlias] });
+    appStore.setState({ customAliases: [baseAlias] });
   });
 
   it('renders usageCount and the lastUsedAt recency label', () => {
-    render(<AliasManager />);
+    render(<AliasSection />);
     expect(screen.getByText(/7×/)).toBeInTheDocument();
     expect(screen.getByText(/ultima .* fa/)).toBeInTheDocument();
   });
 
   it('omits the recency label when lastUsedAt is absent', () => {
-    appStore.setState({ aliasManagerOpen: true, customAliases: [{ ...baseAlias, lastUsedAt: undefined }] });
-    render(<AliasManager />);
+    appStore.setState({ customAliases: [{ ...baseAlias, lastUsedAt: undefined }] });
+    render(<AliasSection />);
     expect(screen.getByText(/7×/)).toBeInTheDocument();
     expect(screen.queryByText(/ultima/)).not.toBeInTheDocument();
   });
@@ -62,21 +62,21 @@ function stubCatalog(payload: unknown = CATALOG, ok = true) {
  * run in five. One change event per field removes the race without weakening
  * what is being checked.
  */
-describe('AliasManager — what the system already recognises', () => {
+describe('AliasSection — what the system already recognises', () => {
   beforeEach(() => {
-    appStore.setState({ aliasManagerOpen: true, customAliases: [] });
+    appStore.setState({ customAliases: [] });
     stubCatalog();
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
   it('lists the aliases we ship, so the user can see them before reinventing one', async () => {
-    render(<AliasManager />);
+    render(<AliasSection />);
     await waitFor(() => expect(screen.getByText('codice ambiente')).toBeInTheDocument());
     expect(screen.getByText(/In dotazione/)).toBeInTheDocument();
   });
 
   it('lists the act names that need no alias at all', async () => {
-    render(<AliasManager />);
+    render(<AliasSection />);
     await waitFor(() => expect(screen.getByText('statuto dei lavoratori')).toBeInTheDocument());
     expect(screen.getByText('legge fornero')).toBeInTheDocument();
   });
@@ -84,19 +84,19 @@ describe('AliasManager — what the system already recognises', () => {
   it('marks a shipped alias the user has taken over', async () => {
     // The user's own `gdpr` wins: the client resolves its aliases before
     // asking the server. The badge is what makes that visible.
-    appStore.setState({ aliasManagerOpen: true, customAliases: [baseAlias] });
-    render(<AliasManager />);
+    appStore.setState({ customAliases: [baseAlias] });
+    render(<AliasSection />);
     await waitFor(() => expect(screen.getByText('sovrascritto')).toBeInTheDocument());
   });
 
   it('does not mark a shipped alias the user has not touched', async () => {
-    render(<AliasManager />);
+    render(<AliasSection />);
     await waitFor(() => expect(screen.getByText('codice ambiente')).toBeInTheDocument());
     expect(screen.queryByText('sovrascritto')).not.toBeInTheDocument();
   });
 
   it('filters both lists together, ignoring accents', async () => {
-    render(<AliasManager />);
+    render(<AliasSection />);
     await waitFor(() => expect(screen.getByText('statuto dei lavoratori')).toBeInTheDocument());
 
     fireEvent.change(screen.getByPlaceholderText(/Cerca fra gli alias/i), {
@@ -107,7 +107,7 @@ describe('AliasManager — what the system already recognises', () => {
   });
 
   it('warns that a trigger would take over a shipped alias', async () => {
-    render(<AliasManager />);
+    render(<AliasSection />);
     await waitFor(() => expect(screen.getByText('codice ambiente')).toBeInTheDocument());
 
     const field = screen.getByPlaceholderText('es. mio-contratto');
@@ -118,7 +118,7 @@ describe('AliasManager — what the system already recognises', () => {
   });
 
   it('warns that an alias is pointless when the name already resolves', async () => {
-    render(<AliasManager />);
+    render(<AliasSection />);
     await waitFor(() => expect(screen.getByText('legge fornero')).toBeInTheDocument());
 
     const field = screen.getByPlaceholderText('es. mio-contratto');
@@ -132,9 +132,9 @@ describe('AliasManager — what the system already recognises', () => {
     const errors: unknown[] = [];
     vi.spyOn(console, 'error').mockImplementation((...a) => { errors.push(a); });
     stubCatalog({}, false);
-    appStore.setState({ aliasManagerOpen: true, customAliases: [baseAlias] });
+    appStore.setState({ customAliases: [baseAlias] });
 
-    render(<AliasManager />);
+    render(<AliasSection />);
     // Degrades to what it did before this existed — but not silently.
     await waitFor(() => expect(errors.length).toBeGreaterThan(0));
     expect(screen.getByText(/7×/)).toBeInTheDocument();
