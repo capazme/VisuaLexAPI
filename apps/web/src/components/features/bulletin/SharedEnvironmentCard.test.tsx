@@ -49,10 +49,11 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
     expect(screen.queryByText('Ai miei dossier')).not.toBeInTheDocument();
   });
 
-  it('names the card’s «⋯» menu and gives it a 44 px touch target on a phone', () => {
+  it('names the card’s «⋯» menu and gives it a 44 px touch target on a phone, 32 on a computer', () => {
     renderCard(base);
     const menu = screen.getByRole('button', { name: 'Azioni su «Ricorso Rossi»' });
-    expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
+    // 32 px on a computer, as the other «⋯» (LC103; it was 24).
+    expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-8', 'md:min-w-8');
   });
 
   it('gives «Mi piace» and «Aggiungi ai miei dossier» a 44 px touch target on a phone', () => {

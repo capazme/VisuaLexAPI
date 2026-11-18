@@ -395,10 +395,10 @@ export function HistoryView() {
                                     {/* Timeline items */}
                                     {/* Mobile: simpler timeline */}
                                     <div className="md:hidden space-y-2">
-                                        {items.map((item, idx) => item.decision_key ? (
+                                        {items.map((item) => item.decision_key ? (
                                             <DecisionHistoryRow key={item.id} item={item} variant="mobile" onDelete={handleDeleteItem} />
                                         ) : (
-                                            <div key={idx} className="relative">
+                                            <div key={item.id} className="relative">
                                                 {/* Mobile Item card - compact, tap-friendly; a button, so Tab reaches it and Enter opens it (A6) */}
                                                 <button
                                                     type="button"
@@ -452,7 +452,7 @@ export function HistoryView() {
                                             <DecisionHistoryRow key={item.id} item={item} variant="desktop" onDelete={handleDeleteItem}
                                                 id={idx === 0 ? 'tour-history-item' : undefined} />
                                         ) : (
-                                            <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
+                                            <div key={item.id} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
 
                                                 {/* Item card: the title is a button stretched over the card (A6), so the card still opens
                                                     on a click anywhere and Tab and Enter reach it; the menu sits beside it, above the stretch. */}

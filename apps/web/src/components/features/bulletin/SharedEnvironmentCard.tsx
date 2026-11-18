@@ -147,7 +147,7 @@ export function SharedEnvironmentCard({
               <MenuButton
                 label={`Azioni su «${environment.title}»`}
                 items={menuItems}
-                triggerClassName="min-h-[44px] min-w-[44px] justify-center p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 md:min-h-0 md:min-w-0"
+                triggerClassName="min-h-[44px] min-w-[44px] justify-center p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 md:min-h-8 md:min-w-8"
               >
                 <MoreHorizontal size={16} aria-hidden className="text-slate-500" />
               </MenuButton>

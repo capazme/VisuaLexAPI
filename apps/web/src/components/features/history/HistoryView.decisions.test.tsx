@@ -142,6 +142,29 @@ describe('HistoryView — decisions', () => {
     }
   });
 
+  // Papiniano on #634: a «⋯» open, then «/» and a search, and the menu stood under another norm and removed it.
+  it('closes an open «⋯» on «/» and never leaves it under another norm when the filter changes', async () => {
+    const other = { ...norm, id: 'n2', act_type: 'codice civile', act_number: null, date: null, article: '2043' };
+    getHistory.mockResolvedValue([norm, other]);
+    mount();
+    const search = screen.getByRole('textbox', { name: 'Cerca nella cronologia' });
+    const desktop = async () => (await screen.findAllByRole('button', { name: 'Altre azioni su art. 3 l. 241/1990' }))[1];
+
+    // «/»: the menu closes, the search has the focus.
+    fireEvent.click(await desktop());
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement!, { key: '/' });
+    expect(search).toHaveFocus();
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    // The filter changing under an open menu: its row goes, and the menu with it; nothing moves under «art. 2043».
+    fireEvent.click(await desktop());
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: '2043' } });
+    await waitFor(() => expect(screen.queryAllByText('art. 3 l. 241/1990')).toHaveLength(0));
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
   it('gives the phone\'s «⋯» a 44 px touch target, in the phone\'s list (it was only in the computer\'s, 0 wide at 390)', async () => {
     getHistory.mockResolvedValue([norm]);
     mount();

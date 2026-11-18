@@ -141,7 +141,16 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
   if (items.length === 0) return null;
 
   return (
-    <div ref={wrapperRef} className={cn('relative', className)} onClick={(e) => e.stopPropagation()}>
+    <div
+      ref={wrapperRef}
+      className={cn('relative', className)}
+      onClick={(e) => e.stopPropagation()}
+      // The focus taken elsewhere (the Cronologia's «/» to its search) closes it, as Tab does (LC103). Only towards an
+      // element: a click on Safari leaves `relatedTarget` null, and the click outside has its own handler.
+      onBlur={(e) => {
+        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpenAt(null);
+      }}
+    >
       <button
         ref={triggerRef}
         type="button"
