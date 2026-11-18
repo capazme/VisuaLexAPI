@@ -16,8 +16,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   through Playwright second, since eur-lex.europa.eu answers a server with an AWS WAF challenge,
   202 plus `x-amzn-waf-action` (`is_waf_challenge`); a page with no act's marker, `is_act_page`, is
   neither served nor kept; the URL the app holds and the copies' key stay EUR-Lex's; at most
-  `BROWSER_SLOTS` (2) browsers at once per process, a call that finds none free within
-  `BROWSER_WAIT_SECONDS` (20) gets a 503 «riprova tra poco», `tests/test_eurlex_browser_slots.py`),
+  `BROWSER_SLOTS` (2) browsers at once per process; a call that finds none free within
+  `BROWSER_WAIT_SECONDS` (20) raises a `NetworkError` (`status_code` 503) whose words say to retry:
+  the reader sees them as the article's error, `/fetch_tree` as a 500; `tests/test_eurlex_browser_slots.py`),
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
   `request(..., session=s)` sends one request on the caller's own session, for a page that
