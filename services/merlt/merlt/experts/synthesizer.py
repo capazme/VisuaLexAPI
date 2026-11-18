@@ -26,6 +26,7 @@ Esempio:
     >>> print(result.synthesis)
 """
 
+from merlt.config.llm_models import DEFAULT_EXPERT_MODEL
 import os
 import structlog
 import time
@@ -923,7 +924,7 @@ class AdaptiveSynthesizer:
             from merlt.config.runtime_config import get_runtime_config
             result = await self.ai_service.generate_response_async(
                 prompt=prompt,
-                model=get_runtime_config().get_str("expert_model", "google/gemini-2.5-flash"),
+                model=get_runtime_config().get_str("expert_model", DEFAULT_EXPERT_MODEL),
                 temperature=0.3,
                 max_tokens=int(os.getenv("MERLT_SYNTHESIS_MAX_TOKENS", "6144")),
             )
@@ -953,7 +954,7 @@ class AdaptiveSynthesizer:
             from merlt.config.runtime_config import get_runtime_config
             result = await self.ai_service.generate_response_async(
                 prompt=prompt,
-                model=get_runtime_config().get_str("expert_model", "google/gemini-2.5-flash"),
+                model=get_runtime_config().get_str("expert_model", DEFAULT_EXPERT_MODEL),
                 temperature=0.3,
                 max_tokens=int(os.getenv("MERLT_SYNTHESIS_MAX_TOKENS", "6144")),
             )

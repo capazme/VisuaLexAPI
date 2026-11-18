@@ -11,6 +11,7 @@ Il giudice usa Chain-of-Thought per produrre valutazioni motivate
 e consistenti, con punteggi su scala 1-5.
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import json
 import os
 import re
@@ -216,7 +217,7 @@ Non aggiungere altro testo prima o dopo il JSON."""
         self.ai_service = ai_service
         self.judge_model = judge_model or os.getenv(
             "RLCF_JUDGE_MODEL",
-            "google/gemini-2.5-flash"
+            DEFAULT_FAST_MODEL
         )
         self.temperature = temperature
         self._initialized = False

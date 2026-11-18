@@ -24,6 +24,7 @@ Esempio:
     >>> aggregated = await gating.aggregate(responses, weights)
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import time
 import structlog
 from dataclasses import dataclass, field
@@ -837,7 +838,7 @@ class GatingNetwork:
             result = await self.ai_service.generate_response_async(
                 prompt=prompt,
                 model=self._config.__dict__.get(
-                    "model", "google/gemini-2.5-flash"
+                    "model", DEFAULT_FAST_MODEL
                 ),
                 temperature=self._config.llm_temperature,
             )

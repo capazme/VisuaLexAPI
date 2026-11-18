@@ -5,6 +5,7 @@ Gestisce il caricamento della configurazione da file YAML
 con supporto per variabili d'ambiente e valori di default.
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import os
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
@@ -91,7 +92,7 @@ class SimulationConfig:
 
     # LLM Judge
     use_llm_judge: bool = True
-    llm_judge_model: str = "google/gemini-2.5-flash"
+    llm_judge_model: str = DEFAULT_FAST_MODEL
     llm_judge_temperature: float = 0.1
     llm_provider: str = "openrouter"
 

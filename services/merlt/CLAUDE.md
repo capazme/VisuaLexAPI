@@ -204,6 +204,13 @@ BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
   with no zero-retention endpoint is refused by OpenRouter, so a model chosen for
   MERL-T must have one. Do not add a client that calls a model another way: the
   unused multi-provider package `experts/llm/` was removed for that reason.
+  Every model MERL-T picks by itself (defaults, fallbacks, the admin's choices) is
+  on `ZERO_RETENTION_MODELS` in `merlt/config/llm_models.py` (G-575), with the two
+  defaults `DEFAULT_FAST_MODEL` and `DEFAULT_EXPERT_MODEL`;
+  `tests/unit/test_default_models_zero_retention.py` fails on any other model id
+  (OpenRouter's `provider/model` form, for the providers it lists) written in a
+  Python or YAML file of `merlt/` or `scripts/`. When an id loses its zero-retention endpoint,
+  remove it there and pick another.
 
 **Logs carry lengths, never text.** A question, a search someone typed, a proposed
 entity, the search strings an expert builds, the model's «thought» and answer, and a

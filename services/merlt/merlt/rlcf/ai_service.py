@@ -12,6 +12,7 @@ References:
     RLCF.md Section 3.6 - Dynamic Task Handler System
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import os
 import aiohttp
 import asyncio
@@ -389,7 +390,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        model: str = "google/gemini-2.5-flash",
+        model: str = DEFAULT_FAST_MODEL,
         temperature: float = 0.1,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
         api_key: Optional[str] = None,
@@ -492,7 +493,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
     async def generate_response_async(
         self,
         prompt: str,
-        model: str = "google/gemini-2.5-flash",
+        model: str = DEFAULT_FAST_MODEL,
         temperature: float = 0.7,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
         system_prompt: Optional[str] = None,
@@ -545,7 +546,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
             prompt: Prompt utente
             json_schema: Schema JSON (usato nel prompt per guidare il modello)
             system_prompt: Prompt di sistema opzionale
-            model: ID modello OpenRouter (default: gemini-2.0-flash-001)
+            model: ID modello OpenRouter (default: LLM_PARSING_MODEL, poi DEFAULT_FAST_MODEL)
             temperature: Temperatura sampling (0.0-1.0)
             max_tokens: Max tokens da generare
             api_key: API key opzionale (default: env OPENROUTER_API_KEY)
@@ -570,7 +571,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 raise ValueError("OpenRouter API key not provided")
 
             # Usa modello da env se non specificato
-            model = model or os.getenv("LLM_PARSING_MODEL", "google/gemini-2.5-flash")
+            model = model or os.getenv("LLM_PARSING_MODEL", DEFAULT_FAST_MODEL)
 
             # Genera esempio JSON dallo schema
             schema_example = self._generate_json_example(json_schema)

@@ -15,6 +15,7 @@ Endpoint:
 - GET /enrichment/pending - Lista pending per validazione
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import asyncio
 import os
 import re
@@ -1151,7 +1152,7 @@ async def live_enrich(
                     ambito=entity_data.ambito,
                     fonte="llm_extraction",
                     llm_confidence=entity_data.llm_confidence,
-                    llm_model=os.environ.get("LLM_ENRICHMENT_MODEL", "google/gemini-2.5-flash"),
+                    llm_model=os.environ.get("LLM_ENRICHMENT_MODEL", DEFAULT_FAST_MODEL),
                     validation_status="pending",
                     contributed_by=request.user_id,
                     contributor_authority=voter_authority,

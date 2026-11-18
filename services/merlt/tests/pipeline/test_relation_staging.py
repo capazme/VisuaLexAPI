@@ -28,6 +28,10 @@ class _FakeRelExtractor:
     def __init__(self, _llm_service):
         pass
 
+    def _llm_config(self):
+        # The model the extractor calls: the stored row must record it (G-575).
+        return {"model": "test/model-used"}
+
     async def extract(self, _content):
         return [
             ExtractedRelation(
@@ -70,6 +74,7 @@ async def test_staging_creates_relation_candidates():
     assert c.target_entity_id == "Inadempimento"
     assert c.verbatim_excerpt  # raw context kept in staging
     assert c.document_id == 42
+    assert c.llm_model == "test/model-used"  # the extractor's own model, not a literal
 
 
 async def test_pending_creates_pending_relations():
@@ -78,6 +83,7 @@ async def test_pending_creates_pending_relations():
     assert all(isinstance(o, PendingRelation) for o in added)
     assert added[0].relation_type == "PRESUPPONE"
     assert added[0].source_node_urn == "Risoluzione"
+    assert added[0].llm_model == "test/model-used"
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +122,9 @@ class _PairsExtractor:
 
     def __init__(self, _llm_service):
         pass
+
+    def _llm_config(self):
+        return {"model": "test/model-used"}
 
     async def extract(self, _content):
         return [

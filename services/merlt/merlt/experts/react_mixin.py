@@ -29,6 +29,7 @@ Esempio:
     ...         return await self._analyze_with_llm(context, sources)
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import re
 import structlog
 import json
@@ -268,7 +269,7 @@ class ReActMixin:
         "max_iterations": 5,
         "novelty_threshold": 0.1,  # Stop se < 10% nuove fonti
         "temperature": 0.1,
-        "model": "google/gemini-2.5-flash"
+        "model": DEFAULT_FAST_MODEL
     }
 
     def _repair_norm_tool_params(
@@ -815,7 +816,7 @@ class ReActMixin:
         try:
             from merlt.config.runtime_config import get_runtime_config
             fallback_model = self.react_config.get(
-                "model", self.model if hasattr(self, 'model') else "google/gemini-2.5-flash"
+                "model", self.model if hasattr(self, 'model') else DEFAULT_FAST_MODEL
             )
             response = await self._traced_llm_call(
                 prompt=prompt,
