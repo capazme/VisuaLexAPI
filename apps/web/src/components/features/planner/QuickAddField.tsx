@@ -175,10 +175,11 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
       {/* The field keeps its hint whole — 12 em of its own text, «Aggiungi un compito» and its padding with some room,
           whatever the reader's text size (the field stays 16 px on a phone while the page's rem shrinks) — but never
           wider than its line; where the row has no room for it and the two buttons (a phone), the buttons go under it,
-          at the right (it was cut to «Aggiun» at 320 px). The ＋ stays with the field. */}
-      <div className="flex flex-wrap items-center gap-1 p-1.5">
+          at the right (it was cut to «Aggiun» at 320 px). The ＋ stays with the field. On a phone the ＋ is «Aggiungi»
+          itself, an icon, so the field and both buttons fit one row and the box stays 56 px tall (it was 104, LC91). */}
+      <div className="flex flex-wrap items-center gap-1 p-1.5 max-sm:p-[5px]">
         <div className="flex min-w-0 flex-[1_1_auto] items-center gap-1">
-          <Plus size={18} aria-hidden className="ml-2 shrink-0 text-slate-500 dark:text-slate-400" />
+          <Plus size={18} aria-hidden className="ml-2 shrink-0 text-slate-500 max-sm:hidden dark:text-slate-400" />
           <label htmlFor={`${id}-title`} className="sr-only">Nuovo compito</label>
           <input
             ref={titleRef}
@@ -214,8 +215,9 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
             {/* Turns as the panel opens, with its height: the button's state at every width. */}
             <ChevronDown size={14} aria-hidden className={cn('shrink-0 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
           </button>
-          <button type="submit" disabled={busy || !task.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
-            {busy ? 'Aggiungo…' : <>Aggiungi<span className="sr-only"> il compito</span></>}
+          <button type="submit" disabled={busy || !task.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 max-sm:w-11 max-sm:px-0 sm:px-4')}>
+            <Plus size={18} aria-hidden className="sm:hidden" />
+            {busy ? <span className="max-sm:sr-only">Aggiungo…</span> : <><span className="max-sm:sr-only">Aggiungi</span><span className="sr-only"> il compito</span></>}
           </button>
         </div>
       </div>

@@ -144,6 +144,7 @@ function PracticeHeader({ practice, compact, simple, headless, children }: { pra
         ) : (
           // The page's title, as every section page writes it (`PageFrame`'s `PAGE_TITLE`, R3).
           <h2
+            data-page-title=""
             onDoubleClick={() => setEditing(true)}
             title={compact ? `${practice.label} · doppio clic per rinominare` : 'Doppio clic per rinominare'}
             className={cn('truncate', compact ? INDEX_TITLE : PAGE_TITLE)}

@@ -67,7 +67,7 @@ export const BROWSER_STORAGE: readonly StorageEntry[] = [
   { area: 'local', key: 'visualex-sidebar', kind: 'device', what: 'the sidebar width' },
   { area: 'local', key: 'visualex_tour', kind: 'device', what: 'the guided tours already seen' },
   { area: 'local', key: 'visualex_last_seen_version', kind: 'device', what: 'the version whose notes were shown' },
-  { area: 'session', key: 'visualex_version_last_check', kind: 'device', what: 'when the version was last checked' },
+  { area: 'session', key: 'visualex_version_last_check', kind: 'device', what: 'when the version was last checked, and the version number it answered' },
   { area: 'local', key: 'visualex-opus-today-grouping', kind: 'device', what: 'Opus: how «Oggi» is grouped' },
   { area: 'session', key: 'visualex-logo-*', kind: 'device', what: 'the logo\'s motions already played in this tab\'s session: the shell\'s sweep, the phone drawer\'s, the sign-in intro' },
   { area: 'session', key: 'visualex:find-window-place', kind: 'device', what: 'where the find window sits' },

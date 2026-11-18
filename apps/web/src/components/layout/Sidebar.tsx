@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { IslandSurface } from '../ui/IslandSurface';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, EyeOff, type LucideIcon } from 'lucide-react';
+import { Plug, Search, Folder, FolderOpen, CalendarCheck, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Library, Scale, Network, ScrollText, Bug, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, EyeOff, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -13,7 +13,6 @@ import { useSection } from '../../features/sections/useSection';
 import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
 import { PALETTE_SHORTCUT, focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
-import { useIsDesktop } from '../../hooks/useIsDesktop';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
 import type { ServiceHealthReading } from '../../hooks/useServiceHealth';
 import { ServiceHealthDot, ServiceHealthMenuEntry } from '../ui/ServiceHealthMenuEntry';
@@ -35,8 +34,8 @@ interface SidebarProps {
   closeMobile: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
-  /** Opens the feedback form: on a phone an entry of the user menu, «Commenti» (M1); from `md` the top right's
-   *  button does it. Not given, no entry. */
+  /** Opens «Segnala un problema» (LC92, `/impostazioni#segnala`): the bug beside «Impostazioni» and an entry of the
+   *  user menu, at every width (the rail has no «Impostazioni» at its foot). Not given, neither. */
   openFeedback?: () => void;
   /** Icons only (the desktop between `lg` and `xl`, or narrowed), icons and words (from `xl`), or the
    *  phone's drawer (icons and words, rows of 44 px). */
@@ -364,8 +363,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
   const logoReduce = useReducedMotion();
   const words = layout !== 'rail';
-  // The floating feedback button covered the foot of every page on a phone: there it is this menu's entry (M1).
-  const feedbackInMenu = !useIsDesktop() && openFeedback !== undefined;
 
   // Placed when it opens, in the same update, so its first paint has its height bounded before an entry takes
   // focus (opened on «Esci» in a low window, the focused entry would otherwise end up out of view).
@@ -669,6 +666,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {/* LC21: «Impostazioni» in sight at the bar's foot, as the prototype has it (it stays in the user menu too). With words
             only: the rail keeps its two controls. */}
         {words && (
+          <div className="flex w-full shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => {
@@ -676,7 +674,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               openSettings();
             }}
             className={cn(
-              "flex w-full shrink-0 items-center gap-3 rounded-lg pl-3 text-left transition-colors duration-200",
+              "flex min-w-0 flex-1 items-center gap-3 rounded-lg pl-3 text-left transition-colors duration-200",
               layout === 'drawer' ? "h-11" : "h-9",
               SIDEBAR_TOGGLE_TEXT,
               "hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
@@ -686,6 +684,28 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             <span className="grid h-5 w-5 shrink-0 place-items-center"><Settings size={18} strokeWidth={1.5} aria-hidden /></span>
             <span className="min-w-0 truncate whitespace-nowrap text-sm font-medium">Impostazioni</span>
           </button>
+          {/* LC92: «Segnala un problema», the bug beside «Impostazioni»; it was «Commenti» at the top right. */}
+          {openFeedback && (
+            <button
+              type="button"
+              onClick={() => {
+                closeMobile();
+                openFeedback();
+              }}
+              aria-label="Segnala un problema"
+              title="Segnala un problema"
+              className={cn(
+                "grid shrink-0 place-items-center rounded-lg transition-colors duration-200",
+                layout === 'drawer' ? "h-11 w-11" : "h-9 w-9",
+                SIDEBAR_TOGGLE_TEXT,
+                "hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+              )}
+            >
+              <Bug size={18} strokeWidth={1.5} aria-hidden />
+            </button>
+          )}
+          </div>
         )}
         {onToggleWide && layout !== 'drawer' && <WidthToggle layout={layout} onToggle={onToggleWide} />}
 
@@ -754,10 +774,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   <ScrollText size={16} />
                   Crediti
                 </button>
-                {feedbackInMenu && (
+                {openFeedback && (
                   <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openFeedback)} className={menuItemClass}>
-                    <MessageSquarePlus size={16} />
-                    Commenti
+                    <Bug size={16} />
+                    Segnala un problema
                   </button>
                 )}
                 <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />

@@ -26,7 +26,9 @@ describe('planTodoistImport on the example file', () => {
   it('counts tasks, subtasks and the sections as labels; meta and empty rows are skipped', () => {
     expect(plan.tasks).toHaveLength(13);
     expect(plan.subtasks).toBe(3);
-    expect(plan.labels).toEqual(['udienza', 'Studio della pratica 📚', 'Adempimenti ⭐️']);
+    // The sections' names apart from the labels read out of the titles: each said where it comes from (LC91).
+    expect(plan.labels).toEqual(['Studio della pratica 📚', 'Adempimenti ⭐️']);
+    expect(plan.titleLabels).toEqual(['udienza']);
     expect(plan.fromTitles).toEqual({ labels: 1, deadlines: 1, durations: 1, links: 1 });
     expect(byTitle('Rileggere il contratto, clausola 7').input.labels).toEqual(['Studio della pratica 📚']);
     expect(byTitle('Deposito memoria').input.labels).toEqual(['udienza']);
@@ -76,7 +78,8 @@ describe('planTodoistImport on the example file', () => {
     expect(monthly.recurrence).toBeUndefined();
     expect(plan.nonRecurring.map((n) => n.phrase)).toEqual(['ogni venerdì alle 10', 'ogni 2 settimane', 'ogni mese']);
     const why = 'ha anche un termine finale, che non si ripete';
-    expect(plan.nonRecurring.map((n) => n.why)).toEqual([why, undefined, why]);
+    // «ogni 2 settimane» says why it does not repeat: the five rules a task can hold (LC91).
+    expect(plan.nonRecurring.map((n) => n.why)).toEqual([why, 'qui un compito si ripete solo ogni giorno, ogni giorno lavorativo, ogni settimana, ogni mese o ogni anno', why]);
   });
 
   it("reads Todoist's syntax out of the title: label, deadline, duration and links", () => {

@@ -1,4 +1,5 @@
 import { appStore } from '../store/useAppStore';
+import { isWorkspaceCovered } from './findWindowControl';
 
 /**
  * The search page's field, reached from elsewhere: the sidebar's «Ricerca», the empty page's button and
@@ -93,6 +94,9 @@ export function focusSearchFieldOrPalette(text?: string): void {
 export function openSearchMenu(): void {
   // Already open: nothing, as before R2 (the field's words would overwrite what is being typed in the box).
   if (appStore.getState().commandPaletteOpen) return;
+  // Under what covers the page (a modal dialog, the comparison, a sheet, the PDF viewer): the menu opens in the page,
+  // under it, unseen (L-75).
+  if (isWorkspaceCovered()) return;
   if (listener) listener({});
   else appStore.getState().openCommandPalette();
 }

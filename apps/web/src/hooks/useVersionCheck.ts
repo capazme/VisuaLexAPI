@@ -28,6 +28,22 @@ interface UseVersionCheckReturn extends UseVersionCheckState {
   setShowChangelog: (show: boolean) => void;
 }
 
+/** The last check of this session: `{ at, version }`, or a plain time as written before LC91. */
+function readLastCheck(raw: string | null): { at: number; version: string | null } | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed === 'number') return { at: parsed, version: null };
+    if (parsed && typeof parsed === 'object' && typeof (parsed as { at?: unknown }).at === 'number') {
+      const version = (parsed as { version?: unknown }).version;
+      return { at: (parsed as { at: number }).at, version: typeof version === 'string' ? version : null };
+    }
+  } catch {
+    // Unreadable: no check to throttle on.
+  }
+  return null;
+}
+
 /**
  * Hook to check for new app versions and manage changelog notifications
  *
@@ -39,7 +55,8 @@ interface UseVersionCheckReturn extends UseVersionCheckState {
  * - dismissNotification: saves current version to localStorage, only when this bundle has its note: a tab
  *   from before a deploy is told the new number but carries the old notes, and the note must still be shown
  *   once the page is reloaded
- * - Throttled: won't check more than once per session within throttle window
+ * - Throttled: won't check more than once per session within throttle window; a reload within it reuses the
+ *   version answered, so the pill stays until opened or closed
  */
 export function useVersionCheck(): UseVersionCheckReturn {
   const [state, setState] = useState<UseVersionCheckState>({
@@ -53,9 +70,36 @@ export function useVersionCheck(): UseVersionCheckReturn {
   const [showChangelog, setShowChangelog] = useState(false);
 
   useEffect(() => {
-    // Throttle: don't check if we recently checked in this session
-    const lastCheck = sessionStorage.getItem(VERSION_CHECK_SESSION_KEY);
-    if (lastCheck && Date.now() - Number(lastCheck) < VERSION_CHECK_THROTTLE) {
+    /** What a version answered means here: the pill while it is newer than the one last seen, until opened or closed. */
+    const settle = (version: string) => {
+      const lastSeenVersion = localStorage.getItem(VERSION_STORAGE_KEY);
+
+      // First visit: save version silently, no notification
+      if (!lastSeenVersion) {
+        localStorage.setItem(VERSION_STORAGE_KEY, version);
+        setState({ currentVersion: version, hasNewVersion: false, lastSeenVersion: null, isLoading: false, error: null });
+        return;
+      }
+
+      const isNewer = compareVersions(version, lastSeenVersion) > 0;
+      setState({
+        currentVersion: version,
+        hasNewVersion: isNewer,
+        lastSeenVersion: isNewer ? lastSeenVersion : null,
+        isLoading: false,
+        error: null,
+      });
+    };
+
+    // Throttle: a check moments ago in this session (a reload) is not made again, but its answer still counts: the
+    // pill stays until it is opened or closed, reload or not (LC91). Read as `{ at, version }`; an older plain time
+    // only throttles.
+    const last = readLastCheck(sessionStorage.getItem(VERSION_CHECK_SESSION_KEY));
+    if (last && Date.now() - last.at < VERSION_CHECK_THROTTLE) {
+      if (last.version) {
+        settle(last.version);
+        return;
+      }
       // Async version-check effect: clear the loading flag on the throttle
       // short-circuit. (CLAUDE.md gotcha #11)
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -75,34 +119,9 @@ export function useVersionCheck(): UseVersionCheckReturn {
       .then((data) => {
         if (controller.signal.aborted) return;
 
-        const lastSeenVersion = localStorage.getItem(VERSION_STORAGE_KEY);
-
-        // First visit: save version silently, no notification
-        if (!lastSeenVersion) {
-          localStorage.setItem(VERSION_STORAGE_KEY, data.version);
-          setState({
-            currentVersion: data.version,
-            hasNewVersion: false,
-            lastSeenVersion: null,
-            isLoading: false,
-            error: null,
-          });
-          return;
-        }
-
-        // Compare versions
-        const isNewer = compareVersions(data.version, lastSeenVersion) > 0;
-
-        setState({
-          currentVersion: data.version,
-          hasNewVersion: isNewer,
-          lastSeenVersion: isNewer ? lastSeenVersion : null,
-          isLoading: false,
-          error: null,
-        });
-
-        // Mark check time
-        sessionStorage.setItem(VERSION_CHECK_SESSION_KEY, String(Date.now()));
+        settle(data.version);
+        // Mark check time, with what it answered
+        sessionStorage.setItem(VERSION_CHECK_SESSION_KEY, JSON.stringify({ at: Date.now(), version: data.version }));
       })
       .catch((err) => {
         if (controller.signal.aborted) return;

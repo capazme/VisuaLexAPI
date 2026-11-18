@@ -82,3 +82,30 @@ export function focusWhenRowLeaves(taskId: string, waitMs = 5000) {
   };
   observer.observe(document.body, { childList: true, subtree: true });
 }
+
+/**
+ * After «Annulla», the task's row comes back at the next read: the focus goes back to its tick, where it was before
+ * the row left (#585: it went to the first task). Not when the reader has gone on to a field or another control
+ * meanwhile: only from the page's body, a notification or another task's row. Watches for a few seconds.
+ */
+export function focusWhenRowReturns(taskId: string, waitMs = 5000) {
+  const tryFocus = () => {
+    const tick = rowOf(taskId)?.querySelector<HTMLElement>(FOCUSABLE);
+    if (!tick) return false;
+    const active = document.activeElement;
+    const free = !active || active === document.body || !active.isConnected
+      || Boolean(active.closest('[data-notification-id], [data-task-row]'));
+    if (free) tick.focus();
+    return true;
+  };
+  if (tryFocus()) return;
+  const observer = new MutationObserver(() => {
+    if (tryFocus()) stop();
+  });
+  const timer = setTimeout(() => stop(), waitMs);
+  const stop = () => {
+    observer.disconnect();
+    clearTimeout(timer);
+  };
+  observer.observe(document.body, { childList: true, subtree: true });
+}

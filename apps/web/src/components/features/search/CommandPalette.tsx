@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Command, useCommandState } from 'cmdk';
-import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, shift, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
-import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence, useIsPresent, useReducedMotion } from 'framer-motion';
 import { BookOpen, ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { ISLAND_CLOSE, ISLAND_OPEN, dur, ease, spring } from '../../../lib/motion';
+import { dur, ease, spring } from '../../../lib/motion';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -13,7 +13,6 @@ import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { isNumberedActType } from '../../../utils/sources/numberedActTypes';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
-import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
 import { ISLAND_FIELD_FOCUS, ISLAND_LENS, ISLAND_PLACEHOLDER, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TEXT, ISLAND_WORDS, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
@@ -22,12 +21,13 @@ import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
 import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
 import { IslandSurface } from '../../ui/IslandSurface';
-import { now } from '../../ui/islandMotion';
+import { Expand } from '../../ui/Expand';
 import { useRassegneForTopic } from '../rassegne/useRassegneForTopic';
 import { rememberSearch } from '../rassegne/searchMemory';
 import { provenance } from '../rassegne/rassegnaFilters';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 import { useOpenSettings } from '../settings/settingsRoute';
+import { focusPage } from '../../../utils/focusPage';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -51,9 +51,6 @@ const STEP_ORDER: Record<PaletteStep, number> = { select_act: 0, input_details: 
 
 /** How many favourites and aliases «A portata di mano» shows before the box is typed in. */
 const AT_HAND_ROWS = 6;
-
-/** The panel's height on a computer, at most (40 rem). */
-const PANEL_MAX_HEIGHT = 640;
 
 /** Case-insensitive, for the reason given on `paletteActName`: an act named
  *  by the server ("regolamento ue") must reach the same branch as the same act
@@ -165,6 +162,54 @@ function Matched({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
+/** The page's title, made reachable by the focus while it holds it (as `focusPage` does for `<main>`). */
+function focusTitle(title: HTMLElement) {
+  if (!title.hasAttribute('tabindex')) {
+    title.setAttribute('tabindex', '-1');
+    title.addEventListener('blur', () => title.removeAttribute('tabindex'), { once: true });
+  }
+  title.focus({ preventScroll: true });
+}
+
+/** How long a page reached by a choice may take to draw its title (its code and its first data). */
+const LANDING_MS = 3000;
+/** A page's title, where the focus lands after a choice: marked on each page, an `h1` or an `h2` (Papiniano, #599). */
+const PAGE_TITLE = 'main [data-page-title]';
+
+/**
+ * After a choice (Papiniano, #599): at once on `<main>`, never left on the body; then on the title of what the choice
+ * opened — the first marked title that was not on screen before it (the page reached, a reader opened beside), or, on
+ * the same page, the title there. `left`: the choice changed the address, so the titles on screen now are the page being
+ * left (the router draws the new one a commit later), never focused. Whatever takes the focus by itself keeps it. The
+ * page is watched for `LANDING_MS`. Returns the cleanup.
+ */
+function focusLanding(left: boolean): () => void {
+  const before = new Set(document.querySelectorAll(PAGE_TITLE));
+  const main = document.querySelector('main');
+  let given: HTMLElement | null = null;
+  const look = () => {
+    const active = document.activeElement;
+    // Something took the focus by itself (a reader that focuses itself): it keeps it.
+    if (active && active !== document.body && active !== main && active !== given) return stop();
+    const titles = [...document.querySelectorAll<HTMLElement>(PAGE_TITLE)];
+    const title = titles.find((el) => !before.has(el)) ?? (left || given ? null : titles[0]);
+    if (title && title !== given) {
+      focusTitle(title);
+      given = title;
+    }
+  };
+  focusPage();
+  look();
+  const observer = new MutationObserver(look);
+  observer.observe(document.body, { childList: true, subtree: true });
+  const timer = window.setTimeout(() => stop(), LANDING_MS);
+  function stop() {
+    observer.disconnect();
+    window.clearTimeout(timer);
+  }
+  return stop;
+}
+
 /** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
 const subscribeViewport = (change: () => void) => {
   window.visualViewport?.addEventListener('resize', change);
@@ -174,49 +219,6 @@ const viewportHeight = () => window.visualViewport?.height ?? null;
 /** Closed, or on a computer: nothing watched. */
 const subscribeNothing = () => () => {};
 const noHeight = () => null;
-
-/** The veil under the island: the same times and curves, by the same technique. */
-function IslandVeil({ onClick }: { onClick: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [isPresent, safeToRemove] = usePresence();
-  const remove = useRef(safeToRemove);
-  // Before the effects that call it: the closing render's own (a removal at once happens in the same commit).
-  useLayoutEffect(() => {
-    remove.current = safeToRemove;
-  });
-  const running = useRef<Animation | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    // Closing, it lets the pointer through: a tap on the pill opens the panel again from where it is.
-    if (el) el.style.pointerEvents = isPresent ? '' : 'none';
-    if (!el || typeof el.animate !== 'function') {
-      if (!isPresent) remove.current?.();
-      return;
-    }
-    const from = running.current ? now(el, ['opacity']) : { opacity: isPresent ? 0 : 1 };
-    running.current?.cancel();
-    const animation = el.animate([from, { opacity: isPresent ? 1 : 0 }], { ...(isPresent ? ISLAND_OPEN : ISLAND_CLOSE), fill: 'both' });
-    running.current = animation;
-    animation.onfinish = () => {
-      if (running.current !== animation) return;
-      if (isPresent) {
-        animation.cancel();
-        running.current = null;
-      } else remove.current?.();
-    };
-    // Once per way.
-  }, [isPresent]);
-  return (
-    <div
-      ref={ref}
-      data-palette-veil=""
-      aria-hidden
-      // `touch-none`: a drag on it does not scroll the page under it (iOS).
-      className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
-      onClick={onClick}
-    />
-  );
-}
 
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, onShowSearch, onOpenRassegne }: CommandPaletteProps) {
   const {
@@ -614,106 +616,41 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   /** The crumb in the field, and its name: the act, with its number and year on the article's step. */
   const crumbText = `${selectedActLabel}${step === 'input_article' && actNumber ? ` ${actNumber}${actDate ? `/${actDate.slice(-4)}` : ''}` : ''}`;
 
-  // On a computer the palette drops from the search page's field, as wide as the field, over it;
-  // where no field is on screen (another page, Focus mode) it hangs at the top, centred. The form is
-  // looked up at every render while open, so a field that mounts later (the address /sentenze) or goes
-  // is followed, and passed at render time (gotcha 13).
-  const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
-  // The top bar's compact field (LC21) is no field to grow from (Luca, 15 Nov: the menu was as narrow as it): the menu
-  // then hangs at the top, centred and wide, as from every other page — one menu, one place.
-  // LC40 (Luca, 16 Nov: «effetto espansione Dynamic Island … in qualsiasi scheda»): the top bar's pill — the search
-  // page's compact field, or the bar's button on every other page — is an island: the menu grows out of it, wide, centred
-  // on it, its top on the pill's. The search page's own large field (Corpus, below lg) stays a field it drops from.
-  // On a phone too (Luca, 16 Nov: «Sì, anche lì»): the bar's «Cerca» pill.
-  const island = !isOpen
-    ? null
-    : isDesktop && field?.isConnected && field.hasAttribute('data-compact')
-      ? field
-      : document.getElementById(SEARCH_ISLAND_ID);
-  const anchor = island?.isConnected ? island : field?.isConnected && !field.hasAttribute('data-compact') ? field : null;
-  const isIsland = anchor !== null && anchor === island;
-  // What the panel grows out of: what it hangs from, or on a phone's search page (no pill there, and the panel hangs
-  // at the top by itself) the page's field, under it (LC69).
-  const growSource = anchor ?? (isOpen && !isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null);
-  // From the island the menu's own width, 768 px, the window allowing.
-  const islandWidth = Math.min(768, (typeof window === 'undefined' ? 1024 : window.innerWidth) - 32);
-  // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
-  // did both).
+  // L-75 (Luca, 17 Nov: «Sì, come proponi»): nothing over the page. The field grows out of what opened it, in the bar
+  // that holds it, by the island (`IslandSurface`, LC69/LC81); the lists are a band under the bars, in the page's flow,
+  // that pushes the page down (`Expand`). What it grows from: the top bar's pill (or, on the search page from lg, its
+  // compact field), the phone's pill, the search page's own field below lg. With nothing (a lesson, full screen below
+  // lg) the field is the band's first row and the band only grows.
+  const sourceNow = (): HTMLElement | null => {
+    const field = document.getElementById(SEARCH_FIELD_FORM_ID);
+    const island = isDesktop && field?.isConnected && field.hasAttribute('data-compact') ? field : document.getElementById(SEARCH_ISLAND_ID);
+    if (island?.isConnected) return island;
+    return field?.isConnected ? field : null;
+  };
+  // A phone: the band as tall as what the keyboard leaves under the bar.
   const watchViewport = isOpen && !isDesktop;
   const shownHeight = useSyncExternalStore(
     watchViewport ? subscribeViewport : subscribeNothing,
     watchViewport ? viewportHeight : noHeight,
     noHeight,
   );
-  useEffect(() => {
-    if (!isOpen || isDesktop) return;
-    const before = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = before;
-    };
-  }, [isOpen, isDesktop]);
-  // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
-  // (the field) when it closes. Placed only when the field is there.
-  // What the box hangs from now, for `size`, which may run with the last element floating-ui had.
-  const anchorRef = useRef(anchor);
-  useLayoutEffect(() => {
-    anchorRef.current = anchor;
-  });
-  const { refs, floatingStyles, context, update } = useFloating({
-    open: isOpen,
-    elements: { reference: anchor },
-    placement: isIsland ? 'bottom' : 'bottom-start',
-    strategy: 'fixed',
-    middleware: [
-      // Its top on the field's: the panel's own box takes the field's place.
-      offset(({ rects }) => -rects.reference.height),
-      // The island's panel, wider than the pill, stays in the window.
-      ...(isIsland ? [shift({ padding: 16 })] : []),
-      // As wide as the field (from the island: the menu's own width, 768 px, the window allowing); as tall as what it
-      // holds, up to the height it always had (Bill: one row is not a 640 px panel), the window allowing.
-      // eslint-disable-next-line react-hooks/refs -- `apply` runs as floating-ui places the box, after the render
-      size({
-        padding: 16,
-        apply({ rects, availableHeight, elements }) {
-          // Nothing to hang from now: floating-ui may still measure the last element it had (it keeps it, in
-          // `@floating-ui/react` and in `react-dom`), a computer's field hidden on a phone, 0 px wide.
-          if (elements.reference !== anchorRef.current) return;
-          elements.floating.style.width = isIsland ? `${islandWidth}px` : `${rects.reference.width}px`;
-          // On a phone what the keyboard leaves (the visual viewport), from the pill down. Read here, not from the
-          // render: floating-ui keeps the first `apply` (same source text), so a captured height would stay stale.
-          const shown = isDesktop ? null : viewportHeight();
-          const room = shown ? shown - rects.reference.y - 8 : availableHeight;
-          elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(isDesktop ? 320 : 200, room))}px`);
-        },
-      }),
-    ],
-    whileElementsMounted: autoUpdate,
-  });
-  // The keyboard opening or closing changes only the visual viewport, which autoUpdate does not watch.
-  useEffect(() => {
-    if (shownHeight !== null) update();
-  }, [shownHeight, update]);
-  // Nothing to hang from (the field gone, another page, Focus mode, or a phone's search page after a computer's): what
-  // `size` wrote on the box goes with it, on a computer and on a phone alike, or the panel would keep a stale width
-  // (0 px, after a window narrowed from a computer's to a phone's).
-  useLayoutEffect(() => {
-    // Closing: the box stays where it is, so the island goes back into the pill (LC69).
-    if (anchor || !isOpen) return;
-    const box = refs.floating.current;
-    box?.style.removeProperty('width');
-    // A phone's height is React's own (the visual viewport's, in `style`): only a computer's is `size`'s.
-    if (isDesktop) box?.style.removeProperty('--palette-max-h');
-  }, [anchor, isDesktop, isOpen, refs]);
-  const role = useRole(context, { role: 'dialog' });
   // What had the focus as the palette opened (the field, a button elsewhere): it gets it back.
   // Taken during render as the palette opens (own state, no effect), before the box takes the focus.
   const [wasOpen, setWasOpen] = useState(false);
   const [opener, setOpener] = useState<HTMLElement | null>(null);
+  // Where it opened, kept while it closes: what the field grows from, and the bar's slot it grows in (none: the band's
+  // first row). Read as it opens, as the opener is.
+  const [chosenRow, setChosenRow] = useState('');
+  const [place, setPlace] = useState<{ source: HTMLElement | null; slot: HTMLElement | null }>({ source: null, slot: null });
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen);
     if (isOpen) {
       setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      // The row chosen in the last opening is not this one's: cmdk lives on between openings now (L-75), so its choice is
+      // ours, and empty again, and cmdk chooses the first row.
+      setChosenRow('');
+      const source = sourceNow();
+      setPlace({ source, slot: source?.closest('[data-palette-bar]')?.querySelector<HTMLElement>('[data-palette-slot]') ?? null });
       setChose(false);
       // Opened again before the reset after a close (200 ms): it starts at its first step all the same, with no
       // words but those handed over.
@@ -727,7 +664,65 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       if (commandPaletteQuery === null) setInputValue('');
     }
   }
-  const { getFloatingProps } = useInteractions([role]);
+  // The field in the bar, drawn while open and while it goes back into the pill.
+  const [fieldOut, setFieldOut] = useState(isOpen);
+  if (isOpen && !fieldOut) setFieldOut(true);
+  const inBar = place.slot !== null;
+  const overBar = place.slot?.closest('[data-palette-bar="over"]') != null;
+
+  // The bar it grew in gone while open (the page changed under it, /sentenze → /): the field moves to the new bar's slot.
+  // After every render on purpose: the bar goes in a commit of the page, not of this menu; only a detached slot sets.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!isOpen || !place.slot || place.slot.isConnected) return;
+    const source = sourceNow();
+    setPlace({ source, slot: source?.closest('[data-palette-bar]')?.querySelector<HTMLElement>('[data-palette-slot]') ?? null });
+  });
+
+  const bandRef = useRef<HTMLDivElement>(null);
+  const fieldBoxRef = useRef<HTMLDivElement>(null);
+  // A click outside the field and the band closes it, as the veil's did; the page under takes the click as well. So does
+  // the focus going out to the page, by Tab (Papiniano, #599): the same «outside».
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const outside = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      // By the DOM, not the refs: a field drawn anew (a step, a new bar) takes the focus before its ref is set.
+      if (target.closest('#command-menu-root, [data-palette-slot]') || place.source?.contains(target)) return;
+      // A dialog opened over it is its own.
+      if (target.closest('[aria-modal="true"]')) return;
+      onClose();
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('focusin', outside);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('focusin', outside);
+    };
+  }, [isOpen, onClose, place.source]);
+
+  // Closed: the focus goes back to what opened it (the pill, the field), if it was in the field or the band.
+  const openNow = useRef(isOpen);
+  // The address as it opened: a choice that changed it leads to another page, whose title is still to come.
+  const openedAt = useRef('');
+  useLayoutEffect(() => {
+    const was = openNow.current;
+    openNow.current = isOpen;
+    if (isOpen) openedAt.current = `${window.location.pathname}${window.location.search}`;
+    if (isOpen || !was) return;
+    const active = document.activeElement;
+    const ours = !active || active === document.body || bandRef.current?.contains(active) || fieldBoxRef.current?.contains(active);
+    if (!ours) return;
+    // A choice made: the focus goes where it led, not back to the pill (Papiniano, #599: it fell to the body).
+    if (!chose && opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
+    else {
+      if (active instanceof HTMLElement) active.blur();
+      return focusLanding(`${window.location.pathname}${window.location.search}` !== openedAt.current);
+    }
+    // Once per closing; the opener is the one taken as it opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Closed: its words go back to the search page's field when no choice was made (R2: one field), the field is
   // emptied after a choice. Only on a closing, not on the first draw.
@@ -788,7 +783,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       : "Scrivi il numero dell'articolo: 2043, 1-bis";
 
   const fieldRow = (
-    <div className="flex items-center gap-2 px-3 pt-2" onKeyDown={keepKeys}>
+    <div className={cn('flex items-center gap-2', inBar ? 'w-full' : 'px-3 pt-2')} onKeyDown={keepKeys}>
       <motion.div key={step} {...stepMotion} className="flex min-w-0 flex-1 items-center gap-3">
         {step === 'select_act' && (
           // LC81: the pill it grew from, the same object: its shape, type, lens, ground and edge, and its focus on the
@@ -1264,92 +1259,73 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       id="command-menu-root"
       label="Menu di ricerca"
       shouldFilter={false}
-      className="flex min-h-0 flex-1 flex-col"
+      value={chosenRow}
+      onValueChange={setChosenRow}
+      ref={bandRef}
+      className="shrink-0"
     >
-      <div className="shrink-0">
-        {/* One live region for the whole life of the palette, its text changing: a region that
-            appears already holding its text is often not announced. */}
-        <p role="status" className="sr-only">
-          {decisionRef
-            ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
-            : waiting ? 'Cerco l’atto… la ricerca parte appena lo trovo.'
-            : parsedCitation && citationPreview
-              ? `${preview!.text}${preview!.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
-              : resolvingRemotely
-                ? 'Cerco l’atto…'
-                : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
-        </p>
-        {fieldRow}
-        {fieldLine}
-      </div>
-      {isDesktop ? (
-        <>
-          {body}
-          {filtersBlock}
-          {keysRow}
-        </>
-      ) : (
-        // On a phone the field stays at the top and the rest scrolls under it.
-        <motion.div layoutScroll className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {body}
-          {filtersBlock}
-        </motion.div>
+      {/* One live region for the whole life of the palette, its text changing: a region that
+          appears already holding its text is often not announced. */}
+      <p role="status" className="sr-only">
+        {decisionRef
+          ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
+          : waiting ? 'Cerco l’atto… la ricerca parte appena lo trovo.'
+          : parsedCitation && citationPreview
+            ? `${preview!.text}${preview!.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
+            : resolvingRemotely
+              ? 'Cerco l’atto…'
+              : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
+      </p>
+      {/* The field in the bar: it grows out of the pill or the field it opens from, and goes back into it (LC69, LC81).
+          A portal into the bar's own slot, in the page's flow: React's context and events stay the menu's. */}
+      {fieldOut && place.slot && createPortal(
+        <IslandSurface
+          ref={fieldBoxRef}
+          open={isOpen}
+          onClosed={() => setFieldOut(false)}
+          source={place.source}
+          hideSource
+          settle
+          surfaceClassName=""
+          contentClassName="relative flex min-w-0 items-center"
+          className="w-full max-w-3xl"
+        >
+          {fieldRow}
+        </IslandSurface>,
+        place.slot,
       )}
+      {/* The band: under the bars, it grows and pushes the page down; no veil, nothing over the page (L-75). */}
+      <Expand open={isOpen} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
+        <div className={cn('border-b border-slate-200 dark:border-slate-800', overBar && 'pt-[calc(3.5rem+env(safe-area-inset-top))]')}>
+          <div
+            style={{ ['--palette-max-h' as string]: isDesktop
+              ? 'min(40rem, calc(100dvh - 12rem))'
+              : `calc(${shownHeight ? `${shownHeight}px` : '100dvh'} - 3.5rem - env(safe-area-inset-top))` }}
+            className={cn('mx-auto flex w-full max-w-3xl flex-col', isDesktop ? 'max-h-[var(--palette-max-h)]' : 'h-[var(--palette-max-h)]')}
+          >
+            <div className="shrink-0">
+              {!inBar && fieldRow}
+              {fieldLine}
+            </div>
+            {isDesktop ? (
+              <>
+                {body}
+                {filtersBlock}
+                {keysRow}
+              </>
+            ) : (
+              // On a phone the field stays at the top and the rest scrolls under it.
+              <motion.div layoutScroll className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                {body}
+                {filtersBlock}
+              </motion.div>
+            )}
+          </div>
+        </div>
+      </Expand>
     </Command>
     </ChosenRowScope.Provider>
   );
 
-  return (
-    <FloatingPortal>
-      {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while open, so the
-          mark goes with the click that closes, not with the veil's fade. */}
-      {isOpen && <span data-find-overlay="" hidden />}
-      {/* The veil rises and falls with the island, by the same times and curves (LC69). */}
-      <AnimatePresence>{isOpen && <IslandVeil key="command-palette-veil" onClick={onClose} />}</AnimatePresence>
-      {/* Outside the presence, so the focus goes back as the palette closes, not once its fade is over. */}
-      <FloatingFocusManager
-        context={context}
-        modal
-        disabled={!isOpen}
-        initialFocus={step === 'select_act' ? boxRef : 0}
-        // Nothing had it (⌘K on the page): the field when it is there, else nowhere — never the page's first control.
-        returnFocus={opener && opener !== document.body ? { current: opener } : anchor !== null}
-      >
-      <AnimatePresence>
-        {isOpen && (
-          // Two elements: the outer is placed by floating-ui, the inner moves (gotcha 10).
-          <div
-            key="command-palette"
-            ref={refs.setFloating}
-            {...getFloatingProps()}
-            aria-label="Menu di ricerca"
-            style={anchor
-              ? floatingStyles
-              : !isDesktop && shownHeight
-                ? { ['--palette-max-h' as string]: `min(40rem, calc(${shownHeight}px - 1rem - env(safe-area-inset-top)))` }
-                : undefined}
-            className={cn(
-              // The box holds the panel's height; only the panel takes the pointer (a shorter step
-              // leaves the rest of the box to the backdrop's click).
-              'pointer-events-none flex flex-col',
-              anchor
-                ? 'fixed'
-                : isDesktop
-                  ? 'fixed inset-x-4 top-16 mx-auto max-w-3xl [--palette-max-h:min(40rem,calc(100dvh-6rem))]'
-                  // A phone: the page's width less 16 px each side, dropping from the bar at the top (R2).
-                  : 'fixed inset-x-4 top-[calc(env(safe-area-inset-top)+0.5rem)] [--palette-max-h:min(40rem,calc(100dvh-1rem-env(safe-area-inset-top)))]',
-              Z_INDEX.commandPalette,
-            )}
-          >
-            {/* The panel grows out of the pill or the field it opens from (LC69, one way for both). As tall as its content,
-                up to `--palette-max-h`: the lists scroll inside it past that. */}
-            <IslandSurface source={growSource} hideSource within settle className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col">
-              {content}
-            </IslandSurface>
-          </div>
-        )}
-      </AnimatePresence>
-      </FloatingFocusManager>
-    </FloatingPortal>
-  );
+  return content;
 }
