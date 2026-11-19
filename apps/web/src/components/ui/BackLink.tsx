@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { FOCUS_RING } from '../../constants/interactions';
+import { CONTROL_RADIUS } from './controlStyles';
 import { focusLanding } from '../../utils/focusPage';
 
 export interface BackLinkProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children'> {
@@ -24,7 +25,8 @@ export function BackLink({ onBack, className, ...props }: BackLinkProps) {
         onBack();
       }}
       className={cn(
-        'inline-flex min-h-[44px] w-fit items-center gap-1.5 rounded-lg px-2 -ml-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:py-1.5 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+        'inline-flex min-h-[44px] w-fit items-center gap-1.5 px-2 -ml-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:py-1.5 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+        CONTROL_RADIUS,
         FOCUS_RING,
         className,
       )}

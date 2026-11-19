@@ -120,16 +120,16 @@ export function AliasSection() {
         return null;
     }, [trigger, isAliasTriggerTaken]);
 
+    // For acts requiring details, number and date are required
+    const needsDetails = ['legge', 'decreto legge', 'decreto legislativo',
+        'decreto del presidente della repubblica', 'regio decreto',
+        'Regolamento UE', 'Direttiva UE'].includes(actType);
     const canSubmit = useMemo(() => {
         if (!trigger || triggerError) return false;
         if (!actType) return false;
-        // For acts requiring details, number and date are required
-        const needsDetails = ['legge', 'decreto legge', 'decreto legislativo',
-            'decreto del presidente della repubblica', 'regio decreto',
-            'Regolamento UE', 'Direttiva UE'].includes(actType);
         if (needsDetails && (!actNumber || !actDate)) return false;
         return true;
-    }, [trigger, triggerError, actType, actNumber, actDate]);
+    }, [trigger, triggerError, actType, needsDetails, actNumber, actDate]);
 
     const resetForm = useCallback(() => {
         setTrigger('');
@@ -233,7 +233,9 @@ export function AliasSection() {
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <Input
-                                    label="Abbreviazione *"
+                                    label="Abbreviazione"
+                                    required
+                                    aria-required
                                     type="text"
                                     value={trigger}
                                     onChange={(e) => setTrigger(e.target.value.toLowerCase())}
@@ -250,19 +252,19 @@ export function AliasSection() {
                                     </p>
                                 )}
                             </div>
-                            <Input label="Nome mostrato" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="es. GDPR, Privacy" />
+                            <Input label="Nome mostrato (facoltativo)" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="es. GDPR, Privacy" />
                         </div>
 
                         {/* Norm Reference Fields */}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <Select label="Tipo di atto *" value={actType} onChange={(e) => setActType(e.target.value)}>
+                            <Select label="Tipo di atto" required aria-required value={actType} onChange={(e) => setActType(e.target.value)}>
                                 <option value="">Scegli…</option>
                                 {ACT_TYPES.map(at => (
                                     <option key={at.value} value={at.value}>{at.label}</option>
                                 ))}
                             </Select>
-                            <Input label="Numero" type="text" value={actNumber} onChange={(e) => setActNumber(e.target.value)} placeholder="es. 679" />
-                            <Input label="Anno o data" type="text" value={actDate} onChange={(e) => setActDate(e.target.value)} placeholder="es. 2016" />
+                            <Input label={needsDetails ? 'Numero' : 'Numero (facoltativo)'} required={needsDetails} aria-required={needsDetails} type="text" value={actNumber} onChange={(e) => setActNumber(e.target.value)} placeholder="es. 679" />
+                            <Input label={needsDetails ? 'Anno o data' : 'Anno o data (facoltativo)'} required={needsDetails} aria-required={needsDetails} type="text" value={actDate} onChange={(e) => setActDate(e.target.value)} placeholder="es. 2016" />
                         </div>
 
                         {/* Default Article (optional) */}

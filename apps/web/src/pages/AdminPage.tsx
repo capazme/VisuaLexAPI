@@ -39,6 +39,8 @@ type AdminSection = 'utenti' | 'problemi-segnalati' | 'pratiche-pubblicate' | 'p
 
 /** The «⋯» of a row: `IconButton`'s quiet look on `MenuButton`'s own trigger. */
 const ROW_MENU = cn(buttonClassName('quiet'), 'min-w-11 px-0 md:min-w-9');
+/** A native checkbox: in the dark theme the browser draws it dark too. */
+const CHECKBOX = 'size-4 rounded border-slate-300 dark:[color-scheme:dark]';
 /** A filter's menu in a part's heading row: as wide as its longest choice needs. */
 // 36 px narrower on a phone, so two menus and «Aggiorna» keep one row at 390.
 const FILTER = 'w-36 md:w-40';
@@ -539,7 +541,7 @@ export function AdminPage() {
                   </div>
                   <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-slate-700 md:min-h-0 dark:text-slate-300">
                     {/* bare-input: a checkbox, which has no common component. */}
-                    <input type="checkbox" checked={newUser.isAdmin} onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })} className="size-4 rounded border-slate-300" />
+                    <input type="checkbox" checked={newUser.isAdmin} onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })} className={CHECKBOX} />
                     Amministratore
                   </label>
                   {createError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{createError}</p>}
@@ -583,7 +585,7 @@ export function AdminPage() {
                                     onChange={() => void updateUser(u.id, { lingoValidatore: !u.lingo_validatore })}
                                     disabled={actionLoading}
                                     aria-label={`Validatore di Learn: ${u.username}`}
-                                    className="size-4 rounded border-slate-300"
+                                    className={CHECKBOX}
                                   />
                                   Validatore di Learn
                                 </label>
@@ -596,7 +598,7 @@ export function AdminPage() {
                                   onChange={() => void updateUser(u.id, { devModeAllowed: !(u.dev_mode_allowed ?? false) })}
                                   disabled={actionLoading}
                                   aria-label={`Modalità sviluppo consentita: ${u.username}`}
-                                  className="size-4 rounded border-slate-300"
+                                  className={CHECKBOX}
                                 />
                                 Modalità sviluppo consentita
                               </label>

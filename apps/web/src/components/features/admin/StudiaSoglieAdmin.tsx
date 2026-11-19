@@ -1,7 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import * as adminService from '../../../services/adminService';
 import type { StudiaSoglie, StudiaSoglieEffetto, StudiaSoglieSettings } from '../../../services/adminService';
 import { Button } from '../../ui/Button';
@@ -128,7 +127,7 @@ export function StudiaSoglieAdmin() {
         <h3 id={headingId} className="text-base font-semibold text-gray-900 dark:text-white">Soglie di validazione</h3>
         <div role="alert" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
           <p>Non riesco a leggere le soglie. Riprova.</p>
-          <Button variant="outline" className={TOUCH_TARGET_RESPONSIVE} onClick={() => setRound((value) => value + 1)}>
+          <Button variant="outline" onClick={() => setRound((value) => value + 1)}>
             Riprova
           </Button>
         </div>
@@ -204,7 +203,7 @@ export function StudiaSoglieAdmin() {
       )}
 
       <div>
-        <Button className={TOUCH_TARGET_RESPONSIVE} disabled={!canSave} onClick={() => void save()}>
+        <Button disabled={!canSave} onClick={() => void save()}>
           {saving ? 'Salvo…' : 'Salva'}
         </Button>
       </div>

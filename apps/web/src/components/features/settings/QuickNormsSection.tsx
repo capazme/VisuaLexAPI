@@ -178,7 +178,7 @@ export function QuickNormsSection() {
             {inputMode === 'manual' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Select label="Tipo di atto" value={actType} onChange={(e) => setActType(e.target.value)}>
+                  <Select label="Tipo di atto" required aria-required value={actType} onChange={(e) => setActType(e.target.value)}>
                     {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
                       <optgroup key={group} label={group}>
                         {acts.map(at => (
@@ -187,7 +187,7 @@ export function QuickNormsSection() {
                       </optgroup>
                     ))}
                   </Select>
-                  <Input label="Articolo" type="text" value={article} onChange={(e) => setArticle(e.target.value)} placeholder="es. 2043" />
+                  <Input label="Articolo" required aria-required type="text" value={article} onChange={(e) => setArticle(e.target.value)} placeholder="es. 2043" />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
