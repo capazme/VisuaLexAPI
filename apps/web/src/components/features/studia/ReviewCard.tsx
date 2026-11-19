@@ -66,12 +66,13 @@ export function ReviewCard({ card, revealed, focusKey, onOpenAnchor }: ReviewCar
                 <ul className="flex flex-wrap gap-2">
                   {anchors.map((anchor) => (
                     <li key={`${anchor.normaKey}|${anchor.articleId}`} className="min-w-0 max-w-full">
+                      {/* bare-button: a chip of the card's article, its words wrapping inside it. */}
                       <button
                         type="button"
                         onClick={() => onOpenAnchor(anchor)}
                         title="Apri l’articolo"
                         className={cn(
-                          'inline-flex min-h-[44px] max-w-full items-center gap-2 rounded-lg border border-slate-200 px-3 text-left text-sm font-medium text-slate-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-900',
+                          'inline-flex min-h-[44px] max-w-full items-center gap-2 rounded-md border border-slate-200 px-3 text-left text-sm font-medium text-slate-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-900',
                           'dark:border-slate-700 dark:text-slate-200 dark:hover:border-primary-700 dark:hover:bg-primary-900/30 dark:hover:text-primary-200',
                           FOCUS_RING,
                         )}

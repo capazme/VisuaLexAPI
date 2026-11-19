@@ -57,6 +57,7 @@ export function ArticleCardsRow({ norma, articleText, structure, historical, ref
   if (!urn) return null;
 
   const newCard = (
+    // bare-button: the reader's line under an article, words in a sentence with the count beside them.
     <button
       type="button"
       onClick={() => {
@@ -81,6 +82,7 @@ export function ArticleCardsRow({ norma, articleText, structure, historical, ref
       {status === 'ready' && (
         <>
           {count > 0 ? (
+            // bare-button: the reader's line, as «+ Nuova scheda».
             <button
               type="button"
               ref={setCountButton}

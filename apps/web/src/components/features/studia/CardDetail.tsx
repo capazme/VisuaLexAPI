@@ -4,13 +4,14 @@ import { cn } from '../../../lib/utils';
 import { studiaService } from '../../../services/studiaService';
 import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
 import { ClaudeMark } from '../../ui/ClaudeMark';
+import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import type { AncoraScheda, RilievoValidatore, Scheda, TestoDaAccettare } from '../../../types/studia';
 import { AcceptTextDialog } from './AcceptTextDialog';
 import { StateChip } from './StateChip';
 import { recordXpSeen } from './progress/seenProgress';
 import { gainOf, gainWords } from './progress/xpGains';
-import { FOCUS_RING, INK_BUTTON, MUTED_TEXT, SECONDARY_BUTTON, TILE } from './progress/tokens';
+import { MUTED_TEXT, TILE } from './progress/tokens';
 import { MATERIA_LABEL, TIPO_LABEL, anchorLabel } from './studiaLabels';
 
 export interface CardDetailProps {
@@ -52,16 +53,10 @@ function withdrawFailure(error: unknown): string {
   return 'Non sono riuscito a ritirare la proposta. Riprova.';
 }
 
-const ACTION = 'inline-flex items-center justify-center whitespace-nowrap';
-const DANGER = cn(
-  ACTION,
-  'min-h-[44px] rounded-xl border border-red-300 px-4 text-sm font-semibold text-red-700 transition-[background-color,scale] hover:bg-red-50 active:scale-[0.97] dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-900/20',
-  FOCUS_RING,
-);
-const BACK = cn(ACTION, '-ml-2 min-h-[44px] rounded-lg px-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING);
+// The destructive action keeps its red (a functional colour) on `Button`'s outline.
+const DANGER = 'border-red-300 text-red-700 hover:border-red-400 hover:bg-red-50 hover:text-red-800 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-900/20 dark:hover:text-red-200';
 /** A source line, a heading of the card's parts: Inter, small, the reader's grey. */
 const PART_HEADING = 'mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200';
-const LINK = cn('min-h-[44px] rounded text-left text-sm hover:text-primary-900 hover:underline dark:hover:text-primary-200', FOCUS_RING);
 const MEASURE = 'max-w-measure';
 
 /**
@@ -139,46 +134,40 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
     <article aria-label="Scheda" className={cn(TILE, 'space-y-5 p-4 md:p-6')}>
       <div className="flex flex-wrap items-center gap-2">
         {onBack && (
-          <button type="button" onClick={onBack} className={BACK}>
-            <ArrowLeft size={16} aria-hidden className="mr-1.5" />
+          <Button type="button" variant="quiet" icon={<ArrowLeft size={16} aria-hidden />} onClick={onBack} className="-ml-2 px-2">
             Indietro
-          </button>
+          </Button>
         )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {canEdit && (
-            <button type="button" onClick={onEdit} className={cn(SECONDARY_BUTTON, ACTION)}>
+            <Button type="button" variant="secondary" onClick={onEdit} className="whitespace-nowrap">
               Modifica
-            </button>
+            </Button>
           )}
           {canPropose && (
-            <button type="button" onClick={() => void propose()} disabled={pending} className={cn(INK_BUTTON, ACTION)}>
+            <Button type="button" onClick={() => void propose()} disabled={pending} className="whitespace-nowrap">
               Proponi alla comunità
-            </button>
+            </Button>
           )}
           {canWithdraw && (
-            <button type="button" onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirmWithdraw(true); }} disabled={pending} className={cn(SECONDARY_BUTTON, ACTION, 'disabled:opacity-60')}>
+            <Button type="button" variant="secondary" onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirmWithdraw(true); }} disabled={pending} className="whitespace-nowrap">
               Ritira
-            </button>
+            </Button>
           )}
           {/* No confirmation (LC89, L-80): the card goes to the trash and the notification offers «Annulla». */}
           {canDelete && (
-            <button type="button" onClick={onDelete} className={DANGER}>
+            <Button type="button" variant="secondary" onClick={onDelete} className={cn('whitespace-nowrap', DANGER)}>
               Elimina
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       <div>
         {source && (
-          <button
-            type="button"
-            onClick={() => onOpenAnchor(source)}
-            title="Apri l’articolo nel lettore"
-            className={cn(LINK, 'mb-1', MUTED_TEXT)}
-          >
+          <Button type="button" variant="link" onClick={() => onOpenAnchor(source)} title="Apri l’articolo nel lettore" className={cn('mb-1 text-left', MUTED_TEXT)}>
             {anchorLabel(source)}
-          </button>
+          </Button>
         )}
         <h3 className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-xl leading-[1.7] text-slate-900 dark:text-slate-50')}>{card.domanda}</h3>
         <hr className={cn(MEASURE, 'my-4 border-slate-200 dark:border-slate-700')} />
@@ -198,14 +187,9 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
           <ul>
             {others.map((anchor) => (
               <li key={`${anchor.normaKey}|${anchor.articleId}`}>
-                <button
-                  type="button"
-                  onClick={() => onOpenAnchor(anchor)}
-                  title="Apri l’articolo nel lettore"
-                  className={cn(LINK, 'text-slate-700 dark:text-slate-200')}
-                >
+                <Button type="button" variant="link" onClick={() => onOpenAnchor(anchor)} title="Apri l’articolo nel lettore" className="text-left">
                   {anchorLabel(anchor)}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -215,9 +199,9 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
       {rilieviFailed && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-700 dark:text-red-400">
           <p>Non ho potuto leggere i rilievi dei validatori.</p>
-          <button type="button" onClick={onRetryRilievi} className={SECONDARY_BUTTON}>
+          <Button type="button" variant="secondary" onClick={onRetryRilievi}>
             Riprova
-          </button>
+          </Button>
         </div>
       )}
 

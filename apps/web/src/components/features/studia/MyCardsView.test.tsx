@@ -125,12 +125,13 @@ describe('«Le mie schede», the list', () => {
     // The heading's «+ Nuova scheda», and the empty list's solid «Scrivi la prima scheda», the same form.
     expect(screen.getAllByRole('button', { name: '+ Nuova scheda' })).toHaveLength(1);
     const first = await screen.findByRole('button', { name: 'Scrivi la prima scheda' });
-    expect(first).toHaveClass('min-h-[44px]', 'font-semibold');
-    // Solid ink: the block's one action (`INK_BUTTON`).
-    expect(first).toHaveClass('bg-primary-900', 'dark:bg-primary-300');
+    // The block's one action: the common primary `Button` (LC112).
+    expect(first).toHaveClass('bg-toga-600');
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
     await userEvent.setup().click(first);
-    expect(await screen.findByRole('dialog', { name: 'Nuova scheda' })).toBeInTheDocument();
+    // In the page (LC112, L-73): no window over the list.
+    expect(await screen.findByRole('region', { name: 'Nuova scheda' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('points to an article, and promises no button, when the sources do not answer', async () => {
@@ -217,12 +218,12 @@ describe('«Le mie schede», the list', () => {
     renderView();
     await screen.findAllByRole('link');
     list.mockResolvedValue(page([]));
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Scritte da Claude, da rileggere' }));
+    await userEvent.setup().click(screen.getByRole('switch', { name: 'Scritte da Claude, da rileggere' }));
     expect(await screen.findByText('Nessuna scheda con questi filtri.')).toBeInTheDocument();
     list.mockResolvedValue(page(FIVE));
     await userEvent.setup().click(screen.getByRole('button', { name: 'Azzera i filtri' }));
     expect(await screen.findAllByRole('link')).toHaveLength(5);
-    expect(screen.getByRole('button', { name: 'Scritte da Claude, da rileggere' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('switch', { name: 'Scritte da Claude, da rileggere' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('folds an institute shut from its heading', async () => {
@@ -287,7 +288,7 @@ describe('«Le mie schede», the filters', () => {
   it('asks for the cards Claude wrote and the user has yet to read', async () => {
     renderView();
     await screen.findAllByRole('link');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Scritte da Claude, da rileggere' }));
+    await userEvent.setup().click(screen.getByRole('switch', { name: 'Scritte da Claude, da rileggere' }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ origine: 'applicazione', stato: 'BOZZA_PERSONALE' })));
     expect(screen.getByRole('combobox', { name: 'Stato' })).toBeDisabled();
   });
@@ -295,11 +296,11 @@ describe('«Le mie schede», the filters', () => {
   it('asks for the cards due today', async () => {
     renderView();
     await screen.findAllByRole('link');
-    const toggle = screen.getByRole('button', { name: 'Da ripassare oggi' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    const toggle = screen.getByRole('switch', { name: 'Da ripassare oggi' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
     await userEvent.setup().click(toggle);
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ dovuteOggi: 'true' })));
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
     // Not together with «Claude»: they are separate filters, and the state select stays free.
     expect(screen.getByRole('combobox', { name: 'Stato' })).toBeEnabled();
     await userEvent.setup().click(toggle);
@@ -626,6 +627,53 @@ describe('«Le mie schede», delete', () => {
 });
 
 describe('«Le mie schede», a new card', () => {
+  // LC112 (L-73): the form opens in the page, under the title's action, as «Modifica pratica» (LC107).
+  it('opens the new card in the page: the focus on its region, Esc closes it and gives the focus back to the command', async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findAllByRole('link');
+    const command = await screen.findByRole('button', { name: '+ Nuova scheda' });
+    expect(command).toHaveAttribute('aria-expanded', 'false');
+    await user.click(command);
+    const region = await screen.findByRole('region', { name: 'Nuova scheda' });
+    expect(command).toHaveAttribute('aria-expanded', 'true');
+    expect(command).toHaveAttribute('aria-controls', region.id);
+    // The space, not a field: a phone's keyboard does not rise over the page.
+    expect(region).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Nuova scheda' })).toBeNull());
+    expect(command).toHaveFocus();
+    expect(command).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('keeps what was typed when Esc closes it: opened again, the draft is there', async () => {
+    const user = userEvent.setup();
+    renderView();
+    const command = await screen.findByRole('button', { name: '+ Nuova scheda' });
+    await user.click(command);
+    const region = await screen.findByRole('region', { name: 'Nuova scheda' });
+    await user.type(within(region).getByLabelText('Domanda'), 'Quando?');
+    region.focus();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Nuova scheda' })).toBeNull());
+    expect(command).toHaveFocus();
+    await user.click(command);
+    const again = await screen.findByRole('region', { name: 'Nuova scheda' });
+    expect(within(again).getByLabelText('Domanda')).toHaveValue('Quando?');
+  });
+
+  it('closes the reference field with Esc, not the page\'s space around it', async () => {
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole('button', { name: '+ Nuova scheda' }));
+    const region = await screen.findByRole('region', { name: 'Nuova scheda' });
+    await user.click(within(region).getByLabelText('Riferimento dell’ancora'));
+    await user.keyboard('{Escape}');
+    expect(within(region).queryByLabelText('Riferimento dell’ancora')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Nuova scheda' })).toBeInTheDocument();
+  });
+
   it('opens the form with no article from the heading, and shows the card once saved', async () => {
     const user = userEvent.setup();
     const created = card('n1', { domanda: 'Quando?', istituto: 'Risoluzione' });
@@ -633,7 +681,7 @@ describe('«Le mie schede», a new card', () => {
     renderView();
     await screen.findAllByRole('link');
     await user.click(await screen.findByRole('button', { name: '+ Nuova scheda' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Nuova scheda' });
+    const dialog = await screen.findByRole('region', { name: 'Nuova scheda' });
     expect(within(dialog).queryByText('principale')).toBeNull();
     await user.selectOptions(within(dialog).getByLabelText('Materia'), 'DIRITTO_CIVILE');
     await user.type(within(dialog).getByLabelText('Istituto'), 'Risoluzione');
@@ -658,7 +706,7 @@ describe('«Le mie schede», a new card', () => {
     const fromHeading = screen.getByRole('button', { name: '+ Nuova scheda' });
     const fromEmpty = await screen.findByRole('button', { name: 'Scrivi la prima scheda' });
     await user.click(fromEmpty);
-    const dialog = await screen.findByRole('dialog', { name: 'Nuova scheda' });
+    const dialog = await screen.findByRole('region', { name: 'Nuova scheda' });
     await user.selectOptions(within(dialog).getByLabelText('Materia'), 'DIRITTO_CIVILE');
     await user.type(within(dialog).getByLabelText('Istituto'), 'Risoluzione');
     await user.type(within(dialog).getByLabelText('Domanda'), 'Quando?');
@@ -672,11 +720,24 @@ describe('«Le mie schede», a new card', () => {
 });
 
 describe('«Le mie schede», edit', () => {
+  // LC112: in the page the list stays in reach, so the edit belongs to its card.
+  it('closes the edit when another card is opened, and does not open it again on the next one', async () => {
+    const user = userEvent.setup();
+    renderView('/learn/schede/r1');
+    const detail = await screen.findByRole('article', { name: 'Scheda' });
+    await user.click(within(detail).getByRole('button', { name: 'Modifica' }));
+    expect(await screen.findByRole('region', { name: 'Modifica scheda' })).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: /Domanda r2\?/ }));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede/r2'));
+    expect(screen.queryByRole('region', { name: 'Modifica scheda' })).toBeNull();
+    expect(await screen.findByRole('heading', { level: 3, name: 'Domanda r2?' })).toBeInTheDocument();
+  });
+
   it('opens the form on the draft', async () => {
     renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'Modifica' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Modifica scheda' });
+    const dialog = await screen.findByRole('region', { name: 'Modifica scheda' });
     expect(within(dialog).getByLabelText('Domanda')).toHaveValue('Domanda r1?');
   });
 
@@ -687,7 +748,7 @@ describe('«Le mie schede», edit', () => {
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     const user = userEvent.setup();
     await user.click(within(detail).getByRole('button', { name: 'Modifica' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Modifica scheda' });
+    const dialog = await screen.findByRole('region', { name: 'Modifica scheda' });
     list.mockClear();
     list.mockResolvedValue(page(FIVE.map((c) => (c.id === 'r1' ? saved : c))));
     await user.click(within(dialog).getByRole('button', { name: /Salva/ }));

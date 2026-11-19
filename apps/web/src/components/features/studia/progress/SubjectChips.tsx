@@ -1,42 +1,49 @@
 import { HIDDEN_SCROLLBAR } from '../../../../constants/interactions';
 import { cn } from '../../../../lib/utils';
 import type { Materia } from '../../../../types/studia';
+import { SegmentedTabs } from '../../../ui/SegmentedTabs';
 import { MATERIA_LABEL } from '../studiaLabels';
-import { FOCUS_RING, INK_BORDER, subjectHue } from './tokens';
+import { subjectHue } from './tokens';
 
 export interface SubjectChipsProps {
   selected: Materia | undefined;
   onSelect: (materia: Materia | undefined) => void;
 }
 
-/** 44 px at every width: on a computer too, where the chips used to drop to 34 px. */
-const CHIP = 'inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm';
+const ALL = 'tutte';
 
 /**
- * The subject filter of the dashboard and of the session it starts (Studia progress spec §6.2):
- * «Tutte le materie» and the five subjects, one pressed at a time.
+ * The subject filter of the dashboard and of the session it starts (Studia progress spec §6.2): «Tutte le materie» and
+ * the five subjects, one chosen at a time — the common choice in a row (LC112, `SegmentedTabs size="sm"`, a radiogroup),
+ * one scrolling row where the page is narrower than the six.
  */
 export function SubjectChips({ selected, onSelect }: SubjectChipsProps) {
-  const chip = (on: boolean) =>
-    cn(
-      CHIP,
-      FOCUS_RING,
-      on
-        ? cn('border-2 font-semibold text-slate-900 dark:text-white', INK_BORDER)
-        : 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800',
-    );
-  return (
-    // One scrolling row on a phone, where six chips would take four lines, its bar not drawn; wrapped from `md`.
-    <div role="group" aria-label="Materia" className={cn('relative -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0', HIDDEN_SCROLLBAR)}>
-      <button type="button" aria-pressed={selected === undefined} onClick={() => onSelect(undefined)} className={chip(selected === undefined)}>
-        Tutte le materie
-      </button>
-      {(Object.entries(MATERIA_LABEL) as Array<[Materia, string]>).map(([materia, label]) => (
-        <button key={materia} type="button" aria-pressed={selected === materia} onClick={() => onSelect(materia)} className={chip(selected === materia)}>
+  const tabs = [
+    { id: ALL, label: 'Tutte le materie' },
+    ...(Object.entries(MATERIA_LABEL) as Array<[Materia, string]>).map(([materia, label]) => ({
+      id: materia,
+      label: (
+        <>
           <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: subjectHue(materia) }} />
           {label}
-        </button>
-      ))}
+        </>
+      ),
+    })),
+  ];
+  return (
+    // The track's own room for its focus ring, its bar not drawn.
+    <div className={cn('relative -mx-1 overflow-x-auto px-1 py-1', HIDDEN_SCROLLBAR)}>
+      <SegmentedTabs
+        size="sm"
+        label="Materia"
+        tabs={tabs}
+        value={selected ?? ALL}
+        onChange={(id) => onSelect(id === ALL ? undefined : (id as Materia))}
+        className="w-max"
+        // 44 px at every width, as before (the `sm` row's segments are 40 on a phone, 32 from md); never squeezed in the
+        // scrolling row.
+        tabClassName="min-h-11 shrink-0 whitespace-nowrap"
+      />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Button } from '../../../ui/Button';
 import { useReducedMotion } from 'framer-motion';
 import { Settings2 } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
 import { todayState } from '../progress/today';
-import { BLOCK_HEADING, MUTED_TEXT, QUIET_BUTTON, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { MISSION_INK_MS, MissionRow } from './MissionMark';
 import { missionOrder, missionSummary, todayMissions, type Mission } from './missions';
 import { useFreshMissions } from '../progress/seenProgress';
@@ -96,7 +97,7 @@ export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel }:
               <div className="h-6 w-6 rounded-full bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
               {/* A row's words, its count and its bar as a phone draws them, 58 px, the goal's with its line 84 (P1); one
                   line from `md`. */}
-              <div className={cn('rounded-lg bg-slate-100 motion-safe:animate-pulse md:h-9 dark:bg-slate-800', row === 2 ? 'h-[84px]' : 'h-[58px]')} />
+              <div className={cn('rounded-md bg-slate-100 motion-safe:animate-pulse md:h-9 dark:bg-slate-800', row === 2 ? 'h-[84px]' : 'h-[58px]')} />
             </div>
           ))}
         </div>
@@ -107,15 +108,10 @@ export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel }:
           <MissionsOfToday day={day} missions={missions} />
           {/* The targets are settings, not missions (G8): one way to them, under the rows. */}
           <div className="mt-2 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              aria-controls={settingsPanel}
-              onClick={() => onOpenSettings(noNewCards ? 'comunita' : undefined)}
-              className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5 font-normal text-slate-600 dark:text-slate-300')}
-            >
+            <Button type="button" variant="quiet" aria-controls={settingsPanel} onClick={() => onOpenSettings(noNewCards ? 'comunita' : undefined)} className="-mx-2 mt-1 px-2 font-normal">
               Obiettivo e nuove al giorno: nelle impostazioni
               <Settings2 size={15} aria-hidden className="shrink-0" />
-            </button>
+            </Button>
           </div>
         </>
       )}

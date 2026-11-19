@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '../../../ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { Check, ListChecks, Lock } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -6,7 +7,7 @@ import type { Materia, Progressi, TappaIstituto } from '../../../../types/studia
 import { BookMark } from '../../../ui/BookMark';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { dueLabel, instituteSessionPath, orderInstitutes } from './today';
-import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, QUIET_BUTTON, SECONDARY_BUTTON, TILE, SUBJECT_ART, subjectHue } from './tokens';
+import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, TILE, SUBJECT_ART, subjectHue } from './tokens';
 import type { PercorsoState } from './usePercorso';
 import { Illustration } from '../../../ui/Illustration';
 import { CourseTrail } from '../corsi/CourseTrail';
@@ -89,9 +90,9 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
           </p>
         </div>
         </div>
-        <button type="button" onClick={() => navigate(subjectPath(materia))} className={cn(SECONDARY_BUTTON, 'shrink-0')}>
+        <Button type="button" variant="secondary" onClick={() => navigate(subjectPath(materia))} className="shrink-0">
           Ripassa<span className="sr-only"> {label}</span>
-        </button>
+        </Button>
       </header>
       <LessonNode materia={materia} label={label} cards={cards} />
       <ol aria-label={`Istituti di ${label}`} className="relative px-4 py-2 sm:px-5 sm:py-4">
@@ -102,6 +103,7 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
           const isHere = stop.istituto === here;
           return (
             <li key={stop.istituto} className="relative">
+              {/* bare-button: a stop of the road, the whole row its target. */}
               <button
                 type="button"
                 // The name says what the stop holds, not only the cards due (a stop of new cards is not «niente da ripassare»).
@@ -109,7 +111,7 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
                 aria-current={isHere ? 'step' : undefined}
                 onClick={() => navigate(instituteSessionPath(materia, stop.istituto))}
                 className={cn(
-                  'group flex w-full items-center gap-4 rounded-xl py-1 pl-1 pr-2 text-left transition-colors sm:py-2 hover:bg-slate-100 dark:hover:bg-slate-800/60',
+                  'group flex w-full items-center gap-4 rounded-md py-1 pl-1 pr-2 text-left transition-colors sm:py-2 hover:bg-slate-100 dark:hover:bg-slate-800/60',
                   FOCUS_RING,
                 )}
               >
@@ -132,9 +134,9 @@ function Unit({ materia, stops, counts, here }: { materia: Materia; stops: Tappa
       </ol>
       {stops.length > PATH_STOPS_SHOWN && (
         <div className="border-t border-slate-200 px-5 py-2 dark:border-slate-800">
-          <button type="button" aria-expanded={all} onClick={() => setAll((open) => !open)} className={QUIET_BUTTON}>
+          <Button type="button" variant="link" aria-expanded={all} onClick={() => setAll((open) => !open)}>
             {all ? `Mostra solo i primi ${PATH_STOPS_SHOWN}` : `Mostra tutti gli istituti (${stops.length})`}
-          </button>
+          </Button>
         </div>
       )}
     </section>
@@ -166,7 +168,7 @@ function LessonNode({ materia, label, cards }: { materia: Materia; label: string
       </span>
     </>
   );
-  const row = 'flex w-full items-center gap-4 rounded-xl py-1 pl-1 pr-2 text-left sm:py-2';
+  const row = 'flex w-full items-center gap-4 rounded-md py-1 pl-1 pr-2 text-left sm:py-2';
   return (
     <div className="border-b border-slate-200 px-4 py-1 sm:px-5 sm:py-2 dark:border-slate-800">
       {open ? (
@@ -214,9 +216,9 @@ export function LearnPath({ percorso, materie, onRetry, onOpenCommunity }: Learn
         {percorso.status === 'error' ? (
           <div className="grid gap-1">
             <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Non riesco a leggere il tuo sentiero.</p>
-            <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
+            <Button type="button" variant="link" onClick={onRetry} className="justify-self-start">
               Riprova
-            </button>
+            </Button>
           </div>
         ) : (
           <div aria-hidden className={cn(TILE, 'h-64 motion-safe:animate-pulse')} />
@@ -249,9 +251,9 @@ export function LearnPath({ percorso, materie, onRetry, onOpenCommunity }: Learn
       {percorso.status === 'error' && (
         <div className="grid gap-1">
           <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Non riesco ad aggiornare il sentiero: resta quello letto prima.</p>
-          <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
+          <Button type="button" variant="link" onClick={onRetry} className="justify-self-start">
             Riprova
-          </button>
+          </Button>
         </div>
       )}
       {units.map((unit) => (
@@ -264,16 +266,16 @@ export function LearnPath({ percorso, materie, onRetry, onOpenCommunity }: Learn
         />
       ))}
       {without.length > 0 && (
-        <div className={cn('rounded-2xl border border-dashed border-slate-300 px-5 py-4 dark:border-slate-700')}>
+        <div className={cn('rounded-[8px] border border-dashed border-slate-300 px-5 py-4 dark:border-slate-700')}>
           <p className="text-sm text-slate-700 dark:text-slate-300">
             {units.length === 0 ? 'Il percorso nasce dalle tue schede. ' : ''}
             <span className="font-medium">{without.map((materia) => MATERIA_LABEL[materia]).join(', ')}</span>
             : nessuna scheda, per ora.
           </p>
           <p className={cn('mt-1 text-sm', MUTED_TEXT)}>Scrivine una sotto un articolo che apri in Ricerca, o accendi le schede della comunità.</p>
-          <button type="button" onClick={onOpenCommunity} className={cn(QUIET_BUTTON, 'mt-1')}>
+          <Button type="button" variant="link" onClick={onOpenCommunity} className="mt-1">
             Scegli le schede della comunità
-          </button>
+          </Button>
         </div>
       )}
     </section>

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
+import { buttonClassName } from '../../../ui/buttonStyles';
 import { cn } from '../../../../lib/utils';
 import { corsiService } from '../../../../services/corsiService';
-import { BLOCK_HEADING, INK_BUTTON, MUTED_TEXT, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { examPath } from './corsiLabels';
 import { useCoursesSwitch } from './coursesSwitch';
 import { useCourseRead } from './useCourseRead';
@@ -30,7 +31,7 @@ export function TodayExam() {
               <span className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">{corso.titolo}</span>
               <span className={cn('break-words text-sm', MUTED_TEXT)}>Hai finito i moduli: l’esame finale ti aspetta.</span>
             </span>
-            <Link to={examPath(corso.id, esameId)} aria-label={`${label(started)} di «${corso.titolo}»`} className={INK_BUTTON}>
+            <Link to={examPath(corso.id, esameId)} aria-label={`${label(started)} di «${corso.titolo}»`} className={buttonClassName('primary', 'lg')}>
               {label(started)}
             </Link>
           </li>

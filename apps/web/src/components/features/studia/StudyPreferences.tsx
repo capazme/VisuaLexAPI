@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Expand } from '../../ui/Expand';
+import { Input } from '../../ui/Input';
+import { Switch } from '../../ui/Switch';
 import { studiaService } from '../../../services/studiaService';
 import type { Materia, PreferenzeStudio } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
@@ -19,8 +21,8 @@ export interface StudyPreferencesProps {
 
 const MIN_PER_DAY = 1;
 const MAX_PER_DAY = 200;
-const CONTROL =
-  'min-h-[44px] rounded-lg border border-slate-300 bg-card px-3 text-sm text-slate-900 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+/** A disclosure's row: its words and its chevron, the whole width (not a button's look). */
+const DISCLOSURE = 'flex min-h-[44px] w-full items-center gap-2 rounded-md text-left text-sm font-medium text-slate-700 md:min-h-0 md:py-1.5 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 /** A whole number in the allowed range, or null. */
 function parseGoal(text: string): number | null {
@@ -80,7 +82,9 @@ function GoalField({ label, hint, value, onSave }: GoalFieldProps) {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        {/* `Input`'s box is as wide as what holds it. */}
+        <div className="w-24">
+        <Input
           id={inputId}
           type="number"
           inputMode="numeric"
@@ -98,8 +102,8 @@ function GoalField({ label, hint, value, onSave }: GoalFieldProps) {
           }}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className={cn(CONTROL, 'w-24')}
         />
+        </div>
         {saved && <span role="status" className="text-sm text-slate-500 dark:text-slate-400">Salvato</span>}
       </div>
       {error && (
@@ -183,13 +187,8 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
     <section className={cn(!alwaysOpen && 'border-t border-slate-200 pt-3 dark:border-slate-800')}>
       {!alwaysOpen && (
       <h2>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={() => setOpen((v) => !v)}
-          className="flex min-h-[44px] w-full items-center gap-2 rounded-md text-left text-sm font-medium text-slate-700 md:min-h-0 md:py-1.5 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        >
+        {/* bare-button: a disclosure's heading row, its words and chevron across the panel. */}
+        <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((v) => !v)} className={DISCLOSURE}>
           <ChevronDown size={16} aria-hidden className={cn('shrink-0 text-slate-400 transition-transform motion-reduce:transition-none', !open && '-rotate-90')} />
           Impostazioni dello studio
         </button>
@@ -213,13 +212,8 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
 
             {/* One level down, closed at first (G6): the first level stays short, the card no longer runs past the missions. */}
             <div>
-              <button
-                type="button"
-                aria-expanded={community}
-                aria-controls={communityId}
-                onClick={() => setCommunity((v) => !v)}
-                className="flex min-h-[44px] w-full items-center gap-2 rounded-md text-left text-sm font-medium text-slate-700 md:min-h-0 md:py-1.5 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
+              {/* bare-button: a disclosure's row, one level down. */}
+              <button type="button" aria-expanded={community} aria-controls={communityId} onClick={() => setCommunity((v) => !v)} className={DISCLOSURE}>
                 <ChevronDown size={16} aria-hidden className={cn('shrink-0 text-slate-400 transition-transform motion-reduce:transition-none', !community && '-rotate-90')} />
                 {`Schede della comunità · ${preferences.materieComunita.length} di ${subjects.length}`}
               </button>
@@ -232,23 +226,9 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
                     {subjects.map(([materia, label]) => {
                       const on = preferences.materieComunita.includes(materia);
                       return (
-                        <li key={materia}>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={on}
-                            disabled={switching}
-                            onClick={() => toggle(materia)}
-                            className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md px-1 text-left text-sm text-slate-800 md:min-h-0 md:py-1.5 disabled:opacity-60 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                          >
-                            {label}
-                            <span
-                              aria-hidden
-                              className={cn('relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600')}
-                            >
-                              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none', on && 'translate-x-4 dark:bg-ink-950')} />
-                            </span>
-                          </button>
+                        <li key={materia} className="flex items-center justify-between gap-3 px-1 text-sm text-slate-800 dark:text-slate-100">
+                          <span id={`${communityId}-${materia}`}>{label}</span>
+                          <Switch checked={on} disabled={switching} onCheckedChange={() => toggle(materia)} aria-labelledby={`${communityId}-${materia}`} />
                         </li>
                       );
                     })}

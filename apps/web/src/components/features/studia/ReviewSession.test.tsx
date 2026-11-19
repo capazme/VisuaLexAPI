@@ -28,7 +28,10 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import type { Progressi, SchedaDiRipasso } from '../../../types/studia';
 import { SESSION_NOTICE_MS } from './progress/Celebration';
 import { GRADE_NOTE_MS } from './useGradeNote';
-import { LESSON_PRIMARY } from './lessonStyles';
+import { buttonClassName } from '../../ui/buttonStyles';
+
+// The lesson's one primary action (LC112): the common `Button`, large.
+const LESSON_PRIMARY = buttonClassName('primary', 'lg');
 import { ReviewSession } from './ReviewSession';
 import { coursesSwitchStore } from './corsi/coursesSwitch';
 import { xpFields } from './__fixtures__/xp';
@@ -224,7 +227,9 @@ describe('the review session', () => {
     // The last of the lesson's rows, in the flow of its frame: never fixed, never put back in the page from md up.
     expect(bar).toHaveClass('shrink-0', 'pb-[max(0.75rem,env(safe-area-inset-bottom))]', Z_INDEX.pinnedBar);
     expect(bar.className).not.toMatch(/\bfixed\b|md:static/);
-    expect(reveal).toHaveClass('min-h-[44px]');
+    // The common large `Button` (LC112): 44 px at every width.
+    expect(reveal).toHaveClass('min-h-11');
+    expect(reveal.className).not.toMatch(/\bmd:min-h-/);
     expect(within(reveal).getByText('Spazio')).toBeInTheDocument();
     await show();
     expect(bar).toContainElement(screen.getByRole('group', { name: 'Come è andata?' }));
@@ -788,8 +793,9 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       await screen.findByText('Domanda a?');
       const fill = screen.getByTestId('lesson-progress-fill');
       const head = bar().querySelector('.vlx-lesson-head')!;
-      expect(head).toHaveClass('motion-safe:transition-[width]', 'motion-safe:duration-150');
-      expect(fill).toHaveClass('motion-safe:delay-[70ms]', 'motion-safe:duration-300', 'motion-safe:ease-(--ease-catch)');
+      expect(head).toHaveClass('motion-safe:transition-[width]', 'motion-safe:duration-(--dur-pop)');
+      // The motion tokens (LC112): 70 ms and `--dur-scene`'s 320, still under 400.
+      expect(fill).toHaveClass('motion-safe:delay-[70ms]', 'motion-safe:duration-(--dur-scene)', 'motion-safe:ease-(--ease-catch)');
       // The ink is drawn over the head: it comes after it.
       expect(head.compareDocumentPosition(fill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       await show();

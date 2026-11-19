@@ -1,9 +1,9 @@
 import type { Ref } from 'react';
 import { Settings2 } from 'lucide-react';
 import { Expand } from '../../../ui/Expand';
+import { IconButton } from '../../../ui/IconButton';
 import { cn } from '../../../../lib/utils';
 import { StudyPreferences } from '../StudyPreferences';
-import { FOCUS_RING } from './tokens';
 
 interface SettingsGearProps {
   open: boolean;
@@ -17,21 +17,17 @@ interface SettingsGearProps {
 /** The gear of the study settings: «Oggi»'s statistics and the strip over «Da validare», each opening the panel in place. */
 export function SettingsGear({ open, onClick, controls, ref }: SettingsGearProps) {
   return (
-    <button
+    <IconButton
       ref={ref}
-      type="button"
+      size="lg"
       aria-label="Impostazioni dello studio"
       aria-controls={controls}
       aria-expanded={open}
+      isActive={open}
       onClick={onClick}
-      className={cn(
-        'ml-auto grid h-11 w-11 shrink-0 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
-        open && 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100',
-        FOCUS_RING,
-      )}
-    >
-      <Settings2 size={20} aria-hidden />
-    </button>
+      icon={<Settings2 size={20} aria-hidden />}
+      className="ml-auto shrink-0"
+    />
   );
 }
 

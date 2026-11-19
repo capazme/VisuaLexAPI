@@ -56,10 +56,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   its name «Cerca nelle schede» at every width, and below `sm` «Per istituto o domanda» its description; the act filter offers the acts of the cards listed,
   keeping what a narrowed list hid until a deletion starts it over; each card shows the next review,
   `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», beside the page's
-  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context), and the empty list's «Scrivi la prima scheda» (Q1), open `CardFormDialog` with `{ kind: 'create' }` and no article (no
+  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context), and the empty list's «Scrivi la prima scheda» (Q1), open the form in the page with `{ kind: 'create' }` and no article (LC112, L-73: `CardFormPanel` on `ui/Expand`, under the
+  title's action, and «Modifica» over the card's detail; the focus on the region, never a field, Esc closes it and the
+  focus goes back to the command; «Scheda salvata» is the view's toast; the reader keeps `CardFormDialog`) (no
   fixed anchor, the reference field open, the anchors typed as «art. 1455 c.c.», which `POST /lingo/cards`
   resolves; saved with no anchor, the reference field stays open and takes the focus; the field has «Aggiungi»
-  only — Esc or an empty «Aggiungi» closes it — so the dialog's «Annulla» is the one; the form's body goes back
+  only — Esc or an empty «Aggiungi» closes it, not the space around it — so the form's «Annulla» is the one; the form's body goes back
   to the top once the dialog's first focus lands, which had left «Materia» scrolled out; a 502/503/504 says the
   service is not available at the moment, only a call with no answer asks to check the connection), and is drawn only while
   Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached `/health/detailed`, read once per
@@ -1804,7 +1806,8 @@ feedback button and the plain toasts — the services' state is the user menu's 
 confirmation and the toast — at the top, off the bar — cover it), with Tab fenced off from the shell (`#root`)
 and the body: a dialog over it, or a popover the article portals to the body (a note being typed), keeps its own.
 The shell is not `inert` — the command palette is drawn inside it — so a screen reader's browse mode can still reach
-it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. The shell's full screen
+it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. Learn's own page, opened by its
+address, waits with `LearnLoading`: nothing for 300 ms, then «Caricamento…» (LC112: it came in some 210 ms, the words a flash). The shell's full screen
 (`focusMode`) is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
 header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
 where done are the cards out of the queue — a «Di nuovo» holds it still —; at each grade that moves it the head runs
@@ -1814,7 +1817,7 @@ bar trembles by a pixel (Web Animations, `PLUCK`), 370 ms in all, all of it `mot
 stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
 in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
 card changes; the scroll is keyed by step, so each card starts at its top), and `LessonBar` at the foot on every width (above the phone's safe edge, in the `pinnedBar` band inside
-the frame), holding the one action: «Mostra risposta» (`LESSON_PRIMARY`, the ink key of «Inizia il ripasso») before the reveal,
+the frame), holding the one action: «Mostra risposta» (`Button size="lg"`, as «Inizia il ripasso») before the reveal,
 the four grades after it — the interval the large text and the grade the small one, every button neutral but
 «Di nuovo» (warning tone), 56 px, pressed with `active:scale-[0.97]`. The bar's line above the action says, in this
 order, «Non registrato: riprova», «Ripasso di pratica: non registrato» once the answer is shown, or the note after a
@@ -1978,10 +1981,17 @@ rule. «Da validare» shows the strip (`progress/StudyStrip`, `dense`: the strea
 line, the ring, the gear) over it (`StudiaPage`); «Le mie schede» none since G8 (the streak and the goal said a third
 time); the session shows none. «Contribuisci» (G4, spec §5.5) draws them in
 the same tokens: each page's name the frame's title (L-37), its action beside it, a `TILE` per subject (its hue's dot) and
-per card, a selected row or a pressed filter marked by an ink edge as well as a tint, `INK_BUTTON` for the one action of
-a block, the three verdicts alike in `SECONDARY_BUTTON`; every control of `MyCardsView`, `CardGroups`, `CardFilters`,
-`CardDetail`, `ValidationQueueView`, `VoteBar` and the reader's row and peek keeps 44 px at every width
-(`contribuisci.test.ts` fails on an `md:` height or minimum size other than 44 px, or text under 11 px). The card
+per card, a selected row marked by an ink edge as well as a tint, the common `Button` for the one action of a block, the
+three verdicts alike as `Button variant="secondary"`. Since LC112 (omologazione 7 of 14) Learn draws the common
+controls: `Button`, `IconButton` (large, 44 px at every width, in the lessons and in «Percorsi»; the common heights,
+44 on a phone and 36 from `md`, elsewhere), `Input`, `Select`, `Switch` (the filters' two yes/no and the community's
+subjects), `SegmentedTabs size="sm"` (the trend's period, the subject filter); 4 px for what is pressed or typed in,
+8 for what holds things (`TILE` too); no duration by hand. `studia.guard.test.ts` (recursive over the sub-folders)
+refuses a bare `<button>`, `<select>` or `<input>` without `bare-button: <reason>` on the line above (a row that is a
+whole choice, a chip, a grade, a radio, a checkbox), the old local looks (`INK_BUTTON`, `SECONDARY_BUTTON`,
+`QUIET_BUTTON`, `LESSON_PRIMARY`, `CONTROL`), a 6, 10 or 16 px radius, a written duration and a new window over the
+content (`contribuisci.test.ts` still fails on an `md:` height other than 44 px written in these files, or text under
+11 px). The card
 form itself (`CardForm`, shared with the reader) still drops to the desktop's sizes from `md`. While the first read travels the day block,
 the missions, the band, the subjects and the list keep their places at their final size; a failed first read stops the pulse, and the
 subjects say they could not be read under their heading (no second alert: the day block's «Riprova» reads them again). Colours are the app's tokens through `progress/tokens.ts` (ink is the
@@ -2051,7 +2061,7 @@ level, never as «+XP» in the lesson (spec §5.3).
 (L-37; «I tuoi progressi» stays the section's heading for a screen reader only), then: **the summary** (`StreakBadge compact` and `GoalRing compact`, always the whole
 day's, as the server's streak and goal are; the reviews of 30 days are the trend's total only — G7, Bill: the sum of
 `materie[].ripassi30`, the review log joined to the cards, and the calendar's daily counters are two counts of one
-thing, which part when cards are deleted for good, and read as two answers); **the subject chips** (`SubjectChips`, 44 px at every width, the subject «Oggi» remembers — «Oggi» chooses it in «Le tue materie» since G8 —, and a line saying
+thing, which part when cards are deleted for good, and read as two answers); **the subject filter** (`SubjectChips`, `SegmentedTabs size="sm"` since LC112, a scrolling row where the page is narrower, the subject «Oggi» remembers — «Oggi» chooses it in «Le tue materie» since G8 —, and a line saying
 what it narrows); **«Il tuo andamento»** (`ReviewTrend`, G7, which replaced the calendar: see below); then, side by side
 from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the
@@ -2095,8 +2105,10 @@ the first-day sentence in place of the chart. The coming days' scale is the inte
 lines (`scaleLines`), the days in a row under it; today's column is tinted and its label set apart; a day with nothing
 due is a hollow mark on the base. Counts go through `formatCount` (`Intl.NumberFormat('it-IT')`: «12.345», four
 digits whole as Italian writes them). States: while the first read travels every block holds its final size
-(`ReviewTrendSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); «Il primo giorno comincia oggi» in place of
-the trend only for someone with no record (no day after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
+(`ReviewTrendSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`; the summary's placeholder its two rows and the
+level's, a subject's card and its placeholder one height, `SUBJECT_CARD_HEIGHT` — LC112: 1352 px of placeholders had
+come down to 1086); «Il primo giorno comincia oggi» in the chart's place, at its placeholder's height (`ReviewTrendSkeleton
+note`), only for someone with no record (no day after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
 tuoi progressi.» with «Riprova» (44 px, no alert) and keeps what was on screen; a new read of the same subject leaves
 the last answer, dimmed. The summary ends with the level (`LevelBar`, G1c), the whole day's.
 

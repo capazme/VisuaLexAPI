@@ -19,6 +19,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { getTransformOrigin } from '../../../utils/floatingOrigin';
 import type { SchedaDellArticolo } from '../../../types/studia';
+import { IconButton } from '../../ui/IconButton';
 import { StateChip } from './StateChip';
 
 export interface ArticleCardsPeekProps {
@@ -86,8 +87,8 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: Omit<ArticleCardsPeekProps,
           <div
             style={{ transformOrigin: getTransformOrigin(placement) }}
             className={cn(
-              'flex max-h-[inherit] w-[360px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-lg dark:border-slate-700 dark:bg-slate-900',
-              'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-150',
+              'flex max-h-[inherit] w-[360px] flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-card shadow-lg dark:border-slate-700 dark:bg-slate-900',
+              'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-(--dur-pop)',
             )}
           >
             <PeekBody onClose={onClose} {...rest} />
@@ -110,14 +111,14 @@ function MobileSheet({ onClose, ...rest }: Omit<ArticleCardsPeekProps, 'isOpen' 
 
   return (
     <FloatingPortal>
-      <div className={cn('fixed inset-0 bg-slate-900/30 motion-safe:animate-in motion-safe:fade-in duration-150', Z_INDEX.citationPreview)} onClick={onClose} aria-hidden />
+      <div className={cn('fixed inset-0 bg-slate-900/30 motion-safe:animate-in motion-safe:fade-in duration-(--dur-pop)', Z_INDEX.citationPreview)} onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Schede su questo articolo"
         className={cn(
-          'fixed inset-x-0 bottom-0 flex max-h-[70vh] flex-col rounded-t-2xl border-t border-slate-200 bg-card dark:border-slate-800 dark:bg-slate-900',
-          'motion-safe:animate-in motion-safe:slide-in-from-bottom duration-200',
+          'fixed inset-x-0 bottom-0 flex max-h-[70vh] flex-col rounded-t-[8px] border-t border-slate-200 bg-card dark:border-slate-800 dark:bg-slate-900',
+          'motion-safe:animate-in motion-safe:slide-in-from-bottom duration-(--dur-panel)',
           Z_INDEX.citationPreview,
         )}
       >
@@ -156,6 +157,7 @@ function CommunityRow({ card }: { card: SchedaDellArticolo }) {
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
     <>
+      {/* bare-button: a list's row that opens in place, the whole row its target. */}
       <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls={open ? detailId : undefined} className={ROW}>
         <Chevron size={16} aria-hidden className="mt-0.5 shrink-0 text-slate-500 dark:text-slate-400" />
         <span className="flex min-w-0 flex-1 items-start justify-between gap-3">
@@ -188,15 +190,7 @@ function PeekBody({ cards, articleLabel, onClose }: Pick<ArticleCardsPeekProps, 
           Schede su {articleLabel}
           <span className="ml-2 font-sans text-xs font-medium text-slate-600 dark:text-slate-300">{cards.length}</span>
         </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Chiudi"
-          title="Chiudi (Esc)"
-          className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
+        <IconButton size="lg" onClick={onClose} aria-label="Chiudi" title="Chiudi (Esc)" icon={<X size={16} aria-hidden="true" />} className="shrink-0" />
       </header>
       <ul className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
         {cards.map((card) => (

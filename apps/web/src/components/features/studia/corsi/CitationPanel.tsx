@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, type MouseEvent } from 'react';
+import { IconButton } from '../../../ui/IconButton';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -8,7 +9,7 @@ import { Sheet } from '../../../ui/Sheet';
 import { DossierDecisionReader } from '../../dossier/DossierDecisionReader';
 import { DossierItemReader } from '../../dossier/DossierItemReader';
 import { searchParamsFromNorma } from '../../dossier/dossierUtils';
-import { FOCUS_RING, MUTED_TEXT } from '../progress/tokens';
+import { MUTED_TEXT } from '../progress/tokens';
 import { citationLabel, decisionOfCitation, normaOfCitation } from './lessonCitations';
 
 interface CitationPanelProps {
@@ -93,17 +94,7 @@ export function CitationPanel({ citation, desktop, onClose, leaveThen, showToast
         <h2 ref={heading} tabIndex={-1} className="min-w-0 break-words text-sm font-semibold text-slate-700 focus:outline-none dark:text-slate-200">
           {label}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Chiudi la citazione"
-          className={cn(
-            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
-            FOCUS_RING,
-          )}
-        >
-          <X size={18} aria-hidden />
-        </button>
+        <IconButton size="lg" onClick={onClose} aria-label="Chiudi la citazione" icon={<X size={18} aria-hidden />} className="shrink-0" />
       </div>
       <div onClickCapture={guardLinks}>{body}</div>
     </aside>

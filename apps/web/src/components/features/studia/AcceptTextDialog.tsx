@@ -65,6 +65,7 @@ export function AcceptTextDialog({ text, onAccept, onCancel, busy = false }: Acc
         {replaced ? 'Il testo è cambiato nel frattempo: rileggilo e conferma.' : ''}
       </div>
       <div className="mt-5 flex items-start gap-3">
+        {/* bare-input: a checkbox, which has no common component; its words are its label. */}
         <input
           ref={checkboxRef}
           id={checkboxId}

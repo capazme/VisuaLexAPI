@@ -38,6 +38,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
         // Each segment answers over 44 px at every width; on a computer the colour is drawn 28 px tall inside it.
         <div className="vlx-grow-x flex h-11 gap-0.5">
           {CARD_STATES.filter((s) => stati[s.key] > 0).map((state, index, segments) => (
+            // bare-button: a segment of the bar, as wide as its share.
             <button
               key={state.key}
               type="button"
@@ -46,7 +47,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
               onFocus={() => setChosen(state.key)}
               onClick={() => setChosen(state.key)}
               style={{ flexGrow: stati[state.key] }}
-              className={cn('relative h-11 min-w-3 basis-0 rounded-md motion-safe:transition-[flex-grow] motion-safe:duration-300', FOCUS_RING, 'focus-visible:ring-offset-0', chosen === state.key && 'opacity-80')}
+              className={cn('relative h-11 min-w-3 basis-0 rounded-md motion-safe:transition-[flex-grow] motion-safe:duration-(--dur-scene)', FOCUS_RING, 'focus-visible:ring-offset-0', chosen === state.key && 'opacity-80')}
             >
               <span aria-hidden className={cn(BAR, state.swatch, index === 0 && 'rounded-l-md', index === segments.length - 1 && 'rounded-r-md')} />
             </button>
@@ -87,7 +88,7 @@ export function CardStatesBarSkeleton() {
       <div className="relative h-11">
         <span className={cn(BAR, 'rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800')} />
       </div>
-      <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse md:max-h-[3.75rem] dark:bg-slate-800" />
+      <div className="h-[4.5rem] rounded-md bg-slate-100 motion-safe:animate-pulse md:max-h-[3.75rem] dark:bg-slate-800" />
       <div className="min-h-5" />
     </div>
   );

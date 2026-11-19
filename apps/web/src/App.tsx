@@ -79,7 +79,7 @@ const ProgressPage = lazy(() =>
   import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
 );
 // Small and eager: what the lesson's frame shows while the session's code loads.
-import { LessonLoading } from './components/features/studia/LessonFrame';
+import { LearnLoading, LessonLoading } from './components/features/studia/LessonFrame';
 const ReviewSession = lazy(() =>
   import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
@@ -263,7 +263,7 @@ function App() {
             <Route
               path="learn"
               element={
-                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                <Suspense fallback={<LearnLoading />}>
                   <StudiaPage />
                 </Suspense>
               }

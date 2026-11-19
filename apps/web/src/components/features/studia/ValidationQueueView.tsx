@@ -5,6 +5,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { Materia, Scheda } from '../../../types/studia';
+import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { Toast } from '../../ui/Toast';
 import { ArticleReadOnly } from './ArticleReadOnly';
@@ -187,13 +188,16 @@ export function ValidationQueueView() {
       {status === 'error' && (
         <div role="alert" className="flex flex-wrap items-center gap-x-3 py-4 text-sm text-red-700 dark:text-red-400">
           Non riesco a leggere le schede da validare.
-          <button type="button" onClick={() => {
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
               votedOn.current = null;
               retry();
             }}
-            className={cn('min-h-[44px] rounded px-1 font-medium underline', FOCUS_RING)}>
+          >
             Riprova
-          </button>
+          </Button>
         </div>
       )}
 
@@ -205,6 +209,7 @@ export function ValidationQueueView() {
               {!desktop && (
                 <section className="mt-5 border-t border-slate-200 pt-2 dark:border-slate-700">
                   <h3>
+                    {/* bare-button: a disclosure's heading row, the article's text under it. */}
                     <button
                       type="button"
                       aria-expanded={openFor === card.id}
@@ -222,7 +227,7 @@ export function ValidationQueueView() {
             {desktop && (
               // Scrolls on its own, and is cut to what is left under the page's heading, the area's strip, the heading with the filter and the vote bar (about 22rem);
               // below lg it pins under the phone's bar (M1).
-              <div className={cn(TILE, 'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none max-h-[calc(100dvh-22rem)] min-w-0 overflow-y-auto p-4')}>
+              <div className={cn(TILE, 'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-(--dur-pop) ease-out motion-reduce:transition-none max-h-[calc(100dvh-22rem)] min-w-0 overflow-y-auto p-4')}>
                 <AnchoredArticle card={card} showToast={showToast} />
               </div>
             )}
