@@ -54,8 +54,6 @@ import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/me
 import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
 import { useDevMode } from '../../../features/devMode/useDevMode';
 import { sendNerFeedback } from '../../../services/merltService';
-import type { NerFeedbackType, NerCorrectReference } from '../../../services/merltService';
-import { buildArticleXrefNerPayload } from './articleXrefNer';
 import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
@@ -587,77 +585,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    // Opens the previewed citation in the practice
-    const handleOpenCitation = useCallback((citation: ParsedCitationData) => {
-        // MERLT-1.9: emit citation_click for the bus tracker. The target URN
-        // is null at click time (resolution happens later via triggerSearch);
-        // the BFF accepts null target and forwards it as such.
-        const citationText = [
-            citation.act_type,
-            citation.act_number ? `n. ${citation.act_number}` : null,
-            citation.article ? `art. ${citation.article}` : null,
-        ].filter(Boolean).join(' ');
-        publishMerltEvent({
-            interaction_type: MERLT_EVENT_TYPES.citationClicked,
-            article_urn: norma_data.urn,
-            metadata: {
-                source_urn: norma_data.urn,
-                target_urn: null,
-                citation_text: citationText,
-                citation,
-            },
-        });
-        // Loop β #2: the 'implicit' NER capture surface — clicking a citation
-        // chip through to its article is a low-weight automatic CONFIRMATION that the
-        // detected reference was real. Full-consent only, fire-and-forget.
-        if (canContribute) {
-            const implicitPayload = buildArticleXrefNerPayload({
-                citation,
-                articleUrn: norma_data.urn,
-                articleText: article_text || '',
-                matchText: citationText,
-                feedbackType: 'confirmation',
-                surface: 'implicit',
-            });
-            void sendNerFeedback(implicitPayload).catch((err) => {
-                console.error('NER implicit feedback failed:', err);
-            });
-        }
-        search({
-            act_type: citation.act_type,
-            act_number: citation.act_number || '',
-            date: citation.date || '',
-            article: citation.article,
-            version: 'vigente',
-        });
-    }, [norma_data.urn, article_text, canContribute, search]);
-
-    // Loop β #2: forward one NER correction/confirmation for the previewed
-    // citation (surface=article_xref — the highest-volume capture surface).
-    // Context window is ±500 chars of the SOURCE article around the citation
-    // span (the privacy budget); fire-and-forget. Only reachable when the
-    // popup renders the bar, which itself is gated on canContribute.
-    const handleCitationNerFeedback = useCallback(
-        (feedbackType: NerFeedbackType, correctReference?: NerCorrectReference) => {
-            const citation = citationPreviewState.citation;
-            if (!citation) return;
-
-            const payload = buildArticleXrefNerPayload({
-                citation,
-                articleUrn: norma_data.urn,
-                articleText: article_text || '',
-                matchText: citationPreviewState.targetElement?.textContent ?? '',
-                feedbackType,
-                correctReference,
-            });
-
-            void sendNerFeedback(payload).catch((err) => {
-                console.error('NER article_xref feedback failed:', err);
-            });
-        },
-        [citationPreviewState.citation, citationPreviewState.targetElement, article_text, norma_data.urn],
-    );
-
     // Loop β #2, surface=article_xref, feedbackType=missed: "Segnala come
     // citazione" from the selection popup. Only wired for full-consent
     // contributors (the prop stays undefined otherwise, so the popup hides the
@@ -890,7 +817,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             });
         }
     }, [onCrossReferenceNavigate, norma_data, search]);
-    const decisionLinks = useDecisionLinks({ besideId: originTabId ?? tabId, origin: citationOrigin });
+    const decisionLinks = useDecisionLinks({ besideId: originTabId ?? tabId });
     useCitationLinks(contentRef, {
         onOpen: onCrossReferenceNavigate ? openCitation : undefined,
         origin: citationOrigin,
@@ -1133,25 +1060,22 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            {sheetOpen && openBlock !== null && openGroup && (
-                <BlockAnnotationsSheet
-                    key={openBlock}
-                    containerRef={contentRef}
-                    blockIndex={openBlock}
-                    blockLabel={describeBlock(article_text || '', structure.blocks[openBlock])}
-                    group={openGroup}
-                    textHash={textHash}
-                    onOpenThread={discussion.openThread}
-                    onClose={closeBlock}
-                    onUpdateNote={updateAnnotation}
-                    onRemoveNote={removeAnnotation}
-                    onRemoveHighlight={removeHighlight}
-                    proposalActions={proposalActions}
-                    glosses={glosses}
-                    shownGlossId={shownGlossId}
-                    onShowGlossPassage={showGlossPassage}
-                />
-            )}
+            <BlockAnnotationsSheet
+                containerRef={contentRef}
+                blockIndex={sheetOpen && openGroup ? openBlock : null}
+                blockLabel={(index) => describeBlock(article_text || '', structure.blocks[index])}
+                groups={blockGroups}
+                textHash={textHash}
+                onOpenThread={discussion.openThread}
+                onClose={closeBlock}
+                onUpdateNote={updateAnnotation}
+                onRemoveNote={removeAnnotation}
+                onRemoveHighlight={removeHighlight}
+                proposalActions={proposalActions}
+                glosses={glosses}
+                shownGlossId={shownGlossId}
+                onShowGlossPassage={showGlossPassage}
+            />
 
             {glossesEnabled && glossMargin.host && createPortal(
                 <ArticleDiscussionPanel
@@ -1257,9 +1181,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 article={citationPreviewState.article}
                 position={citationPreviewState.position}
                 onClose={hidePreview}
-                onOpenCitation={handleOpenCitation}
-                nerFeedbackEnabled={devMode && canContribute}
-                onNerFeedback={handleCitationNerFeedback}
                 onMouseEnter={() => { isHoveringPopupRef.current = true; }}
                 onMouseLeave={() => {
                     isHoveringPopupRef.current = false;

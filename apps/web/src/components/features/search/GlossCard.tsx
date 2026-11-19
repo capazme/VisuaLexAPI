@@ -4,6 +4,7 @@ import type { AiReviewState, Proposal } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { Button } from '../../ui/Button';
 import { GLOSS_WORDS } from '../../../constants/glossWords';
+import { quoteForLabel } from '../../../utils/articleAnnotations';
 import { assistantProposalsStore } from '../../../store/assistantProposals';
 import { NoteEditBox } from './NoteEditBox';
 import { ReviewComment } from './AiReviewControls';
@@ -239,6 +240,7 @@ export function GlossCard({
                     type="button"
                     variant="quiet"
                     onClick={onRemove ?? (() => actions.remove(gloss.id))}
+                    aria-label={GLOSS_WORDS.remove(quoteForLabel(gloss.text))}
                     icon={<Trash2 size={12} aria-hidden />}
                     className={cn(ACTION_ROW, 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400')}
                 >

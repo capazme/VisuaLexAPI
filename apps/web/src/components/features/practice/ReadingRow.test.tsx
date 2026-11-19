@@ -567,7 +567,7 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
       {row()}
       <CitationPreviewPopup
         isVisible isLoading={false} error={null} citation={{ act_type: 'codice civile', article: '2043', confidence: 1 }}
-        article={null} position={{ top: 0, left: 0 }} onClose={vi.fn()} onOpenCitation={vi.fn()}
+        article={null} position={{ top: 0, left: 0 }} onClose={vi.fn()}
       />
     </>);
     fireEvent.click(screen.getByTestId('practice-rail'));

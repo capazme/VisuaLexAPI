@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { FetchDecisionAnswer } from '../../types/decisions';
 
 vi.mock('../../services/decisionService', () => ({ fetchDecision: vi.fn() }));
@@ -26,7 +26,7 @@ const REFERENCE = { corte: 'cassazione', archivio: 'civile', numero: 12789, anno
 
 function Host({ html = HTML, besideId = 'win-1', origin }: { html?: string; besideId?: string; origin?: typeof ORIGIN }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { links, popupProps } = useDecisionLinks({ besideId, origin });
+  const { links, popupProps } = useDecisionLinks({ besideId });
   useCitationLinks(ref, { origin, decisions: links });
   return (
     <>
@@ -167,13 +167,14 @@ describe('the preview of a decision cited in a text', () => {
     expect(screen.getByText(/Impossibile leggere la decisione/)).toBeInTheDocument();
   });
 
-  it('the popup’s button is a jump like a click: the way back, then the decision', async () => {
+  // L-74 (LC142): on hover a pure tooltip, nothing to press or scroll; the click on the citation opens the decision.
+  it('the hover\'s preview is a pure tooltip: no button, no close, no scroll', async () => {
     mocked.mockResolvedValue(found());
     render(<Host origin={ORIGIN} />);
     await hover(parts()[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apri accanto/ }));
-    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(ORIGIN);
-    expect(openDecision).toHaveBeenCalledExactlyOnceWith(REFERENCE, { fromLink: true, besideId: 'win-1' });
+    const tip = screen.getByRole('tooltip');
+    expect(within(tip).queryAllByRole('button')).toEqual([]);
+    expect(tip.querySelector('.overflow-y-auto')).toBeNull();
   });
 });
 

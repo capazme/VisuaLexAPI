@@ -105,14 +105,13 @@ export interface DecisionReadingSurfaceProps {
  */
 export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave, citedNorms, dossierItemId }: DecisionReadingSurfaceProps) {
   const {
-    triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
+    triggerSearch, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings, highlightColor, addHighlight,
   } = useAppStore(useShallow((s) => ({
     showKeyPassages: s.settings.showKeyPassages,
     highlightColor: s.settings.highlightColor,
     updateSettings: s.updateSettings,
     triggerSearch: s.triggerSearch,
-    pushReadingBack: s.pushReadingBack,
     annotations: s.annotations,
     highlights: s.highlights,
     removeAnnotation: s.removeAnnotation,
@@ -312,7 +311,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     onLeave?.();
   }, [search, hostTabId, onLeave, citedNorms]);
 
-  const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin, onOpened: onLeave });
+  const decisionLinks = useDecisionLinks({ besideId: hostTabId, onOpened: onLeave });
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
@@ -481,25 +480,22 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       />
       {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
       {proposalActions && <LostGlossesList glosses={lostGlosses} actions={proposalActions} />}
-      {sheetOpen && openBlock !== null && openGroup && (
-        <BlockAnnotationsSheet
-          key={openBlock}
-          containerRef={contentRef}
-          blockIndex={openBlock}
-          blockLabel={describeBlock(plain, structure.blocks[openBlock])}
-          group={openGroup}
-          textHash={textHash}
-          onOpenThread={discussion.openThread}
-          onClose={closeBlock}
-          onUpdateNote={updateAnnotation}
-          onRemoveNote={removeAnnotation}
-          onRemoveHighlight={removeHighlight}
-          proposalActions={proposalActions}
-          glosses={glosses}
-          shownGlossId={shownGlossId}
-          onShowGlossPassage={showGlossPassage}
-        />
-      )}
+      <BlockAnnotationsSheet
+        containerRef={contentRef}
+        blockIndex={sheetOpen && openGroup ? openBlock : null}
+        blockLabel={(index) => describeBlock(plain, structure.blocks[index])}
+        groups={blockGroups}
+        textHash={textHash}
+        onOpenThread={discussion.openThread}
+        onClose={closeBlock}
+        onUpdateNote={updateAnnotation}
+        onRemoveNote={removeAnnotation}
+        onRemoveHighlight={removeHighlight}
+        proposalActions={proposalActions}
+        glosses={glosses}
+        shownGlossId={shownGlossId}
+        onShowGlossPassage={showGlossPassage}
+      />
       <ArticleDiscussionPanel
         anchor={discussionAnchor}
         label={label}
@@ -520,13 +516,6 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         article={preview.article}
         position={preview.position}
         onClose={hidePreview}
-        // In the dossier: «Apri tra le norme» for a norm it holds, else Dashboard, as the dossier's own buttons say.
-        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : citedNorms.elsewhere ?? 'Apri in Ricerca') : undefined}
-        onOpenCitation={(citation) => {
-          // the popup's own button is a jump like a click: the way back is recorded the same
-          if (origin) pushReadingBack(origin);
-          openCitation(citation);
-        }}
         onMouseEnter={() => { isHoveringPopupRef.current = true; }}
         onMouseLeave={() => {
           isHoveringPopupRef.current = false;

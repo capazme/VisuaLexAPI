@@ -1,15 +1,24 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { Eraser, Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap } from 'lucide-react';
+import { useId, useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { Eraser, Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_ICON_ON_DARK, highlightColorName } from '../../../utils/highlightColors';
 import { useAppStore } from '../../../store/useAppStore';
-import { getSelectionAnchor } from '../../../utils/selectionOffset';
+import { getSelectionAnchor, inReaderSlot, READER_SLOT_ATTR } from '../../../utils/selectionOffset';
+import { isEditableTarget } from '../../ui/notifications/undoShortcut';
 import { getInkAnchor } from '../../../utils/inkSelection';
 import type { Ink } from '../../../utils/highlighterRules';
 import { registerInkTarget, type NoteKind } from '../../../utils/inkTargets';
 import { useInkOnRelease } from '../../../hooks/useInkOnRelease';
 import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
+import { Button } from '../../ui/Button';
+import { BlockSpace } from './BlockSpace';
+import { focusOn, useOneSpaceAtATime } from './textSpaces';
+import { IslandSurface } from '../../ui/IslandSurface';
+import { IconButton } from '../../ui/IconButton';
+import { CARD_RADIUS } from '../../ui/controlStyles';
+import { REPEAT_CLOSE, REPEAT_OPEN } from '../../../lib/motion';
+import { opensUnder, revealBy, scrollViewBy, viewOf } from '../../../utils/selectionSpace';
 
 interface SelectionPopupProps {
   /** Where selections are listened for (mouseup) and where the popup is positioned. */
@@ -43,6 +52,11 @@ interface SelectionPopupProps {
   // article, not by version): only "Copia" is offered, and the shortcuts of the
   // others are off too.
   copyOnly?: boolean;
+  /**
+   * The actions open under the paragraph the selection ends in, in the text (`BlockSpace`, LC142, L-73), with their
+   * words. Off, the dark bar over the selection: Study Mode's, itself still over the page (F2).
+   */
+  inPage?: boolean;
 }
 
 interface PopupState {
@@ -57,6 +71,19 @@ interface PopupState {
   ink: { text: string; startOffset: number };
   /** What the reader sees (line breaks included) — for copy and search only. */
   displayText: string;
+  /** In the page: the block the selection ends in, the space's place. */
+  block: HTMLElement | null;
+  /**
+   * In the page: the actions open under the paragraph (its end within about one view of the words), else as an island
+   * from the words (L-74; a text drawn flat too). Measured as the selection is released (LC142, Luca's option A).
+   */
+  under: boolean;
+  /** The selected words' box on screen as they were released: the island grows from it. */
+  words: { top: number; right: number; bottom: number; left: number };
+  /** The island's top in the container: under the words, never over them. */
+  below: number;
+  /** The paragraph's place among the text's, to find it again once the text is redrawn (a highlight saved). */
+  ordinal: number;
 }
 
 export function SelectionPopup({
@@ -70,8 +97,9 @@ export function SelectionPopup({
   onDiscuss,
   onCreateCard,
   copyOnly = false,
+  inPage = false,
 }: SelectionPopupProps) {
-  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, ink: { text: '', startOffset: -1 }, displayText: '' });
+  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, ink: { text: '', startOffset: -1 }, displayText: '', block: null, under: false, words: { top: 0, right: 0, bottom: 0, left: 0 }, below: 0, ordinal: -1 });
   // The highlighter's ink, chosen in the reading bar (H1, A4): a colour, or «Nessun colore», which takes highlights away.
   const ink = useHighlighterInk();
   // The highlighter on (A4): every selection takes the ink as it is released, and this bar does not appear. Not on a
@@ -173,9 +201,11 @@ export function SelectionPopup({
     };
   }, [containerRef, inking, ink]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((event: Event) => {
     // A tool takes the selection itself (`useInkOnRelease`).
     if (tooling) return;
+    // A press in the space open in the text (its buttons, a note's words) is not a selection of the text.
+    if (event.target instanceof Node && inReaderSlot(event.target)) return;
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -231,17 +261,19 @@ export function SelectionPopup({
         text: anchor.text,
         startOffset: anchor.startOffset,
         ink: inkAnchor,
-        displayText: rawSelected.trim(),
+        // Across a space open in the text, the words as seen hold the space's too: the article's alone, then.
+        displayText: crossesSlot(range, textRootRef?.current ?? containerRef.current) ? anchor.text : rawSelected.trim(),
+        ...placeOf(inPage ? blockOf(range.endContainer, textRootRef?.current ?? containerRef.current) : null, rect, containerRect, textRootRef?.current ?? containerRef.current),
       });
     }, 10);
-  }, [containerRef, textRootRef, hidePopup, tooling]);
+  }, [containerRef, textRootRef, hidePopup, tooling, inPage]);
 
   // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it moves: the
   // position's clamp counts in the container, not the window, and a phone's edge once cut the popup (D7b). A style
   // written on the element, not state: nothing else draws again.
   useLayoutEffect(() => {
     const el = popupRef.current;
-    if (!popup.visible || !el) return;
+    if (!popup.visible || !el || (inPage && popup.under)) return;
     el.style.marginLeft = '0px';
     // The box drawn. The positioning element is `w-max` (absolute in a narrow container it shrank to the room left
     // while the box inside kept its width, and its centring took half the shrunk width: 149–398 in a 390 px window);
@@ -252,7 +284,7 @@ export function SelectionPopup({
     if (box.left < margin) nudge = margin - box.left;
     else if (box.right > window.innerWidth - margin) nudge = window.innerWidth - margin - box.right;
     el.style.marginLeft = `${nudge}px`;
-  }, [popup.visible, popup.x, popup.y]);
+  }, [popup.visible, popup.x, popup.y, inPage, popup.under]);
 
   // Handle mousedown outside popup to hide it
   useEffect(() => {
@@ -289,16 +321,22 @@ export function SelectionPopup({
     if (!popup.visible) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Typed in a field (a note being written in a space open in the text, or anywhere else): not a shortcut.
+      if (isEditableTarget(e.target)) return;
       if (e.key === 'Escape') {
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey && !e.repeat) {
         // Quick highlight, with the ink chosen in the reading bar (H1), by the highlighter's rules (A4); once for a key
         // held down, whose repeats would come before the bar is gone (the owner's duplicates, 5 November)
+        // Taken: the letter is not typed where the focus lands next.
+        e.preventDefault();
         onHighlight(popup.ink.text, ink, popup.ink.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !copyOnly && !e.metaKey && !e.ctrlKey) {
+        // Taken: the note's field opens with the focus, and would get the «n» (LC142, Papiniano on #717).
+        e.preventDefault();
         const selRange = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : null;
         const r = selRange ?? { x: popup.x, y: popup.y, width: 0, height: 0 };
         onAddNote(popup.text, popup.startOffset, { x: r.x, y: r.y, width: r.width, height: r.height });
@@ -368,6 +406,97 @@ export function SelectionPopup({
       }
     }
   };
+
+  const closeInPage = () => {
+    hidePopup();
+    window.getSelection()?.removeAllRanges();
+  };
+  const actions = (
+    <div className="flex flex-wrap gap-1">
+      {!copyOnly && (
+        <>
+          <Button
+            variant="quiet"
+            size="sm"
+            onClick={() => handleAction('highlight')}
+            title={ink === 'none' ? 'Togli l’evidenziazione (H)' : 'Evidenzia (H)'}
+            aria-keyshortcuts="h"
+            icon={ink === 'none' ? <Eraser size={16} aria-hidden /> : <Highlighter size={16} aria-hidden />}
+          >
+            {ink === 'none' ? 'Togli l’evidenziazione' : `Evidenzia in ${highlightColorName(ink)}`}
+          </Button>
+          <Button variant="quiet" size="sm" onClick={() => handleAction('note')} title="Aggiungi nota (N)" aria-keyshortcuts="n" icon={<StickyNote size={16} aria-hidden />}>
+            Aggiungi nota
+          </Button>
+          {onDiscuss && (
+            <Button variant="quiet" size="sm" onClick={() => handleAction('discuss')} icon={<MessageCircle size={16} aria-hidden />}>
+              Discuti con i colleghi
+            </Button>
+          )}
+          {onCreateCard && (
+            <Button variant="quiet" size="sm" onClick={() => handleAction('card')} icon={<GraduationCap size={16} aria-hidden />}>
+              Crea scheda
+            </Button>
+          )}
+        </>
+      )}
+      <Button variant="quiet" size="sm" onClick={() => handleAction('copy')} title="Copia (Cmd+C)" icon={<Copy size={16} aria-hidden />}>
+        Copia
+      </Button>
+      {onSearch && (
+        <Button variant="quiet" size="sm" onClick={() => handleAction('search')} icon={<Search size={16} aria-hidden />}>
+          Cerca
+        </Button>
+      )}
+      {onReportCitation && !copyOnly && (
+        <Button variant="quiet" size="sm" onClick={() => handleAction('report')} icon={<Flag size={16} aria-hidden />}>
+          Segnala come citazione
+        </Button>
+      )}
+    </div>
+  );
+  const quote = <span className="line-clamp-2">&ldquo;{popup.displayText || popup.text}&rdquo;</span>;
+
+  if (inPage) {
+    return (
+      <>
+        <BlockSpace
+          // The same selection released again (a press on its own words) is the same space.
+          value={popup.visible && popup.under ? `${popup.startOffset}:${popup.text.length}` : null}
+          rootRef={textRootRef ?? containerRef}
+          block={() => (popup.block?.isConnected ? popup.block : null)}
+          onClose={closeInPage}
+          title={() => 'Testo selezionato'}
+          line={() => quote}
+          // Into view only as far as the selected words stay in it.
+          reveal={(space) => {
+            const words = liveWordsBox() ?? popup.words;
+            const view = viewOf(space);
+            scrollViewBy(space, revealBy(space.getBoundingClientRect().bottom, words.top, view));
+          }}
+        >
+          {() => <div ref={popupRef}>{actions}</div>}
+        </BlockSpace>
+        <SelectionIsland
+          open={popup.visible && !popup.under}
+          words={popup.words}
+          x={popup.x}
+          top={popup.below}
+          rootRef={containerRef}
+          paragraph={() => {
+            if (popup.block?.isConnected) return popup.block;
+            const root = textRootRef?.current ?? containerRef.current;
+            return root?.querySelectorAll<HTMLElement>(PARAGRAPHS)[popup.ordinal] ?? root;
+          }}
+          onClose={closeInPage}
+          line={quote}
+          islandRef={popupRef}
+        >
+          {actions}
+        </SelectionIsland>
+      </>
+    );
+  }
 
   if (!popup.visible) return null;
 
@@ -487,6 +616,118 @@ export function SelectionPopup({
       <div className="absolute left-1/2 transform -translate-x-1/2 top-full">
         <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-slate-900 dark:border-t-slate-800" />
       </div>
+    </div>
+  );
+}
+
+/** The block a selection ends in, the space's place: an article's comma or item, a decision's paragraph. */
+function blockOf(node: Node, root: HTMLElement | null): HTMLElement | null {
+  const el = node instanceof HTMLElement ? node : node.parentElement;
+  const block = el?.closest<HTMLElement>(PARAGRAPHS) ?? null;
+  return block && root?.contains(block) ? block : null;
+}
+
+/** Whether a range runs across a space open in the text (`BlockSpace`). */
+function crossesSlot(range: Range, root: HTMLElement | null): boolean {
+  return Array.from(root?.querySelectorAll(`[${READER_SLOT_ATTR}]`) ?? []).some((slot) => !!slot.textContent && range.intersectsNode(slot));
+}
+
+/** The live selection's box on screen, or null with none. */
+function liveWordsBox(): DOMRect | null {
+  const selection = window.getSelection();
+  return selection && selection.rangeCount > 0 && !selection.isCollapsed ? selection.getRangeAt(0).getBoundingClientRect() : null;
+}
+
+/** Where the actions open: under the paragraph when its end is within about one view of the words (LC142, option A). */
+function placeOf(block: HTMLElement | null, words: DOMRect, container: DOMRect, root: HTMLElement | null): Pick<PopupState, 'block' | 'under' | 'words' | 'below' | 'ordinal'> {
+  const box = { top: words.top, right: words.right, bottom: words.bottom, left: words.left };
+  const under = !!block && opensUnder(block.getBoundingClientRect().bottom, words.top, viewOf(block));
+  const ordinal = block && root ? Array.from(root.querySelectorAll(PARAGRAPHS)).indexOf(block) : -1;
+  return { block, under, words: box, below: words.bottom - container.top + 8, ordinal };
+}
+
+const PARAGRAPHS = '.vlx-b, .vlx-dec-para';
+
+/**
+ * The selection's actions where the paragraph goes on far below the words (LC142, Luca's option A; L-74's «strictly
+ * necessary» exception): an island that grows from the words and sits under them, never over them; the page does not
+ * move. The focus goes to it without scrolling; Esc and «Chiudi» clear the selection and give the focus to the
+ * paragraph. One at a time with the spaces in the text.
+ */
+function SelectionIsland({ open, words, x, top, rootRef, paragraph, onClose, line, islandRef, children }: {
+  open: boolean;
+  words: { top: number; right: number; bottom: number; left: number };
+  x: number;
+  top: number;
+  rootRef: React.RefObject<HTMLElement | null>;
+  /** What takes the focus on closing: the paragraph the selection ended in. */
+  paragraph: () => HTMLElement | null;
+  onClose: () => void;
+  line: React.ReactNode;
+  islandRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+}) {
+  const headingId = useId();
+  const [shown, setShown] = useState(open);
+  if (open && !shown) setShown(true);
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  useOneSpaceAtATime(open, rootRef, el, onClose);
+  // In, without moving the page; out, to the paragraph, if the focus was left in it or dropped to the page.
+  const wasOpen = useRef(false);
+  const gaveTo = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    // Drawn first, then focused: `el` comes with the commit that draws it.
+    if (!el || open === wasOpen.current) return;
+    wasOpen.current = open;
+    const active = document.activeElement;
+    if (open) el.focus({ preventScroll: true });
+    else if (active === document.body || active === null || el.contains(active)) gaveTo.current = focusOn(paragraph());
+    // `paragraph` reads the props of this render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, el]);
+  // The paragraph redrawn after (a highlight saved later): the focus would fall to the page; it goes to the new one.
+  // After every render on purpose: a redraw comes with no prop of this one.
+  useLayoutEffect(() => {
+    const given = gaveTo.current;
+    if (!given || open) return;
+    const active = document.activeElement;
+    if (!given.isConnected && (active === document.body || active === null)) gaveTo.current = focusOn(paragraph());
+    else if (active !== given) gaveTo.current = null;
+  });
+  if (!shown) return null;
+  return (
+    <div
+      ref={(node) => { setEl(node); islandRef.current = node; }}
+      role="region"
+      aria-labelledby={headingId}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+      className={cn('absolute w-max max-w-[min(32rem,calc(100vw-16px))] -translate-x-1/2 focus:outline-none', Z_INDEX.floating)}
+      style={{ left: x, top }}
+    >
+      <IslandSurface
+        open={open}
+        onClosed={() => setShown(false)}
+        source={() => words}
+        timing={{ open: REPEAT_OPEN, close: REPEAT_CLOSE }}
+        surfaceClassName={cn('border border-slate-200 bg-card shadow-lg dark:border-slate-700', CARD_RADIUS)}
+        contentClassName={cn('relative', CARD_RADIUS)}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 py-2 pl-4 pr-2 font-sans dark:border-slate-700">
+          <div className="min-w-0 pt-1.5">
+            <h2 id={headingId} className="text-sm font-semibold text-slate-900 dark:text-white">Testo selezionato</h2>
+            <p className="text-xs text-slate-600 dark:text-slate-400">{line}</p>
+          </div>
+          <IconButton onClick={onClose} aria-label="Chiudi" icon={<X aria-hidden />} variant="quiet" className="shrink-0" />
+        </div>
+        <div className="px-3 py-2 font-sans">{children}</div>
+      </IslandSurface>
     </div>
   );
 }

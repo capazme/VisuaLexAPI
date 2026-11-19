@@ -9,11 +9,32 @@
  * Returns -1 when the point is outside `root`.
  */
 export function plainOffsetAt(root: Node, node: Node, offset: number): number {
-  if (!root.contains(node)) return -1;
+  if (!root.contains(node) || inReaderSlot(node)) return -1;
   const range = document.createRange();
   range.selectNodeContents(root);
   range.setEnd(node, offset);
-  return range.toString().length;
+  return rangeText(range).length;
+}
+
+/**
+ * A space open in the text, under a block (`BlockSpace`, L-73): its element carries this attribute. It is not text of
+ * the article, so the offsets, the find and the copy pass over it.
+ */
+export const READER_SLOT_ATTR = 'data-reader-slot';
+const SLOT = `[${READER_SLOT_ATTR}]`;
+
+/** Whether `node` is inside a space open in the text. */
+export function inReaderSlot(node: Node): boolean {
+  return Boolean((node instanceof Element ? node : node.parentElement)?.closest(SLOT));
+}
+
+/** `range.toString()` without the text of a space open in it (the plain range, untouched, when there is none). */
+function rangeText(range: Range): string {
+  const common = range.commonAncestorContainer;
+  if (!(common instanceof Element) || !common.querySelector(SLOT)) return range.toString();
+  const fragment = range.cloneContents();
+  fragment.querySelectorAll(SLOT).forEach((slot) => slot.remove());
+  return fragment.textContent ?? '';
 }
 
 /**
@@ -39,9 +60,11 @@ export function getSelectionAnchor(
 /** `getSelectionAnchor` for a range: the highlighter's, once widened to whole words (`inkSelection.ts`). */
 export function getRangeAnchor(root: HTMLElement, range: Range): { text: string; startOffset: number } | null {
   if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
+  // Words selected in a space open in the text (a note's card) are not the article's.
+  if (inReaderSlot(range.startContainer) || inReaderSlot(range.endContainer)) return null;
   const rawOffset = plainOffsetAt(root, range.startContainer, range.startOffset);
   if (rawOffset < 0) return null;
-  const aligned = alignOffsetToTrimmedText(range.toString(), rawOffset);
+  const aligned = alignOffsetToTrimmedText(rangeText(range), rawOffset);
   return aligned.text ? aligned : null;
 }
 
@@ -75,7 +98,10 @@ export function alignOffsetToTrimmedText(
  */
 export function rangeFromPlainOffsets(root: Node, start: number, end: number): Range | null {
   if (start < 0 || end <= start) return null;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => n.nodeType === Node.TEXT_NODE ? NodeFilter.FILTER_ACCEPT
+      : (n as Element).hasAttribute(READER_SLOT_ATTR) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP,
+  });
   let seen = 0;
   let from: { node: Node; offset: number } | null = null;
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {

@@ -4,14 +4,13 @@
  * its body, shared with the preview a list opens (`DecisionPreviewDialog`).
  */
 
-import { useCallback, useMemo } from 'react';
-import { AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import type { DecisionReference, FetchDecisionAnswer } from '../../types/decisions';
 import { previewKeyPassage, previewLines } from '../../utils/decisionPreview';
 import { KEY_PASSAGE_LABELS } from '../../utils/decisionRender';
 import { formatDecisionHeading, formatDecisionShort, notFoundMessage } from '../../utils/decisionLinks';
 import { cn } from '../../lib/utils';
-import { CONTROL_RADIUS } from './controlStyles';
 import { PreviewFrame } from './PreviewFrame';
 
 interface DecisionPreviewPopupProps {
@@ -22,14 +21,13 @@ interface DecisionPreviewPopupProps {
   answer: FetchDecisionAnswer | null;
   position: { top: number; left: number };
   onClose: () => void;
-  onOpenDecision: (reference: DecisionReference) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
 }
 
 /** A found decision: its heading, then its first key passage when it has one (the first lines of a
  *  Cassazione decision are its parties), else its first lines. Computed once per answer. */
-function FoundBody({ answer }: { answer: Extract<FetchDecisionAnswer, { esito: 'trovata' }> }) {
+function FoundBody({ answer, brief }: { answer: Extract<FetchDecisionAnswer, { esito: 'trovata' }>; brief: boolean }) {
   const passage = useMemo(() => previewKeyPassage(answer.testo, answer.identita.corte), [answer.testo, answer.identita.corte]);
   const lines = useMemo(() => (passage ? null : previewLines(answer.testo)), [passage, answer.testo]);
   return (
@@ -40,17 +38,18 @@ function FoundBody({ answer }: { answer: Extract<FetchDecisionAnswer, { esito: '
           {KEY_PASSAGE_LABELS[passage.kind]} <span className="font-normal normal-case tracking-normal text-slate-500 dark:text-slate-400">· evidenziato automaticamente</span>
         </p>
       )}
-      <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line max-h-[220px] overflow-y-auto custom-scrollbar">
+      {/* A tooltip is cut to a few lines, nothing to scroll (L-74); the list's dialog scrolls. */}
+      <div className={cn('text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line', brief ? 'line-clamp-6' : 'max-h-[220px] overflow-y-auto custom-scrollbar')}>
         {passage ? passage.text : lines ?? <span className="text-slate-400 italic">Testo non disponibile</span>}
       </div>
     </div>
   );
 }
 
-function Body({ reference, answer }: { reference: DecisionReference; answer: FetchDecisionAnswer }) {
+function Body({ reference, answer, brief }: { reference: DecisionReference; answer: FetchDecisionAnswer; brief: boolean }) {
   switch (answer.esito) {
     case 'trovata':
-      return <FoundBody answer={answer} />;
+      return <FoundBody answer={answer} brief={brief} />;
     case 'ambigua':
       return (
         <div className="text-sm text-slate-700 dark:text-slate-300">
@@ -66,15 +65,10 @@ function Body({ reference, answer }: { reference: DecisionReference; answer: Fet
   }
 }
 
+/** A pure tooltip on hover (LC142, L-74): nothing to press or scroll; the click on the citation opens the decision. */
 export function DecisionPreviewPopup({
-  isVisible, isLoading, error, reference, answer, position, onClose, onOpenDecision, onMouseEnter, onMouseLeave,
+  isVisible, isLoading, error, reference, answer, position, onClose, onMouseEnter, onMouseLeave,
 }: DecisionPreviewPopupProps) {
-  const handleOpen = useCallback(() => {
-    if (!reference) return;
-    onOpenDecision(reference);
-    onClose();
-  }, [reference, onOpenDecision, onClose]);
-
   return (
     <PreviewFrame
       visible={isVisible && Boolean(reference)}
@@ -83,27 +77,20 @@ export function DecisionPreviewPopup({
       onClose={onClose}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      footer={
-        <button
-          onClick={handleOpen}
-          className={cn('w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white', CONTROL_RADIUS)}
-        >
-          <ExternalLink size={14} />
-          Apri accanto
-        </button>
-      }
     >
-      <DecisionPreviewContent isLoading={isLoading} error={error} reference={reference} answer={answer} />
+      <DecisionPreviewContent isLoading={isLoading} error={error} reference={reference} answer={answer} brief />
     </PreviewFrame>
   );
 }
 
 /** What a preview says while it loads, when the request failed, or the answer (`Body`). */
-export function DecisionPreviewContent({ isLoading, error, reference, answer }: {
+export function DecisionPreviewContent({ isLoading, error, reference, answer, brief = false }: {
   isLoading: boolean;
   error: string | null;
   reference: DecisionReference | null;
   answer: FetchDecisionAnswer | null;
+  /** A hover's tooltip: cut to a few lines. */
+  brief?: boolean;
 }) {
   return (
     <>
@@ -119,7 +106,7 @@ export function DecisionPreviewContent({ isLoading, error, reference, answer }: 
           <span className="text-sm">{error}</span>
         </div>
       )}
-      {!isLoading && !error && reference && answer && <Body reference={reference} answer={answer} />}
+      {!isLoading && !error && reference && answer && <Body reference={reference} answer={answer} brief={brief} />}
     </>
   );
 }

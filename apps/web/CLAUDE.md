@@ -1315,6 +1315,14 @@ from `getSelectionAnchor` (`utils/selectionOffset.ts`; the highlighter's through
 range widened to whole words, `utils/inkSelection.ts`), which reads
 `Range.toString()`: `Selection.toString()` is rendered text and writes a newline
 per line or comma boundary, which made every cross-comma highlight unmatched.
+A space open in the text (`BlockSpace`, `data-reader-slot`) is skipped by every one of them.
+In the readers (`ArticleBody`, `inPage`) the selection's actions open under the paragraph the selection ends in, in
+that `BlockSpace` («Testo selezionato», the actions in words, LC142, L-73), when the paragraph ends within about one
+view of the words (`utils/selectionSpace.ts`, the fixed bars counted from the scroller's `scroll-padding`), brought into
+view only as far as the words stay in it. Further down, or in a text drawn flat, they grow from the words as an island
+under them (`IslandSurface`, L-74's «strictly necessary», Luca's option A); the page does not move; Esc and «Chiudi» clear the selection and give
+the focus to the paragraph. Study Mode keeps the dark bar over the selection until its own PR (F2). One space at a time
+in a text: a block's annotations and the selection's actions close each other.
 The renderer also accepts, at the same offset, a stored text that differs only
 in whitespace, so those older highlights show again.
 
@@ -1447,13 +1455,18 @@ writes the measure's number: it cannot read a variable). **No popover** (A4 §6,
 «The notes beside the text»), where the column is shown and the block has one there — the block is closed again, so
 the next press does the same —; else (a phone, a narrow reader, a block of highlights or an application's proposed
 passages alone), or with Shift (a click or Enter: `blockAll`, the keyboard's way to a block's highlights beside its
-cards; the sign says it, `aria-keyshortcuts`, and so does the «?» dialog), it opens the block's sheet, `BlockAnnotationsSheet` (`ui/Sheet`, a capped width centred on a computer): the
+cards; the sign says it, `aria-keyshortcuts`, and so does the «?» dialog), it opens the block's space, `BlockAnnotationsSheet` (LC142, L-73: a `ReaderSpace` under the block, in the text, through `BlockSpace`): the
 proposals first (D7b), an application's glosses, the reader's notes (`NoteMarginCard`, edited and removed in place),
 the highlights (removed), each with *Vai al passo*, which scrolls to the passage and makes it glow
 (`utils/revealAnnotation.ts`), and the discussions (`ThreadCard`, opened in their panel). Decided as the block opens: a
-reader widened while its sheet is open keeps the sheet (a note half edited in it). Its X and Esc give the focus back to
-the sign found again (`returnFocusRef`: every edit redraws the text), a note being edited is never dropped without
-«Scartare la modifica?», and a press outside never closes it.
+reader widened while its space is open keeps it (a note half edited in it). Its «Chiudi» and Esc give the focus back to
+the sign found again (every edit redraws the text), or to the block once its last annotation took the sign with it; a
+note being edited is never dropped without «Scartare la modifica?», and a press outside never closes it.
+**`BlockSpace`** is the text's one place for a space: an element after the block, inside the text root, marked
+`data-reader-slot` (`READER_SLOT_ATTR`), with the space portalled into it. A redraw takes it away with every node; it is
+put back after the block, with the focus it held. Its words are not the article's: `plainOffsetAt`, `getRangeAnchor`,
+`rangeFromPlainOffsets`, `collectSearchableText` and `decisionClipboardText` pass over it, and a selection inside it
+gives no anchor. Anything new that reads the text root's DOM text must skip it too.
 
 **Passages an application proposed** (D7b: the MCP design's §8, in the documentation pull request #318, as the
 server's contract for the first cut revises it) are highlights with a `proposal` (`types/index.ts`, `HighlightProposal`): only a dossier entry's reader is

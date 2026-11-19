@@ -347,7 +347,7 @@ describe('annotation signs', () => {
     const sign = signOf(div, 2)!;
     expect(sign.getAttribute('role')).toBe('button');
     expect(sign.getAttribute('tabindex')).toBe('0');
-    expect(sign.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(sign.getAttribute('aria-haspopup')).toBeNull();
     // Enter goes to the block's first card beside the text; Shift+Enter to everything of it in its sheet (A4 §6).
     expect(sign.getAttribute('aria-keyshortcuts')).toBe('Shift+Enter');
     expect(sign.getAttribute('aria-label')).toBe('2 note e 3 evidenziazioni in questo passo');

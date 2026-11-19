@@ -54,6 +54,7 @@ export function ArticleBody({
     return (
         <div className="relative group/content" ref={contentRef}>
             {selectionPopup && <SelectionPopup
+                inPage
                 containerRef={contentRef}
                 textRootRef={textRef}
                 onHighlight={onPopupHighlight}

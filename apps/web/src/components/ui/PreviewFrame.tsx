@@ -1,6 +1,7 @@
 /**
- * PreviewFrame - the frame of the hover popups on citations: portal, animation, header with its close
- * button, body and footer. Whoever uses it writes the body (a norm: `CitationPreviewPopup`; a decision:
+ * PreviewFrame - the frame of the hover popups on citations: portal, animation, header, body and, in a dialog, its close
+ * button and footer. On hover it is a pure tooltip (LC142, L-74): words only, nothing to press or scroll; the click on
+ * the citation opens it beside the text. Whoever uses it writes the body (a norm: `CitationPreviewPopup`; a decision:
  * `DecisionPreviewPopup`); the position is computed by the preview's hook. A preview opened by a click
  * or a key (a decision in a list, `DecisionPreviewDialog`) is a non-modal `dialog` holding the focus.
  */
@@ -22,7 +23,8 @@ interface PreviewFrameProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   children: ReactNode;
-  footer: ReactNode;
+  /** A dialog's actions; a tooltip has none. */
+  footer?: ReactNode;
   /** Opened by a click or a key: a `dialog` named `label`, its element in `frameRef` for the focus. A hover popup is a `tooltip`. */
   dialog?: { label: string; frameRef: RefObject<HTMLDivElement | null> };
 }
@@ -68,18 +70,20 @@ export function PreviewFrame({ visible, position, title, badge, onClose, onMouse
                 <span className="text-sm font-semibold text-primary-700 dark:text-primary-300 truncate">{title}</span>
                 {badge}
               </div>
-              <button
-                onClick={onClose}
-                className="p-1 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors shrink-0"
-                aria-label="Chiudi"
-              >
-                <X size={16} />
-              </button>
+              {dialog && (
+                <button
+                  onClick={onClose}
+                  className="p-1 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors shrink-0"
+                  aria-label="Chiudi"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
 
             <div className="p-4">{children}</div>
 
-            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">{footer}</div>
+            {footer && <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">{footer}</div>}
           </div>
         </motion.div>
       )}

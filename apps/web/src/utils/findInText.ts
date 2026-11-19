@@ -1,3 +1,4 @@
+import { READER_SLOT_ATTR } from './selectionOffset';
 /**
  * Find in the text: a pure matcher that ignores case and accents, and the
  * helpers that map its offsets back onto the displayed text nodes. Nothing
@@ -230,7 +231,8 @@ export function collectSearchableText(root: Node): { nodes: TextSegment[]; text:
     acceptNode(n) {
       if (n.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
       const el = n as Element;
-      if (getComputedStyle(el).display === 'none') {
+      // A space open in the text (`BlockSpace`) is not the article's text.
+      if (el.hasAttribute(READER_SLOT_ATTR) || getComputedStyle(el).display === 'none') {
         separate = true;
         return NodeFilter.FILTER_REJECT;
       }

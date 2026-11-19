@@ -114,7 +114,7 @@ describe('discussions on a decision — what shows them', () => {
     expect(await screen.findByRole('button', { name: 'Glosse sulla decisione' })).toBeInTheDocument();
     await waitFor(() => expect(container.querySelector('.vlx-dec-line')).not.toBeNull());
     await selectText(container, 0, 3, 10);
-    expect(await screen.findByLabelText('Discuti con i colleghi')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Discuti con i colleghi' })).toBeInTheDocument();
     expect(articleDiscussionService.listPassages).toHaveBeenCalledTimes(1);
   });
 
@@ -137,7 +137,7 @@ describe('discussions on a decision — what shows them', () => {
       await waitFor(() => expect(fetchDecision).toHaveBeenCalled());
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       expect(screen.queryByRole('button', { name: 'Glosse sulla decisione' })).toBeNull();
-      expect(screen.queryByLabelText('Discuti con i colleghi')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Discuti con i colleghi' })).toBeNull();
       view.unmount();
     }
     expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe('discussions on a decision — what shows them', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Glosse sulla decisione' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
-    expect(screen.queryByLabelText('Discuti con i colleghi')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discuti con i colleghi' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /nuova glossa/i }));
     fireEvent.change(screen.getByPlaceholderText('Titolo della glossa'), { target: { value: 'Dubbio' } });
@@ -184,7 +184,7 @@ describe('discussions on a decision — the passage', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
 
     await selectText(container, 0, 3, 10); // «ricorso»
-    fireEvent.click(await screen.findByLabelText('Discuti con i colleghi'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discuti con i colleghi' }));
     expect(await screen.findByText('Glosse sulla decisione')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Titolo (facoltativo)'), { target: { value: 'Dubbio' } });
     fireEvent.change(screen.getByLabelText('Testo della glossa'), { target: { value: 'Il passo non convince' } });
@@ -219,7 +219,7 @@ describe('discussions on a decision — the passage', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
 
     await selectText(visible.container, 0, 3, 10);
-    fireEvent.click(await screen.findByLabelText('Discuti con i colleghi'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discuti con i colleghi' }));
     fireEvent.change(screen.getByLabelText('Testo della glossa'), { target: { value: 'Il passo non convince' } });
     fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
 
@@ -253,7 +253,7 @@ describe('discussions on a decision — signs and focus', () => {
     });
     expect(container.querySelector('.vlx-thread-focus')).toBeNull();
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni/ });
     fireEvent.click(within(dialog).getByRole('button', { name: /Apri glossa/ }));
     await waitFor(() => expect(container.querySelector('.vlx-thread-focus')?.textContent).toBe('spese'));
     expect(container.querySelector('.vlx-thread-focus')?.getAttribute('data-thread-focus')).toBe('t1');

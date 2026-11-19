@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { codePointRangesToUtf16, decisionClipboardText, decisionParagraphs, hasDecisionText } from './decisionText';
+import { READER_SLOT_ATTR } from './selectionOffset';
 
 describe('decisionParagraphs', () => {
   it('groups lines at empty lines and drops only the newlines', () => {
@@ -127,5 +128,17 @@ describe('codePointRangesToUtf16', () => {
   });
   it('drops empty, overlapping, out-of-range and non-integer ranges, sorting the rest', () => {
     expect(codePointRangesToUtf16('abcdefghij', [[6, 8], [0, 2], [1, 3], [4, 4], [8, 99], [-1, 2], [1.5, 3]])).toEqual([[0, 2], [6, 8]]);
+  });
+});
+
+describe('decisionClipboardText, a space open in the text (LC142)', () => {
+  it('copies the decision, not the space between its paragraphs', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<p class="vlx-dec-para"><span class="vlx-dec-line">Prima riga.</span></p>'
+      + `<div ${READER_SLOT_ATTR}=""><p>Vedi Cass. 2020</p></div>`
+      + '<p class="vlx-dec-para"><span class="vlx-dec-line">Seconda riga.</span></p>';
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    expect(decisionClipboardText(range.cloneContents())).toBe('Prima riga.\n\nSeconda riga.');
   });
 });

@@ -178,7 +178,7 @@ describe('AnnotationMargin — the notes beside the text, as a word processor\'s
     fireEvent.change(within(first).getByRole('textbox'), { target: { value: '   ' } });
     fireEvent.click(within(first).getByRole('button', { name: 'Salva' }));
     expect(onUpdate).toHaveBeenCalledTimes(1);
-    fireEvent.click(within(first).getByRole('button', { name: 'Rimuovi' }));
+    fireEvent.click(within(first).getByRole('button', { name: /^Rimuovi la (glossa|nota)/ }));
     expect(onRemove).toHaveBeenCalledExactlyOnceWith('n1');
     await waitFor(() => expect(document.activeElement).toBe(second));
   });

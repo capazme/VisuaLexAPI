@@ -289,6 +289,12 @@ const OPENING_CHARS = 48;
  * source prints ("1.", "a)", "2-bis)"), without Normattiva's "((" of a
  * modified number; otherwise the block's opening words, cut on a word.
  */
+/** A few words of a text for a button's name («Rimuovi l'evidenziazione «danno ingiusto…»»): which one it acts on. */
+export function quoteForLabel(text: string, max = 40): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return `«${flat.length > max ? `${flat.slice(0, max).trimEnd()}…` : flat}»`;
+}
+
 export function describeBlock(raw: string, block: StructureBlock): string {
   if (block.marker) {
     const printed = raw.slice(block.marker.start, block.marker.end).replace(/^\s*\(\(/, '').trim();

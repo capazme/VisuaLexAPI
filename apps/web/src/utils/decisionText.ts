@@ -1,4 +1,5 @@
 import type { DecisionText } from '../types/decisions';
+import { READER_SLOT_ATTR } from './selectionOffset';
 
 /**
  * Whether the source gave any block of text. A decision found without its text comes with
@@ -60,6 +61,7 @@ export function decisionClipboardText(fragment: DocumentFragment): string {
       return;
     }
     const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : null;
+    if (element?.hasAttribute(READER_SLOT_ATTR)) return; // a space open in the text (`BlockSpace`)
     if (element?.classList.contains(LINE_CLASS)) {
       if (element.textContent) lines.push(element.textContent);
       return;
