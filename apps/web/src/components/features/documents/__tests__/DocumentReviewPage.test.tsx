@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { extractCitations } from '../../../../utils/citationMatcher';
 import { DocumentReviewPage } from '../DocumentReviewPage';
 import { PARERE, testFile } from './fixtures';
+import { REGIONAL_LAW_REFUSAL } from '../../../../utils/regionalLaw';
 
 const navigateMock = vi.fn();
 const triggerSearchMock = vi.fn();
@@ -72,6 +73,22 @@ describe('DocumentReviewPage — an act sent by its page («Analizza l’atto»)
     await userEvent.click(await screen.findByRole('button', { name: 'Scegli un altro documento' }));
     await screen.findByRole('button', { name: /Scegli un file/ });
     expect(document.body.textContent).toMatch(/Il documento resta sul tuo computer/);
+  });
+});
+
+describe('DocumentReviewPage — a regional law to complete (G-577, #650)', () => {
+  it('says why, in the palette\'s words, and offers no «Completa» to make it a State law', async () => {
+    routerState.state = { atto: { id: 'a1', titolo: 'Parere', testo: 'Rileva l’art. 3 della l.r. Toscana 65/2014. Si veda l’art. 5 del contratto.' } };
+    render(<DocumentReviewPage />);
+    const list = await screen.findByRole('list', { name: /Da completare/ });
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    const [regional, contract] = rows;
+    expect(within(regional).getByText(REGIONAL_LAW_REFUSAL)).toBeInTheDocument();
+    expect(within(regional).queryByRole('button', { name: /^Completa/ })).toBeNull();
+    // The other row to complete keeps its «Completa».
+    expect(within(contract).getByRole('button', { name: /^Completa/ })).toBeInTheDocument();
+    expect(within(contract).queryByText(REGIONAL_LAW_REFUSAL)).toBeNull();
   });
 });
 

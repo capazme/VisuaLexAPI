@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, BellRing, Check, Loader2 } from 'lucide-react';
+import { ArrowRight, BellRing, Check } from 'lucide-react';
+import { Button } from '../../ui/Button';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { notificationService, type NormaChangeNotification } from '../../../services/notificationService';
@@ -59,7 +60,7 @@ export function NormaChangesSection({ onOpen }: NormaChangesSectionProps) {
   return (
     <section
       aria-labelledby="norma-changes-title"
-      className="rounded-lg border border-amber-200 bg-amber-50/60 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20"
+      className="rounded-[8px] border border-amber-200 bg-amber-50/60 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20"
     >
       <div className="flex items-center justify-between gap-3 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/40">
         <h2 id="norma-changes-title" className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
@@ -69,14 +70,15 @@ export function NormaChangesSection({ onOpen }: NormaChangesSectionProps) {
           )}
         </h2>
         {notifications.length > 0 && (
-          <button
-            type="button"
+          <Button
+            variant="quiet"
             onClick={() => void markAllRead()}
-            disabled={marking}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-amber-200 dark:hover:bg-amber-900/40 md:min-h-0 md:py-1.5"
+            loading={marking}
+            icon={<Check size={16} aria-hidden />}
+            className="text-amber-800 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-200 dark:hover:bg-amber-900/40 dark:hover:text-amber-100"
           >
-            {marking ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Segna come lette
-          </button>
+            Segna come lette
+          </Button>
         )}
       </div>
       {error && <p role="alert" className="px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -93,13 +95,9 @@ export function NormaChangesSection({ onOpen }: NormaChangesSectionProps) {
                   </p>
                 </div>
                 {norma && (
-                  <button
-                    type="button"
-                    onClick={() => onOpen(searchParamsFromNorma(norma))}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-lg px-3 text-sm font-medium text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-900/20 md:min-h-0 md:py-1.5"
-                  >
-                    Apri <ArrowRight size={14} />
-                  </button>
+                  <Button variant="quiet" onClick={() => onOpen(searchParamsFromNorma(norma))} className="shrink-0">
+                    Apri <ArrowRight size={16} aria-hidden />
+                  </Button>
                 )}
               </li>
             );

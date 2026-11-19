@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
 import type { DecisionSearchQuery } from '../../../types/decisions';
 import { DecisionResultList } from './DecisionResultList';
 
@@ -29,18 +29,9 @@ export function DecisionSearchTabView({ tabId, query }: { tabId: string; query: 
         </p>
       </header>
       {canWiden && (
-        <button
-          type="button"
-          aria-pressed={topicOnly}
-          onClick={() => setTopicOnly((v) => !v)}
-          className={`rounded-lg border px-3 py-1.5 text-sm ${TOUCH_TARGET_RESPONSIVE} ${
-            topicOnly
-              ? 'border-primary-600 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:border-toga-400 text-white'
-              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
-          }`}
-        >
+        <Button variant={topicOnly ? 'primary' : 'secondary'} size="sm" aria-pressed={topicOnly} onClick={() => setTopicOnly((v) => !v)}>
           Solo il tema
-        </button>
+        </Button>
       )}
       <DecisionResultList query={shown} besideId={tabId} />
     </div>

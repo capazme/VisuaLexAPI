@@ -242,6 +242,7 @@ function SearchPage({ chosen }: { chosen: string | null }) {
               const checked = ready.archivio === value;
               const count = value ? counts.get(value) ?? 0 : allCount;
               return (
+                // bare-button: a filter chip with its count, pressed or not.
                 <button
                   key={label}
                   type="button"

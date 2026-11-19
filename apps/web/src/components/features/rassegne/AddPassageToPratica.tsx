@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '../../../lib/utils';
-import { FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
 import { useAppStore } from '../../../store/useAppStore';
 import { notify } from '../../ui/notifications/notifications';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
@@ -33,14 +32,9 @@ export function AddPassageToPratica({ passo, className }: { passo: RassegnePasso
 
   return (
     <>
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        onClick={(e) => setAnchor(e.currentTarget)}
-        className={cn('text-xs font-medium text-primary-600 hover:underline dark:text-primary-400', FOCUS_RING, TOUCH_TARGET_RESPONSIVE, className)}
-      >
+      <Button variant="link" size="sm" aria-haspopup="dialog" onClick={(e) => setAnchor(e.currentTarget)} className={className}>
         Aggiungi alla pratica
-      </button>
+      </Button>
       <AddToDossierPopover isOpen={anchor !== undefined} anchorEl={anchor ?? null} onClose={() => setAnchor(undefined)} onAdded={added} />
     </>
   );

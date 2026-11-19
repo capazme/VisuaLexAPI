@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { Loader2, Search, ArrowRight, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
+import { Loader2, Search, ArrowRight, Trash2, Zap, FolderPlus, MoreVertical, Plus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
@@ -16,7 +16,10 @@ import { actHeading, labelFromParams } from '../../../utils/sources';
 import { DecisionHistoryRow } from './DecisionHistoryRow';
 import { PageFrame } from '../../layout/PageFrame';
 import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
-import { FIELD_TEXT } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Toast } from '../../ui/Toast';
 
 // Humanized group label: today/yesterday/weekday-this-week/full-date.
 // Group key stays YYYY-MM-DD (ISO) for stable insertion order; only the
@@ -100,14 +103,6 @@ export function HistoryView() {
     useEffect(() => {
         tryStartTour('history');
     }, [tryStartTour]);
-
-    // Auto-hide feedback
-    useEffect(() => {
-        if (feedback) {
-            const timer = setTimeout(() => setFeedback(null), 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [feedback]);
 
     // Page-scoped shortcuts: "/" focuses search, Escape clears search when
     // focused. Skipped while any overlay is open or the user is typing in
@@ -305,11 +300,11 @@ export function HistoryView() {
     return (
         <PageFrame
             title="Cronologia"
-            className="animate-in fade-in duration-200"
+            className="animate-in fade-in duration-(--dur-pop)"
             action={
                 <>
-                    <div id="tour-history-search" className="relative min-w-0 flex-1 md:w-64 md:flex-none">
-                        <input
+                    <div id="tour-history-search" className="min-w-0 flex-1 md:w-64 md:flex-none">
+                        <Input
                             ref={searchInputRef}
                             type="text"
                             placeholder="Cerca nella cronologia…"
@@ -318,20 +313,18 @@ export function HistoryView() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             aria-keyshortcuts="/"
                             title="Cerca (premi /)"
-                            className={`w-full pl-9 pr-4 py-2 ${FIELD_TEXT} rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-colors min-h-[44px] md:min-h-0 md:py-1.5 md:rounded-full`}
+                            icon={<Search size={16} aria-hidden />}
                         />
-                        <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
                     {history.length > 0 && (
-                        <button
+                        <IconButton
                             onClick={handleClearHistory}
-                            disabled={clearing}
-                            className="flex shrink-0 items-center justify-center p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg md:rounded-full transition-colors disabled:opacity-50 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
+                            loading={clearing}
                             title="Svuota cronologia"
                             aria-label="Svuota cronologia"
-                        >
-                            {clearing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                        </button>
+                            icon={<Trash2 aria-hidden />}
+                            className="shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                        />
                     )}
                 </>
             }
@@ -339,7 +332,7 @@ export function HistoryView() {
             <NormaChangesSection onOpen={handleOpenNorma} />
             {/* No overflow at all: `hidden` made this card the date labels' scroll container (M1), and `clip` cut the
                 «⋯» menus at its edge (LC103); its padding keeps everything inside the rounded corners. */}
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-800 rounded-[8px] shadow-sm border border-slate-200 dark:border-slate-700">
                 {/* Timeline with grouped dates. No inner scroll: the page is the
                     scroll context so the action dropdown isn't clipped. Sticky date
                     headers attach to the page's scroller, under the phone's bar. */}
@@ -354,12 +347,9 @@ export function HistoryView() {
                             title="Nessuna corrispondenza"
                             description={`Nessuna voce trovata per "${searchTerm}".`}
                             action={
-                                <button
-                                    onClick={() => setSearchTerm('')}
-                                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
-                                >
+                                <Button variant="secondary" onClick={() => setSearchTerm('')}>
                                     Azzera filtro
-                                </button>
+                                </Button>
                             }
                         />
                     ) : filteredHistory.length === 0 ? (
@@ -368,13 +358,9 @@ export function HistoryView() {
                             title="Nessuna ricerca recente"
                             description="Le tue ricerche appariranno qui. Inizia cercando una norma per vedere la cronologia."
                             action={
-                                <button
-                                    onClick={() => navigate('/')}
-                                    className="px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
-                                >
-                                    <Search size={18} />
+                                <Button onClick={() => navigate('/')} icon={<Search size={16} aria-hidden />}>
                                     Inizia una ricerca
-                                </button>
+                                </Button>
                             }
                         />
                     ) : (
@@ -383,12 +369,12 @@ export function HistoryView() {
                                 <div key={key} className="relative">
                                     {/* Date label with timeline line */}
                                     {/* Mobile: smaller, simpler date label */}
-                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-slate-50 dark:bg-slate-950 py-1 z-10">
+                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-(--dur-pop) ease-out motion-reduce:transition-none bg-slate-50 dark:bg-slate-950 py-1 z-10">
                                         <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-400">{label}</h2>
                                     </div>
 
                                     {/* Desktop: full date label */}
-                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-slate-50 dark:bg-slate-950 py-2 z-10">
+                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-(--dur-pop) ease-out motion-reduce:transition-none bg-slate-50 dark:bg-slate-950 py-2 z-10">
                                         <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-400">{label}</h2>
                                     </div>
 
@@ -400,11 +386,12 @@ export function HistoryView() {
                                         ) : (
                                             <div key={item.id} className="relative">
                                                 {/* Mobile Item card - compact, tap-friendly; a button, so Tab reaches it and Enter opens it (A6) */}
+                                                {/* bare-button: the card is a whole entry of the list. */}
                                                 <button
                                                     type="button"
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative block w-full text-left bg-white dark:bg-slate-800 p-3 pr-12 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
+                                                        "relative block w-full text-left bg-white dark:bg-slate-800 p-3 pr-12 rounded-[8px] border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "active:scale-[0.98] active:border-primary-400",
                                                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
@@ -465,11 +452,12 @@ export function HistoryView() {
                                                     )}
                                                 >
                                                     <div className="flex justify-between items-start gap-4">
+                                                        {/* bare-button: the row's title, stretched over the row (A6). */}
                                                         <button
                                                             type="button"
                                                             data-history-open
                                                             onClick={() => handleItemClick(item)}
-                                                            className="flex-1 block text-left focus-visible:outline-none after:absolute after:inset-0 after:rounded-xl after:content-['']"
+                                                            className="flex-1 block text-left focus-visible:outline-none after:absolute after:inset-0 after:content-['']"
                                                         >
                                                             {/* The norm as it is cited («art. 2043 c.c.»), then the act's name and when it was read (B8). */}
                                                             <span className="block font-serif text-lg leading-snug text-slate-900 dark:text-slate-50">
@@ -503,7 +491,7 @@ export function HistoryView() {
                                                                 </MenuButton>
                                                             </div>
 
-                                                            <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-primary-500 pointer-events-none">
+                                                            <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-md text-primary-500 pointer-events-none">
                                                                 <ArrowRight size={18} />
                                                             </div>
                                                         </div>
@@ -519,18 +507,14 @@ export function HistoryView() {
                 </div>
             </div>
 
-            {/* Feedback toast */}
-            {feedback && (
-                <div className={cn(
-                    "fixed bottom-4 right-4 md:right-4 left-4 md:left-auto px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-2 z-50",
-                    feedback.type === 'success'
-                        ? "bg-green-500 text-white"
-                        : "bg-red-500 text-white"
-                )}>
-                    <Check size={16} />
-                    <span className="text-sm font-medium">{feedback.message}</span>
-                </div>
-            )}
+            {/* Feedback: the app's notifications (K1a). */}
+            <Toast
+                message={feedback?.message ?? ''}
+                type={feedback?.type ?? 'success'}
+                isVisible={feedback !== null}
+                onClose={() => setFeedback(null)}
+                duration={2000}
+            />
 
             {/* Clear-all confirmation */}
             <ConfirmDialog
@@ -548,24 +532,23 @@ export function HistoryView() {
             {/* New-dossier inline modal */}
             {createDossierFor && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md p-5">
+                    <div className="bg-white dark:bg-slate-900 rounded-[8px] shadow-lg w-full max-w-md p-5">
                         <div className="flex items-start justify-between mb-3">
                             <h2 className="text-base font-semibold text-slate-900 dark:text-white">
                                 Crea nuova pratica
                             </h2>
-                            <button
+                            <IconButton
                                 onClick={() => { setCreateDossierFor(null); setNewDossierTitle(''); }}
-                                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded"
                                 aria-label="Chiudi"
-                            >
-                                <X size={18} />
-                            </button>
+                                icon={<X aria-hidden />}
+                            />
                         </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
                             La norma verrà aggiunta automaticamente alla nuova pratica.
                         </p>
-                        <input
+                        <Input
                             type="text"
+                            aria-label="Nome della pratica"
                             autoFocus
                             value={newDossierTitle}
                             onChange={(e) => setNewDossierTitle(e.target.value)}
@@ -575,22 +558,14 @@ export function HistoryView() {
                             }}
                             placeholder="Nome della pratica"
                             maxLength={120}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
                         <div className="mt-4 flex justify-end gap-2">
-                            <button
-                                onClick={() => { setCreateDossierFor(null); setNewDossierTitle(''); }}
-                                className="px-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-                            >
+                            <Button variant="secondary" onClick={() => { setCreateDossierFor(null); setNewDossierTitle(''); }}>
                                 Annulla
-                            </button>
-                            <button
-                                onClick={handleConfirmCreateDossier}
-                                disabled={!newDossierTitle.trim()}
-                                className="px-3 py-1.5 text-sm bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
+                            </Button>
+                            <Button onClick={handleConfirmCreateDossier} disabled={!newDossierTitle.trim()}>
                                 Crea e aggiungi
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

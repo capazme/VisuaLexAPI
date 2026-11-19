@@ -12,6 +12,7 @@ import {
 } from '@floating-ui/react';
 import { EyeOff, Highlighter } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { getTransformOrigin } from '../../../utils/floatingOrigin';
 import type { KeyPassageKind } from '../../../utils/decisionKeyPassages';
@@ -25,9 +26,6 @@ export interface KeyPassagePopoverProps {
   onHideAll: () => void;
   onClose: () => void;
 }
-
-const ACTION =
-  'flex min-h-[44px] w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-slate-700 transition-colors duration-150 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-slate-200 dark:hover:bg-slate-800';
 
 /**
  * What a key passage is, and what the reader can do with it (spec 2026-10-13-decision-key-passages-design,
@@ -69,22 +67,20 @@ export function KeyPassagePopover({ kind, anchorEl, onMakeOwn, onHideAll, onClos
           <div
             style={{ transformOrigin: getTransformOrigin(placement) }}
             className={cn(
-              'w-64 rounded-lg border border-teal-200 bg-white p-1.5 shadow-md dark:border-teal-900/60 dark:bg-slate-900',
-              'animate-in fade-in zoom-in-95 duration-150',
+              'w-64 rounded-[8px] border border-teal-200 bg-white p-1.5 shadow-md dark:border-teal-900/60 dark:bg-slate-900',
+              'animate-in fade-in zoom-in-95 duration-(--dur-pop)',
             )}
           >
             <div className="px-2.5 pb-1.5 pt-1">
               <p className="text-sm font-semibold text-teal-800 dark:text-teal-300">{label}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Evidenziato automaticamente: non è una tua evidenziazione.</p>
             </div>
-            <button type="button" className={ACTION} onClick={() => { onMakeOwn(); onClose(); }}>
-              <Highlighter size={15} aria-hidden className="shrink-0 text-amber-500" />
+            <Button variant="quiet" className="w-full justify-start px-2.5" icon={<Highlighter size={16} aria-hidden className="text-amber-500" />} onClick={() => { onMakeOwn(); onClose(); }}>
               Fai tua (evidenzia)
-            </button>
-            <button type="button" className={ACTION} onClick={() => { onHideAll(); onClose(); }}>
-              <EyeOff size={15} aria-hidden className="shrink-0 text-slate-400" />
+            </Button>
+            <Button variant="quiet" className="w-full justify-start px-2.5" icon={<EyeOff size={16} aria-hidden className="text-slate-400" />} onClick={() => { onHideAll(); onClose(); }}>
               Nascondi i passaggi chiave
-            </button>
+            </Button>
           </div>
         </div>
       </FloatingFocusManager>

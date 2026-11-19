@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { RotateCw } from 'lucide-react';
 import type { NormaVisitata } from '../../../types';
 import type { EuCaseLawAnswer, EuCaseLawDecision } from '../../../types/decisions';
-import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { euCaseLawQuery, eurLexDecisionUrl, hasEuCaseLawList, INFOCURIA_SEARCH_URL } from '../../../utils/euCaseLaw';
@@ -145,20 +144,9 @@ export function EuCaseLawBlock({ norma, besideId, backEntry }: EuCaseLawBlockPro
       </p>
 
       {opinions.length > 0 && (
-        <button
-          type="button"
-          aria-pressed={showOpinions}
-          onClick={() => setShowOpinions((v) => !v)}
-          className={cn(
-            'rounded-lg border px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-            TOUCH_TARGET_RESPONSIVE,
-            showOpinions
-              ? 'border-primary-600 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:border-toga-400 text-white'
-              : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800',
-          )}
-        >
+        <Button variant={showOpinions ? 'primary' : 'secondary'} size="sm" aria-pressed={showOpinions} onClick={() => setShowOpinions((v) => !v)} className="self-start">
           {`Conclusioni dell’Avvocato generale (${opinions.length})`}
-        </button>
+        </Button>
       )}
 
       {eligible.length === 0 ? (

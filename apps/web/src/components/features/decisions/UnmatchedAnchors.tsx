@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { IconButton } from '../../ui/IconButton';
 import type { Annotation, Highlight } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 
@@ -16,8 +17,8 @@ const EXPLANATION = {
   no_text: 'La fonte non mostra più il testo di questa decisione: le tue note ed evidenziazioni restano qui.',
 } as const;
 
-const removeButton =
-  'inline-flex shrink-0 items-center justify-center rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0';
+/** The removal's red, over `IconButton`'s quiet look. */
+const REMOVE_TINT = 'shrink-0 text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-400';
 
 /**
  * The notes and highlights on a decision that do not land in its text, listed and never dropped
@@ -30,7 +31,7 @@ export function UnmatchedAnchors({ highlights, annotations, reason, onRemoveHigh
   return (
     <section
       aria-label={`Non ritrovate nel testo attuale (${total})`}
-      className="mt-6 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20"
+      className="mt-6 rounded-[8px] border border-amber-200 bg-amber-50/60 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20"
     >
       <h5 className="font-semibold text-slate-700 dark:text-slate-200">Non ritrovate nel testo attuale</h5>
       <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{EXPLANATION[reason]}</p>
@@ -39,9 +40,7 @@ export function UnmatchedAnchors({ highlights, annotations, reason, onRemoveHigh
           <li key={`h-${h.id}`} className="relative flex items-start gap-2 overflow-hidden rounded border border-slate-100 bg-white py-1.5 pl-3 pr-1.5 dark:border-slate-700 dark:bg-slate-900">
             <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(h.color) }} />
             <p className="min-w-0 flex-1 text-xs text-slate-700 dark:text-slate-300">«{h.text}»</p>
-            <button type="button" className={removeButton} aria-label={`Rimuovi evidenziazione «${h.text}»`} title="Rimuovi evidenziazione" onClick={() => onRemoveHighlight(h.id)}>
-              <X size={14} aria-hidden />
-            </button>
+            <IconButton size="sm" className={REMOVE_TINT} icon={<X aria-hidden />} aria-label={`Rimuovi evidenziazione «${h.text}»`} title="Rimuovi evidenziazione" onClick={() => onRemoveHighlight(h.id)} />
           </li>
         ))}
         {annotations.map((a) => (
@@ -50,9 +49,7 @@ export function UnmatchedAnchors({ highlights, annotations, reason, onRemoveHigh
               {a.anchorText && <p className="italic text-slate-500 dark:text-slate-400">«{a.anchorText}»</p>}
               <p className="whitespace-pre-wrap">{a.text}</p>
             </div>
-            <button type="button" className={removeButton} aria-label={`Rimuovi nota «${a.text.length > 40 ? `${a.text.slice(0, 40)}…` : a.text}»`} title="Rimuovi nota" onClick={() => onRemoveAnnotation(a.id)}>
-              <X size={14} aria-hidden />
-            </button>
+            <IconButton size="sm" className={REMOVE_TINT} icon={<X aria-hidden />} aria-label={`Rimuovi nota «${a.text.length > 40 ? `${a.text.slice(0, 40)}…` : a.text}»`} title="Rimuovi nota" onClick={() => onRemoveAnnotation(a.id)} />
           </li>
         ))}
       </ul>
