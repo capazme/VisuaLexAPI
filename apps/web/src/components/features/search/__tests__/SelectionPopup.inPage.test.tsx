@@ -170,7 +170,7 @@ describe('SelectionPopup in the page (LC142, L-73): the actions under the paragr
     expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull();
   });
 
-  it('a text drawn flat keeps the bar over the selection', async () => {
+  it('a text drawn flat has no paragraph to open under: the actions grow from the words as an island', async () => {
     render(<Harness flat />);
     const node = screen.getByText(FIRST).firstChild as Text;
     const range = document.createRange();
@@ -179,8 +179,83 @@ describe('SelectionPopup in the page (LC142, L-73): the actions under the paragr
     window.getSelection()!.removeAllRanges();
     window.getSelection()!.addRange(range);
     fireEvent.mouseUp(screen.getByTestId('container'));
-    expect(await screen.findByTitle('Aggiungi nota (N)')).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull();
+    const island = await screen.findByRole('region', { name: 'Testo selezionato' });
+    expect(island.closest('[data-reader-slot]')).toBeNull();
+    expect(within(island).getByRole('button', { name: 'Copia' })).toBeInTheDocument();
+  });
+
+  // Luca's option A (LC142): far from the paragraph's end, the actions do not open under it, where the page would have to
+  // scroll the selected words away (a 55,572 px paragraph of a decision, at 390).
+  describe('a paragraph that goes on far below the words', () => {
+    const tall = () => vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const bottom = this.classList.contains('vlx-b') ? 30_000 : 0;
+      return new DOMRect(0, 0, 0, bottom);
+    });
+
+    it('grows the actions from the words as an island, the page still, the focus in it', async () => {
+      const spy = tall();
+      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      try {
+        render(<Harness />);
+        const island = await select('fatto doloso', FIRST);
+        expect(island.closest('[data-reader-slot]')).toBeNull();
+        expect(island.contains(document.activeElement)).toBe(true);
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(window.getSelection()?.toString()).toBe('fatto doloso');
+        expect(scrollBy).not.toHaveBeenCalled();
+        expect(scrollIntoView).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+        scrollBy.mockRestore();
+        delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      }
+    });
+
+    it('Esc and «Chiudi» clear the selection and give the focus to the paragraph', async () => {
+      const spy = tall();
+      try {
+        render(<Harness />);
+        let island = await select('fatto doloso', FIRST);
+        fireEvent.keyDown(island, { key: 'Escape' });
+        await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull());
+        expect(document.activeElement).toBe(screen.getByText(FIRST));
+        expect(window.getSelection()?.toString()).toBe('');
+        island = await select('commesso', SECOND);
+        fireEvent.click(within(island).getByRole('button', { name: 'Chiudi' }));
+        await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull());
+        expect(document.activeElement).toBe(screen.getByText(SECOND));
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('one at a time with the spaces in the text', async () => {
+      const spy = tall();
+      try {
+        render(<Harness />);
+        await select('fatto doloso', FIRST);
+        fireEvent.click(screen.getByRole('button', { name: 'Apri le annotazioni' }));
+        expect(await screen.findByRole('region', { name: 'Annotazioni' })).toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull());
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  it('under the paragraph, the space is not scrolled into view by itself: the selected words stay', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      render(<Harness />);
+      const space = await select('fatto doloso', FIRST);
+      expect(space.closest('[data-reader-slot]')).not.toBeNull();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
   });
 
   it('leaves the text when its reader stops asking for it', async () => {

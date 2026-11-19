@@ -1317,7 +1317,10 @@ range widened to whole words, `utils/inkSelection.ts`), which reads
 per line or comma boundary, which made every cross-comma highlight unmatched.
 A space open in the text (`BlockSpace`, `data-reader-slot`) is skipped by every one of them.
 In the readers (`ArticleBody`, `inPage`) the selection's actions open under the paragraph the selection ends in, in
-that `BlockSpace` («Testo selezionato», the actions in words, LC142, L-73); Esc and «Chiudi» clear the selection and give
+that `BlockSpace` («Testo selezionato», the actions in words, LC142, L-73), when the paragraph ends within about one
+view of the words (`utils/selectionSpace.ts`, the fixed bars counted from the scroller's `scroll-padding`), brought into
+view only as far as the words stay in it. Further down, or in a text drawn flat, they grow from the words as an island
+under them (`IslandSurface`, L-74's «strictly necessary», Luca's option A); the page does not move; Esc and «Chiudi» clear the selection and give
 the focus to the paragraph. Study Mode keeps the dark bar over the selection until its own PR (F2). One space at a time
 in a text: a block's annotations and the selection's actions close each other.
 The renderer also accepts, at the same offset, a stored text that differs only

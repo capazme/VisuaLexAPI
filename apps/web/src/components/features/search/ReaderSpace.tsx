@@ -17,6 +17,8 @@ export interface ReaderSpaceProps {
   /** While the work it started travels (a PDF being written): Esc and «Chiudi» wait. */
   busy?: boolean;
   className?: string;
+  /** How it is brought into view as it opens (`Expand`). */
+  reveal?: (space: HTMLElement) => void;
   children: ReactNode;
 }
 
@@ -25,7 +27,7 @@ export interface ReaderSpaceProps {
  * `role="region"`), with its title and «Chiudi». The focus lands on the space, never in a field; Esc and «Chiudi» close
  * it and the focus goes back to what opened it. The Forum's `ForumSpace` (#709) is the same shape: one day, one component.
  */
-export function ReaderSpace({ open, onClose, title, line, icon, id, busy = false, className, children }: ReaderSpaceProps) {
+export function ReaderSpace({ open, onClose, title, line, icon, id, busy = false, className, reveal, children }: ReaderSpaceProps) {
   const headingId = useId();
   const ownId = useId();
   const spaceId = id ?? ownId;
@@ -38,7 +40,7 @@ export function ReaderSpace({ open, onClose, title, line, icon, id, busy = false
     if (busy && space && (active === document.body || active === null || space.contains(active))) space.focus({ preventScroll: true });
   }, [busy, spaceId]);
   return (
-    <Expand id={spaceId} open={open} onClose={close} role="region" aria-labelledby={headingId} className={cn('my-2 bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
+    <Expand id={spaceId} open={open} onClose={close} reveal={reveal} role="region" aria-labelledby={headingId} className={cn('my-2 bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
       <div className="flex items-start justify-between gap-3 border-b border-slate-200 py-2 pl-4 pr-2 dark:border-slate-700">
         <div className="flex min-w-0 items-center gap-2 pt-1.5">
           {icon}

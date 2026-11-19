@@ -2,6 +2,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode,
 import { createPortal } from 'react-dom';
 import { READER_SLOT_ATTR } from '../../../utils/selectionOffset';
 import { ReaderSpace } from './ReaderSpace';
+import { focusOn, useOneSpaceAtATime } from './textSpaces';
 
 export interface BlockSpaceProps<T extends string | number> {
   /** What the space is about (a block's index); null, closed. Kept while the space closes, so the closing shows it. */
@@ -16,6 +17,8 @@ export interface BlockSpaceProps<T extends string | number> {
   title: (value: T) => ReactNode;
   line?: (value: T) => ReactNode;
   icon?: ReactNode;
+  /** How it is brought into view as it opens (`Expand`): a selection's keeps the selected words in view. */
+  reveal?: (space: HTMLElement) => void;
   children: (value: T) => ReactNode;
 }
 
@@ -27,7 +30,7 @@ export interface BlockSpaceProps<T extends string | number> {
  * put back after the block, and the focus it held with it. On closing the focus goes back to what opened it, or to the
  * block when that is gone (the block's last annotation took its sign with it, or a selection opened it).
  */
-export function BlockSpace<T extends string | number>({ value, rootRef, block, trigger, onClose, title, line, icon, children }: BlockSpaceProps<T>) {
+export function BlockSpace<T extends string | number>({ value, rootRef, block, trigger, onClose, title, line, icon, reveal, children }: BlockSpaceProps<T>) {
   const [host] = useState(() => {
     const el = document.createElement('div');
     el.setAttribute(READER_SLOT_ATTR, '');
@@ -76,19 +79,7 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
   // Gone with its reader (a reader that stops asking for a selection's actions), it leaves the text.
   useEffect(() => () => host.remove(), [host]);
 
-  // One at a time: an opening says so, and the others open in the same text close.
-  const closeRef = useRef(onClose);
-  useEffect(() => { closeRef.current = onClose; });
-  useEffect(() => {
-    if (!open) return undefined;
-    document.dispatchEvent(new CustomEvent(SPACE_OPENED, { detail: host }));
-    const onOther = (event: Event) => {
-      const other = (event as CustomEvent<HTMLElement>).detail;
-      if (other !== host && rootRef.current?.contains(other)) closeRef.current();
-    };
-    document.addEventListener(SPACE_OPENED, onOther);
-    return () => document.removeEventListener(SPACE_OPENED, onOther);
-  }, [open, rootRef, host]);
+  useOneSpaceAtATime(open, rootRef, host, onClose);
 
   // Closed, the focus goes back to the sign looked up again, or the block (`FocusBack`).
   function focusTarget() {
@@ -99,22 +90,12 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
   return createPortal(
     <div onFocus={(event) => { lastFocus.current = event.target as HTMLElement; }}>
       <FocusBack open={open} host={host} target={focusTarget} onGiven={(to) => { gaveTo.current = to; }} />
-      <ReaderSpace open={open} onClose={onClose} title={shown === null ? '' : title(shown)} line={shown === null ? undefined : line?.(shown)} icon={icon}>
+      <ReaderSpace open={open} onClose={onClose} reveal={reveal} title={shown === null ? '' : title(shown)} line={shown === null ? undefined : line?.(shown)} icon={icon}>
         {shown !== null && <Fragment key={shown}>{children(shown)}</Fragment>}
       </ReaderSpace>
     </div>,
     host,
   );
-}
-
-const SPACE_OPENED = 'vlx-space-opened';
-
-/** Focuses an element of the text (a paragraph takes `tabindex="-1"` for it), without scrolling; returns it. */
-function focusOn(to: HTMLElement | null): HTMLElement | null {
-  if (!to) return null;
-  if (!to.hasAttribute('tabindex')) to.setAttribute('tabindex', '-1');
-  to.focus({ preventScroll: true });
-  return to;
 }
 
 /**

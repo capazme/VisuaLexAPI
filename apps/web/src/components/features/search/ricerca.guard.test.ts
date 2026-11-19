@@ -25,7 +25,9 @@ const CONFIRMATIONS = ['search/discussionControls.tsx'];
 /**
  * Over the page by choice, each with why: ⌘K's island grows from its pill (L-75); the glosses' margin is a portal into a
  * slot of the page, in its flow; a block's space (`BlockSpace`, LC142) is a portal into the text itself, after its block,
- * in its flow; the save to a practice's notice is a notification (L-74).
+ * in its flow; the save to a practice's notice is a notification (L-74). Not caught by the check, and over the text by
+ * Luca's choice (LC142, option A, L-74's «strictly necessary»): `SelectionPopup`'s island, where the paragraph goes on
+ * far below the selected words; under the paragraph otherwise.
  */
 const ALLOWED = ['search/CommandPalette.tsx', 'search/ArticleTabContent.tsx', 'search/BlockSpace.tsx', 'practice/usePracticeSaveActions.tsx'];
 const STYLED = files.filter((name) => !UNSTYLED.includes(name));
