@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { CONTROL_BORDER, CONTROL_RADIUS } from '../../ui/controlStyles';
@@ -23,7 +24,14 @@ const TRIGGER_RE = /^[a-zA-Z0-9\-_.]+$/;
  * item, inside the review (LC140, L-73; it was a window with a veil); the space around it is the review's.
  */
 export function AliasConflictDialog({ suggestedTrigger, busy = false, onChoose, onClose }: AliasConflictDialogProps) {
-  const [renameValue, setRenameValue] = useState(`${suggestedTrigger}-2`);
+  const customAliases = useAppStore((s) => s.customAliases);
+  // The server's suggestion is the trigger already taken: the first free numbered one is proposed instead.
+  const [renameValue, setRenameValue] = useState(() => {
+    const taken = new Set(customAliases.map((a) => a.trigger.toLowerCase()));
+    let n = 2;
+    while (taken.has(`${suggestedTrigger}-${n}`.toLowerCase())) n++;
+    return `${suggestedTrigger}-${n}`;
+  });
   const trimmed = renameValue.trim();
   const isValidTrigger = trimmed.length >= 2 && TRIGGER_RE.test(trimmed);
   const box = `${CONTROL_RADIUS} ${CONTROL_BORDER} px-3 py-2`;

@@ -1,6 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import apiClient from '../../../services/api';
 import type { EnvironmentSuggestion, SuggestionItem } from '../../../types';
 import { loadStudyPacks } from '../../../utils/studyPacks';
 import { appStore } from '../../../store/useAppStore';
@@ -39,6 +41,16 @@ function suggestion(id: string, items: SuggestionItem[], extra: Partial<Environm
     counts: { pending: items.length, taken: 0, declined: 0 }, aggregateStatus: 'open', ...extra,
   };
 }
+
+/** What the real client (`services/api.ts`) rejects with when the server answers `status` with `data`: the request goes
+ * through `apiClient` and its interceptors, only the network is replaced. */
+async function clientError(status: number, data: unknown): Promise<unknown> {
+  const adapter = async (config: InternalAxiosRequestConfig) => {
+    throw new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, null, { status, statusText: '', headers: {}, config, data });
+  };
+  return apiClient.post('/shared-environments-suggestions/r1/items/a1/take', undefined, { adapter }).then(() => null, (err: unknown) => err);
+}
+const CONFLICT = { error: 'alias_trigger_conflict', existingAliasId: 'mine', suggestedTrigger: 'gdpr' };
 
 const note = item('n1', 'annotation', { text: 'Una nota', articleId: 'art. 1' });
 const alias = item('a1', 'alias', { trigger: 'gdpr', expandTo: 'Regolamento UE 2016/679', aliasType: 'shortcut' });
@@ -112,9 +124,11 @@ describe('Forum suggestions in the page (LC140, L-73)', () => {
   });
 
   it('opens the alias conflict as a choice under the item; Annulla and Esc give the focus back to «Prendi»', async () => {
-    service.takeSuggestionItem.mockRejectedValue({
-      response: { status: 409, data: { error: 'alias_trigger_conflict', suggestedTrigger: 'gdpr', existingAliasId: 'mine' } },
-    });
+    const conflict = await clientError(409, CONFLICT);
+    // The client's own shape, not axios's: the 409 is read from it.
+    expect(conflict).toMatchObject({ status: 409, data: CONFLICT });
+    expect(conflict).not.toHaveProperty('response');
+    service.takeSuggestionItem.mockRejectedValue(conflict);
     press(await openTab());
     const region = await screen.findByRole('region', { name: REVIEW });
     fireEvent.click(within(region).getByRole('button', { name: /Alias \(1\)/ }));
@@ -135,18 +149,31 @@ describe('Forum suggestions in the page (LC140, L-73)', () => {
     expect(screen.getByRole('region', { name: REVIEW })).toBeInTheDocument();
   });
 
+  it('a «Prendi» refused for another reason says why under the item; the review stays, the focus back on «Prendi»', async () => {
+    service.takeSuggestionItem.mockRejectedValue(await clientError(500, {}));
+    press(await openTab());
+    const region = await screen.findByRole('region', { name: REVIEW });
+    const take = within(region).getByRole('button', { name: 'Prendi «Una nota»' });
+    press(take);
+    expect(await within(region).findByRole('alert')).toHaveTextContent('Richiesta non riuscita (errore 500). Riprova tra poco.');
+    expect(screen.queryByText('Errore')).toBeNull();
+    await waitFor(() => expect(take).toHaveFocus());
+    expect(take).toBeEnabled();
+    expect(screen.getByRole('region', { name: REVIEW })).toBeInTheDocument();
+  });
+
   it('renames through the choice: the same call with the new trigger, then the focus on the review', async () => {
-    service.takeSuggestionItem.mockRejectedValueOnce({
-      response: { status: 409, data: { error: 'alias_trigger_conflict', suggestedTrigger: 'gdpr', existingAliasId: 'mine' } },
-    });
+    service.takeSuggestionItem.mockRejectedValueOnce(await clientError(409, CONFLICT));
+    // «gdpr-2» is the user's already: the first free number is proposed.
+    appStore.setState({ customAliases: [{ id: 'mine', trigger: 'gdpr', type: 'shortcut', expandTo: 'x', createdAt: '' }, { id: 'm2', trigger: 'gdpr-2', type: 'shortcut', expandTo: 'y', createdAt: '' }] as never });
     press(await openTab());
     const region = await screen.findByRole('region', { name: REVIEW });
     fireEvent.click(within(region).getByRole('button', { name: /Alias \(1\)/ }));
     press(within(region).getByRole('button', { name: 'Prendi «gdpr»' }));
     const choice = await within(region).findByRole('region', { name: 'Trigger già in uso' });
-    expect(within(choice).getByRole('textbox', { name: 'Rinomina prima di importare' })).toHaveValue('gdpr-2');
+    expect(within(choice).getByRole('textbox', { name: 'Rinomina prima di importare' })).toHaveValue('gdpr-3');
     fireEvent.click(within(choice).getByRole('button', { name: 'Usa' }));
-    await waitFor(() => expect(service.takeSuggestionItem).toHaveBeenLastCalledWith('r1', 'a1', 'gdpr-2'));
+    await waitFor(() => expect(service.takeSuggestionItem).toHaveBeenLastCalledWith('r1', 'a1', 'gdpr-3'));
     await waitFor(() => expect(within(region).queryByRole('region', { name: 'Trigger già in uso' })).toBeNull());
     expect(region).toHaveFocus();
     expect(aliases.delete).not.toHaveBeenCalled();
@@ -211,5 +238,14 @@ describe('Forum suggestions in the page (LC140, L-73)', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: REVIEW })).toBeNull());
     press(screen.getByRole('button', { name: /da @marta/ }));
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Pubblica un dossier' })).toBeNull());
+  });
+
+  // #709's one-space rule: an old link's import and «Pubblica un dossier» never open together.
+  it('«Pubblica un dossier» closes an old link\'s import', async () => {
+    render(<MemoryRouter initialEntries={['/forum?import=non-un-link']}><BulletinBoardPage /></MemoryRouter>);
+    expect(screen.getByRole('region', { name: 'Link non valido' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica un dossier' }));
+    expect(await screen.findByRole('region', { name: 'Pubblica un dossier' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Link non valido' })).toBeNull());
   });
 });

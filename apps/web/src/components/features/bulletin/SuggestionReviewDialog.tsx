@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, X as XIcon, FileText, Highlighter, Folder, Zap, Link2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import type { EnvironmentSuggestion, SuggestionItem, SuggestionItemType } from '../../../types';
 import { SuggestionItemCard } from './SuggestionItemCard';
@@ -13,7 +13,8 @@ import { CONTROL_BORDER, CONTROL_RADIUS } from '../../ui/controlStyles';
 
 export type TakeResult =
   | { kind: 'ok' }
-  | { kind: 'alias_conflict'; itemId: string; suggestedTrigger: string; existingAliasId?: string };
+  | { kind: 'alias_conflict'; itemId: string; suggestedTrigger: string; existingAliasId?: string }
+  | { kind: 'error'; message: string };
 
 export interface AliasConflict { itemId: string; suggestedTrigger: string; existingAliasId?: string }
 
@@ -66,6 +67,10 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
   const [declineNote, setDeclineNote] = useState('');
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [aliasBusy, setAliasBusy] = useState(false);
+  // «Prendi» refused: what happened, under its item.
+  const [takeError, setTakeError] = useState<{ itemId: string; message: string } | null>(null);
+  // «Prendi» waited disabled: once drawn enabled again, the focus goes back to it.
+  const refocusTake = useRef<string | null>(null);
   // The last conflict, kept while its choice closes: the closing shows it, not an empty box.
   const [shownConflict, setShownConflict] = useState(aliasConflict);
   if (aliasConflict && aliasConflict !== shownConflict) setShownConflict(aliasConflict);
@@ -91,8 +96,13 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
 
   const handleTake = async (itemId: string) => {
     working(itemId);
+    setTakeError(null);
     try {
-      await onTake(itemId);
+      const result = await onTake(itemId);
+      if (result.kind === 'error') {
+        setTakeError({ itemId, message: result.message });
+        refocusTake.current = itemId;
+      }
     } finally {
       working(null);
     }
@@ -116,6 +126,12 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
     if (take && !take.disabled) take.focus({ preventScroll: true });
     else focusSpace();
   };
+  useEffect(() => {
+    const itemId = refocusTake.current;
+    if (itemId === null || busyItemId !== null) return;
+    refocusTake.current = null;
+    backToTake(itemId);
+  });
   const cancelAlias = () => {
     if (aliasBusy || !aliasConflict) return;
     backToTake(aliasConflict.itemId);
@@ -196,6 +212,9 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
                           </p>
                         ) : null}
                       />
+                      {takeError?.itemId === item.id && item.status === 'pending' && (
+                        <p role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">{takeError.message}</p>
+                      )}
                       {/* «Rifiuta»: the note opens under the item (LC140, L-73). */}
                       <Expand
                         open={declineTargetId === item.id && item.status === 'pending'}

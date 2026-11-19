@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
@@ -30,6 +30,17 @@ import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/me
 import type { Environment, SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
 import { PUBLIC_DOSSIERS_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
+import { getErrorMessage } from '../../../utils/errors';
+
+/** A 409 for an alias whose trigger the user already has. The client (`services/api.ts`) rejects with `{ status, message,
+ * data }`; an axios error's `response` is read too. */
+function aliasConflictOf(err: unknown): { suggestedTrigger: string; existingAliasId?: string } | null {
+  const e = err as { status?: number; data?: unknown; response?: { status?: number; data?: unknown } } | null;
+  const status = e?.status ?? e?.response?.status;
+  const data = (e?.data ?? e?.response?.data) as { error?: string; suggestedTrigger?: string; existingAliasId?: string } | undefined;
+  if (status !== 409 || data?.error !== 'alias_trigger_conflict' || typeof data.suggestedTrigger !== 'string') return null;
+  return { suggestedTrigger: data.suggestedTrigger, existingAliasId: data.existingAliasId };
+}
 
 
 export function BulletinBoardPage() {
@@ -83,6 +94,7 @@ export function BulletinBoardPage() {
   };
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const refreshDossiers = useAppStore((s) => s.refreshDossiers);
 
   /** What became study dossiers (a download, a pack): said, the list read again, the one new dossier one tap away. */
@@ -280,15 +292,13 @@ export function BulletinBoardPage() {
       setToast({ type: 'success', message: 'Item preso.' });
       return { kind: 'ok' };
     } catch (err: unknown) {
-      const maybeAxios = err as { response?: { status?: number; data?: { error?: string; suggestedTrigger?: string; existingAliasId?: string } } };
-      if (maybeAxios.response?.status === 409 && maybeAxios.response.data?.error === 'alias_trigger_conflict') {
-        const body = maybeAxios.response.data as { suggestedTrigger: string; existingAliasId?: string };
-        setAliasConflict({ itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId });
-        return { kind: 'alias_conflict', itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId };
+      const conflict = aliasConflictOf(err);
+      if (conflict) {
+        setAliasConflict({ itemId, ...conflict });
+        return { kind: 'alias_conflict', itemId, ...conflict };
       }
-      const msg = err instanceof Error ? err.message : 'Errore';
-      setToast({ type: 'error', message: msg });
-      return { kind: 'ok' };
+      // Said under the item, in the review that stays open: no notice to dismiss with an Esc that would close it.
+      return { kind: 'error', message: getErrorMessage(err) || "Non è stato possibile prendere l'item. Riprova." };
     }
   }, [reviewingSuggestion, fetchSuggestions]);
 
@@ -349,14 +359,12 @@ export function BulletinBoardPage() {
       await fetchSuggestions();
       setToast({ type: 'success', message: 'Item preso.' });
     } catch (err: unknown) {
-      const maybeAxios = err as { response?: { status?: number; data?: { error?: string; suggestedTrigger?: string; existingAliasId?: string } } };
-      if (choice.action === 'rename' && maybeAxios.response?.status === 409 && maybeAxios.response.data?.error === 'alias_trigger_conflict') {
-        const body = maybeAxios.response.data as { suggestedTrigger: string; existingAliasId?: string };
-        setAliasConflict({ itemId: aliasConflict.itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId });
+      const conflict = aliasConflictOf(err);
+      if (choice.action === 'rename' && conflict) {
+        setAliasConflict({ itemId: aliasConflict.itemId, ...conflict });
         return true;
       }
-      const msg = err instanceof Error ? err.message : 'Errore';
-      setToast({ type: 'error', message: msg });
+      setToast({ type: 'error', message: getErrorMessage(err) || "Non è stato possibile prendere l'item. Riprova." });
       setAliasConflict(null);
       return false;
     }
@@ -426,6 +434,12 @@ export function BulletinBoardPage() {
     setReviewingSuggestion(null);
     setEditingSuggestion(null);
     setAliasConflict(null);
+    // An old link's import, under the header, is one of them too.
+    if (searchParams.has('import')) setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('import');
+      return next;
+    }, { replace: true });
   };
 
   const openPublish = () => {
