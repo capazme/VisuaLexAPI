@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import { FOCUS_RING } from '../../constants/interactions';
 import { Z_INDEX } from '../../constants/zIndex';
@@ -59,6 +59,8 @@ export interface PhoneTopBarProps {
   onSearch: () => void;
   /** The bar's element, for `useHideOnScroll`: it never hides while the focus is inside it. */
   barRef?: Ref<HTMLElement>;
+  /** «Dicci cosa ti serve» (LC141), after the search. */
+  action?: ReactNode;
 }
 
 /**
@@ -69,7 +71,7 @@ export interface PhoneTopBarProps {
  * of the way scrolling down and comes back scrolling up — at once under reduced motion; from `md` it stays, and its
  * right side leaves room for `Layout`'s «Commenti» and Focus button.
  */
-export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, barRef }: PhoneTopBarProps) {
+export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, barRef, action }: PhoneTopBarProps) {
   return (
     <header
       ref={barRef}
@@ -123,6 +125,7 @@ export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, 
           <Search aria-hidden className={ISLAND_LENS} />
           <span aria-hidden>Cerca</span>
         </button>
+        {action}
         {/* L-75: the search's field grows out of «Cerca» leftwards, over the bar's title, up to the menu button. */}
         <div data-palette-slot="" className="absolute inset-y-0 left-12 right-4 flex items-center empty:hidden md:right-[calc(10.5rem+0.75rem)]" />
       </div>

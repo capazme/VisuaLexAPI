@@ -210,11 +210,11 @@ describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => 
     // The page's own title, watched in the content scroller, under the bar.
     expect(observer.target).toHaveTextContent('Dossier pubblici');
     expect(observer.target?.tagName).toBe('H1');
-    // Only the menu and the magnifier: no «Forum» over «Forum · il luogo…», no name under the large title.
+    // Only the menu, the magnifier and «Dicci cosa ti serve» (LC141): no «Forum» over «Forum · il luogo…», no name under the large title.
     expect(name(bar)).toHaveTextContent(/^$/);
     // The section beside the menu, always (LC34).
     expect(bar.querySelector('[data-bar-section]')).toHaveTextContent('Forum');
-    expect(within(bar).getAllByRole('button')).toHaveLength(2);
+    expect(within(bar).getAllByRole('button')).toHaveLength(3);
 
     observer.say(false);
     expect(name(bar)).toHaveTextContent(/^Dossier pubblici$/);

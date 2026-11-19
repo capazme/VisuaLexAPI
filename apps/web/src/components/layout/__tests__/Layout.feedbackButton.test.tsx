@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
@@ -166,5 +166,47 @@ describe('Layout — below lg the controls float as before', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(host).not.toHaveAttribute('hidden');
     expect(screen.getByTestId('news-floating')).toBeInTheDocument();
+  });
+});
+
+// LC141 (Luca, 19 Nov): «Dicci cosa ti serve», the bug at the top right in every bar; it opens `/impostazioni#segnala`.
+describe('Layout — «Dicci cosa ti serve» at the top right (LC141)', () => {
+  const original = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = original;
+    auth.isAuthenticated = true;
+  });
+  const Where = () => {
+    const { pathname, hash } = useLocation();
+    return <p data-testid="where">{pathname + hash}</p>;
+  };
+  const withWhere = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layout /><Where /></MemoryRouter>);
+
+  it('sits in the top bar from lg, beside «Tutto schermo», outlined, with its words, and opens the part', () => {
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 1024px)' })) as typeof window.matchMedia;
+    withWhere('/pratiche');
+    const button = within(screen.getByTestId('top-bar')).getByRole('button', { name: 'Dicci cosa ti serve' });
+    expect(button).toHaveAttribute('title', 'Dicci cosa ti serve');
+    expect(button).toHaveTextContent('Dicci cosa ti serve');
+    expect(button).toHaveClass('border');
+    expect(button).not.toHaveClass('bg-toga-600');
+    fireEvent.click(button);
+    expect(screen.getByTestId('where')).toHaveTextContent('/impostazioni#segnala');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it.each(['/pratiche', '/'])("sits in the phone's bar on %s, the icon alone below md, 44 px", (path) => {
+    at(path);
+    const bar = screen.getByTestId(path === '/' ? 'search-bar' : 'phone-top-bar');
+    const button = within(bar).getByRole('button', { name: 'Dicci cosa ti serve' });
+    expect(button).toHaveAttribute('title', 'Dicci cosa ti serve');
+    expect(button).toHaveClass('min-h-11', 'max-md:w-11', 'max-md:px-0');
+    expect(within(button).getByText('Dicci cosa ti serve')).toHaveClass('max-md:sr-only');
+  });
+
+  it('is not drawn for a guest, who has no part to reach', () => {
+    auth.isAuthenticated = false;
+    at('/pratiche');
+    expect(screen.queryByRole('button', { name: 'Dicci cosa ti serve' })).toBeNull();
   });
 });

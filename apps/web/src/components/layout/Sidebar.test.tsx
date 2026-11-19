@@ -580,7 +580,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
-  it('holds «Segnala un problema» in the user menu, after «Crediti», and opens it from there (LC92)', () => {
+  it('holds «Dicci cosa ti serve» in the user menu, after «Crediti», and opens it from there (LC92)', () => {
     const openFeedback = vi.fn();
     render(
       <MemoryRouter>
@@ -589,24 +589,24 @@ describe('Sidebar — the user menu (spec D2)', () => {
     );
     openUserMenu();
     const names = screen.getAllByRole('menuitem').map((e) => e.textContent?.trim());
-    expect(names.indexOf('Segnala un problema')).toBe(names.indexOf('Crediti') + 1);
+    expect(names.indexOf('Dicci cosa ti serve')).toBe(names.indexOf('Crediti') + 1);
     expect(names).not.toContain('Commenti');
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Segnala un problema' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Dicci cosa ti serve' }));
     expect(openFeedback).toHaveBeenCalledTimes(1);
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
   // LC92: the bug beside «Impostazioni» at the bar's foot, in the drawer and in the wide bar.
-  it.each(['drawer', 'wide'] as const)('draws the bug beside «Impostazioni» (%s) and opens «Segnala un problema» from it', (layout) => {
+  it.each(['drawer', 'wide'] as const)('draws the bug beside «Impostazioni» (%s) and opens «Dicci cosa ti serve» from it', (layout) => {
     const openFeedback = vi.fn();
     render(
       <MemoryRouter>
         <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={openFeedback} layout={layout} />
       </MemoryRouter>,
     );
-    const bug = screen.getByRole('button', { name: 'Segnala un problema' });
-    expect(bug).toHaveAttribute('title', 'Segnala un problema');
+    const bug = screen.getByRole('button', { name: 'Dicci cosa ti serve' });
+    expect(bug).toHaveAttribute('title', 'Dicci cosa ti serve');
     expect(bug.parentElement).toBe(screen.getByRole('button', { name: 'Impostazioni' }).parentElement);
     fireEvent.click(bug);
     expect(openFeedback).toHaveBeenCalledTimes(1);
@@ -619,7 +619,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
         <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} layout="drawer" />
       </MemoryRouter>,
     );
-    expect(screen.queryByRole('button', { name: 'Segnala un problema' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dicci cosa ti serve' })).toBeNull();
   });
 
   it('takes the closed drawer out of reach (inert), and only the drawer', () => {
@@ -660,7 +660,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(aside().style.transitionDuration).toBe('');
   });
 
-  it('keeps «Segnala un problema» in the user menu from md too: the rail has no bug at its foot (LC92)', () => {
+  it('keeps «Dicci cosa ti serve» in the user menu from md too: the rail has no bug at its foot (LC92)', () => {
     const original = window.matchMedia;
     window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;
     try {
@@ -669,9 +669,9 @@ describe('Sidebar — the user menu (spec D2)', () => {
           <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={vi.fn()} />
         </MemoryRouter>,
       );
-      expect(screen.queryByRole('button', { name: 'Segnala un problema' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Dicci cosa ti serve' })).toBeNull();
       openUserMenu();
-      expect(screen.getByRole('menuitem', { name: 'Segnala un problema' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Dicci cosa ti serve' })).toBeInTheDocument();
     } finally {
       window.matchMedia = original;
     }

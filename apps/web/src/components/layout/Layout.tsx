@@ -6,7 +6,8 @@ import { Sidebar } from './Sidebar';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
 import { RoutePage } from './RouteBoundary';
 import { useDesktopSidebar } from './sidebarWidth';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Bug, Maximize2, Minimize2 } from 'lucide-react';
+import { Button } from '../ui/Button';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { CorpusPracticesDialog } from '../features/practice/CorpusPracticesDialog';
@@ -323,9 +324,26 @@ export function Layout() {
 
   // The controls of the top bar (LC21): the version's news and «Tutto schermo», compact and in line. «Commenti» left
   // it for the bug beside «Impostazioni» in the sidebar (LC92).
+  // LC141 (Luca, 19 Nov): «Dicci cosa ti serve», the bug at the top right again, in every bar; outlined, not filled, so
+  // it does not compete with the page's own commands. Below md the icon alone, 44 px; it opens `/impostazioni#segnala`.
+  const feedbackButton = isAuthenticated ? (
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      icon={<Bug size={16} aria-hidden />}
+      title="Dicci cosa ti serve"
+      onClick={() => openSettings('segnala')}
+      className="shrink-0 whitespace-nowrap max-md:w-11 max-md:px-0"
+    >
+      <span className="max-md:sr-only">Dicci cosa ti serve</span>
+    </Button>
+  ) : null;
+
   const barControls = (
     <>
       <ChangelogNotification inBar />
+      {feedbackButton}
       <button
         type="button"
         onClick={() => updateSettings({ focusMode: !settings.focusMode })}
@@ -458,6 +476,7 @@ export function Layout() {
             onReveal={phoneBar.reveal}
             barRef={setPhoneBarElement}
             onSearch={openCommandPalette}
+            action={feedbackButton}
           />
         )}
 
@@ -479,6 +498,7 @@ export function Layout() {
           >
             <MenuToggle {...menuToggle} />
             <SearchField />
+            {feedbackButton}
             {/* L-75: the search's field grows out of this one, in its place. */}
             <div data-palette-slot="" className="absolute bottom-0 left-12 right-4 flex h-14 items-center empty:hidden md:right-[10.5rem]" />
           </div>
