@@ -12,6 +12,16 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.62.0] - 2026-11-19
+
+No focus ring around titles and landing points: the ring stays on the controls you reach with the keyboard. Web
+only, no migration. MERL-T stays off.
+
+### Interface
+
+- Titles, spaces, paragraphs and notices that receive the focus after a change of page no longer show a ring; the
+  ring stays on buttons, fields and links reached with the keyboard (LC143).
+
 ## [1.61.0] - 2026-11-19
 
 «Dicci cosa ti serve» in the top bar, and the reading bar's and the Forum suggestions' windows inside the page.
