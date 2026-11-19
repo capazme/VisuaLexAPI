@@ -289,6 +289,8 @@ describe('SelectionPopup in the page (LC142, L-73): the actions under the paragr
       document.body.append(foot);
       await select('fatto doloso', FIRST);
       await waitFor(() => expect(screen.getByRole('region', { name: 'Testo selezionato' }).closest('[data-reader-slot]')).toBeNull());
+      // No space left standing in the text while the island takes over.
+      expect(document.querySelector('[data-reader-slot] [role="region"]:not([style*="display: none"])')).toBeNull();
       const island = screen.getByRole('region', { name: 'Testo selezionato' });
       expect(island.contains(document.activeElement)).toBe(true);
       expect(window.getSelection()?.toString()).toBe('fatto doloso');

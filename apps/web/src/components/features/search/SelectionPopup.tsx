@@ -475,6 +475,8 @@ export function SelectionPopup({
             const view = viewOf(space);
             const bottom = space.getBoundingClientRect().bottom;
             if (!fitsInView(bottom, words.top, view)) {
+              // Gone at once: under reduced motion its closing fade would leave an empty box pushing the text down.
+              space.style.display = 'none';
               setPopup((prev) => ({ ...prev, under: false }));
               return;
             }
