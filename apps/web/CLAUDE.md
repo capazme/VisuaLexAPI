@@ -584,10 +584,9 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   inDrawer`) the page changes at once, with no transition: the drawer closing over it is the change, and the content's
   picture would be drawn over the drawer and its veil. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
-  `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
-  went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
-  so a choice made with a pointer (the entry's click in `SectionSwitcher`, `detail` above 0) marks the title
-  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Scadenziario» —, the dossier list's
+  `data-section-title="<section id>"` with `tabIndex={-1}` (`PageFrame`'s `section`); like every landing target it
+  shows no ring, from a pointer or the keyboard (`index.css`'s tabindex -1 rule, LC143; LC145 removed the
+  `data-pointer-focus` mark it made redundant) (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Scadenziario» —, the dossier list's
   `h1` — `opus` or `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier
   pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
@@ -3515,7 +3514,7 @@ meant to stay split; add new features as new files, not inside the shells:
   line height, since driver.js writes `display` on the buttons inline —, and `useTour` renames
   driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`). A tour is closed, unseen (asked again next time), when the window
   passes to another layout (768 and 1024 px) or the element of its step is no longer drawn: driver.js redrew the veil at
-  its old size (Y1); and a focus driver.js gives its buttons with no key pressed shows no ring (`data-pointer-focus`).
+  its old size (Y1).
   driver.js and its stylesheet are fetched when a tour first starts (`loadDriver` in `useTour`), not with every page —
   ahead, while the tour waits for its delay (`prepareTour`: `tryStartTour`, `resetAndStartTour`, `Layout`'s welcome);
   the steps, the guards and the screen are read once it is here, and a `stopTour` or the surface unmounting meanwhile
