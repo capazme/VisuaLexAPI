@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent
 import { AnimatePresence } from 'framer-motion';
 import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { CARD_RADIUS } from './controlStyles';
 import { Z_INDEX } from '../../constants/zIndex';
 import { MenuSurface } from './MenuSurface';
 
@@ -180,7 +181,7 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
           above={above}
           className={cn(
             Z_INDEX.dropdown,
-            'absolute w-56 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
+            CARD_RADIUS, 'absolute w-56 overflow-y-auto overscroll-contain border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
             above ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
             menuClassName,

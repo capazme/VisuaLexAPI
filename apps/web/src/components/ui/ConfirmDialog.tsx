@@ -85,6 +85,7 @@ export function ConfirmDialog({
       showCloseButton={false}
       initialFocusRef={focusCancel ? cancelRef : confirmRef}
       growFrom={from.source}
+      cardCorners
       footer={
         <>
           <Button ref={cancelRef} variant="ghost" onClick={onCancel}>

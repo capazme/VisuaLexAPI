@@ -3,6 +3,7 @@ import { motion, useAnimate, useDragControls, type AnimationPlaybackControls, ty
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { ease } from '../../../lib/motion';
+import { CARD_RADIUS, CONTROL_RADIUS } from '../controlStyles';
 import type { HoldReason } from './countdown';
 import type { NotificationEntry, NotificationType } from './notifications';
 import { createSwipeGuard } from './swipeGuard';
@@ -224,8 +225,8 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
           onExited();
         }}
         // The page's paper, a thin border, ink: the typography does the work (K1a).
-        surfaceClassName="rounded-xl border border-slate-200 bg-background shadow-lg dark:border-slate-700"
-        contentClassName="relative rounded-xl text-slate-800 dark:text-slate-100"
+        surfaceClassName={cn('border border-slate-200 bg-background shadow-lg dark:border-slate-700', CARD_RADIUS)}
+        contentClassName={cn('relative text-slate-800 dark:text-slate-100', CARD_RADIUS)}
       >
         {/* With two buttons the text keeps 13 rem of its own: where the row has no room for them, they go under it,
             at the right, with ✕ (it went one word to a line at 390 px, #595). One button keeps the single row. */}
@@ -244,7 +245,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
                 disabled={closing}
                 aria-keyshortcuts={shortcut?.keys}
                 className={cn(
-                  'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                  CONTROL_RADIUS, 'min-h-[44px] shrink-0 px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                 )}
               >
@@ -260,7 +261,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
                 onClick={entry.action.onClick}
                 disabled={closing}
                 className={cn(
-                  'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                  CONTROL_RADIUS, 'min-h-[44px] shrink-0 px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                 )}
               >
@@ -273,7 +274,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
               disabled={closing}
               aria-label="Chiudi notifica"
               className={cn(
-                'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
+                CONTROL_RADIUS, 'grid h-11 w-11 shrink-0 place-items-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
               )}
             >
@@ -290,7 +291,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
               <div
                 key={side}
                 className={cn(
-                  'absolute bottom-0 h-1.5 w-px origin-bottom transition-transform duration-200 ease-out motion-reduce:transition-none',
+                  'absolute bottom-0 h-1.5 w-px origin-bottom transition-transform duration-(--dur-pop) ease-out motion-reduce:transition-none',
                   side,
                   LINE_INK(entry.type),
                   entry.clock.held && 'scale-y-[2.5]',

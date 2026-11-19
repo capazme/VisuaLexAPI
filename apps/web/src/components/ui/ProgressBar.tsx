@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { dur, ease } from '../../lib/motion';
+import { PROGRESS_SWEEP, dur, ease } from '../../lib/motion';
 import { cn } from '../../lib/utils';
 
 export interface ProgressBarProps {
@@ -69,7 +69,7 @@ export function ProgressBar({
           <motion.div
             className={cn('h-full rounded-full w-1/3', fillVariants[variant])}
             animate={{ x: ['-100%', '400%'] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            transition={{ duration: PROGRESS_SWEEP, repeat: Infinity, ease: 'easeInOut' }}
           />
         ) : (
           // A scale, not a width: the fill moves on the compositor, in a panel's time (≤ 300 ms on UI).

@@ -2,7 +2,7 @@ import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { FOCUS_RING } from '../../constants/interactions';
-import { CONTROL_RADIUS } from './controlStyles';
+import { CARD_RADIUS, CONTROL_RADIUS } from './controlStyles';
 import { cn } from '../../lib/utils';
 import { markTransition, panelEntrance, PANEL_ENTRANCE_TIMING } from './segmentedTabsMotion';
 
@@ -55,7 +55,7 @@ const tabId = (panelId: string, id: string) => `${panelId}-tab-${id}`;
 /** The mark's corners (`rounded-md`) and shadow (`shadow-sm`). */
 const MARK_STYLE = { borderRadius: 6, boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' };
 
-const TRACK = 'flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800';
+const TRACK = cn('flex gap-1 bg-slate-100 p-1 dark:bg-slate-800', CARD_RADIUS);
 // The small row (LC114, the consultant's rule: a segment is 44 px to touch on a phone): on a phone segments of 44 px
 // with no track round them, the row 44; from md 2 px of track round segments of 32, the row `CONTROL_HEIGHT.md`'s 36.
 const TRACK_SM = cn('md:p-0.5', CONTROL_RADIUS);
@@ -63,7 +63,7 @@ const SEGMENT_SM = 'min-h-11 px-3 text-xs md:min-h-8';
 /** The small mark's corners: 2 px inside the track's 4. */
 const MARK_STYLE_SM = { ...MARK_STYLE, borderRadius: 2 };
 // The words change colour over the mark's slide (`spring.snappy`, 0.3 s).
-const SEGMENT = 'relative flex min-h-[44px] items-center justify-center rounded-md text-sm font-medium transition-colors duration-300';
+const SEGMENT = 'relative flex min-h-[44px] items-center justify-center rounded-md text-sm font-medium transition-colors duration-(--dur-scene)';
 const segmentTone = (active: boolean) =>
   active ? 'text-slate-900 dark:text-ink-950' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white';
 

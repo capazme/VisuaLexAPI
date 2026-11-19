@@ -37,7 +37,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <div
                 className={cn(
-                  'transition-colors duration-150',
+                  'transition-colors duration-(--dur-press)',
                   isFocused ? 'text-toga-600 dark:text-toga-400' : 'text-ink-500 dark:text-ink-400'
                 )}
               >

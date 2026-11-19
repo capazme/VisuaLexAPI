@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { cn } from '../../lib/utils';
-import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
+import { ISLAND_CLOSE, ISLAND_OPEN, MENU_FADE } from '../../lib/motion';
 import { prefersReducedMotion } from '../../features/sections/sectionTransition';
 
 /** Web Animations here (jsdom has none): without them it opens and closes at once. */
-/** The closing fade reduced motion keeps, as `index.css` gives every opacity change. */
-const REDUCED_FADE = { duration: 150, easing: 'linear' } as const;
+/** The closing fade reduced motion keeps, as `index.css` gives every opacity change: the menus' own (150 ms, linear). */
+const REDUCED_FADE = MENU_FADE;
 const canAnimate = () => typeof Element.prototype.animate === 'function';
 
 // Clipped only while its height moves, and on the height alone (`clip`, no scroll container): at rest nothing is cut, a

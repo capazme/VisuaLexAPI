@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { CARD_RADIUS } from './controlStyles';
 import { Z_INDEX } from '../../constants/zIndex';
 import { useDialogFocus } from './useDialogFocus';
 import { dur, ease } from '../../lib/motion';
@@ -35,6 +36,11 @@ export interface ModalProps {
    * The confirmations' (`ConfirmDialog`): the large dialogs keep their own way until they move into the page.
    */
   growFrom?: IslandSource;
+  /**
+   * A box's 8 px corners (`CARD_RADIUS`) for the shape and the content alike, instead of the windows' 14: the
+   * confirmations', which stay after L-73 (L-74). The other windows keep theirs until they move into the page (LC119).
+   */
+  cardCorners?: boolean;
   children?: ReactNode;
 }
 
@@ -73,6 +79,7 @@ export function Modal({
   labelledBy,
   phoneFullScreen = false,
   growFrom,
+  cardCorners = false,
   children,
 }: ModalProps) {
   const reactId = useId();
@@ -220,7 +227,10 @@ export function Modal({
                 aria-describedby={descriptionId}
                 onClick={(e) => e.stopPropagation()}
                 className={cn('w-full pointer-events-auto max-h-[90vh] flex flex-col', sizeStyles[size], className)}
-                surfaceClassName="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800"
+                surfaceClassName={cn('bg-white dark:bg-slate-900 shadow-lg border border-slate-200 dark:border-slate-800', cardCorners ? CARD_RADIUS : 'rounded-2xl')}
+                // The content's corners are the shape's, so nothing jumps as it grows: the island's own (8 px) for a
+                // confirmation; else the window's, the same as when it does not grow, until L-73 (LC119).
+                contentClassName={cardCorners ? undefined : 'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl'}
               >
                 {body}
               </IslandSurface>

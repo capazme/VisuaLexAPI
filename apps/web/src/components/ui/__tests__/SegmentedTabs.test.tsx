@@ -209,7 +209,7 @@ describe('SegmentedTabs, small', () => {
     const row = screen.getByRole('radiogroup', { name: 'Ordina' });
     // LC114: segments of 44 px with no track round them on a phone (the row 44); 2 px of track round 32 from md.
     expect(row).toHaveClass('md:p-0.5', 'rounded-md');
-    expect(row).not.toHaveClass('p-1', 'p-0.5', 'rounded-lg');
+    expect(row).not.toHaveClass('p-1', 'p-0.5', 'rounded-lg', 'rounded-[8px]');
     for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveClass('min-h-11', 'md:min-h-8', 'rounded-md');
   });
 });

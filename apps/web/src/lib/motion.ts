@@ -28,3 +28,9 @@ export const MENU_OPEN = { duration: 140, easing: `cubic-bezier(${ease.out.join(
 export const MENU_CLOSE = { duration: 100, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
 export const MENU_FADE = { duration: 150, easing: 'linear' } as const;
 export const MENU_SHIFT = 4;
+
+/**
+ * The indeterminate progress bar's sweep, in seconds (LC119): a loop that says «still working», not a move, so none of
+ * `dur`, which would make it frantic.
+ */
+export const PROGRESS_SWEEP = 1.5;
