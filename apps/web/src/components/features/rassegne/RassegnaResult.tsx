@@ -1,6 +1,7 @@
 import { forwardRef, useId, useMemo, useState, type ReactNode } from 'react';
 import { cn } from '../../../lib/utils';
-import { FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { FOCUS_RING } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
 import type { SearchParams } from '../../../types';
 import { articleLink } from './articleLink';
 import { AddPassageToPratica } from './AddPassageToPratica';
@@ -29,12 +30,6 @@ function marked(text: string, spans: Span[], from: number): ReactNode[] {
   if (at < text.length) out.push(text.slice(at));
   return out;
 }
-
-const LINK = cn(
-  'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium text-primary-700 ring-1 ring-inset ring-primary-200 hover:bg-primary-50 dark:text-primary-300 dark:ring-primary-800 dark:hover:bg-primary-900/30',
-  FOCUS_RING,
-  TOUCH_TARGET_RESPONSIVE,
-);
 
 interface Props {
   passo: RassegnaRisultato;
@@ -74,23 +69,17 @@ export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function Rassegna
         {marked(passo.testo, spans, whole ? 0 : start)}
       </p>
       {cut && (
-        <button
-          type="button"
-          aria-expanded={whole}
-          aria-controls={textId}
-          onClick={() => setWhole((v) => !v)}
-          className={cn('text-xs font-medium text-primary-600 hover:underline dark:text-primary-400', FOCUS_RING, TOUCH_TARGET_RESPONSIVE)}
-        >
+        <Button variant="link" aria-expanded={whole} aria-controls={textId} onClick={() => setWhole((v) => !v)}>
           {whole ? 'Mostra meno' : 'Leggi tutto il passo'}
-        </button>
+        </Button>
       )}
       {articles.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-slate-600 dark:text-slate-400">Articoli citati:</span>
           {articles.map(({ label, params }, i) => (params ? (
-            <button key={`${passo.articoli[i].urn}`} type="button" className={LINK} onClick={() => onOpenArticle(params)}>
+            <Button key={`${passo.articoli[i].urn}`} variant="secondary" onClick={() => onOpenArticle(params)}>
               {label}
-            </button>
+            </Button>
           ) : (
             <span key={`${passo.articoli[i].urn}`} className="px-2 py-0.5 text-xs text-slate-600 dark:text-slate-400">{label}</span>
           )))}

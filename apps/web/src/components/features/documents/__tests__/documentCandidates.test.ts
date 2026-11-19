@@ -597,4 +597,13 @@ describe('a regional law is never read as a State law (G-577)', () => {
     const resolved = run.analysis.citations.filter((c) => c.state === 'resolved').map((c) => [slice(TEXT, c), c.act?.act_number]);
     expect(resolved).toEqual([['art. 5 l. 241/1990', '241']]);
   });
+
+  // LC117 (#650): the rows to complete that cite a regional law say so, and are never offered «Completa».
+  it('marks the rows of a regional law, and only those', async () => {
+    const ask = async (q: string[]) => ({ answers: new Map(q.map((x) => [x, { recognized: false, parsed: null }])), unanswered: [] });
+    const run = await analyseDocument(TEXT, { serverNames: recorded.act_names, ask });
+    const incomplete = run.analysis.citations.filter((c) => c.state === 'incomplete');
+    expect(incomplete.filter((c) => c.regional).map((c) => c.article)).toEqual(['3', '2', '4', '3', '1']);
+    expect(incomplete.filter((c) => !c.regional).map((c) => c.article)).toEqual(['9']);
+  });
 });

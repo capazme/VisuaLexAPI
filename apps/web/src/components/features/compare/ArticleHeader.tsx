@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { IconButton } from '../../ui/IconButton';
 import type { CompareArticle } from '../../../hooks/useCompare';
 
 interface ArticleHeaderProps {
@@ -18,7 +19,7 @@ export function ArticleHeader({ article, side, onRemove, className }: ArticleHea
     <div className={cn('flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/50', className)}>
       <div className="flex items-center gap-3 min-w-0">
         <div className={cn(
-          'w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0',
+          'w-8 h-8 rounded-md flex items-center justify-center font-bold text-xs shrink-0',
           side === 'left'
             ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
             : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
@@ -41,15 +42,14 @@ export function ArticleHeader({ article, side, onRemove, className }: ArticleHea
           </p>
         </div>
       </div>
-      <button
-        type="button"
+      <IconButton
+        size="sm"
         onClick={onRemove}
-        className="p-1.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 inline-flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
         title="Rimuovi dal confronto"
         aria-label={`Rimuovi dal confronto: ${article.label}`}
-      >
-        <X size={16} />
-      </button>
+        icon={<X aria-hidden />}
+        className="text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+      />
     </div>
   );
 }

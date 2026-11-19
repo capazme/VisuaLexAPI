@@ -31,6 +31,11 @@ describe('the user\'s choices on the rows (#376 §5.4)', () => {
     expect(completionScopes(TEXT, rows, 3)).toEqual({ identical: [3], all: [3, 1, 2] });
   });
 
+  it('never reaches a regional law from another row\'s scopes: «A tutte» would make it a State law (G-577)', () => {
+    const rows = reviewRows(ROWS.map((r, i) => (i === 3 ? { ...r, regional: true as const } : r)), new Map());
+    expect(completionScopes(TEXT, rows, 1)).toEqual({ identical: [1, 2], all: [1, 2] });
+  });
+
   it('a row chosen for itself is the user\'s; one chosen in bulk waits for a confirmation; undo puts all back', () => {
     const keys = [rowKey(ROWS[1]), rowKey(ROWS[2])];
     const before = snapshot(new Map(), keys);

@@ -92,7 +92,8 @@ const written = (text: string, row: { start: number; end: number }) => text.slic
 
 /** The rows the picker's scopes reach (§5.4): the identical ones (same article, written alike) and all, the row first. */
 export function completionScopes(text: string, rows: readonly ReviewedRow[], index: number): { identical: number[]; all: number[] } {
-  const pending = toCompleteRows(rows);
+  // A regional law is never completed, nor reached by another row's «A tutte» (G-577): it would become a State law.
+  const pending = toCompleteRows(rows).filter((r) => !r.regional);
   const row = rows[index];
   if (!row) return { identical: [], all: [] };
   const others = pending.filter((r) => r.index !== index);

@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { extractCitations } from '../../../../utils/citationMatcher';
 import { DocumentReviewPage } from '../DocumentReviewPage';
 import { PARERE, testFile } from './fixtures';
+import { REGIONAL_LAW_REFUSAL } from '../../../../utils/regionalLaw';
 
 const navigateMock = vi.fn();
 const triggerSearchMock = vi.fn();
@@ -72,6 +73,22 @@ describe('DocumentReviewPage — an act sent by its page («Analizza l’atto»)
     await userEvent.click(await screen.findByRole('button', { name: 'Scegli un altro documento' }));
     await screen.findByRole('button', { name: /Scegli un file/ });
     expect(document.body.textContent).toMatch(/Il documento resta sul tuo computer/);
+  });
+});
+
+describe('DocumentReviewPage — a regional law to complete (G-577, #650)', () => {
+  it('says why, in the palette\'s words, and offers no «Completa» to make it a State law', async () => {
+    routerState.state = { atto: { id: 'a1', titolo: 'Parere', testo: 'Rileva l’art. 3 della l.r. Toscana 65/2014. Si veda l’art. 5 del contratto.' } };
+    render(<DocumentReviewPage />);
+    const list = await screen.findByRole('list', { name: /Da completare/ });
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    const [regional, contract] = rows;
+    expect(within(regional).getByText(REGIONAL_LAW_REFUSAL)).toBeInTheDocument();
+    expect(within(regional).queryByRole('button', { name: /^Completa/ })).toBeNull();
+    // The other row to complete keeps its «Completa».
+    expect(within(contract).getByRole('button', { name: /^Completa/ })).toBeInTheDocument();
+    expect(within(contract).queryByText(REGIONAL_LAW_REFUSAL)).toBeNull();
   });
 });
 
@@ -402,14 +419,22 @@ describe('DocumentReviewPage — motion', () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
-  it('under reduced motion, jumps to the citation and does not pulse it', async () => {
-    reduceMotion(true);
-    const { container } = render(<DocumentReviewPage />);
-    await choose(container, PARERE);
-    const list = screen.getByRole('complementary', { name: 'Citazioni' });
-    await userEvent.click(within(list).getByText('art. 1455').closest('button')!);
-    expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: 'auto' });
-    expect(animate).not.toHaveBeenCalled();
+  // LC117: the ring is measured, not assumed. `animate` is installed, so «not called» says the ring did not run.
+  it.each([[false, 1], [true, 0]])('under reduced motion %s, pulses the citation reached %i times', async (reduce, rings) => {
+    reduceMotion(reduce);
+    const original = HTMLElement.prototype.animate;
+    HTMLElement.prototype.animate = animate as unknown as HTMLElement['animate'];
+    try {
+      const { container } = render(<DocumentReviewPage />);
+      await choose(container, PARERE);
+      const list = screen.getByRole('complementary', { name: 'Citazioni' });
+      await userEvent.click(within(list).getByText('art. 1455').closest('button')!);
+      expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: reduce ? 'auto' : 'smooth' });
+      const ringCalls = animate.mock.calls.filter(([frames]) => JSON.stringify(frames).includes('boxShadow'));
+      expect(ringCalls).toHaveLength(rings);
+    } finally {
+      HTMLElement.prototype.animate = original;
+    }
   });
 
   it('lets the text column be scrolled from the keyboard', async () => {

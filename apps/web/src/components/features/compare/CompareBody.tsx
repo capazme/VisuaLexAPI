@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { FOCUS_RING } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
+import { Switch } from '../../ui/Switch';
 import type { CompareArticle } from '../../../hooks/useCompare';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { compareArticles, summarySentence, type CompareSide } from '../../../utils/articleCompare';
@@ -100,28 +102,11 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
           {sentence}
         </p>
         {versions && (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={onlyChanges}
-            onClick={toggleOnlyChanges}
-            className={cn(
-              'inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium md:min-h-0 md:py-1.5',
-              'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800',
-              FOCUS_RING,
-            )}
-          >
-            <span
-              aria-hidden
-              className={cn(
-                'relative h-5 w-9 rounded-full transition-colors',
-                onlyChanges ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600',
-              )}
-            >
-              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform', onlyChanges && 'translate-x-[0.975rem] dark:bg-ink-950')} />
-            </span>
-            Solo le modifiche
-          </button>
+          // The words are the switch's `<label>`: a press on them turns it too (LC117).
+          <span className="inline-flex items-center gap-2">
+            <Switch id="compare-only-changes" checked={onlyChanges} onCheckedChange={toggleOnlyChanges} />
+            <label htmlFor="compare-only-changes" className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200">Solo le modifiche</label>
+          </span>
         )}
       </div>
 
@@ -132,13 +117,9 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{names[side]}</p>
               <VersionBanner banner={banner} variant={hidden ? 'state' : 'banner'} />
               {hidden && (
-                <button
-                  type="button"
-                  onClick={() => onRemove(side)}
-                  className={cn('mb-4 min-h-[44px] rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 md:py-1.5 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING)}
-                >
+                <Button variant="quiet" onClick={() => onRemove(side)} className="mb-4">
                   Scegli un altro articolo
-                </button>
+                </Button>
               )}
             </div>
           ))}
@@ -179,6 +160,7 @@ type Tails = Record<CompareSide, { start: number; end: number } | null>;
 
 function FoldRow({ item, onUnfold, className }: { item: Extract<ViewItem, { type: 'fold' }>; onUnfold: (key: string) => void; className?: string }) {
   return (
+    // bare-button: a folded stretch of the comparison, a whole row that unfolds it.
     <button
       type="button"
       data-testid="compare-fold"
@@ -338,8 +320,9 @@ function PhoneRows({
               {item.label && <LabelPill label={item.label} tooLong={item.tooLong} />}
             </div>
             {options.length > 0 && (
-              <div role="group" aria-label="Versione da mostrare" className="mx-4 mt-2 flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+              <div role="group" aria-label="Versione da mostrare" className="mx-4 mt-2 flex gap-1 rounded-[8px] bg-slate-100 p-1 dark:bg-slate-800">
                 {options.map((o) => (
+                  // bare-button: a segment of the version picker, pressed or not.
                   <button
                     key={o.choice}
                     type="button"

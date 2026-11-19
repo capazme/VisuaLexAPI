@@ -84,6 +84,28 @@ describe('RassegnePanel', () => {
     expect(screen.queryByText("Rassegna dell'anno 2024")).not.toBeInTheDocument();
   });
 
+  // LC117: the accordion and its years open with `Expand`, the space that grows under its heading (LC77), not by hand.
+  it('opens its space and its years with `Expand`: named by the heading, the focus inside, Esc closing it', async () => {
+    fetchRassegne.mockResolvedValue(SUMMARY);
+    renderPanel();
+    const row = await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ });
+    expect(row).toHaveAttribute('aria-controls');
+    expect(document.getElementById(row.getAttribute('aria-controls')!)).toBeNull();
+    row.focus();
+    fireEvent.click(row);
+    const space = document.getElementById(row.getAttribute('aria-controls')!)!;
+    expect(space).toHaveAttribute('tabindex', '-1');
+    expect(space).toContainElement(screen.getByRole('search', { name: 'Rassegne di un altro articolo' }));
+    expect(space).toHaveFocus();
+    const year = screen.getByRole('button', { name: /Rassegna dell'anno 2024/ });
+    expect(year).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById(year.getAttribute('aria-controls')!)).toContainElement(screen.getByText('di Anna Rossi'));
+    fireEvent.keyDown(space, { key: 'Escape' });
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById(row.getAttribute('aria-controls')!)).toBeNull();
+    expect(row).toHaveFocus();
+  });
+
   it('opens with the keyboard on the newest year', async () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel();

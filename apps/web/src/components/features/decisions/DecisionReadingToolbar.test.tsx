@@ -36,6 +36,6 @@ describe('DecisionReadingToolbar', () => {
         onToggleNotes={vi.fn()} onToggleHighlights={vi.fn()} onToggleDiscussion={vi.fn()}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Cambia il significato dei colori' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(screen.getByRole('button', { name: 'Cambia il significato dei colori' })).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-8');
   });
 });

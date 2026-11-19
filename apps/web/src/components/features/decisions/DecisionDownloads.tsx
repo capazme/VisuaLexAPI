@@ -95,6 +95,7 @@ export function DecisionDownloads({ answer, identity }: { answer: FoundDecision;
             Scarica PDF
           </Button>
           <label className={`inline-flex items-center gap-2 px-1 text-sm text-slate-700 dark:text-slate-300 ${TOUCH_TARGET_RESPONSIVE}`}>
+            {/* bare-input: a checkbox, its words its label. */}
             <input type="checkbox" checked={withMarks} onChange={(e) => setWithMarks(e.target.checked)} />
             Con le mie evidenziazioni e note
           </label>

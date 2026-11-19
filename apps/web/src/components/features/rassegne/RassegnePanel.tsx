@@ -1,6 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
+import { Expand } from '../../ui/Expand';
+import { Input } from '../../ui/Input';
 import { RassegnaPassage } from './RassegnaPassage';
 import { MAX_QUERY_CHARS, MAX_WORDS, searchWords, textOfPassage, yearsOfPassage } from './rassegnaFilters';
 import { useCaseLawFilters, useReportCaseLawYears } from '../search/caseLaw/caseLawFiltersContext';
@@ -56,6 +59,7 @@ interface YearProps {
 }
 
 function YearSection({ urn, archivio, q, report, anno, count, initial, besideId, backEntry }: YearProps) {
+  const spaceId = useId();
   const [open, setOpen] = useState(Boolean(initial));
   const [items, setItems] = useState<RassegnePasso[]>(initial?.items ?? []);
   const [next, setNext] = useState<string | null>(initial?.next ?? null);
@@ -101,15 +105,15 @@ function YearSection({ urn, archivio, q, report, anno, count, initial, besideId,
 
   return (
     <section className="border-t border-slate-100 dark:border-slate-800">
-      <button type="button" aria-expanded={open} onClick={toggle}
+      {/* bare-button: the year's heading, a whole row that opens its space. */}
+      <button type="button" aria-expanded={open} aria-controls={spaceId} onClick={toggle}
         className="flex min-h-[44px] w-full items-center justify-between py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
         <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Rassegna dell'anno {anno}</span>
         <span className="text-xs text-slate-500 dark:text-slate-400">
           {isNarrowing(filters) && items.length > 0 ? `${shown.length} di ${items.length} caricati` : passi(count)}
         </span>
       </button>
-      {open && (
-        <div>
+      <Expand id={spaceId} open={open} onClose={() => setOpen(false)}>
           {isNarrowing(filters) && items.length > 0 && shown.length === 0 && (
             <p className="py-2 text-sm text-slate-500 dark:text-slate-400">Nessun passo caricato con i filtri selezionati.</p>
           )}
@@ -118,13 +122,11 @@ function YearSection({ urn, archivio, q, report, anno, count, initial, besideId,
           </ul>
           {failed && <p className={NOTICE}>{UNAVAILABLE}</p>}
           {next && !loading && (
-            <button type="button" onClick={() => load(next)}
-              className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400">
+            <Button variant="link" onClick={() => load(next)}>
               Altri passi
-            </button>
+            </Button>
           )}
-        </div>
-      )}
+      </Expand>
     </section>
   );
 }
@@ -162,15 +164,15 @@ function OtherArticleForm({ onFound, inputRef }: { onFound: (urn: string, label:
   return (
     <form onSubmit={submit} className="mb-3" role="search" aria-label="Rassegne di un altro articolo">
       <label htmlFor={inputId} className="mb-1 block text-xs text-slate-600 dark:text-slate-400">Rassegne di un altro articolo</label>
-      <div className="flex gap-2">
-        <input ref={inputRef} id={inputId} type="text" value={text} maxLength={MAX_QUERY_CHARS} placeholder="Es. art. 1218 c.c."
-          onChange={(e) => setText(e.target.value)}
-          aria-describedby={notice ? `${inputId}-notice` : undefined}
-          className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-slate-300 px-2 text-sm md:min-h-0 md:py-1 dark:border-slate-600 dark:bg-slate-900" />
-        <button type="submit" disabled={busy || !text.trim()}
-          className="min-h-[44px] rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <Input ref={inputRef} id={inputId} type="text" value={text} maxLength={MAX_QUERY_CHARS} placeholder="Es. art. 1218 c.c."
+            onChange={(e) => setText(e.target.value)}
+            aria-describedby={notice ? `${inputId}-notice` : undefined} />
+        </div>
+        <Button type="submit" variant="secondary" disabled={busy || !text.trim()}>
           {busy ? 'Cerco…' : 'Cerca'}
-        </button>
+        </Button>
       </div>
       <p id={`${inputId}-notice`} role="status" className="mt-1 text-xs text-slate-500 dark:text-slate-400">{notice ?? ''}</p>
     </form>
@@ -202,6 +204,7 @@ export interface RassegnePanelProps {
  */
 export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanelProps) {
   const { order, text } = useCaseLawFilters();
+  const spaceId = useId();
   const [open, setOpen] = useState(false);
   const [archivio, setArchivio] = useState<Archivio | undefined>(undefined);
   const [other, setOther] = useState<{ urn: string; label: string } | null>(null);
@@ -258,24 +261,24 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
     <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
       {/* Accordion pattern: the toggle inside the heading, named by its text, state in aria-expanded alone. */}
       <h4>
-        <button type="button" aria-expanded={open} onClick={toggle}
-          className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
+        {/* bare-button: the accordion's heading, a whole row. */}
+        <button type="button" aria-expanded={open} aria-controls={spaceId} onClick={toggle}
+          className="flex min-h-11 w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-8">
           <span className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</span>
           <span className="flex items-center gap-2 text-xs font-normal text-slate-500 dark:text-slate-400">
             <span>{`${passi(presence.data.total)}, ${years(presence.data.anni)}`}</span>
-            <ChevronDown size={16} className={cn('transition-transform duration-200', open && 'rotate-180')} />
+            <ChevronDown size={16} aria-hidden className={cn('transition-transform duration-(--dur-pop) ease-out', open && 'rotate-180')} />
           </span>
         </button>
       </h4>
-      {open && (
-        <div className="mt-3">
+      <Expand id={spaceId} open={open} onClose={() => setOpen(false)}>
+        <div className="pt-3">
           {other ? (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-slate-700 dark:text-slate-200">Rassegne su <span className="font-semibold">{other.label}</span></p>
-              <button ref={backRef} type="button" onClick={backToArticle}
-                className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400">
+              <Button ref={backRef} variant="link" onClick={backToArticle}>
                 Torna all’articolo
-              </button>
+              </Button>
             </div>
           ) : (
             <OtherArticleForm onFound={showOther} inputRef={formInputRef} />
@@ -288,7 +291,7 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
           <PanelBody view={view} urn={viewUrn!} otherLabel={other?.label} order={order} archivio={archivio}
             onArchivio={setArchivio} besideId={besideId} backEntry={backEntry} />
         </div>
-      )}
+      </Expand>
     </div>
   );
 }
@@ -325,11 +328,9 @@ function PanelBody({ view, urn, otherLabel, order, archivio, onArchivio, besideI
       {both && (
         <div className="mb-2 flex gap-2" role="group" aria-label="Filtra per archivio">
           {([undefined, 'civile', 'penale'] as const).map((value) => (
-            <button key={value ?? 'tutte'} type="button" aria-pressed={archivio === value} onClick={() => onArchivio(value)}
-              className={cn('min-h-[44px] rounded px-2 text-xs md:min-h-0',
-                archivio === value ? 'bg-slate-200 font-semibold dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800')}>
+            <Button key={value ?? 'tutte'} variant={archivio === value ? 'secondary' : 'quiet'} aria-pressed={archivio === value} onClick={() => onArchivio(value)}>
               {value === undefined ? 'Tutte' : value === 'civile' ? 'Civile' : 'Penale'}
-            </button>
+            </Button>
           ))}
         </div>
       )}

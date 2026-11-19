@@ -73,6 +73,21 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Medio' })).toHaveClass('text-sm/5');
     expect(screen.getByRole('button', { name: 'Grande' })).toHaveClass('text-base/5');
   });
+
+  // LC117 (Papiniano on #670): the 20 px line, the padding and the 1 px border stay inside each height — 30 in the small
+  // one's 32 (6 px of padding made it 34), 34 in the 36 and the 44.
+  it('keeps its border inside its height: the small one pads 4 px, the others 6', () => {
+    render(
+      <>
+        <Button size="sm" variant="secondary">Piccolo</Button>
+        <Button size="md" variant="secondary">Medio</Button>
+      </>,
+    );
+    const small = screen.getByRole('button', { name: 'Piccolo' });
+    expect(small).toHaveClass('py-1', 'md:min-h-8');
+    expect(small).not.toHaveClass('py-1.5');
+    expect(screen.getByRole('button', { name: 'Medio' })).toHaveClass('py-1.5', 'md:min-h-9');
+  });
   // LC19: in the dark a disabled primary is a dull grey slab with dimmed text (#b2afa9 on #42403c, 4.73:1), at full
   // opacity, not the light action made transparent; the light theme keeps its opacity.
   it('in the dark a disabled primary is a grey slab with dimmed text, the other variants untouched', () => {

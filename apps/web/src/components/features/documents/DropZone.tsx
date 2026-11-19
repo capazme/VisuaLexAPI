@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { FOCUS_RING } from '../../../constants/interactions';
-import { ease } from '../../../lib/motion';
+import { dur, ease } from '../../../lib/motion';
 import { buttonClassName } from '../../ui/buttonStyles';
 import { cn } from '../../../lib/utils';
 
@@ -56,6 +56,7 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
   const title = phase === 'over' ? 'Rilascia per leggerlo' : phase === 'page' ? 'Lascia qui il documento' : touch ? 'Scegli un documento' : 'Trascina qui il documento';
 
   return (
+    // bare-button: the whole drop zone, a box that takes a file and opens the picker.
     <button
       ref={ref}
       type="button"
@@ -64,14 +65,14 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
       data-phase={phase}
       data-tab-hidden={tabHidden || undefined}
       className={cn(
-        'group relative flex min-h-48 w-full flex-col items-center justify-center overflow-hidden rounded-[10px] bg-white px-6 py-8 text-center dark:bg-slate-900',
+        'group relative flex min-h-48 w-full flex-col items-center justify-center overflow-hidden rounded-[8px] bg-white px-6 py-8 text-center dark:bg-slate-900',
         // Inset: the wrapper that closes upwards clips whatever is drawn outside the box.
         FOCUS_RING,
         'focus-visible:ring-inset focus-visible:ring-offset-0',
       )}
     >
       {/* The ground tinted while a file is near, by its opacity; half of it under a mouse at rest. */}
-      <span aria-hidden className={cn('pointer-events-none absolute inset-0 bg-primary-50/70 transition-opacity duration-200 dark:bg-primary-950/40', phase === 'idle' ? 'opacity-0 group-hover:opacity-50' : 'opacity-100')} />
+      <span aria-hidden className={cn('pointer-events-none absolute inset-0 bg-primary-50/70 transition-opacity duration-(--dur-pop) dark:bg-primary-950/40', phase === 'idle' ? 'opacity-0 group-hover:opacity-50' : 'opacity-100')} />
       {/* The frame: dashes that turn, and the line they join into over the box. Drawn, never read. */}
       <span ref={frame} aria-hidden className="pointer-events-none absolute inset-0">
         {size.width > 0 && (
@@ -87,12 +88,12 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
                 y={1}
                 width={size.width - 2}
                 height={size.height - 2}
-                rx={9}
+                rx={7}
                 fill="none"
                 strokeWidth={2}
                 strokeDasharray="8 6"
                 className={cn(
-                  'transition-opacity duration-200',
+                  'transition-opacity duration-(--dur-pop)',
                   kind === 'rest' ? 'stroke-slate-300 dark:stroke-slate-700' : 'stroke-primary-600 dark:stroke-primary-400',
                   // Each turns only while it is shown.
                   (kind === 'rest' ? phase === 'idle' : phase === 'page') ? cn('opacity-100', kind === 'rest' ? 'vlx-dash' : 'vlx-dash-run') : 'opacity-0',
@@ -105,10 +106,10 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
               y={1}
               width={size.width - 2}
               height={size.height - 2}
-              rx={9}
+              rx={7}
               fill="none"
               strokeWidth={2}
-              className={cn('stroke-primary-600 transition-opacity duration-200 dark:stroke-primary-400', phase === 'over' ? 'opacity-100' : 'opacity-0')}
+              className={cn('stroke-primary-600 transition-opacity duration-(--dur-pop) dark:stroke-primary-400', phase === 'over' ? 'opacity-100' : 'opacity-0')}
             />
           </svg>
         )}
@@ -118,10 +119,11 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
           {!still && landings > 0 && (
             <motion.span
               key={landings}
-              className="absolute inset-0 rounded-[10px] border-2 border-primary-500/60"
+              data-drop-wave=""
+              className="absolute inset-0 rounded-[8px] border-2 border-primary-500/60"
               initial={{ opacity: 0.7, scale: 1 }}
               animate={{ opacity: 0, scale: 0.94 }}
-              transition={{ duration: 0.6, ease: ease.out }}
+              transition={{ duration: dur.scene * 2, ease: ease.out }}
             />
           )}
         </AnimatePresence>
