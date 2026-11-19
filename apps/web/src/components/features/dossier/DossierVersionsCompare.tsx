@@ -104,11 +104,15 @@ function ChangeRow({ change }: { change: ItemChange }) {
         <span className={cn('rounded-[4px] px-1.5 py-0.5 text-xs font-semibold', KIND_STYLE[change.kind])}>{CHANGE_WORDS[change.kind]}</span>
         <span className="text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{change.item.title}</span>
       </p>
+      {/* Every note is titled «Nota»: a note that came or went is told by its text. */}
+      {!change.words && typeof change.item.content === 'string' && (
+        <p className="text-sm leading-relaxed text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{change.item.content}</p>
+      )}
       {change.words && (
         <p className="text-sm leading-relaxed text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">
           {change.words.map((part, i) =>
             part.added ? (
-              <ins key={i} className="rounded-[4px] bg-emerald-100 no-underline dark:bg-emerald-900/40"><span className="sr-only">aggiunto: </span>{part.value}</ins>
+              <ins key={i} className="rounded-[4px] bg-emerald-100 dark:bg-emerald-900/40"><span className="sr-only">aggiunto: </span>{part.value}</ins>
             ) : part.removed ? (
               <del key={i} className="rounded-[4px] bg-red-100 dark:bg-red-900/40"><span className="sr-only">tolto: </span>{part.value}</del>
             ) : (
