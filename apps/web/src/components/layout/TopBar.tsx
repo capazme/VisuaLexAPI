@@ -88,10 +88,11 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
       data-palette-bar=""
       className={cn(
         'relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:grid dark:border-slate-800',
-        // LC141: three columns, the path · the search · the controls. The search may shrink (`minmax(0,22rem)`) and a
-        // side column never goes below what it holds (the path clips to 0, the controls do not), so the controls can
-        // never sit under the search, «Novità» or not, whatever the sidebar's width; centred while the sides are even.
-        'grid-cols-[1fr_minmax(0,22rem)_1fr]',
+        // LC141: three columns, the path · the search · the controls. The middle one is flexible (2fr: a fixed
+        // `minmax(0,22rem)` was taken to its 22 rem first, Papiniano at e4088e23), the pill in it at most 22 rem; the path
+        // may shrink to 0 and clip; the controls never go below their whole width (`max-content`). Centred while the
+        // controls fit their 1fr, a little to the left when they need more.
+        'grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(max-content,1fr)]',
         // L-75: while the search's field is in the bar (its slot not empty), the field takes the path's place.
         '[&:has([data-palette-slot]:not(:empty))>[data-bar-path]]:invisible',
       )}
@@ -149,7 +150,7 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
       </button>}
       </div>
       {/* One box for the controls, measured for the field's room; the bar's gap between them, as before. */}
-      <div ref={setControls} className="flex shrink-0 items-center gap-3 justify-self-end">{actions}</div>
+      <div ref={setControls} className="flex shrink-0 items-center gap-3 justify-self-end [&>*]:shrink-0">{actions}</div>
       {/* L-75: the search's field, grown out of the pill (`CommandPalette`) to both sides, in the room the controls leave
           (`useFieldRoom`). After them in the page's order, so Tab goes from the field to the lists under the bar. */}
       <div
