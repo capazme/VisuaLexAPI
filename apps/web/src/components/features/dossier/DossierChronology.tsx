@@ -14,6 +14,7 @@ interface Props {
 }
 
 const SOURCE_LABEL = { nota: 'Nota', sentenza: 'Sentenza' } as const;
+const textOf = (entry: ChronologyEntry) => entry.text || 'Nota senza testo dopo la data';
 
 /** «Cronologia» (LC137): the dossier's dated facts by year, each row opening its entry in «Fonti». */
 export function DossierChronology({ items, onOpen }: Props) {
@@ -35,8 +36,9 @@ export function DossierChronology({ items, onOpen }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {undated || <span />}
-        <Button variant="secondary" size="sm" aria-pressed={newestFirst} onClick={() => setNewestFirst((v) => !v)}>
-          Dal più recente
+        {/* It says the order a press gives. */}
+        <Button variant="secondary" size="sm" onClick={() => setNewestFirst((v) => !v)}>
+          {newestFirst ? 'Dal più vecchio' : 'Dal più recente'}
         </Button>
       </div>
       {years.map(({ year, entries }) => (
@@ -46,13 +48,18 @@ export function DossierChronology({ items, onOpen }: Props) {
           </h2>
           <ol className="mt-1">
             {entries.map((entry) => (
-              <li key={entry.id} className={cn(ROW, 'py-2.5')}>
-                <p className={cn(ROW_LINE, 'font-medium')}>
-                  <time dateTime={entry.date}>{formatDateItalianLong(entry.date)}</time> · {SOURCE_LABEL[entry.source]}
-                </p>
-                <p className={cn(ROW_TITLE, 'mt-0.5 line-clamp-2 break-words')}>{entry.text || 'Nota senza testo dopo la data'}</p>
-                <Button variant="link" className="-ml-1 min-h-11 px-1 text-[13px] md:min-h-8" onClick={() => onOpen(entry)}>
-                  Apri nella pratica
+              <li key={entry.id} className={cn(ROW, 'py-1')}>
+                {/* The row is the command (the consultant on #705): one per fact, no repeated link under each. */}
+                <Button
+                  variant="quiet"
+                  aria-label={`${formatDateItalianLong(entry.date)}, ${SOURCE_LABEL[entry.source]}: ${textOf(entry)} — apri nella pratica`}
+                  className="-mx-2 h-auto w-[calc(100%+1rem)] flex-col items-start justify-start gap-0 px-2 py-1.5 text-left font-normal"
+                  onClick={() => onOpen(entry)}
+                >
+                  <span className={cn(ROW_LINE, 'font-medium')}>
+                    <time dateTime={entry.date}>{formatDateItalianLong(entry.date)}</time> · {SOURCE_LABEL[entry.source]}
+                  </span>
+                  <span className={cn(ROW_TITLE, 'mt-0.5 line-clamp-2 break-words')}>{textOf(entry)}</span>
                 </Button>
               </li>
             ))}

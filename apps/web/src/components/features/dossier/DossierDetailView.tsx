@@ -144,10 +144,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // A note is its own row in «Fonti»; a note about an article is read in the article's row, a decision in its own.
   useEffect(() => {
     if (view !== 'fonti' || !openEntry) return;
-    const rows = (id: string) => document.querySelector<HTMLElement>(`[data-dossier-entry="${CSS.escape(id)}"], [data-dossier-entries~="${CSS.escape(id)}"]`);
-    const row = rows(openEntry.id) ?? (openEntry.aboutItemId ? rows(openEntry.aboutItemId) : null);
+    // Two queries: jsdom's selector engine misses the second half of the list.
+    const rows = (id: string) => document.querySelector<HTMLElement>(`[data-dossier-entry="${CSS.escape(id)}"]`)
+      ?? document.querySelector<HTMLElement>(`[data-dossier-entries~="${CSS.escape(id)}"]`);
+    const own = rows(openEntry.id);
+    const row = own ?? (openEntry.aboutItemId ? rows(openEntry.aboutItemId) : null);
     setOpenEntry(null);
     if (!row) return;
+    // A note about an article is read in the article's open row: opened as any row opens (`setRowOpen`).
+    if (!own && row.dataset.practiceRow) appStore.getState().setRowOpen(row.dataset.practiceRow, true);
     row.scrollIntoView({ block: 'start' });
     // The row's toggle, else the row itself: never its first button, which on a note is «Rimuovi nota».
     const target = row.querySelector<HTMLElement>('[aria-expanded]') ?? row;
