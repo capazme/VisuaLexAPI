@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { ArticleData, Dossier, Norma, NormaVisitata, SearchParams } from '../../../types';
@@ -11,8 +11,7 @@ import { ReadingHostContext, type ReadingHost } from '../practice/readingHost';
 import { askerPracticeOf, crossReferenceParams, fetchActPdfUrl, openFromAsker, revealHeldCitation } from '../practice/hostGestures';
 import { ReadingRow } from '../practice/ReadingRow';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
-
-const PDFViewer = lazy(() => import('../../ui/PDFViewer').then((m) => ({ default: m.PDFViewer })));
+import { PDFViewer } from '../../ui/PDFViewer';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -229,14 +228,15 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
     host.search(asker ? { ...params, besideId: asker } : params);
   }, [practiceId, host]);
 
-  const [pdf, setPdf] = useState<{ url: string | null; isLoading: boolean } | null>(null);
+  // Kept while it closes: the space fades out on the PDF it showed (LC124).
+  const [pdf, setPdf] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({ isOpen: false, url: null, isLoading: false });
   const onViewPdf = useCallback(async (urn: string) => {
-    setPdf({ url: null, isLoading: true });
+    setPdf({ isOpen: true, url: null, isLoading: true });
     try {
-      setPdf({ url: await fetchActPdfUrl(urn), isLoading: false });
+      setPdf({ isOpen: true, url: await fetchActPdfUrl(urn), isLoading: false });
     } catch (e) {
       console.error(e);
-      setPdf(null);
+      setPdf({ isOpen: false, url: null, isLoading: false });
       showToast('Impossibile caricare il PDF.', 'error');
     }
   }, [showToast]);
@@ -245,6 +245,8 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
     <div ref={rootRef} className="space-y-3">
       {/* LC86: no sentence over the blocks; a row only on the table says «Non nella pratica» itself (§14). */}
       {pending > 0 && <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Carico il testo…</p>}
+      {/* The act's PDF opens in the page, above the reading (LC124, L-73). */}
+      <PDFViewer isOpen={pdf.isOpen} onClose={() => setPdf((p) => ({ ...p, isOpen: false }))} pdfUrl={pdf.url} isLoading={pdf.isLoading} />
       {practiceId && (empty ? (
         <p className="rounded-[8px] border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
           Questa pratica non ha ancora norme o sentenze da leggere.
@@ -258,11 +260,6 @@ export function DossierReadingView({ dossier, showToast, onTrashChanged }: Props
           )}
         </ReadingHostContext.Provider>
       ))}
-      {pdf && (
-        <Suspense fallback={null}>
-          <PDFViewer isOpen onClose={() => setPdf(null)} pdfUrl={pdf.url} isLoading={pdf.isLoading} />
-        </Suspense>
-      )}
     </div>
   );
 }

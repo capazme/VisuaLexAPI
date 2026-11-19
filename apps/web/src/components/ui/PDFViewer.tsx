@@ -1,82 +1,51 @@
-import { useEffect } from 'react';
+import { useId } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Z_INDEX } from '../../constants/zIndex';
+import { Expand } from './Expand';
+import { IconButton } from './IconButton';
+import { buttonClassName } from './buttonStyles';
+import { CARD_RADIUS, CONTROL_BORDER } from './controlStyles';
 
 interface PDFViewerProps {
   isOpen: boolean;
   onClose: () => void;
   pdfUrl: string | null;
   isLoading: boolean;
+  className?: string;
 }
 
-export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps) {
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
+/**
+ * The act's PDF in the page (LC124, L-73): a space that opens in the reading's flow (`Expand`), not a window over it.
+ * Esc inside it closes it and the focus goes back to the command (`Expand`); once the focus is inside the browser's own
+ * PDF frame, Esc is the frame's. «Scarica» is always there: Safari and Chrome on Android may not draw a PDF in a frame.
+ * It opens at the first page: the web does not know the article's page in Normattiva's PDF.
+ */
+export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading, className }: PDFViewerProps) {
+  const headingId = useId();
   return (
-    // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
-    <div data-find-overlay="" className={cn('fixed inset-0 flex items-center justify-center p-4 sm:p-6', Z_INDEX.modal)}>
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      
-      <div className="relative bg-slate-900 rounded-xl shadow-lg w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-800">
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-800 shrink-0">
-          <h3 className="text-white font-bold flex items-center gap-3">
-            <div className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-              PDF
-            </div>
-            <span className="text-slate-300 font-medium">Visualizzatore Documento</span>
-          </h3>
-          <div className="flex items-center gap-3">
-            {pdfUrl && (
-              <a
-                href={pdfUrl}
-                download
-                className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium px-4"
-                title="Scarica PDF"
-              >
-                <Download size={20} />
-                <span className="hidden sm:inline">Scarica</span>
-              </a>
-            )}
-            <button
-              onClick={onClose}
-              className="bg-white text-slate-900 hover:bg-slate-200 p-2.5 rounded-lg transition-colors font-medium"
-              title="Chiudi"
-              aria-label="Chiudi il PDF"
-            >
-              <X size={20} aria-hidden />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 relative bg-slate-950/50 flex items-center justify-center">
-          {isLoading ? (
-            <div className="text-center text-white">
-              <Loader2 size={40} className="animate-spin mx-auto mb-4 text-primary-500" />
-              <p className="text-slate-400">Generazione PDF in corso...</p>
-            </div>
-          ) : pdfUrl ? (
-            <iframe 
-              src={pdfUrl} 
-              className="w-full h-full border-0" 
-              title="PDF Viewer" 
-            />
-          ) : (
-            <div className="text-red-400">Errore caricamento PDF</div>
-          )}
-        </div>
+    <Expand open={isOpen} onClose={onClose} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
+      <div className="flex items-center gap-2 border-b border-slate-200 py-1 pl-4 pr-1 dark:border-slate-800">
+        <h2 id={headingId} className="mr-auto text-base font-semibold text-slate-900 dark:text-slate-50">PDF della norma</h2>
+        {pdfUrl && (
+          <a href={pdfUrl} download className={buttonClassName('secondary')}>
+            <Download size={16} aria-hidden />
+            Scarica
+          </a>
+        )}
+        <IconButton onClick={onClose} aria-label="Chiudi il PDF" icon={<X aria-hidden />} />
       </div>
-    </div>
+      <div className="flex h-[70vh] items-center justify-center overflow-hidden rounded-b-[8px]">
+        {isLoading ? (
+          <p role="status" className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <Loader2 size={16} aria-hidden className="animate-spin" />
+            Preparo il PDF…
+          </p>
+        ) : pdfUrl ? (
+          <iframe src={pdfUrl} className="h-full w-full border-0" title="PDF della norma" />
+        ) : (
+          <p className="text-sm text-red-700 dark:text-red-400">Non riesco a caricare il PDF.</p>
+        )}
+      </div>
+    </Expand>
   );
 }
-
