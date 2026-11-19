@@ -12,6 +12,20 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.52.0] - 2026-11-19
+
+Two saved versions of a dossier side by side, and loading placeholders shaped like the content. Web only, no
+migration. MERL-T stays off.
+
+### Work
+
+- Compare two snapshots of a dossier: «Da» and «A», a count of what came in, went out or changed, and one row per
+  entry, in a space inside the page (LC121).
+
+### Interface
+
+- While a page loads, its placeholders have the shape of the content that will appear (LC120).
+
 ## [1.51.0] - 2026-11-19
 
 The interface alignment is complete: a global guard keeps the pages on the common controls, and the common

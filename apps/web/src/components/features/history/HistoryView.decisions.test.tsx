@@ -60,6 +60,20 @@ describe('HistoryView — decisions', () => {
     expect(screen.getByRole('textbox', { name: 'Cerca nella cronologia' })).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
   });
 
+  // LC120: the bin's place is held while the history is read, so the search field does not move when it comes.
+  it('holds the bin\'s place and the rows\' while the history is read', async () => {
+    let read: (rows: unknown[]) => void = () => {};
+    getHistory.mockReturnValue(new Promise((resolve) => { read = resolve; }));
+    mount();
+    expect(screen.getByRole('status')).toHaveTextContent('Apro la cronologia…');
+    expect(document.querySelectorAll('[data-skeleton-row]').length).toBeGreaterThan(0);
+    const bin = screen.getByTitle('Svuota cronologia');
+    expect(bin).toHaveClass('invisible');
+    await act(async () => { read([norm]); });
+    expect(screen.getByRole('button', { name: 'Svuota cronologia' })).not.toHaveClass('invisible');
+    expect(document.querySelector('[data-skeleton-row]')).toBeNull();
+  });
+
   // LC21 (B8): a norm row is titled as the norm is cited, the act's heading under it; rows of a list, no cards or dots.
   it('titles a norm row as it is cited, with the act under it, beside a decision', async () => {
     getHistory.mockResolvedValue([norm, decision]);

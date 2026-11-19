@@ -177,7 +177,7 @@ const PILLS: Record<string, number> = {
   'components/ui/PDFViewer.tsx': 1,
   'components/ui/ProgressBar.tsx': 3,
   'components/ui/ServiceHealthMenuEntry.tsx': 1,
-  'components/ui/Skeleton.tsx': 3,
+  'components/ui/Skeleton.tsx': 1,
   'components/ui/Switch.tsx': 3,
   'features/connections/AiWaysDiagram.tsx': 1,
   'features/sections/SectionSwitcher.tsx': 2,
