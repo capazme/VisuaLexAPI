@@ -95,6 +95,8 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
   };
 
   const handleTake = async (itemId: string) => {
+    // Its alias choice open, «Prendi» waits for it: no second request.
+    if (aliasConflict?.itemId === itemId) return;
     working(itemId);
     setTakeError(null);
     try {
@@ -192,9 +194,11 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
                               id={takeId(item.id)}
                               onClick={() => void handleTake(item.id)}
                               disabled={busyItemId === item.id}
+                              // Held while its alias choice is open, still reachable: the choice gives the focus back to it.
+                              aria-disabled={aliasConflict?.itemId === item.id || undefined}
                               aria-label={`Prendi ${name}`}
                               icon={<Check aria-hidden />}
-                              className="text-green-700 dark:text-green-300"
+                              className="text-green-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:text-green-300"
                             />
                             <IconButton
                               onClick={() => { setDeclineTargetId(item.id); setDeclineNote(''); }}

@@ -137,9 +137,14 @@ describe('Forum suggestions in the page (LC140, L-73)', () => {
     const choice = await within(region).findByRole('region', { name: 'Trigger già in uso' });
     noWindow();
     await waitFor(() => expect(choice).toHaveFocus());
+    // While the choice is open, «Prendi» waits for it: said, and a press sends nothing (LC145).
+    expect(take).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(take);
+    expect(service.takeSuggestionItem).toHaveBeenCalledTimes(1);
     fireEvent.click(within(choice).getByRole('button', { name: 'Annulla' }));
     await waitFor(() => expect(within(region).queryByRole('region', { name: 'Trigger già in uso' })).toBeNull());
     expect(take).toHaveFocus();
+    expect(take).not.toHaveAttribute('aria-disabled');
 
     press(take);
     const again = await within(region).findByRole('region', { name: 'Trigger già in uso' });

@@ -71,6 +71,8 @@ export function BulletinBoardPage() {
 
   // Modals
   const [showPublishModal, setShowPublishModal] = useState(false);
+  // A publication on its way holds its space open, even after another space took its place.
+  const [publishing, setPublishing] = useState(false);
   // The archive's «Recupera i dossier»: one of the tabs' spaces too.
   const [recoveringEnv, setRecoveringEnv] = useState<Environment | null>(null);
   const [importingEnv, setImportingEnv] = useState<SharedEnvironment | null>(null);
@@ -511,7 +513,7 @@ export function BulletinBoardPage() {
       line="I dossier di studio pubblicati dalla comunità"
       section="forum"
       action={
-        <Button id="tour-forum-publish" onClick={openPublish} aria-expanded={showPublishModal} icon={<Upload size={16} aria-hidden />}>
+        <Button id="tour-forum-publish" onClick={openPublish} aria-expanded={showPublishModal || publishing} icon={<Upload size={16} aria-hidden />}>
           Pubblica un dossier
         </Button>
       }
@@ -520,7 +522,7 @@ export function BulletinBoardPage() {
       {/* The tabs: short labels on a phone, whole from `sm` (S7a). */}
       {/* A space left open in one tab does not wait in it for the next visit. */}
       {/* «Pubblica un dossier» and an old link's import open here, under the header, in the page (LC138, L-73). */}
-      <PublishDossierPicker open={showPublishModal} onClose={() => setShowPublishModal(false)} onPublished={handlePublishComplete} />
+      <PublishDossierPicker open={showPublishModal} onClose={() => setShowPublishModal(false)} onPublished={handlePublishComplete} onBusyChange={setPublishing} onReopen={openPublish} />
       <SharedLinkImport onRecovered={handleStudyDossiersAdded} />
 
       <ForumTabs active={activeTab} onChange={(tab) => { setActiveTab(tab); closeSpaces(); }} pendingCount={pendingCount} />
@@ -587,7 +589,7 @@ export function BulletinBoardPage() {
             onWithdraw={handleWithdraw}
             onRepublish={handleRepublish}
             onPublishClick={openPublish}
-            publishOpen={showPublishModal}
+            publishOpen={showPublishModal || publishing}
           />
         )}
         {activeTab === 'my' && (
