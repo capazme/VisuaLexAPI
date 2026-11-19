@@ -192,7 +192,7 @@ function StatusBreakdownChip({ counts, aggregate }: {
     );
   }
   const parts: string[] = [];
-  if (counts.pending > 0) parts.push(`${counts.pending} pending`);
+  if (counts.pending > 0) parts.push(`${counts.pending} in attesa`);
   if (counts.taken > 0) parts.push(`${counts.taken} prese`);
   if (counts.declined > 0) parts.push(`${counts.declined} rifiutate`);
   const classes =

@@ -27,7 +27,7 @@ interface Props {
  * 2026-10-13-environments-into-forum, D11c): its preview, then «Recupera i dossier» through `POST /dossiers/import-study`,
  * which filters it as Forum content. Its quick norms and aliases are not added. The parameter stays in the address
  * until the space closes, so a reload shows it again. In the page at its top (LC138, L-73): drawn open with the page,
- * it takes no focus; Esc and «Chiudi» clear the address.
+ * it takes no focus; Esc (with the focus anywhere but in another space) and «Chiudi» clear the address.
  */
 export function SharedLinkImport({ onRecovered }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,6 +44,7 @@ export function SharedLinkImport({ onRecovered }: Props) {
     <ForumSpace
       value={parsed}
       onClose={clear}
+      closeOnPageEscape
       icon={parsed?.ok === false ? <Link2Off size={20} aria-hidden className="shrink-0" /> : <FolderPlus size={20} aria-hidden className="shrink-0" />}
       title={(link) => (link.ok ? 'Recupera i dossier' : 'Link non valido')}
     >

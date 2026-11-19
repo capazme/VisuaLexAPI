@@ -29,10 +29,6 @@ type Counts = Partial<Record<StyleRule, number>>;
 const EXCEPTIONS: Record<string, Counts & { why: string }> = {
   'pages/MerltHubPage.tsx': { bare: 2, why: LABS },
 
-  'components/features/bulletin/AddItemsDialog.tsx': { bare: 3, radius: 4, why: WINDOW },
-  'components/features/bulletin/AliasConflictDialog.tsx': { bare: 5, radius: 4, why: WINDOW },
-  'components/features/bulletin/EditSuggestionDialog.tsx': { bare: 5, radius: 6, why: WINDOW },
-  'components/features/bulletin/SuggestionReviewDialog.tsx': { bare: 8, radius: 7, why: WINDOW },
   'components/features/compare/CompareView.tsx': { bare: 14, radius: 23, duration: 1, why: WINDOW },
   'components/features/decisions/DecisionPreviewDialog.tsx': { bare: 1, radius: 1, duration: 1, why: WINDOW },
   'components/features/decisions/KeyPassagesMenu.tsx': { bare: 3, why: WINDOW },

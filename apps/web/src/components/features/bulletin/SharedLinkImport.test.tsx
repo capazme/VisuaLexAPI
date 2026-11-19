@@ -65,4 +65,23 @@ describe('SharedLinkImport', () => {
     expect(screen.queryByRole('region')).toBeNull();
     expect(screen.getByTestId('where')).toHaveTextContent(/^$/);
   });
+
+  // #709's review: drawn open with the page it takes no focus, so Esc closes it from anywhere but another space.
+  it('closes on Esc with the focus outside it, unless the focus is inside another space', async () => {
+    render(
+      <MemoryRouter initialEntries={[`/forum?import=${encode(shared)}`]}>
+        <SharedLinkImport onRecovered={vi.fn()} />
+        <div role="region" aria-label="Altro spazio"><button type="button">Dentro</button></div>
+        <button type="button">Fuori</button>
+        <Where />
+      </MemoryRouter>,
+    );
+    screen.getByRole('button', { name: 'Dentro' }).focus();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Dentro' }), { key: 'Escape' });
+    expect(screen.getByRole('region', { name: 'Recupera i dossier' })).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Fuori' }).focus();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Fuori' }), { key: 'Escape' });
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^$/));
+    expect(screen.queryByRole('region', { name: 'Recupera i dossier' })).toBeNull();
+  });
 });

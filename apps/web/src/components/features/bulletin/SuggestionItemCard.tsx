@@ -140,7 +140,7 @@ function ItemPreview({ item }: { item: SuggestionItem }) {
     case 'alias': {
       const trigger = typeof p.trigger === 'string' ? p.trigger : '';
       const expand = typeof p.expandTo === 'string' ? p.expandTo : '';
-      const aliasType = typeof p.aliasType === 'string' ? p.aliasType : '';
+      const aliasType = p.aliasType === 'reference' ? 'Riferimento' : p.aliasType === 'shortcut' ? 'Scorciatoia' : '';
       return (
         <div>
           <p className="text-sm text-slate-900 dark:text-slate-100">
