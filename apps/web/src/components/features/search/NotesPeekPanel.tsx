@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { StickyNote, X, BookOpen, Download } from 'lucide-react';
 import type { Annotation } from '../../../types';
 import { Button } from '../../ui/Button';
@@ -60,6 +60,14 @@ function PeekBody({
 }: BodyProps) {
     const { editingId, editingText, setEditingText, startEdit, commitEdit, cancelEdit } = useNoteEditing(annotations, onUpdateNote);
     const [composerText, setComposerText] = useState('');
+    // A button pressed that goes (a note removed) or turns off («Salva», the field emptied) would drop the focus to the
+    // page, where Esc no longer reaches the space: it goes to the list, or stays in the field.
+    const listRef = useRef<HTMLDivElement>(null);
+    const composerRef = useRef<HTMLTextAreaElement>(null);
+    const removeNote = (id: string) => {
+        onRemoveNote(id);
+        listRef.current?.focus();
+    };
     const [ownerFilter, setOwnerFilter] = useState<'all' | 'own' | 'imported'>('all');
 
     const visibleNotes = useMemo(() => {
@@ -73,6 +81,7 @@ function PeekBody({
         if (!trimmed) return;
         onAddNote(trimmed);
         setComposerText('');
+        composerRef.current?.focus();
     };
 
     const { anchoredNotes, freeNotes } = groupByAnchor(visibleNotes);
@@ -93,7 +102,7 @@ function PeekBody({
                 </Button>
             </div>
 
-            <div className="max-h-[50vh] space-y-3 overflow-y-auto py-1">
+            <div ref={listRef} tabIndex={-1} className="max-h-[50vh] space-y-3 overflow-y-auto py-1 outline-none">
                 {visibleNotes.length === 0 && (
                     <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-6">
                         {annotations.length === 0
@@ -112,7 +121,7 @@ function PeekBody({
                         onChangeEdit={setEditingText}
                         onCommitEdit={commitEdit}
                         onCancelEdit={cancelEdit}
-                        onRemove={onRemoveNote}
+                        onRemove={removeNote}
                     />
                 )}
 
@@ -126,7 +135,7 @@ function PeekBody({
                         onChangeEdit={setEditingText}
                         onCommitEdit={commitEdit}
                         onCancelEdit={cancelEdit}
-                        onRemove={onRemoveNote}
+                        onRemove={removeNote}
                     />
                 )}
             </div>
@@ -145,6 +154,7 @@ function PeekBody({
                 <div className="flex items-end gap-2">
                     <div className="min-w-0 flex-1">
                     <Textarea
+                        ref={composerRef}
                         aria-label={noteAnchor ? 'Nota ancorata' : 'Nuova nota'}
                         value={composerText}
                         onChange={(e) => setComposerText(e.target.value)}

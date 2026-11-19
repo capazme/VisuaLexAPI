@@ -39,12 +39,13 @@ const note = (id: string, text: string): Annotation => ({ id, text, articleId: '
 describe('the reader\'s spaces under the toolbar', () => {
   it('«Note»: a region with the notes and a new one, the field not focused', () => {
     const onAddNote = vi.fn();
+    const onRemoveNote = vi.fn();
     render(
       <Host label="Note">
         {(open, close) => (
           <NotesPeekPanel
             isOpen={open} onClose={close} annotations={[note('n1', 'Vedi Cass. 2019')]} articleLabel="art. 2043 c.c."
-            noteAnchor={null} onAddNote={onAddNote} onUpdateNote={() => {}} onRemoveNote={() => {}} onClearAnchor={() => {}} onExportTxt={() => {}}
+            noteAnchor={null} onAddNote={onAddNote} onUpdateNote={() => {}} onRemoveNote={onRemoveNote} onClearAnchor={() => {}} onExportTxt={() => {}}
           />
         )}
       </Host>,
@@ -54,8 +55,18 @@ describe('the reader\'s spaces under the toolbar', () => {
     const region = screen.getByRole('region', { name: 'Note su art. 2043 c.c.' });
     expect(region).toHaveTextContent('Vedi Cass. 2019');
     fireEvent.change(within(region).getByRole('textbox', { name: 'Nuova nota' }), { target: { value: 'Una nota' } });
-    fireEvent.click(within(region).getByRole('button', { name: 'Salva' }));
+    const field = within(region).getByRole('textbox', { name: 'Nuova nota' });
+    const save = within(region).getByRole('button', { name: 'Salva' });
+    save.focus();
+    fireEvent.click(save);
     expect(onAddNote).toHaveBeenCalledWith('Una nota');
+    // «Salva» turns off with the field emptied: the focus stays in the field, not on the page.
+    expect(field).toHaveFocus();
+    // A note removed takes its button with it: the focus goes to the list, inside the space.
+    fireEvent.click(within(region).getByRole('button', { name: 'Elimina nota' }));
+    expect(onRemoveNote).toHaveBeenCalledWith('n1');
+    expect(region).toContainElement(document.activeElement as HTMLElement);
+    expect(document.activeElement).not.toBe(document.body);
   });
 
   it('«Evidenziazioni»: hide, show and export, in words', () => {

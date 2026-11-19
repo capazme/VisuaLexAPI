@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useEffect, useId, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Expand } from '../../ui/Expand';
 import { IconButton } from '../../ui/IconButton';
@@ -27,9 +27,18 @@ export interface ReaderSpaceProps {
  */
 export function ReaderSpace({ open, onClose, title, line, icon, id, busy = false, className, children }: ReaderSpaceProps) {
   const headingId = useId();
+  const ownId = useId();
+  const spaceId = id ?? ownId;
   const close = () => { if (!busy) onClose(); };
+  // Busy, the pressed button turns off and the browser drops the focus to the page: the space takes it, so the reader
+  // stays there and Esc still reaches it once the work is done or has failed.
+  useEffect(() => {
+    const space = document.getElementById(spaceId);
+    const active = document.activeElement;
+    if (busy && space && (active === document.body || active === null || space.contains(active))) space.focus({ preventScroll: true });
+  }, [busy, spaceId]);
   return (
-    <Expand id={id} open={open} onClose={close} role="region" aria-labelledby={headingId} className={cn('my-2 bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
+    <Expand id={spaceId} open={open} onClose={close} role="region" aria-labelledby={headingId} className={cn('my-2 bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
       <div className="flex items-start justify-between gap-3 border-b border-slate-200 py-2 pl-4 pr-2 dark:border-slate-700">
         <div className="flex min-w-0 items-center gap-2 pt-1.5">
           {icon}

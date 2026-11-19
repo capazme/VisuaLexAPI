@@ -262,6 +262,8 @@ describe('AdvancedExportModal — in the page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
     expect(screen.getByRole('button', { name: 'Chiudi' })).toBeDisabled();
+    // The pressed button turned off: the space holds the focus, not the page.
+    expect(region).toHaveFocus();
     fireEvent.keyDown(region, { key: 'Escape' });
     expect(screen.getByRole('region', { name: 'Esporta l’articolo' })).toBeInTheDocument();
     held.open();

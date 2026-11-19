@@ -348,6 +348,20 @@ describe('ArticleTabContent — the way back and the way on', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo alla data' })).not.toBeInTheDocument());
   });
 
+  // LC139 (L-73): opened from the «⋯» menu, the space under the toolbar takes the focus; Esc gives it back to «⋯».
+  it.each(['Testo alla data…', 'Copia$', 'Esporta…'])('opens «%s» from «⋯» in the page, and Esc gives the focus back to «⋯»', async (item) => {
+    show(article());
+    const menu = openMore();
+    const trigger = screen.getAllByRole('button', { name: 'Altre azioni sull’articolo' })[1];
+    fireEvent.click(entry(menu, item));
+    const region = await screen.findByRole('region', { name: { 'Testo alla data…': 'Testo alla data', 'Copia$': 'Copia contenuto', 'Esporta…': 'Esporta l’articolo' }[item] });
+    expect(region).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('region', { name: /Testo alla data|Copia contenuto|Esporta l’articolo/ })).toBeNull());
+    expect(trigger).toHaveFocus();
+  });
+
   it('refuses an act of the Union in the dialog', () => {
     show(article(undefined, { tipo_atto: 'regolamento ue', allegato: undefined }));
     fireEvent.click(entry(openMore(), 'Testo alla data…'));
