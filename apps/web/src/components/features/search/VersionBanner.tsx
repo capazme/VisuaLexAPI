@@ -44,7 +44,7 @@ export function VersionBanner({ banner, onAction, variant = 'banner' }: VersionB
         <div
             role={banner.kind === 'unreliable' ? 'alert' : 'status'}
             className={cn(
-                'mb-4 flex gap-3 rounded-lg border p-3 text-sm',
+                'mb-4 flex gap-3 rounded-[8px] border p-3 text-sm',
                 variant === 'state' && 'py-8 flex-col items-center gap-2 text-center',
                 TONE[banner.kind],
             )}

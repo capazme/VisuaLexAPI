@@ -190,7 +190,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(screen.queryByTestId('practice-column')).toBeNull();
     expect(screen.queryByTestId('practice-phone-view')).toBeNull();
     const back = within(reader).getByRole('button', { name: 'Pratica' });
-    expect(back).toHaveClass('min-h-[44px]');
+    expect(back).toHaveClass('min-h-11');
     expect(reader).toHaveAccessibleName('art. 5, l. 8 marzo 2017, n. 24');
     // the desktop's windows are untouched
     expect(s().practices[0].beside).toEqual([]);
@@ -268,8 +268,8 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     withArticleAndDecision();
     render(view());
     const open = screen.getByRole('button', { name: /^Apri accanto art\. 5/ });
-    expect(open).toHaveClass('min-h-[44px]', 'min-w-[44px]');
-    expect(open.querySelector('span')).toHaveClass('hidden', 'md:inline');
+    expect(open).toHaveClass('min-h-11', 'min-w-11');
+    expect(within(open).getByText('Apri accanto')).toHaveClass('hidden', 'md:inline');
   });
 
   it('the count sits after the name, on its row, in the part that gives way to the buttons (R3)', () => {

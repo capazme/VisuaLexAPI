@@ -4,7 +4,8 @@ import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, Link2, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
+import { buttonClassName } from '../../ui/buttonStyles';
 import type { VersionChip } from '../../../utils/versionDisplay';
 import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 import { VersionStatusChip } from './VersionStatusChip';
@@ -87,15 +88,15 @@ export interface ReadingToolbarProps {
     };
 }
 
-/** The article's visible actions (R3): quiet, neutral, the word with the icon; 36 px on a computer, 44 on a phone. */
-const ACTION = cn(
-    'vlx-hover-tile inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600',
-    'hover:text-slate-900 aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
-    'aria-pressed:bg-ink-300/70 aria-pressed:text-slate-900 dark:aria-pressed:bg-ink-700/60 dark:aria-pressed:text-white',
-    'dark:text-slate-300 dark:hover:text-white dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white',
-    'disabled:cursor-not-allowed disabled:opacity-40',
-    FOCUS_RING,
+/** A tool's pressed and open states, on `Button`'s quiet look; square on a phone, where only the icon shows. */
+const TOOL_STATES = cn(
+    // A switched-off tool keeps the pointer, so its tooltip still says why (`Button` drops it when disabled).
+    'vlx-hover-tile min-w-11 gap-1.5 px-2.5 md:min-w-0 disabled:pointer-events-auto',
+    'aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 aria-pressed:bg-ink-300/70 aria-pressed:text-slate-900',
+    'dark:aria-pressed:bg-ink-700/60 dark:aria-pressed:text-white dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white',
 );
+/** The article's visible actions (R3): quiet, neutral, the word with the icon; 36 px on a computer, 44 on a phone. */
+const TOOL = cn(buttonClassName('quiet'), TOOL_STATES);
 
 export function ReadingToolbar({
     normaData,
@@ -203,38 +204,40 @@ export function ReadingToolbar({
      * one. On a phone the icon and the count, the whole name for a screen reader.
      */
     const glossesButton = (phone = false) => (
-        <button
+        <Button
             type="button"
+            variant="quiet"
             data-glosses-button=""
             onClick={onToggleDiscussion}
             aria-pressed={isDiscussionOpen}
             aria-label={discussionCount > 0 ? `Glosse, ${discussionCount}` : phone ? 'Glosse' : undefined}
             title={tip('Glosse sull’articolo', lockedReason)}
-            className={ACTION}
+            className={TOOL_STATES}
+            icon={<MessageCircle size={phone ? 18 : 16} aria-hidden />}
             {...lock(lockedReason)}
         >
-            <MessageCircle size={phone ? 18 : 16} aria-hidden />
             {!phone && 'Glosse'}
             {discussionCount > 0 && <span aria-hidden className="tabular-nums">{discussionCount}</span>}
-        </button>
+        </Button>
     );
 
     // The annex as the source convention names it: never a code's own (the codice civile is Allegato 2 of its decree).
     const annex = namedAnnex(normaData);
     /** «Al dossier»: its word on a computer; on a phone the icon, so the status and the tools keep one row. */
     const dossierButton = (ref?: Ref<HTMLButtonElement | null>, phone = false) => (
-        <button
+        <Button
             ref={ref}
             type="button"
+            variant="quiet"
             onClick={onOpenDossier}
-            className={ACTION}
+            className={TOOL_STATES}
+            icon={<FolderPlus size={phone ? 18 : 16} aria-hidden />}
             aria-label={phone ? (dossierLabel ?? 'Alla pratica') : undefined}
             title={tip(dossierLabel ?? 'Aggiungi l’articolo a una pratica', copyLockedReason)}
             {...lock(copyLockedReason)}
         >
-            <FolderPlus size={phone ? 18 : 16} aria-hidden />
             {!phone && (dossierLabel ?? 'Alla pratica')}
-        </button>
+        </Button>
     );
 
     const status = (
@@ -282,17 +285,17 @@ export function ReadingToolbar({
                 window): there the card's padding is the edge, and its overflow would cut the focus ring. */}
             <div className={cn('ml-auto flex flex-shrink-0 items-center md:hidden', !compact && '-mr-3')}>
                 {/* The highlighter's toggle (A4); its inks are at the end of «⋯». */}
-                {!lockedReason && <HighlighterButton toggleOnly triggerClassName={ACTION} />}
+                {!lockedReason && <HighlighterButton toggleOnly triggerClassName={TOOL} />}
                 {/* The note tool has no room here; turned on elsewhere (a decision's bar, Study Mode), its toggle shows,
                     so it can be turned off where there is no Esc (A4 §6). */}
-                {!lockedReason && noteToolOn && <NoteToolButton triggerClassName={ACTION} />}
+                {!lockedReason && noteToolOn && <NoteToolButton triggerClassName={TOOL} />}
                 {!compact && !hideDossier && dossierButton(undefined, true)}
                 {glossesButton(true)}
                 <div ref={phoneMoreRef} className="contents">
                     {/* Its list is long (the colours close it): capped under the bar, it scrolls on its own. */}
                     <MenuButton
                         label="Altre azioni sull’articolo"
-                        triggerClassName={ACTION}
+                        triggerClassName={TOOL}
                         items={moreItems(true)}
                         menuClassName="max-h-[calc(100dvh-12rem)] overflow-y-auto overscroll-contain"
                     >
@@ -315,13 +318,13 @@ export function ReadingToolbar({
                     onToggleHighlights={onToggleHighlightsPeek}
                     lockedReason={lockedReason}
                 />
-                {!lockedReason && <HighlighterButton triggerClassName={ACTION} />}
+                {!lockedReason && <HighlighterButton triggerClassName={TOOL} />}
                 {/* The note tool (A4 §6): a personal note, or a gloss with colleagues. */}
-                {!lockedReason && <NoteToolButton gloss triggerClassName={ACTION} />}
+                {!lockedReason && <NoteToolButton gloss triggerClassName={TOOL} />}
                 {!compact && !hideDossier && dossierButton(dossierButtonRef)}
                 {glossesButton()}
                 <div ref={desktopMoreRef} className="contents">
-                    <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>
+                    <MenuButton label="Altre azioni sull’articolo" triggerClassName={TOOL} items={moreItems(false)}>
                         <MoreHorizontal size={18} aria-hidden />
                     </MenuButton>
                 </div>

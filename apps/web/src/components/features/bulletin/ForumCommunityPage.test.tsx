@@ -394,7 +394,7 @@ describe('ForumCommunityPage: the open discussion', () => {
     renderAt('/forum/community/t1');
     const vote = await screen.findByRole('button', { name: 'Vota la discussione, 4 voti' });
     // 44 px on a phone, the panel's size from md.
-    expect(vote).toHaveClass('min-h-11', 'md:min-h-0');
+    expect(vote).toHaveClass('min-h-11', 'md:min-h-9');
     fireEvent.click(vote);
     expect(await screen.findByRole('button', { name: 'Vota la discussione, 5 voti' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vota la risposta di luigi, 1 voto' })).toBeInTheDocument();

@@ -215,7 +215,7 @@ describe('CaseLawSection — on a phone', () => {
     render(<MemoryRouter><CaseLawSection norma={NORMA} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     const filtri = screen.getByRole('button', { name: 'Filtri' });
-    expect(filtri).toHaveClass('min-h-[44px]');
+    expect(filtri).toHaveClass('min-h-11');
     expect(filtri).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Anni' })).toBeNull();
@@ -229,7 +229,7 @@ describe('CaseLawSection — on a phone', () => {
     expect(screen.getByRole('searchbox')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Anni' })).toBeInTheDocument();
     for (const control of [screen.getByRole('searchbox'), screen.getByRole('textbox', { name: 'Dall’anno' }), screen.getByRole('textbox', { name: 'All’anno' })]) {
-      expect(control).toHaveClass('min-h-[44px]');
+      expect(control).toHaveClass('min-h-11');
     }
     // a year's chip too, once a block has reported its years (the Massimario's passages: 2024, 2016)
     await userEvent.click(await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ }));

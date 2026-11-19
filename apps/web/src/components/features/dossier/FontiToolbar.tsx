@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { CheckSquare, FolderInput, FolderMinus, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Expand } from '../../ui/Expand';
@@ -34,6 +34,8 @@ export function FontiToolbar({
 }: Props) {
   const [moving, setMoving] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const barId = useId();
+  const moveId = useId();
   const filtering = query.trim() !== '';
 
   // `/` takes the field, as the dossiers' list does; never while typing elsewhere.
@@ -86,6 +88,7 @@ export function FontiToolbar({
           variant="secondary"
           onClick={() => { setMoving(false); onSelecting(!selecting); }}
           aria-expanded={selecting}
+          aria-controls={barId}
           className="whitespace-nowrap"
           icon={<CheckSquare size={16} aria-hidden />}
         >
@@ -96,7 +99,8 @@ export function FontiToolbar({
       <p role="status" className={cn('text-sm text-slate-600 dark:text-slate-400', !filtering && 'sr-only')}>
         {filtering ? `${shown} di ${total}` : ''}
       </p>
-      <Expand open={selecting} onClose={() => onSelecting(false)} initialFocusRef={toggleRef}>
+      {/* Kept drawn while closed (hidden), so «Seleziona» always names the bar it opens. */}
+      <Expand id={barId} open={selecting} onClose={() => onSelecting(false)} initialFocusRef={toggleRef} keepMounted role="region" aria-label="Barra della selezione">
         <Card className="flex flex-wrap items-center gap-2 p-2">
           <span role="status" className="mr-auto px-1 text-sm text-slate-700 dark:text-slate-300">
             {selectedCount === 1 ? '1 selezionato' : `${selectedCount} selezionati`}
@@ -107,6 +111,7 @@ export function FontiToolbar({
             onClick={() => setMoving((v) => !v)}
             disabled={selectedCount === 0}
             aria-expanded={moving}
+            aria-controls={moving ? moveId : undefined}
             className="whitespace-nowrap"
             icon={<FolderInput size={16} aria-hidden />}
           >
@@ -124,7 +129,7 @@ export function FontiToolbar({
             Togli dalla pratica
           </Button>
         </Card>
-        <Expand open={selecting && moving} onClose={() => setMoving(false)}>
+        <Expand id={moveId} open={selecting && moving} onClose={() => setMoving(false)}>
           <RowMovePicker from={dossierId} onMove={onMove} onDone={() => setMoving(false)} />
         </Expand>
       </Expand>

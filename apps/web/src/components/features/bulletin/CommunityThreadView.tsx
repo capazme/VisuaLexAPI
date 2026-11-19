@@ -8,6 +8,7 @@ import { ReplyForm, ReportButton, TOUCH, VoteButton } from '../search/discussion
 import { voteFailure } from '../search/voteFailure';
 import { CommunityTarget } from './CommunityTarget';
 import { FOCUS_RING } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
 import { cn } from '../../../lib/utils';
 
 export const COMMUNITY_PATH = '/forum/community';
@@ -208,9 +209,10 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                   <div className="mt-2 flex flex-wrap items-center gap-4 md:gap-3">
                     <VoteButton voted={reply.userVoted} count={reply.voteCount} label={`Vota la risposta di ${reply.user.username}`} own={reply.isOwner} onVote={() => void voteReply(reply)} />
                     {!thread.locked && (
-                      <button type="button" onClick={() => setCommenting(commenting === reply.id ? null : reply.id)} aria-expanded={commenting === reply.id} aria-label={`Commenta la risposta di ${reply.user.username}`} className={cn('rounded px-2 text-xs text-primary-700 hover:underline dark:text-primary-300 md:px-0', TOUCH, FOCUS_RING)}>
+                      // LC113: the common link, 36 px on a computer and 44 on a phone (it was 16 from md).
+                      <Button type="button" variant="link" onClick={() => setCommenting(commenting === reply.id ? null : reply.id)} aria-expanded={commenting === reply.id} aria-label={`Commenta la risposta di ${reply.user.username}`} className="text-xs">
                         Commenta
-                      </button>
+                      </Button>
                     )}
                     {!reply.isOwner && (
                       <ReportButton label={`Segnala la risposta di ${reply.user.username}`} onReport={() => void report(() => articleDiscussionService.reportComment(reply.id, 'segnalazione'))} />

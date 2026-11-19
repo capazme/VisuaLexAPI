@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../../store/useAppStore';
 import { CaseLawRow } from './CaseLawRow';
+import { ISLAND_OPEN } from '../../../../lib/motion';
 
 vi.mock('../../../../utils/decisionFetchCache', () => ({
   fetchDecisionCached: () => Promise.resolve({ esito: 'non_trovata', motivo: 'inesistente' }),
@@ -109,6 +110,38 @@ describe('CaseLawRow — the cut text', () => {
 
   it('makes the button a 44 px target on a phone', () => {
     show(<CaseLawRow label="A">{'parola '.repeat(60)}</CaseLawRow>);
-    expect(screen.getByRole('button', { name: 'Mostra tutto' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: 'Mostra tutto' })).toHaveClass('min-h-11', 'md:min-h-9');
+  });
+
+  // LC113: the text sits in an `Expand` that stays open, so «Mostra tutto» and «Mostra meno» move its height on the
+  // island's timing (`ISLAND_OPEN`) from where it is, instead of jumping.
+  it('follows «Mostra tutto» with the opening space\'s timing, from the cut height to the whole', () => {
+    const runs: Array<{ frames: Keyframe[]; timing: unknown }> = [];
+    let notify = () => {};
+    const OriginalObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class { constructor(cb: () => void) { notify = cb; } observe() {} disconnect() {} } as unknown as typeof ResizeObserver;
+    Element.prototype.animate = function (frames: Keyframe[], timing: unknown) {
+      runs.push({ frames, timing });
+      return { cancel() {}, finished: Promise.resolve(), onfinish: null } as unknown as Animation;
+    } as unknown as typeof Element.prototype.animate;
+    let height = 60;
+    const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!;
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => height });
+    try {
+      show(<CaseLawRow label="A">{'parola '.repeat(60)}</CaseLawRow>);
+      const text = screen.getByText(/parola parola/);
+      const space = text.parentElement!.parentElement!;
+      expect(space).toHaveAttribute('tabindex', '-1');
+      expect(runs).toEqual([]);
+      fireEvent.click(screen.getByRole('button', { name: 'Mostra tutto' }));
+      expect(text).not.toHaveClass('line-clamp-3');
+      height = 180;
+      act(() => notify());
+      expect(runs.at(-1)).toEqual({ frames: [{ height: '60px' }, { height: '180px' }], timing: ISLAND_OPEN });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offset);
+      globalThis.ResizeObserver = OriginalObserver;
+      delete (Element.prototype as Partial<Element>).animate;
+    }
   });
 });

@@ -9,6 +9,7 @@ import { isEditableTarget } from '../../ui/notifications/undoShortcut';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import { setFootBarRoom } from '../../ui/notifications/footBar';
+import { Button } from '../../ui/Button';
 
 /** The server's bounds for a passage's words (D7b contract §2.3). */
 export const MOVE_MIN = 1;
@@ -307,7 +308,7 @@ export function MoveProposalBar({
             aria-label={label}
             aria-describedby={`${titleId} ${helpId}`}
             className={cn(
-                'fixed inset-x-0 bottom-0 select-none border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg focus:outline-none md:inset-x-auto md:bottom-4 md:left-1/2 md:w-[min(36rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-xl md:border dark:border-slate-700 dark:bg-slate-900',
+                'fixed inset-x-0 bottom-0 select-none border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg focus:outline-none md:inset-x-auto md:bottom-4 md:left-1/2 md:w-[min(36rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-[8px] md:border dark:border-slate-700 dark:bg-slate-900',
                 Z_INDEX.floating,
             )}
         >
@@ -328,38 +329,28 @@ export function MoveProposalBar({
             <div className="mt-2 flex flex-wrap items-center gap-2">
                 {!coarse && <div role="group" aria-label="Il bordo che si sposta" className="flex gap-1">
                     {(['start', 'end'] as const).map((which) => (
-                        <button
+                        <Button
                             key={which}
                             type="button"
+                            variant="secondary"
                             aria-pressed={edge === which}
                             onClick={() => chooseEdge(which)}
                             className={cn(
-                                'min-h-[44px] rounded-lg border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 motion-reduce:transition-none md:min-h-9',
-                                edge === which
-                                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                                    : 'border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
+                                'px-3 text-xs',
+                                edge === which && 'border-primary-500 bg-primary-50 text-primary-700 hover:border-primary-500 hover:bg-primary-50 dark:border-toga-400 dark:bg-toga-400 dark:text-ink-950 dark:hover:bg-toga-300',
                             )}
                         >
                             {which === 'start' ? "Sposta l'inizio" : 'Sposta la fine'}
-                        </button>
+                        </Button>
                     ))}
                 </div>}
                 <div className="ml-auto flex gap-2">
-                    <button
-                        type="button"
-                        onClick={cancel}
-                        className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-9 dark:text-slate-300 dark:hover:bg-slate-800"
-                    >
+                    <Button type="button" variant="quiet" onClick={cancel}>
                         Annulla
-                    </button>
-                    <button
-                        type="button"
-                        onClick={save}
-                        disabled={!canSave}
-                        className="min-h-[44px] rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 px-4 text-sm font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-9"
-                    >
+                    </Button>
+                    <Button type="button" onClick={save} disabled={!canSave}>
                         Sposta qui
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>,

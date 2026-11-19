@@ -21,7 +21,7 @@ export function LostProposalsList({ proposals, actions }: LostProposalsListProps
     return (
         <section
             aria-label={`Proposte dell'IA non più nel testo (${proposals.length})`}
-            className="mt-6 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20"
+            className="mt-6 rounded-[8px] border border-amber-200 bg-amber-50/60 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20"
         >
             <h5 className="font-semibold text-slate-700 dark:text-slate-200">Proposte dell'IA non più nel testo</h5>
             <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
@@ -68,7 +68,7 @@ export function LostGlossesList({ glosses, actions }: { glosses: readonly Propos
             ref={listRef}
             tabIndex={-1}
             aria-label={`${GLOSS_WORDS.lostTitle} (${glosses.length})`}
-            className="mt-6 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm outline-none dark:border-amber-900/40 dark:bg-amber-950/20"
+            className="mt-6 rounded-[8px] border border-amber-200 bg-amber-50/60 p-3 text-sm outline-none dark:border-amber-900/40 dark:bg-amber-950/20"
         >
             <h5 className="font-semibold text-slate-700 dark:text-slate-200">{GLOSS_WORDS.lostTitle}</h5>
             <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{GLOSS_WORDS.lostHelp}</p>

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, GripVertical, X } from 'lucide-react';
-import { FOCUS_RING } from '../../../constants/interactions';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -18,7 +17,10 @@ import {
   type FindWindowRequest,
 } from '../../../utils/findWindowControl';
 import { workspaceOrigin } from '../../../utils/workspaceOrigin';
-import { counterText, ICON_BUTTON } from './findBarParts';
+import { counterText } from './findBarParts';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
 
 const PLACE_KEY = 'visualex:find-window-place';
 const SCOPE_KEY = 'visualex:find-window-scope';
@@ -149,9 +151,6 @@ export function FindWindow() {
   return createPortal(<FindWindowBody session={session} onClose={close} />, document.body);
 }
 
-const SCOPE_BUTTON =
-  'rounded-md px-2 py-1 text-xs transition-colors min-h-[44px] md:min-h-0 ' + FOCUS_RING;
-
 function FindWindowBody({ session, onClose }: { session: Session; onClose: () => void }) {
   const isDesktop = useIsDesktop();
   const [query, setQuery] = useState('');
@@ -273,7 +272,8 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
   const current = find.current;
   const where = scope === 'all' && current ? current.label : '';
 
-  const button = isDesktop ? ICON_BUTTON : cn(ICON_BUTTON, 'min-h-[44px] min-w-[44px]');
+  // 44 px on a phone, 32 on a computer (`IconButton`'s `sm`), however wide the window is.
+  const size = isDesktop ? 'sm' : 'lg';
 
   return (
     <div
@@ -287,13 +287,13 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
       className={cn(
         'fixed border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900',
         Z_INDEX.findWindow,
-        isDesktop ? 'rounded-xl' : 'inset-x-0 top-0 w-full border-x-0 border-t-0',
+        isDesktop ? 'rounded-[8px]' : 'inset-x-0 top-0 w-full border-x-0 border-t-0',
       )}
     >
       <div className="flex flex-wrap items-center gap-1 px-1.5 pt-1.5">
         {isDesktop && (
-          <button
-            type="button"
+          <IconButton
+            size="sm"
             aria-label="Sposta la finestra di ricerca"
             title="Sposta la finestra di ricerca"
             onPointerDown={onHandleDown}
@@ -301,59 +301,51 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
             onPointerUp={onHandleUp}
             onPointerCancel={onHandleUp}
             onKeyDown={onHandleKey}
-            className={cn('cursor-grab touch-none rounded-md p-1 text-slate-400 hover:bg-slate-100 active:cursor-grabbing dark:hover:bg-slate-800', FOCUS_RING)}
-          >
-            <GripVertical size={16} aria-hidden />
-          </button>
+            icon={<GripVertical aria-hidden />}
+            className="cursor-grab touch-none text-slate-400 active:scale-100 active:cursor-grabbing"
+          />
         )}
-        <input
-          ref={inputRef}
-          type="text"
-          role="searchbox"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={onFieldKeyDown}
-          aria-label="Cerca nel testo"
-          placeholder="Cerca nel testo"
-          autoComplete="off"
-          spellCheck={false}
-          className={cn(
-            'min-w-0 rounded-md border border-slate-300 bg-transparent px-2 py-1 text-sm text-slate-800 dark:border-slate-600 dark:text-slate-100',
-            isDesktop ? 'flex-1' : 'min-h-[44px] w-full basis-full',
-            FOCUS_RING,
-          )}
-        />
+        <div className={isDesktop ? 'min-w-0 flex-1' : 'w-full basis-full'}>
+          <Input
+            ref={inputRef}
+            type="text"
+            role="searchbox"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onFieldKeyDown}
+            aria-label="Cerca nel testo"
+            placeholder="Cerca nel testo"
+            autoComplete="off"
+            spellCheck={false}
+            className="px-2"
+          />
+        </div>
         <span role="status" aria-live="polite" className={cn('whitespace-nowrap px-1 text-xs text-slate-500 dark:text-slate-400', !isDesktop && 'flex-1')}>
           {counterText(find)}
           {where && <span className="sr-only">{`, ${where}`}</span>}
         </span>
-        <button type="button" onClick={find.previous} aria-label="Risultato precedente" title="Risultato precedente" className={button}>
-          <ChevronUp size={16} aria-hidden />
-        </button>
-        <button type="button" onClick={find.next} aria-label="Risultato successivo" title="Risultato successivo" className={button}>
-          <ChevronDown size={16} aria-hidden />
-        </button>
-        <button type="button" onClick={close} aria-label="Chiudi la ricerca" title="Chiudi la ricerca" className={button}>
-          <X size={16} aria-hidden />
-        </button>
+        <IconButton size={size} onClick={find.previous} aria-label="Risultato precedente" title="Risultato precedente" icon={<ChevronUp aria-hidden />} />
+        <IconButton size={size} onClick={find.next} aria-label="Risultato successivo" title="Risultato successivo" icon={<ChevronDown aria-hidden />} />
+        <IconButton size={size} onClick={close} aria-label="Chiudi la ricerca" title="Chiudi la ricerca" icon={<X aria-hidden />} />
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1.5 pb-1.5 pt-1">
         <div role="group" aria-label="Dove cercare" className="inline-flex rounded-md bg-slate-100 p-0.5 dark:bg-slate-800">
           {([['tab', 'Questo tavolo'], ['all', 'Tutti i tavoli']] as const).map(([value, label]) => (
-            <button
+            <Button
               key={value}
               type="button"
+              variant="quiet"
               aria-pressed={scope === value}
               onClick={() => setScope(value)}
               className={cn(
-                SCOPE_BUTTON,
+                'px-2',
                 scope === value
                   ? 'bg-white text-primary-600 shadow-sm dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
               )}
             >
               {label}
-            </button>
+            </Button>
           ))}
         </div>
         {where && (

@@ -67,6 +67,7 @@ export function NoteToolButton({ triggerClassName, className, placement, gloss =
   const Icon = kind === 'gloss' ? MessageCircle : MessageSquarePlus;
   return (
     <div role="group" aria-label="Strumento nota" className={cn('flex items-center', className)}>
+      {/* bare-button: a tool of the reading bars, in the bar's own look (`triggerClassName`: `Button`'s quiet in the article's). */}
       <button
         type="button"
         aria-pressed={on}
@@ -79,7 +80,7 @@ export function NoteToolButton({ triggerClassName, className, placement, gloss =
         onClick={(event) => { event.stopPropagation(); press(); }}
         // 44 px wide on a phone whatever the bar's padding; a bar that keeps 44 px at every width says so in its classes.
         className={cn(
-          'inline-flex min-w-[44px] items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
+          'inline-flex min-w-[44px] items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
           triggerClassName,
           on && TOOL_PRESSED,
         )}

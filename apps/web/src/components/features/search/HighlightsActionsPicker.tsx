@@ -82,9 +82,9 @@ export function HighlightsActionsPicker({
                     <div
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'flex items-center rounded-lg shadow-md overflow-hidden',
+                            'flex items-center rounded-[8px] shadow-md overflow-hidden',
                             'bg-slate-900 dark:bg-slate-800 border border-slate-700/60',
-                            'animate-in fade-in zoom-in-95 duration-150',
+                            'animate-in fade-in zoom-in-95 duration-(--dur-pop)',
                         )}
                     >
                         <IconAction
@@ -124,7 +124,9 @@ interface IconActionProps {
 
 function IconAction({ icon, title, pressed, disabled, onClick }: IconActionProps) {
     return (
+        // bare-button: an icon of the selection's dark bar, dark in both themes, as the bar's other icons.
         <button
+            type="button"
             onClick={onClick}
             disabled={disabled}
             title={title}

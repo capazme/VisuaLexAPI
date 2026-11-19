@@ -246,6 +246,7 @@ export function ReadingRow(props: Omit<PracticeTableProps, 'layout' | 'concealed
           the act blocks hold the structure window and Study Mode, which a pick from them must not unmount. */}
       {isRail && practice && (
         <div data-testid="reading-row-rail" className={COLUMN_FRAME} style={{ width: RAIL_WIDTH }}>
+          {/* bare-button: the practice's rail, a column the row's height with the count and the vertical word. */}
           <button
             ref={railButtonRef}
             type="button"
@@ -259,7 +260,7 @@ export function ReadingRow(props: Omit<PracticeTableProps, 'layout' | 'concealed
             }}
             data-testid="practice-rail"
             className={cn(
-              'flex h-full w-full flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
+              'flex h-full w-full flex-col items-center gap-2 rounded-[8px] border border-slate-200 bg-white py-3 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
               FOCUS_RING,
             )}
           >
@@ -281,7 +282,7 @@ export function ReadingRow(props: Omit<PracticeTableProps, 'layout' | 'concealed
           hidden={!overlayOpen}
           style={{ left: RAIL_WIDTH, width: `min(${INDEX_WIDTH + 24}px, calc(100% - ${RAIL_WIDTH}px))` }}
           className={cn(
-            'absolute top-0 h-app-row overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900',
+            'absolute top-0 h-app-row overflow-y-auto rounded-[8px] border border-slate-200 bg-slate-50 p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900',
             Z_INDEX.dropdown,
           )}
         >

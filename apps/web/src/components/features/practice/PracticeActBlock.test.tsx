@@ -400,7 +400,7 @@ describe('PracticeActBlock: the two views (U2)', () => {
     const { container } = render(<Block practiceId={practiceId} actId={actId} />);
     const section = container.querySelector('section') as HTMLElement;
     expect(section).toHaveAttribute('data-layout', 'overview');
-    expect(section).toHaveClass('rounded-xl', 'border');
+    expect(section).toHaveClass('rounded-[8px]', 'border');
     // The title gives way, the tools follow it: no `ml-auto` pushing them to the edge.
     const studio = screen.getByRole('button', { name: 'Modalità studio' });
     const tools = studio.parentElement?.parentElement as HTMLElement;

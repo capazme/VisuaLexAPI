@@ -103,7 +103,7 @@ describe('discussions on a decision — what shows them', () => {
       isFindOpen={false} onToggleFind={vi.fn()}
     />);
     const button = screen.getByRole('button', { name: 'Glosse sulla decisione' });
-    expect(button.className).toContain('min-h-[44px]');
+    expect(button).toHaveClass('min-h-11', 'min-w-11');
     fireEvent.click(button);
     expect(onToggleDiscussion).toHaveBeenCalled();
   });

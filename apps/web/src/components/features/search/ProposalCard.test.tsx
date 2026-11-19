@@ -142,7 +142,7 @@ describe('ProposalCard', () => {
   it('«Salva» and «Annulla» have 44 px targets', () => {
     setup();
     edit();
-    for (const name of ['Salva', 'Annulla']) expect(screen.getByRole('button', { name }).className).toMatch(/(^| )min-h-\[44px\]( |$)/);
+    for (const name of ['Salva', 'Annulla']) expect(screen.getByRole('button', { name }).className).toMatch(/(^| )min-h-(\[44px\]|11)( |$)/);
   });
 
   it('a passage without a note is a mark of known origin: no checkbox, no flag, no pencil, only the bin', () => {

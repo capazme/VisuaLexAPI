@@ -1,4 +1,5 @@
 import { cn } from '../../../lib/utils';
+import { buttonClassName } from '../../ui/buttonStyles';
 
 /** A reading toolbar's toggle while it is on (its panel open, the highlighter's tool on): the one tinted look. */
 export const TOOLBAR_TOGGLE_ON = 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400';
@@ -7,15 +8,11 @@ export const TOOLBAR_TOGGLE_ON = 'bg-primary-50 text-primary-600 dark:bg-primary
 export const TOOL_PRESSED = cn(TOOLBAR_TOGGLE_ON, 'hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20 dark:hover:text-primary-400');
 
 /**
- * The look of a reading toolbar's toggle button (discussions, find in text): a 44px target on touch screens, tinted
- * while its panel is open. `extra` adds classes after the base ones.
+ * The look of a reading toolbar's toggle button (discussions, find in text, the decision's key passages): `IconButton`'s
+ * small square (44 px on a phone, 32 from md, wider with a count), tinted while its panel is open. `extra` adds classes after the base ones.
  */
 export function toolbarToggleClass(isOpen: boolean, extra?: string): string {
-    return cn(
-        'inline-flex items-center justify-center min-h-[44px] min-w-[44px] p-2.5 md:min-h-0 md:min-w-0 md:p-1.5 rounded-md transition-colors',
-        extra,
-        isOpen
-            ? TOOLBAR_TOGGLE_ON
-            : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500',
-    );
+    // Square for an icon alone (the minimum width wins), the padding kept for an icon with a count. A disabled one
+    // keeps the pointer, so its tooltip still says why.
+    return cn(buttonClassName('quiet', 'sm'), 'min-w-11 px-1.5 md:min-w-8 disabled:pointer-events-auto', extra, isOpen && TOOL_PRESSED);
 }
