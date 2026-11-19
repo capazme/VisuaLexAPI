@@ -72,6 +72,8 @@ export function PublishDossierPicker({ open, onClose, onPublished, onBusyChange,
             onFailed={() => {
               setKeepChosen(true);
               onReopen?.();
+              // It never closed, so it opens nothing: brought into view, the error is seen where the page was scrolled.
+              document.getElementById(spaceId)?.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
             }}
             headingId={headingId}
             busy={busy}

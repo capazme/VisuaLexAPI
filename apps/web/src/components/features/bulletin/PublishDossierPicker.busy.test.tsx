@@ -101,8 +101,15 @@ describe('PublishDossierPicker while it publishes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Un altro spazio' }));
     expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
     expect(command).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Rifiuta' }));
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Rifiuta' }));
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
     expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
+    expect(scrollIntoView.mock.contexts[0]).toBe(screen.getByRole('region', { name: 'Pubblica nel Forum' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Pubblicazione non riuscita. Riprova.');
     expect(command).toHaveAttribute('aria-expanded', 'true');
   });
