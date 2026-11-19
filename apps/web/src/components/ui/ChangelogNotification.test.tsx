@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChangelogNotification, ReleaseNews } from './ChangelogNotification';
 import { VERSION_CHECK_SESSION_KEY, VERSION_STORAGE_KEY } from '../../config/versionConfig';
@@ -160,21 +160,32 @@ describe('ChangelogNotification', () => {
   });
 
   it('only fades the toast in under reduced motion, where it otherwise rises and grows', async () => {
-    const toastOf = async () => (await screen.findByRole('button', { name: 'Vedi' })).parentElement as HTMLElement;
+    // The style the toast lands in the page with, before any frame of its entrance has run: read once the toast is
+    // found, a busy machine had already drawn a frame of the fade (an opacity of 0.00046, not 0).
+    const drawnAs = async () => {
+      let drawn: { opacity: string; transform: string } | null = null;
+      const watch = new MutationObserver(() => {
+        const toast = screen.queryByRole('button', { name: 'Vedi' })?.parentElement;
+        if (toast && !drawn) drawn = { opacity: toast.style.opacity, transform: toast.style.transform };
+      });
+      watch.observe(document.body, { childList: true, subtree: true });
+      render(<ChangelogNotification />);
+      await screen.findByRole('button', { name: 'Vedi' });
+      watch.disconnect();
+      return drawn!;
+    };
     localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
     answer('1.9.1');
 
-    const moving = render(<ChangelogNotification />);
-    expect((await toastOf()).style.transform).toMatch(/translateY|scale/);
-    moving.unmount();
+    expect((await drawnAs()).transform).toMatch(/translateY|scale/);
+    cleanup();
 
     forget();
     localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
     motionPreference.reduced = true;
-    render(<ChangelogNotification />);
-    const toast = await toastOf();
-    expect(toast.style.transform).not.toMatch(/translateY|scale/);
-    expect(toast.style.opacity).toBe('0');
+    const toast = await drawnAs();
+    expect(toast.transform).not.toMatch(/translateY|scale/);
+    expect(toast.opacity).toBe('0');
   });
 
   it('gives the focus back to where it was before the toast once the window closes', async () => {

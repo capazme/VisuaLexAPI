@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -10,6 +10,7 @@ vi.mock('../../../services/accountService', () => ({ accountService: {} }));
 import { SettingsPage } from './SettingsPage';
 import { useOpenSettings, useSettingsRequests } from './settingsRoute';
 import type { SettingsSection } from '../../../types';
+import { resetNotifications } from '../../ui/notifications/notifications';
 
 /** A page of the app with a way into Impostazioni, as the sidebar and the reader's gear have. */
 function Elsewhere({ section }: { section?: SettingsSection }) {
@@ -43,6 +44,9 @@ const enter = () => fireEvent.click(screen.getByRole('button', { name: 'Apri le 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 });
+// The aliases deleted below leave their «Annulla» (10 s) and «Ripristinato» counting down in the notifications' store: one
+// ran out after jsdom was gone, and its `document` call failed the CI job (LC122).
+afterEach(() => resetNotifications());
 
 describe('Impostazioni — a page with its parts (LC84)', () => {
   it('opens at the part asked for, an anchor of the page', () => {
