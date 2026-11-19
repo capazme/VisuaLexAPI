@@ -579,19 +579,22 @@ describe('DossierDetailView — «Cronologia» (LC137)', () => {
 
   it('opens a note in «Fonti», clearing the filter, the focus on its row', () => {
     renderView(dated);
+    fireEvent.change(screen.getByLabelText('Filtra le fonti della pratica'), { target: { value: 'decorrenza' } });
     fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
     const row = within(screen.getByRole('region', { name: '2025 (1)' }));
     fireEvent.click(row.getByRole('button', { name: 'Apri nella pratica' }));
     expect(screen.getByRole('tab', { name: /^Fonti/ })).toHaveAttribute('aria-selected', 'true');
-    const note = document.querySelector('[data-voce="n2"]')!;
+    const note = document.querySelector('[data-dossier-entry="n2"]')!;
     expect(note).toBeVisible();
-    expect(note.contains(document.activeElement)).toBe(true);
+    expect(screen.getByLabelText('Filtra le fonti della pratica')).toHaveValue('');
+    expect(document.activeElement).toBe(note);
   });
 
   it('says how dates are read when nothing has one', () => {
     renderView();
     fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
     expect(screen.getByText(/Le note che iniziano con una data, come 12\/03\/2025/)).toBeVisible();
+    expect(screen.getByText('1 nota senza data non compare.')).toBeVisible();
   });
 
   it('is not offered in a pratica di studio', () => {

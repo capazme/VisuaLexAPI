@@ -69,7 +69,7 @@ function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => v
   // A note an application wrote has its state and its own bin among the controls under it (D7b).
   if (hasAssistantNote(note)) {
     return (
-      <li ref={rowRef} data-voce={note.id} className={cn(ROW, 'pl-1 pr-1')}>
+      <li ref={rowRef} data-dossier-entry={note.id} className={cn(ROW, 'pl-1 pr-1')}>
         <div className="min-w-0 py-2.5">
           <AiNoteEntryReview note={note} meta={meta} onRemove={onRemove}>{words}</AiNoteEntryReview>
         </div>
@@ -77,7 +77,7 @@ function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => v
     );
   }
   return (
-    <li ref={rowRef} data-voce={note.id} className={cn(ROW, 'flex items-start gap-1 pl-1')}>
+    <li ref={rowRef} data-dossier-entry={note.id} className={cn(ROW, 'flex items-start gap-1 pl-1')}>
       <div className="min-w-0 flex-1 py-2.5">
         {words}
         {meta}

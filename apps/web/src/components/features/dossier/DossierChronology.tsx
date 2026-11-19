@@ -19,20 +19,18 @@ const SOURCE_LABEL = { nota: 'Nota', sentenza: 'Sentenza' } as const;
 export function DossierChronology({ items, onOpen }: Props) {
   const [newestFirst, setNewestFirst] = useState(false);
   const { years, undatedNotes } = useMemo(() => buildChronology(items, newestFirst), [items, newestFirst]);
-  const undated = undatedNotes > 0 && (
-    <p className={ROW_LINE}>
-      {undatedNotes === 1 ? '1 nota senza data non compare' : `${undatedNotes} note senza data non compaiono`}: una nota entra
-      nella cronologia se inizia con la data, come 12/03/2025.
-    </p>
-  );
+  const undatedCount = undatedNotes === 1 ? '1 nota senza data non compare' : `${undatedNotes} note senza data non compaiono`;
   if (years.length === 0) {
     return (
       <div className="space-y-2">
         <p className={ROW_TITLE}>Le note che iniziano con una data, come 12/03/2025, e le sentenze con la data di deposito compaiono qui.</p>
-        {undated}
+        {undatedNotes > 0 && <p className={ROW_LINE}>{undatedCount}.</p>}
       </div>
     );
   }
+  const undated = undatedNotes > 0 && (
+    <p className={ROW_LINE}>{undatedCount}: una nota entra nella cronologia se inizia con la data, come 12/03/2025.</p>
+  );
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">

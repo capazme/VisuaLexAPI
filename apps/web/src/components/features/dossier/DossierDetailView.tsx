@@ -144,12 +144,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // A note is its own row in «Fonti»; a note about an article is read in the article's row, a decision in its own.
   useEffect(() => {
     if (view !== 'fonti' || !openEntry) return;
-    const rows = (id: string) => document.querySelector<HTMLElement>(`[data-voce="${CSS.escape(id)}"], [data-voci~="${CSS.escape(id)}"]`);
+    const rows = (id: string) => document.querySelector<HTMLElement>(`[data-dossier-entry="${CSS.escape(id)}"], [data-dossier-entries~="${CSS.escape(id)}"]`);
     const row = rows(openEntry.id) ?? (openEntry.aboutItemId ? rows(openEntry.aboutItemId) : null);
     setOpenEntry(null);
     if (!row) return;
     row.scrollIntoView({ block: 'start' });
-    row.querySelector<HTMLElement>('button, [role="button"]')?.focus({ preventScroll: true });
+    // The row's toggle, else the row itself: never its first button, which on a note is «Rimuovi nota».
+    const target = row.querySelector<HTMLElement>('[aria-expanded]') ?? row;
+    if (target === row && !row.hasAttribute('tabindex')) row.tabIndex = -1;
+    target.focus({ preventScroll: true });
   }, [view, openEntry]);
 
   // «Fonti»'s filter and selection (LC88), handed to the reading's rows through `FontiToolsContext`.
