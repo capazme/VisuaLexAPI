@@ -610,7 +610,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   coming with the desktop app, LC48). In the other sections «Analizza
   documento» stays a Corpus tool with no label. «Prossimi giorni» and «Lista d'ingresso»
   are tabs of Work's page (`OpusPage`: «Scadenziario», «Prossimi giorni», «Lista d'ingresso», links with `aria-current`, the
-  short word on a phone, beside «Scadenze» from `md`, LC83; on those three views and on the trash, its way back; the trash's link only on the three), «Analizza un documento» and «Rassegne» links
+  short word on a phone, under «Attività» from `md`, LC83, LC130; on those three views and on the trash, its way back; the trash's link only on the three), «Analizza un documento» and «Rassegne» links
   of the search page's Scrivania, under the examples and drawn as them, underlined;
   Gymnasium in two groups (Gymnasium spec §4), «Learn»
   (Oggi, the home `/learn/ripasso`, Progressi, `/learn/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators),
@@ -963,9 +963,9 @@ Personal tasks, filed under a dossier or in the inbox, with a planned date and a
 (maps the snake_case answer once). Wording: no string may suggest a computed deadline (`plannerStyle.test.ts`
 checks the files; «termine calcolato» comes with wave 2 and its warning), and no Todoist names, icons or texts.
 
-- **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`; LC83, one compact header: «Scadenze» as the title over
-  the three views, which the switcher focuses, the views' tabs beside it (`beside`), «Raggruppa» (on «Scadenziario»)
-  and «Cestino» on the same row; from `md` the header sticks under the phone's bar, `--phone-bar-offset`; on a phone the
+- **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`; LC83, one compact header: «Attività» as the title over
+  the three views, which the switcher focuses, «Cestino» on its row and the views' tabs on a row of their own under it
+  from `md` (`beside`, LC130: the header wraps, the tabs last at full width); «Raggruppa» is in «Scadenziario»; from `md` the header sticks under the phone's bar, `--phone-bar-offset`; on a phone the
   tabs are the bar at the foot and the two options icons beside the title; each tab one name per width, the other
   `display: none`; the inbox's count on its tab, `plannerStore.inboxCount`; the trash keeps its own title; the view the
   frame's width, P2b), `OpusViews`: no view explains itself in a sentence; the quick add is the one way to add, in the

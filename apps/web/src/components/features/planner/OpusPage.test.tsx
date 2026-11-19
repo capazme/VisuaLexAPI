@@ -32,12 +32,15 @@ describe('Work\'s page', () => {
     expect(screen.getByRole('link', { name: 'Cestino dei compiti' })).toBeInTheDocument();
   });
 
-  it.each(['/work/scadenziario', '/work/prossimi', '/work/ingresso'])('on %s says «Scadenze» once, the tabs beside it in the one header (LC83)', (path) => {
+  it.each(['/work/scadenziario', '/work/prossimi', '/work/ingresso'])('on %s says «Attività» once, the tabs under it in the one header (LC83, LC130)', (path) => {
     renderAt(path);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Scadenze$/);
-    expect(screen.getAllByText('Scadenze')).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Attività$/);
+    expect(screen.getAllByText('Attività')).toHaveLength(1);
     const header = screen.getByRole('banner');
     expect(header).toContainElement(screen.getByRole('navigation', { name: 'Viste di Work' }));
+    // From md the views are a row of their own, under the title and the trash (LC130).
+    expect(header).toHaveClass('md:flex-wrap');
+    expect(screen.getByRole('navigation', { name: 'Viste di Work' }).closest('.md\\:basis-full')).toHaveClass('md:order-last');
     expect(header).toContainElement(screen.getByRole('link', { name: 'Cestino dei compiti' }));
     // Nothing fixed over the list: on a phone the tabs are the bar at the foot, outside the view.
     const fixed = [...document.querySelectorAll('[class*="max-md:fixed"], [class~="fixed"]')];
