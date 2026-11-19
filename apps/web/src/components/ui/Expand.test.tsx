@@ -2,7 +2,7 @@ import { StrictMode, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Expand } from './Expand';
-import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
+import { ISLAND_OPEN, REPEAT_CLOSE, REPEAT_OPEN, SEARCH_CLOSE, SEARCH_OPEN } from '../../lib/motion';
 
 interface Call { el: Element; frames: Keyframe[]; timing: KeyframeAnimationOptions; anim: { cancel: ReturnType<typeof vi.fn>; onfinish: (() => void) | null } }
 let calls: Call[] = [];
@@ -45,7 +45,7 @@ describe('Expand', () => {
     window.matchMedia = originalMatchMedia;
   });
 
-  it('opens in the page, before what follows, growing from no height to its own on the island’s opening', () => {
+  it('opens in the page, before what follows, growing from no height to its own in 200 ms (LC132)', () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
     const field = screen.getByRole('textbox', { name: 'Campo' });
@@ -54,19 +54,22 @@ describe('Expand', () => {
     expect(field.compareDocumentPosition(screen.getByText('Il resto della pagina')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(heights()).toHaveLength(1);
     expect(heights()[0].frames).toEqual([{ height: '0px' }, { height: '120px' }]);
-    expect(heights()[0].timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+    expect(heights()[0].timing).toEqual(expect.objectContaining(REPEAT_OPEN));
+    expect(heights()[0].timing.duration).toBe(200);
+    expect(fades()[0].timing.duration).toBe(200);
     // The natural height is not held: content arriving later still grows it.
     expect(heights()[0].timing.fill).toBe('none');
     expect(fades()[0].frames).toEqual([{ opacity: 0 }, { opacity: 1 }]);
   });
 
-  it('closes to no height on the island’s closing, and leaves the page once it has', () => {
+  it('closes to no height in 150 ms (LC132), and leaves the page once it has', () => {
     render(<Harness initial />);
     // Already open: nothing moves on mounting.
     expect(calls).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
     expect(heights()[0].frames).toEqual([{ height: '120px' }, { height: '0px' }]);
-    expect(heights()[0].timing).toEqual(expect.objectContaining({ ...ISLAND_CLOSE, fill: 'forwards' }));
+    expect(heights()[0].timing).toEqual(expect.objectContaining({ ...REPEAT_CLOSE, fill: 'forwards' }));
+    expect(heights()[0].timing.duration).toBe(150);
     expect(fades()[0].frames).toEqual([{ opacity: 1 }, { opacity: 0 }]);
     // Going: still drawn, no longer reached.
     expect(screen.getByRole('textbox', { name: 'Campo', hidden: true }).closest('[inert]')).not.toBeNull();
@@ -95,6 +98,8 @@ describe('Expand', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
     expect(heights()).toHaveLength(0);
     expect(fades()).toHaveLength(1);
+    // Opening, the island's time, as before LC132 (a shorter fade showed a row's late content settling, #599).
+    expect(fades()[0].timing).toEqual(expect.objectContaining(ISLAND_OPEN));
     // Closing, the app's brief fade, not the island's time: no space left standing empty.
     fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
     expect(fades()).toHaveLength(2);
@@ -141,7 +146,7 @@ describe('Expand', () => {
       act(() => notify());
       expect(opening.anim.cancel).toHaveBeenCalled();
       expect(heights()[1].frames).toEqual([{ height: '60px' }, { height: '400px' }]);
-      expect(heights()[1].timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+      expect(heights()[1].timing).toEqual(expect.objectContaining(REPEAT_OPEN));
     } finally {
       rect.mockRestore();
       globalThis.ResizeObserver = original;
@@ -175,7 +180,7 @@ describe('Expand', () => {
       Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 400 });
       act(() => notify());
       expect(heights().at(-1)!.frames).toEqual([{ height: '120px' }, { height: '400px' }]);
-      expect(heights().at(-1)!.timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+      expect(heights().at(-1)!.timing).toEqual(expect.objectContaining(REPEAT_OPEN));
       // Held at the height it had until the animation applies (the next frame), then let go.
       const space = document.getElementById('space')!;
       expect(space.style.height).toBe('120px');
@@ -187,7 +192,7 @@ describe('Expand', () => {
     }
   });
 
-  it('on opening comes into view from its start, smoothly, and at once under reduced motion', () => {
+  it('on opening comes into view from its start, at once and only if it would leave the view (LC132)', () => {
     let heightsAtScroll = -1;
     const scroll = vi.fn(() => { heightsAtScroll = heights().length; });
     Element.prototype.scrollIntoView = scroll;
@@ -197,7 +202,7 @@ describe('Expand', () => {
       fireEvent.click(button);
       expect(scroll).toHaveBeenCalledTimes(1);
       expect(scroll.mock.contexts[0]).toBe(screen.getByRole('textbox', { name: 'Campo' }).closest('#space'));
-      expect(scroll).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' });
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' });
       // Brought into view while it has its natural height, before the opening starts from none.
       expect(heightsAtScroll).toBe(0);
       fireEvent.click(button);
@@ -208,6 +213,15 @@ describe('Expand', () => {
     } finally {
       Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
     }
+  });
+
+  it('takes the times it is given: ⌘K\'s band its island\'s (LC132)', () => {
+    const timing = { open: SEARCH_OPEN, close: SEARCH_CLOSE };
+    const { rerender } = render(<Expand open={false} timing={timing}><p>Righe</p></Expand>);
+    rerender(<Expand open timing={timing}><p>Righe</p></Expand>);
+    expect(heights()[0].timing).toEqual(expect.objectContaining(SEARCH_OPEN));
+    rerender(<Expand open={false} timing={timing}><p>Righe</p></Expand>);
+    expect(heights()[1].timing).toEqual(expect.objectContaining(SEARCH_CLOSE));
   });
 
   it('without Web Animations opens and closes at once', () => {

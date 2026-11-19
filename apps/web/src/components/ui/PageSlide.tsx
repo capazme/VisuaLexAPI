@@ -11,6 +11,8 @@ export interface PageSlideProps {
   pageKey: string;
   /** Going back (LC84, leaving Impostazioni): the same movement the other way, the page coming from the left. */
   back?: boolean;
+  /** The coming page's entrance in place of the slide below (`ViewSlide`, LC132); the leaving page still goes at once. */
+  entrance?: (still: boolean, back: boolean) => { keyframes: Keyframe[]; timing: KeyframeAnimationOptions };
   className?: string;
   children: ReactNode;
 }
@@ -21,7 +23,7 @@ export interface PageSlideProps {
  * motion only the fade; without Web Animations the page changes at once. The page is mounted anew on a new key, so a
  * `PageFade` inside it starts there and plays nothing: one movement per change (LC126).
  */
-export function PageSlide({ pageKey, back = false, className, children }: PageSlideProps) {
+export function PageSlide({ pageKey, back = false, entrance, className, children }: PageSlideProps) {
   const ref = useRef<HTMLDivElement>(null);
   // The key last moved in: a commit with the same key (StrictMode's second run, a new child) plays nothing.
   const shown = useRef(pageKey);
@@ -32,12 +34,15 @@ export function PageSlide({ pageKey, back = false, className, children }: PageSl
     const place = ref.current;
     if (!place || typeof place.animate !== 'function') return undefined;
     const still = prefersReducedMotion();
-    const coming = place.animate(
-      [{ opacity: 0, transform: still ? 'none' : `translateX(${(back ? -1 : 1) * SHIFT}px)` }, { opacity: 1, transform: 'none' }],
-      ISLAND_OPEN,
-    );
+    const own = entrance?.(still, back);
+    const coming = own
+      ? place.animate(own.keyframes, own.timing)
+      : place.animate(
+        [{ opacity: 0, transform: still ? 'none' : `translateX(${(back ? -1 : 1) * SHIFT}px)` }, { opacity: 1, transform: 'none' }],
+        ISLAND_OPEN,
+      );
     return () => coming.cancel();
-    // `back` is read with the key that brought it.
+    // `back` and `entrance` are read with the key that brought them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageKey]);
 

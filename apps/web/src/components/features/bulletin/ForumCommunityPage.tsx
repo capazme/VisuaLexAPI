@@ -99,9 +99,9 @@ export function ForumCommunityPage() {
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10">
         <div className="min-w-0">
           <Communities value={materia} onChange={choose} row />
-          {/* LC114: a discussion opened slides in over the list's place, and the list back the other way (`ViewSlide`, the
-              tokens' 24 px on `ISLAND_OPEN` and `ISLAND_CLOSE`, the fade alone under reduced motion). */}
-          <ViewSlide view={threadId ? 'thread' : 'list'} order={COMMUNITY_VIEWS}>
+          {/* LC114: a discussion opened slides in over the list's place, and the list back the other way (`ViewSlide`:
+              12 px in 180 ms since LC132, the fade alone under reduced motion). */}
+          <ViewSlide view={threadId ? 'thread' : 'list'} order={COMMUNITY_VIEWS} drill={COMMUNITY_VIEWS}>
           {threadId ? (
             <section aria-label="Discussione aperta" className="min-w-0">
               <CommunityThreadView key={threadId} threadId={threadId} onChanged={onChanged} onDeleted={onDeleted} />

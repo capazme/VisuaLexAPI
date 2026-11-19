@@ -3,7 +3,8 @@ import { act, render, screen } from '@testing-library/react';
 import { Suspense, lazy, useEffect, useRef, type JSX } from 'react';
 import { Link, MemoryRouter, Route, Routes, useLocation, useOutlet } from 'react-router-dom';
 import { ViewSlide } from './ViewSlide';
-import { ISLAND_OPEN } from '../../lib/motion';
+import { PLACE_CHANGE } from '../../lib/motion';
+import { pageFade } from './pageChange';
 
 const ORDER = ['list', 'detail', 'trash'];
 
@@ -32,7 +33,7 @@ function Page({ view, children }: { view: string; children: React.ReactNode }) {
   return (
     <MemoryRouter>
       <main>
-        <ViewSlide view={view} order={ORDER}>{children}</ViewSlide>
+        <ViewSlide view={view} order={ORDER} drill={['list', 'detail']}>{children}</ViewSlide>
       </main>
     </MemoryRouter>
   );
@@ -46,22 +47,34 @@ describe('ViewSlide (LC98)', () => {
     window.matchMedia = matchMedia;
   });
 
-  it('slides a view further along in from the right on the island\'s tokens, and one before it from the left', () => {
+  it('slides the detail in from the right by 12 px in 180 ms, and the list back from the left (LC132)', () => {
     const calls = recordAnimations();
     const { rerender } = render(<Page view="list"><Titled name="Pratiche" /></Page>);
     expect(calls).toHaveLength(0);
 
     rerender(<Page view="detail"><Titled name="Una pratica" /></Page>);
     const coming = calls.find((c) => c.el.contains(screen.getByText('Una pratica')))!;
-    expect(coming.frames[0]).toEqual({ opacity: 0, transform: 'translateX(24px)' });
-    expect(coming.timing).toEqual(ISLAND_OPEN);
+    expect(coming.frames[0]).toEqual({ opacity: 0, transform: 'translateX(12px)' });
+    expect(coming.timing).toEqual(PLACE_CHANGE);
+    expect(coming.timing.duration).toBe(180);
     // The leaving view is gone at once (LC127): one view on screen, one movement.
     expect(screen.queryByText('Pratiche')).toBeNull();
     expect(calls).toHaveLength(1);
 
     calls.length = 0;
     rerender(<Page view="list"><Titled name="Pratiche" /></Page>);
-    expect(calls.find((c) => c.el.contains(screen.getByText('Pratiche')))!.frames[0]).toEqual({ opacity: 0, transform: 'translateX(-24px)' });
+    expect(calls.find((c) => c.el.contains(screen.getByText('Pratiche')))!.frames[0]).toEqual({ opacity: 0, transform: 'translateX(-12px)' });
+  });
+
+  it('every other change (the sidebar\'s entries) fades in rising by 5 px, as `PageFade` (LC132)', () => {
+    const calls = recordAnimations();
+    const { rerender } = render(<Page view="list"><Titled name="Pratiche" /></Page>);
+    rerender(<Page view="trash"><Titled name="Cestino" /></Page>);
+    const coming = calls.find((c) => c.el.contains(screen.getByText('Cestino')))!;
+    expect(coming.frames).toEqual(pageFade(false).keyframes);
+    expect(coming.frames[0]).toEqual({ opacity: 0, transform: 'translateY(5px)' });
+    expect(coming.timing).toEqual(pageFade(false).timing);
+    expect(coming.timing.duration).toBe(180);
   });
 
   it('under reduced motion only fades', () => {
@@ -71,7 +84,12 @@ describe('ViewSlide (LC98)', () => {
     rerender(<Page view="trash"><Titled name="Cestino" /></Page>);
     const coming = calls.find((c) => c.el.contains(screen.getByText('Cestino')))!;
     expect(coming.frames[0]).toEqual({ opacity: 0, transform: 'none' });
-    expect(coming.timing).toEqual(ISLAND_OPEN);
+    expect(coming.timing).toEqual(pageFade(true).timing);
+    rerender(<Page view="list"><Titled name="Pratiche" /></Page>);
+    rerender(<Page view="detail"><Titled name="Una pratica" /></Page>);
+    const detail = calls.find((c) => c.el.contains(screen.getByText('Una pratica')))!;
+    expect(detail.frames[0]).toEqual({ opacity: 0, transform: 'none' });
+    expect(detail.timing).toEqual(pageFade(true).timing);
   });
 
   it('puts the focus on the coming view\'s title, and not when the page first draws', () => {
@@ -98,7 +116,7 @@ describe('ViewSlide (LC98)', () => {
     expect(document.activeElement).toBe(screen.getByText('Scadenze'));
   });
 
-  it('with a view whose code is on its way (Learn), keeps the view left until it is there, then slides it in with its content', async () => {
+  it('with a view whose code is on its way (Learn), keeps the view left until it is there, then fades it in with its content', async () => {
     const calls = recordAnimations();
     let arrive: (view: { default: () => JSX.Element }) => void = () => {};
     const Later = lazy(() => new Promise<{ default: () => JSX.Element }>((resolve) => { arrive = resolve; }));
@@ -129,8 +147,8 @@ describe('ViewSlide (LC98)', () => {
 
     await act(async () => arrive({ default: () => <h2>I tuoi progressi</h2> }));
     const coming = calls.find((c) => c.el.contains(screen.getByText('I tuoi progressi')));
-    expect(coming?.frames[0]).toEqual({ opacity: 0, transform: 'translateX(24px)' });
-    expect(coming?.timing).toEqual(ISLAND_OPEN);
+    expect(coming?.frames[0]).toEqual({ opacity: 0, transform: 'translateY(5px)' });
+    expect(coming?.timing).toEqual(pageFade(false).timing);
   });
 
   it('leaves the focus where the coming view put it', () => {

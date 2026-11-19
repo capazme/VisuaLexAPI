@@ -1717,8 +1717,9 @@
   .vlx-digit-land { animation: none; }
 }
 
-/* Changing section (T1): the page's content fades out (100 ms), then the new one fades in rising by 5 px (140 ms):
-   240 ms, no overlap, nothing over the screen (`features/sections/sectionTransition.ts`). The sidebar, the floating
+/* Changing section (T1): the old page's content goes at once and the new one fades in rising by 5 px, in `dur.pop`
+   (180 ms), as `PageFade` (LC132, the common page timing; it was 120 ms out, then 120 ms in): no overlap, nothing over
+   the screen (`features/sections/sectionTransition.ts`). The sidebar, the floating
    buttons, the search bar and the rest of the screen hold still; the groups do not move either, or their default
    250 ms would outlast the change. A tap goes through the pictures to the page under them (it also ends the change).
    Entering from the sign-in page there is no old page to wait for. */
@@ -1739,11 +1740,9 @@
 ::view-transition-new(root),
 ::view-transition-group(root),
 ::view-transition-group(vlx-page) { animation: none; }
-/* Out in `dur.press`, then in in `dur.press`: `dur.panel` in all (LC98). */
-::view-transition-old(vlx-page) { animation: vlx-page-out var(--dur-press) var(--ease-out) both; }
-::view-transition-new(vlx-page) { animation: vlx-page-in var(--dur-press) var(--ease-out) var(--dur-press) both; }
-::view-transition-new(vlx-page):only-child { animation-delay: 0ms; }
-@keyframes vlx-page-out { to { opacity: 0; } }
+/* The old picture gone at once, the new one in in `dur.pop` (LC132). */
+::view-transition-old(vlx-page) { animation: none; opacity: 0; }
+::view-transition-new(vlx-page) { animation: vlx-page-in var(--dur-pop) var(--ease-out) both; }
 @keyframes vlx-page-in { from { opacity: 0; translate: 0 5px; } }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }

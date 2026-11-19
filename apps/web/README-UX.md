@@ -662,6 +662,22 @@ Norma (documento legale)
 | Serif | Georgia, Times | Lettura testi |
 | Mono | JetBrains Mono, monospace | Codice/citazioni |
 
+### Movimento: la regola della frequenza
+
+Le animazioni stanno solo dove aiutano (Luca, 19-11; regola concordata con il consulente UI, LC132). Più un gesto è
+frequente, meno si muove:
+
+| Gesto | Movimento | Esempi |
+|-------|-----------|--------|
+| Un tasto | Nessuno: il cambiamento è lì nello stesso frame | Una lettera in ⌘K, le frecce in un elenco |
+| Un'azione ripetuta | Al massimo 150–200 ms, senza molla e senza cascata | ⌘K (180 in apertura, 120 in chiusura), `Expand` (200/150), le notifiche (200/150), il pulsante occupato (subito) |
+| Un cambio di posto | 180 ms | `PageFade`, `ViewSlide` (12 px di lato solo tra elenco e dettaglio), il cambio di sezione |
+
+I momenti rari (le conferme, i premi di Gymnasium, il primo disegno di una pagina) tengono i loro tempi. Con «Riduci
+movimento» restano le sole dissolvenze: quelle dell'isola e di `Expand` con i tempi di prima, quella di `ViewSlide`
+con i 180 ms lineari di `PageFade`. Ogni tempo è un token di `src/lib/motion.ts`: il guard
+`src/styleRules.guard.test.ts` rifiuta le durate scritte a mano.
+
 ---
 
 ## 8. Flussi Utente Principali
