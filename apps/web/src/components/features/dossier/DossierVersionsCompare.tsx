@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useState } from 'react';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
 import { Expand } from '../../ui/Expand';
 import { Select } from '../../ui/Select';
@@ -11,6 +11,8 @@ import { CHANGE_WORDS, changesLine, compareSnapshots, type ItemChange, type Item
 interface Props {
   dossierId: string;
   open: boolean;
+  /** Changes when a snapshot is saved: an open comparison reads the list again. */
+  refreshKey?: string;
   onClose: () => void;
   className?: string;
 }
@@ -28,14 +30,14 @@ const versionName = (s: DossierSnapshotApi) => `v${s.version} · ${s.label || fo
  * Two snapshots of the dossier compared in the page (LC121, L-73): entries that came, went and changed, a note's
  * changed words marked. The browser computes it from the snapshots' content.
  */
-export function DossierVersionsCompare({ dossierId, open, onClose, className }: Props) {
+export function DossierVersionsCompare({ dossierId, open, refreshKey, onClose, className }: Props) {
   const headingId = useId();
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [fromId, setFromId] = useState('');
   const [toId, setToId] = useState('');
 
-  // Read again at each opening: a snapshot just saved came back from the POST without its content.
+  // Read again at each opening and at each new snapshot: one just saved came back from the POST without its content.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -49,7 +51,7 @@ export function DossierVersionsCompare({ dossierId, open, onClose, className }: 
       })
       .catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
-  }, [open, dossierId]);
+  }, [open, dossierId, refreshKey]);
 
   const changes = useMemo(() => {
     const from = snapshots?.find((s) => s.id === fromId);
@@ -58,7 +60,8 @@ export function DossierVersionsCompare({ dossierId, open, onClose, className }: 
   }, [snapshots, fromId, toId]);
 
   return (
-    <Expand open={open} onClose={onClose} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
+    // Opens once the list is here: drawn while loading, the space grew for «Leggo…» and jumped when the data came.
+    <Expand open={open && (snapshots !== null || failed)} onClose={onClose} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
       <div className="space-y-4 p-4 md:p-5">
         <h2 id={headingId} className="text-base font-semibold text-slate-900 dark:text-slate-50">Confronta due versioni</h2>
         {failed ? (
@@ -82,7 +85,7 @@ export function DossierVersionsCompare({ dossierId, open, onClose, className }: 
                 <p role="status" className="text-sm font-medium text-slate-800 dark:text-slate-200">{changesLine(changes)}</p>
                 {changes.length > 0 && (
                   <ul aria-label="Differenze" className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {changes.map((change) => <ChangeRow key={`${change.kind}-${change.item.id}`} change={change} />)}
+                    {changes.map((change) => <ChangeRow key={`${change.kind}-${change.id}`} change={change} />)}
                   </ul>
                 )}
               </>
@@ -102,11 +105,11 @@ function ChangeRow({ change }: { change: ItemChange }) {
     <li className="space-y-1 py-2">
       <p className="flex flex-wrap items-baseline gap-2 text-sm">
         <span className={cn('rounded-[4px] px-1.5 py-0.5 text-xs font-semibold', KIND_STYLE[change.kind])}>{CHANGE_WORDS[change.kind]}</span>
-        <span className="text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{change.item.title}</span>
+        <span className="text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{change.label}</span>
       </p>
       {/* Every note is titled «Nota»: a note that came or went is told by its text. */}
-      {!change.words && typeof change.item.content === 'string' && (
-        <p className="text-sm leading-relaxed text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{change.item.content}</p>
+      {change.text !== undefined && (
+        <p className="text-sm leading-relaxed text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{change.text}</p>
       )}
       {change.words && (
         <p className="text-sm leading-relaxed text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">
@@ -114,7 +117,8 @@ function ChangeRow({ change }: { change: ItemChange }) {
             part.added ? (
               <ins key={i} className="rounded-[4px] bg-emerald-100 dark:bg-emerald-900/40"><span className="sr-only">aggiunto: </span>{part.value}</ins>
             ) : part.removed ? (
-              <del key={i} className="rounded-[4px] bg-red-100 dark:bg-red-900/40"><span className="sr-only">tolto: </span>{part.value}</del>
+              // A word that went and the one that came in its place touch: a space between them.
+              <Fragment key={i}><del className="rounded-[4px] bg-red-100 dark:bg-red-900/40"><span className="sr-only">tolto: </span>{part.value}</del>{change.words![i + 1]?.added && !/\s$/.test(part.value) ? ' ' : null}</Fragment>
             ) : (
               <span key={i}>{part.value}</span>
             ),

@@ -378,7 +378,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
           { label: 'JSON', icon: FileJson, onSelect: exportDossierJSON },
           { label: snapshotBusy ? 'Salvo lo snapshot…' : 'Salva snapshot', icon: History, onSelect: () => void handleCreateSnapshot(), disabled: snapshotBusy },
-          { label: 'Confronta versioni', icon: GitCompare, onSelect: () => setComparing(true) },
         ]}
       >
         <Download size={16} aria-hidden />
@@ -390,6 +389,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         triggerClassName={HEADER_ICON_BUTTON}
         items={[
           { label: 'Modifica', icon: Edit2, onSelect: () => setEditing(true) },
+          // Comparing is not exporting (LC121, the consultant on #678): with the dossier's own actions.
+          { label: 'Confronta versioni', icon: GitCompare, onSelect: () => setComparing(true) },
           { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
           { label: 'Elimina la pratica', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => {
             // No confirmation: the dossier goes to the trash and the notification's «Annulla» restores it (K1a).
@@ -475,7 +476,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         {/* «Modifica» opens here, under the header, in the page (LC107, L-73). */}
         <EditDossierPanel dossier={editing ? dossier : null} onClose={() => setEditing(false)} onSave={handleUpdateDossier} className="mb-6" />
         {/* LC121: two snapshots compared, in the page under the header, as «Modifica» (L-73). */}
-        <DossierVersionsCompare dossierId={dossier.id} open={comparing} onClose={() => setComparing(false)} className="mb-6" />
+        <DossierVersionsCompare dossierId={dossier.id} open={comparing} refreshKey={snapshots[0]?.id} onClose={() => setComparing(false)} className="mb-6" />
 
         {/* LC21: the dossier's views as tabs, as the prototype: «Fonti» (its norms, decisions and notes), «Atti» (Luca, 15-11) and «Compiti».
             Both stay mounted, the other hidden, so a selection or a task being written survives the switch. */}
