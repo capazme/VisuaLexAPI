@@ -11,7 +11,8 @@ import {
   type HighlightColor,
 } from '../../../utils/highlightColors';
 import { cn } from '../../../lib/utils';
-import { FIELD_TEXT } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
 import { scrollParentOf } from '../../../utils/scrollParent';
 
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -107,7 +108,7 @@ export function HighlightMeaningsSection({ firstFieldRef, revealOnFocus = false 
         Cosa vuol dire per te ogni colore dell’evidenziatore, fino a {HIGHLIGHT_MEANING_MAX} caratteri: lo leggi accanto al
         colore quando lo scegli. Le evidenziazioni non cambiano. Resta su questo dispositivo.
       </p>
-      <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+      <div className="space-y-3 rounded-[8px] border border-slate-200 p-3 dark:border-slate-700">
         {HIGHLIGHT_COLORS.map((color, i) => {
           const inputId = `${id}-${color}`;
           return (
@@ -122,7 +123,7 @@ export function HighlightMeaningsSection({ firstFieldRef, revealOnFocus = false 
                 />
                 {capitalised(highlightColorName(color))}
               </label>
-              <input
+              <Input
                 ref={i === 0 ? firstFieldRef : undefined}
                 id={inputId}
                 type="text"
@@ -138,28 +139,21 @@ export function HighlightMeaningsSection({ firstFieldRef, revealOnFocus = false 
                 onFocus={i === 0 ? reveal : undefined}
                 onBlur={() => commit(color)}
                 onKeyDown={(event) => onKeyDown(color, event)}
-                className={cn(
-                  'min-h-[44px] w-full min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-800 md:min-h-0 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100',
-                  FIELD_TEXT,
-                )}
+                className="px-3"
               />
             </div>
           );
         })}
-        <button
+        <Button
           type="button"
+          variant="quiet"
           onClick={reset}
           aria-disabled={!customised}
-          className={cn(
-            'inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:min-h-0',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-            customised
-              ? 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-              : 'cursor-not-allowed text-slate-500 dark:text-slate-400',
-          )}
+          icon={<RotateCcw size={16} aria-hidden />}
+          className={cn('w-full', !customised && 'cursor-not-allowed text-slate-500 hover:bg-transparent hover:text-slate-500 dark:text-slate-400 dark:hover:bg-transparent')}
         >
-          <RotateCcw size={16} aria-hidden /> Ripristina predefiniti
-        </button>
+          Ripristina predefiniti
+        </Button>
         {/* Always drawn, empty too: a live region that appears with its words is not read. */}
         <p role="status" className="text-xs text-slate-500 dark:text-slate-400">{status}</p>
       </div>

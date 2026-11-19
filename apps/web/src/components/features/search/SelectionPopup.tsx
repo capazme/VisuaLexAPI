@@ -377,7 +377,7 @@ export function SelectionPopup({
       className={cn(
         // As wide as what it holds, not as the room left in its container: centred on the selection as it is.
         'absolute w-max max-w-[calc(100vw-16px)] transform -translate-x-1/2 -translate-y-full',
-        'animate-in fade-in zoom-in-95 duration-150',
+        'animate-in fade-in zoom-in-95 duration-(--dur-pop)',
         Z_INDEX.floating
       )}
       style={{
@@ -387,11 +387,12 @@ export function SelectionPopup({
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Main popup */}
-      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-md border border-slate-700 overflow-hidden">
+      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-[8px] shadow-md border border-slate-700 overflow-hidden">
         {/* Main actions */}
           <div className="flex items-center">
             {!copyOnly && (
               <>
+                {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                 <button
                   onClick={() => handleAction('highlight')}
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
@@ -405,6 +406,7 @@ export function SelectionPopup({
                     : <Highlighter size={16} aria-hidden className={HIGHLIGHT_ICON_ON_DARK[ink]} />}
                 </button>
                 <div className="w-px h-5 bg-slate-700" />
+                {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                 <button
                   onClick={() => handleAction('note')}
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
@@ -415,6 +417,7 @@ export function SelectionPopup({
                 {onDiscuss && (
                   <>
                     <div className="w-px h-5 bg-slate-700" />
+                    {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                     <button
                       onClick={() => handleAction('discuss')}
                       className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
@@ -428,6 +431,7 @@ export function SelectionPopup({
                 {onCreateCard && (
                   <>
                     <div className="w-px h-5 bg-slate-700" />
+                    {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                     <button
                       onClick={() => handleAction('card')}
                       className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
@@ -441,6 +445,7 @@ export function SelectionPopup({
                 <div className="w-px h-5 bg-slate-700" />
               </>
             )}
+            {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
             <button
               onClick={() => handleAction('copy')}
               className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
@@ -451,6 +456,7 @@ export function SelectionPopup({
             {onSearch && (
               <>
                 <div className="w-px h-5 bg-slate-700" />
+                {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                 <button
                   onClick={() => handleAction('search')}
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
@@ -463,6 +469,7 @@ export function SelectionPopup({
             {onReportCitation && !copyOnly && (
               <>
                 <div className="w-px h-5 bg-slate-700" />
+                {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                 <button
                   onClick={() => handleAction('report')}
                   className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"

@@ -25,6 +25,7 @@ interface VersionStatusChipProps {
  */
 export function VersionStatusChip({ chip, onClick }: VersionStatusChipProps) {
     return (
+        // bare-button: the text's status in words beside it, no padding (not a pill, R3), coloured by its tone.
         <button
             type="button"
             onClick={onClick}

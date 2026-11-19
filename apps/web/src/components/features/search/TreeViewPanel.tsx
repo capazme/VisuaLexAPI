@@ -9,6 +9,9 @@ import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { abrogatiFor, rubricheFor } from '../../../utils/actRubriche';
 import { articleLabel, buildActTree, headingLabel, type ActTreeItem, type ActTreeNode } from '../../../utils/actTree';
 import { Expand } from '../../ui/Expand';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
 
 /** Accents stripped, lowercased: a lawyer types «responsabilita» and expects «Responsabilità del debitore». */
 function foldIndexLabel(value: string): string {
@@ -286,7 +289,7 @@ export function TreeViewPanel({
           <ChevronRight
             size={14}
             aria-hidden
-            className={cn('mt-[3px] shrink-0 text-slate-400 transition-transform duration-150', expanded && 'rotate-90')}
+            className={cn('mt-[3px] shrink-0 text-slate-400 transition-transform duration-(--dur-press)', expanded && 'rotate-90')}
           />
           <span className="min-w-0 flex-1">{headingLabel(node.title)}</span>
         </div>
@@ -299,6 +302,7 @@ export function TreeViewPanel({
     const rubrica = rubricaFor(numero);
     const tail = rubrica || (isAbrogato(numero) ? 'abrogato' : '');
     return (
+      // bare-button: an article's row of the index, a whole option (its number, rubrica and mark).
       <button
         key={`a${index}-${numero}`}
         type="button"
@@ -348,31 +352,13 @@ export function TreeViewPanel({
     );
   };
 
-  const fieldHeight = drawer ? 'min-h-[44px] text-base' : 'h-8 text-sm';
-  const FIELD = cn(
-    'w-full rounded-md border border-slate-300 bg-transparent px-2 text-slate-800 dark:border-slate-600 dark:text-slate-100',
-    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-    fieldHeight,
-  );
   const matched = isFiltering ? countArticles(shown) : 0;
 
   const panelBody = (
     <>
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 py-1.5 pl-4 pr-1.5 dark:border-slate-800">
         <h4 id={titleId} className="min-w-0 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">{title}</h4>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Chiudi la struttura"
-          title="Chiudi la struttura"
-          className={cn(
-            'inline-flex shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
-            drawer ? 'h-11 w-11' : 'h-8 w-8',
-            ROW_FOCUS,
-          )}
-        >
-          <X size={18} aria-hidden />
-        </button>
+        <IconButton size={drawer ? 'lg' : 'sm'} onClick={onClose} aria-label="Chiudi la struttura" title="Chiudi la struttura" icon={<X aria-hidden />} className="shrink-0" />
       </header>
 
       <div className="shrink-0 space-y-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
@@ -380,21 +366,21 @@ export function TreeViewPanel({
           <>
             <label htmlFor={selectId} className="sr-only">Parte dell'atto</label>
             {/* The parts in the act's order, by their whole names. */}
-            <select
+            <Select
               id={selectId}
+              size={drawer ? 'lg' : 'sm'}
               value={effectiveAnnex ?? ''}
               onChange={(e) => setSelectedAnnex(e.target.value === '' ? null : e.target.value)}
-              className={cn(FIELD, 'cursor-pointer dark:bg-slate-900')}
             >
               {annexes!.map((annex) => (
                 <option key={annex.number ?? 'main'} value={annex.number ?? ''}>
                   {headingLabel(annex.label)}
                 </option>
               ))}
-            </select>
+            </Select>
           </>
         )}
-        <input
+        <Input
           ref={filterRef}
           type="text"
           role="searchbox"
@@ -404,7 +390,7 @@ export function TreeViewPanel({
           aria-label="Filtra gli articoli per numero o rubrica"
           autoComplete="off"
           spellCheck={false}
-          className={FIELD}
+          className={cn('px-2', drawer && 'min-h-11 text-base md:min-h-11')}
         />
         {isFiltering && (
           <p role="status" aria-live="polite" className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
@@ -438,7 +424,7 @@ export function TreeViewPanel({
       <section
         aria-labelledby={titleId}
         className={cn(
-          'my-2 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
+          'my-2 flex flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
           drawer ? 'max-h-[70vh]' : 'max-h-[min(60vh,32rem)]',
         )}
       >

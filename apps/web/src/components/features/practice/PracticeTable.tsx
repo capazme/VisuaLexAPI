@@ -156,7 +156,7 @@ function PracticeHeader({ practice, compact, simple, headless, children }: { pra
       </div>
       <MenuButton
         label={`Altre azioni per ${practice.label}`}
-        triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-2 dark:text-slate-300 dark:hover:bg-slate-800"
+        triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-2 dark:text-slate-300 dark:hover:bg-slate-800"
         items={[
           { label: 'Rinomina', icon: Pencil, onSelect: () => setEditing(true) },
           ...save.items,

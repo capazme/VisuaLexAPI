@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { ArrowDownWideNarrow, ArrowUpNarrowWide, Search } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../../constants/interactions';
+import { Button } from '../../../ui/Button';
+import { Input } from '../../../ui/Input';
 import { isNarrowing, NO_FILTERS, type CaseLawFilters } from './caseLawFilter';
 import { parseYear, type YearCount } from './caseLawYears';
 
@@ -14,9 +16,6 @@ interface CaseLawControlsProps {
   /** The years of the rows loaded so far, with how many rows each has. */
   counts: YearCount[];
 }
-
-const field =
-  'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100';
 
 const show = (year: number | undefined): string => (year === undefined ? '' : String(year));
 
@@ -53,51 +52,52 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
   const OrderIcon = order === 'desc' ? ArrowDownWideNarrow : ArrowUpNarrowWide;
 
   return (
-    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+    <div className="space-y-3 rounded-[8px] border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
       <div className="flex flex-wrap items-center gap-2">
         <div role="group" aria-label="Anni" className="flex items-center gap-1.5">
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="dal"
-            aria-label="Dall’anno"
-            value={draft.from}
-            onChange={(e) => typeYear('from', e.target.value)}
-            className={cn(field, 'w-20', TOUCH_TARGET_RESPONSIVE)}
-          />
+          <div className="w-20">
+            <Input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="dal"
+              aria-label="Dall’anno"
+              value={draft.from}
+              onChange={(e) => typeYear('from', e.target.value)}
+              className="px-2"
+            />
+          </div>
           <span aria-hidden="true" className="text-xs text-slate-400">–</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="al"
-            aria-label="All’anno"
-            value={draft.to}
-            onChange={(e) => typeYear('to', e.target.value)}
-            className={cn(field, 'w-20', TOUCH_TARGET_RESPONSIVE)}
-          />
+          <div className="w-20">
+            <Input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="al"
+              aria-label="All’anno"
+              value={draft.to}
+              onChange={(e) => typeYear('to', e.target.value)}
+              className="px-2"
+            />
+          </div>
         </div>
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => onChange({ ...filters, order: order === 'desc' ? 'asc' : 'desc' })}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700',
-            TOUCH_TARGET_RESPONSIVE,
-          )}
+          icon={<OrderIcon size={14} aria-hidden="true" />}
+          className="gap-1.5 px-2 text-xs"
         >
-          <OrderIcon size={14} aria-hidden="true" />
           {order === 'desc' ? 'Dal più recente' : 'Dal meno recente'}
-        </button>
-        <div className="relative min-w-[10rem] flex-1">
-          <Search size={14} aria-hidden="true" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
+        </Button>
+        <div className="min-w-[10rem] flex-1">
+          <Input
             type="search"
+            icon={<Search size={14} aria-hidden="true" />}
             placeholder="Filtra per parola…"
             aria-label="Filtra per parola"
             value={text}
             onChange={(e) => onChange({ ...filters, text: e.target.value })}
-            className={cn(field, 'w-full pl-8', TOUCH_TARGET_RESPONSIVE)}
           />
         </div>
       </div>
@@ -107,6 +107,7 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
           {shownCounts.map(({ year, n, approx }) => {
             const pressed = range.from === year && range.to === year;
             return (
+              // bare-button: a year's chip, pressed while it narrows the list (the app has no common chip yet).
               <button
                 key={year}
                 type="button"
@@ -125,26 +126,17 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
             );
           })}
           {counts.length > CHIPS_SHOWN && (
-            <button
-              type="button"
-              aria-expanded={allYears}
-              onClick={() => setAllYears((v) => !v)}
-              className={cn('px-2 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400', TOUCH_TARGET_RESPONSIVE)}
-            >
+            <Button type="button" variant="link" size="sm" aria-expanded={allYears} onClick={() => setAllYears((v) => !v)} className="px-2">
               {allYears ? 'Meno anni' : `Tutti gli anni (${counts.length})`}
-            </button>
+            </Button>
           )}
         </div>
       )}
 
       {isNarrowing(filters) && (
-        <button
-          type="button"
-          onClick={() => onChange({ ...NO_FILTERS, order })}
-          className={cn('text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400', TOUCH_TARGET_RESPONSIVE)}
-        >
+        <Button type="button" variant="link" size="sm" onClick={() => onChange({ ...NO_FILTERS, order })}>
           Azzera i filtri
-        </button>
+        </Button>
       )}
     </div>
   );

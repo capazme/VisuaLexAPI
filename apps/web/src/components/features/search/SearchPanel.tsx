@@ -20,6 +20,7 @@ import { matchesSearchFilters } from '../../../utils/searchFilters';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
 import { Scrivania } from './Scrivania';
 import { BookMark } from '../../ui/BookMark';
+import { IconButton } from '../../ui/IconButton';
 import { deriveVersionInfo } from '../../../utils/versionDisplay';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
@@ -615,16 +616,16 @@ export function SearchPanel() {
       {isLoading && !hasTabs && (
         <div className="w-full p-12 space-y-8 animate-pulse">
           <div className="space-y-4">
-            <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded-2xl w-1/3" />
-            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/2" />
+            <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded-[8px] w-1/3" />
+            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-[8px] w-1/2" />
           </div>
 
           <div className="grid grid-cols-1 gap-6">
             {Array.from({ length: expectedSkeletonCount }, (_, i) => i + 1).map(i => (
-              <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div key={i} className="bg-white dark:bg-slate-900 rounded-[8px] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="p-8 space-y-6">
                   <div className="flex gap-4 items-center">
-                    <div className="w-12 h-12 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+                    <div className="w-12 h-12 bg-slate-200 dark:bg-slate-800 rounded-[8px]" />
                     <div className="space-y-2 flex-1">
                       <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-md w-1/4" />
                       <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded-md w-1/6" />
@@ -654,7 +655,7 @@ export function SearchPanel() {
             aria-live="polite"
             aria-atomic="true"
           >
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-lg flex items-start gap-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-[8px] shadow-lg flex items-start gap-4">
               {/* The column breathes while the texts arrive (spec 2026-10-18-redesign-inchiostro §6.3.1). */}
               <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-primary-600 dark:text-primary-400">
                 <BookMark size={28} breathe />
@@ -696,7 +697,7 @@ export function SearchPanel() {
             role="alert"
             aria-live="polite"
           >
-            <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 p-4 rounded-2xl shadow-lg shadow-amber-500/10 flex items-start gap-3">
+            <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 p-4 rounded-[8px] shadow-lg shadow-amber-500/10 flex items-start gap-3">
               <Info size={20} className="shrink-0 text-amber-500 mt-0.5" />
               <div className="min-w-0 flex-1">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Risultato parziale</h4>
@@ -707,9 +708,7 @@ export function SearchPanel() {
                   {partialErrors.map((message, index) => <li key={`${message}-${index}`}>{message}</li>)}
                 </ul>
               </div>
-              <button onClick={() => setPartialErrors([])} aria-label="Chiudi avviso risultato parziale" className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg focus-ring">
-                <X size={16} />
-              </button>
+              <IconButton size="sm" onClick={() => setPartialErrors([])} aria-label="Chiudi avviso risultato parziale" icon={<X aria-hidden />} className="shrink-0" />
             </div>
           </motion.div>
         )}
@@ -723,20 +722,15 @@ export function SearchPanel() {
             aria-live="assertive"
             aria-atomic="true"
           >
-            <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 p-4 rounded-2xl shadow-lg shadow-red-500/10 flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500">
+            <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 p-4 rounded-[8px] shadow-lg shadow-red-500/10 flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-[8px] bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500">
                 <SearchX size={20} />
               </div>
               <div className="flex-1 min-w-0 pt-0.5">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Errore di Ricerca</h4>
                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">{error}</p>
               </div>
-              <button
-                onClick={() => setError(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              >
-                <X size={16} />
-              </button>
+              <IconButton size="sm" onClick={() => setError(null)} aria-label="Chiudi l’errore" icon={<X aria-hidden />} className="shrink-0" />
             </div>
           </motion.div>
         )}
@@ -751,20 +745,15 @@ export function SearchPanel() {
             exit={{ opacity: 0, y: -20, x: '-50%' }}
             className={cn('fixed top-24 left-1/2 w-full max-w-md px-4', Z_INDEX.searchPanel)}
           >
-            <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-lg shadow-primary-500/10 flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
+            <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-[8px] shadow-lg shadow-primary-500/10 flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-[8px] bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
                 <Info size={20} />
               </div>
               <div className="flex-1 min-w-0 pt-0.5">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Navigazione allegato</h4>
                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">{annexToast.message}</p>
               </div>
-              <button
-                onClick={dismissAnnexToast}
-                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              >
-                <X size={16} />
-              </button>
+              <IconButton size="sm" onClick={dismissAnnexToast} aria-label="Chiudi l’avviso" icon={<X aria-hidden />} className="shrink-0" />
             </div>
           </motion.div>
         )}

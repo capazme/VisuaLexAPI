@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import type { ArticleDiscussionThread } from '../../../types';
 import type { LocatedThread } from '../../../utils/articleAnnotations';
 import { cn } from '../../../lib/utils';
-import { ease } from '../../../lib/motion';
+import { dur, ease } from '../../../lib/motion';
 import { placeGlossCards } from '../../../utils/glossLayout';
 import { rangeFromPlainOffsets } from '../../../utils/selectionOffset';
 
@@ -117,7 +117,7 @@ export function AlignedGlosses({ threads, located, textRootRef, contentKey, litI
   useLayoutEffect(() => {
     const path = wireRef.current;
     if (!wireId || !path || typeof path.animate !== 'function' || reduced()) return;
-    path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 200, easing: `cubic-bezier(${ease.out.join(', ')})` });
+    path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: dur.pop * 1000, easing: `cubic-bezier(${ease.out.join(', ')})` });
   }, [wireId]);
 
   return (

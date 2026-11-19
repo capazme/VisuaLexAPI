@@ -79,6 +79,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
     : `${name}: con del testo selezionato ${ink === 'none' ? 'ne toglie l’evidenziazione' : 'lo evidenzia'}; senza, si accende`;
   return (
     <div role="group" aria-label="Evidenziatore" className={cn('flex items-center', className)}>
+      {/* bare-button: a tool of the reading bars, in the bar's own look (`triggerClassName`: `Button`'s quiet in the article's). */}
       <button
         type="button"
         aria-pressed={on}
@@ -91,7 +92,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
         onClick={(event) => { event.stopPropagation(); press(); }}
         // 44 px wide on a phone whatever the bar's padding; a bar that keeps 44 px at every width says so in its classes.
         className={cn(
-          'inline-flex min-w-[44px] items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
+          'inline-flex min-w-[44px] items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
           triggerClassName,
           on && TOOL_PRESSED,
         )}
@@ -124,6 +125,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
       )}
       {/* The trigger's own look, as an icon: 44 px wide on a phone whatever the trigger's padding. */}
       {meaningsGear && !toggleOnly && (
+        // bare-button: as the tool beside it, in the bar's own look (`triggerClassName`).
         <button
           type="button"
           // As the menu's clicks, it never reaches the card it sits in (a dossier's row).
@@ -131,7 +133,7 @@ export function HighlighterButton({ triggerClassName, className, placement, mean
           aria-label={CHANGE_MEANINGS_LABEL}
           title={CHANGE_MEANINGS_LABEL}
           className={cn(
-            'inline-flex min-w-[44px] items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
+            'inline-flex min-w-[44px] items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-w-0',
             triggerClassName,
           )}
         >

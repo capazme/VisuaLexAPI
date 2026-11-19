@@ -1,5 +1,7 @@
 import { MessageCircle } from 'lucide-react';
-import { toolbarToggleClass } from './toolbarToggle';
+import { TOOL_PRESSED } from './toolbarToggle';
+import { IconButton } from '../../ui/IconButton';
+import { cn } from '../../../lib/utils';
 
 export interface DiscussionButtonProps {
     isOpen: boolean;
@@ -16,16 +18,16 @@ export interface DiscussionButtonProps {
  */
 export function DiscussionButton({ isOpen, onToggle, name, lockedReason }: DiscussionButtonProps) {
     return (
-        <button
+        <IconButton
+            size="sm"
             onClick={onToggle}
             aria-expanded={isOpen}
             aria-haspopup="dialog"
             aria-label={name}
-            className={toolbarToggleClass(isOpen, 'relative')}
+            className={cn('relative', isOpen && TOOL_PRESSED)}
             title={lockedReason ? `${name}: ${lockedReason}` : name}
             disabled={Boolean(lockedReason)}
-        >
-            <MessageCircle size={16} aria-hidden />
-        </button>
+            icon={<MessageCircle aria-hidden />}
+        />
     );
 }

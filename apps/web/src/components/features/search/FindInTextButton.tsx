@@ -1,7 +1,5 @@
 import { useEffect, useRef, type Ref } from 'react';
 import { Search } from 'lucide-react';
-import { FOCUS_RING } from '../../../constants/interactions';
-import { cn } from '../../../lib/utils';
 import { toolbarToggleClass } from './toolbarToggle';
 
 export interface FindInTextButtonProps {
@@ -44,6 +42,7 @@ export function FindInTextButton({ isOpen, onToggle, ref, size = 16 }: FindInTex
         };
     };
     return (
+        // bare-button: `toolbarToggleClass` is IconButton's small square, tinted while on; its icon keeps the row's size (16 or 20).
         <button
             ref={ref}
             type="button"
@@ -61,7 +60,7 @@ export function FindInTextButton({ isOpen, onToggle, ref, size = 16 }: FindInTex
             aria-pressed={isOpen}
             aria-label="Cerca nel testo"
             title="Cerca nel testo"
-            className={cn(toolbarToggleClass(isOpen), FOCUS_RING)}
+            className={toolbarToggleClass(isOpen)}
         >
             <Search size={size} aria-hidden />
         </button>

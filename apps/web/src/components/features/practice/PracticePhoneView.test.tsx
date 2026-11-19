@@ -190,7 +190,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(screen.queryByTestId('practice-column')).toBeNull();
     expect(screen.queryByTestId('practice-phone-view')).toBeNull();
     const back = within(reader).getByRole('button', { name: 'Pratica' });
-    expect(back).toHaveClass('min-h-[44px]');
+    expect(back).toHaveClass('min-h-11');
     expect(reader).toHaveAccessibleName('art. 5, l. 8 marzo 2017, n. 24');
     // the desktop's windows are untouched
     expect(s().practices[0].beside).toEqual([]);

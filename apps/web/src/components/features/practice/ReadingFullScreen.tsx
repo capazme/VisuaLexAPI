@@ -1,6 +1,5 @@
 import { ChevronLeft } from 'lucide-react';
-import { FOCUS_RING } from '../../../constants/interactions';
-import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { ReadingWindowBody } from './ReadingWindow';
@@ -36,20 +35,12 @@ export function ReadingFullScreen({ onCrossReference, practiceId }: ReadingFullS
       aria-label={title}
       data-testid="reading-full-screen"
       data-window-id={reader.ref.id}
-      className="flex h-app-row min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+      className="flex h-app-row min-w-0 flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
     >
       <header className="flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 dark:border-slate-700">
-        <button
-          type="button"
-          onClick={closePhoneReader}
-          className={cn(
-            'flex min-h-[44px] flex-shrink-0 items-center gap-1 rounded-lg pr-2 text-sm font-medium text-primary-700 transition-colors hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-700',
-            FOCUS_RING,
-          )}
-        >
-          <ChevronLeft size={18} aria-hidden />
+        <Button type="button" variant="quiet" size="lg" onClick={closePhoneReader} icon={<ChevronLeft size={18} aria-hidden />} className="shrink-0 gap-1 pl-0 pr-2">
           Pratica
-        </button>
+        </Button>
         <h3 title={title} className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">
           {title}
         </h3>

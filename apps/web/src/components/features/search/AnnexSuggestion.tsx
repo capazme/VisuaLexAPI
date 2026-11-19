@@ -94,7 +94,7 @@ export function AnnexSuggestion({
           exit={{ opacity: 0, y: -10, scale: 0.98 }}
           transition={spring.snappy}
           className={cn(
-            "flex items-center gap-3 p-3 rounded-xl border overflow-hidden relative",
+            "flex items-center gap-3 p-3 rounded-[8px] border overflow-hidden relative",
             // Flat paper with the notice's tint (Y1): no gradient, no glow.
             "bg-amber-50 dark:bg-amber-900/20",
             "border-amber-200/80 dark:border-amber-700/50",
@@ -103,7 +103,7 @@ export function AnnexSuggestion({
         >
           {/* Icon */}
           <motion.div
-            className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0"
+            className="w-9 h-9 rounded-[8px] bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0"
             initial={{ rotate: -10 }}
             animate={{ rotate: 0 }}
             transition={spring.gentle}
@@ -130,9 +130,9 @@ export function AnnexSuggestion({
             whileTap={{ scale: 0.97 }}
             className={cn(
               // The action in ink, as every primary action (Y1).
-              "relative flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold md:min-h-0",
+              "relative flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-md text-xs font-bold md:min-h-0",
               "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700",
-              "transition-[background-color,opacity] duration-200",
+              "transition-[background-color,opacity] duration-(--dur-pop)",
               FOCUS_RING,
               isLoading && "opacity-80 cursor-wait"
             )}
