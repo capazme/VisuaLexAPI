@@ -482,6 +482,7 @@ export function AdvancedExportModal({
         <div className="grid grid-cols-3 gap-2 sm:flex">
           <button
             onClick={() => setExportFormat('clipboard')}
+            aria-pressed={exportFormat === 'clipboard'}
             disabled={writingPdf}
             className={cn(
               TOUCH_TARGET_RESPONSIVE,
@@ -496,6 +497,7 @@ export function AdvancedExportModal({
           </button>
           <button
             onClick={() => setExportFormat('markdown')}
+            aria-pressed={exportFormat === 'markdown'}
             disabled={writingPdf}
             className={cn(
               TOUCH_TARGET_RESPONSIVE,
@@ -510,6 +512,7 @@ export function AdvancedExportModal({
           </button>
           <button
             onClick={() => setExportFormat('pdf')}
+            aria-pressed={exportFormat === 'pdf'}
             disabled={writingPdf}
             className={cn(
               TOUCH_TARGET_RESPONSIVE,
@@ -524,6 +527,7 @@ export function AdvancedExportModal({
           </button>
           <button
             onClick={() => setExportFormat('rtf')}
+            aria-pressed={exportFormat === 'rtf'}
             disabled={writingPdf}
             className={cn(
               TOUCH_TARGET_RESPONSIVE,
@@ -538,6 +542,7 @@ export function AdvancedExportModal({
           </button>
           <button
             onClick={() => setExportFormat('txt')}
+            aria-pressed={exportFormat === 'txt'}
             disabled={writingPdf}
             className={cn(
               TOUCH_TARGET_RESPONSIVE,

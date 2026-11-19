@@ -362,6 +362,30 @@ describe('ArticleTabContent — the way back and the way on', () => {
     expect(trigger).toHaveFocus();
   });
 
+  // LC139: a day the article did not exist on. The row read goes with the label pressed (the host puts the answer in
+  // its place): the focus goes to the notice, never to BODY; the label keeps the day and the way back is offered.
+  it('gives the focus to the «non esisteva» notice when the row asked from goes', async () => {
+    const first = show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
+    const chip = screen.getByRole('button', { name: /In vigore/ });
+    chip.focus();
+    fireEvent.click(chip);
+    const space = screen.getByRole('region', { name: 'Testo alla data' });
+    fireEvent.change(within(space).getByLabelText('Data'), { target: { value: '1935-01-01' } });
+    fireEvent.click(within(space).getByRole('button', { name: /Mostra il testo/ }));
+    expect(triggerSearch).toHaveBeenCalled();
+    // The answer comes: the row asked from is replaced, its label gone with it.
+    first.unmount();
+    expect(document.activeElement).toBe(document.body);
+    show(article(NOT_YET, { versione: 'vigente', data_versione: '1935-01-01' }));
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveTextContent('Questo articolo non esisteva al 1° gennaio 1935.');
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(notice);
+    expect(screen.getByRole('button', { name: 'Al 1° gennaio 1935 l’articolo non esisteva' })).toBeInTheDocument();
+    fireEvent.click(within(notice).getByRole('button', { name: 'Vai al testo attuale' }));
+    expect(triggerSearch.mock.calls.at(-1)?.[0]).toMatchObject({ version: 'vigente' });
+  });
+
   it('refuses an act of the Union in the dialog', () => {
     show(article(undefined, { tipo_atto: 'regolamento ue', allegato: undefined }));
     fireEvent.click(entry(openMore(), 'Testo alla data…'));

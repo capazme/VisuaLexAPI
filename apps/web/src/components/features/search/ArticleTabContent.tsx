@@ -826,6 +826,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // The glosses at the margin (LC74): beside the text where the card can widen, in the notes' column where that is
     // already there, else under the text. One margin per article, opened on its own.
     const articleRootRef = useRef<HTMLDivElement>(null);
+    // A day the article did not exist on: its notice stands where the text was, and the row that was read may have gone
+    // with the command pressed (a practice's row replaced by the answer). The focus the page was left with goes to the
+    // notice, never to BODY (LC139).
+    const stateRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const active = document.activeElement;
+        if (!display.textVisible && (active === null || active === document.body)) stateRef.current?.focus({ preventScroll: true });
+    }, [display.textVisible, data]);
     // As the side panel was: an article with an id, not a past text (a notice in place of the text keeps its glosses).
     const glossesEnabled = Boolean(discussionAnchor.articleId) && !readOnly;
     const [glossCount, setGlossCount] = useState(0);
@@ -1021,12 +1029,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             )}
 
             {display.banner && (
-                <VersionBanner
-                    // No address of the source, no «Copia link Normattiva».
-                    banner={handleCopyLink ? display.banner : { ...display.banner, actions: display.banner.actions.filter((a) => a !== 'copy_link') }}
-                    onAction={handleBannerAction}
-                    variant={display.textVisible ? 'banner' : 'state'}
-                />
+                <div ref={stateRef} tabIndex={-1} className="outline-none">
+                    <VersionBanner
+                        // No address of the source, no «Copia link Normattiva».
+                        banner={handleCopyLink ? display.banner : { ...display.banner, actions: display.banner.actions.filter((a) => a !== 'copy_link') }}
+                        onAction={handleBannerAction}
+                        variant={display.textVisible ? 'banner' : 'state'}
+                    />
+                </div>
             )}
 
             {display.textVisible && (
