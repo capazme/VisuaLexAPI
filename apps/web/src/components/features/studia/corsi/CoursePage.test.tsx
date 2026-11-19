@@ -342,7 +342,8 @@ describe('the course page', () => {
     get.mockRejectedValue({ status: 404, data: { detail: 'Percorso non trovato.' } });
     renderPage('altro');
     expect(await screen.findByText('Questo percorso non c’è: forse è stato eliminato.')).toBeInTheDocument();
-    expect(loadAssistantFeatures).toHaveBeenCalled();
+    // The check is an effect of the commit that draws the notice: it may run after the text is found (LC144).
+    await waitFor(() => expect(loadAssistantFeatures).toHaveBeenCalled());
   });
 
   it('a course trashed elsewhere, read again, is no longer kept on screen', async () => {
