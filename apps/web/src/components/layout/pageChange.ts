@@ -7,7 +7,8 @@ const RISE = 5;
  * The places that are one page with views of their own (`ViewSlide`, `PageSlide`): any address under them is that page,
  * and its views move on their own. Pratiche's views live in the query, not in the path.
  */
-const ONE_PAGE = ['/work', '/learn', '/forum/community', '/admin'];
+// Learn's planner first (LC130): it is a page of its own, not one of Learn's views.
+const ONE_PAGE = ['/work', '/learn/attivita', '/learn', '/forum/community', '/admin'];
 
 /** The page an address shows (LC126): what changes it plays the page's fade. */
 export function pageKeyOf(pathname: string): string {

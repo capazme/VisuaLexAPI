@@ -225,12 +225,14 @@ describe('SectionSwitcher (spec S3)', () => {
   });
 
   it("counts Opus's tasks for today on its entry, with no dot (planner)", () => {
-    plannerStore.setState({ todayCount: 2 });
+    plannerStore.setState({ todayCount: { work: 2, learn: 1 } });
     try {
       renderSwitcher('/forum');
       expect(screen.queryByTestId('forum-dot')).toBeNull();
       fireEvent.click(trigger());
       expect(screen.getByRole('menuitemradio', { name: /Work.*2 compiti per oggi o scaduti/ })).toBeInTheDocument();
+      // Learn's own tasks on Learn's entry (LC130).
+      expect(screen.getByRole('menuitemradio', { name: /Learn.*1 compito per oggi o scaduto/ })).toBeInTheDocument();
     } finally {
       plannerStore.setState({ todayCount: null });
     }

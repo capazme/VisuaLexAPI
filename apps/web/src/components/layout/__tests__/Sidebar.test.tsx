@@ -147,7 +147,7 @@ describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
     for (const state of ['unknown', 'off'] as const) {
       coursesSwitchStore.setState({ state });
       const { unmount } = renderSidebar('/learn/ripasso');
-      expect(studia()).toEqual(['/learn/ripasso', '/learn/progressi', '/pratiche', '/learn/schede']);
+      expect(studia()).toEqual(['/learn/ripasso', '/learn/progressi', '/learn/attivita/scadenziario', '/pratiche', '/learn/schede']);
       unmount();
     }
   });
@@ -155,7 +155,7 @@ describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
   it('comes second, Oggi · Percorsi · Progressi · Dossier, once the switch is on', () => {
     coursesSwitchStore.setState({ state: 'on' });
     renderSidebar('/learn/ripasso');
-    expect(studia()).toEqual(['/learn/ripasso', '/learn/percorsi', '/learn/progressi', '/pratiche', '/learn/schede']);
+    expect(studia()).toEqual(['/learn/ripasso', '/learn/percorsi', '/learn/progressi', '/learn/attivita/scadenziario', '/pratiche', '/learn/schede']);
     expect(screen.getByRole('link', { name: 'Percorsi' })).toBeInTheDocument();
   });
 });

@@ -1,7 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { FolderPlus } from 'lucide-react';
 import { Button } from '../../ui/Button';
-import { Modal } from '../../ui/Modal';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { getErrorMessage } from '../../../utils/errors';
 import type { StudyImportReport } from '../../../types';
@@ -12,7 +10,6 @@ export interface StudyImportSwitches {
 }
 
 export interface StudyImportDialogProps {
-  title: string;
   /** The sentence that says what becomes of what. */
   intro: ReactNode;
   dossiers: ReadonlyArray<{ id: string; title: string; items: readonly unknown[] }>;
@@ -27,6 +24,8 @@ export interface StudyImportDialogProps {
   run: (switches: StudyImportSwitches) => Promise<StudyImportReport>;
   onClose: () => void;
   onAdded: (report: StudyImportReport) => void;
+  /** The space's: Esc and «Chiudi» wait while the server works. */
+  setBusy?: (busy: boolean) => void;
 }
 
 const CHECKBOX = 'mt-0.5 h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
@@ -34,14 +33,16 @@ const CHECKBOX = 'mt-0.5 h-4 w-4 shrink-0 accent-primary-600 focus-visible:outli
 /**
  * Content that becomes the user's dossiers di studio (spec 2026-10-13-environments-into-forum, D8–D11): a Forum
  * item, an environment of the archive, an old environment link. The dossiers listed, the notes and highlights as
- * switches, one server request; never an existing dossier changed.
+ * switches, one server request; never an existing dossier changed. The content of a space in the page (`ForumSpace`,
+ * LC138, L-73), no longer a window: its host gives the title.
  */
 export function StudyImportDialog({
-  title, intro, dossiers, notes, highlights, shortcuts = 0, fromAuthor = false, confirmLabel, failure, run, onClose, onAdded,
+  intro, dossiers, notes, highlights, shortcuts = 0, fromAuthor = false, confirmLabel, failure, run, onClose, onAdded, setBusy: setSpaceBusy,
 }: StudyImportDialogProps) {
   const [addNotes, setAddNotes] = useState(notes > 0);
   const [addHighlights, setAddHighlights] = useState(highlights > 0);
-  const [busy, setBusy] = useState(false);
+  const [busy, setOwnBusy] = useState(false);
+  const setBusy = (value: boolean) => { setOwnBusy(value); setSpaceBusy?.(value); };
   const [error, setError] = useState<string | null>(null);
 
   const add = async () => {
@@ -56,61 +57,50 @@ export function StudyImportDialog({
   };
 
   return (
-    <Modal
-      isOpen
-      onClose={() => { if (!busy) onClose(); }}
-      title={title}
-      icon={<FolderPlus size={20} />}
-      size="md"
-      footer={(
-        <>
-          <Button variant="secondary" size="sm" className={TOUCH_TARGET_RESPONSIVE} disabled={busy} onClick={onClose}>Annulla</Button>
-          <Button size="sm" className={TOUCH_TARGET_RESPONSIVE} loading={busy} onClick={() => void add()}>{confirmLabel}</Button>
-        </>
-      )}
-    >
-      <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
-        <p>
-          {intro}
-          {' '}I tuoi dossier esistenti restano come sono.
-        </p>
-        <ul className="space-y-0.5">
-          {dossiers.map((d) => (
-            <li key={d.id}>
-              <span className="font-medium text-slate-900 dark:text-white">{d.title}</span>
-              <span className="text-slate-500"> · {d.items.length} {d.items.length === 1 ? 'voce' : 'voci'}</span>
-            </li>
-          ))}
-        </ul>
-        {(notes > 0 || highlights > 0) && (
-          <fieldset className="space-y-1">
-            <legend className="sr-only">Cosa aggiungere</legend>
-            {notes > 0 && (
-              <label className={`flex items-start gap-2 ${TOUCH_TARGET_RESPONSIVE}`}>
-                <input type="checkbox" checked={addNotes} onChange={(e) => setAddNotes(e.target.checked)} className={CHECKBOX} />
-                Le note ({notes})
-              </label>
-            )}
-            {highlights > 0 && (
-              <label className={`flex items-start gap-2 ${TOUCH_TARGET_RESPONSIVE}`}>
-                <input type="checkbox" checked={addHighlights} onChange={(e) => setAddHighlights(e.target.checked)} className={CHECKBOX} />
-                Le evidenziazioni ({highlights})
-              </label>
-            )}
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Note ed evidenziazioni si aggiungono agli articoli: le vedrai ovunque leggi quegli articoli{fromAuthor ? ', con il nome di chi le ha scritte' : ''}.
-              Quelle che hai già non si ripetono.
-            </p>
-          </fieldset>
-        )}
-        {shortcuts > 0 && (
+    <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
+      <p>
+        {intro}
+        {' '}I tuoi dossier esistenti restano come sono.
+      </p>
+      <ul className="space-y-0.5">
+        {dossiers.map((d) => (
+          <li key={d.id}>
+            <span className="font-medium text-slate-900 dark:text-white">{d.title}</span>
+            <span className="text-slate-500"> · {d.items.length} {d.items.length === 1 ? 'voce' : 'voci'}</span>
+          </li>
+        ))}
+      </ul>
+      {(notes > 0 || highlights > 0) && (
+        <fieldset className="space-y-1">
+          <legend className="sr-only">Cosa aggiungere</legend>
+          {notes > 0 && (
+            <label className={`flex items-start gap-2 ${TOUCH_TARGET_RESPONSIVE}`}>
+              <input type="checkbox" checked={addNotes} onChange={(e) => setAddNotes(e.target.checked)} className={CHECKBOX} />
+              Le note ({notes})
+            </label>
+          )}
+          {highlights > 0 && (
+            <label className={`flex items-start gap-2 ${TOUCH_TARGET_RESPONSIVE}`}>
+              <input type="checkbox" checked={addHighlights} onChange={(e) => setAddHighlights(e.target.checked)} className={CHECKBOX} />
+              Le evidenziazioni ({highlights})
+            </label>
+          )}
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Contiene anche {shortcuts} tra norme rapide e alias: si aggiungono ai tuoi, saltando quelli con lo stesso nome.
+            Note ed evidenziazioni si aggiungono agli articoli: le vedrai ovunque leggi quegli articoli{fromAuthor ? ', con il nome di chi le ha scritte' : ''}.
+            Quelle che hai già non si ripetono.
           </p>
-        )}
-        {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
+        </fieldset>
+      )}
+      {shortcuts > 0 && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Contiene anche {shortcuts} tra norme rapide e alias: si aggiungono ai tuoi, saltando quelli con lo stesso nome.
+        </p>
+      )}
+      {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
+      <div className="flex justify-end gap-3">
+        <Button variant="quiet" disabled={busy} onClick={onClose}>Annulla</Button>
+        <Button loading={busy} onClick={() => void add()}>{confirmLabel}</Button>
       </div>
-    </Modal>
+    </div>
   );
 }
-

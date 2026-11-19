@@ -284,6 +284,16 @@ function App() {
               <Route path="valida" element={<ValidationQueueView />} />
             </Route>
           )}
+          {/* Learn's own «Attività» (LC130): Work's planner page and views, with the «studio» tasks. */}
+          {isStudiaEnabled() && (
+            <Route path="learn/attivita" element={<OpusPage />}>
+              <Route index element={<Navigate to="scadenziario" replace />} />
+              <Route path="scadenziario" element={<TodayView />} />
+              <Route path="prossimi" element={<UpcomingView />} />
+              <Route path="ingresso" element={<InboxView />} />
+              <Route path="cestino" element={<TaskTrashView />} />
+            </Route>
+          )}
           <Route path="sentenze" element={<DecisionAddress />} />
           <Route path="sentenze/:corte/:numero/:anno" element={<DecisionAddress />} />
           {/* Global 404 catch-all (inside the layout: sidebar stays visible) */}

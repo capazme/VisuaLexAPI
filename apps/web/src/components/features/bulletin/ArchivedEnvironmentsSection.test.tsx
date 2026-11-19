@@ -27,7 +27,7 @@ describe('ArchivedEnvironmentsSection', () => {
     const onRecovered = vi.fn();
     render(<ArchivedEnvironmentsSection onRecovered={onRecovered} onMessage={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Recupera i dossier di «Privacy»' }));
-    const dialog = screen.getByRole('dialog', { name: 'Recupera i dossier' });
+    const dialog = screen.getByRole('region', { name: 'Recupera i dossier' });
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Le note (1)' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Recupera i dossier' }));
     await waitFor(() => expect(onRecovered).toHaveBeenCalled());
@@ -42,5 +42,21 @@ describe('ArchivedEnvironmentsSection', () => {
     expect(deleteEnvironment).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
     expect(deleteEnvironment).toHaveBeenCalledWith('e1');
+  });
+
+  // LC138 (L-73): «Recupera i dossier» opens in the section, not over it.
+  it('opens the recovery as a region that takes the focus; Esc closes it and gives the focus back', () => {
+    appStore.setState({ environments: [env] });
+    render(<ArchivedEnvironmentsSection onRecovered={vi.fn()} onMessage={vi.fn()} />);
+    const command = screen.getByRole('button', { name: 'Recupera i dossier di «Privacy»' });
+    command.focus();
+    fireEvent.click(command);
+    const region = screen.getByRole('region', { name: 'Recupera i dossier' });
+    expect(command).toHaveAttribute('aria-expanded', 'true');
+    expect(region).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Recupera i dossier' })).toBeNull();
+    expect(command).toHaveFocus();
   });
 });

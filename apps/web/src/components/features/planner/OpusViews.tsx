@@ -23,6 +23,7 @@ import { WeekStrip } from './WeekStrip';
 import { TaskListSkeleton, TaskViewEmpty, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { Arrive } from '../../ui/Arrive';
 import { useTaskView } from './useTaskView';
+import { inSection, useTaskSection } from './taskSection';
 import { plannerStore } from './plannerStore';
 
 interface FrameProps {
@@ -45,7 +46,8 @@ interface FrameProps {
  * at every width (LC83, L-73): no button floats over the list, no sheet rises over it.
  */
 function ViewFrame({ view, heading, line, defaults, before, children, empty }: FrameProps) {
-  const state = useTaskView(view);
+  // Work's or Learn's own tasks (LC130), as the page around the view says.
+  const state = useTaskView(view, undefined, useTaskSection());
   const today = state.answer?.today ?? todayInRome();
   const tasks = state.answer?.tasks ?? [];
   // The inbox has no group to carry its count: its tab does (LC83). The tasks, not their subtasks.
@@ -105,7 +107,12 @@ const NEXT_ROW = cn(
  */
 function TodayEmpty() {
   const dossiers = useAppStore((s) => s.dossiers);
-  const recent = [...dossiers].sort((a, b) => dossierRecency(b) - dossierRecency(a)).slice(0, 3);
+  // In Learn the pratiche di studio, in Work the others (LC130): the ones whose new tasks this list shows.
+  const section = useTaskSection();
+  const recent = [...dossiers]
+    .filter((d) => !section || inSection({ origin: d.kind ?? 'lavoro' }, section))
+    .sort((a, b) => dossierRecency(b) - dossierRecency(a))
+    .slice(0, 3);
   return (
     <div className="space-y-6">
       <p className="text-slate-700 dark:text-slate-300">Nessun compito per oggi</p>

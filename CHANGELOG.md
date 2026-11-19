@@ -12,6 +12,20 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.60.0] - 2026-11-19
+
+Two to-do lists, one for Work and one for Learn, and the Forum's windows inside the page. Web only, no
+migration. MERL-T stays off.
+
+### Work and Learn
+
+- Two to-do lists: Work's «Attività» and Learn's own, each with its path in the top bar; in the quick add, Enter
+  takes the first «#» suggestion (LC130, part 2).
+
+### Forum
+
+- Six Forum windows open in the page flow, one at a time, «Pubblica» and «Recupera» included (LC138, L-73).
+
 ## [1.59.0] - 2026-11-19
 
 The chronology of the facts in a work dossier, and no notifications timer left running after a test. Web only, no
