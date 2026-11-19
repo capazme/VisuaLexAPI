@@ -53,6 +53,7 @@ import { EditDossierPanel } from './EditDossierPanel';
 import { DossierVersionsCompare } from './DossierVersionsCompare';
 import { kindLabel } from './dossierKinds';
 import { DossierForumActions } from './DossierForumActions';
+import { PublishDossierDialog } from './PublishDossierDialog';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { AddNoteModal } from './AddNoteModal';
 import { saveBlob } from '../../../utils/saveBlob';
@@ -86,6 +87,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     moveToDossier,
     addToDossier,
     addNoteToDossier,
+    refreshDossier,
   } = useAppStore();
   const navigate = useNavigate();
 
@@ -116,6 +118,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [comparing, setComparing] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   // D7b: the flag again as the page mounts (it may have been switched since the app started); no polling.
   useEffect(() => { void loadAssistantFeatures(); }, []);
@@ -383,7 +386,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         <Download size={16} aria-hidden />
         <span className="hidden sm:inline">Esporta</span>
       </MenuButton>
-      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={HEADER_BUTTON} />
+      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={HEADER_BUTTON} onPublish={() => setPublishing(true)} publishOpen={publishing} />
       <MenuButton
         label="Altre azioni"
         triggerClassName={HEADER_ICON_BUTTON}
@@ -475,6 +478,44 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
         {/* «Modifica» opens here, under the header, in the page (LC107, L-73). */}
         <EditDossierPanel dossier={editing ? dossier : null} onClose={() => setEditing(false)} onSave={handleUpdateDossier} className="mb-6" />
+        {/* LC125: what the header's «Aggiungi», «Esporta» and «Pubblica nel Forum» ask, in the page under it, as «Modifica»
+            (L-73). The empty dossier's «Importa da norma» opens the same space. */}
+        <TreeNavigatorModal
+          open={treeNavigatorAct !== undefined}
+          initialAct={treeNavigatorAct ?? undefined}
+          onClose={() => setTreeNavigatorAct(undefined)}
+          onImport={handleTreeImport}
+          className="mb-6"
+        />
+        <AddNoteModal
+          open={noteTarget !== null}
+          heading={noteTarget?.heading}
+          confirmLabel={noteTarget?.aboutItemId ? "Aggiungi all'articolo" : 'Aggiungi alla pratica'}
+          onClose={() => setNoteTarget(null)}
+          onSave={handleAddNote}
+          className="mb-6"
+        />
+        <DossierPdfDialog
+          isOpen={pdfDialogOpen}
+          onClose={() => setPdfDialogOpen(false)}
+          decisions={fullLayout.decisions}
+          progress={pdfProgress}
+          onExport={(options) => void handleExportPdf(options)}
+          className="mb-6"
+        />
+        <PublishDossierDialog
+          open={publishing}
+          dossier={dossier}
+          otherDossiers={dossiers}
+          onClose={() => setPublishing(false)}
+          onPublished={(message) => {
+            setPublishing(false);
+            showToast(message, 'success');
+            void refreshDossier(dossier.id);
+          }}
+          onAlreadyPublished={() => void refreshDossier(dossier.id)}
+          className="mb-6"
+        />
         {/* LC121: two snapshots compared, in the page under the header, as «Modifica» (L-73). */}
         <DossierVersionsCompare dossierId={dossier.id} open={comparing} refreshKey={snapshots[0]?.id} onClose={() => setComparing(false)} className="mb-6" />
 
@@ -544,31 +585,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           {trash && recentlyRemoved}
         </div>
         </div>
-
-        {treeNavigatorAct !== undefined && (
-          <TreeNavigatorModal
-            initialAct={treeNavigatorAct ?? undefined}
-            onClose={() => setTreeNavigatorAct(undefined)}
-            onImport={handleTreeImport}
-          />
-        )}
-
-        {noteTarget && (
-          <AddNoteModal
-            heading={noteTarget.heading}
-            confirmLabel={noteTarget.aboutItemId ? "Aggiungi all'articolo" : 'Aggiungi alla pratica'}
-            onClose={() => setNoteTarget(null)}
-            onSave={handleAddNote}
-          />
-        )}
-
-        <DossierPdfDialog
-          isOpen={pdfDialogOpen}
-          onClose={() => setPdfDialogOpen(false)}
-          decisions={fullLayout.decisions}
-          progress={pdfProgress}
-          onExport={(options) => void handleExportPdf(options)}
-        />
 
         </div>
       </PageFrame>

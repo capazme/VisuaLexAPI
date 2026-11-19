@@ -151,7 +151,9 @@ export function CaseLawRow({
           <Button
             type="button"
             variant="quiet"
-            onClick={(e) => adding.open(e.currentTarget)}
+            onClick={adding.open}
+            aria-expanded={adding.isOpen}
+            aria-controls={adding.id}
             aria-label={estremi ? `Aggiungi alla pratica ${estremi}` : undefined}
             icon={<FolderPlus size={14} aria-hidden />}
             className="gap-1 px-2 text-sm"

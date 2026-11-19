@@ -17,7 +17,7 @@ beforeEach(() => {
 describe('TreeNavigatorModal', () => {
   it("opens on an act's index at once, and imports with the act's identity", async () => {
     const onImport = vi.fn();
-    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport}
+    render(<TreeNavigatorModal open onClose={() => {}} onImport={onImport}
       initialAct={{ tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31' }} />);
     await screen.findByText('Art. 3');
     expect(resolveAct).toHaveBeenCalledWith({ act_type: 'legge', act_number: '247', date: '2012-12-31' });
@@ -31,7 +31,7 @@ describe('TreeNavigatorModal', () => {
 
   it('stores the day as the source has it, not as it was typed, so the act is one block', async () => {
     const onImport = vi.fn();
-    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport} />);
+    render(<TreeNavigatorModal open onClose={() => {}} onImport={onImport} />);
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'legge' } });
     fireEvent.change(screen.getByPlaceholderText('241'), { target: { value: '247' } });
     fireEvent.change(screen.getByPlaceholderText('aaaa o gg-mm-aaaa'), { target: { value: '31-12-2012' } });
@@ -44,7 +44,7 @@ describe('TreeNavigatorModal', () => {
   });
 
   it('shows an act type the list does not offer', async () => {
-    render(<TreeNavigatorModal onClose={() => {}} onImport={() => {}}
+    render(<TreeNavigatorModal open onClose={() => {}} onImport={() => {}}
       initialAct={{ tipo_atto: 'legge regionale', numero_atto: '12', data: '2005-03-11' }} />);
     expect(screen.getByRole('combobox')).toHaveValue('legge regionale');
     await screen.findByText('Art. 1');
@@ -53,7 +53,7 @@ describe('TreeNavigatorModal', () => {
   it("offers the Union's regulations and directives, and imports them under the source's type", async () => {
     resolveAct.mockResolvedValue({ urn: 'https://eur-lex.europa.eu/eli/dir/2019/1937/oj/ita', norma: { tipo_atto: 'direttiva ue', numero_atto: '1937', data: '2019' } });
     const onImport = vi.fn();
-    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport} />);
+    render(<TreeNavigatorModal open onClose={() => {}} onImport={onImport} />);
     const select = screen.getByRole('combobox');
     expect(screen.getByRole('option', { name: 'Regolamento UE' })).toHaveValue('regolamento ue');
     fireEvent.change(select, { target: { value: 'direttiva ue' } });
@@ -71,7 +71,7 @@ describe('TreeNavigatorModal', () => {
   it('keeps only the year of an act of the Union, even when a full day is typed', async () => {
     resolveAct.mockResolvedValue({ urn: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita', norma: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016-04-27' } });
     const onImport = vi.fn();
-    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport} />);
+    render(<TreeNavigatorModal open onClose={() => {}} onImport={onImport} />);
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'regolamento ue' } });
     fireEvent.change(screen.getByPlaceholderText('241'), { target: { value: '679' } });
     fireEvent.change(screen.getByPlaceholderText('aaaa o gg-mm-aaaa'), { target: { value: '27-04-2016' } });
@@ -87,7 +87,7 @@ describe('TreeNavigatorModal', () => {
 describe('TreeNavigatorModal — a second search', () => {
   it("empties the first act's index, so a failed second search imports nothing under the wrong act", async () => {
     const onImport = vi.fn();
-    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport}
+    render(<TreeNavigatorModal open onClose={() => {}} onImport={onImport}
       initialAct={{ tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31' }} />);
     await screen.findByText('Art. 3');
     fireEvent.click(screen.getByText('Art. 3'));

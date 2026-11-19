@@ -19,7 +19,7 @@ function setup(props: Partial<React.ComponentProps<typeof DossierPdfDialog>> = {
 describe('DossierPdfDialog', () => {
   it('opens on the full text with every decision ticked, and exports exactly that', () => {
     const { onExport } = setup();
-    expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Esporta in PDF' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Testo completo' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Solo le parti evidenziate e annotate' })).not.toBeChecked();
     const group = screen.getByRole('group', { name: 'Sentenze' });
@@ -68,7 +68,7 @@ describe('DossierPdfDialog', () => {
     expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Annulla' })).toBeDisabled();
     expect(screen.getByRole('radio', { name: 'Testo completo' })).toBeDisabled();
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('region', { name: 'Esporta in PDF' }), { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -81,7 +81,7 @@ describe('DossierPdfDialog', () => {
     const { onClose } = setup();
     fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('region', { name: 'Esporta in PDF' }), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('button', { name: /Scarica PDF/ })).toHaveClass('min-h-11', 'md:min-h-9');
     expect(screen.getByRole('radio', { name: 'Testo completo' }).closest('label')?.className).toContain('min-h-[44px]');
@@ -89,6 +89,6 @@ describe('DossierPdfDialog', () => {
 
   it('draws nothing when closed', () => {
     setup({ isOpen: false });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
   });
 });

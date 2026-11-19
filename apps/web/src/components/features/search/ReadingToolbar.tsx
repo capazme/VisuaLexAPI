@@ -60,6 +60,10 @@ export interface ReadingToolbarProps {
     /** The dossier command's words; default «Al dossier» (a popover to choose one). «Aggiungi a questo dossier» in a
      *  dossier's «Lettura» (LC55). */
     dossierLabel?: string;
+    /** Whether the space it opens is open (LC125): its `aria-expanded`; undefined when it adds at once (a host dossier). */
+    dossierExpanded?: boolean;
+    /** The id of that space: its `aria-controls`. */
+    dossierControls?: string;
     /** No dossier command in the bar (LC61): the row offers it, or the article is already in the hosting dossier. */
     hideDossier?: boolean;
     onShareLink: () => void;
@@ -123,6 +127,8 @@ export function ReadingToolbar({
     onOpenCopyModal,
     onOpenDossier,
     dossierLabel,
+    dossierExpanded,
+    dossierControls,
     hideDossier,
     onShareLink,
     onCopyLink,
@@ -230,6 +236,8 @@ export function ReadingToolbar({
             type="button"
             variant="quiet"
             onClick={onOpenDossier}
+            aria-expanded={dossierExpanded}
+            aria-controls={dossierControls}
             className={TOOL_STATES}
             icon={<FolderPlus size={phone ? 18 : 16} aria-hidden />}
             aria-label={phone ? (dossierLabel ?? 'Alla pratica') : undefined}

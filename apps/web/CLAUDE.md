@@ -1167,9 +1167,9 @@ numbers are 14 px. The reader's dossier command
 additive: what leaves the dossier elsewhere stays on the table, marked. The Corpus, with no host dossier, keeps none of
 this; there (LC59) every article and identified decision row (`PracticeRowShell`'s `corpusItem`) and every hit of case law
 our reader opens (`CaseLawRow`'s `dossierItem`: the Cassazione's hits, the Union's judgments; wherever drawn, a dossier's
-«Lettura» included, where it too opens the popover) says «Aggiungi al dossier» and opens the reader's `AddToDossierPopover`, nothing saved before a dossier is chosen (`dossier/addFromResult.tsx`); a row
+«Lettura» included, where it too opens the space) says «Aggiungi al dossier» and opens the reader's `AddToDossierPopover`, in the page under the row (LC125, L-73: an `Expand`, no popover or sheet), nothing saved before a dossier is chosen (`dossier/addFromResult.tsx`); a row
 held says «Nel dossier «X»» or «In 2 dossier» by the popover's own rules (`dossierContainsArticle`, version included). On a
-phone a table row has it in its «⋯» with «Togli dal tavolo» (the popover is then the bottom sheet); a hit of case law, which
+phone a table row has it in its «⋯» with «Togli dal tavolo» (the same space under the row); a hit of case law, which
 has no «⋯», keeps the named button at every width. Massimario passages add nothing: a dossier holds no massima. The
 index entries of the reading view are not marked: the window they open beside has the reader's command.
 In the «Lettura» (LC58 c5) the dossier's own work is there too. A row of the dossier knows its entry (`RowDossier.itemId`;
@@ -2603,7 +2603,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   («Nel Forum · v N», «Ritirato dai dossier pubblici», «Ritirato dall'amministrazione») with «Aggiorna la versione
   pubblicata», «Ritira dai dossier pubblici» / «Ripubblica nel Forum», «Apri i dossier pubblici» and «Elimina dai
   dossier pubblici» (danger confirmation, «Eliminare la copia pubblicata?»);
-  each reads the dossier again (`refreshDossier`). `PublishDossierDialog` (a `ui/Modal`) asks title,
+  each reads the dossier again (`refreshDossier`). `PublishDossierDialog` (in the page since LC125, L-73: an `Expand`
+  under the header that `DossierDetailView` holds, not closed while the server works; its form is `PublishDossierForm`,
+  which the Forum's `PublishDossierPicker` still holds in a `ui/Modal`) asks title,
   description, category (`utils/forumCategories.ts`, the one list) and tags, reads the marks once, at
   opening, from the server (`publicationMarks.ts`: `loadPdfMarks`, never the browser's partial cache; a
   decision's anchors only when their words are still in its current text, `travellingSelection`, what is
@@ -2732,7 +2734,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
   norma» do not have (spec `docs/superpowers/specs/2026-10-13-dossier-pdf-decisions-design.md`).
-  «Esporta → PDF» opens `DossierPdfDialog` (a `ui/Modal`), which only asks: «Cosa
+  «Esporta → PDF» opens `DossierPdfDialog` (in the page under the header since LC125, L-73: an `Expand`), which only asks: «Cosa
   stampare» («Testo completo», the default, or «Solo le parti evidenziate e annotate») and, when the
   dossier holds decisions, «Sentenze» (a checkbox per decision, labelled `decisionCitationOf`, all ticked,
   «Tutte»/«Nessuna»); `DossierDetailView.handleExportPdf({ excerpts, decisionIds })` loads and writes, the
@@ -2771,8 +2773,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `addItem` POST hasn't returned a server id yet), replaying it once settled.
   Legacy status values still hydrate and simply render as unstarred.
 - **Collection**: `AddToDossierPopover.tsx` is the add-from-reading entry
-  point for articles (from `ReadingToolbar`) and for
-  decisions (`DecisionView`'s actions, with `sentenza`). It lists recent dossiers,
+  point for articles (from `ReadingToolbar`, opening under it) and for
+  decisions (`DecisionView`'s actions, with `sentenza`, opening under them): a space in the page (LC125, L-73, `Expand`). It lists recent dossiers,
   guards duplicates, and its inline "Nuovo dossier" waits for the server id
   before adding — `createDossier()` returns `Promise<string | null>`.
   `DossierModal` is create-only and opens on its form («Nuovo dossier», the name field focused; B7).
@@ -3254,7 +3256,8 @@ meant to stay split; add new features as new files, not inside the shells:
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
   (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),
-  `AddToDossierPopover.tsx`, one file per modal, shared helpers in
+  `AddToDossierPopover.tsx`, one file per space (LC125: the note, «Importa da norma», the PDF and «Pubblica nel Forum»
+  open under the header as `Expand`s, as «Modifica»; only the confirmations stay windows), shared helpers in
   `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
 - `features/bulletin/` — the Forum. Its area «Dossier pubblici»: «I dossier di studio pubblicati dalla comunità» (spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`; it absorbed «Ambienti»). Folder and
@@ -3303,8 +3306,8 @@ meant to stay split; add new features as new files, not inside the shells:
   on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
   card that comes leaves a smaller shift upwards). The search's hint is «Cerca un dossier…» (whole at 768 with the
   sidebar, where the search is 226 px), its name «Cerca nei dossier pubblici». «Pubblica un dossier»
-  is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
-  `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
+  is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own form,
+  `PublishDossierForm`, in the picker's window until the Forum's PR; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentPanel`, in the page since LC114, L-73: an `Expand` at the top of «I miei pubblicati», the
   common fields, not closed while the save travels) edits its name, description, category and tags only — what it
   holds changes from the dossier. «Suggerisci contenuto» on another's card (`SuggestContentPanel`, LC114, L-73: it

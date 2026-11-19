@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
@@ -42,7 +43,7 @@ beforeEach(() => {
 
 function renderPopover(onAdded = vi.fn(), onDuplicate?: (title: string) => void) {
   render(
-    <AddToDossierPopover isOpen anchorEl={document.body} onClose={() => {}} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />,
+    <AddToDossierPopover isOpen onClose={() => {}} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />,
   );
   return onAdded;
 }
@@ -90,7 +91,7 @@ describe('AddToDossierPopover', () => {
     const onClose = vi.fn();
     const onDuplicate = vi.fn();
     render(
-      <AddToDossierPopover isOpen anchorEl={document.body} onClose={onClose} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />,
+      <AddToDossierPopover isOpen onClose={onClose} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /con duplicato/i }));
     expect(onDuplicate).toHaveBeenCalledWith('Con duplicato');
@@ -131,7 +132,7 @@ describe('AddToDossierPopover with a decision', () => {
 
   it('adds the decision as a sentenza item', () => {
     const onAdded = vi.fn();
-    render(<AddToDossierPopover isOpen anchorEl={document.body} onClose={() => {}} sentenza={sentenza} onAdded={onAdded} />);
+    render(<AddToDossierPopover isOpen onClose={() => {}} sentenza={sentenza} onAdded={onAdded} />);
     fireEvent.click(screen.getByRole('button', { name: /pratica recente/i }));
     const items = appStore.getState().dossiers.find(d => d.id === 'recent')!.items;
     expect(items[items.length - 1]).toMatchObject({ type: 'sentenza', data: sentenza });
@@ -148,7 +149,7 @@ describe('AddToDossierPopover with a decision', () => {
       ] },
     ] });
     const onDuplicate = vi.fn();
-    render(<AddToDossierPopover isOpen anchorEl={document.body} onClose={() => {}} sentenza={sentenza} onAdded={vi.fn()} onDuplicate={onDuplicate} />);
+    render(<AddToDossierPopover isOpen onClose={() => {}} sentenza={sentenza} onAdded={vi.fn()} onDuplicate={onDuplicate} />);
     expect(screen.getByRole('button', { name: /con un articolo/i })).not.toHaveTextContent(/già presente/i);
     fireEvent.click(screen.getByRole('button', { name: /con la sentenza/i }));
     expect(onDuplicate).toHaveBeenCalledWith('Con la sentenza');
@@ -185,5 +186,50 @@ describe('AddToDossierPopover with a decision', () => {
     ];
     // The rows and the field keep their own 44 px; the buttons take `Button`'s (`min-h-11` below md, LC106).
     for (const control of controls) expect(control.className).toMatch(/min-h-\[44px\]|min-h-11/);
+  });
+});
+
+describe('AddToDossierPopover in the page (LC125, L-73)', () => {
+  function Host({ onAdded }: { onAdded: (id: string, title: string) => void }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" aria-expanded={open} onClick={() => setOpen(true)}>Aggiungi alla pratica</button>
+        <AddToDossierPopover isOpen={open} onClose={() => setOpen(false)} norma={norma} onAdded={onAdded} />
+      </>
+    );
+  }
+
+  it('opens under its command as a region, takes the focus, and Esc gives it back', () => {
+    render(<Host onAdded={vi.fn()} />);
+    const command = screen.getByRole('button', { name: 'Aggiungi alla pratica' });
+    command.focus();
+    fireEvent.click(command);
+    const region = screen.getByRole('region', { name: 'Aggiungi alla pratica' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(command.nextElementSibling).toBe(region);
+    expect(document.activeElement).toBe(region);
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(document.activeElement).toBe(command);
+  });
+
+  it('saves for real: the article goes into the dossier chosen and the space closes', () => {
+    const onAdded = vi.fn();
+    render(<Host onAdded={onAdded} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: /pratica vecchia/i }));
+    expect(appStore.getState().dossiers.find((d) => d.id === 'old')!.items).toMatchObject([{ type: 'norma', data: norma }]);
+    expect(onAdded).toHaveBeenCalledWith('old', 'Pratica vecchia');
+    expect(screen.queryByRole('region')).toBeNull();
+  });
+
+  it('Esc in the new practice\'s name closes the name, not the space', () => {
+    render(<Host onAdded={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica' }));
+    fireEvent.click(screen.getByRole('button', { name: /Nuova pratica/ }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nome della nuova pratica' }), { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Nome della nuova pratica' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Aggiungi alla pratica' })).toBeInTheDocument();
   });
 });

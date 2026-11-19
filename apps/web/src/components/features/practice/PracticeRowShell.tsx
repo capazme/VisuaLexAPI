@@ -174,7 +174,7 @@ export function PracticeRowShell({
           </Button>
         )}
         {corpus && (
-          <Button type="button" variant="quiet" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi alla pratica ${removeName}`} title="Aggiungi alla pratica" icon={<FolderPlus size={14} aria-hidden />} className={cn(ROW_COMMAND, 'hidden md:inline-flex')}>
+          <Button type="button" variant="quiet" onClick={adding.open} aria-expanded={adding.isOpen} aria-controls={adding.id} aria-label={`Aggiungi alla pratica ${removeName}`} title="Aggiungi alla pratica" icon={<FolderPlus size={14} aria-hidden />} className={cn(ROW_COMMAND, 'hidden md:inline-flex')}>
             {/* Icon only in a narrow column: the row's name is never the one cut. */}
             <span className="hidden @[40rem]:inline">Aggiungi alla pratica</span>
           </Button>
@@ -211,14 +211,14 @@ export function PracticeRowShell({
           </MenuButton>
         ) : (
           <>
-            {/* A phone has «Aggiungi al dossier» in the row's «⋯», with its name; the popover is then the bottom sheet. */}
+            {/* A phone has «Aggiungi al dossier» in the row's «⋯», with its name; it opens the same space under the row. */}
             {corpus && (
               <MenuButton
                 label={`Azioni su ${removeName}`}
                 className="md:hidden"
                 triggerClassName={ROW_MENU}
                 items={[
-                  { label: 'Aggiungi alla pratica', icon: FolderPlus, onSelect: () => adding.open(null) },
+                  { label: 'Aggiungi alla pratica', icon: FolderPlus, onSelect: adding.open },
                   { label: 'Togli dal tavolo', icon: X, danger: true, onSelect: onRemove },
                 ]}
               >
@@ -235,8 +235,9 @@ export function PracticeRowShell({
             />
           </>
         )}
-        {adding.popover}
       </div>
+      {/* «Aggiungi alla pratica» opens under the row's heading, in the page (LC125, L-73). */}
+      {adding.popover}
       {/* The mark goes under the name, never beside it: the row's name is never the one cut (#536). */}
       {heldIn && (
         <div className="flex pl-7 md:pl-8">

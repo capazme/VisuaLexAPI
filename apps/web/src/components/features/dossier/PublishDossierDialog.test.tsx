@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import type { Dossier, DossierItem, NormaVisitata } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { PublishDossierDialog } from './PublishDossierDialog';
@@ -26,9 +27,9 @@ const onAlreadyPublished = vi.fn();
 
 function open(d: Dossier = dossier(), others: Dossier[] = []) {
   const onPublished = vi.fn();
-  const view = render(<PublishDossierDialog dossier={d} otherDossiers={others} onClose={() => {}} onPublished={onPublished} onAlreadyPublished={onAlreadyPublished} />);
+  const view = render(<PublishDossierDialog open dossier={d} otherDossiers={others} onClose={() => {}} onPublished={onPublished} onAlreadyPublished={onAlreadyPublished} />);
   const rerender = (next: Dossier) => view.rerender(
-    <PublishDossierDialog dossier={next} otherDossiers={others} onClose={() => {}} onPublished={onPublished} onAlreadyPublished={onAlreadyPublished} />,
+    <PublishDossierDialog open dossier={next} otherDossiers={others} onClose={() => {}} onPublished={onPublished} onAlreadyPublished={onAlreadyPublished} />,
   );
   return Object.assign(onPublished, { rerender });
 }
@@ -178,5 +179,50 @@ describe('PublishDossierDialog', () => {
     expect(await screen.findByText(/Non riesco a leggere le note/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ho controllato: non contiene dati personali' }));
     expect(publishButton()).toBeDisabled();
+  });
+});
+
+describe('PublishDossierDialog in the page (LC125, L-73)', () => {
+  function Host({ onPublished }: { onPublished: (message: string) => void }) {
+    const [isOpen, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>Pubblica nel Forum</button>
+        <PublishDossierDialog open={isOpen} dossier={dossier()} otherDossiers={[]} onClose={() => setOpen(false)}
+          onPublished={(message) => { setOpen(false); onPublished(message); }} onAlreadyPublished={onAlreadyPublished} />
+      </>
+    );
+  }
+
+  it('opens as a region with the focus on it, not in the title; Esc closes it and gives the focus back', async () => {
+    render(<Host onPublished={vi.fn()} />);
+    const command = screen.getByRole('button', { name: 'Pubblica nel Forum' });
+    command.focus();
+    fireEvent.click(command);
+    const region = screen.getByRole('region', { name: 'Pubblica nel Forum' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(region);
+    await screen.findByText(/1 voce/);
+    fireEvent.keyDown(screen.getByLabelText('Titolo nel Forum'), { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Pubblica nel Forum' })).toBeNull();
+    expect(document.activeElement).toBe(command);
+  });
+
+  it('does not close on Esc while the server works, then publishes for real and closes', async () => {
+    let answer: (value: { id: string }) => void = () => {};
+    service.publish.mockReturnValue(new Promise((ok) => { answer = ok; }));
+    const onPublished = vi.fn();
+    render(<Host onPublished={onPublished} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica nel Forum' }));
+    await screen.findByText(/1 voce/);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ho controllato: non contiene dati personali' }));
+    fireEvent.click(publishButton());
+    const region = screen.getByRole('region', { name: 'Pubblica nel Forum' });
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
+    answer({ id: 'e1' });
+    await waitFor(() => expect(onPublished).toHaveBeenCalledWith('Dossier pubblicato nel Forum'));
+    expect(service.publish).toHaveBeenCalledWith(expect.objectContaining({ sourceDossierId: 'd', title: 'Rossi c. Bianchi' }));
+    expect(screen.queryByRole('region', { name: 'Pubblica nel Forum' })).toBeNull();
   });
 });
