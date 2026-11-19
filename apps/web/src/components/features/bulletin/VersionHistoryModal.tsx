@@ -2,7 +2,6 @@ import { useEffect, useId, useState } from 'react';
 import { History, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
 import { ForumSpace } from './ForumSpace';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment, SharedEnvironmentVersion } from '../../../types';
@@ -98,11 +97,12 @@ function VersionList({ environment, spaceId, onRestored }: { environment: Shared
           Nessuna versione precedente. Una versione nuova nasce a ogni «Aggiorna la versione pubblicata» dal dossier.
         </div>
       ) : (
-        <ul className="space-y-2">
+        // Rows parted by a line, not boxes inside the space's box.
+        <ul className="divide-y divide-slate-200 dark:divide-slate-700">
           {versions.map((version) => (
             <li
               key={version.id}
-              className={`flex items-start justify-between gap-4 px-4 py-3 ${CARD_RADIUS} ${CONTROL_BORDER} bg-white dark:bg-slate-800`}
+              className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">

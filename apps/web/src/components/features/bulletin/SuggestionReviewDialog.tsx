@@ -1,16 +1,31 @@
-import { useMemo, useState } from 'react';
-import { X, Check, X as XIcon, FileText, Highlighter, Folder, Zap, Link2, ChevronDown, ChevronRight } from 'lucide-react';
+import { useId, useMemo, useState } from 'react';
+import { Check, X as XIcon, FileText, Highlighter, Folder, Zap, Link2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import type { EnvironmentSuggestion, SuggestionItem, SuggestionItemType } from '../../../types';
 import { SuggestionItemCard } from './SuggestionItemCard';
+import { itemName } from './suggestionItemName';
+import { ForumSpace } from './ForumSpace';
+import { AliasConflictDialog, type AliasChoice } from './AliasConflictDialog';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Textarea } from '../../ui/Textarea';
+import { Expand } from '../../ui/Expand';
+import { CONTROL_BORDER, CONTROL_RADIUS } from '../../ui/controlStyles';
 
 export type TakeResult =
   | { kind: 'ok' }
   | { kind: 'alias_conflict'; itemId: string; suggestedTrigger: string; existingAliasId?: string };
 
+export interface AliasConflict { itemId: string; suggestedTrigger: string; existingAliasId?: string }
+
 interface SuggestionReviewDialogProps {
-  suggestion: EnvironmentSuggestion;
+  /** The received suggestion reviewed; null, closed. */
+  suggestion: EnvironmentSuggestion | null;
   onTake: (itemId: string) => Promise<TakeResult>;
   onDecline: (itemId: string, reviewNote?: string) => Promise<void>;
+  /** A 409 on an alias item's «Prendi»: the choice opens under that item. */
+  aliasConflict: AliasConflict | null;
+  onAliasChoose: (choice: AliasChoice) => Promise<void>;
+  onAliasCancel: () => void;
   onClose: () => void;
 }
 
@@ -23,10 +38,36 @@ const SECTION_META: Record<SuggestionItemType, { label: string; Icon: typeof Fil
   alias: { label: 'Alias', Icon: Link2 },
 };
 
-export function SuggestionReviewDialog({ suggestion, onTake, onDecline, onClose }: SuggestionReviewDialogProps) {
+/**
+ * A received suggestion's review, in the page at the top of Suggerimenti (LC140, L-73; it was a window with a veil):
+ * its items grouped by kind, each to take or decline. «Rifiuta» opens its note under the item; an alias whose trigger
+ * the user already has opens the choice under the item. While the server works the focus waits on the space, since the
+ * pressed button goes with the item's new state.
+ */
+export function SuggestionReviewDialog({ suggestion, onClose, ...rest }: SuggestionReviewDialogProps) {
+  const spaceId = useId();
+  return (
+    <ForumSpace
+      id={spaceId}
+      value={suggestion}
+      onClose={onClose}
+      title={(s) => `Suggerimento da @${s.suggester.username}`}
+      line={(s) => `per «${s.sharedEnvironment?.title ?? ''}» · ${new Date(s.createdAt).toLocaleDateString('it-IT')} · ${s.counts.taken + s.counts.declined}/${s.items.length} revisionati`}
+    >
+      {(s, setBusy) => <Review suggestion={s} spaceId={spaceId} setBusy={setBusy} {...rest} />}
+    </ForumSpace>
+  );
+}
+
+function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict, onAliasChoose, onAliasCancel }:
+  Omit<SuggestionReviewDialogProps, 'suggestion' | 'onClose'> & { suggestion: EnvironmentSuggestion; spaceId: string; setBusy: (busy: boolean) => void }) {
   const [declineTargetId, setDeclineTargetId] = useState<string | null>(null);
   const [declineNote, setDeclineNote] = useState('');
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [aliasBusy, setAliasBusy] = useState(false);
+  // The last conflict, kept while its choice closes: the closing shows it, not an empty box.
+  const [shownConflict, setShownConflict] = useState(aliasConflict);
+  if (aliasConflict && aliasConflict !== shownConflict) setShownConflict(aliasConflict);
   const [expanded, setExpanded] = useState<Record<SuggestionItemType, boolean>>({
     annotation: true, highlight: false, dossier: false, quickNorm: false, alias: false,
   });
@@ -39,164 +80,173 @@ export function SuggestionReviewDialog({ suggestion, onTake, onDecline, onClose 
     return acc;
   }, [suggestion.items]);
 
-  const reviewedCount = suggestion.counts.taken + suggestion.counts.declined;
-  const totalCount = suggestion.items.length;
+  const takeId = (itemId: string) => `${spaceId}-take-${itemId}`;
+  const focusSpace = () => document.getElementById(spaceId)?.focus({ preventScroll: true });
+  const working = (itemId: string | null) => {
+    setBusyItemId(itemId);
+    setBusy(itemId !== null);
+    if (itemId) focusSpace();
+  };
 
   const handleTake = async (itemId: string) => {
-    setBusyItemId(itemId);
+    working(itemId);
     try {
       await onTake(itemId);
     } finally {
-      setBusyItemId(null);
+      working(null);
     }
   };
 
+  const closeDecline = () => { setDeclineTargetId(null); setDeclineNote(''); };
   const handleConfirmDecline = async () => {
     if (!declineTargetId) return;
-    setBusyItemId(declineTargetId);
+    working(declineTargetId);
     try {
       await onDecline(declineTargetId, declineNote.trim() || undefined);
     } finally {
-      setBusyItemId(null);
-      setDeclineTargetId(null);
-      setDeclineNote('');
+      working(null);
+      closeDecline();
+    }
+  };
+
+  // «Prendi» was disabled as the choice opened: the focus goes back to it by hand, or to the space once it is gone.
+  const backToTake = (itemId: string) => {
+    const take = document.getElementById(takeId(itemId)) as HTMLButtonElement | null;
+    if (take && !take.disabled) take.focus({ preventScroll: true });
+    else focusSpace();
+  };
+  const cancelAlias = () => {
+    if (aliasBusy || !aliasConflict) return;
+    backToTake(aliasConflict.itemId);
+    onAliasCancel();
+  };
+  const chooseAlias = async (choice: AliasChoice) => {
+    if (!aliasConflict) return;
+    const { itemId } = aliasConflict;
+    if (choice.action === 'skip') { backToTake(itemId); onAliasCancel(); return; }
+    setAliasBusy(true);
+    setBusy(true);
+    try {
+      await onAliasChoose(choice);
+    } finally {
+      setAliasBusy(false);
+      setBusy(false);
+      focusSpace();
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Suggerimento da @{suggestion.suggester.username}
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              per "{suggestion.sharedEnvironment?.title}" · {new Date(suggestion.createdAt).toLocaleDateString('it-IT')}
-            </p>
-            {suggestion.message && (
-              <p className="mt-2 text-sm italic text-slate-700 dark:text-slate-300 max-w-prose">
-                "{suggestion.message}"
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Body: grouped items */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {SECTION_ORDER.map((type) => {
-            const items = grouped[type];
-            if (items.length === 0) return null;
-            const { label, Icon } = SECTION_META[type];
-            const isOpen = expanded[type];
-            return (
-              <div key={type}>
-                <button
-                  type="button"
-                  onClick={() => setExpanded(prev => ({ ...prev, [type]: !prev[type] }))}
-                  aria-expanded={isOpen}
-                  aria-label={`${isOpen ? 'Comprimi' : 'Espandi'} ${label}`}
-                  className="w-full flex items-center gap-2 px-1 py-1 text-left text-sm font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
-                >
-                  {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  <Icon size={16} />
-                  {label} ({items.length})
-                </button>
-                {isOpen && (
-                  <div className="mt-2 space-y-2">
-                    {items.map(item => (
+    <>
+      {suggestion.message && (
+        <p className="text-sm italic text-slate-700 dark:text-slate-300 max-w-prose">«{suggestion.message}»</p>
+      )}
+      {SECTION_ORDER.map((type) => {
+        const items = grouped[type];
+        if (items.length === 0) return null;
+        const { label, Icon } = SECTION_META[type];
+        const isOpen = expanded[type];
+        return (
+          <div key={type}>
+            <Button
+              variant="quiet"
+              size="sm"
+              onClick={() => setExpanded(prev => ({ ...prev, [type]: !prev[type] }))}
+              aria-expanded={isOpen}
+              icon={isOpen ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}
+              className="font-medium"
+            >
+              <Icon size={16} aria-hidden />
+              {label} ({items.length})
+            </Button>
+            {isOpen && (
+              <div className="mt-2 space-y-2">
+                {items.map(item => {
+                  const name = itemName(item);
+                  const conflict = shownConflict?.itemId === item.id ? shownConflict : null;
+                  return (
+                    <div key={item.id}>
                       <SuggestionItemCard
-                        key={item.id}
                         item={item}
                         actions={
                           <>
-                            <button
-                              onClick={() => handleTake(item.id)}
+                            <IconButton
+                              id={takeId(item.id)}
+                              onClick={() => void handleTake(item.id)}
                               disabled={busyItemId === item.id}
-                              title="Prendi"
-                              className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 disabled:opacity-50"
-                            >
-                              <Check size={16} />
-                            </button>
-                            <button
-                              onClick={() => setDeclineTargetId(item.id)}
+                              aria-label={`Prendi ${name}`}
+                              icon={<Check aria-hidden />}
+                              className="text-green-700 dark:text-green-300"
+                            />
+                            <IconButton
+                              onClick={() => { setDeclineTargetId(item.id); setDeclineNote(''); }}
                               disabled={busyItemId === item.id}
-                              title="Rifiuta"
-                              className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 disabled:opacity-50"
-                            >
-                              <XIcon size={16} />
-                            </button>
+                              aria-label={`Rifiuta ${name}`}
+                              aria-expanded={declineTargetId === item.id}
+                              icon={<XIcon aria-hidden />}
+                              className="text-red-700 dark:text-red-300"
+                            />
                           </>
                         }
                         footer={item.status === 'declined' && item.reviewNote ? (
                           <p className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">
-                            Nota: "{item.reviewNote}"
+                            Nota: «{item.reviewNote}»
                           </p>
                         ) : null}
                       />
-                    ))}
-                  </div>
-                )}
+                      {/* «Rifiuta»: the note opens under the item (LC140, L-73). */}
+                      <Expand
+                        open={declineTargetId === item.id && item.status === 'pending'}
+                        onClose={() => { if (busyItemId !== item.id) closeDecline(); }}
+                        role="region"
+                        aria-label={`Rifiuta ${name}`}
+                        className={`mt-2 ${CONTROL_RADIUS} ${CONTROL_BORDER} p-3`}
+                      >
+                        <Textarea
+                          label="Nota per chi ha suggerito (facoltativa)"
+                          value={declineNote}
+                          onChange={(e) => setDeclineNote(e.target.value.slice(0, 500))}
+                          rows={3}
+                          className="resize-none"
+                        />
+                        <p className="text-xs text-slate-500 text-right">{declineNote.length}/500</p>
+                        <div className="mt-2 flex justify-end gap-2">
+                          <Button variant="quiet" onClick={closeDecline} disabled={busyItemId === item.id}>Annulla</Button>
+                          <Button variant="danger" onClick={() => void handleConfirmDecline()} loading={busyItemId === item.id}>
+                            Conferma rifiuto
+                          </Button>
+                        </div>
+                      </Expand>
+                      {/* An alias whose trigger the user already has: the choice opens under the item (LC140, L-73). */}
+                      <Expand
+                        open={aliasConflict?.itemId === item.id}
+                        onClose={cancelAlias}
+                        role="region"
+                        aria-label="Trigger già in uso"
+                        className={`mt-2 ${CONTROL_RADIUS} ${CONTROL_BORDER} p-3`}
+                      >
+                        {conflict && (
+                          <>
+                            <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                              <AlertTriangle size={16} aria-hidden className="shrink-0 text-amber-500" />
+                              Trigger già in uso
+                            </p>
+                            <AliasConflictDialog
+                              suggestedTrigger={conflict.suggestedTrigger}
+                              busy={aliasBusy}
+                              onChoose={(choice) => void chooseAlias(choice)}
+                              onClose={cancelAlias}
+                            />
+                          </>
+                        )}
+                      </Expand>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-
-        {/* Footer: progress + close */}
-        <div className="flex items-center justify-between px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-          <span className="text-sm text-slate-600 dark:text-slate-400">
-            {reviewedCount}/{totalCount} revisionati
-          </span>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-          >
-            Chiudi
-          </button>
-        </div>
-
-        {/* Decline popover (inline modal) */}
-        {declineTargetId && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center p-4 bg-black/40">
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md p-5">
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2">Rifiuta questo item</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                Puoi opzionalmente aggiungere una nota per il suggeritore (max 500 caratteri).
-              </p>
-              <textarea
-                aria-label="Nota per il suggeritore"
-                value={declineNote}
-                onChange={(e) => setDeclineNote(e.target.value.slice(0, 500))}
-                rows={3}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
-              />
-              <div className="text-xs text-slate-500 text-right">{declineNote.length}/500</div>
-              <div className="mt-3 flex justify-end gap-2">
-                <button
-                  onClick={() => { setDeclineTargetId(null); setDeclineNote(''); }}
-                  className="px-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={handleConfirmDecline}
-                  disabled={busyItemId === declineTargetId}
-                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  Conferma rifiuto
-                </button>
-              </div>
-            </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
+        );
+      })}
+    </>
   );
 }

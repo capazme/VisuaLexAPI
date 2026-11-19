@@ -1,9 +1,15 @@
 import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { CONTROL_BORDER, CONTROL_RADIUS } from '../../ui/controlStyles';
+
+export type AliasChoice = { action: 'replace' } | { action: 'rename'; newTrigger: string } | { action: 'skip' };
 
 interface AliasConflictDialogProps {
   suggestedTrigger: string;
-  onChoose: (choice: { action: 'replace' } | { action: 'rename'; newTrigger: string } | { action: 'skip' }) => void;
+  /** While the server works: the choices wait. */
+  busy?: boolean;
+  onChoose: (choice: AliasChoice) => void;
   onClose: () => void;
 }
 
@@ -12,73 +18,53 @@ interface AliasConflictDialogProps {
 // alphanumeric plus dash/underscore/dot.
 const TRIGGER_RE = /^[a-zA-Z0-9\-_.]+$/;
 
-export function AliasConflictDialog({ suggestedTrigger, onChoose, onClose }: AliasConflictDialogProps) {
+/**
+ * An alias item whose trigger the user already has (a 409 on «Prendi»): replace, rename or skip. In the page under the
+ * item, inside the review (LC140, L-73; it was a window with a veil); the space around it is the review's.
+ */
+export function AliasConflictDialog({ suggestedTrigger, busy = false, onChoose, onClose }: AliasConflictDialogProps) {
   const [renameValue, setRenameValue] = useState(`${suggestedTrigger}-2`);
   const trimmed = renameValue.trim();
   const isValidTrigger = trimmed.length >= 2 && TRIGGER_RE.test(trimmed);
+  const box = `${CONTROL_RADIUS} ${CONTROL_BORDER} px-3 py-2`;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md p-5">
-        <div className="flex items-start gap-3 mb-4">
-          <AlertTriangle className="text-amber-500 shrink-0" size={20} />
-          <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-              Trigger già in uso
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              Hai già un alias con trigger <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{suggestedTrigger}</code>. Come vuoi procedere?
-            </p>
+    <div className="space-y-2">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Hai già un alias con trigger <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded-[4px]">{suggestedTrigger}</code>. Come vuoi procedere?
+      </p>
+
+      <div className={`${box} flex flex-wrap items-center justify-between gap-2`}>
+        <span className="text-xs text-slate-500 dark:text-slate-400">Il tuo alias esistente verrà eliminato.</span>
+        <Button variant="secondary" onClick={() => onChoose({ action: 'replace' })} disabled={busy}>Sostituisci il mio alias</Button>
+      </div>
+
+      <div className={box}>
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <Input
+              label="Rinomina prima di importare"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              error={trimmed && !isValidTrigger ? 'Il trigger deve avere almeno 2 caratteri (lettere, numeri, - _ .)' : undefined}
+            />
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <button
-            onClick={() => onChoose({ action: 'replace' })}
-            className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          <Button
+            onClick={() => onChoose({ action: 'rename', newTrigger: trimmed })}
+            disabled={busy || !isValidTrigger || trimmed === suggestedTrigger}
           >
-            <div className="text-sm font-medium text-slate-900 dark:text-white">Sostituisci il mio alias</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">Il tuo alias esistente verrà eliminato.</div>
-          </button>
-
-          <div className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="text-sm font-medium text-slate-900 dark:text-white mb-1">Rinomina prima di importare</div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                className="flex-1 px-2 py-1 text-sm rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-              <button
-                onClick={() => onChoose({ action: 'rename', newTrigger: trimmed })}
-                disabled={!isValidTrigger || trimmed === suggestedTrigger}
-                className="px-3 py-1 text-sm bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Usa
-              </button>
-            </div>
-            {trimmed && !isValidTrigger && (
-              <p className="text-xs text-red-500 mt-1">
-                Il trigger deve avere almeno 2 caratteri (lettere, numeri, - _ .)
-              </p>
-            )}
-          </div>
-
-          <button
-            onClick={() => onChoose({ action: 'skip' })}
-            className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            <div className="text-sm font-medium text-slate-900 dark:text-white">Salta questo elemento</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">L'item resta pending, puoi decidere più tardi.</div>
-          </button>
+            Usa
+          </Button>
         </div>
+      </div>
 
-        <div className="mt-4 flex justify-end">
-          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
-            Annulla
-          </button>
-        </div>
+      <div className={`${box} flex flex-wrap items-center justify-between gap-2`}>
+        <span className="text-xs text-slate-500 dark:text-slate-400">L'item resta in attesa, puoi decidere più tardi.</span>
+        <Button variant="secondary" onClick={() => onChoose({ action: 'skip' })} disabled={busy}>Salta questo elemento</Button>
+      </div>
+
+      <div className="flex justify-end">
+        <Button variant="quiet" onClick={onClose} disabled={busy}>Annulla</Button>
       </div>
     </div>
   );

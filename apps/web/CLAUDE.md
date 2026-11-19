@@ -3302,7 +3302,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `<button>`, `<select>` or `<input>` without `bare-button: <reason>` on the line above, the old local looks
   (`FILTER_BUTTON`, `INPUT`, `ACTION`, `LINK`), a 6, 10 or 16 px radius, a written duration and a new window over the
   content but the confirmations (L-74: the archive's «Elimina», «Ripristina versione», a published copy's and a
-  discussion's «Elimina»); the suggestions' windows still there (L-73) are listed and left out of the style checks. While
+  discussion's «Elimina», a suggestion's two «Revocare…?»); since LC140 no other window is left in the Forum. While
   Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
   on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
   card that comes leaves a smaller shift upwards). The search's hint is «Cerca un dossier…» (whole at 768 with the
@@ -3320,9 +3320,16 @@ meant to stay split; add new features as new files, not inside the shells:
   gone) the focus lands on the discussion's title. Since LC138 (L-73) the Forum's other windows open in the page as
   `ForumSpace`s (an `Expand` with its title and «Chiudi»; Esc and «Chiudi» wait while the server works): «Segnala»
   (`ReportModal`) and «Aggiungi ai miei dossier» at the top of the card's tab, «Versioni» (`VersionHistoryModal`) above
-  «I miei pubblicati»' cards, an old link's import under the header (drawn open, it takes no focus). The suggestions'
-  review and editing (`SuggestionReviewDialog`, `EditSuggestionDialog`, `AddItemsDialog`, `AliasConflictDialog`) are
-  still windows, for the next PR. Content becomes the user's dossiers di studio through one form, `StudyImportDialog` (the
+  «I miei pubblicati»' cards (its rows parted by a line), an old link's import under the header (drawn open, it takes
+  no focus; Esc closes it with the focus anywhere but inside another space). «Pubblica un dossier» stays open while it
+  publishes, another space opened or not, and closes once the server answers. Since LC140 the suggestions too
+  (`ForumSpace`s at the top of Suggerimenti, one at a time with the others, the Ricevuti/Inviati switch closing them):
+  a received one's review (`SuggestionReviewDialog`; «Rifiuta» opens its note under the item, an alias whose trigger the
+  user has, a 409 on «Prendi», opens `AliasConflictDialog`'s choice under the item, and its «Annulla», «Salta» and Esc
+  give the focus back to «Prendi» by hand, disabled as it opened) and a sent one's editing (`EditSuggestionDialog`;
+  «Aggiungi item» opens `AddItemsDialog`'s form under the command; «Revoca» keeps its confirmation, `focusBack` to the
+  space). While an item travels the focus waits on the space, since the pressed button goes with the item's state; the
+  list's placeholders show on the first read only, so its rows (and the focus back to them) stay. Content becomes the user's dossiers di studio through one form, `StudyImportDialog` (the
   dossiers listed, notes and highlights as switches, one server request, never an existing dossier changed;
   the toast is `studyImportSentence`): «Ai miei dossier» on a card (`AddToMyDossiersDialog`, `POST
   /shared-environments/:id/download`, then `forum_download` unless the item is the user's own), an environment

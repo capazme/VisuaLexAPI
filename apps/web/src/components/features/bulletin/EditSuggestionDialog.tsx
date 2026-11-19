@@ -1,12 +1,19 @@
-import { useMemo, useState } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { useId, useMemo, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import type { EnvironmentSuggestion, SuggestionItem, SuggestionItemType } from '../../../types';
 import { SuggestionItemCard } from './SuggestionItemCard';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Expand } from '../../ui/Expand';
+import { CONTROL_BORDER, CONTROL_RADIUS } from '../../ui/controlStyles';
 import { AddItemsDialog } from './AddItemsDialog';
+import { ForumSpace } from './ForumSpace';
+import { itemName } from './suggestionItemName';
 
 interface EditSuggestionDialogProps {
-  suggestion: EnvironmentSuggestion;
+  /** The sent suggestion edited; null, closed. */
+  suggestion: EnvironmentSuggestion | null;
   onRevoke: (itemId: string) => Promise<void>;
   onItemsAdded: () => void;
   onClose: () => void;
@@ -18,13 +25,37 @@ const SECTION_LABEL: Record<SuggestionItemType, string> = {
   quickNorm: 'Norme veloci', alias: 'Alias',
 };
 
-export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClose }: EditSuggestionDialogProps) {
+/**
+ * A sent suggestion, in the page at the top of Suggerimenti (LC140, L-73; it was a window with a veil): its items, each
+ * to revoke, and «Aggiungi item», which opens its form under the command. A revocation cannot be undone: it keeps its
+ * confirmation, grown from its button, and the focus comes back to the space once the item is gone.
+ */
+export function EditSuggestionDialog({ suggestion, onClose, ...rest }: EditSuggestionDialogProps) {
+  const spaceId = useId();
+  return (
+    <ForumSpace
+      id={spaceId}
+      value={suggestion}
+      onClose={onClose}
+      title={(s) => `Suggerimento a @${s.sharedEnvironment?.user.username ?? ''}`}
+      line={(s) => `«${s.sharedEnvironment?.title ?? ''}» · ${s.counts.pending} in attesa · ${s.counts.taken} prese · ${s.counts.declined} rifiutate`}
+    >
+      {(s, setBusy) => <Edit suggestion={s} spaceId={spaceId} setBusy={setBusy} {...rest} />}
+    </ForumSpace>
+  );
+}
+
+function Edit({ suggestion, spaceId, setBusy: setSpaceBusy, onRevoke, onItemsAdded }:
+  Omit<EditSuggestionDialogProps, 'suggestion' | 'onClose'> & { suggestion: EnvironmentSuggestion; spaceId: string; setBusy: (busy: boolean) => void }) {
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
   const [showRevokeAll, setShowRevokeAll] = useState(false);
   // The button a revocation's confirmation grows from and gives the focus back to (LC85).
   const [revokeFrom, setRevokeFrom] = useState<HTMLElement | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setOwnBusy] = useState(false);
+  const setBusy = (value: boolean) => { setOwnBusy(value); setSpaceBusy(value); };
+  const space = () => document.getElementById(spaceId);
 
   const grouped = useMemo(() => {
     const acc: Record<SuggestionItemType, SuggestionItem[]> = {
@@ -54,135 +85,108 @@ export function EditSuggestionDialog({ suggestion, onRevoke, onItemsAdded, onClo
   const pendingCount = suggestion.counts.pending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Suggerimento a @{suggestion.sharedEnvironment?.user.username}
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              "{suggestion.sharedEnvironment?.title}" · Stato:
-              {' '}{suggestion.counts.pending} pending ·
-              {' '}{suggestion.counts.taken} prese ·
-              {' '}{suggestion.counts.declined} rifiutate
-            </p>
-            {suggestion.message && (
-              <p className="mt-2 text-sm italic text-slate-700 dark:text-slate-300">"{suggestion.message}"</p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {SECTION_ORDER.map((type) => {
-            const items = grouped[type];
-            if (items.length === 0) return null;
-            return (
-              <div key={type}>
-                <h3 className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                  {SECTION_LABEL[type]} ({items.length})
-                </h3>
-                <div className="space-y-2">
-                  {items.map(item => (
-                    <SuggestionItemCard
-                      key={item.id}
-                      item={item}
-                      actions={
-                        <button
-                          onClick={(event) => { setRevokeFrom(event.currentTarget); setPendingRevokeId(item.id); }}
-                          title="Revoca"
-                          disabled={busy}
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      }
-                      footer={item.status === 'declined' && item.reviewNote ? (
-                        <p className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">
-                          Risposta: "{item.reviewNote}"
-                        </p>
-                      ) : null}
+    <>
+      {suggestion.message && (
+        <p className="text-sm italic text-slate-700 dark:text-slate-300">«{suggestion.message}»</p>
+      )}
+      {SECTION_ORDER.map((type) => {
+        const items = grouped[type];
+        if (items.length === 0) return null;
+        return (
+          <div key={type}>
+            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+              {SECTION_LABEL[type]} ({items.length})
+            </h3>
+            <div className="space-y-2">
+              {items.map(item => (
+                <SuggestionItemCard
+                  key={item.id}
+                  item={item}
+                  actions={
+                    <IconButton
+                      onClick={(event) => { setRevokeFrom(event.currentTarget); setPendingRevokeId(item.id); }}
+                      aria-label={`Revoca ${itemName(item)}`}
+                      disabled={busy}
+                      icon={<Trash2 aria-hidden />}
+                      className="hover:text-red-600"
                     />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {suggestion.items.length === 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-6">
-              Nessun elemento: il suggerimento è stato revocato.
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700"
-            >
-              <Plus size={14} /> Aggiungi item
-            </button>
-            {pendingCount > 0 && (
-              <button
-                onClick={(event) => { setRevokeFrom(event.currentTarget); setShowRevokeAll(true); }}
-                disabled={busy}
-                className="px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg disabled:opacity-50"
-              >
-                Revoca tutti pending
-              </button>
-            )}
+                  }
+                  footer={item.status === 'declined' && item.reviewNote ? (
+                    <p className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">
+                      Risposta: «{item.reviewNote}»
+                    </p>
+                  ) : null}
+                />
+              ))}
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+        );
+      })}
+      {suggestion.items.length === 0 && (
+        <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-6">
+          Nessun elemento: il suggerimento è stato revocato.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => setShowAdd(true)} aria-expanded={showAdd} icon={<Plus size={14} aria-hidden />}>
+          Aggiungi item
+        </Button>
+        {pendingCount > 0 && (
+          <Button
+            variant="quiet"
+            onClick={(event) => { setRevokeFrom(event.currentTarget); setShowRevokeAll(true); }}
+            disabled={busy}
+            className="text-red-700 dark:text-red-400"
           >
-            Chiudi
-          </button>
-        </div>
+            Revoca tutti gli item in attesa
+          </Button>
+        )}
       </div>
 
-      {showAdd && (
-        <AddItemsDialog
-          suggestionId={suggestion.id}
-          onAdded={() => { setShowAdd(false); onItemsAdded(); }}
-          onClose={() => setShowAdd(false)}
-        />
-      )}
+      {/* «Aggiungi item»: its form opens under the command, inside the editing (LC140, L-73). */}
+      <Expand
+        open={showAdd}
+        onClose={() => { if (!addBusy) setShowAdd(false); }}
+        role="region"
+        aria-label="Aggiungi item al suggerimento"
+        className={`${CONTROL_RADIUS} ${CONTROL_BORDER} p-3`}
+      >
+        <div className="space-y-4">
+          <AddItemsDialog
+            suggestionId={suggestion.id}
+            onAdded={() => { setShowAdd(false); onItemsAdded(); }}
+            onClose={() => setShowAdd(false)}
+            setBusy={(value) => { setAddBusy(value); setSpaceBusy(value); }}
+          />
+        </div>
+      </Expand>
 
-      {pendingRevokeId && (
-        <ConfirmDialog
-          open
-          variant="danger"
-          title="Revocare questo item?"
-          message="L'item verrà rimosso dal thread e l'autore non potrà più prenderlo."
-          confirmLabel="Revoca"
-          focusCancel
-          origin={revokeFrom}
-          onConfirm={() => handleRevoke(pendingRevokeId)}
-          onCancel={() => setPendingRevokeId(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={pendingRevokeId !== null}
+        variant="danger"
+        title="Revocare questo item?"
+        message="L'item verrà rimosso dal thread e l'autore non potrà più prenderlo."
+        confirmLabel="Revoca"
+        focusCancel
+        origin={revokeFrom}
+        focusBack={space}
+        onConfirm={() => { if (pendingRevokeId) void handleRevoke(pendingRevokeId); }}
+        onCancel={() => setPendingRevokeId(null)}
+      />
 
-      {showRevokeAll && (
-        <ConfirmDialog
-          open
-          variant="danger"
-          title={`Revocare ${pendingCount} item pending?`}
-          message="Solo gli item non ancora revisionati verranno rimossi. Le decisioni già prese dall'autore restano."
-          confirmLabel="Revoca tutti"
-          focusCancel
-          onConfirm={handleRevokeAll}
-          origin={revokeFrom}
-          onCancel={() => setShowRevokeAll(false)}
-        />
-      )}
-    </div>
+      <ConfirmDialog
+        open={showRevokeAll}
+        variant="danger"
+        title={`Revocare ${pendingCount} item pending?`}
+        message="Solo gli item non ancora revisionati verranno rimossi. Le decisioni già prese dall'autore restano."
+        confirmLabel="Revoca tutti"
+        focusCancel
+        onConfirm={() => void handleRevokeAll()}
+        origin={revokeFrom}
+        focusBack={space}
+        onCancel={() => setShowRevokeAll(false)}
+      />
+    </>
   );
 }

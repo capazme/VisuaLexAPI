@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useLeftOutNotice } from './useLeftOutNotice';
 import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
-import { X, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
+import { Button } from '../../ui/Button';
 import { EnvironmentContentViewer } from './EnvironmentContentViewer';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { useAppStore } from '../../../store/useAppStore';
@@ -13,16 +14,21 @@ interface AddItemsDialogProps {
   suggestionId: string;
   onAdded: () => void;
   onClose: () => void;
+  /** While the server works: the space around it waits (Esc, «Chiudi»). */
+  setBusy?: (busy: boolean) => void;
 }
 
 const emptySelection: EnvironmentSelection = {
   dossierIds: [], quickNormIds: [], aliasIds: [], annotationIds: [], highlightIds: [],
 };
 
-export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialogProps) {
+/** «Aggiungi item» to a sent suggestion: the user's own content to choose from, one request. The form inside the space
+ * that opens under the command in the editing (LC140, L-73; it was a window with a veil). */
+export function AddItemsDialog({ suggestionId, onAdded, onClose, setBusy: setOuterBusy }: AddItemsDialogProps) {
   const { dossiers, quickNorms, customAliases, annotations, highlights } = useAppStore();
   const [selection, setSelection] = useState<EnvironmentSelection>(emptySelection);
-  const [busy, setBusy] = useState(false);
+  const [busy, setOwnBusy] = useState(false);
+  const setBusy = (value: boolean) => { setOwnBusy(value); setOuterBusy?.(value); };
   const [error, setError] = useState<string | null>(null);
 
   const pseudoEnv = useMemo<Partial<Environment>>(() => ({
@@ -89,46 +95,24 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
   };
 
   return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Aggiungi item al suggerimento</h2>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          <EnvironmentContentViewer
-            environment={pseudoEnv}
-            selectable
-            selection={selection}
-            onSelectionChange={setSelection}
-            maxHeight="250px"
-          />
-          {leftOutNotice && (
-            <p role="status" className="text-sm text-amber-700 dark:text-amber-400">{leftOutNotice}</p>
-          )}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </div>
-        <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg"
-          >
-            Annulla
-          </button>
-          <button
-            onClick={submit}
-            disabled={!hasSelection || busy}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-          >
-            <Send size={16} /> {busy ? 'Invio…' : 'Aggiungi'}
-          </button>
-        </div>
+    <>
+      <EnvironmentContentViewer
+        environment={pseudoEnv}
+        selectable
+        selection={selection}
+        onSelectionChange={setSelection}
+        maxHeight="250px"
+      />
+      {leftOutNotice && (
+        <p role="status" className="text-sm text-amber-700 dark:text-amber-400">{leftOutNotice}</p>
+      )}
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-center justify-end gap-3">
+        <Button variant="quiet" onClick={onClose} disabled={busy}>Annulla</Button>
+        <Button onClick={() => void submit()} disabled={!hasSelection} loading={busy} icon={<Send size={16} aria-hidden />}>
+          {busy ? 'Invio…' : 'Aggiungi'}
+        </Button>
       </div>
-    </div>
+    </>
   );
 }

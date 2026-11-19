@@ -1,4 +1,4 @@
-import { Fragment, useId, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Expand } from '../../ui/Expand';
 import { IconButton } from '../../ui/IconButton';
@@ -15,6 +15,9 @@ interface Props<T> {
   /** For a confirmation's `focusBack` inside it: the space itself. */
   id?: string;
   className?: string;
+  /** Esc closes it with the focus anywhere on the page, but inside another space, a dialog or a menu (a space that
+   * opened with the page and took no focus: an old link's import). */
+  closeOnPageEscape?: boolean;
   /** `setBusy(true)` while the server works: Esc and «Chiudi» wait, the answer has a place to land. */
   children: (value: T, setBusy: (busy: boolean) => void) => ReactNode;
 }
@@ -24,13 +27,24 @@ interface Props<T> {
  * its title and «Chiudi». The focus lands on the space, never in a field; Esc and «Chiudi» close it and the focus goes
  * back to what opened it. Another value while open starts its content afresh.
  */
-export function ForumSpace<T>({ value, onClose, icon, title, line, id, className, children }: Props<T>) {
+export function ForumSpace<T>({ value, onClose, icon, title, line, id, className, closeOnPageEscape = false, children }: Props<T>) {
   const [shown, setShown] = useState(value);
   if (value !== null && value !== shown) setShown(value);
   const [busy, setBusy] = useState(false);
   if (value === null && busy) setBusy(false);
   const headingId = useId();
   const close = () => { if (!busy) onClose(); };
+  useEffect(() => {
+    if (!closeOnPageEscape || value === null || busy) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const active = document.activeElement;
+      if (active?.closest('[role="region"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
+      onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [closeOnPageEscape, value, busy, onClose]);
   const key = typeof shown === 'string' ? shown : (shown as { id?: string } | null)?.id;
   return (
     <Expand id={id} open={value !== null} onClose={close} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>

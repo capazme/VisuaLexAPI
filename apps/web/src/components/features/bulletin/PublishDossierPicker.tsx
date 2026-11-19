@@ -27,11 +27,11 @@ export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
   const refreshDossier = useAppStore((s) => s.refreshDossier);
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Opened again, it starts from the list.
+  // Opened again, it starts from the list; not while a publication it holds is still travelling.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) { setChosenId(null); setBusy(false); }
+    if (open && !busy) setChosenId(null);
   }
   const chosen = chosenId ? dossiers.find((d) => d.id === chosenId) ?? null : null;
   const candidates = dossiers.filter((d) => !d.published && d.items.length > 0);
@@ -45,7 +45,8 @@ export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
   };
 
   return (
-    <Expand id={spaceId} open={open} onClose={close} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER)}>
+    // Another space opened while it publishes: it stays until the server answers, then closes (one space at a time).
+    <Expand id={spaceId} open={open || busy} onClose={close} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER)}>
       {chosen ? (
         <div className="p-4 md:p-5">
           <PublishDossierForm
