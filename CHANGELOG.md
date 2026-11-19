@@ -12,6 +12,16 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.58.0] - 2026-11-19
+
+Five motion touch-ups after the common timings, and the arrows in Fonti. Web only, no migration. MERL-T stays off.
+
+### Interface
+
+- Five touch-ups to the motion after the common timings; the Learn page is preloaded like the other main pages
+  (LC133).
+- The arrows in Fonti move as the rest of the app (LC133).
+
 ## [1.57.0] - 2026-11-19
 
 Common motion timings across the app, and a rule on how often something may move. Web only, no migration.
