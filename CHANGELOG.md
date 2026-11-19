@@ -12,6 +12,22 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.63.0] - 2026-11-19
+
+In the reader, the annotations and the actions of a selection open under the paragraph, and citation previews
+are text only. Web only, no migration. MERL-T stays off.
+
+### Reading
+
+- The block annotations and the actions of a selection open under the paragraph they belong to; in long
+  paragraphs and low windows the island follows the selection (LC142, L-73).
+- Citation previews on hover show the text only; the NER feedback bar for contributors is no longer there, queued
+  for MERL-T (LC142).
+
+### Tests
+
+- The DecisionEntryView test waits for its effects, no longer flaky (LC144).
+
 ## [1.62.0] - 2026-11-19
 
 No focus ring around titles and landing points: the ring stays on the controls you reach with the keyboard. Web
