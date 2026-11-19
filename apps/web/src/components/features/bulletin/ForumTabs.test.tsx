@@ -23,7 +23,7 @@ describe('ForumTabs', () => {
     expect(screen.getByRole('tablist', { name: 'Sezioni del Forum' })).toBe(row);
     const tabs = within(row).getAllByRole('tab');
     expect(tabs).toHaveLength(3);
-    for (const tab of tabs) expect(tab).toHaveClass('flex-1', 'sm:flex-none', 'min-h-[44px]', 'whitespace-nowrap');
+    for (const tab of tabs) expect(tab).toHaveClass('flex-1', 'sm:flex-none', 'min-h-11', 'md:min-h-8', 'whitespace-nowrap');
   });
 
   it('marks the tab shown, and changes tab on a press', async () => {

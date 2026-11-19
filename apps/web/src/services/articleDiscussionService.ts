@@ -88,6 +88,24 @@ export const articleDiscussionService = {
     const response = await apiClient.post(`/article-discussions/${threadId}/accept`, { commentId });
     return response.data;
   },
+  /** The author edits a discussion's title and text (never its anchor). */
+  async editThread(threadId: string, edit: { title?: string; body?: string }): Promise<void> {
+    await apiClient.patch(`/article-discussions/${threadId}`, edit);
+  },
+  /** The author deletes a discussion: `deleted` when nothing of anyone else hangs on it, else `emptied` (its place stays). */
+  async deleteThread(threadId: string): Promise<{ outcome: 'deleted' | 'emptied' }> {
+    const response = await apiClient.delete(`/article-discussions/${threadId}`);
+    return response.data;
+  },
+  /** The author edits a reply or a comment. */
+  async editComment(commentId: string, body: string): Promise<void> {
+    await apiClient.patch(`/article-discussion-comments/${commentId}`, { body });
+  },
+  /** The author deletes a reply or a comment: `deleted`, or `emptied` when others' comments hang on it. */
+  async deleteComment(commentId: string): Promise<{ outcome: 'deleted' | 'emptied' }> {
+    const response = await apiClient.delete(`/article-discussion-comments/${commentId}`);
+    return response.data;
+  },
   async reportComment(commentId: string, reason: string, details?: string): Promise<void> {
     await apiClient.post(`/article-discussion-comments/${commentId}/report`, { reason, details });
   },

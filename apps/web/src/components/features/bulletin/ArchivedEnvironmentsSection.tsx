@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useAppStore } from '../../../store/useAppStore';
 import { environmentService } from '../../../services/environmentService';
 import { exportEnvironmentToFile } from '../../../utils/environmentUtils';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
 import { StudyImportDialog } from './StudyImportDialog';
 import { becomesStudyDossiers } from '../../../utils/studyImportReport';
 import type { Environment, StudyImportReport } from '../../../types';
@@ -13,8 +13,6 @@ interface Props {
   onRecovered: (report: StudyImportReport) => void;
   onMessage: (message: string, type: 'success' | 'error' | 'info') => void;
 }
-
-const ACTION = `inline-flex items-center gap-1 rounded-lg px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`;
 
 /**
  * «Ambienti salvati (archivio)» (spec 2026-10-13-environments-into-forum, D11b; the owner's answer 184): the private
@@ -50,7 +48,7 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
           Gli ambienti che avevi salvato. Non se ne creano più: recuperane i dossier come dossier di studio.
         </p>
       </div>
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800">
+      <ul className="divide-y divide-slate-100 rounded-[8px] border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800">
         {environments.map((env) => (
           <li key={env.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="min-w-0">
@@ -60,31 +58,37 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
               </span>
             </span>
             <span className="flex flex-wrap gap-1">
-              <button
+              <Button
                 type="button"
+                variant="quiet"
                 onClick={() => setRecovering(env)}
                 disabled={env.dossiers.length === 0}
                 aria-label={`Recupera i dossier di «${env.name}»`}
-                className={`${ACTION} text-primary-700 hover:bg-primary-50 disabled:opacity-50 dark:text-primary-300 dark:hover:bg-slate-700`}
+                icon={<FolderPlus size={14} aria-hidden />}
+                className="gap-1 px-2 text-xs text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-slate-700"
               >
-                <FolderPlus size={14} aria-hidden /> Recupera i dossier
-              </button>
-              <button
+                Recupera i dossier
+              </Button>
+              <Button
                 type="button"
+                variant="quiet"
                 onClick={() => void exportOne(env)}
                 aria-label={`Esporta «${env.name}» in JSON`}
-                className={`${ACTION} text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700`}
+                icon={<Download size={14} aria-hidden />}
+                className="gap-1 px-2 text-xs"
               >
-                <Download size={14} aria-hidden /> Esporta JSON
-              </button>
-              <button
+                Esporta JSON
+              </Button>
+              <Button
                 type="button"
+                variant="quiet"
                 onClick={(event) => { setDeleteFrom(event.currentTarget); setDeleting(env); }}
                 aria-label={`Elimina «${env.name}»`}
-                className={`${ACTION} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20`}
+                icon={<Trash2 size={14} aria-hidden />}
+                className="gap-1 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
               >
-                <Trash2 size={14} aria-hidden /> Elimina
-              </button>
+                Elimina
+              </Button>
             </span>
           </li>
         ))}

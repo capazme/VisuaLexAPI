@@ -87,9 +87,9 @@ describe('Work\'s page', () => {
   it('draws the tabs and the trash at the common sizes, the tabs a bar at the foot on a phone', () => {
     renderAt('/work/prossimi');
     const views = screen.getByRole('navigation', { name: 'Viste di Work' });
-    expect(views).toHaveClass('p-0.5', 'rounded-md', 'max-md:bg-transparent');
+    expect(views).toHaveClass('md:p-0.5', 'rounded-md', 'max-md:bg-transparent');
     for (const link of views.querySelectorAll('a')) {
-      expect(link).toHaveClass('min-h-10', 'md:min-h-8', 'rounded-md', 'max-md:min-h-11', 'max-md:flex-1');
+      expect(link).toHaveClass('min-h-11', 'md:min-h-8', 'rounded-md', 'max-md:min-h-11', 'max-md:flex-1');
       expect(link.querySelector('svg')!.parentElement).toHaveClass('md:hidden');
     }
     expect(views.closest('.max-md\\:fixed')).toHaveClass('max-md:bottom-0');

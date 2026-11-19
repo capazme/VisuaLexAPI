@@ -37,12 +37,13 @@ export function ForumSuggestionsView({
         onChange={setSuggestionTab}
         className="mb-4 w-fit max-w-full"
         tabClassName="gap-2 px-4"
+        size="sm"
         tabs={[
           {
             id: 'received',
             label: (
               <>
-                <Inbox size={16} aria-hidden />
+                <Inbox size={14} aria-hidden />
                 Ricevuti
               </>
             ),
@@ -58,7 +59,7 @@ export function ForumSuggestionsView({
             id: 'sent',
             label: (
               <>
-                <Send size={16} aria-hidden />
+                <Send size={14} aria-hidden />
                 Inviati
               </>
             ),
@@ -72,7 +73,7 @@ export function ForumSuggestionsView({
             {[...Array(3)].map((_, i) => (
               <div
                 key={i}
-                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 animate-pulse"
+                className="bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 p-4 animate-pulse"
               >
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full" />
@@ -100,11 +101,12 @@ export function ForumSuggestionsView({
               {receivedSuggestions.map((suggestion) => {
                 const { counts, aggregateStatus } = suggestion;
                 return (
+                  // bare-button: a whole row, the suggestion's state, author, dossier and message, that opens it.
                   <button
                     key={suggestion.id}
                     type="button"
                     onClick={() => onOpenReview(suggestion)}
-                    className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    className="w-full text-left bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -146,12 +148,13 @@ export function ForumSuggestionsView({
                 const { counts, aggregateStatus } = suggestion;
                 const canEdit = aggregateStatus === 'open' || aggregateStatus === 'revoked';
                 return (
+                  // bare-button: a whole row, the suggestion's state, author, dossier and message, that opens it.
                   <button
                     key={suggestion.id}
                     type="button"
                     onClick={() => canEdit && onOpenEdit(suggestion)}
                     disabled={!canEdit}
-                    className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 transition-colors disabled:cursor-default enabled:hover:border-primary-400 dark:enabled:hover:border-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    className="w-full text-left bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 p-4 transition-colors disabled:cursor-default enabled:hover:border-primary-400 dark:enabled:hover:border-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">

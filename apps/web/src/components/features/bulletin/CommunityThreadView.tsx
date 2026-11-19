@@ -4,11 +4,15 @@ import { ArrowLeft, Check } from 'lucide-react';
 import { articleDiscussionService } from '../../../services/articleDiscussionService';
 import type { CommunityItem, CommunityReply, CommunityThread } from '../../../types/community';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
-import { ReplyForm, ReportButton, TOUCH, VoteButton } from '../search/discussionControls';
+import { ReplyForm, ReportButton, VoteButton } from '../search/discussionControls';
 import { voteFailure } from '../search/voteFailure';
 import { CommunityTarget } from './CommunityTarget';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { Textarea } from '../../ui/Textarea';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
+import { getErrorMessage } from '../../../utils/errors';
 import { cn } from '../../../lib/utils';
 
 export const COMMUNITY_PATH = '/forum/community';
@@ -58,10 +62,57 @@ function itemText(item: CommunityItem) {
   return <p className="mt-1.5 max-w-measure whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">{item.body}</p>;
 }
 
+/**
+ * The author's edit, in the item's place (LC114): the discussion's title and text, or a reply's or a comment's text.
+ * The text takes the focus: the author asked to write. `onSave` resolves true once saved.
+ */
+function EditItem({ title, body, label, onSave, onCancel }: {
+  title?: string;
+  body: string;
+  label: string;
+  onSave: (edit: { title?: string; body: string }) => Promise<boolean>;
+  onCancel: () => void;
+}) {
+  const [nextTitle, setNextTitle] = useState(title ?? '');
+  const [nextBody, setNextBody] = useState(body);
+  const [saving, setSaving] = useState(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { field.current?.focus(); }, []);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    const ok = await onSave({ ...(title !== undefined ? { title: nextTitle.trim() } : {}), body: nextBody.trim() });
+    if (!ok) setSaving(false);
+  };
+  return (
+    <form aria-label={label} onSubmit={(event) => void save(event)} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onCancel(); } }} className="mt-2 grid max-w-measure gap-3">
+      {title !== undefined && <Input label="Titolo" value={nextTitle} onChange={(event) => setNextTitle(event.target.value)} maxLength={200} />}
+      <Textarea ref={field} label="Testo" value={nextBody} onChange={(event) => setNextBody(event.target.value)} rows={4} required />
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="quiet" onClick={onCancel} disabled={saving}>Annulla</Button>
+        <Button type="submit" loading={saving} disabled={!nextBody.trim()}>Salva</Button>
+      </div>
+    </form>
+  );
+}
+
+/** «Modifica» and «Elimina», the author's own commands on what they wrote (LC114); never on another's. */
+function OwnCommands({ id, what, onEdit, onDelete }: { id: string; what: string; onEdit: () => void; onDelete: (from: HTMLElement) => void }) {
+  return (
+    <>
+      {/* `data-edit`: the edit closed, the focus comes back here (the button is drawn again, not kept). */}
+      <Button type="button" variant="link" onClick={onEdit} aria-label={`Modifica ${what}`} data-edit={id} className="text-xs">Modifica</Button>
+      <Button type="button" variant="link" onClick={(event) => onDelete(event.currentTarget)} aria-label={`Elimina ${what}`} className="text-xs">Elimina</Button>
+    </>
+  );
+}
+
 interface Props {
   threadId: string;
   /** The discussion as read again (after a vote, a reply, an acceptance): the feed's row follows it. */
   onChanged: (thread: CommunityThread) => void;
+  /** The author deleted the discussion and nothing of it stays: the feed drops its row and goes back to the list. */
+  onDeleted?: (threadId: string) => void;
 }
 
 /**
@@ -70,12 +121,28 @@ interface Props {
  * its comments one level under it. Replying, voting and reporting use the controls of the panel under an article;
  * the discussion's author alone accepts a reply (never their own: the server refuses it).
  */
-export function CommunityThreadView({ threadId, onChanged }: Props) {
+export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
   const [thread, setThread] = useState<CommunityThread | null>(null);
   const [loadError, setLoadError] = useState<'missing' | 'failed' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [commenting, setCommenting] = useState<string | null>(null);
+  // The item being edited in its place (the discussion's id, or a reply's or a comment's).
+  const [editing, setEditing] = useState<string | null>(null);
+  // What «Elimina» asked about, kept while the question goes back into its button; `asking` opens and closes it.
+  const [asked, setAsked] = useState<{ kind: 'thread' | 'comment'; id: string; what: string; from: HTMLElement } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const ask = (target: NonNullable<typeof asked>) => { setAsked(target); setAsking(true); };
+  // An edit closed (saved, «Annulla», Esc): the focus back on its «Modifica», drawn again in its place.
+  const edited = useRef<string | null>(null);
+  useEffect(() => {
+    if (editing) edited.current = editing;
+    else if (edited.current) {
+      const id = edited.current;
+      edited.current = null;
+      document.querySelector<HTMLElement>(`[data-edit="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
+    }
+  }, [editing, thread]);
   const heading = useRef<HTMLHeadingElement>(null);
   const focused = useRef(false);
 
@@ -131,11 +198,11 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
     return (
       <div>
         {back}
-        <div role="alert" className="rounded-xl border border-slate-200 p-6 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-300">
+        <div role="alert" className="rounded-[8px] border border-slate-200 p-6 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-300">
           {loadError === 'missing' ? 'Questa discussione non c’è più.' : (
             <>
               Impossibile caricare la discussione.{' '}
-              <button type="button" onClick={() => { setLoadError(null); void load(); }} className={cn('font-semibold underline underline-offset-2', FOCUS_RING)}>Riprova</button>
+              <Button type="button" variant="link" onClick={() => { setLoadError(null); void load(); }} className="font-semibold">Riprova</Button>
             </>
           )}
         </div>
@@ -162,6 +229,32 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
     () => articleDiscussionService.accept(thread.id, commentId), 'Impossibile aggiornare la risposta accettata. Riprova.',
   );
 
+  // The server's words on a refusal (a text too short, the day's limit), else ours.
+  const saved = (run: () => Promise<unknown>) => act(run, (failure) => getErrorMessage(failure) || 'Impossibile salvare la modifica. Riprova.').then((ok) => {
+    if (ok) setEditing(null);
+    return ok;
+  });
+
+  const remove = async (target: typeof asked) => {
+    if (!target) return;
+    const { kind, id } = target;
+    setAsking(false);
+    setError(null);
+    setNotice(null);
+    try {
+      const { outcome } = kind === 'thread' ? await articleDiscussionService.deleteThread(id) : await articleDiscussionService.deleteComment(id);
+      // Nothing of the discussion stays: back to the list, its row gone. Emptied, its place stays: read it again.
+      if (kind === 'thread' && outcome === 'deleted') onDeleted?.(id);
+      else {
+        await load();
+        // «Elimina» is gone with what it deleted: the focus on the discussion's title, not left on the page's body.
+        heading.current?.focus({ preventScroll: true });
+      }
+    } catch (failure) {
+      setError(getErrorMessage(failure) || 'Impossibile eliminare. Riprova.');
+    }
+  };
+
   const title = thread.deleted ? 'Discussione cancellata dall’autore' : thread.title || (thread.passage ? `«${thread.passage.quote}»` : 'Discussione su un passo');
   const canAccept = (reply: CommunityReply) => thread.isOwner && !thread.deleted && !reply.isOwner && !reply.deleted && !reply.removed && !reply.hidden;
   const visible = (item: CommunityItem) => !item.deleted && !item.removed;
@@ -179,16 +272,28 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
       <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
         <CommunityTarget {...thread} />
       </div>
-      {!thread.deleted && <p className="mt-4 max-w-measure whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">{thread.body}</p>}
+      {editing === thread.id ? (
+        <EditItem
+          label="Modifica la discussione"
+          title={thread.title}
+          body={thread.body}
+          onCancel={() => setEditing(null)}
+          onSave={(edit) => saved(() => articleDiscussionService.editThread(thread.id, edit))}
+        />
+      ) : !thread.deleted && <p className="mt-4 max-w-measure whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">{thread.body}</p>}
       <div className="mt-4 flex items-center gap-4 border-b border-slate-200 pb-4 md:gap-3 dark:border-slate-800">
+        {/* One's own discussion: its count only, no «Segnala» (G-476); «Modifica» and «Elimina» instead (LC114). */}
         <VoteButton voted={thread.userVoted} count={thread.voteCount} label="Vota la discussione" own={thread.isOwner} onVote={() => void vote()} />
         {!thread.isOwner && !thread.deleted && (
           <ReportButton label="Segnala la discussione" onReport={() => void report(() => articleDiscussionService.report(thread.id, 'segnalazione'))} />
         )}
+        {thread.isOwner && !thread.deleted && editing !== thread.id && (
+          <OwnCommands id={thread.id} what="la discussione" onEdit={() => setEditing(thread.id)} onDelete={(from) => ask({ kind: 'thread', id: thread.id, what: 'la discussione', from })} />
+        )}
       </div>
 
-      {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">{error}</div>}
-      {notice && <div role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">{notice}</div>}
+      {error && <div role="alert" className="mt-4 rounded-[8px] border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">{error}</div>}
+      {notice && <div role="status" className="mt-4 rounded-[8px] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">{notice}</div>}
 
       <h3 id="community-replies" className="mt-6 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-400">
         {thread.replyCount === 1 ? '1 risposta' : `${thread.replyCount} risposte`}
@@ -204,8 +309,15 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                   {reply.accepted && <AcceptedMark />}
                 </div>
                 {reply.hidden && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">Nascosta dalla moderazione.</p>}
-                {itemText(reply)}
-                {visible(reply) && (
+                {editing === reply.id ? (
+                  <EditItem
+                    label="Modifica la tua risposta"
+                    body={reply.body}
+                    onCancel={() => setEditing(null)}
+                    onSave={({ body }) => saved(() => articleDiscussionService.editComment(reply.id, body))}
+                  />
+                ) : itemText(reply)}
+                {visible(reply) && editing !== reply.id && (
                   <div className="mt-2 flex flex-wrap items-center gap-4 md:gap-3">
                     <VoteButton voted={reply.userVoted} count={reply.voteCount} label={`Vota la risposta di ${reply.user.username}`} own={reply.isOwner} onVote={() => void voteReply(reply)} />
                     {!thread.locked && (
@@ -217,15 +329,19 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                     {!reply.isOwner && (
                       <ReportButton label={`Segnala la risposta di ${reply.user.username}`} onReport={() => void report(() => articleDiscussionService.reportComment(reply.id, 'segnalazione'))} />
                     )}
+                    {reply.isOwner && (
+                      <OwnCommands id={reply.id} what="la tua risposta" onEdit={() => setEditing(reply.id)} onDelete={(from) => ask({ kind: 'comment', id: reply.id, what: 'la tua risposta', from })} />
+                    )}
                     {canAccept(reply) && (
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
                         onClick={() => void accept(reply.accepted ? null : reply.id)}
                         aria-label={reply.accepted ? 'Ritira l’accettazione' : `Accetta la risposta di ${reply.user.username}`}
-                        className={cn('ml-auto rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium', TOUCH, ' text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING)}
+                        className="ml-auto px-3 text-xs"
                       >
                         {reply.accepted ? 'Ritira l’accettazione' : 'Accetta'}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -234,10 +350,19 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                     {reply.comments.map(comment => (
                       <li key={comment.id}>
                         <span className="text-[13px]"><AuthorName name={comment.user.username || 'utente senza nome'} when={day(comment.createdAt)} /></span>
-                        {itemText(comment)}
-                        {visible(comment) && !comment.isOwner && (
-                          <div className="mt-1">
-                            <ReportButton label={`Segnala il commento di ${comment.user.username}`} onReport={() => void report(() => articleDiscussionService.reportComment(comment.id, 'segnalazione'))} />
+                        {editing === comment.id ? (
+                          <EditItem
+                            label="Modifica il tuo commento"
+                            body={comment.body}
+                            onCancel={() => setEditing(null)}
+                            onSave={({ body }) => saved(() => articleDiscussionService.editComment(comment.id, body))}
+                          />
+                        ) : itemText(comment)}
+                        {visible(comment) && editing !== comment.id && (
+                          <div className="mt-1 flex flex-wrap items-center gap-4 md:gap-3">
+                            {comment.isOwner
+                              ? <OwnCommands id={comment.id} what="il tuo commento" onEdit={() => setEditing(comment.id)} onDelete={(from) => ask({ kind: 'comment', id: comment.id, what: 'il tuo commento', from })} />
+                              : <ReportButton label={`Segnala il commento di ${comment.user.username}`} onReport={() => void report(() => articleDiscussionService.reportComment(comment.id, 'segnalazione'))} />}
                           </div>
                         )}
                       </li>
@@ -246,6 +371,7 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
                 )}
                 {commenting === reply.id && (
                   <ReplyForm
+                    focusOnOpen
                     placeholder="Scrivi un commento…"
                     sendLabel="Invia commento"
                     onSend={body => act(() => articleDiscussionService.comment(thread.id, body, reply.id), 'Impossibile pubblicare il commento.').then(ok => {
@@ -263,6 +389,17 @@ export function CommunityThreadView({ threadId, onChanged }: Props) {
       {thread.locked
         ? <p className="mt-6 text-sm text-slate-600 dark:text-slate-400">La discussione è chiusa: non si possono aggiungere risposte.</p>
         : <ReplyForm onSend={body => act(() => articleDiscussionService.comment(thread.id, body, undefined), 'Impossibile pubblicare la risposta.')} />}
+
+      <WireConfirm
+        open={asking}
+        origin={asked?.from ?? null}
+        variant="danger"
+        title={asked ? `Eliminare ${asked.what}?` : 'Eliminare?'}
+        message="Se altri hanno risposto, resta il posto con «Cancellata dall’autore» e le loro risposte restano; altrimenti sparisce. Il testo non si recupera."
+        confirmLabel="Elimina"
+        onConfirm={() => remove(asked)}
+        onCancel={() => setAsking(false)}
+      />
     </article>
   );
 }
