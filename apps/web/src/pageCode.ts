@@ -14,8 +14,8 @@ export const PAGE_CODE = {
   connectAiApp: () => import('./features/connections/ConnectAiAppPage'),
   // Opus's frame and its views together: one wait, not two in a row.
   opus: () => Promise.all([import('./components/features/planner/OpusPage'), import('./components/features/planner/OpusViews')]),
-  // Learn's frame and its home view («Oggi») together (LC133): asked one after the other, the frame's title waited for both.
-  learn: () => Promise.all([import('./components/features/studia/StudiaPage'), import('./components/features/studia/ReviewHome')]),
+  // Learn's home view («Oggi»); its frame, with the title, is in the first chunk (LC133).
+  learn: () => import('./components/features/studia/ReviewHome'),
 } as const;
 
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);

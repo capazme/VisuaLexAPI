@@ -315,6 +315,25 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     expect(band.hidden).toBe(false);
   });
 
+  it('names the chosen row from the field, as it opens, as the arrows move and after a reopening (aria-activedescendant, LC133)', async () => {
+    asDesktop(true);
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const box = screen.getByRole('combobox');
+    const named = () => document.getElementById(box.getAttribute('aria-activedescendant') ?? '');
+    const chosen = () => document.querySelector('[cmdk-item][data-selected="true"]');
+    expect(chosen()).not.toBeNull();
+    await waitFor(() => expect(named()).toBe(chosen()));
+    expect(document.getElementById(box.getAttribute('aria-controls')!)).toHaveAttribute('role', 'listbox');
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    await waitFor(() => expect(named()).toBe(chosen()));
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(named()).toBe(chosen()));
+    await waitFor(() => expect(named()).toBe(document.querySelector('[cmdk-item]')));
+  });
+
   it('the band does not move while one types: its height changes at once, no row slides (LC129)', () => {
     asDesktop(true);
     recordAnimations();

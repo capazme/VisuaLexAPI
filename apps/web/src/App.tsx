@@ -51,15 +51,13 @@ const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
 );
 
-// Loaded with «Oggi» (`PAGE_CODE.learn`): one wait for the frame and its home view, not two in a row (LC133).
-const StudiaPage = lazy(() => PAGE_CODE.learn().then(([m]) => ({ default: m.StudiaPage })));
 const MyCardsView = lazy(() =>
   import('./components/features/studia/MyCardsView').then(m => ({ default: m.MyCardsView })),
 );
 const ValidationQueueView = lazy(() =>
   import('./components/features/studia/ValidationQueueView').then(m => ({ default: m.ValidationQueueView })),
 );
-const ReviewHome = lazy(() => PAGE_CODE.learn().then(([, m]) => ({ default: m.ReviewHome })));
+const ReviewHome = lazy(() => PAGE_CODE.learn().then(m => ({ default: m.ReviewHome })));
 const CoursesView = lazy(() =>
   import('./components/features/studia/corsi/CoursesView').then(m => ({ default: m.CoursesView })),
 );
@@ -76,7 +74,11 @@ const ProgressPage = lazy(() =>
   import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
 );
 // Small and eager: what the lesson's frame shows while the session's code loads.
-import { LearnLoading, LessonLoading } from './components/features/studia/LessonFrame';
+import { LessonLoading } from './components/features/studia/LessonFrame';
+// Learn's frame is in the first chunk (LC133): its title is there with the page's first frame, and only the view
+// under it waits for its code. A lazy page suspends at its first draw even with its code already fetched, and React then
+// holds the content back up to 300 ms after the fallback (its `FALLBACK_THROTTLE_MS`): «Oggi» came 155–300 ms late.
+import { StudiaPage } from './components/features/studia/StudiaPage';
 const ReviewSession = lazy(() =>
   import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
@@ -259,11 +261,7 @@ function App() {
           {isStudiaEnabled() && (
             <Route
               path="learn"
-              element={
-                <Suspense fallback={<LearnLoading />}>
-                  <StudiaPage />
-                </Suspense>
-              }
+              element={<StudiaPage />}
             >
               {/* Learn's views have no Suspense of their own (LC98): a change of view is the router's transition, so the view
                   left stays until the coming one's code is there, and `ViewSlide` slides it in with its content. The lessons

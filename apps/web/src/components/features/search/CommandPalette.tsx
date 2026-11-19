@@ -621,6 +621,22 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     const first = bandRef.current?.querySelector('[cmdk-item]:not([aria-disabled="true"])')?.getAttribute('data-value');
     if (first) setChosenRow(first);
   }, [isOpen]);
+  // The field names the chosen row to a screen reader (LC133): cmdk sets `aria-activedescendant` only from its arrows, never
+  // from a controlled value (ours), so the first row and the row after a reopening went unsaid. Its rows redraw on their
+  // own, after this menu's render: their mark is watched.
+  useEffect(() => {
+    const band = bandRef.current;
+    if (!isOpen || !band) return undefined;
+    const name = () => {
+      const id = band.querySelector('[cmdk-item][data-selected="true"]')?.id;
+      if (id) boxRef.current?.setAttribute('aria-activedescendant', id);
+      else boxRef.current?.removeAttribute('aria-activedescendant');
+    };
+    name();
+    const watch = new MutationObserver(name);
+    watch.observe(band, { subtree: true, attributes: true, attributeFilter: ['data-selected'] });
+    return () => watch.disconnect();
+  }, [isOpen]);
   // A click outside the field and the band closes it, as the veil's did; the page under takes the click as well. So does
   // the focus going out to the page, by Tab (Papiniano, #599): the same «outside».
   useEffect(() => {

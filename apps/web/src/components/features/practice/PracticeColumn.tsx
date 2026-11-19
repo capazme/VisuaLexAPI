@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { scrollParentOf } from '../../../utils/scrollParent';
 import {
   DndContext,
   KeyboardSensor,
@@ -39,6 +40,27 @@ export interface PracticeColumnProps {
 }
 
 /**
+ * Brings an opened row into view, its heading and its article together (LC133). The article's space may still be
+ * growing from no height (`Expand`), so the row's own box is only its heading: the article is measured by its text, laid
+ * out at its full height already. A row taller than the room under the act's sticky head comes to the top (`start`);
+ * one that fits is brought in whole, its heading first (`nearest` on the row, then on the article).
+ */
+function revealOpenedRow(row: HTMLElement) {
+  const controlled = row.querySelector('[aria-expanded][aria-controls]')?.getAttribute('aria-controls');
+  const text = controlled ? document.getElementById(controlled) : null;
+  const scroller = scrollParentOf(row);
+  const room = (scroller ? scroller.clientHeight : window.innerHeight) - (parseFloat(getComputedStyle(row).scrollMarginTop) || 0);
+  const top = row.getBoundingClientRect().top;
+  const bottom = Math.max(row.getBoundingClientRect().bottom, text?.getBoundingClientRect().bottom ?? 0);
+  if (bottom - top > room) {
+    row.scrollIntoView({ block: 'start', behavior: 'auto' });
+    return;
+  }
+  row.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+  text?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+}
+
+/**
  * The practice's column (spec §3, D3; U2): its acts in their order — one under the other on a phone and in the index, a
  * grid of panels in the overview — reordered by drag (pointer and keyboard, as the dossier's acts); «Giurisprudenza»
  * follows them (§3.3). Outside the index it takes the practice's reveal (`takeReveal`, once, gotcha 14) and brings the
@@ -63,7 +85,7 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
     const row = Array.from(rows).find((el) => el.dataset.practiceRow === taken.rowKey);
     // At once and only if the row is out of view (LC132): the act's arrows come one after the other, and the browser's
     // smooth scroll took 450–500 ms each time. The same for every reveal (a search that landed, a find match, the way back).
-    row?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    if (row) revealOpenedRow(row);
   }, [revealKey, isIndex, practiceId, takeReveal]);
 
   const sensors = useSensors(
