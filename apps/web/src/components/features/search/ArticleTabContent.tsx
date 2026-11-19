@@ -1133,25 +1133,22 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            {sheetOpen && openBlock !== null && openGroup && (
-                <BlockAnnotationsSheet
-                    key={openBlock}
-                    containerRef={contentRef}
-                    blockIndex={openBlock}
-                    blockLabel={describeBlock(article_text || '', structure.blocks[openBlock])}
-                    group={openGroup}
-                    textHash={textHash}
-                    onOpenThread={discussion.openThread}
-                    onClose={closeBlock}
-                    onUpdateNote={updateAnnotation}
-                    onRemoveNote={removeAnnotation}
-                    onRemoveHighlight={removeHighlight}
-                    proposalActions={proposalActions}
-                    glosses={glosses}
-                    shownGlossId={shownGlossId}
-                    onShowGlossPassage={showGlossPassage}
-                />
-            )}
+            <BlockAnnotationsSheet
+                containerRef={contentRef}
+                blockIndex={sheetOpen && openGroup ? openBlock : null}
+                blockLabel={(index) => describeBlock(article_text || '', structure.blocks[index])}
+                groups={blockGroups}
+                textHash={textHash}
+                onOpenThread={discussion.openThread}
+                onClose={closeBlock}
+                onUpdateNote={updateAnnotation}
+                onRemoveNote={removeAnnotation}
+                onRemoveHighlight={removeHighlight}
+                proposalActions={proposalActions}
+                glosses={glosses}
+                shownGlossId={shownGlossId}
+                onShowGlossPassage={showGlossPassage}
+            />
 
             {glossesEnabled && glossMargin.host && createPortal(
                 <ArticleDiscussionPanel

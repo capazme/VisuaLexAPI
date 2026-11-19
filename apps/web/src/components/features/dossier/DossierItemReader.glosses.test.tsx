@@ -99,7 +99,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
   it('narrow (no column): the sign opens its sheet with the gloss\'s card, «Valida» through the entry\'s route', async () => {
     const { container } = renderReader();
     fireEvent.click(await signOf(container, 2));
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
     const card = within(dialog).getByRole('article', { name: /Da validare/ });
     expect(within(card).getByText('La parte che ha adempiuto può scegliere.')).toBeInTheDocument();
     fireEvent.click(within(card).getByRole('button', { name: 'Valida' }));
@@ -119,7 +119,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
   it('«Rimuovi» takes the card away at once and offers «Annulla» under the gloss\'s own words', async () => {
     const { container } = renderReader();
     fireEvent.click(await signOf(container, 2));
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi' }));
     expect(notificationStore.getState().entries.at(-1)).toMatchObject({ message: GLOSS_WORDS.removed, undoable: true });
     expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).not.toContain('g1');
@@ -138,7 +138,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     // Shift: everything of the block, the proposal with it, in its sheet.
     fireEvent.click(await signOf(container, 2), { shiftKey: true });
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
     expect(within(dialog).getByRole('heading', { name: "Proposte dell'IA" })).toBeInTheDocument();
     expect(within(dialog).getByRole('article', { name: /Da validare/ })).toBeInTheDocument();
   });
@@ -147,7 +147,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     const { container } = renderReader();
     const sign = await signOf(container, 2);
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sposta' }));
     const bar = await screen.findByRole('group', { name: GLOSS_WORDS.moveTitle });
     fireEvent.click(within(bar).getByRole('button', { name: 'Annulla' }));

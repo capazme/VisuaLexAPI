@@ -253,7 +253,7 @@ describe('discussions on a decision — signs and focus', () => {
     });
     expect(container.querySelector('.vlx-thread-focus')).toBeNull();
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni/ });
     fireEvent.click(within(dialog).getByRole('button', { name: /Apri glossa/ }));
     await waitFor(() => expect(container.querySelector('.vlx-thread-focus')?.textContent).toBe('spese'));
     expect(container.querySelector('.vlx-thread-focus')?.getAttribute('data-thread-focus')).toBe('t1');

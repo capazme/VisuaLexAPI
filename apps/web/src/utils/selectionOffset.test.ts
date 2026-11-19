@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { alignOffsetToTrimmedText, getSelectionAnchor, plainOffsetAt, rangeFromPlainOffsets } from './selectionOffset';
+import { alignOffsetToTrimmedText, getSelectionAnchor, plainOffsetAt, rangeFromPlainOffsets, READER_SLOT_ATTR } from './selectionOffset';
+import { collectSearchableText } from './findInText';
 
 describe('alignOffsetToTrimmedText', () => {
   it('shifts the offset past leading whitespace', () => {
@@ -137,5 +138,58 @@ describe('rangeFromPlainOffsets (D7b: a stored anchor selected again)', () => {
     expect(rangeFromPlainOffsets(r, 5, 5)).toBeNull();
     expect(rangeFromPlainOffsets(r, -1, 3)).toBeNull();
     r.remove();
+  });
+});
+
+// LC142: a space open in the text (`BlockSpace`) sits between two blocks, inside the text root. Its words are the page's,
+// not the article's: no offset, no find and no copy counts them.
+describe('a space open in the text', () => {
+  const text = () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<div class="vlx-b">Il danno ingiusto.</div><div class="vlx-b">Obbliga al risarcimento.</div>';
+    document.body.replaceChildren(root);
+    return root;
+  };
+  const open = (root: HTMLElement) => {
+    const slot = document.createElement('div');
+    slot.setAttribute(READER_SLOT_ATTR, '');
+    slot.innerHTML = '<h2>Annotazioni</h2><p>Vedi Cass. 2020</p>';
+    root.firstElementChild!.after(slot);
+    return slot;
+  };
+  const select = (root: HTMLElement, from: Node, fromOffset: number, to: Node, toOffset: number) => {
+    const range = document.createRange();
+    range.setStart(from, fromOffset);
+    range.setEnd(to, toOffset);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return getSelectionAnchor(root, selection);
+  };
+
+  it('leaves the anchors after it where they are', () => {
+    const root = text();
+    const second = root.children[1].firstChild!;
+    const closed = select(root, second, 0, second, 7);
+    open(root);
+    expect(select(root, second, 0, second, 7)).toEqual(closed);
+    expect(plainOffsetAt(root, second, 0)).toBe('Il danno ingiusto.'.length);
+    expect(rangeFromPlainOffsets(root, 18, 25)?.toString()).toBe('Obbliga');
+  });
+
+  it('keeps its words out of a selection across it, and gives none for words inside it', () => {
+    const root = text();
+    const slot = open(root);
+    const first = root.children[0].firstChild!;
+    const second = root.children[2].firstChild!;
+    expect(select(root, first, 9, second, 7)).toEqual({ text: 'ingiusto.Obbliga', startOffset: 9 });
+    expect(select(root, slot.querySelector('p')!.firstChild!, 0, slot.querySelector('p')!.firstChild!, 4)).toBeNull();
+    expect(plainOffsetAt(root, slot.querySelector('p')!.firstChild!, 0)).toBe(-1);
+  });
+
+  it('is not searched', () => {
+    const root = text();
+    open(root);
+    expect(collectSearchableText(root).text).not.toMatch(/Cass|Annotazioni/);
   });
 });

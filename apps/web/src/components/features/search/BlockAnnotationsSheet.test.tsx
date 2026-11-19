@@ -71,18 +71,20 @@ function setup(
   const props: BlockAnnotationsSheetProps = {
     containerRef: { current: container },
     blockIndex: 2,
-    blockLabel: describeBlock(RAW, STRUCTURE.blocks[2]),
-    group: groupAnnotationsByBlock(RAW, STRUCTURE, highlights, annotations, locatedThreads)[2],
+    blockLabel: (index) => describeBlock(RAW, STRUCTURE.blocks[index]),
+    groups: groupAnnotationsByBlock(RAW, STRUCTURE, highlights, annotations, locatedThreads),
     onClose: vi.fn(), onUpdateNote: vi.fn(), onRemoveNote: vi.fn(), onRemoveHighlight: vi.fn(),
     ...over,
   };
   const utils = render(<BlockAnnotationsSheet {...props} />);
   const sign = () => container.querySelector<HTMLElement>('.vlx-sign[data-block="2"]')!;
+  // The reader closes it: no block any more (`closeBlock`).
+  const close = () => utils.rerender(<BlockAnnotationsSheet {...props} blockIndex={null} />);
   // RTL's own `container` must not shadow the article container.
-  return { ...utils, container, props, sign, draw };
+  return { ...utils, container, props, sign, draw, close };
 }
 
-describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)', () => {
+describe('BlockAnnotationsSheet — a block\'s sign, a space under the block (A4 §6, L-73)', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     vi.useRealTimers();
@@ -90,7 +92,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
   it('lists the block\'s notes, then its highlights, under the block\'s own words', async () => {
     setup();
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
     expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
     expect(within(dialog).getByText('Vedi Cass. 2020')).toBeInTheDocument();
     expect(within(dialog).getByText(/risarcimento del danno/)).toBeInTheDocument();
@@ -107,7 +109,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
     it('come first, each acting on its own id', async () => {
       const proposalActions = actions();
       setup([h1, p1], [n1], { proposalActions });
-      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      const dialog = await screen.findByRole('region', { name: TITLE });
       expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(["Proposte dell'IA", 'Note', 'Evidenziazioni']);
       expect(within(dialog).getByText('La parte non inadempiente.')).toBeInTheDocument();
       fireEvent.click(within(dialog).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
@@ -126,7 +128,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
     it('«Cosa non va?» goes to its own id', async () => {
       const proposalActions = actions();
       setup([{ ...p1, proposal: { ...p1.proposal!, note: aiNote('La parte non inadempiente.', 'review') } }], [], { proposalActions });
-      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      const dialog = await screen.findByRole('region', { name: TITLE });
       const field = within(dialog).getByRole('textbox', { name: 'Cosa non va?' });
       fireEvent.change(field, { target: { value: 'Il passo è un altro.' } });
       fireEvent.blur(field);
@@ -135,14 +137,14 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
     it('the last one removed closes the sheet, as any last annotation; another stays, the focus in the sheet', async () => {
       const first = setup([h1, p1], [], { proposalActions: actions() });
-      let dialog = await screen.findByRole('dialog', { name: TITLE });
+      let dialog = await screen.findByRole('region', { name: TITLE });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
       expect(first.props.onClose).not.toHaveBeenCalled();
       expect(dialog.contains(document.activeElement)).toBe(true);
       first.unmount();
       document.body.innerHTML = '';
       const only = setup([p1], [], { proposalActions: actions() });
-      dialog = await screen.findByRole('dialog', { name: TITLE });
+      dialog = await screen.findByRole('region', { name: TITLE });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
       expect(only.props.onClose).toHaveBeenCalled();
     });
@@ -150,7 +152,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
     it('a validated one stays listed with them, ticked, so it can be unticked', async () => {
       const proposalActions = actions();
       setup([{ ...p1, proposal: { ...p1.proposal!, note: aiNote('La parte non inadempiente.', 'validated') } }], [], { proposalActions });
-      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      const dialog = await screen.findByRole('region', { name: TITLE });
       const box = within(dialog).getByRole('checkbox', { name: 'Validato' });
       expect(box).toBeChecked();
       fireEvent.click(box);
@@ -159,7 +161,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
     describe('a note being edited is never lost', () => {
       const editIt = async (text?: string) => {
-        const dialog = await screen.findByRole('dialog', { name: TITLE });
+        const dialog = await screen.findByRole('region', { name: TITLE });
         fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica la nota del passaggio' }));
         const box = within(dialog).getByRole('textbox', { name: 'Nota del passaggio' });
         if (text !== undefined) fireEvent.change(box, { target: { value: text } });
@@ -194,7 +196,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
       it('changed, Esc outside the box asks too', async () => {
         const { props } = setup([p1], [], { proposalActions: actions() });
         const { dialog } = await editIt('Il creditore sceglie.');
-        fireEvent.keyDown(document, { key: 'Escape' });
+        fireEvent.keyDown(dialog, { key: 'Escape' });
         expect(props.onClose).not.toHaveBeenCalled();
         expect(within(dialog).getByRole('alert')).toHaveTextContent('Scartare la modifica?');
       });
@@ -209,7 +211,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
     it('a reader that cannot act on them lists none apart', async () => {
       setup([h1, p1], [n1]);
-      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      const dialog = await screen.findByRole('region', { name: TITLE });
       expect(within(dialog).queryByRole('checkbox')).toBeNull();
       expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
     });
@@ -217,7 +219,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
   it('"Vai al passo" closes, scrolls the text to the anchor and makes it flash', async () => {
     const { container, props } = setup();
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
     vi.useFakeTimers();
     fireEvent.click(within(dialog).getAllByRole('button', { name: /Vai al passo/ })[0]);
     const anchor = container.querySelector('[data-note-id="n1"]')!;
@@ -230,7 +232,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
   it('edits a note in place, as its card beside the text does: «Modifica», then Enter or «Salva»', async () => {
     const { props } = setup();
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica' }));
     const box = within(dialog).getByRole('textbox', { name: 'Testo della nota' });
     fireEvent.change(box, { target: { value: 'Vedi Cass. 2021' } });
@@ -240,7 +242,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
   it('a note being edited is not lost to its X: it asks first', async () => {
     const { props } = setup();
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica' }));
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Testo della nota' }), { target: { value: 'Vedi Cass. 2021' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi' }));
@@ -252,7 +254,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
   it('removes a highlight and stays open; the last annotation closes it', async () => {
     const first = setup();
-    let dialog = await screen.findByRole('dialog', { name: TITLE });
+    let dialog = await screen.findByRole('region', { name: TITLE });
     // The note's «Rimuovi» comes first, the highlight's after it.
     fireEvent.click(within(dialog).getAllByRole('button', { name: /Rimuovi/ }).at(-1)!);
     expect(first.props.onRemoveHighlight).toHaveBeenCalledWith('h1');
@@ -260,35 +262,59 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
     first.unmount();
     document.body.innerHTML = '';
     const only = setup([h1], []);
-    dialog = await screen.findByRole('dialog', { name: TITLE });
+    dialog = await screen.findByRole('region', { name: TITLE });
     fireEvent.click(within(dialog).getByRole('button', { name: /Rimuovi/ }));
     expect(only.props.onClose).toHaveBeenCalled();
   });
 
   it('closes on Escape and gives focus back to its sign', async () => {
-    const { props, sign, unmount } = setup();
-    await screen.findByRole('dialog', { name: TITLE });
-    fireEvent.keyDown(document, { key: 'Escape' });
+    const { props, sign, close } = setup();
+    const space = await screen.findByRole('region', { name: TITLE });
+    fireEvent.keyDown(space, { key: 'Escape' });
     expect(props.onClose).toHaveBeenCalled();
-    unmount();
+    close();
     await waitFor(() => expect(document.activeElement).toBe(sign()));
+  });
+
+  it('closed with its sign gone (the last annotation), gives the focus to the block', async () => {
+    const { container, close } = setup();
+    await screen.findByRole('region', { name: TITLE });
+    container.querySelector('.vlx-sign[data-block="2"]')!.remove();
+    close();
+    await waitFor(() => expect(document.activeElement).toBe(container.querySelectorAll('.vlx-b')[2]));
   });
 
   it('takes the focus when it opens, so Tab goes through its buttons', async () => {
     setup();
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
   });
 
-  it('holds keyboard and screen-reader focus while open: the text behind is hidden from them', async () => {
+  // L-73: no window over the text. The space opens in it, right after its block, and hides nothing.
+  it('opens in the text, under its block, with no dialog and nothing hidden', async () => {
     const { container } = setup();
-    await screen.findByRole('dialog', { name: TITLE });
-    await waitFor(() => expect(container.getAttribute('aria-hidden')).toBe('true'));
+    const space = await screen.findByRole('region', { name: TITLE });
+    const block = container.querySelector('.vlx-sign[data-block="2"]')!.parentElement!;
+    expect(block.nextElementSibling?.contains(space)).toBe(true);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(container.getAttribute('aria-hidden')).toBeNull();
+  });
+
+  it('a redraw of the text puts it back under its block, the focus where it was', async () => {
+    const { container, draw, rerender, props } = setup();
+    const space = await screen.findByRole('region', { name: TITLE });
+    const button = within(space).getByRole('button', { name: 'Modifica' });
+    button.focus();
+    draw();
+    rerender(<BlockAnnotationsSheet {...props} />);
+    const block = container.querySelector('.vlx-sign[data-block="2"]')!.parentElement!;
+    expect(block.nextElementSibling?.contains(space)).toBe(true);
+    expect(button).toHaveFocus();
   });
 
   it('closes by its X or Esc, never by a stray press outside', async () => {
     const { props } = setup();
-    await screen.findByRole('dialog', { name: TITLE });
+    await screen.findByRole('region', { name: TITLE });
     fireEvent.pointerDown(document.body);
     fireEvent.mouseDown(document.body);
     fireEvent.click(document.body);
@@ -296,20 +322,22 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
   });
 
   it('gives the focus back to its sign found again, the text redrawn meanwhile (an edit, a removal)', async () => {
-    const { props, sign, draw, unmount } = setup();
-    await screen.findByRole('dialog', { name: TITLE });
+    const { props, sign, draw, close, rerender } = setup();
+    await screen.findByRole('region', { name: TITLE });
     const old = sign();
     draw();
+    // A redraw comes with the reader's render (the annotations changed): the space is put back under its block.
+    rerender(<BlockAnnotationsSheet {...props} />);
     expect(sign()).not.toBe(old);
     fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
     expect(props.onClose).toHaveBeenCalled();
-    unmount();
+    close();
     await waitFor(() => expect(document.activeElement).toBe(sign()));
   });
 
   it('credits an imported highlight to its author', async () => {
     setup([{ ...h1, sourceSuggestionId: 's1', originalAuthor: { id: 'u', username: 'marta' } }], []);
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
     expect(within(dialog).getByTitle('Suggerita da @marta')).toBeInTheDocument();
   });
 
@@ -317,7 +345,7 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
     const thread = createDummyThread({ commentCount: 1 });
     const onOpenThread = vi.fn();
     const { props } = setup([], [], { onOpenThread }, [thread]);
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
 
     expect(within(dialog).getByRole('heading', { level: 3, name: 'Glosse' })).toBeInTheDocument();
     expect(within(dialog).getByText('“prestazioni corrispettive”')).toBeInTheDocument();
@@ -335,21 +363,21 @@ describe('BlockAnnotationsSheet — a block\'s sign, without a popover (A4 §6)'
 
     // Same hash -> no notice
     const same = setup([], [], { textHash: 'hash-orig' }, [thread]);
-    let dialog = await screen.findByRole('dialog', { name: TITLE });
+    let dialog = await screen.findByRole('region', { name: TITLE });
     expect(within(dialog).queryByText(/Il testo è cambiato/)).not.toBeInTheDocument();
     same.unmount();
     document.body.innerHTML = '';
 
     // Different hash -> notice shown
     setup([], [], { textHash: 'hash-different' }, [thread]);
-    dialog = await screen.findByRole('dialog', { name: TITLE });
+    dialog = await screen.findByRole('region', { name: TITLE });
     expect(within(dialog).getByText('Il testo è cambiato da quando è stata aperta')).toBeInTheDocument();
   });
 
   it('removing the last highlight of a block that still has a thread does not close the sheet', async () => {
     const thread = createDummyThread();
     const { props } = setup([h1], [], {}, [thread]);
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
 
     fireEvent.click(within(dialog).getByRole('button', { name: /Rimuovi/ }));
     expect(props.onRemoveHighlight).toHaveBeenCalledWith('h1');
@@ -369,13 +397,13 @@ describe('BlockAnnotationsSheet — an application\'s glosses (D8)', () => {
   };
   const proposalActions = { validate: vi.fn(), flag: vi.fn(), comment: vi.fn(), editNote: vi.fn(), remove: vi.fn(), move: vi.fn() };
   const withGloss = (over: Partial<BlockAnnotationsSheetProps>) => {
-    const group = groupAnnotationsByBlock(RAW, STRUCTURE, [h1], [n1], [], [{ id: 'g1', startOffset: gloss.startOffset, text: words, state: 'proposed' }])[2];
-    return setup([h1], [n1], { group, glosses: [gloss], proposalActions, ...over });
+    const groups = groupAnnotationsByBlock(RAW, STRUCTURE, [h1], [n1], [], [{ id: 'g1', startOffset: gloss.startOffset, text: words, state: 'proposed' }]);
+    return setup([h1], [n1], { groups, glosses: [gloss], proposalActions, ...over });
   };
 
   it('lists the block\'s gloss cards first: the column\'s are the margin\'s, this is everything of the block', async () => {
     withGloss({});
-    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    const dialog = await screen.findByRole('region', { name: TITLE });
     expect(within(dialog).getByRole('article', { name: /Da validare/ })).toBeInTheDocument();
     expect(within(dialog).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(["Glosse dell'IA", 'Note', 'Evidenziazioni']);
   });

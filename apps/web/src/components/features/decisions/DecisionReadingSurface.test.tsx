@@ -326,7 +326,7 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(sign).not.toBeNull();
     expect(container.querySelectorAll('.vlx-sign')).toHaveLength(1);
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Il ricorso è fondato\./ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Il ricorso è fondato\./ });
     expect(within(dialog).getByText('da verificare')).toBeInTheDocument();
     expect(within(dialog).getAllByText(/ricorso/).length).toBeGreaterThan(0);
     fireEvent.click(within(dialog).getAllByRole('button', { name: /Rimuovi/ })[0]);

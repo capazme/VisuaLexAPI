@@ -5,7 +5,7 @@ import { isProposal, type BlockAnnotations } from '../../../utils/articleAnnotat
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { revealAnnotation, type AnnotationTarget } from '../../../utils/revealAnnotation';
 import { AttributionChip } from '../bulletin/AttributionChip';
-import { Sheet } from '../../ui/Sheet';
+import { BlockSpace } from './BlockSpace';
 import { ProposalCard } from './ProposalCard';
 import { GlossCard } from './GlossCard';
 import { NoteMarginCard, ThreadCard } from './MarginCards';
@@ -14,16 +14,17 @@ import { GLOSS_WORDS } from '../../../constants/glossWords';
 export interface BlockAnnotationsSheetProps {
     /** The element holding the article text (ArticleBody's contentRef). */
     containerRef: RefObject<HTMLElement | null>;
-    /** The block whose sign opened the sheet (its `data-block`). */
-    blockIndex: number;
+    /** The block whose sign opened it (its `data-block`); null, closed. */
+    blockIndex: number | null;
     /** `describeBlock`: the printed enumerator, or the block's opening words. */
-    blockLabel: string;
-    group: BlockAnnotations;
+    blockLabel: (index: number) => string;
+    /** The text's annotations by block (`groupAnnotationsByBlock`). */
+    groups: readonly BlockAnnotations[];
     onClose: () => void;
     onUpdateNote: (id: string, text: string) => void;
     onRemoveNote: (id: string) => void;
     onRemoveHighlight: (id: string) => void;
-    /** Open this discussion in the panel (the sheet closes first). */
+    /** Open this discussion in the panel (the space closes first). */
     onOpenThread?: (threadId: string) => void;
     /** Fingerprint of the text on screen, to tell a discussion opened on another text. */
     textHash?: string | null;
@@ -49,19 +50,19 @@ export interface ProposalActions {
 }
 
 /**
- * Everything one block of a text holds, from its sign (A4 §6; round B's popover before it): a sheet from the bottom
- * where the column beside the text is not shown (a phone, a narrow reader), where the block has nothing in the column
+ * Everything one block of a text holds, from its sign (A4 §6; round B's popover before it): a space that opens under the
+ * block, in the text (`BlockSpace`, LC142, L-73; a sheet from the bottom before it), where the column beside the text is not shown (a phone, a narrow reader), where the block has nothing in the column
  * (its highlights alone, an application's proposed passages), and with Shift on a computer (the keyboard's way to the
  * block's highlights beside its cards). The passages an application proposed come first (D7b, `ProposalCard`), then its
  * glosses (D8), the reader's notes — edited and removed in place —, the highlights — removed — each with «Vai al passo»,
- * and the discussions, opened in their panel. Esc and the X give the focus back to the sign; a note being edited is never
- * dropped without asking.
+ * and the discussions, opened in their panel. Esc and «Chiudi» give the focus back to the sign (the block, once its last
+ * annotation took the sign with it); a note being edited is never dropped without asking.
  */
 export function BlockAnnotationsSheet({
     containerRef,
     blockIndex,
     blockLabel,
-    group,
+    groups,
     onClose,
     onUpdateNote,
     onRemoveNote,
@@ -73,25 +74,24 @@ export function BlockAnnotationsSheet({
     shownGlossId = null,
     onShowGlossPassage,
 }: BlockAnnotationsSheetProps) {
-    // Where focus goes on close: the sign after Esc, the X or "Vai al passo"; nowhere when something else takes it.
-    const returnFocusRef = useRef<HTMLElement | null>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
     // The sign is SafeHTML markup, replaced on every redraw of the text:
     // always look it up again rather than hold an element.
     const findSign = useCallback(
-        () => containerRef.current?.querySelector<HTMLElement>(`.vlx-sign[data-block="${blockIndex}"]`) ?? null,
+        () => (blockIndex === null ? null : containerRef.current?.querySelector<HTMLElement>(signSelector(blockIndex)) ?? null),
         [containerRef, blockIndex],
     );
-
-    const close = useCallback((refocus: boolean) => {
-        returnFocusRef.current = refocus ? findSign() : null;
-        onClose();
-    }, [findSign, onClose]);
 
     // The notes being edited here (the reader's, an application's, D7b), by id: over a changed one, the X, Esc or «Vai al
     // passo» first ask in that card «Scartare la modifica?».
     const [drafts, setDrafts] = useState<Record<string, 'clean' | 'dirty'>>({});
+    const [draftsOf, setDraftsOf] = useState(blockIndex);
+    // Another block, or closed: its cards' drafts went with them (adjusted during render, gotcha 11).
+    if (draftsOf !== blockIndex) {
+        setDraftsOf(blockIndex);
+        setDrafts({});
+    }
     const reportDraft = useCallback((id: string, state: 'none' | 'clean' | 'dirty') => {
         setDrafts((d) => {
             if (state === 'none') {
@@ -103,52 +103,48 @@ export function BlockAnnotationsSheet({
             return d[id] === state ? d : { ...d, [id]: state };
         });
     }, []);
-    const [closeAsk, setCloseAsk] = useState<{ id: string; refocus: boolean } | null>(null);
-    const requestClose = (refocus: boolean): boolean => {
+    const [closeAsk, setCloseAsk] = useState<{ id: string } | null>(null);
+    const requestClose = (): boolean => {
         const dirty = Object.keys(drafts).find((id) => drafts[id] === 'dirty');
         if (!dirty) return false;
-        setCloseAsk({ id: dirty, refocus });
+        setCloseAsk({ id: dirty });
         return true;
     };
-    const closeOrAsk = (refocus: boolean) => { if (!requestClose(refocus)) close(refocus); };
+    // Closed, the focus goes back to the sign (`BlockSpace`), unless what the action opens takes it (a panel, a bar).
+    const closeOrAsk = () => { if (!requestClose()) onClose(); };
     const answerClose = (discarded: boolean) => {
         const ask = closeAsk;
         setCloseAsk(null);
-        if (discarded && ask) close(ask.refocus);
+        if (discarded && ask) onClose();
     };
 
-    // The block's glosses (D8), as the entry holds them.
-    const listedGlosses = proposalActions && entryGlosses
-        ? group.glosses.flatMap((g) => entryGlosses.find((e) => e.id === g.id) ?? [])
-        : [];
-    const total = group.notes.length + group.highlights.length + group.threads.length + listedGlosses.length;
-    // Only a reader that can act on them lists proposals apart; none other is ever given one.
-    const proposals = proposalActions ? group.highlights.filter(isProposal) : [];
-    const highlights = proposalActions ? group.highlights.filter((h) => !isProposal(h)) : group.highlights;
-    const remove = (run: () => void) => {
-        run();
-        // The block's last annotation takes the sign with it; otherwise the focus, on a card just gone, comes back to
-        // the sheet's list rather than fall to the page.
-        if (total === 1) close(false);
-        else listRef.current?.focus();
-    };
-    const goTo = (target: AnnotationTarget) => {
-        if (requestClose(true)) return;
-        const sign = findSign();
-        const container = containerRef.current;
-        close(true);
-        if (container) revealAnnotation(container, target, sign?.parentElement);
-    };
+    const body = (index: number) => {
+        const group = groups[index] ?? NO_ANNOTATIONS;
+        // The block's glosses (D8), as the entry holds them.
+        const listedGlosses = proposalActions && entryGlosses
+            ? group.glosses.flatMap((g) => entryGlosses.find((e) => e.id === g.id) ?? [])
+            : [];
+        const total = group.notes.length + group.highlights.length + group.threads.length + listedGlosses.length;
+        // Only a reader that can act on them lists proposals apart; none other is ever given one.
+        const proposals = proposalActions ? group.highlights.filter(isProposal) : [];
+        const highlights = proposalActions ? group.highlights.filter((h) => !isProposal(h)) : group.highlights;
+        const remove = (run: () => void) => {
+            run();
+            // The block's last annotation takes the sign with it; otherwise the focus, on a card just gone, comes back to
+            // the sheet's list rather than fall to the page.
+            if (total === 1) onClose();
+            else listRef.current?.focus();
+        };
+        const goTo = (target: AnnotationTarget) => {
+            if (requestClose()) return;
+            const sign = findSign();
+            const container = containerRef.current;
+            onClose();
+            if (container) revealAnnotation(container, target, sign?.parentElement);
+        };
 
-    return (
-        <Sheet
-            title={`Annotazioni · ${blockLabel}`}
-            onClose={() => closeOrAsk(true)}
-            closeOnEscape
-            returnFocusRef={returnFocusRef}
-            className="sm:mx-auto sm:max-w-lg"
-        >
-            <div ref={listRef} tabIndex={-1} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] outline-none">
+        return (
+            <div ref={listRef} tabIndex={-1} className="space-y-3 outline-none">
                 {listedGlosses.length > 0 && proposalActions && (
                     <section className="space-y-2">
                         <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">{GLOSS_WORDS.column}</h3>
@@ -161,8 +157,7 @@ export function BlockAnnotationsSheet({
                                 onShowPassage={(show) => onShowGlossPassage?.(gloss.id, show)}
                                 onRemove={() => remove(() => proposalActions.remove(gloss.id))}
                                 onMove={proposalActions.move && (() => {
-                                    if (requestClose(false)) return;
-                                    returnFocusRef.current = null;
+                                    if (requestClose()) return;
                                     onClose();
                                     proposalActions.move!(gloss.id);
                                 })}
@@ -188,8 +183,7 @@ export function BlockAnnotationsSheet({
                                 onRemove={() => remove(() => proposalActions.remove(proposal.id))}
                                 onMove={proposalActions.move && (() => {
                                     // A changed note asks first («Scartare la modifica?»); the bar takes the focus.
-                                    if (requestClose(false)) return;
-                                    returnFocusRef.current = null;
+                                    if (requestClose()) return;
                                     onClose();
                                     proposalActions.move!(proposal.id);
                                 })}
@@ -242,8 +236,7 @@ export function BlockAnnotationsSheet({
                                 currentTextHash={textHash}
                                 className="shadow-none"
                                 onOpen={() => {
-                                    // The sheet closes without giving the focus back to the sign: the panel takes it.
-                                    returnFocusRef.current = null;
+                                    // The space closes; the panel takes the focus.
                                     onClose();
                                     onOpenThread?.(thread.id);
                                 }}
@@ -252,9 +245,25 @@ export function BlockAnnotationsSheet({
                     </section>
                 )}
             </div>
-        </Sheet>
+        );
+    };
+
+    return (
+        <BlockSpace
+            value={blockIndex}
+            rootRef={containerRef}
+            block={(root, index) => root.querySelector<HTMLElement>(signSelector(index))?.parentElement ?? null}
+            trigger={(root, index) => root.querySelector<HTMLElement>(signSelector(index))}
+            onClose={closeOrAsk}
+            title={(index) => `Annotazioni · ${blockLabel(index)}`}
+        >
+            {body}
+        </BlockSpace>
     );
 }
+
+const signSelector = (index: number) => `.vlx-sign[data-block="${index}"]`;
+const NO_ANNOTATIONS: BlockAnnotations = { notes: [], highlights: [], threads: [], glosses: [] };
 
 /** «Vai al passo» under a note's card: the sheet closes and the text shows its words. */
 function GoTo({ onClick }: { onClick: () => void }) {

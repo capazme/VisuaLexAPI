@@ -48,7 +48,7 @@ describe('DossierItemReader — annotations on the text', () => {
       return found;
     });
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
     fireEvent.click(within(dialog).getByRole('button', { name: /Rimuovi/ }));
     expect(removeHighlight).toHaveBeenCalledWith('h1');
   });
@@ -150,7 +150,7 @@ describe('DossierItemReader — what an application proposed on the entry (D7b)'
       return found;
     });
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
     fireEvent.click(within(dialog).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
     await waitFor(() => expect(assistantService.setProposalState).toHaveBeenCalledWith('d1', 'a1', 'p1', 'validated', undefined));
     await waitFor(() => expect(within(dialog).getByRole('checkbox', { name: 'Validato' })).toBeChecked());
@@ -166,9 +166,9 @@ describe('DossierItemReader — what an application proposed on the entry (D7b)'
       return found;
     });
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
     fireEvent.click(within(dialog).getAllByRole('button', { name: "Sposta l'evidenziazione" })[0]);
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Annotazioni/ })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('region', { name: /Annotazioni/ })).toBeNull());
     const bar = screen.getByRole('group', { name: "Sposta l'evidenziazione" });
     expect(window.getSelection()!.toString()).toBe('contraenti');
     // The new words, selected in the text root: read as a highlight of the user's is.

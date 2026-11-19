@@ -481,25 +481,22 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       />
       {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
       {proposalActions && <LostGlossesList glosses={lostGlosses} actions={proposalActions} />}
-      {sheetOpen && openBlock !== null && openGroup && (
-        <BlockAnnotationsSheet
-          key={openBlock}
-          containerRef={contentRef}
-          blockIndex={openBlock}
-          blockLabel={describeBlock(plain, structure.blocks[openBlock])}
-          group={openGroup}
-          textHash={textHash}
-          onOpenThread={discussion.openThread}
-          onClose={closeBlock}
-          onUpdateNote={updateAnnotation}
-          onRemoveNote={removeAnnotation}
-          onRemoveHighlight={removeHighlight}
-          proposalActions={proposalActions}
-          glosses={glosses}
-          shownGlossId={shownGlossId}
-          onShowGlossPassage={showGlossPassage}
-        />
-      )}
+      <BlockAnnotationsSheet
+        containerRef={contentRef}
+        blockIndex={sheetOpen && openGroup ? openBlock : null}
+        blockLabel={(index) => describeBlock(plain, structure.blocks[index])}
+        groups={blockGroups}
+        textHash={textHash}
+        onOpenThread={discussion.openThread}
+        onClose={closeBlock}
+        onUpdateNote={updateAnnotation}
+        onRemoveNote={removeAnnotation}
+        onRemoveHighlight={removeHighlight}
+        proposalActions={proposalActions}
+        glosses={glosses}
+        shownGlossId={shownGlossId}
+        onShowGlossPassage={showGlossPassage}
+      />
       <ArticleDiscussionPanel
         anchor={discussionAnchor}
         label={label}

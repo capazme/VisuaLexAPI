@@ -370,23 +370,20 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onClose={closeNote}
         />
       )}
-      {sheetOpen && openBlock !== null && openGroup && (
-        <BlockAnnotationsSheet
-          key={openBlock}
-          containerRef={contentRef}
-          blockIndex={openBlock}
-          blockLabel={describeBlock(rawText, structure.blocks[openBlock])}
-          group={openGroup}
-          onClose={closeBlock}
-          onUpdateNote={updateAnnotation}
-          onRemoveNote={removeAnnotation}
-          onRemoveHighlight={removeHighlight}
-          proposalActions={proposalActions}
-          glosses={glosses}
-          shownGlossId={shownGlossId}
-          onShowGlossPassage={showGlossPassage}
-        />
-      )}
+      <BlockAnnotationsSheet
+        containerRef={contentRef}
+        blockIndex={sheetOpen && openGroup ? openBlock : null}
+        blockLabel={(index) => describeBlock(rawText, structure.blocks[index])}
+        groups={blockGroups}
+        onClose={closeBlock}
+        onUpdateNote={updateAnnotation}
+        onRemoveNote={removeAnnotation}
+        onRemoveHighlight={removeHighlight}
+        proposalActions={proposalActions}
+        glosses={glosses}
+        shownGlossId={shownGlossId}
+        onShowGlossPassage={showGlossPassage}
+      />
       <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
         <Button type="button" variant="quiet" onClick={handleCopyCitation} disabled={citeLocked} className="gap-1.5 px-2" icon={<Copy size={13} aria-hidden />}>
           Copia citazione
